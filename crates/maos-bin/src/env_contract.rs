@@ -77,6 +77,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_TEST_BOOT_NONCE",
+        purpose: "Debug-build-only deterministic process boot nonce for real multi-daemon integration tests",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,
@@ -283,12 +288,42 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_LOOM_HOME_TEAM",
-        purpose: "Canonical tenant team id for the Loom-lite store; requires a refreshable verified schema-v2-or-newer cohort source (Stories 13.1/13.3)",
+        purpose: "Canonical tenant team id for the Loom-lite store; requires a refreshable verified schema-v2-or-newer cohort source, and in cohort-a2a-daemon mode MUST equal the signed CohortMember.team for this host or the boot fails (Stories 13.1/13.3/13.6b AC4)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {
         name: "MAOS_CROSS_TEAM_BASE_SEED",
-        purpose: "Optional hex-encoded 32-byte root used only at composition to derive public cross-team row-verification keys; the store never receives the seed (Story 13.3)",
+        purpose: "Hex-encoded 32-byte root for cross-team key derivation. Story 13.3 read it only to derive PUBLIC row-verification keys; Story 13.6b widened it to the SIGN side for the crossing emitter, so a host holding it can produce a validly-signed bundle under ANY team's key — the applier's envelope/payload weld, not this seed, is what binds a crossing to its team (Stories 13.3/13.6b D-7)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_PEER",
+        purpose: "Destination cohort host_id for a boot-time cross-team share emitted by the cohort-a2a-daemon; presence is the emit trigger, absence leaves the daemon byte-for-byte unchanged (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_TO_TEAM",
+        purpose: "Canonical destination team id requested for a boot-time cross-team share; the applier rejects any request that does not name its own home team (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_PID",
+        purpose: "Spirit pid attributed to a boot-time cross-team share row and its Transparency Log event (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_NAMESPACE",
+        purpose: "Collective namespace for a boot-time cross-team share (default|coordination|forgotten); principal is refused at both ends (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_KEY",
+        purpose: "Collective key for a boot-time cross-team share (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_VALUE",
+        purpose: "Text value for a boot-time cross-team share (Story 13.6b AC1)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

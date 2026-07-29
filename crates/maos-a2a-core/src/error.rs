@@ -96,6 +96,43 @@ pub enum A2AError {
         declared: Option<String>,
     },
 
+    /// Story 13.6b / AC3 (D-13) — the applier refused a crossing whose ENVELOPE
+    /// claim it had already authenticated but whose PAYLOAD named a different
+    /// source team. Distinct from [`Self::CohortTeamIdentityRefused`] (a lying
+    /// envelope, -32010) and from [`Self::CrossTeamCrossingRefused`] (an honest
+    /// but ungranted crossing, -32012).
+    ///
+    /// This is the ONLY refusal that catches a seed-holding forger: the bundle
+    /// signature verifies correctly under the claimed `(region, team)` because
+    /// `derive_team_signing_seed` works for any pair, so the derived-key check
+    /// structurally cannot see the lie.
+    #[error(
+        "cross-team crossing source team unbound: envelope authenticated \
+         {envelope_team} but the signed payload claims {payload_team}"
+    )]
+    CrossingSourceTeamUnbound {
+        envelope_team: String,
+        payload_team: String,
+    },
+
+    /// Story 13.6b / AC2 — the applier refused an authenticated crossing on its
+    /// own merits, re-materialised emitter-side from `-32012`. `reason` is the
+    /// stable `CrossingRefusal::reason()` token, so a denied crossing, a stale
+    /// consent lease, and an unreachable consent state stay three distinct
+    /// observable outcomes at the EMITTER — the distinction D-15 measured as
+    /// absent because `TransportCause` never crossed a socket.
+    #[error(
+        "cross-team crossing refused at applier ({reason}): {from_team} -> \
+         {to_team} for intent {intent}: {detail}"
+    )]
+    CrossTeamCrossingRefused {
+        reason: String,
+        detail: String,
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+
     /// Receiver returned a JSON-RPC NACK with `-32001 EIntentDenied`.
     #[error("a2a intent denied at peer {peer}: {message}")]
     IntentDeniedAtPeer { peer: String, message: String },

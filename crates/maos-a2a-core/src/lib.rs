@@ -45,9 +45,10 @@ pub use chaos::churn::{AdversarialAttempt, AdversarialDetection, ChurnDrillRepor
 pub use chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
 pub use cohort::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    CohortReissueDisposition, CohortReissueRejection, ConsentRuptureSink, DigestFrameClass,
-    DigestReadPort, DigestReplyObservation, HaltReceiptObserver, COHORT_INTENT_DIGEST_READ,
-    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    CohortReissueDisposition, CohortReissueRejection, ConsentRuptureSink, CrossTeamCrossingPort,
+    CrossingOutcome, CrossingRefusal, DigestFrameClass, DigestReadPort, DigestReplyObservation,
+    HaltReceiptObserver, COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ,
+    CROSSING_EVENT_TYPE, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
 // Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).
@@ -57,5 +58,8 @@ pub use identity::{PeerCertFingerprint, PeerId};
 pub use mtls::{HandshakeRetryPolicy, LoopbackTlsConfig};
 pub use router::{map_a2a_error_to_iac_bus, A2APeerRouter, A2ARouterCore, A2ATransport};
 pub use tofu::{EPinMismatch, InMemoryTofuPinStore, RePinDecision, TofuPin, TofuPinStore};
-pub use transport::json_rpc::{A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, NackError};
+pub use transport::json_rpc::{
+    A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, NackError, CODE_CROSSING_SOURCE_TEAM_UNBOUND,
+    CODE_CROSS_TEAM_CROSSING_REFUSED, CODE_TEAM_IDENTITY_MISMATCH,
+};
 pub use transport::logical_clock::LamportClock;

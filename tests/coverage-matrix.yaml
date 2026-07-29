@@ -146,8 +146,67 @@ coverage:
       the surviving limit is that isolation is enforced against a peer, not
       against the operator (per-team key provisioning = v25-signed-shard).
       No artifact may claim "Fork-4 proven" of the crossing path.
-      Absent successors: 13.6b production crossing initiators and the 13.6
-      three-team journey.
+      Story 13.6b wires the production crossing and welds the two team fields.
+      Topology: TWO cohort-a2a-daemon processes, one store each (D-5 — exactly
+      one production LoomLiteStore::new, now a Blocking control), joined by the
+      cohort A2A mesh. The emitter lives INSIDE the daemon runtime because
+      prepare_outbound is the only production outbound A2A path and its
+      transport exists only there (D-14); it uses the 13.3b originate_team_row
+      seam so the row is born attested and the bytes on the wire are the bytes
+      that were signed. The applier hangs off handle_intake_verified (D-8, 12.3
+      P5r) through a dependency-inverted CrossTeamCrossingPort, and is the FIRST
+      production caller of apply_replication_bundle -> is_granted.
+      THE HEADLINE (D-13): 13.6a authenticates the ENVELOPE
+      (request.cohort_source_team) while consent is decided from the PAYLOAD
+      (bundle.source_team); nothing bound them, so a truthful envelope plus a
+      correctly-signed lying payload landed an impersonated row with every
+      shipped check green. The applier now refuses that before any apply, under
+      CODE_CROSSING_SOURCE_TEAM_UNBOUND (-32011), distinct from -32010 (a lying
+      envelope) and -32012 (an honest but ungranted crossing). 13.6a's
+      impersonation leg is NOT evidence for it: different site, different
+      assertion, and the forger here HOLDS the seed so its signature verifies.
+      AC2 gives the refusal a wire: -32012 carries reason/from_team/to_team/
+      intent and interpret_response re-materialises it, so denial, staleness,
+      and unavailability stay three distinct EMITTER-side outcomes (D-15
+      measured zero TransportCause occurrences in either A2A crate);
+      TransportCause stays applier-local where the five-cause matrix already
+      holds. AC4 extends reconcile_transport_identity_with_manifest to the team
+      axis: MAOS_LOOM_HOME_TEAM must equal the signed CohortMember.team or the
+      process does not start — the correctness control against misconfiguration,
+      explicitly NOT a substitute for the AC3 weld.
+      13.6b legs: crossing-has-production-initiator-both-endpoints (a call-chain
+      REACHABILITY walk, not a text scan — the first draft stayed green when the
+      emitter call was deleted, 13.5g's exact finding reproduced inside this
+      story's own gate), crossing-scan-closes-originate-team-row-hole (D-6b: the
+      retired negative skipped replication/bundle.rs and never named
+      originate_team_row, so routing the call one file over kept it green; at
+      cutover the retired needle set was measured BLIND to the emitter),
+      exactly-one-production-loom-lite-store,
+      crossing-payload-team-must-equal-authenticated-envelope,
+      crossing-weld-is-a-binding-not-a-refuse-all-stub,
+      crossing-applier-ignores-non-crossing-frames,
+      crossing-control-rides-the-telemetry-idiom (golden wire constant — no
+      FramePayload/FrameKind variant is added, because abi-diff is a null
+      control that cannot see an enum addition),
+      boot-refuses-home-team-manifest-disagreement,
+      boot-refuses-uncorroborated-home-team,
+      crossing-weld-refusal-has-its-own-wire-code,
+      crossing-consent-denial-reaches-the-emitter,
+      crossing-causes-stay-distinguishable-on-the-wire (all hermetic Blocking) +
+      live-crossing-lands-at-destination-datname (advisory-substrate: physical
+      presence in maos_team_b, physical ABSENCE from maos_team_a, reverse
+      refused at the applier with the ordered pair, seed-holding forger
+      refused). Dead-wire clause (f-i) no-production-crossing-initiator is
+      INVERTED and replaced in the same commit (11.3 D2 / 10.4c atomic
+      cutover); (f-ii) was inverted by 13.5c.
+      Story 13.6b claims NOTHING about the kernel's cause erasure
+      (kernel-core memory/mod.rs maps Transport(_) to one word, so no Spirit has
+      ever distinguished ConsentDenied from MapStale) and nothing about
+      per-team key provisioning. The operator-trust limit is unchanged:
+      isolation is enforced against a peer, not against the operator.
+      Absent successors: the cross-wall RECALL initiator (read side, split to
+      13.6d), the 13.6 three-team journey closer, and the kernel cause
+      erasure (13.6 to judge).
   ADR-024:
     gates:
     - check-escape-detector

@@ -852,7 +852,7 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 11] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 12] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -881,6 +881,14 @@ fn composition_root_does_not_seed_manifest_scopes() {
         (
             "cassette_replay.rs",
             include_str!("../src/cassette_replay.rs"),
+        ),
+        // Story 13.6b — the cross-team crossing emitter/applier. Listed here so
+        // the 13.5d manifest-scope negative covers it: the crossing reads the
+        // verified manifest only through the shipped consent/tenant adapters and
+        // must never seed scopes at the composition root.
+        (
+            "cross_team_crossing.rs",
+            include_str!("../src/cross_team_crossing.rs"),
         ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");

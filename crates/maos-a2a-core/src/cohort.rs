@@ -382,3 +382,189 @@ impl DigestReadPort for LegacyDigestReadPort {
         Ok(DigestReplyObservation::Unauthorized)
     }
 }
+
+/// Story 13.6b — the event type every cross-team crossing frame carries in its
+/// `TelemetryEventPayload.event_type`, mirroring the shipped
+/// [`crate::cohort`] control idiom (`maos.cohort-manifest.v1`). The router never
+/// parses the payload; it hands the frame to [`CrossTeamCrossingPort`], so no
+/// `maos-loom-lite` type leaks into `maos-a2a-core`.
+pub const CROSSING_EVENT_TYPE: &str = "maos.cross-team-crossing.v1";
+
+/// Story 13.6b / AC2+AC3 — why an applier refused a crossing it authenticated.
+///
+/// Every variant is a DISTINCT wire outcome. `SourceTeamUnbound` is AC3's own
+/// named cause and rides its own JSON-RPC code
+/// ([`crate::CODE_CROSSING_SOURCE_TEAM_UNBOUND`]); the rest ride
+/// [`crate::CODE_CROSS_TEAM_CROSSING_REFUSED`] and are told apart by
+/// [`Self::reason`] in the NACK `data` — the shipped `CohortConsentDenial`
+/// pattern.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrossingRefusal {
+    /// AC3 / D-13 — the payload's `source_team` is not the team the mesh
+    /// authenticated on the envelope. Refused BEFORE the bundle is applied.
+    /// This is the impersonation control: a seed-holding emitter signs a
+    /// correctly-verifying bundle under ANY team, so the derived-key check
+    /// cannot see it and only this comparison can.
+    SourceTeamUnbound {
+        envelope_team: String,
+        payload_team: String,
+    },
+    /// The signed manifest holds no grant for the ordered pair + intent.
+    ConsentDenied {
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+    /// The consent state exists but its lease has aged out — NOT a denial.
+    ConsentStale {
+        reason: String,
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+    /// No consent state is reachable at all — NOT a denial, NOT staleness.
+    StateUnavailable {
+        reason: String,
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+    /// The crossing was consented and welded but the apply itself failed
+    /// (malformed bundle, signature, region/team binding, store error).
+    ApplyFailed {
+        reason: String,
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+}
+
+impl CrossingRefusal {
+    /// The stable wire token for this refusal — the emitter's only reliable
+    /// discriminator once the refusal has crossed the socket.
+    pub fn reason(&self) -> &'static str {
+        match self {
+            Self::SourceTeamUnbound { .. } => "crossing_source_team_unbound",
+            Self::ConsentDenied { .. } => "crossing_consent_denied",
+            Self::ConsentStale { .. } => "crossing_consent_stale",
+            Self::StateUnavailable { .. } => "crossing_state_unavailable",
+            Self::ApplyFailed { .. } => "crossing_apply_failed",
+        }
+    }
+
+    /// The JSON-RPC code + `data` object this refusal travels as.
+    ///
+    /// AC3's weld gets its OWN code so an impersonation refusal can never read
+    /// as a roster or grant problem; every other refusal rides
+    /// `CODE_CROSS_TEAM_CROSSING_REFUSED` and is discriminated by
+    /// [`Self::reason`]. Shaping lives here, next to the taxonomy it encodes, so
+    /// the router's intake arm stays three lines and the wire contract is
+    /// testable through the public surface rather than through a private helper.
+    pub fn wire(&self) -> (i32, serde_json::Value) {
+        match self {
+            Self::SourceTeamUnbound {
+                envelope_team,
+                payload_team,
+            } => (
+                crate::transport::json_rpc::CODE_CROSSING_SOURCE_TEAM_UNBOUND,
+                serde_json::json!({
+                    "reason": self.reason(),
+                    "envelope_team": envelope_team,
+                    "payload_team": payload_team,
+                }),
+            ),
+            Self::ConsentDenied {
+                from_team,
+                to_team,
+                intent,
+            } => (
+                crate::transport::json_rpc::CODE_CROSS_TEAM_CROSSING_REFUSED,
+                serde_json::json!({
+                    "reason": self.reason(),
+                    "from_team": from_team,
+                    "to_team": to_team,
+                    "intent": intent,
+                }),
+            ),
+            Self::ConsentStale {
+                reason,
+                from_team,
+                to_team,
+                intent,
+            }
+            | Self::StateUnavailable {
+                reason,
+                from_team,
+                to_team,
+                intent,
+            }
+            | Self::ApplyFailed {
+                reason,
+                from_team,
+                to_team,
+                intent,
+            } => (
+                crate::transport::json_rpc::CODE_CROSS_TEAM_CROSSING_REFUSED,
+                serde_json::json!({
+                    "reason": self.reason(),
+                    "detail": reason,
+                    "from_team": from_team,
+                    "to_team": to_team,
+                    "intent": intent,
+                }),
+            ),
+        }
+    }
+}
+
+/// Story 13.6b — what the applier did with an intake frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrossingOutcome {
+    /// Not a crossing payload — the unchanged intake path applies. The legacy
+    /// default returns this for EVERY frame, so non-cohort deployments and
+    /// every pre-13.6b test are byte-for-byte unaffected.
+    NotCrossing,
+    /// The bundle verified, the weld held, consent was granted, and rows landed.
+    Applied {
+        applied_count: usize,
+    },
+    Refused(CrossingRefusal),
+}
+
+/// Story 13.6b / AC1+AC2+AC3 — dependency-inverted **cross-team crossing**
+/// applier port.
+///
+/// The production impl lives in `maos-bin` (the composition root that owns the
+/// single `LoomLiteStore`, D-5) and is the FIRST production caller of
+/// `apply_replication_bundle` → `CrossTeamConsentAdapter::is_granted`. This
+/// seam speaks only primitives and `&IacFrame`, exactly like
+/// [`HaltReceiptObserver`] and [`DigestReadPort`], so no `maos-loom-lite` /
+/// `maos-cohort` type reaches `maos-a2a-core`.
+///
+/// **`authenticated_team` is load-bearing.** It is the envelope claim
+/// [`crate::router::A2ARouterCore::handle_intake_verified`] has ALREADY proven
+/// the TLS-verified peer speaks for under the signed V4 manifest (Story 13.6a,
+/// `CODE_TEAM_IDENTITY_MISMATCH`). The impl MUST refuse — with
+/// [`CrossingRefusal::SourceTeamUnbound`], BEFORE applying anything — when the
+/// bundle payload's `source_team` differs from it (D-13). Nothing else in the
+/// system binds those two fields.
+#[async_trait::async_trait]
+pub trait CrossTeamCrossingPort: Send + Sync {
+    async fn apply_crossing(&self, authenticated_team: &str, frame: &IacFrame) -> CrossingOutcome;
+}
+
+/// No-op default so non-cohort deployments are byte-for-byte unaffected
+/// (mirrors [`LegacyDigestReadPort`]): no frame is ever a crossing, so the
+/// intake path is unchanged.
+pub(crate) struct LegacyCrossTeamCrossingPort;
+
+#[async_trait::async_trait]
+impl CrossTeamCrossingPort for LegacyCrossTeamCrossingPort {
+    async fn apply_crossing(
+        &self,
+        _authenticated_team: &str,
+        _frame: &IacFrame,
+    ) -> CrossingOutcome {
+        CrossingOutcome::NotCrossing
+    }
+}

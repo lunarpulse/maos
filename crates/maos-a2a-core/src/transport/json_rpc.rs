@@ -67,6 +67,23 @@ pub const CODE_CONSENT_UNCLASSIFIED: i32 = -32009;
 /// confused-deputy attempt from a cross-team impersonation attempt.
 /// `A2AError::CohortTeamIdentityRefused` is the typed mirror.
 pub const CODE_TEAM_IDENTITY_MISMATCH: i32 = -32010;
+/// Story 13.6b (AC3 / D-13) — the crossing PAYLOAD's `source_team` is not the
+/// team the mesh authenticated on the ENVELOPE. DISTINCT from
+/// `CODE_TEAM_IDENTITY_MISMATCH` (-32010), which fires on a LYING envelope:
+/// here the envelope is truthful and the payload lies, so a seed-holding
+/// emitter's bundle signature verifies correctly and only the envelope/payload
+/// weld can refuse it. Collapsing the two would make an impersonation bypass
+/// look like a misconfigured roster. `A2AError::CrossingSourceTeamUnbound` is
+/// the typed mirror.
+pub const CODE_CROSSING_SOURCE_TEAM_UNBOUND: i32 = -32011;
+/// Story 13.6b (AC2) — the applier refused an AUTHENTICATED crossing on its
+/// own merits: no manifest grant for the ordered pair + intent, a stale consent
+/// lease, unreachable consent state, or a failed apply. The `data` object
+/// carries `reason` / `from_team` / `to_team` / `intent` so the emitter can tell
+/// denial from staleness from unavailability — the three outcomes D-15 measured
+/// as indistinguishable because `TransportCause` has never crossed a socket.
+/// `A2AError::CrossTeamCrossingRefused` is the typed mirror.
+pub const CODE_CROSS_TEAM_CROSSING_REFUSED: i32 = -32012;
 pub const CODE_INTERNAL: i32 = -32099;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

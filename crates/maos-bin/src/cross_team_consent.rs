@@ -83,23 +83,41 @@ impl CrossWallRecallConsentPort for CrossWallRecallConsentAdapter {
     }
 }
 
-/// Derive the public team-key set at the composition root. The optional
-/// `MAOS_CROSS_TEAM_BASE_SEED` input is a 32-byte hex seed; only derived public
+/// Read the optional `MAOS_CROSS_TEAM_BASE_SEED` root: a 32-byte hex seed.
+///
+/// ⚠ **Story 13.6b widened this from a verify-side input to a SIGN-side one
+/// (D-7).** Before 13.6b production read the seed only to derive *public*
+/// cross-team row-verification keys — a host that held it could check other
+/// teams' signatures but never make one. The crossing emitter needs it on the
+/// sign side (`build_replication_bundle_v2` → `derive_team_signing_seed`), and
+/// because that derivation works for **any** `(region, team)`, every emitter can
+/// now produce a validly-signed bundle under every team's key. That is why the
+/// applier's envelope/payload weld exists at all, and why the surviving limit is
+/// an operator-trust limit rather than a cryptographic one — see
+/// `docs/security/loom-threat-model.md` T1.
+pub fn cross_team_base_seed_from_env() -> Result<Option<[u8; 32]>, String> {
+    let raw_seed = match std::env::var("MAOS_CROSS_TEAM_BASE_SEED") {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => return Ok(None),
+        Err(error) => return Err(format!("MAOS_CROSS_TEAM_BASE_SEED is unreadable: {error}")),
+    };
+    let decoded = hex::decode(raw_seed.trim())
+        .map_err(|error| format!("MAOS_CROSS_TEAM_BASE_SEED must be 64 hex characters: {error}"))?;
+    <[u8; 32]>::try_from(decoded.as_slice())
+        .map(Some)
+        .map_err(|_| "MAOS_CROSS_TEAM_BASE_SEED must decode to exactly 32 bytes".to_string())
+}
+
+/// Derive the public team-key set at the composition root. Only derived public
 /// keys cross into Loom-lite. Absence leaves the map empty, making cross-team
 /// reads fail closed while the crossing remains unwired.
 pub fn team_verifying_keys_from_env(
     state: &CohortManifestState,
 ) -> Result<HashMap<(Region, TeamId), [u8; 32]>, String> {
-    let raw_seed = match std::env::var("MAOS_CROSS_TEAM_BASE_SEED") {
-        Ok(value) => value,
-        Err(std::env::VarError::NotPresent) => return Ok(HashMap::new()),
-        Err(error) => return Err(format!("MAOS_CROSS_TEAM_BASE_SEED is unreadable: {error}")),
-    };
-    let decoded = hex::decode(raw_seed.trim())
-        .map_err(|error| format!("MAOS_CROSS_TEAM_BASE_SEED must be 64 hex characters: {error}"))?;
-    let base_seed = <[u8; 32]>::try_from(decoded.as_slice())
-        .map_err(|_| "MAOS_CROSS_TEAM_BASE_SEED must decode to exactly 32 bytes".to_string())?;
-    derive_team_verifying_keys(state, &base_seed)
+    match cross_team_base_seed_from_env()? {
+        Some(base_seed) => derive_team_verifying_keys(state, &base_seed),
+        None => Ok(HashMap::new()),
+    }
 }
 
 pub fn derive_team_verifying_keys(

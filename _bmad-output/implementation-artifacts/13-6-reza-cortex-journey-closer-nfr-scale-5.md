@@ -1,13 +1,14 @@
 ---
-baseline_commit: cb412348
-depends_on: 13-6a-production-cross-team-crossing-initiators
-blocked_by: 13-6a-production-cross-team-crossing-initiators
-kernel_grant: NONE — ZERO maos-kernel-core Δ expected, pin stays 23401 (verify final baseline after 13.6a)
+baseline_commit: a414f922
+depends_on: 13-6a-authenticated-team-identity (DONE @a414f922), 13-6b-production-cross-team-crossing-initiators, 13-6c-three-team-three-region-substrate, 13-6d-cross-wall-recall-production-initiator
+blocked_by: 13-6b-production-cross-team-crossing-initiators, 13-6c-three-team-three-region-substrate, 13-6d-cross-wall-recall-production-initiator
+kernel_grant: NONE — ZERO maos-kernel-core Δ expected, pin stays 23401 (verify final baseline after 13.6b/13.6d)
+inherited_residuals: (a) the kernel erases every collective cause — `maos-kernel-core/src/memory/mod.rs:204`, `CollectivePortError::Transport(_) => CollectiveErrorKind::Transport`, so no Spirit has ever distinguished `ConsentDenied` from `MapStale` on any path (13.6b D-15, Residual 6 — THIS STORY IS THE NAMED OWNER: judge whether "the operator can see why the wall refused" is a claim the epic may make on the Spirit path); (b) `CollectiveMemoryPort` has no `share` verb (13.6b Residual 7)
 ---
 
 # Story 13.6 — The closer is a judge, and the courtroom has no instrument for recording a verdict
 
-Status: **blocked** — on `13-6a-production-cross-team-crossing-initiators`
+Status: **blocked** — on `13-6b`, `13-6c`, `13-6d` *(13.6a landed `a414f922`; the former `13-6a-production-cross-team-crossing-initiators` was renamed to `13-6b` at the 2026-07-28 split and the stale duplicate file was deleted 2026-07-29)*
 
 **Kernel-Δ: ZERO expected.** Work lands in `xtask`, `.github/workflows`, `crates/maos-bench`, tests and docs. **No new gate** — legs go on `check-multi-tenant-loom` and `check-reza-production-path`.
 

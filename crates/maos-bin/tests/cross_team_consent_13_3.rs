@@ -160,64 +160,26 @@ fn directional_grant_and_stale_state_are_distinguishable() {
     ));
 }
 
-#[test]
-fn replication_crossing_has_no_production_initiator() {
-    // AC5(f-i): NO non-test caller reaches the crossing builders or apply.
-    // The scan walks every production Rust source in the workspace — not
-    // just main.rs — because this story itself added a production module
-    // (`maos-bin/src/cross_team_consent.rs`): a crossing wired in any module
-    // this walk covers turns the leg red (13.3 review).
-    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("workspace root");
-    let needles = [
-        "apply_replication_bundle(",
-        "build_replication_bundle(",
-        "build_replication_bundle_v2(",
-    ];
-    let mut callers = Vec::new();
-    let mut stack = vec![
-        workspace_root.join("crates"),
-        workspace_root.join("spirits"),
-    ];
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                // Production sources only — never test/bench/target trees.
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if matches!(name, "tests" | "benches" | "examples" | "target")
-                    || name.starts_with('.')
-                {
-                    continue;
-                }
-                stack.push(path);
-            } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-                // The definitions themselves live in the bundle module.
-                if path.ends_with("replication/bundle.rs") {
-                    continue;
-                }
-                let text = std::fs::read_to_string(&path).expect("read source");
-                for needle in needles {
-                    let hits = text.match_indices(needle).count();
-                    if hits > 0 {
-                        callers.push(format!("{}: {needle} x{hits}", path.display()));
-                    }
-                }
-            }
-        }
-    }
-    assert!(
-        callers.is_empty(),
-        "remaining dead-wire clause (f-i) inverted: production callers found {callers:?}; \
-         assign the production crossing owner; Story 13.5c already inverted clause (f-ii) \
-         by making tenant mode bootable"
-    );
-}
+// ─── Story 13.6b — clause (f-i) is INVERTED, not deleted ────────────────────
+//
+// `replication_crossing_has_no_production_initiator` lived here and asserted the
+// crossing had NO production initiator. Story 13.6b wired one, so the negative
+// was inverted and REPLACED in the same commit (11.3 D2 / 10.4c atomic cutover —
+// never left half-deleted). Its replacements live in
+// `crates/maos-bin/tests/cross_team_crossing_13_6b.rs`:
+//
+//   * `crossing_has_a_production_initiator_at_both_endpoints` — the positive,
+//     naming the emitter AND the destination applier;
+//   * `crossing_scan_closes_the_originate_team_row_hole` — closes D-6b, the hole
+//     the retired scan had: it skipped `replication/bundle.rs` and never named
+//     `originate_team_row(`, so routing the call one file over kept it green.
+//     Measured at cutover: the retired needle set saw only the applier's
+//     `apply_replication_bundle(` and was BLIND to the emitter;
+//   * `exactly_one_production_loom_lite_store_construction` — the D-5 one-store
+//     wall as a control rather than a sentence;
+//   * `crossing_weld_refuses_a_forged_payload_team_before_apply` — the envelope/
+//     payload weld (AC3), with the seed-holding forger the shipped relabel
+//     negative structurally cannot reach.
 
 #[test]
 fn cross_wall_recall_manifest_direction_and_staleness_are_typed() {

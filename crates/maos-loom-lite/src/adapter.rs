@@ -159,7 +159,13 @@ impl CollectiveMemoryPort for LoomLiteAdapter {
 }
 
 /// Map store errors to port errors with halt-safe semantics.
-fn store_error_to_port_error(error: StoreError) -> CollectivePortError {
+///
+/// `pub` since Story 13.6b: the cross-team crossing applier
+/// (`maos-bin/src/cross_team_crossing.rs`) runs its refusals through this SAME
+/// mapping before projecting them onto the wire, so the five-cause matrix keeps
+/// holding inside the applier process — the only boundary `TransportCause` has
+/// ever crossed (D-15).
+pub fn store_error_to_port_error(error: StoreError) -> CollectivePortError {
     match error {
         StoreError::Pool(reason) => CollectivePortError::Unreachable { reason },
         StoreError::Timeout { timeout_ms } => CollectivePortError::Timeout { timeout_ms },

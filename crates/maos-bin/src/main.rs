@@ -2519,10 +2519,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
     let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
     let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
-    let boot_nonce: u64 = {
-        let mut buf = [0u8; 8];
-        getrandom::fill(&mut buf).expect("failed to generate boot nonce");
-        u64::from_ne_bytes(buf) & 0x7FFF_FFFF_FFFF_FFFF // mask high bit → always fits i64 (SQLite stores boot_nonce as signed 64-bit)
+    let boot_nonce: u64 = match cfg!(debug_assertions)
+        .then(|| std::env::var("MAOS_TEST_BOOT_NONCE").ok())
+        .flatten()
+    {
+        Some(value) => value
+            .parse::<u64>()
+            .map_err(|_| "MAOS_TEST_BOOT_NONCE must be a u64")?,
+        None => {
+            let mut buf = [0u8; 8];
+            getrandom::fill(&mut buf).expect("failed to generate boot nonce");
+            // Mask the high bit: SQLite stores boot_nonce as signed i64.
+            u64::from_ne_bytes(buf) & 0x7FFF_FFFF_FFFF_FFFF
+        }
     };
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let capability = Arc::new(CapabilityRegistryAdapter::new(
@@ -2690,9 +2699,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // MAOS_LOOM_POSTGRES; when absent the collective tier is disabled (ops
     // return CollectiveNotYetAvailable).  The port goes LIVE here so the
     // de-stub is not inert in production (AC1 review Decision A).
-    let (collective_port, tenant_spirit_map): (
+    // Story 13.6b — the CONCRETE store rides out alongside the port. The
+    // crossing applier needs `apply_replication_bundle`, which is a Loom-lite
+    // API and not on `CollectiveMemoryPort` (that port has no `share` verb at
+    // all — Residual 7), so the trait object cannot carry it. This is still
+    // exactly ONE `LoomLiteStore::new` in the process (D-5): the same `Arc` the
+    // adapter holds, cloned, never a second construction.
+    let (collective_port, tenant_spirit_map, collective_store): (
         Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>>,
         Option<Arc<maos_bin::tenant_map::TenantMapAdapter>>,
+        Option<Arc<maos_loom_lite::store::LoomLiteStore>>,
     ) = match std::env::var("MAOS_LOOM_POSTGRES") {
         Ok(conn_str) => {
             let home_region_str = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
@@ -2842,7 +2858,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             format!("maos: tenant Transparency Log binding failed: {error}")
                         })?;
                         let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
-                            store,
+                            Arc::clone(&store),
                             tokio::runtime::Handle::current(),
                             std::time::Duration::from_secs(5),
                         ));
@@ -2850,6 +2866,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         (
                             Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>),
                             tenant_spirit_map,
+                            Some(store),
                         )
                     }
                 }
@@ -2862,7 +2879,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!(
                     "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
                 );
-            (None, None)
+            (None, None, None)
         }
     };
 
@@ -7646,6 +7663,7 @@ description = "smoke test spirit successor"
                 cohort_daemon,
                 enterprise_posture_required,
                 enterprise_daemon_governance,
+                collective_store.clone(),
             )
             .await;
         }
@@ -9289,6 +9307,10 @@ async fn run_cohort_a2a_daemon(
     bootstrap: Option<CohortDaemonBootstrap>,
     enterprise_posture_required: bool,
     enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>,
+    // Story 13.6b — the SINGLE `LoomLiteStore` this process constructed (D-5).
+    // `None` when `MAOS_LOOM_POSTGRES` is unset: the daemon then serves with no
+    // crossing applier and no crossing emitter, byte-for-byte as before.
+    collective_store: Option<Arc<maos_loom_lite::store::LoomLiteStore>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport as _;
     // The state is loaded at the composition root when the config is present;
@@ -9317,12 +9339,38 @@ async fn run_cohort_a2a_daemon(
                 siem_cancel.clone(),
             )
         });
+    // Story 13.6b / AC1 — the applier port is built HERE, from the one store
+    // this process owns, and installed before the accept loop spawns so no
+    // inbound connection observes a legacy-applier window.
+    let base_seed = maos_bin::cross_team_consent::cross_team_base_seed_from_env()?;
+    let crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>> =
+        match (collective_store.as_ref(), base_seed) {
+            (Some(store), Some(seed)) => {
+                let home_team =
+                    maos_domain::team::TeamId::new(&store.config().home_team).map_err(|error| {
+                        format!("cohort daemon: MAOS_LOOM_HOME_TEAM is not canonical: {error}")
+                    })?;
+                Some(Arc::new(
+                    maos_bin::cross_team_crossing::CrossTeamCrossingAdapter::new(
+                        Arc::clone(store),
+                        home_team,
+                        seed,
+                    ),
+                )
+                    as Arc<dyn maos_a2a_core::CrossTeamCrossingPort>)
+            }
+            // Fail-closed shape, not a silent pass: without a store or without
+            // the seed the applier cannot verify a bundle at all, so the legacy
+            // port stays installed and a crossing frame is never applied.
+            _ => None,
+        };
     let runtime = build_cohort_a2a_daemon_runtime(
         Arc::clone(&transparency_log),
         boot_nonce,
         bootstrap,
         enterprise_posture_required,
         enterprise_daemon_governance,
+        crossing_port,
     )
     .await?;
     runtime.assert_collective_serve_port_fails_closed()?;
@@ -9342,6 +9390,29 @@ async fn run_cohort_a2a_daemon(
         maos_domain::invariants::i3::FrameOrigin::Kernel,
     );
     eprintln!("cohort-a2a-daemon listening on {listen_addr}");
+    // ── Story 13.6b / AC1 — THE PRODUCTION WRITE-SIDE CROSSING INITIATOR ──
+    //
+    // It lives HERE, inside the daemon runtime, and nowhere else. D-14 measured
+    // why: `prepare_outbound` (`maos-a2a-tcp/src/transport.rs`) is the only
+    // non-test outbound A2A send in the workspace, its transport is constructed
+    // only by `build_cohort_a2a_daemon_runtime`, and the sibling
+    // `MAOS_ONE_SHOT` arms return from the dispatch thousands of lines before
+    // any transport, peer pin, or manifest gate exists. A one-shot emitter
+    // cannot send an authenticated cohort frame; this one can, because by this
+    // point the listener is live, the pins are loaded, and the signed manifest
+    // has been reconciled against the operator's config (AC4).
+    //
+    // A refused crossing is journaled and reported, NOT fatal: the daemon's job
+    // is to serve the mesh, and an operator's unconsented share request must not
+    // take the node down.
+    if let Some(request) = maos_bin::cross_team_crossing::CrossTeamShareRequest::from_env()? {
+        let store = collective_store
+            .as_ref()
+            .ok_or("MAOS_CROSS_TEAM_SHARE_PEER requires MAOS_LOOM_POSTGRES")?;
+        let seed =
+            base_seed.ok_or("MAOS_CROSS_TEAM_SHARE_PEER requires MAOS_CROSS_TEAM_BASE_SEED")?;
+        emit_cross_team_share(&runtime, store, &seed, request, &transparency_log).await?;
+    }
     tokio::signal::ctrl_c().await?;
     siem_cancel.cancel();
     runtime.shutdown().await
@@ -9357,6 +9428,10 @@ struct CohortDaemonRuntime {
     /// bare `CohortManifestState`. It is the SAME `Arc` handed to
     /// `bind_with_cohort_wiring_and_digest`.
     digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort>,
+    /// Story 13.6b — the control-Spirit address every outbound cohort frame is
+    /// stamped `from`. Retained (not rebuilt) so the crossing emitter uses the
+    /// SAME identity the manifest distributor does.
+    from: maos_domain::frame::FrameAddress,
     cancel: tokio_util::sync::CancellationToken,
     service: tokio::task::JoinHandle<Result<(), maos_cohort::CohortError>>,
 }
@@ -9475,6 +9550,21 @@ fn reconcile_transport_identity_with_manifest(
             .into());
         }
     }
+    // (d) Story 13.6b / AC4 — THE TEAM AXIS, one field over from the
+    // certificate axis above and argued by this function's own doctrine:
+    // "a config-time fact silently overrides a manifest-time fact …
+    // Disagreement is a boot error, never a warning."
+    //
+    // The comparison itself lives in
+    // `maos_bin::cross_team_crossing::reconcile_home_team_with_manifest` so it
+    // is reachable from a hermetic leg without standing up a TLS config.
+    if let Ok(env_team) = std::env::var("MAOS_LOOM_HOME_TEAM") {
+        maos_bin::cross_team_crossing::reconcile_home_team_with_manifest(
+            &manifest,
+            state.local_host().as_str(),
+            &env_team,
+        )?;
+    }
     Ok(())
 }
 
@@ -9485,6 +9575,10 @@ async fn build_cohort_a2a_daemon_runtime(
     bootstrap: CohortDaemonBootstrap,
     enterprise_posture_required: bool,
     enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>,
+    // Story 13.6b — the cross-team crossing applier. `None` installs the
+    // legacy no-op port, so a node without a collective store never applies a
+    // crossing.
+    crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
 ) -> Result<CohortDaemonRuntime, Box<dyn std::error::Error>> {
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     let CohortDaemonBootstrap {
@@ -9524,7 +9618,7 @@ async fn build_cohort_a2a_daemon_runtime(
     let rupture_sink: std::sync::Arc<dyn maos_a2a_core::ConsentRuptureSink> =
         std::sync::Arc::new(maos_cohort::CohortRuptureLogSink::new(transparency_log));
     let transport = std::sync::Arc::new(
-        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_digest(
+        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_crossing(
             tcp_config,
             peer_configs,
             boot_nonce,
@@ -9536,6 +9630,7 @@ async fn build_cohort_a2a_daemon_runtime(
             Some(observer),
             Some(std::sync::Arc::clone(&digest_port)),
             Some(rupture_sink),
+            crossing_port,
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,
@@ -9554,7 +9649,7 @@ async fn build_cohort_a2a_daemon_runtime(
     let digest_distributor = std::sync::Arc::new(maos_cohort::CohortDigestDistributor::new(
         state.clone(),
         router,
-        from,
+        from.clone(),
     ));
     let cancel = tokio_util::sync::CancellationToken::new();
     let service_cancel = cancel.child_token();
@@ -9598,9 +9693,118 @@ async fn build_cohort_a2a_daemon_runtime(
     Ok(CohortDaemonRuntime {
         transport,
         digest_port,
+        from,
         cancel,
         service,
     })
+}
+
+/// Story 13.6b / AC1+AC2 — emit one allowed cross-team share and report the
+/// outcome in a way an operator can act on.
+///
+/// Three things make this the *production* initiator rather than a demo:
+///   1. it uses the seam 13.3b left (`originate_team_row`), so the row is BORN
+///      attested in this team's own database and the bytes on the wire are the
+///      bytes that were signed — no hand-rolled leaf, no second signature;
+///   2. it sends through `route_outbound`, so `prepare_outbound` stamps
+///      `cohort_source_team` from this host's own SIGNED V4 declaration and the
+///      emitter cannot choose the team it speaks for even while holding the seed;
+///   3. the refusal it reports is a typed, attributable outcome
+///      (`crossing_outcome_label`), so a consent denial, a stale lease, and an
+///      unreachable state stay three distinct observations at the emitter — the
+///      distinction D-15 measured as absent everywhere in the architecture.
+#[cfg(feature = "network")]
+async fn emit_cross_team_share(
+    runtime: &CohortDaemonRuntime,
+    store: &Arc<maos_loom_lite::store::LoomLiteStore>,
+    base_seed: &[u8; 32],
+    request: maos_bin::cross_team_crossing::CrossTeamShareRequest,
+    transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2APeerRouter as _;
+    let home_team = maos_domain::team::TeamId::new(&store.config().home_team)
+        .map_err(|error| format!("crossing emitter: home team is not canonical: {error}"))?;
+    if home_team == request.to_team {
+        return Err(format!(
+            "crossing emitter: MAOS_CROSS_TEAM_SHARE_TO_TEAM={} equals this host's own team \
+             — a crossing must cross",
+            request.to_team.as_str()
+        )
+        .into());
+    }
+    let bundle = maos_loom_lite::replication::bundle::originate_team_row(
+        store,
+        request.spirit_pid,
+        &request.namespace,
+        &request.key,
+        request.value.clone(),
+        1,
+        maos_domain::invariants::i13::IntentLineage::new(vec![
+            maos_domain::invariants::i8::A2AIntent::new(
+                maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE,
+            ),
+        ]),
+        &home_team,
+        base_seed,
+    )
+    .await
+    .map_err(|error| format!("crossing emitter: originate failed: {error}"))?;
+    let peer = maos_spirit_abi::identity::HostId(request.peer.clone());
+    let frame = maos_bin::cross_team_crossing::crossing_frame(
+        &runtime.from,
+        &peer,
+        1,
+        &request.to_team,
+        bundle,
+    )?;
+    let outcome = runtime.transport.route_outbound(frame, &peer).await;
+    let (status, detail) = match &outcome {
+        Ok(()) => ("crossing_applied", String::new()),
+        Err(error) => (crossing_outcome_label(error), error.to_string()),
+    };
+    let audit_payload = serde_json::json!({
+        "from_team": home_team.as_str(),
+        "to_team": request.to_team.as_str(),
+        "intent": maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE,
+        "peer": request.peer,
+        "key": request.key,
+        "status": status,
+        "detail": detail,
+    });
+    let audit_frame_id = transparency_log.insert_kernel_event_returning_id(
+        request.spirit_pid,
+        "collective.host.cross-team-share",
+        audit_payload.to_string().as_bytes(),
+    );
+    println!(
+        "{}",
+        serde_json::json!({
+            "crossing": audit_payload,
+            "audit_frame_id": hex::encode(audit_frame_id),
+        })
+    );
+    Ok(())
+}
+
+/// Story 13.6b / AC2 — the emitter's stable discriminator for a refused
+/// crossing. Each arm is a DIFFERENT observable outcome: a manifest denial, a
+/// stale consent lease, an unreachable consent state, the AC3 impersonation
+/// weld, the 13.6a envelope binding, and everything else. Collapsing any two
+/// would recreate exactly the erasure D-15 measured at the kernel boundary.
+#[cfg(feature = "network")]
+fn crossing_outcome_label(error: &maos_a2a_core::A2AError) -> &'static str {
+    match error {
+        maos_a2a_core::A2AError::CrossTeamCrossingRefused { reason, .. } => match reason.as_str() {
+            "crossing_consent_denied" => "crossing_consent_denied",
+            "crossing_consent_stale" => "crossing_consent_stale",
+            "crossing_state_unavailable" => "crossing_state_unavailable",
+            _ => "crossing_apply_failed",
+        },
+        maos_a2a_core::A2AError::CrossingSourceTeamUnbound { .. } => "crossing_source_team_unbound",
+        maos_a2a_core::A2AError::CohortTeamIdentityRefused { .. } => "team_identity_mismatch",
+        maos_a2a_core::A2AError::CohortConsentDenied { .. } => "cohort_consent_denied",
+        _ => "transport_failure",
+    }
 }
 
 #[cfg(feature = "network")]
@@ -12833,6 +13037,7 @@ mod story_13_5a_enterprise_daemon_seam {
             bootstrap,
             true,
             governance,
+            None,
         )
         .await
         .map_err(|error| error.to_string())?;
@@ -13257,6 +13462,7 @@ mod story_13_5a_enterprise_daemon_seam {
             bootstrap,
             true,
             Some(governance),
+            None,
         )
         .await
         .expect("cohort daemon runtime");

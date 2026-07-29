@@ -3,7 +3,7 @@ baseline_commit: cb412348
 depends_on: 13-5g-tl-stage2-datname-inversion-defense-in-depth
 blocks: 13-6b-production-cross-team-crossing-initiators
 kernel_grant: NONE — ZERO maos-kernel-core Δ expected, pin stays 23401. NON-kernel Δ: maos-cohort (COHORT_SCHEMA_V4), maos-a2a-core (seam semantics)
-splits_from: 13-6a-production-cross-team-crossing-initiators (operator-ratified 2026-07-28)
+splits_from: 13-6b-production-cross-team-crossing-initiators (operator-ratified 2026-07-28; that story was named 13.6a at the time and was renamed in the same split — its stale pre-split file was deleted 2026-07-29)
 ---
 
 # Story 13.6a — The cohort knows which host is which, but not which team it speaks for

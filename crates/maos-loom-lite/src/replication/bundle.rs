@@ -425,11 +425,6 @@ pub fn build_replication_bundle_v2(
     })
 }
 
-/// Verify a replication bundle against the source region's derived public key.
-///
-/// Reconstructs the exact sign payload, verifies the Ed25519 signature under
-/// the public key derived from the *bundle-declared* source region (so a
-/// relabelled/copied bundle fails — the region weld, R-RG1), and confirms the
 /// Story 13.3b (review): originate a provenance-carrying row on the
 /// production write path. The chain must be BORN before it can cross — and
 /// a team-carrying row without full bundle attestation is refused by the
@@ -439,8 +434,26 @@ pub fn build_replication_bundle_v2(
 /// `(region, team)`, verify it, persist with its attestation — so the row
 /// is servable locally and rebundlable at the next hop.
 ///
-/// No production caller exists yet: the Spirit→collective digest
-/// publication flow is the 13.6 journey. This is the seam it will use.
+/// Returns the signed, verified single-leaf bundle it persisted, so the
+/// caller can put exactly those bytes on the wire without rebuilding (and
+/// therefore without re-signing) the leaf.
+///
+/// # This is the HOST's seam, not a Spirit's (Story 13.6b / D-16)
+///
+/// The comment this replaces claimed the "Spirit→collective digest
+/// publication flow" would use this seam. Measured, that is false and it
+/// steered three stories: `CollectiveMemoryPort`
+/// (`maos-domain/src/ports/collective_memory.rs`) has exactly four methods —
+/// `write`, `read`, `scan`, `erase` — and no `share`, so a Spirit cannot
+/// express a crossing through it at all; `write` is precisely the method
+/// `team_guard` refuses foreign-team rows on.
+///
+/// The split is a security property, not an omission. A **Spirit** initiates
+/// *publication* into its own team's collective tier (Story 13.5d). The
+/// **host** initiates the *crossing*, under the operator-signed cohort
+/// manifest (Story 13.6b, inside the `cohort-a2a-daemon` runtime — the only
+/// process that owns an authenticated outbound A2A path). Keeping them apart
+/// is what stops a prompt-injected Spirit from naming a destination team.
 #[allow(clippy::too_many_arguments)]
 pub async fn originate_team_row(
     store: &LoomLiteStore,
@@ -452,7 +465,7 @@ pub async fn originate_team_row(
     intent_lineage: maos_domain::invariants::i13::IntentLineage,
     home_team: &TeamId,
     base_seed: &[u8; 32],
-) -> Result<(), BundleError> {
+) -> Result<CrossRegionReplicationBundle, BundleError> {
     let home_region = Region::canonicalize(&store.config().home_region)
         .map_err(|e| BundleError::InvalidRegion(e.to_string()))?;
     let (namespace_kind, namespace_detail) = schema::namespace_to_parts(namespace);
@@ -508,9 +521,15 @@ pub async fn originate_team_row(
             Some(&attestation),
         )
         .await
-        .map_err(|e| BundleError::StoreError(e.to_string()))
+        .map_err(|e| BundleError::StoreError(e.to_string()))?;
+    Ok(bundle)
 }
 
+/// Verify a replication bundle against the source region's derived public key.
+///
+/// Reconstructs the exact sign payload, verifies the Ed25519 signature under
+/// the public key derived from the *bundle-declared* source region (so a
+/// relabelled/copied bundle fails — the region weld, R-RG1), and confirms the
 /// carried `root` matches the recomputed Merkle root of `leaves`.
 pub fn verify_replication_bundle(
     bundle: &CrossRegionReplicationBundle,

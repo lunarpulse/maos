@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
-//! Stories 13.1–13.6a — physical multi-tenant Loom wall, crossing gate, and
-//! authenticated team identity.
+//! Stories 13.1–13.6b — physical multi-tenant Loom wall, the crossing gate,
+//! authenticated team identity, and the production crossing initiator.
 //!
 //! Hermetic legs are [`BindingClass::Blocking`] at development HEAD. Live
 //! Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence emits a
@@ -14,6 +14,20 @@ use std::process::Command;
 use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition, BindingClass};
 
 const GATE_NAME: &str = "check-multi-tenant-loom";
+/// Successors this gate declares ABSENT: a control this ADR names but that no
+/// leg here can yet bind.
+///
+/// **Empty is a claim, not a default.** Story 13.6b inverted the last dead-wire
+/// clause `(f-i) no-production-crossing-initiator` and replaced it with legs that
+/// bind at HEAD, so nothing this gate owns is currently unbound. What 13.6b does
+/// NOT close is owned elsewhere and deliberately not laundered through this list:
+///
+///   * the cross-wall RECALL initiator (read side) — Story 13.6d, whose dead-wire
+///     leg `cross-wall-recall-no-production-caller` still lives in this registry;
+///   * the kernel's collective-cause erasure (`Transport(_)` collapses all five
+///     causes at `kernel-core/src/memory/mod.rs`) — a kernel-core edit plus a
+///     FLAG-Winston conversation, owned by Story 13.6 to judge;
+///   * the three-team journey closer — Story 13.6.
 const ABSENT_SUCCESSORS: &[&str] = &[];
 
 struct TestLeg {
@@ -360,17 +374,350 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // ── Story 13.6b — the crossing crosses, and the team that crossed it
+        // is the team that signed it.
+        //
+        // `replication-crossing-has-no-production-initiator` lived here and was
+        // INVERTED in 13.6b's commit. Per AC5 it is not merely deleted: the
+        // clauses below replace it with a positive naming BOTH endpoints, the
+        // D-6b hole closure, the D-5 one-store control, and the AC3 weld — each
+        // a separately-named leg with its own inverter, never one composite
+        // assertion (epic-13:175). One `#[test]` per `--exact` leg, because the
+        // gate's only anti-vacuity oracle is `"running 1 test"` + `"1 passed"`.
         TestLeg {
-            name: "replication-crossing-has-no-production-initiator",
+            name: "crossing-has-production-initiator-both-endpoints",
+            class: BindingClass::Blocking,
+            // Inverter: delete the emitter arm in `run_cohort_a2a_daemon` or the
+            // `apply_replication_bundle` call in `cross_team_crossing.rs` — the
+            // 13.5g composition-root test.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_has_a_production_initiator_at_both_endpoints",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-scan-closes-originate-team-row-hole",
+            class: BindingClass::Blocking,
+            // Inverter: drop `originate_team_row(` from `CROSSING_NEEDLES` and
+            // the fixture stops being caught — the exact D-6b blindness.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_scan_closes_the_originate_team_row_hole",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "exactly-one-production-loom-lite-store",
+            class: BindingClass::Blocking,
+            // Inverter: add a second production `LoomLiteStore::new` anywhere.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "exactly_one_production_loom_lite_store_construction",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-payload-team-must-equal-authenticated-envelope",
+            class: BindingClass::Blocking,
+            // AC3 / D-13 — its OWN leg and its OWN inverter, never folded into a
+            // composite. Inverter: neuter the `payload_team != authenticated_team`
+            // comparison in `cross_team_crossing.rs`.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_weld_refuses_a_forged_payload_team_before_apply",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-weld-is-a-binding-not-a-refuse-all-stub",
+            class: BindingClass::Blocking,
+            // Inverter: make the weld refuse unconditionally — the leg above
+            // would still pass, this one reds.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_weld_admits_the_authenticated_team_and_proceeds_to_apply",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-applier-ignores-non-crossing-frames",
+            class: BindingClass::Blocking,
+            // Inverter: make the applier claim every frame — every other cohort
+            // intent would start failing, and this leg names why.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_applier_ignores_frames_that_are_not_crossings",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-control-rides-the-telemetry-idiom",
+            class: BindingClass::Blocking,
+            // Inverter: add a `FramePayload`/`FrameKind` variant instead — this
+            // leg is what keeps the null `abi-diff` control from mattering.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_control_round_trips_through_the_telemetry_idiom",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "boot-refuses-home-team-manifest-disagreement",
+            class: BindingClass::Blocking,
+            // AC4 — the correctness control against misconfiguration. Inverter:
+            // downgrade clause (d) of `reconcile_transport_identity_with_manifest`
+            // to a warning.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "boot_refuses_a_home_team_that_disagrees_with_the_signed_manifest",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "boot-refuses-uncorroborated-home-team",
+            class: BindingClass::Blocking,
+            // AC4 — absence never permits. Inverter: treat `team_of_host == None`
+            // as a pass.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "boot_refuses_a_home_team_the_manifest_cannot_corroborate",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-weld-refusal-has-its-own-wire-code",
+            class: BindingClass::Blocking,
+            // AC3 — the refusal must not collapse into -32010 or -32012.
+            // Inverter: reuse `CODE_TEAM_IDENTITY_MISMATCH` for the weld.
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-core",
+                "--test",
+                "crossing_wire_13_6b",
+                "crossing_source_team_unbound_survives_the_wire_under_its_own_code",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-consent-denial-reaches-the-emitter",
+            class: BindingClass::Blocking,
+            // AC2 — the ordered pair + intent survive the socket. Inverter: drop
+            // the `data` object from `crossing_refusal_nack`.
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-core",
+                "--test",
+                "crossing_wire_13_6b",
+                "crossing_consent_denial_reaches_the_emitter_with_the_ordered_pair",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-causes-stay-distinguishable-on-the-wire",
+            class: BindingClass::Blocking,
+            // AC2 — denied / stale / unavailable must not collapse the way the
+            // kernel collapses them (Residual 6). Inverter: map two refusal
+            // variants onto one `reason` token.
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-core",
+                "--test",
+                "crossing_wire_13_6b",
+                "crossing_denial_staleness_and_unavailability_stay_distinguishable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-applier-rejects-mismatched-frame-kind",
             class: BindingClass::Blocking,
             args: &[
                 "test",
                 "-p",
                 "maos-bin",
                 "--test",
-                "cross_team_consent_13_3",
-                "replication_crossing_has_no_production_initiator",
+                "cross_team_crossing_13_6b",
+                "crossing_applier_rejects_a_mismatched_frame_kind",
                 "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-binds-requested-destination-team",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_applier_binds_the_requested_destination_team",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-unconsented-applier-refusal",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "unconsented_crossing_is_refused_at_the_destination_applier",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-seedless-relabel-refusal",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "seedless_source_team_relabel_is_refused_at_the_destination_applier",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-rejects-unreadable-peer-config",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_request_rejects_non_utf8_peer_configuration",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-rejects-unreadable-namespace-config",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_request_rejects_non_utf8_namespace_configuration",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-rejects-empty-key",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "crossing_request_rejects_an_empty_key",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-unavailable-applier-fails-closed",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-core",
+                "--lib",
+                "router::tests::verified_crossing_without_an_applier_fails_closed",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "crossing-stale-gate-keeps-typed-outcome",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-a2a-core",
+                "--lib",
+                "router::tests::stale_crossing_gate_keeps_the_typed_stale_outcome",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "live-crossing-runs-through-two-daemons",
+            class: BindingClass::AdvisorySubstrate,
+            // The two-datname witness starts the real team-A and team-B daemon
+            // processes, sends through route_outbound/prepare_outbound, and
+            // observes the destination row after handle_intake_verified applies it.
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "live_crossing_runs_through_two_daemon_processes",
+                "--",
+                "--ignored",
                 "--exact",
             ],
         },

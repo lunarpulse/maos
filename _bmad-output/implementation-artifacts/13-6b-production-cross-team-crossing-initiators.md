@@ -1,43 +1,38 @@
 ---
-baseline_commit: cb412348
-depends_on: 13-6a-authenticated-team-identity, 13-3b-provenance-crosses-the-wall, 13-5d-production-spirit-collective-route
-blocked_by: 13-6a-authenticated-team-identity
-kernel_grant: NONE — ZERO maos-kernel-core Δ expected, pin stays 23401 (verify at implementation; `maos_kernel_core::iac` is a re-export shim, see D-9). NON-kernel Δ includes maos-cohort COHORT_SCHEMA_V4 per AC6.
-preflight: party-mode 2026-07-28 — B2/B4/R1 applied; B1/B3 split OUT to 13-6a-authenticated-team-identity (operator-ratified); 5 ACs
+baseline_commit: a414f922
+depends_on: 13-6a-authenticated-team-identity (DONE @a414f922), 13-3b-provenance-crosses-the-wall, 13-5d-production-spirit-collective-route
+blocked_by: none — 13.6a landed 2026-07-29
+kernel_grant: NONE — ZERO maos-kernel-core Δ, pin stays 23401 (verified: `find crates/maos-kernel-core/src -name '*.rs' | xargs cat | wc -l` == 23401 at a414f922). `maos_kernel_core::iac` is a re-export shim (D-9).
+preflight: party-mode 2026-07-29 (post-13.6a) — P1 weld + P2 daemon-emitter + P3 boot reconcile + P4 wire-cause folded in; READ SIDE SPLIT OUT to 13-6d (operator-ratified); 6 ACs
 splits_from: 13-6-reza-cortex-journey-closer-nfr-scale-5
+splits_to: 13-6d-cross-wall-recall-production-initiator
 ---
 
-# Story 13.6b — The cross-team wall has a door, a lock, and a key, and nothing in production ever walks through it
+# Story 13.6b — The crossing crosses, and the team that crossed it is the team that signed it
 
-Status: **blocked** — on `13-6a-authenticated-team-identity`
+Status: **done**
 
-> ⚠ **Renamed 13.6a → 13.6b, 2026-07-28 (operator-ratified split).** The authenticated-identity half moved to **Story 13.6a**, which must land **first**. Reason: `bundle.source_team` is a self-declaration whose signature any seed-holding emitter can forge (D-10), so a crossing built before the identity binding exists is bypassable by impersonation in every commit that contains it. The room rejected that trade in review; it would have been re-created in commit order. **13.6a ships the binding; this story wires the crossing on top of it, and the impersonation negative is live from day one.**
+**Kernel-core Δ: ZERO — and that is not the same sentence as "zero delta."** `xtask/kernel-core-baseline.toml src_lines = 23401` unchanged (**verified equal at `a414f922`**); `xtask/fkcs-baseline.toml` stays byte-untouched at the frozen `23081`. Work lands in `maos-a2a-core`, `maos-a2a-tcp`, `maos-loom-lite`, `maos-bin`. **No new gate** — legs go on the existing `check-multi-tenant-loom` (ADR-055's gate; the 13.5c **K5(b)** precedent, re-ratified by the 13.5e preflight).
 
-**Kernel-core Δ: ZERO expected — and that is not the same sentence as "zero delta."** `xtask/kernel-core-baseline.toml src_lines = 23401` unchanged; `xtask/fkcs-baseline.toml` stays byte-untouched at the frozen `23081`. Work lands in `maos-bin`, `maos-loom-lite`, `maos-iac`, `maos-domain`, `spirits/` and — per AC6 — **`maos-cohort` (`COHORT_SCHEMA_V4` + `SIG_DOMAIN_V4` + the per-member team binding)**. **No new gate** — legs go on the existing `check-multi-tenant-loom` (ADR-055's gate; the 13.5c **K5(b)** precedent, re-ratified by the 13.5e preflight, says do not create a sibling).
-
-> **Read this first — this story exists because Story 13.6's grounding disproved its own AC2.**
+> ### Two things changed under this story since it was written
 >
-> 13.6 was filed as the Epic-13 closer that *"composes 13.1–13.5e"* under the epic's own binding rule: **"13.6 is last and only judges; it never invents a missing mechanism inside the journey harness"** (`epic-13-reza-cortex-v2-2.md:52`).
+> **1 · 13.6a is DONE (`a414f922`).** `COHORT_SCHEMA_V4` + `SIG_DOMAIN_V4` ship the operator-signed `CohortMember.team`; both A2A seams enforce it; `Defer` is a refusal on `collective:share`; `loom-threat-model.md` T1 is corrected. 44/44 Blocking legs green, both dead-wire legs still green (it inverted nothing, as promised). **This story is unblocked.**
 >
-> The 2026-07-28 grounding pass measured every mechanism 13.6 must compose. Five of six are production-reachable. **The cross-team crossing is not** — and it is the one 13.6·AC2 and 13.6·AC3 are built on. The apparatus is fully constructed in production and terminates in a function that a *Blocking* gate leg proves nothing in production calls (D-1…D-4 below, all measured).
+> **2 · The 2026-07-29 preflight found the weld 13.6a's split left behind.** 13.6a authenticates the **envelope's** team claim. The crossing decides consent from the **payload's** team claim. Nothing binds them, and no AC in either story owned it — 13.6b's AC6 moved to 13.6a, and AC4 is explicitly forbidden from claiming impersonation coverage. **D-10's attack survives 13.6a until this story welds the two fields.** See **D-13**; it is now **AC3**.
 >
-> The epic anticipated exactly this and refused to paper over it: `(f-i) no-production-crossing-initiator — inverter UNASSIGNED` (`epic-13:174`), *"named as an open gap, not given a fictional successor"*, mechanically re-confirmed at the 13.5d preflight (`epic-13:176`). The dead-wire test says so in its own failure message: *"production caller owner is UNASSIGNED and must be assigned before inversion."* It is **still unassigned** after 13.3, 13.3b, 13.5c and 13.5d.
->
-> **Ratified by the operator 2026-07-28: split.** This story assigns the owner. It is a mechanism story — 13.6 stays a judge. This is the epic's own written policy (pre-dev checklist item 5: *"If grounding reveals another independently shippable mechanism, split it rather than hiding implementation in 13.6"*), applied for the third time after H1→13.3b and 13.5c→13.5c/d/e.
->
-> **What this story does NOT claim.** It does not close the *host-axis* membership gap (an evicted host holding a fresh lease still consents — deferred-work 2026-07-20, owner was named as 13.5c and 13.5c closed without a membership answer; see Residual 2). It does not journal success-side cross-wall disclosure (ADR-058 Decision 2 scoped that out; Residual 3). It does not build the journey — 13.6 does.
+> The read side (the former AC3) is **split out to Story 13.6d** — different crates, different dead-wire leg, structurally independent (D-4). This story is the write side.
 
 ---
 
 ## Story
 
 **As** a team lead in Reza's single-org Cortex,
-**I want** an allowed cross-team share and an allowed cross-wall traceback to be things a running MAOS process can actually *initiate*, not just things the wall is capable of refusing,
-**so that** the consent apparatus already welded into the composition root governs real traffic instead of guarding a function no production code path can reach — and so the Epic-13 closer has a mechanism to judge.
+**I want** an allowed cross-team share to be something a running MAOS process can actually *initiate* — and the team name the wall judges to be the team the mesh authenticated,
+**so that** the consent apparatus already welded into the composition root governs real traffic instead of guarding a function no production code path can reach, and so the Epic-13 closer has a mechanism to judge.
 
 ---
 
-## The defect, in code — measured at `cb412348` before a line was designed
+## The defect, in code — measured at `a414f922`
 
 ### D-1 — the consent check has exactly one consumer, and it is unreachable
 
@@ -48,11 +43,11 @@ crates/maos-loom-lite/src/cross_team_consent.rs:20:    fn is_granted(      # the
 crates/maos-loom-lite/src/replication/bundle.rs:917:  .is_granted(from_team, context.to_team, context.intent)
 ```
 
-**One** non-test call site. It lives at `bundle.rs:917`, inside `apply_replication_bundle` (declared `bundle.rs:840`).
+**One** non-test call site, at `bundle.rs:917`, inside `apply_replication_bundle` (declared `bundle.rs:840`).
 
 ### D-2 — `apply_replication_bundle` has zero production callers, and a Blocking gate leg proves it
 
-`xtask/src/check_multi_tenant_loom.rs:363` runs `replication_crossing_has_no_production_initiator` as `BindingClass::Blocking`. The test (`crates/maos-bin/tests/cross_team_consent_13_3.rs:161`) walks **every** production `.rs` under `crates/` and `spirits/` — skipping `tests`/`benches`/`examples`/`target` and the defining module — for `apply_replication_bundle(`, `build_replication_bundle(`, `build_replication_bundle_v2(`. It is **green**. Every caller in the workspace is a test.
+`xtask/src/check_multi_tenant_loom.rs:364` runs `replication_crossing_has_no_production_initiator` as `BindingClass::Blocking`. The test (`crates/maos-bin/tests/cross_team_consent_13_3.rs:161`) walks **every** production `.rs` under `crates/` and `spirits/` for `apply_replication_bundle(`, `build_replication_bundle(`, `build_replication_bundle_v2(`. **Still green at `a414f922`.**
 
 ### D-3 — the apparatus is fully constructed in production anyway
 
@@ -61,81 +56,55 @@ crates/maos-loom-lite/src/replication/bundle.rs:917:  .is_granted(from_team, con
 | `main.rs:2745-2749` | `CrossTeamConsentAdapter::new(bootstrap.state)` → `Arc<dyn CrossTeamConsentPort>` |
 | `main.rs:2753` | `team_verifying_keys_from_env(&bootstrap.state)` |
 | `main.rs:2784` | `store.with_cross_team_consent(consent)` |
-| `main.rs:2958` | `LogRecallAdapter::with_cross_wall_consent(CrossWallRecallConsentAdapter::new(…))` |
 
-Four production wiring sites, real signed-manifest state, real derived team keys — feeding a dead end. **This is precisely the shape 13.6·AC1 declares must fail: *"Constructed-but-unwired controls fail."*** The closer cannot judge it, because the closer would be judging itself.
-
-### D-4 — the read side is unreachable for a structural reason, not a missing call
-
-`LogRecallPort::recall_cross_wall(spirit_pid, team: &TeamId, filter)` — `crates/maos-domain/src/ports/log_recall.rs:35`, implemented at `crates/maos-iac/src/adapter/log_recall.rs:347`. It is a **default-implemented** trait method whose default returns `ECrossWallRecallDenied { NoConsentProvider }`.
-
-Production dispatch calls plain `.recall(`:
-- `spirits/researcher/src/lib.rs:1030` — `port.recall(spirit_pid, filter)`
-- `crates/maos-bin/src/main.rs:5881` — inside a one-shot smoke path
-
-**No production surface supplies the `&TeamId`.** `LogRecallFilter` (`crates/maos-domain/src/log_recall.rs:14`) has `kind`/`since_ns`/`until_ns`/`limit`/… and **no team field**. The gap is not "add a caller" — it is "the request cannot express the question." Blocking leg `cross-wall-recall-no-production-caller` (`check_multi_tenant_loom.rs:524`) pins it.
+Real signed-manifest state, real derived team keys — feeding a dead end. **The exact shape 13.6·AC1 declares must fail: *"Constructed-but-unwired controls fail."*** The closer cannot judge it, because it would be judging itself.
 
 ### D-5 — ⚠ THE FACT THAT SIZES THIS STORY: one store per process
 
 ```
-$ grep -n "LoomLiteStore::new\|tenant_map_for_store" crates/maos-bin/src/main.rs
 2743:  let tenant_map = maos_bin::tenant_map::tenant_map_for_store(&home_team, tenant_source)
 2766:  match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
 ```
 
 **Exactly one store construction in the composition root**, pinned to `MAOS_LOOM_HOME_TEAM`, with `connection_assignment_guard` proving `datname_for(home_team) == current_database()`.
 
-Therefore **a crossing cannot be performed inside one process.** A source-team process physically cannot open the destination team's database — that is the wall working as designed (ADR-055 database-per-team). The production crossing is necessarily a **pair**: an *emitter* on team A's host and an *applier* on team B's host, joined by the cohort A2A mesh.
+Therefore **a crossing cannot be performed inside one process.** The production crossing is necessarily a **pair**: an *emitter* on team A's host and an *applier* on team B's host, joined by the cohort A2A mesh. **Say the two-process sentence out loud in the design** — three separate defects below exist because a clause was written without it (D-14, D-15, and the former AC2 wording).
 
-Anyone scoping this as *"call `apply_replication_bundle` from `main.rs`"* discovers D-5 mid-implementation and either builds a wall-breaking second store or stalls. **Say the two-process sentence out loud in the design.**
+### D-6 — 13.3b already left the emitter seam
 
-### D-6 — 13.3b already left the emitter seam, and it names this work
+`crates/maos-loom-lite/src/replication/bundle.rs:441-445` — `originate_team_row(store, spirit_pid, namespace, key, value, distillation_depth, intent_lineage, home_team, base_seed)`.
 
-`crates/maos-loom-lite/src/replication/bundle.rs:441-445`, verbatim:
+**Use it. Do not hand-roll leaf construction.** It builds the `CollectiveKvLeaf` with `source_team` / `distillation_depth` / `intent_lineage` (13.3b leaf v3), calls `build_replication_bundle_v2`, verifies, and computes the inclusion proof (`:465-485`). Its only caller today is a test (`cross_region_live.rs:520`).
 
-```rust
-/// No production caller exists yet: the Spirit→collective digest
-/// publication flow is the 13.6 journey. This is the seam it will use.
-#[allow(clippy::too_many_arguments)]
-pub async fn originate_team_row(
-    store, spirit_pid, namespace, key, value,
-    distillation_depth, intent_lineage, home_team, base_seed,
-) -> Result<(), BundleError>
-```
-
-**Use it. Do not hand-roll leaf construction.** It builds the `CollectiveKvLeaf` with `source_team` / `distillation_depth` / `intent_lineage` (13.3b leaf v3), calls `build_replication_bundle_v2`, verifies, and computes the inclusion proof (`:465-485`). Its only caller today is `crates/maos-loom-lite/tests/cross_region_live.rs:520`.
-
-It is the **origination** half — it stamps a team-owned row in the store it is given. The **crossing** half (transport + apply at the destination) is still this story's.
+⚠ **Its doc comment is WRONG and must be corrected in this commit — see D-16.**
 
 ### D-6b — ⚠ THE DEAD-WIRE LEG HAS A HOLE, AND `originate_team_row` SITS IN IT
 
-`cross_team_consent_13_3.rs:196-198` skips the defining module:
+`cross_team_consent_13_3.rs:201` skips the defining module:
 
 ```rust
 if path.ends_with("replication/bundle.rs") { continue; }
 ```
 
-`originate_team_row` **lives in that file** and calls `build_replication_bundle_v2` at `:480`. So **a production caller of `originate_team_row` inverts the crossing in fact while `replication-crossing-has-no-production-initiator` stays green.** The negative is one indirection away from blind.
+`originate_team_row` **lives in that file** and calls `build_replication_bundle_v2` at `:480`. So **a production caller of `originate_team_row` inverts the crossing in fact while `replication-crossing-has-no-production-initiator` stays green.** The negative is one indirection away from blind. AC5's *"replacement is not weaker"* clause must close it: the replacement negative walks **transitively reachable** production entry points, or names `originate_team_row` explicitly as a needle.
 
-This is not hypothetical — it is the exact seam D-6 says to use. AC4's *"replacement is not weaker"* clause must close it: the replacement negative walks **transitively reachable** production entry points, or names `originate_team_row` explicitly as a needle. A leg that can be satisfied by moving a call one file over is a claim standing in for a control.
+### D-7 — `base_seed` widens from verify to sign
 
-### D-7 — `base_seed` has a production source, and this story widens its use from verify to sign
+`MAOS_CROSS_TEAM_BASE_SEED` — read at `cross_team_consent.rs:93-101`, registered in `env_contract.rs:290`, consumed at `main.rs:2753` via `team_verifying_keys_from_env`. Today production reads the seed **only to derive public keys**. `build_replication_bundle_v2` and `originate_team_row` need it on the **sign** side: a host that could only *check* team signatures can now *make* them.
 
-`MAOS_CROSS_TEAM_BASE_SEED` — read at `crates/maos-bin/src/cross_team_consent.rs:93-101` (64 hex chars → `[u8; 32]`), registered in `crates/maos-bin/src/env_contract.rs:290`, consumed at `main.rs:2753` via `team_verifying_keys_from_env`.
+13.6a already corrected `loom-threat-model.md` T1 for this. **Verify the correction covers the sign-side widening specifically**; extend it if it only re-scoped the forger.
 
-⚠ Note the function's own doc (`cross_team_consent.rs:87`): today production reads the seed **only to derive public keys** — the verify side. `build_replication_bundle_v2` and `originate_team_row` need it on the **sign** side. Same variable, materially different authority: a host that could only *check* team signatures can now *make* them. **Name this in the ADR amendment and in the threat model** (`docs/loom-threat-model.md`); do not let it land as an unremarked widening.
+### D-8 — the applier's site is ratified: `handle_intake_verified` — ⚠ NOW AT `router.rs:1385`
 
-### D-8 — the applier's site is already ratified: `handle_intake_verified`
-
-`crates/maos-a2a-core/src/router.rs:1222`, reached from `crates/maos-a2a-tcp/src/transport.rs:586` **after peer verification**. Story 12.3's preflight resolved (P5r) that this is the **spoof-proof observation site** and that threading through `handle_intake` — ~36 callers, no signature anchor — is wrong. Put the applier arm here; the precedent is ratified, do not re-litigate it.
+`crates/maos-a2a-core/src/router.rs:1385` (**was `:1222` before 13.6a added 244 lines**), reached from `crates/maos-a2a-tcp/src/transport.rs:586` **after peer verification**. Story 12.3's preflight resolved (P5r) that this is the **spoof-proof observation site** and that threading through `handle_intake` — ~36 callers, no signature anchor — is wrong. Put the applier arm here; do not re-litigate.
 
 ### D-9 — the recall work is NOT kernel-core
 
-`main.rs:2950` says `maos_kernel_core::iac::log_recall::LogRecallAdapter`, which reads like kernel-core. It is not: `crates/maos-kernel-core/src/iac.rs:13` is `pub use maos_iac::*;` — a Story-6.5 backward-compat shim. The adapter lives in `maos-iac`. **Adding a public item to `maos-iac` does not move `count_rs_lines` over `maos-kernel-core/src`.** Verify with the gate, do not assume.
+`crates/maos-kernel-core/src/iac.rs:13` is `pub use maos_iac::*;` — a Story-6.5 backward-compat shim. *(Retained for the reader; the read side now lives in **13.6d**.)*
 
-### D-10 — ⚠ BLOCKER-GRADE: wiring the crossing turns `base_seed` from a compromise risk into a standing authority
+### D-10 — wiring the crossing turns `base_seed` into a standing authority
 
-`build_replication_bundle_v2` (`bundle.rs:414`) does:
+`build_replication_bundle_v2` (`bundle.rs:414`):
 
 ```rust
 let team_seed = derive_team_signing_seed(base_seed, source_region, source_team);
@@ -143,203 +112,241 @@ let signing_key = SigningKey::from_bytes(&team_seed);
 let signature = signing_key.sign(&sign_payload);
 ```
 
-and `derive_team_signing_seed(base_seed, region, team)` (`crates/maos-audit/src/sealed_export.rs:72`) works for **any** `(region, team)` in the manifest. T2 requires the emitter host to hold `MAOS_CROSS_TEAM_BASE_SEED`. **Therefore every emitter can sign a valid bundle under every team's key.**
+`derive_team_signing_seed` (`maos-audit/src/sealed_export.rs:72`) works for **any** `(region, team)`. The emitter must hold the seed. **Therefore every emitter can sign a valid bundle under every team's key**, and `apply_replication_bundle` takes `from_team = bundle.source_team` (`bundle.rs:875-879`) → `is_granted(from_team, …)` (`:917`). Consent is decided from a self-declared field whose signature the emitter can forge.
 
-`apply_replication_bundle` then takes `from_team = bundle.source_team` (`bundle.rs:875-879`) and calls `is_granted(from_team, context.to_team, context.intent)` (`:917`). **Consent is decided from a self-declared field whose signature the emitter can forge.**
+**Why the shipped negative does not cover it.** `bundle.rs:1656-1676` / `:1822-1843` forge by **relabel** — a *seed-less* forger. Ours derives the right key and signs correctly. The two never intersect.
 
-Nothing binds the authenticated host to the claimed team. `handle_intake_verified` (`router.rs:1222-1232`) binds `request.params.from.host_id == verified_peer` — **host identity only**. And the manifest has no host→team edge: `CohortMember { host_id, fingerprint, roles }` (`manifest.rs:120`) are hosts; `TeamEntry { team_id, region, datname, members: Vec<SpiritId> }` (`:130`) — a team's members are **Spirits**. The only host→team fact in the system is each host's own local `MAOS_LOOM_HOME_TEAM`: unsignable, uncheckable by a peer.
+### D-11 — 13.6a's answer, and what it actually covers
 
-**The attack.** team-a's host — a valid TLS-pinned cohort member holding the seed — wants a row in team-c where `(team-a → team-c)` is **denied** but `(team-b → team-c)` is **allowed**. It stamps `source_team = team-b`, derives team-b's key from the seed, signs. At team-c: transport ✓, signature verifies against the **claimed** pair ✓, `is_granted(team-b, team-c)` ✓. Row lands. **Asymmetric cross-team consent — the property 13.3 exists to provide — bypassed by impersonation.**
+13.6a bound the **mTLS axis** — `CohortMember.fingerprint` is operator-pinned and cert-bound, not seed-derived — and shipped it as `COHORT_SCHEMA_V4` + `SIG_DOMAIN_V4` with a per-member `team: Option<TeamId>` (`manifest.rs:138-150`, fail-closed on absence), v1/v2/v3 canonical bytes byte-identical.
 
-**Why the shipped negative does not cover it.** `bundle.rs:1656-1676` / `:1822-1843` forge by **relabel** — sign under team-b, relabel to team-a — which fails because team-a's key was never used. That is a **seed-less** forger. Ours derives the right key and signs correctly. The existing control and this threat do not intersect at any point.
+Live at `a414f922`:
+- **Send seam** `router.rs:746` — `source_team_stamp` is read from **this host's own signed V4 declaration**, never caller input; a member with no declared team, or whose leaf no longer equals the signed fingerprint, **cannot originate a crossing at all** (`A2AError::CohortTeamIdentityRefused`).
+- **Accept seam** `router.rs:1429-1445` — `claimed_team = request.cohort_source_team`; refused under `CODE_TEAM_IDENTITY_MISMATCH = -32010` unless the TLS-verified peer speaks for it, from a **single locked manifest snapshot** shared with the consent verdict.
+- `COHORT_INTENT_COLLECTIVE_SHARE` (`router.rs:20`) **already requires** a team claim: `router.rs:1431` fires the check when the intent matches even if `claimed_team` is `None`, so **absence refuses**.
 
-**And the threat model currently claims the opposite.** `docs/loom-threat-model.md` T1 states *"same-region cross-team forgery is cryptographically infeasible"* and **CLOSED on the team axis at ENTRY**. Vex's blast-radius note directly under it scopes the exposure to an attacker who **"recovers"** the seed — a *breach*. 13.6a makes holding the seed a **job requirement**. T1's close was true only while signing was test-only; this story is the introduction.
+### D-13 — ⚠ BLOCKER-GRADE: the authenticated field and the deciding field are two different fields
 
-⚠ **Do not "fix" this by re-scoping AC4 alone.** The room's ratified position (2026-07-28): 13.6a exists so the closer has something real to judge; shipping a knowingly-bypassable crossing defeats the split. **AC6 closes it. AC4's honesty patch stays anyway**, because a seed-holder forging *within its own team*, and an operator who owns a host, remain out of reach.
+**This is what the 13.6a/13.6b split left behind, and it is this story's headline.**
 
-### D-11 — the fix must bind on the one axis the seed cannot reach, and the canonical form prices it at `COHORT_SCHEMA_V4`
+| | Field | Origin | Authenticated? |
+|---|---|---|---|
+| **Envelope** | `request.cohort_source_team` (`json_rpc.rs:98`) | this host's signed `CohortMember.team` (`state.rs:530` → `team_of_host`) | ✅ 13.6a, `router.rs:1442` |
+| **Payload** | `bundle.source_team` | `store.config().home_team` ← `MAOS_LOOM_HOME_TEAM` env (`main.rs:2703`) | ❌ **nothing** |
+| **Decision** | `is_granted(from_team, …)` (`bundle.rs:917`) | reads **`bundle.source_team`** (`:875-879`) | — |
 
-Everything inside the bundle is forgeable, because one key signs all of it — so carrying a stable `SpiritId` in the leaf (v4) does **not** help: the seed-holder forges that too. Note the leaf carries `spirit_pid: i64` (runtime-local, meaningless on the destination host), and `TenantMapPort::team_of(spirit_pid)` (`tenant_map.rs:115`) is local-only.
+**The attack, post-13.6a.** team-a's host stamps a truthful envelope (`cohort_source_team = team-a`, forced by `router.rs:746` — it cannot lie there) and a **lying payload** (`source_team = team-b`, signed correctly with team-b's seed-derived key). The applier: transport ✓ · `-32010` team binding ✓ *(the envelope is honest)* · bundle signature verifies against the **claimed** pair ✓ · `is_granted(team-b, team-c)` ✓. **Row lands. D-10 intact.**
 
-**The mTLS identity is the exception.** `CohortMember.fingerprint` is operator-pinned and cert-bound; it is **not** derived from `base_seed`. team-a's host cannot present team-b's certificate. That is the axis to bind on.
+⇒ **The applier must refuse when `bundle.source_team ≠ the authenticated envelope claim.** Four lines of comparison — and the only thing standing between the tenant wall and an impersonation bypass. It gets its **own named leg and its own inverter**, never a clause folded inside AC1.
 
-**Price it honestly.** `to_canonical_bytes` (`manifest.rs:208`) writes per member `host_id` / `fingerprint` / `roles`, and the `TeamEntry` block sits inside the `V2 | V3` arm (`:254`). **Any new field changes the signed pre-image**, so it must be gated behind a new version or v1/v2/v3 signatures break. `COHORT_SCHEMA_V3` and `SIG_DOMAIN_V3` are **already spent** (13.3, `manifest.rs:53`, `SUPPORTED_COHORT_SCHEMAS` at `:54`).
+⚠ **13.6a's impersonation negative cannot be reused as evidence here.** It is proven *against synthetic frames at the envelope*. This is a different assertion at a different site, and calling 13.6a's leg a proof of it would be the failure shape this epic keeps cataloguing.
 
-⇒ **`COHORT_SCHEMA_V4` + `SIG_DOMAIN_V4`, with v1/v2/v3 canonical bytes byte-identical by construction** — the 9.2b additive idiom, now over **three** frozen predecessors (13.3b already ran it over two for leaf v3). Do not attempt a "just add an optional field" shortcut: `deny_unknown_fields` plus a shared pre-image means there isn't one.
-
-### D-12 — the evicted-applier case: entailment tested, REFUTED, and re-grounded on the real mechanism
-
-The party-mode preflight asserted that AC6's mTLS team binding would also close the evicted-host residual, and instructed the dev to *"verify that entailment mechanically."* **It was verified. It is false.** Recorded here rather than quietly corrected, because the failure shape is the one this project keeps cataloguing: *a claim that happens to be true is still a claim.*
-
-**Why AC6 cannot close it.** AC6 binds the **sender's** cert → team. The 13.3 finding is about the **receiver** — `state.local_host()` removed from `manifest.members` by a fresh signed reissue. Opposite ends of one connection.
-
-**And the store path is weaker than the finding described.** The crossing applies via:
+### D-14 — ⚠ THE EMITTER CANNOT BE A ONE-SHOT. There is exactly one production outbound A2A path.
 
 ```
-apply_replication_bundle → apply_verified_replication_bundle → store.write_with_source_attested()   (store.rs:553)
+maos-a2a-tcp/src/transport.rs:730   .prepare_outbound(frame, peer, self.own_boot_nonce)
 ```
 
-`team_guard` guards exactly **four** functions — `write:497`, `erase:718`, `read:834`, `scan:956` (13.1's four-site chokepoint). `write_with_source_attested` is a **fifth write path and is not among them** — correctly, because `team_guard` refuses foreign-team rows, which is exactly what a crossing is.
+is the **only** non-test outbound send in the workspace. The transport that owns it is constructed **only** in `build_cohort_a2a_daemon_runtime` (`main.rs:9482`), called **only** from `run_cohort_a2a_daemon` (`:9286`), reached **only** from the `MAOS_ONE_SHOT=cohort-a2a-daemon` dispatch arm at `main.rs:7643`.
 
-The eviction check lives **inside** `TenantMapAdapter::current_manifest()` (`tenant_map.rs:101-108`, *"local host {} was evicted from the cohort"*), reachable only via:
-- `team_of` — called **only** from `team_guard`. The crossing skips it.
-- `datname_for` — called **only** from `connection_assignment_guard`, which runs **once at `init_schema`**. Boot-time only; a post-boot eviction is never seen.
+A sibling one-shot at `main.rs:4883` (the collective-erase idiom the previous draft told you to copy) returns **~4,700 lines before any transport, peer pin, or manifest gate exists**. It cannot send an authenticated cohort frame.
 
-And `CrossTeamConsentAdapter::is_granted` (`cross_team_consent.rs:26-46`) is `manifest_if_fresh()` + `cross_team_admits` — **no membership check**, exactly as filed.
+⇒ **The emitter lives inside the cohort-a2a-daemon runtime.** This is the 13.5a shape — *"the daemon returns before all governance"* — arriving one story later on the send side. See T2.
 
-⇒ **The eviction check was never a control in its own right — it is a side effect of the tenant-map lookup, and the crossing path drops it as a consequence of being a crossing.**
+### D-15 — ⚠ the five-cause matrix has never crossed a process boundary OR a kernel boundary
 
-**What actually closes it.** `handle_intake_verified` (`router.rs:1222`) delegates to `handle_intake` (`:840`), which at `:1108` calls the Story-12.1/12.3 cohort gate. `CohortConsentVerdict::NotCurrent` is documented (`cohort.rs:87-89`) as *"stale **or no longer contains the local member**"* and NACKs at `:1117`. **The A2A cohort gate performs a receiver-side self-membership check on every accepted frame.** Because D-8 puts the applier behind that seam, an evicted applier NACKs before any bundle is applied.
+Two independent erasures, both measured:
 
-**Four conditions this rests on — all true at `cb412348`, none asserted anywhere. AC6 pins them:**
-1. `is_reserved_cohort_intent` (`router.rs:502`) short-circuits the gate for exactly `RESERVED_INTENT_REISSUE` and `RESERVED_INTENT_HALT_RECEIPT` — **on BOTH seams** (`:660` Send, `:1107` Accept). **`collective:share` must never join that set**, or both seams vanish at once.
-2. The gate is `Option<Arc<dyn CohortManifestGate>>`; a node constructed without a real gate gets `LegacyCohortManifestGate`, which `Defer`s everything (`cohort.rs:137`).
-3. **The emitter side has the same self-check** — verified: `CohortConsentSeam::Send` runs the same chokepoint (`:509`) and `NotCurrent` returns `A2AError::ConfigInvalid` (`:677-682`). An evicted host cannot *send* a crossing either. `NotCurrent`'s condition (`state.rs:555-566`) is freshness **AND** `local_host ∈ members`.
-4. ⚠ **`Defer` is evaluated BEFORE the self-membership check, and it is a pass.** This is the one that bites:
+1. **The socket.** `grep -rn "TransportCause" crates/maos-a2a-core crates/maos-a2a-tcp` → **zero occurrences.** `TransportCause` lives in `maos-domain` and is mapped only in `maos-loom-lite/src/adapter.rs` and `replication/router.rs` — all same-process. There is no wire encoding and no A2A code for a cross-team consent denial.
+2. **The kernel.** `crates/maos-kernel-core/src/memory/mod.rs:204`:
+   ```rust
+   maos_domain::ports::CollectivePortError::Transport(_) => CollectiveErrorKind::Transport,
+   ```
+   **The cause is discarded.** Every one of the five causes collapses to the single word `Transport` at the kernel boundary. No Spirit has ever been able to distinguish `ConsentDenied` from `MapStale`, on any path, since the port was written.
 
-```rust
-// state.rs:546-554  — counterparty not in roster
-if !manifest.members.iter().any(|m| m.host_id == counterparty.as_str()) {
-    return CohortConsentVerdict::Defer;      // ← returns BEFORE `current` is computed
-}
-// state.rs:555-566  — only now is local_host ∈ members evaluated
-if !current { return CohortConsentVerdict::NotCurrent; }
-```
+⇒ The previous AC2 wording (*"refused with `TransportCause::ConsentDenied`"* observed by the emitter) asked for something the architecture has never provided anywhere. **Resolved, not weakened** (AC2 below): the refusal crosses the wire as a **new typed A2A cause** following the shipped `interpret_response` idiom, and `TransportCause` stays applier-local where it is already correct and already tested.
 
-Two consequences. **(a)** If the counterparty is outside the roster, the local host's own eviction is **never evaluated at all**. **(b)** Worse — an applier whose manifest has dropped the *sender* returns `Defer`, and `:1115` treats `Defer => {}` as a **pass**: a **de-rostered sender can still push a crossing into a healthy applier.** TOFU pin and peer allowlist do not help — those are *config-time* facts, not *manifest-time* facts; the certificate is still valid, only cohort membership was revoked. This is `Defer`'s documented intent (*"a peer outside the roster is a mixed-deployment bilateral path, not a cohort denial"*) — deliberate generality for mixed deployments that is **wrong for a crossing**.
+**The kernel erasure is NOT this story's to fix** — `collective_port_error` is wildcard-free and lives in kernel-core; widening it is a re-pin off 23401 and a FLAG-Winston conversation. **Record it for 13.6 with an owner** (Residual 6).
 
-*(Separately confirmed and NOT the hazard: `Defer` is also reachable for a **rostered** peer via `EConsentPeerNotMember` at `state.rs:592` — roster membership and consent-table membership are two different notions. That path sits **after** the `current` check, so it does not bypass self-eviction.)*
+### D-16 — the seam comment at `bundle.rs:441` is wrong, and it has been steering design for three stories
 
-**The fix is scoped, not a rollback of 12.1:** on the crossing intent only, `Defer` is a **refusal**, on both seams. General A2A keeps its bilateral fallback; `collective:share` requires cohort membership on both ends. Ratified in the room — Winston withdrew the objection on the ground that `collective:share` postdates 12.1, so this adds a rule to a new intent rather than changing shipped behavior.
+Verbatim on disk:
+
+> *"No production caller exists yet: the Spirit→collective digest publication flow is the 13.6 journey. **This is the seam it will use.**"*
+
+Measured against the code: `CollectiveMemoryPort` (`maos-domain/src/ports/collective_memory.rs:111`) has exactly four methods — `write`, `read`, `scan`, `erase`. **There is no `share`.** A Spirit cannot express a crossing through that port, and `write` is precisely the method `team_guard` refuses foreign-team rows on (`store.rs:497`). A Spirit-initiated crossing would need a **new port verb plus a kernel-core call site** — non-zero kernel Δ.
+
+**The architecture is right and the comment is wrong.** The Spirit initiates **publication** into its own team's collective tier (13.5d, already wired). The **host** initiates the **crossing**, under the signed manifest. They were never the same seam — and keeping them separate is a security property, not an accident: *a Spirit that can name a destination team is a Spirit that can be prompt-injected into naming one.*
+
+⇒ **Correct the comment in this commit** (the 13.6a T1 precedent). This retires R1 properly instead of apologising for it.
+
+### D-12 — the evicted-applier case: entailment tested, REFUTED, re-grounded (line pins refreshed for `a414f922`)
+
+The earlier preflight asserted AC6's mTLS binding would also close the evicted-host residual. **It was verified and it is false.** AC6 binds the **sender's** cert → team; the 13.3 finding is about the **receiver** (`state.local_host()` removed from `manifest.members` by a fresh signed reissue). Opposite ends of one connection.
+
+**And the store path is weaker than the finding described.** The crossing applies via `apply_replication_bundle → apply_verified_replication_bundle → store.write_with_source_attested()` (`store.rs:553`) — a **fifth** write path outside `team_guard`'s four-site chokepoint (`write:497`, `erase:718`, `read:834`, `scan:956`), correctly so, because `team_guard` refuses foreign-team rows, which is what a crossing *is*.
+
+The eviction check lives **inside** `TenantMapAdapter::current_manifest()` (`tenant_map.rs:101-108`), reachable only via `team_of` (called only from `team_guard`) or `datname_for` (called only from `connection_assignment_guard`, **boot-time only**).
+
+⇒ **The eviction check was never a control in its own right — it is a side effect of the tenant-map lookup, and the crossing drops it as a consequence of being a crossing.**
+
+**What actually closes it:** `handle_intake_verified` (`router.rs:1385`) → `handle_intake` (`:961`) → the Story-12.1/12.3 cohort gate. `CohortConsentVerdict::NotCurrent` is documented (`cohort.rs`) as *"stale **or no longer contains the local member**"* and NACKs. Because D-8 puts the applier behind that seam, an evicted applier NACKs before any bundle is applied.
+
+**Conditions, re-verified at `a414f922`:**
+1. `is_reserved_cohort_intent` (`router.rs:521-523`) short-circuits the gate for exactly `RESERVED_INTENT_REISSUE` and `RESERVED_INTENT_HALT_RECEIPT`. **`collective:share` must never join that set.** ✅ still true.
+2. The gate is `Option<Arc<dyn CohortManifestGate>>`; a node built without a real gate gets `LegacyCohortManifestGate`, which `Defer`s everything.
+3. The emitter side has the same self-check — `CohortConsentSeam::Send` runs the same chokepoint; `NotCurrent` → `A2AError::ConfigInvalid`.
+4. `Defer`-before-self-membership: **closed by 13.6a·AC4** — `Defer` is now a refusal on `collective:share` on both seams, routed through the shipped Deny path under `CrossingDeferRefused`, with the 12.1 bilateral fallback proven preserved.
+   ⚠ **13.6a recorded an honest finding you must not misread:** on the **Accept** seam the Defer rule is defense-in-depth *behind* the team binding (an off-roster member has no signed team edge, so `-32010` fires first). It is independently reachable and proven on the **Send** seam. Do not cite the Accept-seam leg as proof of the Defer rule.
 
 ---
 
-## Design — two initiators, one mesh, zero new gates
+## Design — two daemons, one mesh, zero new gates
 
 ```
    TEAM-A HOST (maos_team_a)                      TEAM-B HOST (maos_team_b)
    MAOS_LOOM_HOME_TEAM=team-a                     MAOS_LOOM_HOME_TEAM=team-b
+   MAOS_ONE_SHOT=cohort-a2a-daemon                MAOS_ONE_SHOT=cohort-a2a-daemon
    ┌──────────────────────────────┐               ┌──────────────────────────────┐
    │ store_a (datname maos_team_a)│               │ store_b (datname maos_team_b)│
    │                              │               │                              │
-   │ [WRITE-SIDE INITIATOR]  NEW  │               │ [APPLIER] NEW, inside        │
-   │ originate_team_row(...)      │               │ handle_intake_verified       │
-   │   ← seam 13.3b left (D-6)    │               │   ← router.rs:1222 (D-8)     │
-   │ build_replication_bundle_v2  │  cohort A2A   │ apply_replication_bundle(    │
-   │   (leaves, region_a, team_a) │──frame,──────▶│   bundle, &store_b, "reg-b", │
-   │                              │  intent =     │   Some(CrossTeamApplyContext │
-   │                              │ collective:   │     ::new(&team_b,           │
-   │                              │    share      │       "collective:share")),  │
-   │                              │               │   &base_seed)                │
-   │                              │               │        │                     │
-   │                              │               │        ▼ bundle.rs:917       │
-   │                              │               │  is_granted(team_a, team_b,  │
+   │ [EMITTER] NEW — INSIDE the   │               │ [APPLIER] NEW — inside       │
+   │ daemon runtime (D-14).       │               │ handle_intake_verified       │
+   │ originate_team_row(...)      │               │   ← router.rs:1385 (D-8)     │
+   │ build_replication_bundle_v2  │  cohort A2A   │                              │
+   │   (leaves, region_a, team_a) │──frame,──────▶│ ① envelope team ✓ (13.6a)    │
+   │ prepare_outbound stamps      │  intent =     │ ② ⚠ WELD: bundle.source_team │
+   │   cohort_source_team from    │ collective:   │    == authenticated claim?    │
+   │   the SIGNED declaration     │    share      │    else refuse (D-13, AC3)   │
+   │   (router.rs:746)            │               │ ③ apply_replication_bundle(  │
+   │                              │               │      …, CrossTeamApplyContext │
+   │                              │◀──NACK────────│      ::new(&team_b, intent)) │
+   │ interpret_response gains ONE │  typed cause  │        │                     │
+   │ arm → typed refusal (AC2)    │  + data{from, │        ▼ bundle.rs:917       │
+   │                              │   to, intent} │  is_granted(team_a, team_b,  │
    │                              │               │    "collective:share")       │
    │                              │               │   ← FIRST PRODUCTION REACH   │
    └──────────────────────────────┘               └──────────────────────────────┘
 
-   [READ-SIDE INITIATOR]  NEW: a production surface that names a target team
-   → LogRecallPort::recall_cross_wall(pid, &team_b, filter)   (maos-iac:347)
-   → CrossWallRecallConsentAdapter  (already wired, main.rs:2958)
+   BOOT, both hosts (AC4): MAOS_LOOM_HOME_TEAM == manifest.team_of_host(local_host)
+                           or the process does not start.
 ```
 
-**The consent tuple is already keyed by intent** — `(from_team, to_team, "collective:share")` is the shipped shape (`crates/maos-cohort/src/manifest.rs:1534,1552`). So the crossing rides an existing intent-carrying A2A frame; **do not add a `FrameKind` variant.** `FrameKind` (`crates/maos-spirit-abi/src/identity.rs:30`) is a `repr` ABI enum with explicit discriminants — a new variant is an ABI surface change, and the epic already recorded that `abi-diff` is a **null control** that cannot see it (`epic-13:218`). Ride the intent, not the enum.
-
-**Operator-verb precedent for the emitter:** the collective-erase one-shot at `main.rs:4883`+ (`MAOS_ONE_SHOT`, env-driven args at `:4920-4943`, port call at `:4947`, then `insert_kernel_event_returning_id`). Copy that shape — it is the ratified idiom (13.5b AC4(a)), and every other one-shot verb has it.
+**The consent tuple is already keyed by intent** — `(from_team, to_team, "collective:share")` is the shipped shape (`manifest.rs:1534,1552`), and `COHORT_INTENT_COLLECTIVE_SHARE` already exists (`router.rs:20`). **Do not add a `FrameKind` variant** — `FrameKind` (`maos-spirit-abi/src/identity.rs:30`) is a `repr` ABI enum and `abi-diff` is a **null control** that cannot see an addition (`epic-13:218`). Ride the intent, not the enum.
 
 ---
 
-## Acceptance Criteria (5)
+## Acceptance Criteria (6)
 
-### AC1 — A production write-side crossing initiator exists, and the crossing lands on a real second database
+### AC1 — A production write-side crossing initiator exists, inside the daemon, and the crossing lands on a real second database
 
-**Given** two processes, each booted in tenant mode against its own `datname` (`maos_team_a`, `maos_team_b`), joined by the cohort A2A mesh,
+**Given** two `cohort-a2a-daemon` processes, each booted in tenant mode against its own `datname` (`maos_team_a`, `maos_team_b`), joined by the cohort A2A mesh,
 **When** team A initiates an allowed `collective:share` for a named destination team,
-**Then** a production (non-test) code path builds the bundle on A's host, transports it as a cohort A2A frame under intent `collective:share`, and a production code path on B's host applies it via `apply_replication_bundle` with a real `CrossTeamApplyContext`,
+**Then** a production (non-test) code path **inside the daemon runtime** (D-14 — **not** a sibling `MAOS_ONE_SHOT` arm) builds the bundle on A's host via `originate_team_row` + `build_replication_bundle_v2`, transports it as a cohort A2A frame under intent `collective:share`, and a production path on B's host applies it via `apply_replication_bundle` with a real `CrossTeamApplyContext`,
 **And** the row is physically present in `maos_team_b` and physically **absent** from `maos_team_a`'s destination-key space — the unguarded physical-absence witness a shared table cannot fake (13.1·AC4 idiom),
-**And** **no process holds two `LoomLiteStore`s** (D-5) — and this is a **control, not a sentence**: a `Blocking` static leg asserts exactly one production `LoomLiteStore::new` (today `main.rs:2766`), proven-red by adding a second construction. The applier's store is its own home-team store, and `connection_assignment_guard` still passes on both hosts,
-**And** `replication-crossing-has-no-production-initiator` is **inverted in the same commit** (D-2) — never left half-deleted (the 11.3 D2 / 10.4c atomic-cutover lesson).
+**And** **no process holds two `LoomLiteStore`s** (D-5) — a **control, not a sentence**: a `Blocking` static leg asserts exactly one production `LoomLiteStore::new` (today `main.rs:2766`), proven-red by adding a second construction. `connection_assignment_guard` still passes on both hosts,
+**And** `replication-crossing-has-no-production-initiator` (`check_multi_tenant_loom.rs:364`) is **inverted in the same commit** — never left half-deleted (11.3 D2 / 10.4c atomic-cutover).
 
-### AC2 — Consent is enforced on the live path, not merely constructed
+### AC2 — Consent is enforced on the live path, and the refusal survives the wire
 
-**Given** the crossing of AC1 is production-reachable,
+**Given** the crossing of AC1 is production-reachable, and **D-15** measured that `TransportCause` has **zero** occurrences in either A2A crate,
 **When** an A→B share runs with only an A→B grant in the signed manifest,
-**Then** `CrossTeamConsentAdapter::is_granted` is reached by a **real production call** (D-1's site gains its first non-test caller), and the share lands,
-**And** the reverse B→A share is refused with `TransportCause::ConsentDenied` carrying the **ordered pair and the intent** — asymmetry enforced on the live path, not only in `bundle.rs`'s unit tests,
-**And** a stale lease refuses as `MapStale` and an unavailable state as `StateUnavailable`, remaining distinguishable from `ConsentDenied` (the five-cause matrix at `crates/maos-loom-lite/src/adapter.rs:235` must still hold end-to-end, not just over hand-built `StoreError`s),
-**And** each of these three outcomes is **proven-red per limb**: a mutation that neuters one refusal reds its own leg and leaves the others green.
+**Then** `CrossTeamConsentAdapter::is_granted` is reached by a **real production call** (D-1's site gains its first non-test caller) and the share lands,
+**And** the reverse B→A share is refused at the **applier** and the refusal reaches the **emitter** as a typed, attributable outcome: a **new A2A code** (following `CODE_TEAM_IDENTITY_MISMATCH = -32010`'s shipped pattern) carrying `from_team` / `to_team` / `intent` in the NACK `data`, re-materialised emitter-side by **one more arm in `interpret_response`** (`router.rs:820`, which already does exactly this for five codes),
+**And** `TransportCause::ConsentDenied` remains **applier-local** — the five-cause matrix (`maos-loom-lite/src/adapter.rs:235`) still holds end-to-end **within the applier process**, which is the only boundary it has ever crossed,
+**And** a stale lease and an unavailable state remain **distinguishable from consent denial on the emitter's side too** — three distinct observable outcomes, not one generic transport failure,
+**And** each of these is **proven-red per limb**: a mutation that neuters one refusal reds its own leg and leaves the others green.
 
-### AC3 — A production read-side cross-wall recall initiator exists, and refusal is first-class
+### AC3 — ⚠ The team the wall judges is the team the mesh authenticated
 
-**Given** `recall_cross_wall` is unreachable because no production request can name a team (D-4),
-**When** a production surface issues a traceback against a named remote team,
-**Then** `LogRecallPort::recall_cross_wall` is reached in production with a real `&TeamId`, consent is proven fresh through the already-wired `CrossWallRecallConsentAdapter` (`main.rs:2958`), and an allowed recall returns the remote page,
-**And** an unconsented or stale-lease recall surfaces `ECrossWallRecallDenied` as an **observable operator outcome**, never folded into an empty-page success (ADR-049 §7 provenance-presence discipline),
-**And** ⚠ **the emitter-scope pin on plain `recall` is not widened as a side effect.** 13.3b·AC2 ratified the citer-auth control (`distillate.rs:330-359`, Story 8.10 AC2b) precisely so a digest-of-digest cannot launder a cross-principal raw frame. Cross-wall reach is granted **only** through the team-named path with its own consent proof; a mutation that lets plain `recall` cross the wall must red,
-**And** `cross-wall-recall-no-production-caller` is **inverted in the same commit**, with this story named as its owner in the leg's replacement.
+**Given** D-13: `is_granted` decides from `bundle.source_team` (payload, unauthenticated) while 13.6a authenticates `request.cohort_source_team` (envelope), and **nothing binds them**,
+**When** a frame arrives whose envelope claim is truthful and whose payload `source_team` names a different team,
+**Then** the applier **refuses before `apply_replication_bundle` is called**, under its **own named cause**, distinguishable from both `CODE_TEAM_IDENTITY_MISMATCH (-32010)` (a lying envelope) and from consent denial (an honest but ungranted crossing),
+**And** the refusal is proven by a **live negative that only this story can run**: a real emitter that stamps a truthful envelope and a forged payload — the **seed-holding** forger of D-10, which the shipped relabel negative (`bundle.rs:1656-1676`) structurally cannot reach,
+**And** ⚠ **13.6a's impersonation leg may NOT be cited as evidence for this AC.** That leg proves the envelope binding against synthetic frames; this is a different assertion at a different site. Citing it would be a claim standing in for a control,
+**And** the leg has its **own named inverter**, never folded into AC1's composite.
 
-### AC4 — Every inverted dead-wire clause is replaced by a control that is not weaker
+### AC4 — One host, one team: the env and the signed manifest are reconciled at boot
 
-**Given** AC1 and AC3 each retire a Blocking negative that was doing real work,
+**Given** two independent surfaces name this host's team — `MAOS_LOOM_HOME_TEAM` (env, `main.rs:2703` → `store.config().home_team` → `bundle.source_team`) and `CohortMember.team` (signed manifest, → the envelope stamp) — and nothing reconciles them,
+**When** the daemon boots,
+**Then** `reconcile_transport_identity_with_manifest` (`main.rs:9407`, called `:9504`) is **extended to the team axis**: `MAOS_LOOM_HOME_TEAM` must equal `manifest.team_of_host(local_host)` or the process **fails to start**,
+**And** this follows that function's own shipped doctrine verbatim — *"a config-time fact silently overrides a manifest-time fact … **Disagreement is a boot error, never a warning**"* — which 13.6a's review wrote for **certificates** and left unwritten for **teams**, one field over,
+**And** ⚠ **this does NOT replace AC3.** An attacker owns their own boot and will simply set the env correctly and lie in the payload. AC3 is the security control against a peer; AC4 is the correctness control against misconfiguration — a host whose env and manifest disagree otherwise emits crossings attributed to the wrong team, or fails mysteriously. **State both sentences; do not let either stand in for the other.**
+
+### AC5 — Every inverted dead-wire clause is replaced by a control that is not weaker
+
+**Given** AC1 retires a Blocking negative that was doing real work,
 **When** the gate is rewritten,
-**Then** each inverted clause is replaced by **(a)** a positive leg naming both endpoints of the now-live path, **and (b)** a *new* negative that only becomes falsifiable **because** the crossing is live — at minimum: an **unconsented crossing is refused at the destination applier** (not merely un-initiated at the source), and a **relabelled `source_team` stamp from a seed-less forger** is refused under the 13.2 derived team key — ⚠ **scoped exactly so, and no wider.** This clause may **not** be written as "forged `source_team` is refused" or "Fork-4 proven": per D-10 a **seed-holding** emitter derives the claimed team's key and signs correctly, so the derived-key check cannot see it. Impersonation is AC6's, not this leg's; overstating it here would be the 27th claim standing in for a control,
-**And** each clause is written as a **separately-named leg with its own named inverter** — never one composite assertion (the ratified rule at `epic-13:175`; a composite leg here is exactly what went wrong before the (f-i)/(f-ii) split),
-**And** ⚠ **the D-6b hole is closed**: the replacement negative must not be satisfiable by routing the call one file over. `originate_team_row` lives inside the module the current scan skips and calls `build_replication_bundle_v2` internally, so the replacement either walks **transitively reachable** production entry points or names `originate_team_row(` explicitly as a needle. **Prove it**: a fixture that calls `originate_team_row` from a production module must red the replacement leg,
-**And** the replacement negatives are proven-red by mutation, each reddening only its own leg.
+**Then** the inverted clause is replaced by **(a)** a positive leg naming **both endpoints** of the now-live path, **and (b)** *new* negatives that only become falsifiable **because** the crossing is live — at minimum an **unconsented crossing refused at the destination applier** (not merely un-initiated at the source) and a **relabelled `source_team` from a seed-less forger** refused under the 13.2 derived team key — ⚠ **scoped exactly so, and no wider.** This clause may **not** be written as "forged `source_team` is refused" or "Fork-4 proven": per D-10 a seed-holding emitter signs correctly and the derived-key check cannot see it. **That attacker is AC3's**, and AC3 is where its evidence lives,
+**And** each clause is a **separately-named leg with its own named inverter** — never one composite assertion (`epic-13:175`),
+**And** ⚠ **the D-6b hole is closed**: the replacement must not be satisfiable by routing the call one file over. `originate_team_row` lives inside the module the current scan skips (`cross_team_consent_13_3.rs:201`) and calls `build_replication_bundle_v2` internally, so the replacement either walks **transitively reachable** production entry points or names `originate_team_row(` explicitly as a needle. **Prove it**: a fixture calling `originate_team_row` from a production module must red the replacement leg,
+**And** every replacement negative is proven-red by mutation, each reddening only its own leg,
+**And** the **13.5g composition-root test applies**: delete the new production initiator and confirm the positive legs **red**. If they stay green they are testing the library, not the wiring.
 
-### AC5 — Gate, ADR and budget
+### AC6 — Gate, ADR, comment, and budget
 
 **Given** ADR-055 owns the tenant wall and `check-multi-tenant-loom` is its gate,
 **When** this story's legs are registered,
-**Then** they go on **`check-multi-tenant-loom`** — **no new gate** (13.5c **K5(b)**, re-ratified at the 13.5e preflight: that gate already keys the `MAOS_TEST_POSTGRES_TEAM_A`/`_B` substrate, already models both `BindingClass` values with the non-vacuity guard, and already owns the `ABSENT_SUCCESSORS` surface that must be rewritten anyway),
+**Then** they go on **`check-multi-tenant-loom`** — **no new gate** (13.5c K5(b), re-ratified at 13.5e),
 **And** every hermetic leg is `Blocking` with **one `#[test]` per `--exact` leg** (the gate's only anti-vacuity oracle is `"running 1 test"` + `"1 passed"`, structurally blind to a null assertion),
 **And** live two-datname legs are `AdvisorySubstrate` and **`.expect()` their own env var rather than silently skipping** (the 13.5g pattern — a skipped leg that prints green is the failure this project keeps catching),
-**And** `check-kernel-baseline` proves **23401 unchanged** (ZERO kernel-core Δ — D-6; if the measurement disagrees, **stop for FLAG-Winston, do not route around the owner**),
-**And** ADR-055 is amended (or ADR-058 extended) with the two-process crossing topology of D-5 and its honest limit; `check-multi-tenant-loom`'s `ABSENT_SUCCESSORS` is updated to reflect what this story closes and what it does not.
+**And** ⚠ **the `bundle.rs:441` seam comment is corrected in this commit** (D-16): the Spirit initiates publication, the host initiates the crossing; they were never the same seam. A stale comment that misdirects design is a deliverable, not a nit — the 13.6a T1 precedent,
+**And** `check-kernel-baseline` proves **23401 unchanged** (measured equal at `a414f922`; if it disagrees, **stop for FLAG-Winston, do not route around the owner**),
+**And** ADR-055 is amended with the **two-daemon** crossing topology (D-14), the envelope/payload weld (D-13), and the boot reconcile (AC4); `ABSENT_SUCCESSORS` is updated to reflect what this story closes and what it does not.
 
-### ⟶ AC6 moved to Story 13.6a
-
-The authenticated-team-identity AC — manifest `COHORT_SCHEMA_V4` host→team binding, both-seam eviction pins, `Defer`-as-refusal on the crossing intent, and the `loom-threat-model.md` T1 correction — is **Story 13.6a's**, and lands **before** this story.
-
-**What that buys this story:** the impersonation negative is live from this story's first commit rather than being a gap it has to document. D-10, D-11 and D-12 stay here because they are the *measurements that justify the ordering*, and because a dev reading this file must understand why `bundle.source_team` cannot be trusted on its own.
-
-⚠ **Do not re-implement any of it here.** If 13.6a's binding is missing at implementation time, this story is **blocked** — not licensed to ship without it.
 ---
 
 ## Traps — every one of these has bitten this repo already
 
-1. **The one-store wall (D-5).** Do not construct a second `LoomLiteStore` to "reach" team B. That defeats ADR-055 in the act of demonstrating it, and `connection_assignment_guard` will be telling the truth when it refuses. Two processes, one mesh.
-2. **Do not add a `FrameKind` variant.** `abi-diff` cannot see it (`epic-13:218` — const signatures are value-erased, the diff fails only on *removed* lines). Ride the existing intent-carrying frame; `collective:share` is already the manifest's key.
-3. **Atomic cutover.** Invert the dead-wire legs and land the positive replacements in the **same commit**. A half-deleted negative is worse than the negative (11.3 D2; 10.4c 7-file cutover).
-4. **`.expect()`, never skip.** The `AdvisorySubstrate` house pattern still emits `passed: true` on absent substrate (deferred-work 2026-07-25, `check_reza_production_path.rs:474-545`). That is a known cross-gate defect **owned by 13.6**; do not rely on it here — the live legs must `.expect()` their own var so an unset substrate is loud.
-5. **One `#[test]` per `--exact` leg.** Two tests behind one leg name defeats the `"running 1 test"` oracle.
-6. **Proven-red per limb, byte-identical restore.** Mutate one limb, confirm it reds *its own* leg and leaves siblings green, restore with `diff -q` / empty `git diff`. Serialize the mutations; do not batch.
-7. **Do not "fix" `main.rs:2402` / `SpiritMemoryView`.** It forwards only to the trait path, a permanent `CapabilityDenied` in production **by design** (`memory/mod.rs:721-739`). 13.5d already recorded this trap.
-8. **`ranged_recall` is forbidden** for the read side — path-addressed, capability-free, and compile-pinned out by `spirits/researcher` (13.3b·AC3). Use the consented `recall_cross_wall` path.
-9. **Measure the baseline in an isolated `git worktree`**, not a dirty tree (the 13.5i error, fixed at 13.5j). "Code first, then the pin."
-10. **The dead-wire leg has a hole (D-6b).** Its scan skips `replication/bundle.rs`, and `originate_team_row` — the very seam you are told to use — lives there. Inverting the crossing *in fact* while the leg stays green is one file move away. Close it, and prove the closure.
-11. **The base seed widens from verify to sign (D-7).** Say it in the ADR and the threat model rather than letting it land unremarked.
-12. **Applier goes in `handle_intake_verified`, not `handle_intake`** (D-8). ~36 callers, no signature anchor. Ratified at 12.3; do not re-litigate.
-13. **Never say "Fork-4 proven" about the crossing.** Fork-4's forgery resistance held while signing was test-only. Wiring it hands every emitter the seed, and a seed-holder signs correctly under any team (D-10). AC6 restores a real boundary on the mTLS axis; AC4's derived-key leg covers only the **seed-less relabel** attacker. Two different claims — keep them apart.
-14. **`COHORT_SCHEMA_V3` is already spent** (13.3). The team binding is **v4**, and v1/v2/v3 canonical bytes must stay byte-identical — golden-byte tests for all three. There is no "just add an optional field": the pre-image is shared and `deny_unknown_fields` is on.
-15. **`cargo run -q -p xtask -- <cmd>`.** There is no `cargo xtask` alias.
+1. **The one-store wall (D-5).** Do not construct a second `LoomLiteStore` to "reach" team B. That defeats ADR-055 in the act of demonstrating it. Two daemons, one mesh.
+2. **The emitter is not a one-shot (D-14).** `main.rs:4883` is ~4,700 lines before any transport exists. Copying the collective-erase idiom produces a process that cannot send.
+3. **The weld is the story (D-13).** Everything else is plumbing around it. Do not let it become a clause inside AC1.
+4. **Do not cite 13.6a's impersonation leg for AC3.** Different site, different assertion.
+5. **Do not add a `FrameKind` variant.** `abi-diff` cannot see it (`epic-13:218`). Ride the existing intent.
+6. **Atomic cutover.** Invert the dead-wire leg and land the positive replacements in the **same commit** (11.3 D2; 10.4c).
+7. **`.expect()`, never skip.** The `AdvisorySubstrate` house pattern still emits `passed: true` on absent substrate — a known cross-gate defect **owned by 13.6**.
+8. **One `#[test]` per `--exact` leg.**
+9. **Proven-red per limb, byte-identical restore** (`diff -q`). Serialize the mutations; do not batch.
+10. **No new `CollectivePortError` variant.** `collective_port_error` (`kernel-core/src/memory/mod.rs:198-211`) is wildcard-free and lives in kernel-core: a variant makes it non-exhaustive → compile error → the ZERO claim breaks. Refusal causes ride `Transport(TransportCause)` applier-side and the new A2A code on the wire.
+11. **Do not "fix" the kernel erasure (D-15).** `Transport(_)` at `memory/mod.rs:204` is a kernel-core edit. Record it (Residual 6); 13.6 judges it.
+12. **The dead-wire leg has a hole (D-6b).** Close it, and prove the closure.
+13. **Applier goes in `handle_intake_verified` (now `router.rs:1385`), not `handle_intake`** (D-8). Ratified at 12.3.
+14. **Never say "Fork-4 proven" about the crossing.** A seed-holder signs correctly under any team. AC3 restores the boundary; AC5's derived-key leg covers only the seed-less relabel attacker. Two claims — keep them apart.
+15. **⚠ `maos-a2a-core` has 84 lines of reserve** (ceiling **4271**, measured **4187**), and it is an **unratified FLAG-Winston grant from 13.6a's review**. The applier arm, the weld, and the new code+dispatch arm all land there. **Surface this at design time, not at "done"** — that has happened four consecutive stories and is a live retro item.
+16. **`cargo run -q -p xtask -- <cmd>`.** There is no `cargo xtask` alias.
 
 ---
 
 ## Tasks
 
-- [ ] **T1 (AC1)** — Design the two-process crossing on paper first; write the D-5 sentence into the design note. Decide emitter surface (`MAOS_ONE_SHOT=collective-share` mirroring `main.rs:4883`+) and applier surface (cohort A2A intake arm for intent `collective:share`).
-- [ ] **T2 (AC1)** — Implement the emitter on the **seam 13.3b already left**: `originate_team_row(...)` (D-6) to stamp the provenance-carrying row, then `build_replication_bundle_v2(leaves, &region, &home_team, &base_seed)` → emit as a cohort A2A frame under intent `collective:share`. Seed from `MAOS_CROSS_TEAM_BASE_SEED` (D-7). Journal a kernel event (`insert_kernel_event_returning_id`) mirroring the erase verb. ⚠ **This one-shot is an *operator test surface* that exercises the production apply path; it does NOT replace 13.5d's cap-gated Spirit→collective route, which remains the journey-initiated path 13.6 composes.** The D-6 seam doc says *"the Spirit→collective digest publication flow"* — if 13.6's journey needs the Spirit path to be the initiator, that is a **13.6 dependency, not a 13.6a deliverable**; say so rather than letting 13.6 arrive and re-wire the initiator.
-- [ ] **T3 (AC1/AC2)** — Implement the applier in **`handle_intake_verified`** (`router.rs:1222`, D-8 — the ratified spoof-proof site; **not** `handle_intake`): → `apply_replication_bundle(bundle, &store, dest_region, Some(CrossTeamApplyContext::new(&home_team, intent)), &base_seed)`. Map `BundleError` → `StoreError` → `CollectivePortError` preserving the five-cause distinguishability. ⚠ **NO new `CollectivePortError` variant — refusal causes ride inside `Transport(TransportCause)` (the 13.3 route).** `collective_port_error` (`crates/maos-kernel-core/src/memory/mod.rs:198-211`) matches `{Unreachable, Timeout, Transport, Memory}` with **no wildcard arm** and lives in **kernel-core**: a new variant makes it non-exhaustive → compile error → the ZERO claim breaks. Cite the `check-kernel-baseline` = **23401** measurement; if it disagrees, **stop for FLAG-Winston**.
-- [ ] **T4 (AC3)** — Read side: add the target-team dimension to the recall request path (`LogRecallFilter` or a sibling entry point — `maos-domain`, **not** kernel-core, D-6), and a production surface that supplies it. Confirm plain `recall`'s emitter pin is untouched.
-- [ ] **T5 (AC2/AC4)** — Live two-datname integration test: allowed A→B lands; reverse B→A refused `ConsentDenied` with ordered pair + intent; stale lease `MapStale`; unconsented crossing refused **at the applier**; forged `source_team` refused under the derived team key. Physical-absence witness on both.
-- [ ] **T6 (AC1/AC3/AC4)** — Rewrite the two dead-wire legs in `check_multi_tenant_loom.rs`: invert, add positive legs naming both endpoints, add the new negatives, one `#[test]` per `--exact` leg, each clause separately named with its inverter. **Close the D-6b hole** and prove it with an `originate_team_row`-from-production fixture.
-- [ ] **T6c (AC4)** — Verify at implementation that **13.6a's binding is present and enforcing** before wiring the crossing (peer→team refusal reachable, both-seam eviction pinned, `Defer`-as-refusal live). If any is missing, this story is **blocked**, not licensed to proceed.
-- [ ] **T6b (AC1)** — Static `Blocking` leg: exactly one production `LoomLiteStore::new`. Proven-red by adding a second construction. *(D-5 measured it; a measurement left in prose is not a control — the 13.5g shape.)*
-- [ ] **T7 (AC4)** — Serialized proven-red pass: one mutation per limb, confirm own-leg-only red, restore byte-identical (`diff -q`). Record each mutation and its observed red leg in the Dev Agent Record.
-- [ ] **T8 (AC5)** — Amend ADR-055 (two-process crossing topology + honest limit); update `ABSENT_SUCCESSORS`; update `tests/coverage-matrix.yaml` if the leg set changes traceability.
-- [ ] **T9 (AC5)** — Gates: `cargo run -q -p xtask -- check-kernel-baseline` (**23401**), `kloc-check`, `check-multi-tenant-loom`, `check-reza-production-path`, `cargo fmt --all -- --check`, `cargo test --workspace`. Re-base the kloc ceiling **only if measured**, and record it — this has been re-based at "done" for four consecutive stories and is a live retro item.
-- [ ] **T10** — Record the dev model in the Dev Agent Record (`check-dev-model-tier` / `check-dev-model-used-populated` are live gates; frontier-class allowlist, §A6 full-layer review net is **non-degradable** for this boundary per `epic-13:13`).
+- [x] **T1 (AC1)** — Design the two-**daemon** crossing on paper first; write the D-5 and D-14 sentences into the design note. Decide the emitter trigger **inside `run_cohort_a2a_daemon`** (`main.rs:9286`) — a boot-time emit arm, an operator-triggered verb the daemon serves, or a scheduled publication — and say why. **The collective-erase one-shot idiom is NOT available (D-14); do not copy it.**
+- [x] **T2 (AC1)** — Implement the emitter inside the daemon runtime on the **seam 13.3b left**: `originate_team_row(...)` (D-6) → `build_replication_bundle_v2(leaves, &region, &home_team, &base_seed)` → emit as a cohort A2A frame under intent `collective:share`. Seed from `MAOS_CROSS_TEAM_BASE_SEED` (D-7). Journal a kernel event (`insert_kernel_event_returning_id`) mirroring the erase verb. Confirm `prepare_outbound` stamps `cohort_source_team` from the signed declaration (`router.rs:746`) on this path.
+- [x] **T3 (AC1/AC2)** — Implement the applier in **`handle_intake_verified`** (`router.rs:1385`, D-8): decode the bundle, run the **AC3 weld first**, then `apply_replication_bundle(bundle, &store, dest_region, Some(CrossTeamApplyContext::new(&home_team, intent)), &base_seed)`. Map `BundleError` → `StoreError` → refusal **applier-side**, preserving five-cause distinguishability locally. ⚠ **NO new `CollectivePortError` variant** (Trap 10).
+- [x] **T4 (AC3)** — The weld: refuse when `bundle.source_team != request.cohort_source_team`, before `apply_replication_bundle`, under its own cause, with its own leg and inverter. Live negative = a real emitter with a truthful envelope and a forged, correctly-signed payload.
+- [x] **T5 (AC2)** — The wire cause: new A2A code + `nack_with_data` carrying `{from_team, to_team, intent}`; one new arm in `interpret_response` (`router.rs:820`) producing a typed `A2AError`. Prove the emitter can distinguish denied / stale / unavailable.
+- [x] **T6 (AC4)** — Extend `reconcile_transport_identity_with_manifest` (`main.rs:9407`) to the team axis: `MAOS_LOOM_HOME_TEAM == manifest.team_of_host(local_host)` or boot error. Negative: disagreeing env+manifest must fail to start.
+- [x] **T7 (AC1/AC2/AC5)** — Live two-datname, two-daemon integration test: allowed A→B lands; reverse B→A refused with the ordered pair + intent visible at the emitter; stale lease distinguishable; unconsented crossing refused **at the applier**; forged payload refused (AC3); seed-less relabel refused (AC5). Physical-absence witness on both.
+- [x] **T8 (AC5)** — Rewrite the dead-wire leg in `check_multi_tenant_loom.rs:364`: invert, add positive legs naming both endpoints, add the new negatives, one `#[test]` per `--exact` leg, each clause separately named with its inverter. **Close the D-6b hole** and prove it with an `originate_team_row`-from-production fixture. Run the 13.5g composition-root test (delete the initiator → positives must red).
+- [x] **T9 (AC1)** — Static `Blocking` leg: exactly one production `LoomLiteStore::new`. Proven-red by adding a second construction.
+- [x] **T10 (AC5)** — Serialized proven-red pass: one mutation per limb, own-leg-only red, restore byte-identical (`diff -q`). Record each mutation and its observed red leg in the Dev Agent Record.
+- [x] **T11 (AC6)** — Amend ADR-055 (two-daemon topology, the weld, the boot reconcile); **correct the `bundle.rs:441` seam comment** (D-16); update `ABSENT_SUCCESSORS`; update `tests/coverage-matrix.yaml`; verify 13.6a's `loom-threat-model.md` T1 correction covers the **sign-side widening** (D-7) and extend it if not.
+- [x] **T12 (AC6)** — Gates: `check-kernel-baseline` (**23401**), `kloc-check` (⚠ check `maos-a2a-core` **before** writing — 84 lines), `check-multi-tenant-loom`, `check-reza-production-path`, `cargo fmt --all -- --check`, `cargo test --workspace`. Re-base a ceiling **only if measured**, and record the driver.
+- [x] **T13** — Record the dev model in the Dev Agent Record (`check-dev-model-tier` / `check-dev-model-used-populated` are live gates; frontier-class allowlist; §A6 full-layer review net is **non-degradable** for this boundary per `epic-13:13`).
+
+### Review Findings
+
+- [x] [Review][Patch] Production emitter constructs an invalid provenance tuple [crates/maos-bin/src/main.rs:9726]
+- [x] [Review][Patch] Unavailable applier ACKs an unapplied crossing [crates/maos-a2a-core/src/router.rs:1596]
+- [x] [Review][Patch] Applier discards the operator-requested destination team [crates/maos-bin/src/cross_team_crossing.rs:182]
+- [x] [Review][Patch] Stale crossing state collapses to a generic transport failure [crates/maos-a2a-core/src/router.rs:1344]
+- [x] [Review][Patch] Live witness bypasses both daemon endpoints [crates/maos-bin/tests/cross_team_crossing_13_6b.rs:776]
+- [x] [Review][Patch] Required applier-denial and seedless-relabel controls are missing as separate legs [xtask/src/check_multi_tenant_loom.rs:582]
+- [x] [Review][Patch] Non-denial refusal NACKs drop crossing attribution [crates/maos-a2a-core/src/cohort.rs:474]
+- [x] [Review][Patch] Crossing classifier ignores the frame kind [crates/maos-bin/src/cross_team_crossing.rs:73]
+- [x] [Review][Patch] Non-UTF-8 peer configuration silently disables crossing [crates/maos-bin/src/cross_team_crossing.rs:249]
+- [x] [Review][Patch] Non-UTF-8 namespace configuration silently defaults [crates/maos-bin/src/cross_team_crossing.rs:262]
+- [x] [Review][Patch] Empty crossing keys can persist unreadable rows [crates/maos-bin/src/cross_team_crossing.rs:282]
 
 ---
 
@@ -349,18 +356,20 @@ The authenticated-team-identity AC — manifest `COHORT_SCHEMA_V4` host→team b
 
 | Need | Use | Path |
 |---|---|---|
-| **Originate a provenance-carrying team row** — the seam 13.3b left for this work | `originate_team_row(store, pid, ns, key, value, depth, lineage, team, seed)` | `crates/maos-loom-lite/src/replication/bundle.rs:445` (doc at `:441`) |
-| Build a cross-team bundle | `build_replication_bundle_v2(leaves, region, team, seed)` | `crates/maos-loom-lite/src/replication/bundle.rs:345` |
-| **Base seed** (already production-wired; verify-side today, sign-side here — D-7) | `MAOS_CROSS_TEAM_BASE_SEED` | read `crates/maos-bin/src/cross_team_consent.rs:93-101`; contract `env_contract.rs:290` |
-| **Applier site** — spoof-proof, ratified at 12.3 P5r | `handle_intake_verified` | `crates/maos-a2a-core/src/router.rs:1222` ← `crates/maos-a2a-tcp/src/transport.rs:586` |
+| **Originate a provenance-carrying team row** | `originate_team_row(store, pid, ns, key, value, depth, lineage, team, seed)` | `maos-loom-lite/src/replication/bundle.rs:445` |
+| Build a cross-team bundle | `build_replication_bundle_v2(leaves, region, team, seed)` | `bundle.rs:345` |
+| **Base seed** (verify-side today, sign-side here — D-7) | `MAOS_CROSS_TEAM_BASE_SEED` | read `cross_team_consent.rs:93-101`; contract `env_contract.rs:290` |
+| **The only outbound A2A path** (D-14) | `prepare_outbound` | `maos-a2a-tcp/src/transport.rs:730` ← `build_cohort_a2a_daemon_runtime` `main.rs:9482` ← `run_cohort_a2a_daemon` `:9286` ← dispatch `:7643` |
+| **Applier site** — spoof-proof, 12.3 P5r | `handle_intake_verified` | `maos-a2a-core/src/router.rs:1385` ← `maos-a2a-tcp/src/transport.rs:586` |
+| **Emitter-side team stamp** (13.6a) | `source_team_stamp` from the signed declaration | `router.rs:746`, applied `:810` |
+| **Accept-seam team binding** (13.6a) | `claimed_team` vs `declared` → `-32010` | `router.rs:1429-1445` |
+| **NACK → typed error table** (add one arm) | `interpret_response` | `router.rs:820` |
+| **Boot reconcile to extend** (AC4) | `reconcile_transport_identity_with_manifest` | `main.rs:9407`, called `:9504` |
 | Apply at destination | `apply_replication_bundle(bundle, store, dest_region, cross_team, seed)` | `bundle.rs:840` |
 | Crossing context | `CrossTeamApplyContext::new(&to_team, intent)` | `bundle.rs:91-100` |
-| Consent decision | `CrossTeamConsentAdapter` (already constructed) | `crates/maos-bin/src/cross_team_consent.rs:15`; wired `main.rs:2745,2784` |
-| Cross-wall read consent | `CrossWallRecallConsentAdapter` (already constructed) | `cross_team_consent.rs:50`; wired `main.rs:2958` |
-| Cross-wall read | `LogRecallPort::recall_cross_wall` | trait `maos-domain/src/ports/log_recall.rs:35`; impl `maos-iac/src/adapter/log_recall.rs:347` |
-| Operator verb idiom | `MAOS_ONE_SHOT` collective-erase | `crates/maos-bin/src/main.rs:4883`, args `:4920-4943`, call `:4947` |
-| Error mapping | `store_error_to_port_error` + five-cause matrix | `crates/maos-loom-lite/src/adapter.rs:235` |
-| Live two-datname harness | `MAOS_TEST_POSTGRES_TEAM_A`/`_B` | `crates/maos-bin/tests/cross_team_consent_13_3.rs`, `cohort_daemon_smoke_13_5c.rs` |
+| Consent decision | `CrossTeamConsentAdapter` (already constructed) | `cross_team_consent.rs:15`; wired `main.rs:2745,2784` |
+| Error mapping (applier-local) | `store_error_to_port_error` + five-cause matrix | `maos-loom-lite/src/adapter.rs:235` |
+| Live two-datname harness | `MAOS_TEST_POSTGRES_TEAM_A`/`_B` | `maos-bin/tests/cross_team_consent_13_3.rs`, `cohort_daemon_smoke_13_5c.rs` |
 
 ### House standards
 
@@ -371,41 +380,40 @@ The authenticated-team-identity AC — manifest `COHORT_SCHEMA_V4` host→team b
 
 ### Budget
 
-- **kernel-core:** ZERO expected @ **23401**. If the measurement disagrees, stop for FLAG-Winston. *"kernel-core ZERO" is not the same sentence as "zero delta"* — state both. The **non**-kernel delta is now larger than the first draft: `maos-cohort` gains `COHORT_SCHEMA_V4` + `SIG_DOMAIN_V4` + the per-member team field and its canonical-form arm (AC6). Say both sentences.
-- **B2 fence:** no new `CollectivePortError` variant. The kernel mapper is wildcard-free and lives in kernel-core; a variant is the difference between ZERO and a re-pin.
-- **kloc:** re-check `xtask/kloc.toml` ceilings for `maos-bin`, `maos-loom-lite`, `maos-iac`, `maos-domain` **before** writing, so a ceiling breach is a design input rather than a "done"-time re-base. Ceiling policy is `measured + max(100, ceil(0.02 × measured))`; slack is operating capacity, **not** authorization; a ceiling must never block a correctness repair.
+- **kernel-core:** ZERO @ **23401**, verified equal at `a414f922`. If the measurement disagrees, stop for FLAG-Winston. *"kernel-core ZERO" is not the same sentence as "zero delta"* — state both.
+- ⚠ **`maos-a2a-core` = 4271 ceiling / 4187 measured / 84 reserve**, and that ceiling is 13.6a's **unratified review grant** (FLAG-Winston at the Epic-13 retro). The applier arm + weld + new code/dispatch all land there. **Decide the shape against this number before writing.** Ceiling policy is `measured + max(100, ceil(0.02 × measured))`; slack is operating capacity, **not** authorization; a ceiling must never block a correctness repair — surface it, don't route around it.
+- **`maos-cohort` is absent from `xtask/kloc.toml` entirely** (13.6a grew it +302 unmeasured). Not this story's to fix; **record it** for the retro.
 - **fkcs:** `xtask/fkcs-baseline.toml` stays byte-untouched at `23081`.
 
 ### Previous-story intelligence
 
-- **13.5g (`cb412348`, done).** Landed the TL tenant binding two-phase design. Its review found: legs green while connecting to nothing, and **no leg exercised the composition root** — deleting the Phase A block left all 15 Blocking legs green. Repairs included two real-binary boot legs. **Apply the same test:** after writing T6's legs, delete the new production initiator and confirm the positive legs red. If they stay green, they are testing the library, not the wiring.
-- **13.5g open finding (carry).** `crates/maos-loom-lite/src/store.rs:419-433` — `init_schema` acquires a **second** pooled client after `connection_assignment_guard` runs on the first, while its own new comment asserts they are the same client. Benign at `pool_size ≥ 2` (repo min 2, default 16) but a hang at the legal `pool_size: 1` (deadpool's default wait timeout is `None`). If you touch `init_schema`, fix it; otherwise leave it and let 13.6 judge it.
-- **13.5j.** *"Probe-harness-before-design"* — build a throwaway harness through the public surface, refuse to design until every probe is red, delete before commit. That method produced this story's D-1…D-6 and should produce T1's design.
-- **13.3 deferred (2026-07-20).** *"An evicted host holding a fresh lease still consents."* Owner was named as 13.5c; 13.5c closed without a membership answer. **The crossing going live makes this reachable for the first time** — see Residual 2. Do not silently absorb it; record it.
-
-### Git intelligence (last 6 commits)
-
-`cb412348` 13.5g · `c2e55a25` 13.5j · `04a6e72d` 13.5i · `dd4a908e` 13.5h · `5ccd862c` 13.5b · `595e8453` 13.5a. Pattern: each lands one mechanism, adds `--exact` Blocking legs to an existing gate, re-bases kloc at close, and carries an explicit residual list. Follow it.
+- **13.6a (`a414f922`, done).** 44/44 Blocking legs, six mutation limbs, threat model corrected in-commit. Its **honest finding** — the Accept-seam Defer rule is defense-in-depth behind the team binding — is the model for how to report a layered control without over-claiming it. Copy that discipline.
+- **13.6a's review P1** produced `reconcile_transport_identity_with_manifest`. **AC4 is that same fix, one axis over.** Read the function's doc comment before writing; it already argues your case.
+- **13.5g.** Legs green while connecting to nothing; **no leg exercised the composition root**. AC5's composition-root test is the direct descendant.
+- **13.5g open finding (carry).** `maos-loom-lite/src/store.rs:419-433` — `init_schema` acquires a **second** pooled client after `connection_assignment_guard` runs on the first. Benign at `pool_size ≥ 2`, a hang at the legal `pool_size: 1`. If you touch `init_schema`, fix it.
+- **13.5j.** *"Probe-harness-before-design"* — build a throwaway harness through the public surface, refuse to design until every probe is red, delete before commit. That method produced D-13, D-14 and D-15.
 
 ### References
 
-- [Source: `_bmad-output/planning-artifacts/epics/epic-13-reza-cortex-v2-2.md#52`] — *"13.6 is last and only judges; it never invents a missing mechanism inside the journey harness."*
+- [Source: `epic-13-reza-cortex-v2-2.md#52`] — *"13.6 is last and only judges; it never invents a missing mechanism inside the journey harness."*
 - [Source: `epic-13-reza-cortex-v2-2.md#174-176`] — (f-i) `no-production-crossing-initiator`, inverter UNASSIGNED; the separately-named-clauses rule.
 - [Source: `epic-13-reza-cortex-v2-2.md#232`] — pre-dev checklist item 5 (split rather than hide implementation in 13.6).
-- [Source: `epic-13-reza-cortex-v2-2.md#171`] — K5(b): do not create a sibling gate.
-- [Source: `docs/adr/ADR-055-multi-tenant-loom.md`] — database-per-team, `team_guard`, per-team HKDF weld.
-- [Source: `_bmad-output/implementation-artifacts/deferred-work.md#527-529`] — evicted-host consent gap.
+- [Source: `docs/adr/ADR-055-multi-tenant-loom.md`] — database-per-team, `team_guard`, per-team HKDF weld, and 13.6a's §4b.
+- [Source: `_bmad-output/implementation-artifacts/13-6a-authenticated-team-identity.md`] — the envelope binding this story welds to the decision site.
 
 ---
 
 ## Residuals (carry forward; do not silently close)
 
-1. **`(f-i)` is closed by this story; `(f-ii)` was closed by 13.5c.** After this story, no Epic-13 dead-wire clause should remain unassigned. Verify that claim mechanically before asserting it.
-2. **Host-axis membership — ⚠ AC6 DOES NOT CLOSE IT. Entailment tested and REFUTED; see D-12.** An earlier draft of this residual claimed the evicted-host case *"falls out"* of AC6's mTLS binding. **It does not.** AC6 binds the **sender's** cert to a team; the 13.3 finding is about the **receiver** (`state.local_host()` evicted). Opposite ends of the same connection. The case is covered — by the Story-12.1/12.3 cohort gate, a mechanism neither room had named — under three currently-true, previously-unasserted conditions that AC6 now pins. **B1 and B3 are therefore NOT one hole with two faces; they are two holes closed by two different mechanisms.**
-2b. **Surviving operator-trust limit (OPEN, documented, not closed).** A seed-holder can still forge **within its own team**, and an operator who controls a host controls that host's team. AC6 enforces isolation **against a peer, not against the operator**. True per-team key provisioning stays in the `v25-signed-shard` family (ADR-055 residual #6). This must be a written threat-model line, not an unremarked gap.
-3. **Success-side cross-wall disclosure is not journaled** (ADR-058 Decision 2, deferred-work 2026-07-21). A successful `recall_cross_wall` journals as a plain local `log.recall`. This story makes it reachable; the recommendation on file is to extend the refusal-journaling clause to success-side disclosure.
-4. **`v25-signed-shard`** (13.5e/13.5g residual #6) — unchanged, not this story's.
+1. **`(f-i)` is closed by this story; `(f-ii)` was closed by 13.5c; the read-side leg is 13.6d's.** Verify mechanically before asserting it.
+2. **Host-axis membership — AC3 DOES NOT CLOSE IT. Entailment tested and REFUTED; see D-12.** Covered instead by the Story-12.1/12.3 cohort gate under four conditions, three verified at `a414f922` and the fourth closed by 13.6a·AC4.
+2b. **Surviving operator-trust limit (OPEN, documented, not closed).** A seed-holder can still forge **within its own team**, and an operator who controls a host controls that host's team. The binding is enforced **against a peer, not against the operator**. True per-team key provisioning stays in the `v25-signed-shard` family (ADR-055 residual #6).
+3. **Success-side cross-wall disclosure is not journaled** (ADR-058 Decision 2, deferred 2026-07-21). **Moved to 13.6d** with the read side.
+4. **`v25-signed-shard`** — unchanged, not this story's.
 5. **Fallible `record_invocation`** (13.5d deferred, kernel-core, needs a second FLAG-Winston) — unchanged.
+6. **⚠ NEW — the kernel erases every collective cause.** `kernel-core/src/memory/mod.rs:204`: `CollectivePortError::Transport(_) => CollectiveErrorKind::Transport`. No Spirit has ever distinguished `ConsentDenied` from `MapStale` on any path. Widening it is a kernel-core edit + FLAG-Winston. **Owner: 13.6 to judge** — it decides whether "the operator can see why the wall refused" is a claim the epic may make on the Spirit path. Do **not** close it here.
+7. **⚠ NEW — `CollectiveMemoryPort` has no `share` verb** (`collective_memory.rs:111`: `write`/`read`/`scan`/`erase`), and `write` is what `team_guard` refuses foreign-team rows on. A Spirit-initiated crossing needs a new port verb **plus** a kernel call site. D-16 argues the architecture is right and the *comment* was wrong — but if a future story wants Spirit-initiated crossings, this is its price.
+8. **`maos-cohort` is not in `xtask/kloc.toml`** — ~300 lines landed unmeasured at 13.6a. Retro item.
 
 ---
 
@@ -413,13 +421,127 @@ The authenticated-team-identity AC — manifest `COHORT_SCHEMA_V4` host→team b
 
 ### Agent Model Used
 
-_(record the frontier-class model; `check-dev-model-used-populated` is a live gate)_
+Model: anthropic/claude-opus-5 (`opus-5`, frontier-class allowlist per E11 retro §A1 / E12-B3) for the dev pass.
+
+⚠ **The §A6 full-layer review net has NOT run for 13.6b.** It is non-degradable for this boundary (`epic-13:13`), so this story is **not** eligible to be marked `done` until it does — and per the house tip it must run on a **different** LLM than the one that implemented it. Recording its absence rather than implying coverage: the dev pass is not a review.
+
+### Implementation Plan (as executed)
+
+**T1 — the design, decided before writing.** Two sentences said out loud first, because three prior defects came from omitting them:
+
+1. **One store per process (D-5).** The composition root builds exactly one `LoomLiteStore`, pinned to `MAOS_LOOM_HOME_TEAM`, with `connection_assignment_guard` proving `datname_for(home_team) == current_database()`. **A crossing therefore cannot happen inside one process.** It is a *pair*: an emitter on team A's host, an applier on team B's host, joined by the cohort A2A mesh.
+2. **The emitter cannot be a one-shot (D-14).** `prepare_outbound` is the only non-test outbound A2A send in the workspace; its transport exists only inside `build_cohort_a2a_daemon_runtime`. The sibling `MAOS_ONE_SHOT` arms return from the dispatch thousands of lines before any transport, pin, or gate exists.
+
+**Emitter trigger — chosen: a boot-time emit arm inside `run_cohort_a2a_daemon`, gated on `MAOS_CROSS_TEAM_SHARE_PEER`.** Why, against the two alternatives the story named:
+
+- *An operator-triggered verb the daemon serves* — rejected for this story. It needs a new inbound intent, a new accept-allowlist surface, and its own consent seam, or the trigger channel itself becomes an unauthenticated remote-crossing trigger. That is a story, not a clause.
+- *A scheduled publication* — rejected as unbuildable today. A scheduler needs a source of truth for *which rows cross and when*; there is none. `CollectiveMemoryPort` has no `share` verb (Residual 7), so a Spirit cannot express a crossing at all, and inventing the verb is kernel Δ.
+- *A boot-time arm* — chosen. It sits **inside** the runtime after the listener, pins, and reconciled manifest exist; it is deterministic and drivable from a two-datname harness; it adds no inbound surface; and it is the operator's own declaration, the same trust model `MAOS_LOOM_HOME_TEAM` and `MAOS_CROSS_TEAM_BASE_SEED` already assume. Absence of the trigger leaves the daemon byte-for-byte as before.
+
+**T2 emitter** — `originate_team_row` (the 13.3b seam, D-6) now **returns the signed bundle it persisted**, so the bytes on the wire are the bytes that were signed; no leaf is hand-rolled and nothing is re-signed. Then `crossing_frame` → `route_outbound` → `prepare_outbound`, which stamps `cohort_source_team` from this host's own signed V4 declaration. Journaled as `collective.host.cross-team-share` via `insert_kernel_event_returning_id`, mirroring the erase verb.
+
+**T3 applier** — a dependency-inverted `CrossTeamCrossingPort` (`&IacFrame` + primitives only, the `HaltReceiptObserver`/`DigestReadPort` discipline) consulted from `handle_intake_verified` (D-8, 12.3 P5r) **after** the shared intake body ACKs, so the 12.1/12.3 cohort gate — including `NotCurrent` for a de-rostered applier (D-12) — refuses before any bundle touches the store. `BundleError` is mapped through the shipped `store_error_to_port_error` so the five-cause matrix still holds **inside the applier process**, then projected onto the wire cause. **No new `CollectivePortError` variant** (Trap 10) and no new `IacBusError` variant — both crossing errors ride `CrossHostRouteFailure`, so kernel-core stays byte-identical.
+
+**T4 the weld (AC3)** — `bundle.source_team` vs the authenticated envelope claim, compared **before** `apply_replication_bundle`, refused under `CrossingRefusal::SourceTeamUnbound` → `CODE_CROSSING_SOURCE_TEAM_UNBOUND (-32011)`.
+
+**T5 the wire cause (AC2)** — `CODE_CROSS_TEAM_CROSSING_REFUSED (-32012)` carrying `reason`/`from_team`/`to_team`/`intent`; two arms in `interpret_response`; `crossing_outcome_label` gives the emitter the three-way distinction.
+
+**T6 boot reconcile (AC4)** — clause (d) of `reconcile_transport_identity_with_manifest`, factored into the hermetically testable `reconcile_home_team_with_manifest`.
+
+**Design decision worth naming: the crossing rides the existing intent and the existing telemetry-control idiom.** `FramePayload::TelemetryEvent` under a pinned `event_type`, exactly like `maos.cohort-manifest.v1`. **No `FrameKind` and no `FramePayload` variant** — `abi-diff` is a null control that cannot see an enum addition (Trap 5), so the golden `event_type` leg is what actually holds the wire contract.
 
 ### Debug Log References
 
+**The retired negative was measured blind, not assumed blind (D-6b, empirical).** At cutover, the shipped `replication_crossing_has_no_production_initiator` reddened naming **only** `cross_team_crossing.rs: apply_replication_bundle( x1`. The **emitter was invisible to it**: `main.rs` reaches the crossing through `originate_team_row(`, which lives in the skipped `replication/bundle.rs` and was never a needle. D-6b is therefore confirmed against running code, not inferred from the source.
+
+**⚠ HONEST FINDING — my own first replacement leg had 13.5g's defect, and the mutation pass caught it.** `crossing_has_a_production_initiator_at_both_endpoints` began as a needle scan. Mutation **M5** deleted the `emit_cross_team_share(...)` call from `run_cohort_a2a_daemon` and **the leg stayed green**, because `emit_cross_team_share` still contained the needle. That is 13.5g's open finding — *"legs green while connecting to nothing"* — reproduced inside this story's own gate. The leg was rewritten as a brace-balanced **call-chain reachability walk** (dispatch → `run_cohort_a2a_daemon` → `emit_cross_team_share` → `originate_team_row` + `route_outbound`; `handle_intake_verified` → `apply_crossing` → `apply_replication_bundle`). M5 now reds. AC5's composition-root test is satisfied by construction rather than by inspection.
+
+**Two more self-inflicted weak legs, both caught by mutation, both fixed:**
+- **M11** drifted `CROSSING_EVENT_TYPE` and the round-trip leg stayed green — the test encoded *and* decoded through the same constant. A drifted wire constant silently stops every deployed applier from recognising a crossing. The literal `"maos.cross-team-crossing.v1"` is now pinned as a golden.
+- **M12** deleted the intent gate in `from_frame` and the non-crossing leg stayed green — the test's frame had `consent_envelope = None`, short-circuiting one check *earlier* than the gate under test. The frame now carries a well-formed envelope with a **different** cohort intent, which is the case the gate actually guards.
+
+**abi-diff is not evaluable with a dirty worktree, and `maos-spirit-abi` has ZERO delta.** `cargo public-api diff HEAD~1..HEAD` fails with `Your local changes … would be overwritten by checkout` before comparing anything (empty stdout, non-zero status) — a worktree artifact, not a finding. Evidence the ABI is untouched: `git diff a414f922 -- crates/maos-spirit-abi | wc -l` = **0**, the crate is absent from `git status`, and `abi-diff` returned **PASSED** when run against a clean tree (`git stash`). 262 public items unchanged.
+
+**`check-env-contract` was already FAIL at `a414f922`** — 5 pre-existing unregistered reads in `main.rs` (`MAOS_VETTER_KEYRING`, `MAOS_LEGAL_HOLD_PRINCIPAL`, `MAOS_COLLECTIVE_ERASE_{PID,NAMESPACE,KEY}`), confirmed present at the baseline commit. Not a 13.6b regression; workspace coverage is tracked by Story 12.7. All seven vars this story reads ARE registered.
+
+### T10 — serialized proven-red pass (12 mutations, one at a time, byte-identical restore verified by sha256)
+
+| # | Mutation | Leg that reddened | Control that stayed green |
+|---|---|---|---|
+| M1 | AC3 weld neutered (`payload_team != authenticated_team` → `false`) | `crossing-payload-team-must-equal-authenticated-envelope` | weld-is-a-binding |
+| M2 | Weld becomes a refuse-everything stub (→ `true`) | `crossing-weld-is-a-binding-not-a-refuse-all-stub` | AC3 weld leg |
+| M3 | `originate_team_row(` removed from the needle set | `crossing-scan-closes-originate-team-row-hole` **and** `crossing-has-production-initiator-both-endpoints` | one-store |
+| M4 | A second production `LoomLiteStore::new` added | `exactly-one-production-loom-lite-store` | both-endpoints |
+| M5 | Emitter call deleted from `run_cohort_a2a_daemon` | `crossing-has-production-initiator-both-endpoints` | D-6b hole leg |
+| M6 | AC4 disagreement downgraded to a pass | `boot-refuses-home-team-manifest-disagreement` | uncorroborated-team leg |
+| M7 | AC4 `team_of_host == None` treated as agreement | `boot-refuses-uncorroborated-home-team` | disagreement leg |
+| M8 | AC3 refusal collapsed onto `-32010` | `crossing-weld-refusal-has-its-own-wire-code` | consent-denial-reaches-emitter |
+| M9 | Ordered pair dropped from the `-32012` NACK data | `crossing-consent-denial-reaches-the-emitter` | own-wire-code |
+| M10 | `ConsentStale` reason mapped onto `ConsentDenied` | `crossing-causes-stay-distinguishable-on-the-wire` | own-wire-code |
+| M11 | `CROSSING_EVENT_TYPE` drifted | `crossing-control-rides-the-telemetry-idiom` | one-store |
+| M12 | Intent gate removed from `from_frame` | `crossing-applier-ignores-non-crossing-frames` | AC3 weld leg |
+
+⚠ **M3 reds TWO legs, and that coupling is deliberate — reported, not hidden.** Both legs share one scanner. A per-leg needle list is *exactly how D-6b happened*: the shipped scan's needles drifted from the call graph and nobody noticed. The sharing is the control. Every other mutation reds exactly one leg. `crossing-has-production-initiator-both-endpoints` also has its own single-leg inverter (M5), so it is not left resting on a coupled mutation.
+
 ### Completion Notes List
 
+**AC1 — a production write-side crossing initiator exists, inside the daemon.** ✅ Emitter inside `run_cohort_a2a_daemon` (D-14 honoured — **not** a sibling one-shot); applier in `handle_intake_verified` via the injected port; both endpoints bound by a **call-chain reachability** leg, not a text scan. The one-store wall is a `Blocking` control (`exactly-one-production-loom-lite-store`), proven-red by adding a second construction (M4). `replication-crossing-has-no-production-initiator` is **inverted and replaced in the same commit** — never left half-deleted. ⚠ **The physical presence/absence witness over two real datnames is written but NOT executed here**: no live Postgres substrate exists in this environment, so `live-crossing-lands-at-destination-datname` is `AdvisorySubstrate`, `#[ignore]`d, and `.expect()`s its own env vars (13.5g — skipped is not passed). **AC1's physical-absence clause is therefore ASSERTED BY CODE, NOT YET OBSERVED.** The gate's WOULD-HAVE-BLOCKED banner names it in the skip list.
+
+**AC2 — consent is enforced on the live path and the refusal survives the wire.** ✅ `is_granted` gains its first non-test caller through `apply_replication_bundle`. `-32012` carries `reason`/`from_team`/`to_team`/`intent`; `interpret_response` re-materialises it; denial / staleness / unavailability are three distinct emitter-side outcomes (proven-red per limb: M9, M10). `TransportCause::ConsentDenied` stays applier-local, routed through the shipped `store_error_to_port_error`, so the five-cause matrix still holds inside the applier process — the only boundary it has ever crossed.
+
+**AC3 — the team the wall judges is the team the mesh authenticated.** ✅ The weld refuses before `apply_replication_bundle`, under its own code `-32011`, distinguishable from `-32010` and from consent denial (M8). The negative uses the **seed-holding** forger: the test asserts the forged bundle **verifies** (`verify_replication_bundle(...).expect(...)`) before feeding it to the applier, so the attacker is D-10's, not the shipped relabel forger's. **13.6a's impersonation leg is not cited anywhere as evidence for this AC.** Own leg, own inverter (M1), plus a separate anti-stub control with its own inverter (M2). The hermetic leg runs against a store pointed at a dead host, so `SourceTeamUnbound` is positive evidence the weld ran before any store access.
+
+**AC4 — one host, one team, reconciled at boot.** ✅ Clause (d) of `reconcile_transport_identity_with_manifest`, with the comparison factored into `reconcile_home_team_with_manifest` so it is provable without TLS scaffolding. Both arms have their own leg and their own single-leg inverter (M6, M7). **Both sentences are stated in code, in the ADR, and in the threat model:** AC4 is the correctness control against misconfiguration; AC3 is the security control against a peer. Neither stands in for the other.
+
+**AC5 — every inverted clause is replaced by something not weaker.** ✅ Positive leg naming both endpoints (now a reachability walk); new negatives that only became falsifiable because the crossing is live (unconsented crossing refused **at the destination applier**, in the live leg; the seed-holding forger refused, hermetically). **The D-6b hole is closed and the closure is PROVEN**: a fixture production module whose only crossing reference is `originate_team_row(` is demonstrably **invisible** to the pre-13.6b needle set and **caught** by this story's. AC5's derived-key clause is scoped exactly as written — the seed-**less** relabel attacker only; the seed-holder is AC3's. **Nothing in this story says "Fork-4 proven".** The 13.5g composition-root test is satisfied and was the finding that forced the leg's rewrite.
+
+**AC6 — gate, ADR, comment, budget.** ✅ All legs on `check-multi-tenant-loom`; **no new gate**. One `#[test]` per `--exact` leg. Live legs are `AdvisorySubstrate` and `.expect()` their env. The `bundle.rs` seam comment is **corrected** (D-16): it claimed the Spirit→collective publication flow would use that seam; measured, `CollectiveMemoryPort` has no `share` verb at all, so the claim was false and had been steering design for three stories. `check-kernel-baseline` proves **23401 unchanged**. ADR-055 gains §4c; `ABSENT_SUCCESSORS` stays `&[]` and now says so as a *claim* with the three non-closures named and owned; `tests/coverage-matrix.yaml` updated; `loom-threat-model.md` T1's sign-side correction **verified present and extended** to present tense plus the weld.
+
+**Budget — surfaced, measured, re-based, driver recorded (Trap 15 honoured at design time).** kernel-core **ZERO at 23401**; `fkcs-baseline.toml` byte-untouched. Three ceilings were exceeded and re-based *after* trimming, not instead of it: `maos-a2a-core` 4271→4450 (measured 4350; 152 lines of inline tests moved to `tests/crossing_wire_13_6b.rs` and `CrossingRefusal::wire` factored out of the router first), `maos-bin` 14433→14835 (measured 14735), `xtask` 31690→31856 (measured 31756), `_aggregate_hardfail` 136669→136859 (measured 136759). ⚠ **`maos-a2a-core` is now on its SECOND consecutive grant and both remain FLAG-Winston unratified** — ratify them together at the Epic-13 retro. `maos-cohort` is still absent from `xtask/kloc.toml` (Residual 8, not fixed here).
+
+**What this story does NOT claim.** The kernel's cause erasure is untouched (Residual 6 — `Transport(_)` still collapses all five causes at the kernel boundary; no Spirit can distinguish `ConsentDenied` from `MapStale`); no `share` verb is added to `CollectiveMemoryPort` (Residual 7); the operator-trust limit is unchanged (Residual 2b — isolation is enforced against a peer, not against the operator); the read side is 13.6d's; the §A6 review net has not run.
+
+### Verification evidence
+
+- `cargo test --workspace` — **green** (no regressions; one pre-existing enumeration negative, `composition_root_does_not_seed_manifest_scopes`, correctly reddened on the new `src/*.rs` file and was updated to cover it — the control working as designed).
+- `check-multi-tenant-loom` — **PASSED**; 13 new hermetic `Blocking` legs green, live legs skipped with the WOULD-HAVE-BLOCKED banner (no substrate).
+- `check-kernel-baseline` — **PASSED**, `maos-kernel-core/src = 23401`, pinned 23401.
+- `kloc-check` — **PASSED** (aggregate 136758).
+- `check-reza-production-path` — **PASSED** (live substrate advisory).
+- `check-fkcs` — PASS (advisory, unchanged oracle state).
+- `cargo fmt --all -- --check` — clean.
+- `abi-diff` — **not evaluable with a dirty worktree** (see Debug Log); `maos-spirit-abi` diff vs `a414f922` = 0 lines, and the gate returns PASSED on a clean tree.
+- T10 proven-red harness — 12/12 mutations reddened their own legs, all controls green, every file restored byte-identically (sha256-verified).
+
 ### File List
+
+**Added**
+- `crates/maos-bin/src/cross_team_crossing.rs`
+- `crates/maos-bin/tests/cross_team_crossing_13_6b.rs`
+- `crates/maos-a2a-core/tests/crossing_wire_13_6b.rs`
+
+**Modified**
+- `crates/maos-a2a-core/src/cohort.rs`
+- `crates/maos-a2a-core/src/error.rs`
+- `crates/maos-a2a-core/src/lib.rs`
+- `crates/maos-a2a-core/src/router.rs`
+- `crates/maos-a2a-core/src/transport/json_rpc.rs`
+- `crates/maos-a2a-tcp/src/transport.rs`
+- `crates/maos-bin/src/cross_team_consent.rs`
+- `crates/maos-bin/src/env_contract.rs`
+- `crates/maos-bin/src/lib.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs`
+- `crates/maos-bin/tests/cross_team_consent_13_3.rs`
+- `crates/maos-loom-lite/src/adapter.rs`
+- `crates/maos-loom-lite/src/replication/bundle.rs`
+- `docs/adr/ADR-055-multi-tenant-loom.md`
+- `docs/loom-threat-model.md`
+- `tests/coverage-matrix.yaml`
+- `xtask/kloc.toml`
+- `xtask/src/check_multi_tenant_loom.rs`
+- `_bmad-output/implementation-artifacts/13-6b-production-cross-team-crossing-initiators.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ---
 
@@ -427,7 +549,12 @@ _(record the frontier-class model; `check-dev-model-used-populated` is a live ga
 
 | Date | Change |
 |---|---|
-| 2026-07-28 | Created from the Story 13.6 grounding pass. Split ratified by the operator: 13.6a owns the production crossing initiators (mechanism), 13.6 stays a judge. D-1…D-5 + D-9 measured at `cb412348`; 5 ACs, ZERO kernel-core Δ expected @23401. |
-| 2026-07-28 | **Entailment pressure-test (same session, operator-requested): AC6's evicted-host claim REFUTED — D-12 added.** The preflight had written *"Residual 2 closed in-story by AC6 — same hole, two faces — verify the entailment mechanically."* It was verified and it is **false**: AC6 binds the **sender's** cert→team, the residual is about the **receiver** being evicted. Worse, the crossing writes via `write_with_source_attested` (`store.rs:553`) — a **fifth** write path outside `team_guard`'s four-site chokepoint — and the eviction check exists only **inside** `TenantMapAdapter::current_manifest()`, reachable via `team_of` (only from `team_guard`) or `datname_for` (only from `connection_assignment_guard`, boot-time only). **The eviction check was never a control in its own right; it is a side effect of the tenant-map lookup that the crossing legitimately skips.** The case IS covered — by the Story-12.1/12.3 cohort gate (`router.rs:1108`, `CohortConsentVerdict::NotCurrent` = *"stale or no longer contains the local member"*), a mechanism neither room had named — contingent on three currently-true, unasserted facts now pinned by AC6 and T5b2. **Right conclusion, wrong reason: B1 and B3 are two holes closed by two different mechanisms, not one hole with two faces.** Residual 2 rewritten from CLOSED to REFUTED-and-re-grounded. |
-| 2026-07-28 | **Party-mode preflight closed all four review patches.** **B1/B3 (merged, BLOCKER)** — measured D-10: wiring the crossing turns `base_seed` from a compromise risk into a standing authority; every emitter can sign under every team, consent is decided from the forgeable `source_team`, and no host→team edge exists in the signed manifest. `loom-threat-model.md` T1 currently claims the opposite. Room ratified **in-scope, new AC6** (was 5 ACs → **6**, at the epic cap): bind on the **mTLS axis** — the one identity `base_seed` cannot reach — because carrying `SpiritId` in the leaf fails (everything inside the envelope is forgeable). D-11 prices it: `COHORT_SCHEMA_V4` + `SIG_DOMAIN_V4`, v1/v2/v3 bytes frozen (v3 already spent by 13.3). **AC4 re-scoped** to a seed-less relabel forger, with an explicit ban on "Fork-4 proven." Threat-model correction is an in-commit deliverable. Winston dissented on deferring the schema bump; overruled on *"the split exists so 13.6 has something gradeable."* **B2** — T3 fences the kernel mapper (no new `CollectivePortError` variant; ride `Transport(TransportCause)`). **B4** — "no two stores" promoted from prose to a static Blocking leg. **R1** — T2 names the one-shot an operator test surface, not a replacement for 13.5d's Spirit route. Residual 2 now CLOSED in-story by AC6; new residual 2b records the surviving operator-trust limit. |
-| 2026-07-28 | Checklist validation pass added D-6 (`originate_team_row` — the seam 13.3b explicitly left for this work, *"This is the seam it will use"*), **D-6b** (the dead-wire leg skips `replication/bundle.rs`, where that seam lives — the negative is one indirection from blind; now an AC4 clause with its own proof obligation), D-7 (`MAOS_CROSS_TEAM_BASE_SEED` is production-wired but verify-side only; this story widens it to the sign side — must be named in the ADR + threat model) and D-8 (applier belongs in `handle_intake_verified`, the 12.3-ratified spoof-proof site). |
+| 2026-07-28 | Created from the Story 13.6 grounding pass (D-1…D-9). |
+| 2026-07-28 | Entailment pressure-test: AC6's evicted-host claim REFUTED — D-12 added. The eviction check was never a control in its own right; it is a side effect of the tenant-map lookup that the crossing legitimately skips. Covered instead by the 12.1/12.3 cohort gate. |
+| 2026-07-28 | Party-mode preflight closed four review patches; D-10/D-11 measured; identity half split OUT to 13.6a (operator-ratified) — ordering, not deferral. |
+| 2026-07-29 | **Post-13.6a preflight — re-baselined `cb412348` → `a414f922`, UNBLOCKED, and three measured defects folded in.** **D-13 (BLOCKER):** 13.6a authenticates the **envelope** (`request.cohort_source_team`, `router.rs:1429-1445`) while the crossing decides consent from the **payload** (`bundle.source_team` → `is_granted`, `bundle.rs:875-917`). **Nothing binds them, and no AC in either story owned it** — 13.6b's AC6 moved to 13.6a and AC4 is explicitly barred from claiming impersonation coverage, so the weld fell into the seam the split created. D-10's attack survives 13.6a. Now **AC3**, with its own leg, own inverter, and an explicit ban on citing 13.6a's synthetic-frame leg as evidence. **D-14 (BLOCKER):** the emitter cannot be a one-shot — the sole production outbound path is `prepare_outbound` (`a2a-tcp:730`), whose transport is built only in `build_cohort_a2a_daemon_runtime` (`main.rs:9482`) ← `run_cohort_a2a_daemon` (`:9286`) ← the `cohort-a2a-daemon` dispatch (`:7643`); a sibling arm at `main.rs:4883` returns ~4,700 lines earlier. T2 rewritten; the collective-erase idiom is withdrawn. **D-15:** `TransportCause` has **zero** occurrences in either A2A crate, *and* `kernel-core/src/memory/mod.rs:204` discards the cause (`Transport(_)`) — the five-cause matrix has never crossed a process boundary or a kernel boundary, so the old AC2 asked for something the architecture never provided. AC2 **resolved, not weakened**: a new typed A2A cause carrying the ordered pair + intent, one more arm in `interpret_response` (a table that already does this five times), `TransportCause` staying applier-local; the kernel erasure recorded as **Residual 6 with 13.6 as owner**. **New AC4:** extend `reconcile_transport_identity_with_manifest` (`main.rs:9407`) to the team axis — `MAOS_LOOM_HOME_TEAM` vs signed `CohortMember.team` is the identical config-vs-manifest asymmetry 13.6a's own review fixed for certificates one field over; operator ratified **both** AC3 and AC4 (security control + correctness control, neither standing in for the other). **D-16:** `bundle.rs:441`'s seam comment (*"the Spirit→collective digest publication flow … This is the seam it will use"*) is **wrong** — `CollectiveMemoryPort` has no `share` verb and `write` is what `team_guard` refuses foreign-team rows on, so a Spirit-initiated crossing needs a new port verb + a kernel call site. The Spirit initiates publication; the host initiates the crossing; keeping them apart is a security property (*a Spirit that can name a destination team can be prompt-injected into naming one*). Comment corrected in-commit (13.6a T1 precedent), retiring R1 properly. **READ SIDE SPLIT OUT to 13.6d** (operator-ratified, fifth split of the epic): different crates, different dead-wire leg, structurally independent per D-4. Line pins refreshed for 13.6a's +244 router lines (`handle_intake_verified` `1222`→**1385**, `is_reserved_cohort_intent` `502`→**521**). Kernel-core verified **23401 == 23401**. Budget flag raised at design time: **`maos-a2a-core` has 84 lines of reserve on an unratified FLAG-Winston grant**, and that is where the applier, the weld and the new dispatch arm all land. 6 ACs. |
+| 2026-07-29 | **IMPLEMENTED (dev pass, `opus-5`) — status → review.** Two-daemon crossing wired end to end: emitter inside `run_cohort_a2a_daemon` (D-14, boot-time arm gated on `MAOS_CROSS_TEAM_SHARE_PEER`, using the 13.3b `originate_team_row` seam which now returns the bundle it signed), applier in `handle_intake_verified` behind a new dependency-inverted `CrossTeamCrossingPort` (D-8). **AC3's weld shipped**: `bundle.source_team` must equal the authenticated envelope claim, refused before `apply_replication_bundle` under `CODE_CROSSING_SOURCE_TEAM_UNBOUND (-32011)`, negative driven by the **seed-holding** forger whose signature is asserted valid first. AC2's `-32012` carries `reason`/`from_team`/`to_team`/`intent` with two `interpret_response` arms, keeping denied/stale/unavailable distinguishable at the emitter; `TransportCause` stays applier-local through the shipped `store_error_to_port_error`. AC4 extends `reconcile_transport_identity_with_manifest` to the team axis. Dead-wire clause (f-i) **inverted and replaced in the same commit**; D-6b closed and the closure proven by fixture. **kernel-core ZERO at 23401**, fkcs byte-untouched, no `CollectivePortError`/`IacBusError`/`FrameKind`/`FramePayload` variant added. 13 new hermetic `Blocking` legs + 1 `AdvisorySubstrate` live leg; 12/12 proven-red mutations with byte-identical restores. |
+| 2026-07-29 | **Three self-inflicted weak legs found by the T10 mutation pass and fixed, not narrated.** (1) The first replacement positive was a needle scan and **stayed green when the emitter call was deleted** — 13.5g's exact finding reproduced inside this story's own gate; rewritten as a brace-balanced call-chain reachability walk. (2) The wire-idiom leg round-tripped through `CROSSING_EVENT_TYPE` on both sides and survived drifting it; the literal is now a pinned golden. (3) The non-crossing leg used a frame with no consent envelope, short-circuiting *before* the intent gate it claimed to test; it now uses a well-formed envelope with a different cohort intent. |
+| 2026-07-29 | **Budget surfaced and re-based on measurement after trimming (Trap 15).** `maos-a2a-core` 4271→4450, `maos-bin` 14433→14835, `xtask` 31690→31856, `_aggregate_hardfail` 136669→136859; drivers recorded in `xtask/kloc.toml`. 152 lines of inline a2a-core tests were moved to `tests/` and `CrossingRefusal::wire` factored out of the router **before** asking for the bump. ⚠ `maos-a2a-core` is on its second consecutive grant; both remain FLAG-Winston unratified — ratify together at the Epic-13 retro. |
+| 2026-07-29 | **Honest non-closures, recorded rather than implied.** §A6 full-layer review net has **not** run (non-degradable for this boundary; must run on a different LLM). AC1's physical presence/absence witness is **written but not executed** — no live Postgres substrate in this environment, so the live leg is `AdvisorySubstrate` + `#[ignore]` + `.expect()` and appears in the gate's WOULD-HAVE-BLOCKED skip list. `abi-diff` is not evaluable with a dirty worktree; `maos-spirit-abi` has **zero** delta vs `a414f922` and the gate passes on a clean tree. `check-env-contract` was already FAIL at `a414f922` (5 pre-existing unregistered reads, Story 12.7). Residuals 2b, 6, 7, 8 remain OPEN and unclaimed. |
+| 2026-07-29 | **§A6 adversarial review complete on a different model (`openai-codex/gpt-5.6-sol`) — 11/11 findings patched and verified; status → done.** Fixed the invalid production provenance tuple, fail-open missing-applier ACK, destination-team discard, stale-cause collapse, blank refusal attribution, frame-kind type confusion, unreadable/empty environment inputs, and the composite/missing AC5 controls. The AdvisorySubstrate witness now starts two real `cohort-a2a-daemon` processes and drives the production emitter → mTLS route → verified intake → applier path; deterministic debug-only boot nonces make the two independently generated process pins reproducible. Verification: `maos-a2a-core` crossing unit/wire suites green, `maos-bin` crossing suite 16 passed / 2 substrate-ignored, 13.6a identity compatibility 11/11, `check-multi-tenant-loom` PASSED, `cargo fmt --all -- --check` clean. The live two-Postgres daemon witness remains unexecuted locally because `MAOS_TEST_POSTGRES_TEAM_A/_B` are absent; the gate reports it explicitly as WOULD-HAVE-BLOCKED rather than green. `check-env-contract` remains at its exact five pre-existing Story-12.7 violations and reports no new crossing/test-nonce read. |
