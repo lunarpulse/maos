@@ -73,7 +73,7 @@ pub use identity_assertion::{AuthenticatedPrincipal, IdentityAssertionPort, Iden
 pub use inference::InferencePort;
 pub use io_subsystem::IoSubsystemPort;
 pub use key_management::{KeyManagementPort, KmsError}; // NEW — Story 11.4c
-pub use log_recall::LogRecallPort; // NEW — Story 4.4
+pub use log_recall::{CrossWallLogReadPort, LogRecallPort}; // Story 4.4 / 13.6d
 pub use mcp::{McpAttribution, McpClientPort, McpError, McpRequest, McpResponse, McpTransportId}; // NEW — Story 5.5c
 pub use memory::MemoryManagerPort;
 pub use policy_decision::{

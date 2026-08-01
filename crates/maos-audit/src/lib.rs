@@ -1066,11 +1066,20 @@ pub struct TenantArtifactRead {
 /// `None`/0 rather than an error, so a refused boot never mutates the other
 /// team's artifact (D-4). The `team_id` is returned raw — canonicality is
 /// enforced by the pure verdict, not here.
-pub fn read_tenant_artifact(path: &Path) -> Result<TenantArtifactRead, TenantBindingError> {
+/// Open a **read-only** NOFOLLOW connection to a tenant Transparency Log artifact
+/// (Story 13.6d P2 — single-connection foreign read).
+///
+/// Returns `Ok(None)` when the file is absent, mirroring [`read_tenant_artifact`]'s
+/// "absent reads as default" contract so a refused boot never mutates another
+/// team's artifact (D-4). The returned connection is the *sole* handle a
+/// cross-wall reader holds: the binding is verified AND the rows are served
+/// through it, so a file replacement between the two can no longer attest one
+/// artifact while disclosing another (the binding-vs-rows TOCTOU).
+pub fn open_tenant_artifact_readonly(
+    path: &Path,
+) -> Result<Option<rusqlite::Connection>, TenantBindingError> {
     match std::fs::symlink_metadata(path) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(TenantArtifactRead::default());
-        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(TenantBindingError::Io(error)),
         Ok(_) => {}
     }
@@ -1080,9 +1089,22 @@ pub fn read_tenant_artifact(path: &Path) -> Result<TenantArtifactRead, TenantBin
             | OpenFlags::SQLITE_OPEN_NO_MUTEX
             | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
+    Ok(Some(conn))
+}
+
+/// Read the in-artifact tenant binding + `transparency_log` row count through a
+/// caller-supplied connection (Story 13.6d P2).
+///
+/// Pair with [`open_tenant_artifact_readonly`] so the cross-wall reader verifies
+/// the binding and serves rows on the **same** connection. The `team_id` is
+/// returned raw; canonicality is enforced by the caller (the pure verdict, not
+/// here).
+pub fn read_tenant_artifact_on(
+    conn: &rusqlite::Connection,
+) -> Result<TenantArtifactRead, TenantBindingError> {
     let binding_team;
     let binding_datname;
-    match read_binding_row(&conn)? {
+    match read_binding_row(conn)? {
         Some((team, datname)) => {
             binding_team = Some(team);
             binding_datname = datname;
@@ -1092,12 +1114,30 @@ pub fn read_tenant_artifact(path: &Path) -> Result<TenantArtifactRead, TenantBin
             binding_datname = None;
         }
     }
-    let transparency_log_rows = count_transparency_log_rows(&conn)?;
+    let transparency_log_rows = count_transparency_log_rows(conn)?;
     Ok(TenantArtifactRead {
         binding_team,
         binding_datname,
         transparency_log_rows,
     })
+}
+
+/// Read the in-artifact tenant binding + transparency_log row count through a
+/// **read-only** NOFOLLOW connection (Story 13.5g AC2).
+///
+/// A missing file, or a file without a `tenant_binding` table, reads as
+/// `None`/0 rather than an error, so a refused boot never mutates the other
+/// team's artifact (D-4). The `team_id` is returned raw — canonicality is
+/// enforced by the pure verdict, not here.
+///
+/// Thin wrapper over [`open_tenant_artifact_readonly`] + [`read_tenant_artifact_on`];
+/// kept for the Phase A verdict and Phase B datname check, which read the binding
+/// and then discard the connection.
+pub fn read_tenant_artifact(path: &Path) -> Result<TenantArtifactRead, TenantBindingError> {
+    match open_tenant_artifact_readonly(path)? {
+        None => Ok(TenantArtifactRead::default()),
+        Some(conn) => read_tenant_artifact_on(&conn),
+    }
 }
 
 /// Persist the single tenant binding row, or update the `datname` of an

@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
-//! Stories 13.1–13.6b — physical multi-tenant Loom wall, the crossing gate,
-//! authenticated team identity, and the production crossing initiator.
+//! Stories 13.1–13.6d — physical multi-tenant Loom wall, authenticated write
+//! crossing, and consent-governed production read crossing.
 //!
 //! Hermetic legs are [`BindingClass::Blocking`] at development HEAD. Live
 //! Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence emits a
@@ -17,13 +17,11 @@ const GATE_NAME: &str = "check-multi-tenant-loom";
 /// Successors this gate declares ABSENT: a control this ADR names but that no
 /// leg here can yet bind.
 ///
-/// **Empty is a claim, not a default.** Story 13.6b inverted the last dead-wire
-/// clause `(f-i) no-production-crossing-initiator` and replaced it with legs that
-/// bind at HEAD, so nothing this gate owns is currently unbound. What 13.6b does
-/// NOT close is owned elsewhere and deliberately not laundered through this list:
+/// **Empty is a claim, not a default.** Story 13.6b inverted the write-side
+/// dead-wire clause and Story 13.6d inverted the read-side clause; both now
+/// bind at HEAD. Remaining controls owned elsewhere are deliberately not
+/// laundered through this list:
 ///
-///   * the cross-wall RECALL initiator (read side) — Story 13.6d, whose dead-wire
-///     leg `cross-wall-recall-no-production-caller` still lives in this registry;
 ///   * the kernel's collective-cause erasure (`Transport(_)` collapses all five
 ///     causes at `kernel-core/src/memory/mod.rs`) — a kernel-core edit plus a
 ///     FLAG-Winston conversation, owned by Story 13.6 to judge;
@@ -826,6 +824,113 @@ pub fn run(json: bool) -> Result<(), String> {
             ],
         },
         TestLeg {
+            name: "cross-wall-recall-no-consent-provider",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-no-grant",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-wrong-direction",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-stale-state",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-unavailable-state",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-read-port-unavailable",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-local-emitter-scope",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-ranged-recall-compile-pinned",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_consent_13_3",
+                "researcher_recall_surface_cannot_import_unscoped_ranged_recall",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
             name: "cross-wall-recall-manifest-direction",
             class: BindingClass::Blocking,
             args: &[
@@ -837,6 +942,102 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--test",
                 "cross_team_consent_13_3",
                 "cross_wall_recall_manifest_direction_and_staleness_are_typed",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-filter-no-team-dimension",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_consent_13_3",
+                "log_recall_filter_has_no_team_dimension",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-remote-artifact-read",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_wall_log_read_13_6d",
+                "cross_wall_reader_returns_rows_from_the_named_bound_artifact",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-foreign-binding-refused",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_wall_log_read_13_6d",
+                "cross_wall_reader_refuses_a_path_whose_artifact_binding_names_another_team",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-read-only-open",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_wall_log_read_13_6d",
+                "cross_wall_reader_open_is_read_only_nofollow_and_non_migrating",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-remote-not-local",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_wall_log_read_13_6d",
+                "consented_cross_wall_page_contains_remote_frames_and_no_local_frames",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-ordinary-foreign-open-refused",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_wall_log_read_13_6d",
+                "ordinary_boot_path_still_refuses_a_foreign_bound_artifact",
                 "--",
                 "--exact",
             ],
@@ -869,7 +1070,7 @@ pub fn run(json: bool) -> Result<(), String> {
             ],
         },
         TestLeg {
-            name: "cross-wall-recall-no-production-caller",
+            name: "cross-wall-recall-production-caller-live",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -879,13 +1080,13 @@ pub fn run(json: bool) -> Result<(), String> {
                 "network",
                 "--test",
                 "cross_team_consent_13_3",
-                "cross_wall_recall_has_no_production_caller",
+                "cross_wall_recall_has_production_caller_and_live_preconditions",
                 "--",
                 "--exact",
             ],
         },
         TestLeg {
-            name: "cross-wall-recall-refusals-not-journaled",
+            name: "cross-wall-recall-signed-consent-live-path",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -895,7 +1096,81 @@ pub fn run(json: bool) -> Result<(), String> {
                 "network",
                 "--test",
                 "cross_team_consent_13_3",
-                "cross_wall_recall_refusals_not_journaled",
+                "cross_wall_recall_live_path_uses_verified_state_and_home_team",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-request-parser",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--bin",
+                "maos",
+                "tests::story_13_6d_parses_validated_cross_wall_traceback_request",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-request-parser-refuses-invalid",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--bin",
+                "maos",
+                "tests::story_13_6d_rejects_invalid_or_incomplete_traceback_request",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-refusal-and-disclosure-journaled",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_consent_13_3",
+                "cross_wall_recall_refusals_and_disclosures_are_journaled",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-refusal-journal",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_journals_refusal",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "cross-wall-recall-disclosure-before-read",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-iac",
+                "--lib",
+                "adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read",
                 "--",
                 "--exact",
             ],

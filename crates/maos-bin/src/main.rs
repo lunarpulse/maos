@@ -477,6 +477,59 @@ fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunA
     }
 }
 
+#[cfg(feature = "network")]
+fn parse_cross_wall_traceback_args<I: IntoIterator<Item = String>>(
+    args: I,
+) -> Result<Option<maos_domain::log_recall::CrossWallRecallRequest>, String> {
+    let mut args = args.into_iter();
+    if args.next().as_deref() != Some("traceback") {
+        return Ok(None);
+    }
+    let mut remote_team = None;
+    let mut spirit_pid = None;
+    let mut limit = maos_domain::log_recall::LogRecallFilter::MAX_LIMIT;
+    while let Some(argument) = args.next() {
+        match argument.as_str() {
+            "--team" => remote_team = args.next(),
+            "--spirit-pid" => {
+                spirit_pid = Some(
+                    args.next()
+                        .ok_or_else(|| "maos traceback: --spirit-pid requires a value".to_string())?
+                        .parse::<u32>()
+                        .map_err(|error| {
+                            format!("maos traceback: invalid --spirit-pid: {error}")
+                        })?,
+                );
+            }
+            "--limit" => {
+                limit = args
+                    .next()
+                    .ok_or_else(|| "maos traceback: --limit requires a value".to_string())?
+                    .parse::<usize>()
+                    .map_err(|error| format!("maos traceback: invalid --limit: {error}"))?;
+            }
+            other => return Err(format!("maos traceback: unknown argument '{other}'")),
+        }
+    }
+    let remote_team =
+        remote_team.ok_or_else(|| "maos traceback: --team is required".to_string())?;
+    let spirit_pid =
+        spirit_pid.ok_or_else(|| "maos traceback: --spirit-pid is required".to_string())?;
+    let filter = maos_domain::log_recall::LogRecallFilter::new(None, None, None, limit, None, None);
+    maos_domain::log_recall::CrossWallRecallRequest::new(spirit_pid, &remote_team, filter)
+        .map(Some)
+        .map_err(|error| format!("maos traceback: {error}"))
+}
+
+#[cfg(feature = "network")]
+fn run_cross_wall_traceback(
+    port: &dyn maos_domain::ports::LogRecallPort,
+    request: maos_domain::log_recall::CrossWallRecallRequest,
+) -> Result<maos_domain::log_recall::LogRecallPage, maos_domain::log_recall::LogRecallError> {
+    let (spirit_pid, remote_team, filter) = request.into_parts();
+    port.recall_cross_wall(spirit_pid, &remote_team, filter)
+}
+
 /// Which reference Spirit a manifest's `[class].name` selects. Construction is
 /// keyed by class (the daemon MUST build the right concrete Spirit type); the
 /// port-requirement decision is keyed by the declared epistemic halt transport,
@@ -2326,6 +2379,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    let cross_wall_traceback = match parse_cross_wall_traceback_args(std::env::args().skip(1)) {
+        Ok(args) => args,
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+    };
     // Story 8.14a — dispatch `maos init`, `maos shell`, `maos audit query`.
     let mut shell_mode = false;
     let mut audit_spirit: Option<String> = None;
@@ -2384,6 +2444,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return Err("expected subcommand: query".into());
                 }
             }
+            Some("traceback") => {}
             Some("shell") => {
                 for a in args {
                     if a == "--plain" {
@@ -2977,8 +3038,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 home_team,
             ),
         ));
+        // The cross-wall read resolves per-team shards, which only exist under
+        // the collective tier (ADR-055 §4: MAOS_LOOM_POSTGRES + home team). With
+        // Postgres absent, leave the read port unattached so `recall_cross_wall`
+        // fails closed (ReadPortUnavailable) instead of deriving the global
+        // artifact and returning the caller's own rows under a remote label.
+        if std::env::var_os("MAOS_LOOM_POSTGRES").is_some() {
+            log_recall = log_recall.with_cross_wall_read(Arc::new(
+                maos_bin::cross_wall_log_read::CrossWallLogReadAdapter::new(true),
+            ));
+        }
     }
     let log_recall_adapter = Arc::new(log_recall);
+    if let Some(request) = cross_wall_traceback {
+        let remote_team = request.remote_team().to_string();
+        let spirit_pid = request.spirit_pid();
+        match run_cross_wall_traceback(log_recall_adapter.as_ref(), request) {
+            Ok(page) => {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "surface": "cross_wall_traceback",
+                        "outcome": "ok",
+                        "remote_team": remote_team,
+                        "spirit_pid": spirit_pid,
+                        "page": page,
+                    })
+                );
+                return Ok(());
+            }
+            Err(error) => {
+                let outcome = matches!(
+                    &error,
+                    maos_domain::log_recall::LogRecallError::ECrossWallRecallDenied { .. }
+                )
+                .then_some("refused")
+                .unwrap_or("error");
+                eprintln!(
+                    "{}",
+                    serde_json::json!({
+                        "surface": "cross_wall_traceback",
+                        "outcome": outcome,
+                        "remote_team": remote_team,
+                        "spirit_pid": spirit_pid,
+                        "error": error.to_string(),
+                    })
+                );
+                return Err(error.into());
+            }
+        }
+    }
     let memory_any: Arc<dyn std::any::Any + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn std::any::Any + Send + Sync>;
     let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(
@@ -12112,6 +12221,39 @@ async fn smoke_compliance_7_3() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(all(test, feature = "network"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn story_13_6d_parses_validated_cross_wall_traceback_request() {
+        let request = parse_cross_wall_traceback_args(
+            [
+                "traceback",
+                "--team",
+                "team-b",
+                "--spirit-pid",
+                "42",
+                "--limit",
+                "7",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(request.remote_team().as_str(), "team-b");
+        assert_eq!(request.spirit_pid(), 42);
+        assert_eq!(request.filter().limit, 7);
+    }
+
+    #[test]
+    fn story_13_6d_rejects_invalid_or_incomplete_traceback_request() {
+        for args in [
+            vec!["traceback", "--team", "TEAM-B", "--spirit-pid", "42"],
+            vec!["traceback", "--team", "team-b"],
+            vec!["traceback", "--spirit-pid", "42"],
+        ] {
+            assert!(parse_cross_wall_traceback_args(args.into_iter().map(str::to_string)).is_err());
+        }
+    }
 
     #[test]
     fn story_9_6_classifies_founder_and_diagnostic_spirits() {

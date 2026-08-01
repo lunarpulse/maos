@@ -35,8 +35,8 @@ use maos_domain::log_recall::{
     LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter, LogRecallPage,
 };
 use maos_domain::ports::{
-    CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
-    LogRecallPort,
+    CrossWallLogReadPort, CrossWallRecallConsentDecision, CrossWallRecallConsentError,
+    CrossWallRecallConsentPort, LogRecallPort,
 };
 use maos_domain::team::TeamId;
 
@@ -48,6 +48,8 @@ use super::transparency_log::{
 pub const LOG_RECALL_INTENT: &str = "log.recall";
 /// Canonical A2A intent used for signed directional cross-team grants.
 pub const CROSS_WALL_RECALL_CONSENT_INTENT: &str = "log:recall";
+/// Audit intent for a consent-governed cross-wall disclosure or refusal.
+pub const LOG_CROSS_WALL_RECALL_INTENT: &str = "log.recall.cross-wall";
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const LOG_FETCH_INTENT: &str = "log.fetch";
@@ -59,6 +61,7 @@ pub const LOG_FETCH_INTENT: &str = "log.fetch";
 pub struct LogRecallAdapter {
     transparency_log: Arc<TransparencyLogAdapter>,
     cross_wall_consent: Option<Arc<dyn CrossWallRecallConsentPort>>,
+    cross_wall_read: Option<Arc<dyn CrossWallLogReadPort>>,
     /// Story 4.4 — cross-Spirit isolation hook (Story 4.5 corpus).
     /// Feature-gated so production builds carry zero runtime cost.
     #[cfg(feature = "spirit_test")]
@@ -71,6 +74,7 @@ impl LogRecallAdapter {
         Self {
             transparency_log,
             cross_wall_consent: None,
+            cross_wall_read: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
         }
@@ -81,6 +85,38 @@ impl LogRecallAdapter {
     pub fn with_cross_wall_consent(mut self, consent: Arc<dyn CrossWallRecallConsentPort>) -> Self {
         self.cross_wall_consent = Some(consent);
         self
+    }
+
+    /// Attach the dependency-inverted remote audit-artifact reader.
+    pub fn with_cross_wall_read(mut self, read: Arc<dyn CrossWallLogReadPort>) -> Self {
+        self.cross_wall_read = Some(read);
+        self
+    }
+
+    fn journal_cross_wall_recall(
+        &self,
+        spirit_pid: u32,
+        remote_team: &TeamId,
+        outcome: &str,
+        refusal: Option<&CrossWallRecallRefusal>,
+    ) {
+        let consent_granted = outcome != "refused";
+        let crossed = outcome == "disclosed";
+        let payload = serde_json::json!({
+            "remote_team": remote_team.as_str(),
+            "outcome": outcome,
+            "consent_grant": consent_granted.then_some(CROSS_WALL_RECALL_CONSENT_INTENT),
+            "crossed_team_boundary": crossed,
+            "refusal": refusal.map(ToString::to_string),
+        });
+        self.transparency_log.insert_frame_event(
+            FrameKind::CapabilityInvocation,
+            spirit_pid,
+            None,
+            LOG_CROSS_WALL_RECALL_INTENT,
+            payload.to_string().as_bytes(),
+            FrameOrigin::SpiritAuto,
+        );
     }
 
     /// Story 4.4 — attach an isolation hook for the `spirit_test` feature.
@@ -260,6 +296,51 @@ impl LogRecallAdapter {
         (result, next_cursor)
     }
 
+    /// Query one emitter-scoped page without emitting a local audit row.
+    ///
+    /// Composition-root remote readers reuse this mapping over a connection
+    /// that SQLite has already opened read-only.
+    pub fn query_page(
+        transparency_log: &TransparencyLogAdapter,
+        spirit_pid: u32,
+        filter: LogRecallFilter,
+    ) -> Result<LogRecallPage, LogRecallError> {
+        let kernel_filter = FrameFilter {
+            spirit_pid: Some(spirit_pid),
+            frame_id: None,
+            kind: filter.kind.as_ref().and_then(Self::to_kernel_kind),
+            correlation_id: None,
+            since_ns: filter.since_ns,
+            until_ns: filter.until_ns,
+            limit: Some(
+                filter
+                    .limit
+                    .min(LogRecallFilter::MAX_LIMIT)
+                    .saturating_add(1),
+            ),
+            cursor_timestamp_ns: filter
+                .cursor
+                .as_ref()
+                .map(|cursor| cursor.last_timestamp_ns),
+            cursor_frame_id: filter.cursor.as_ref().map(|cursor| cursor.last_frame_id),
+        };
+        let mut entries = transparency_log
+            .query_frames(kernel_filter)
+            .map_err(|error| LogRecallError::Storage(error.to_string()))?;
+        entries.retain(|entry| {
+            entry.kind != FrameKind::CapabilityInvocation
+                && filter
+                    .intent_filter
+                    .as_ref()
+                    .is_none_or(|intent| entry.intent == *intent)
+        });
+        let effective_limit = filter.limit.min(LogRecallFilter::MAX_LIMIT);
+        let (selected, next_cursor) =
+            Self::apply_cursor(&entries, filter.cursor.as_ref(), effective_limit);
+        let entries = selected.iter().map(Self::build_entry).collect();
+        Ok(LogRecallPage::new(entries, next_cursor))
+    }
+
     /// Convert kernel origin → domain origin.
     fn to_domain_origin(origin: FrameOrigin) -> maos_domain::invariants::i3::FrameOrigin {
         origin
@@ -291,57 +372,7 @@ impl LogRecallPort for LogRecallAdapter {
         #[cfg(feature = "spirit_test")]
         self.fire_isolation_hooks(&format!("log.recall:{spirit_pid}"), true);
 
-        // 2. Build kernel-side filter.
-        let kind_filter = filter.kind.as_ref().and_then(Self::to_kernel_kind);
-        let kernel_filter = FrameFilter {
-            spirit_pid: Some(spirit_pid), // emitter-scope at v0.3-β
-            frame_id: None,
-            kind: kind_filter,
-            correlation_id: None,
-            since_ns: filter.since_ns,
-            until_ns: filter.until_ns,
-            limit: Some(
-                filter
-                    .limit
-                    .min(LogRecallFilter::MAX_LIMIT)
-                    .saturating_add(1),
-            ),
-            cursor_timestamp_ns: filter.cursor.as_ref().map(|c| c.last_timestamp_ns),
-            cursor_frame_id: filter.cursor.as_ref().map(|c| c.last_frame_id),
-        };
-
-        // 3. Query transparency log with SQL-level cursor pagination.
-        let all_entries = self
-            .transparency_log
-            .query_frames(kernel_filter)
-            .map_err(|e| LogRecallError::Storage(e.to_string()))?;
-
-        // 3a. Exclude CapabilityInvocation audit rows from recall results —
-        // they are audit metadata, not visible business frames.
-        let audit_filtered: Vec<_> = all_entries
-            .into_iter()
-            .filter(|e| e.kind != FrameKind::CapabilityInvocation)
-            .collect();
-
-        // 4. Apply intent filter (post-query since TL query_frames does not support it).
-        let intent_filtered: Vec<_> = if let Some(ref intent_f) = filter.intent_filter {
-            audit_filtered
-                .into_iter()
-                .filter(|e| e.intent == *intent_f)
-                .collect()
-        } else {
-            audit_filtered
-        };
-
-        // 5. Apply cursor pagination (limit-clamp already pushed to SQL as limit+1).
-        let effective_limit = filter.limit.min(LogRecallFilter::MAX_LIMIT);
-        let (selected, next_cursor) =
-            Self::apply_cursor(&intent_filtered, filter.cursor.as_ref(), effective_limit);
-
-        // 6. Build domain entries.
-        let entries: Vec<LogRecallEntry> = selected.iter().map(Self::build_entry).collect();
-
-        Ok(LogRecallPage::new(entries, next_cursor))
+        Self::query_page(&self.transparency_log, spirit_pid, filter)
     }
 
     fn recall_cross_wall(
@@ -369,12 +400,35 @@ impl LogRecallPort for LogRecallAdapter {
             },
         };
         if let Some(reason) = reason {
+            self.journal_cross_wall_recall(spirit_pid, team, "refused", Some(&reason));
             return Err(LogRecallError::ECrossWallRecallDenied {
                 team: team.clone(),
                 reason,
             });
         }
-        self.recall(spirit_pid, filter)
+        let Some(read) = self.cross_wall_read.as_ref() else {
+            let reason = CrossWallRecallRefusal::ReadPortUnavailable;
+            self.journal_cross_wall_recall(spirit_pid, team, "refused", Some(&reason));
+            return Err(LogRecallError::ECrossWallRecallDenied {
+                team: team.clone(),
+                reason,
+            });
+        };
+        // FR4: record the consented cross-wall disclosure intent BEFORE data
+        // movement, then journal the truthful outcome once the read resolves.
+        // A single pre-movement "disclosed" would be a false disclosure on a
+        // read that later fails (the D-6 truthfulness property this enforces).
+        self.journal_cross_wall_recall(spirit_pid, team, "disclosing", None);
+        match read.read_remote(spirit_pid, team, filter) {
+            Ok(page) => {
+                self.journal_cross_wall_recall(spirit_pid, team, "disclosed", None);
+                Ok(page)
+            }
+            Err(error) => {
+                self.journal_cross_wall_recall(spirit_pid, team, "failed", None);
+                Err(error)
+            }
+        }
     }
 
     fn fetch(
@@ -470,6 +524,17 @@ mod tests {
                 FrameOrigin::HumanAuthored,
             );
         }
+    }
+
+    fn cross_wall_audit_rows(tl: &TransparencyLogAdapter) -> Vec<TransparencyLogEntry> {
+        tl.query_frames(FrameFilter {
+            kind: Some(FrameKind::CapabilityInvocation),
+            ..Default::default()
+        })
+        .unwrap()
+        .into_iter()
+        .filter(|entry| entry.intent == LOG_CROSS_WALL_RECALL_INTENT)
+        .collect()
     }
 
     #[test]
@@ -688,6 +753,68 @@ mod tests {
         }
     }
 
+    struct FixedCrossWallRead;
+
+    impl CrossWallLogReadPort for FixedCrossWallRead {
+        fn read_remote(
+            &self,
+            spirit_pid: u32,
+            _remote_team: &TeamId,
+            _filter: LogRecallFilter,
+        ) -> Result<LogRecallPage, LogRecallError> {
+            let entries = if spirit_pid == 20 {
+                vec![
+                    LogRecallEntry::new(
+                        [0xA1; 16],
+                        1,
+                        DomainFrameKindLabel::TaskAssign,
+                        "delegate".into(),
+                        spirit_pid,
+                        true,
+                    ),
+                    LogRecallEntry::new(
+                        [0xA2; 16],
+                        2,
+                        DomainFrameKindLabel::TaskAssign,
+                        "delegate".into(),
+                        spirit_pid,
+                        true,
+                    ),
+                ]
+            } else {
+                Vec::new()
+            };
+            Ok(LogRecallPage::new(entries, None))
+        }
+    }
+
+    struct AuditObservingRead {
+        local: Arc<TransparencyLogAdapter>,
+    }
+
+    impl CrossWallLogReadPort for AuditObservingRead {
+        fn read_remote(
+            &self,
+            spirit_pid: u32,
+            remote_team: &TeamId,
+            filter: LogRecallFilter,
+        ) -> Result<LogRecallPage, LogRecallError> {
+            let rows = cross_wall_audit_rows(&self.local);
+            assert_eq!(
+                rows.len(),
+                1,
+                "intent audit row must exist before remote read"
+            );
+            let payload: serde_json::Value =
+                serde_json::from_slice(&rows[0].payload_redacted).unwrap();
+            assert_eq!(payload["remote_team"], remote_team.as_str());
+            assert_eq!(payload["outcome"], "disclosing");
+            assert_eq!(payload["consent_grant"], CROSS_WALL_RECALL_CONSENT_INTENT);
+            assert_eq!(payload["crossed_team_boundary"], false);
+            FixedCrossWallRead.read_remote(spirit_pid, remote_team, filter)
+        }
+    }
+
     struct RecordingCrossWallConsent {
         result: Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError>,
         calls: std::sync::Mutex<Vec<(String, String)>>,
@@ -723,26 +850,42 @@ mod tests {
             })
             .unwrap()[0]
             .frame_id;
+        let local_frame_ids: std::collections::HashSet<_> = tl
+            .query_frames(FrameFilter {
+                spirit_pid: Some(20),
+                kind: Some(FrameKind::TaskAssign),
+                ..Default::default()
+            })
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.frame_id)
+            .collect();
 
         let granted_consent = Arc::new(RecordingCrossWallConsent {
             result: Ok(CrossWallRecallConsentDecision::Granted),
             calls: std::sync::Mutex::new(Vec::new()),
         });
         let granted_consent_port: Arc<dyn CrossWallRecallConsentPort> = granted_consent.clone();
-        let granted =
-            LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(granted_consent_port);
-        // Granted AND non-empty: the method must forward spirit_pid/filter to
-        // `recall` and return the frames — an implementation that consents
-        // correctly but always returns an empty page fails here.
+        let granted = LogRecallAdapter::new(Arc::clone(&tl))
+            .with_cross_wall_consent(granted_consent_port)
+            .with_cross_wall_read(Arc::new(FixedCrossWallRead));
+        // Granted AND non-empty: the method must route through the remote-read
+        // port and return its rows, never delegate to the local `recall`.
         let page = granted
             .recall_cross_wall(20, &remote_team, LogRecallFilter::default())
             .unwrap();
+        let returned_frame_ids: std::collections::HashSet<_> =
+            page.entries.iter().map(|entry| entry.frame_id).collect();
         assert_eq!(
-            page.entries.len(),
-            2,
-            "a granted cross-wall recall returns the target pid's frames"
+            returned_frame_ids,
+            std::collections::HashSet::from([[0xA1; 16], [0xA2; 16]]),
+            "a granted cross-wall recall returns the remote reader's frames"
         );
-        assert!(page.entries.iter().all(|e| e.intent == "delegate"));
+        assert!(
+            returned_frame_ids.is_disjoint(&local_frame_ids),
+            "remote disclosure must contain none of the caller-local frames"
+        );
+        assert!(page.entries.iter().all(|entry| entry.intent == "delegate"));
         // Granted AND legitimately empty: success, not refusal — and never
         // the same observation as a refusal.
         assert!(
@@ -806,6 +949,19 @@ mod tests {
             })
         ));
 
+        let unavailable = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
+            FixedCrossWallConsent(Err(CrossWallRecallConsentError::StateUnavailable {
+                reason: "manifest store offline".into(),
+            })),
+        ));
+        assert!(matches!(
+            unavailable.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+            Err(LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::ConsentStateUnavailable(_),
+                ..
+            })
+        ));
+
         assert!(matches!(
             granted.fetch(20, frame_id),
             Err(LogRecallError::ScopeViolation { .. })
@@ -813,15 +969,215 @@ mod tests {
     }
 
     #[test]
+    fn cross_wall_recall_journals_refusal() {
+        let team = TeamId::new("team-a").unwrap();
+        let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xD40E));
+        let adapter = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
+            FixedCrossWallConsent(Ok(CrossWallRecallConsentDecision::NoGrant)),
+        ));
+        adapter
+            .recall_cross_wall(10, &team, LogRecallFilter::default())
+            .unwrap_err();
+
+        let rows = cross_wall_audit_rows(&tl);
+        assert_eq!(rows.len(), 1);
+        let payload: serde_json::Value = serde_json::from_slice(&rows[0].payload_redacted).unwrap();
+        assert_eq!(payload["remote_team"], "team-a");
+        assert_eq!(payload["outcome"], "refused");
+        assert_eq!(payload["consent_grant"], serde_json::Value::Null);
+        assert_eq!(payload["crossed_team_boundary"], false);
+        assert_eq!(payload["refusal"], "no directional grant");
+    }
+
+    #[test]
+    fn cross_wall_recall_journals_disclosure_before_remote_read() {
+        let team = TeamId::new("team-a").unwrap();
+        let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xD40F));
+        let read = Arc::new(AuditObservingRead {
+            local: Arc::clone(&tl),
+        });
+        let page = LogRecallAdapter::new(Arc::clone(&tl))
+            .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Ok(
+                CrossWallRecallConsentDecision::Granted,
+            ))))
+            .with_cross_wall_read(read)
+            .recall_cross_wall(20, &team, LogRecallFilter::default())
+            .unwrap();
+        assert_eq!(page.entries.len(), 2);
+        // FR4: a pre-movement "disclosing" intent, then the truthful "disclosed"
+        // outcome — never a false "disclosed" before data movement.
+        let rows = cross_wall_audit_rows(&tl);
+        assert_eq!(rows.len(), 2, "disclosure journals intent then outcome");
+        let outcomes: Vec<String> = rows
+            .iter()
+            .map(|row| {
+                serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
+                    .unwrap()
+                    .get("outcome")
+                    .and_then(|value| value.as_str())
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(outcomes, vec!["disclosing", "disclosed"]);
+    }
+
+    struct FailingCrossWallRead;
+
+    impl CrossWallLogReadPort for FailingCrossWallRead {
+        fn read_remote(
+            &self,
+            _spirit_pid: u32,
+            _remote_team: &TeamId,
+            _filter: LogRecallFilter,
+        ) -> Result<LogRecallPage, LogRecallError> {
+            Err(LogRecallError::Storage(
+                "simulated remote shard read failure".to_string(),
+            ))
+        }
+    }
+
+    #[test]
+    fn cross_wall_recall_journals_failure_when_remote_read_fails() {
+        let team = TeamId::new("team-a").unwrap();
+        let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xD410));
+        let adapter = LogRecallAdapter::new(Arc::clone(&tl))
+            .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Ok(
+                CrossWallRecallConsentDecision::Granted,
+            ))))
+            .with_cross_wall_read(Arc::new(FailingCrossWallRead));
+        let error = adapter
+            .recall_cross_wall(20, &team, LogRecallFilter::default())
+            .unwrap_err();
+        assert!(
+            matches!(error, LogRecallError::Storage(_)),
+            "a remote-read failure surfaces as a storage error, not a denial"
+        );
+        let rows = cross_wall_audit_rows(&tl);
+        assert_eq!(rows.len(), 2, "failure journals intent then failure");
+        let outcomes: Vec<String> = rows
+            .iter()
+            .map(|row| {
+                serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
+                    .unwrap()
+                    .get("outcome")
+                    .and_then(|value| value.as_str())
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
+        assert_eq!(outcomes, vec!["disclosing", "failed"]);
+        assert!(
+            !outcomes.iter().any(|outcome| *outcome == "disclosed"),
+            "a failed read must never leave a false disclosed audit row"
+        );
+    }
+
+    fn refusal_from(
+        consent: Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError>,
+    ) -> LogRecallError {
+        let team = TeamId::new("team-a").unwrap();
+        make_adapter(0xD40D)
+            .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(consent)))
+            .recall_cross_wall(10, &team, LogRecallFilter::default())
+            .unwrap_err()
+    }
+
+    #[test]
+    fn cross_wall_recall_no_grant_is_observable() {
+        let error = refusal_from(Ok(CrossWallRecallConsentDecision::NoGrant));
+        assert!(matches!(
+            error,
+            LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::NoGrant,
+                ..
+            }
+        ));
+        assert!(error.to_string().contains("no directional grant"));
+    }
+
+    #[test]
+    fn cross_wall_recall_wrong_direction_is_observable() {
+        let error = refusal_from(Ok(CrossWallRecallConsentDecision::WrongDirection));
+        assert!(matches!(
+            error,
+            LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::WrongDirection,
+                ..
+            }
+        ));
+        assert!(error.to_string().contains("reverse directional grant"));
+    }
+
+    #[test]
+    fn cross_wall_recall_stale_state_is_observable() {
+        let error = refusal_from(Err(CrossWallRecallConsentError::Stale {
+            reason: "expired".into(),
+        }));
+        assert!(matches!(
+            error,
+            LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::ConsentStateStale(_),
+                ..
+            }
+        ));
+        assert!(error
+            .to_string()
+            .contains("consent state is stale: expired"));
+    }
+
+    #[test]
+    fn cross_wall_recall_unavailable_state_is_observable() {
+        let error = refusal_from(Err(CrossWallRecallConsentError::StateUnavailable {
+            reason: "offline".into(),
+        }));
+        assert!(matches!(
+            error,
+            LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::ConsentStateUnavailable(_),
+                ..
+            }
+        ));
+        assert!(error
+            .to_string()
+            .contains("consent state is unavailable: offline"));
+    }
+
+    #[test]
+    fn cross_wall_recall_granted_without_read_port_fails_closed() {
+        let team = TeamId::new("team-a").unwrap();
+        let adapter = make_adapter(0xD40C).with_cross_wall_consent(Arc::new(
+            FixedCrossWallConsent(Ok(CrossWallRecallConsentDecision::Granted)),
+        ));
+        let error = adapter
+            .recall_cross_wall(10, &team, LogRecallFilter::default())
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            LogRecallError::ECrossWallRecallDenied {
+                reason: CrossWallRecallRefusal::ReadPortUnavailable,
+                ..
+            }
+        ));
+        assert!(error
+            .to_string()
+            .contains("cross-wall read port is not wired"));
+    }
+
+    #[test]
     fn cross_wall_recall_without_injected_consent_fails_closed() {
         let team = TeamId::new("team-a").unwrap();
         let adapter = make_adapter(0xD40B);
+        let error = adapter
+            .recall_cross_wall(10, &team, LogRecallFilter::default())
+            .unwrap_err();
         assert!(matches!(
-            adapter.recall_cross_wall(10, &team, LogRecallFilter::default()),
-            Err(LogRecallError::ECrossWallRecallDenied {
+            error,
+            LogRecallError::ECrossWallRecallDenied {
                 reason: CrossWallRecallRefusal::NoConsentProvider,
                 ..
-            })
+            }
         ));
+        assert!(error.to_string().contains("consent provider is not wired"));
     }
 }

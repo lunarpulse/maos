@@ -385,6 +385,43 @@ impl TransparencyLogAdapter {
         )
     }
 
+    /// Open an existing Transparency Log for query-only cross-wall disclosure.
+    ///
+    /// SQLite enforces read-only mode and `NOFOLLOW`; no schema migration,
+    /// journal-mode change, or file creation is attempted.
+    pub fn open_read_only(path: &Path) -> Result<Self, AuditError> {
+        let conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
+        Ok(Self::from_read_only_connection(conn))
+    }
+
+    /// Wrap an externally-opened **read-only** SQLite connection for query-only
+    /// cross-wall disclosure (Story 13.6d P2 — single-connection foreign read).
+    ///
+    /// The connection MUST already be read-only with `NOFOLLOW` (open it via
+    /// `maos_audit::open_tenant_artifact_readonly`); this constructor performs no
+    /// schema work and assumes a query-only handle. No counters or nonce are
+    /// seeded — query paths never write, so the zeroed frame-id state is inert.
+    /// Redaction is the same stateless `CorpusBackedRedactionPolicy` the local
+    /// read uses, so a foreign shard is redacted identically.
+    pub fn from_read_only_connection(conn: Connection) -> Self {
+        Self {
+            inner: Mutex::new(TransparencyLogInner {
+                conn,
+                next_frame_id_counter: 0,
+                boot_nonce: 0,
+                last_frame_id: [0; 16],
+                legal_hold_authority: None,
+            }),
+            redaction: Box::new(CorpusBackedRedactionPolicy::new()),
+            mailbox: MailboxStub::new(),
+        }
+    }
+
     /// Open a Transparency Log with an explicit Host-global legal-hold
     /// authority. Team shards attach `global_path`; the global artifact binds
     /// its own `main` schema. Callers using [`Self::open`] remain unbound and

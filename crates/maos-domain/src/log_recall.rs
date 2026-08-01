@@ -6,7 +6,7 @@
 //! These are the pure domain shape types consumed by `LogRecallPort` and
 //! implemented by `LogRecallAdapter` in `maos-kernel-core`.
 
-use crate::team::TeamId;
+use crate::team::{TeamId, TeamIdError};
 use thiserror::Error;
 
 /// Filter for `LogRecallPort::recall`.
@@ -125,6 +125,48 @@ impl Default for LogRecallFilter {
             cursor: None,
             intent_filter: None,
         }
+    }
+}
+
+/// Operator-authored cross-wall recall question.
+///
+/// This sibling request keeps the remote team outside [`LogRecallFilter`], so
+/// LLM-backed filter construction cannot acquire authority to name a tenant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrossWallRecallRequest {
+    spirit_pid: u32,
+    remote_team: TeamId,
+    filter: LogRecallFilter,
+}
+
+impl CrossWallRecallRequest {
+    /// Construct a request while enforcing canonical remote-team identity.
+    pub fn new(
+        spirit_pid: u32,
+        remote_team: &str,
+        filter: LogRecallFilter,
+    ) -> Result<Self, TeamIdError> {
+        Ok(Self {
+            spirit_pid,
+            remote_team: TeamId::new(remote_team)?,
+            filter,
+        })
+    }
+
+    pub fn spirit_pid(&self) -> u32 {
+        self.spirit_pid
+    }
+
+    pub fn remote_team(&self) -> &TeamId {
+        &self.remote_team
+    }
+
+    pub fn filter(&self) -> &LogRecallFilter {
+        &self.filter
+    }
+
+    pub fn into_parts(self) -> (u32, TeamId, LogRecallFilter) {
+        (self.spirit_pid, self.remote_team, self.filter)
     }
 }
 
@@ -257,6 +299,8 @@ pub enum CrossWallRecallRefusal {
     ConsentStateStale(String),
     #[error("consent state is unavailable: {0}")]
     ConsentStateUnavailable(String),
+    #[error("cross-wall read port is not wired")]
+    ReadPortUnavailable,
 }
 
 /// Typed error for log-recall operations.
@@ -385,5 +429,19 @@ mod tests {
         assert_eq!(back.frame_id, [0xCC; 16]);
         assert_eq!(back.intent, "distillate.write");
         assert_eq!(back.capability_token, Some([0xDD; 32]));
+    }
+
+    #[test]
+    fn cross_wall_request_validates_team_and_preserves_filter() {
+        let filter = LogRecallFilter::new(None, Some(10), Some(20), 7, None, Some("task".into()));
+        let request = CrossWallRecallRequest::new(42, "team-b", filter.clone()).unwrap();
+        assert_eq!(request.spirit_pid(), 42);
+        assert_eq!(request.remote_team().as_str(), "team-b");
+        assert_eq!(request.filter(), &filter);
+    }
+
+    #[test]
+    fn cross_wall_request_rejects_noncanonical_team() {
+        assert!(CrossWallRecallRequest::new(42, "TEAM-B", LogRecallFilter::default()).is_err());
     }
 }

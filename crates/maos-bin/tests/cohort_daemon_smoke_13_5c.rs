@@ -852,7 +852,7 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 12] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 13] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -889,6 +889,12 @@ fn composition_root_does_not_seed_manifest_scopes() {
         (
             "cross_team_crossing.rs",
             include_str!("../src/cross_team_crossing.rs"),
+        ),
+        // Story 13.6d — read-only foreign artifact adapter. It must consume the
+        // verified consent decision, never seed manifest scopes itself.
+        (
+            "cross_wall_log_read.rs",
+            include_str!("../src/cross_wall_log_read.rs"),
         ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");

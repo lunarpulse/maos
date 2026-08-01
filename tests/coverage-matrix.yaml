@@ -204,9 +204,18 @@ coverage:
       ever distinguished ConsentDenied from MapStale) and nothing about
       per-team key provisioning. The operator-trust limit is unchanged:
       isolation is enforced against a peer, not against the operator.
-      Absent successors: the cross-wall RECALL initiator (read side, split to
-      13.6d), the 13.6 three-team journey closer, and the kernel cause
-      erasure (13.6 to judge).
+      Story 13.6d closes the read-side successor. `CrossWallRecallRequest`
+      keeps the team dimension out of the LLM-built six-field filter;
+      `CrossWallLogReadPort` routes a granted recall to the named team's
+      read-only/NOFOLLOW artifact after path and in-artifact binding checks.
+      The two-artifact negative proves remote rows are returned and caller-local
+      rows are absent, while ordinary boot still refuses a foreign binding.
+      Six refusal limbs stay typed and independently proven-red. Refusals and
+      allowed disclosures journal under `log.recall.cross-wall` before remote
+      data movement. The `maos traceback` composition-root initiator is wired
+      only with verified cohort state plus `MAOS_LOOM_HOME_TEAM`; its deletion
+      reds the positive caller leg. Absent successors now remain the 13.6
+      three-team journey closer and kernel cause erasure (13.6 to judge).
   ADR-024:
     gates:
     - check-escape-detector

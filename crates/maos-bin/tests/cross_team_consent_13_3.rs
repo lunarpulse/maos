@@ -6,17 +6,23 @@ use ed25519_dalek::SigningKey;
 use maos_bin::cross_team_consent::{
     derive_team_verifying_keys, CrossTeamConsentAdapter, CrossWallRecallConsentAdapter,
 };
+use maos_bin::cross_wall_log_read::CrossWallLogReadAdapter;
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     CrossTeamConsentGrant, InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys,
     TeamEntry, COHORT_SCHEMA_V3, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::log_recall::{LogRecallError, LogRecallFilter, LogRecallPage};
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::ports::{
-    CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
+    CrossWallLogReadPort, CrossWallRecallConsentDecision, CrossWallRecallConsentError,
+    CrossWallRecallConsentPort, LogRecallPort,
 };
 use maos_domain::region::Region;
 use maos_domain::team::TeamId;
+use maos_iac::adapter::log_recall::LogRecallAdapter;
+use maos_iac::adapter::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 use maos_loom_lite::replication::bundle::{
     apply_replication_bundle, build_replication_bundle_v2, BundleError, CrossTeamApplyContext,
@@ -25,6 +31,17 @@ use maos_loom_lite::replication::leaf::CollectiveKvLeaf;
 use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
 use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 use maos_spirit_abi::identity::{HostId, SpiritId};
+
+struct RestoreMaosHome(Option<std::ffi::OsString>);
+
+impl Drop for RestoreMaosHome {
+    fn drop(&mut self) {
+        match &self.0 {
+            Some(value) => std::env::set_var("MAOS_HOME", value),
+            None => std::env::remove_var("MAOS_HOME"),
+        }
+    }
+}
 
 #[derive(Default)]
 struct TestClock(Mutex<u64>);
@@ -218,7 +235,96 @@ fn cross_wall_recall_manifest_direction_and_staleness_are_typed() {
 }
 
 #[test]
-fn cross_wall_recall_has_no_production_caller() {
+fn cross_wall_recall_live_path_uses_verified_state_and_home_team() {
+    let _lock = LIVE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let _restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
+    let home = tempfile::tempdir().unwrap();
+    std::env::set_var("MAOS_HOME", home.path());
+    let state = consent_state_for(
+        Arc::new(TestClock::default()),
+        "cross-wall-live-path",
+        "region-a",
+        "region-b",
+        "maos_team_a".to_string(),
+        "maos_team_b".to_string(),
+        "log:recall",
+    );
+    let home_team = TeamId::new("team-a").unwrap();
+    let remote_team = TeamId::new("team-b").unwrap();
+    let remote_path =
+        maos_audit::transparency_log_path_for_tenant_mode(true, Some(remote_team.as_str()))
+            .unwrap();
+    std::fs::create_dir_all(remote_path.parent().unwrap()).unwrap();
+    let remote_log = TransparencyLogAdapter::open(&remote_path, 0x136D).unwrap();
+    remote_log.insert_frame_event(
+        FrameKind::TaskAssign,
+        42,
+        None,
+        "remote-live-path",
+        b"remote",
+        FrameOrigin::HumanAuthored,
+    );
+    drop(remote_log);
+    maos_audit::write_tenant_binding(&remote_path, &remote_team, Some("maos_team_b")).unwrap();
+
+    let adapter = LogRecallAdapter::new(Arc::new(TransparencyLogAdapter::open_in_memory(0x136E)))
+        .with_cross_wall_consent(Arc::new(CrossWallRecallConsentAdapter::new(
+            state, home_team,
+        )))
+        .with_cross_wall_read(Arc::new(CrossWallLogReadAdapter::new(true)));
+    let page = adapter
+        .recall_cross_wall(42, &remote_team, LogRecallFilter::default())
+        .unwrap();
+    assert_eq!(page.entries.len(), 1);
+    assert_eq!(page.entries[0].intent, "remote-live-path");
+}
+
+#[test]
+fn log_recall_filter_has_no_team_dimension() {
+    let source = include_str!("../src/../../maos-domain/src/log_recall.rs");
+    let fields = source
+        .split("pub struct LogRecallFilter {")
+        .nth(1)
+        .and_then(|tail| tail.split("\n}").next())
+        .expect("LogRecallFilter fields");
+    let constructor = source
+        .split("impl LogRecallFilter {")
+        .nth(1)
+        .and_then(|tail| tail.split("impl Default for LogRecallFilter").next())
+        .expect("LogRecallFilter constructor");
+    assert!(
+        !fields.contains("TeamId")
+            && !fields
+                .lines()
+                .any(|line| line.trim_start().starts_with("team:"))
+            && !constructor.contains("TeamId")
+            && !constructor.contains("remote_team"),
+        "Story 13.6d security property: LLM-built LogRecallFilter must not name a team"
+    );
+    assert!(
+        source.contains("pub struct CrossWallRecallRequest")
+            && source.contains("remote_team: TeamId")
+            && source.contains("remote_team: TeamId::new(remote_team)?"),
+        "the operator-only sibling request must own the validated team dimension"
+    );
+}
+
+#[test]
+fn researcher_recall_surface_cannot_import_unscoped_ranged_recall() {
+    let cargo = include_str!("../../../spirits/researcher/Cargo.toml");
+    let source = include_str!("../../../spirits/researcher/src/lib.rs");
+    assert!(
+        !cargo.contains("maos-audit"),
+        "Researcher must not gain the crate that exposes ranged_recall"
+    );
+    assert!(
+        !source.contains("ranged_recall("),
+        "Researcher production code must stay compile-pinned to LogRecallPort"
+    );
+}
+
+#[test]
+fn cross_wall_recall_has_production_caller_and_live_preconditions() {
     let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(std::path::Path::parent)
@@ -254,25 +360,163 @@ fn cross_wall_recall_has_no_production_caller() {
             }
         }
     }
+    assert_eq!(
+        callers,
+        vec![workspace_root.join("crates/maos-bin/src/main.rs")],
+        "Story 13.6d owns exactly one production caller in the composition root"
+    );
+    let main = include_str!("../src/main.rs");
+    let wiring = main
+        .split("LogRecallAdapter + directional manifest-consent seam")
+        .nth(1)
+        .and_then(|tail| tail.split("let log_recall_adapter").next())
+        .expect("cross-wall composition-root wiring");
+    // All four preconditions must live inside this single conditional branch,
+    // in source order — relocating any token outside the guard reds the leg
+    // (independent substring checks could not catch that).
+    let mut cursor = 0usize;
+    for token in [
+        "cohort_daemon.as_ref()",
+        "MAOS_LOOM_HOME_TEAM",
+        "with_cross_wall_consent",
+        "with_cross_wall_read",
+    ] {
+        cursor = wiring[cursor..]
+            .find(token)
+            .unwrap_or_else(|| panic!("cross-wall wiring missing token in order: {token}"))
+            + cursor;
+    }
+    // The composition-root dispatch must be wired, not merely defined: a dead
+    // `run_cross_wall_traceback` helper with the dispatch deleted would keep a
+    // substring scanner green, so assert the dispatch site itself.
+    let dispatch = main
+        .split("if let Some(request) = cross_wall_traceback")
+        .nth(1)
+        .and_then(|tail| tail.split("let memory_any").next())
+        .expect("cross-wall traceback dispatch block");
     assert!(
-        callers.is_empty(),
-        "cross-wall-recall-has-no-production-caller inverted by {callers:?}; \
-         production caller owner is UNASSIGNED and must be assigned before inversion"
+        dispatch.contains("run_cross_wall_traceback"),
+        "the composition root must dispatch to run_cross_wall_traceback"
     );
 }
 
+struct GrantedCrossWallConsent;
+
+impl CrossWallRecallConsentPort for GrantedCrossWallConsent {
+    fn decide(
+        &self,
+        _team: &TeamId,
+        _intent: &str,
+    ) -> Result<CrossWallRecallConsentDecision, CrossWallRecallConsentError> {
+        Ok(CrossWallRecallConsentDecision::Granted)
+    }
+}
+
+struct SucceedingCrossWallRead;
+
+impl CrossWallLogReadPort for SucceedingCrossWallRead {
+    fn read_remote(
+        &self,
+        _spirit_pid: u32,
+        _remote_team: &TeamId,
+        _filter: LogRecallFilter,
+    ) -> Result<LogRecallPage, LogRecallError> {
+        Ok(LogRecallPage::new(Vec::new(), None))
+    }
+}
+
+fn cross_wall_capability_rows(
+    tl: &TransparencyLogAdapter,
+) -> Vec<maos_iac::adapter::transparency_log::TransparencyLogEntry> {
+    tl.query_frames(FrameFilter {
+        kind: Some(FrameKind::CapabilityInvocation),
+        ..Default::default()
+    })
+    .expect("query cross-wall audit rows")
+}
+
 #[test]
-fn cross_wall_recall_refusals_not_journaled() {
-    let adapter = include_str!("../src/../../maos-iac/src/adapter/log_recall.rs");
-    let method = adapter
-        .split("fn recall_cross_wall")
-        .nth(1)
-        .and_then(|tail| tail.split("fn fetch").next())
-        .expect("cross-wall method source");
+fn cross_wall_recall_refusals_and_disclosures_are_journaled() {
+    // Behavioral (not a source-scan): drive a refusal and a disclosure through
+    // a real LogRecallAdapter and assert the audit rows. AC5 / ADR-049 §7: a
+    // refusal and a disclosure each journal a CapabilityInvocation row, never
+    // folded into an empty page; a disclosure claims crossed_team_boundary only
+    // once the read succeeded.
+    let team = TeamId::new("team-a").unwrap();
+
+    // Refusal: no consent provider → NoConsentProvider, journaled "refused".
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x13_6D));
+    let error = LogRecallAdapter::new(Arc::clone(&tl))
+        .recall_cross_wall(7, &team, LogRecallFilter::default())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        LogRecallError::ECrossWallRecallDenied { .. }
+    ));
+    let rows = cross_wall_capability_rows(&tl);
+    assert_eq!(rows.len(), 1, "a refused recall journals one audit row");
+    let payload: serde_json::Value = serde_json::from_slice(&rows[0].payload_redacted).unwrap();
+    assert_eq!(payload["outcome"], "refused");
+    assert_eq!(payload["crossed_team_boundary"], false);
+
+    // Disclosure: consent granted + succeeding read → "disclosing" then
+    // "disclosed"; crossed_team_boundary is true only on the outcome row.
+    let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x13_6E));
+    LogRecallAdapter::new(Arc::clone(&tl))
+        .with_cross_wall_consent(Arc::new(GrantedCrossWallConsent))
+        .with_cross_wall_read(Arc::new(SucceedingCrossWallRead))
+        .recall_cross_wall(7, &team, LogRecallFilter::default())
+        .unwrap();
+    let rows = cross_wall_capability_rows(&tl);
+    assert_eq!(
+        rows.len(),
+        2,
+        "a disclosed recall journals intent then outcome"
+    );
+    let outcomes: Vec<String> = rows
+        .iter()
+        .map(|row| {
+            serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
+                .unwrap()
+                .get("outcome")
+                .and_then(|value| value.as_str())
+                .unwrap()
+                .to_string()
+        })
+        .collect();
+    assert_eq!(outcomes, vec!["disclosing", "disclosed"]);
+}
+
+#[test]
+fn cross_wall_traceback_refuses_without_cohort_preconditions() {
+    // Composition-root guard (AC3 / 13.5g): `maos traceback` must reach
+    // recall_cross_wall and fail closed (NoConsentProvider) when the cohort
+    // preconditions are absent. Deleting the dispatch would make the binary not
+    // recognize the request and fail differently → this leg reds. Mirrors the
+    // dev T8 smoke; BOOTS ≠ SERVES.
+    let _restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
+    let home = tempfile::tempdir().unwrap();
+    std::env::set_var("MAOS_HOME", home.path());
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_maos"))
+        .args([
+            "traceback",
+            "--team",
+            "team-b",
+            "--spirit-pid",
+            "42",
+            "--limit",
+            "2",
+        ])
+        .output()
+        .expect("maos binary runs");
     assert!(
-        !method.contains("insert_frame_event"),
-        "cross-wall-recall-refusals-not-journaled inverted: Story 13.5e must \
-         replace this dead-wire assertion with per-team refusal-audit coverage"
+        !output.status.success(),
+        "cross-wall traceback without cohort state must fail closed, not exit 0"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cross_wall_traceback") && stderr.contains("refused"),
+        "cross-wall traceback must surface a typed refusal; got stderr: {stderr}"
     );
 }
 

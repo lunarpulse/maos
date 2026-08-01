@@ -29,11 +29,13 @@ The existing `CollectiveRow.source_log_ref: String` remains excluded. It is a de
 
 ## Decision 2 — Cross-wall recall is a separate directional capability
 
-The existing `LogRecallPort::recall` and `fetch` signatures and emitter-scope behavior remain unchanged. A third additive method, `recall_cross_wall(spirit_pid, team, filter)`, is separately mediated. `LogRecallAdapter::new` remains one-argument; an unconditional `with_cross_wall_consent` builder injects a `CrossWallRecallConsentPort` from the composition root.
+The existing `LogRecallPort::recall` and `fetch` signatures, `LogRecallFilter`'s six fields, and emitter-scope behavior remain unchanged. The team dimension lives in the sibling `CrossWallRecallRequest`, whose private fields can be constructed only through canonical `TeamId` validation, and in the separately mediated `recall_cross_wall(spirit_pid, team, filter)` method. This separation is a security property, not an API preference: 13.6b D-16 established that a team name reachable through an LLM-built filter is prompt-injectable authority. `LogRecallAdapter::new` remains one-argument; unconditional `with_cross_wall_consent` and `with_cross_wall_read` builders inject domain ports from the composition root.
 
-The production adapter reads one fresh `CohortManifestState` snapshot. For a home team disclosing to a remote team, only the exact ordered grant `(home_team, remote_team, "log:recall")` admits the request. A reverse-only grant is not symmetric and is reported separately. Missing injection, no grant, reverse-only grant, stale lease, and unavailable state all fail closed as typed `LogRecallError::ECrossWallRecallDenied` reasons. A legitimately empty page remains `Ok(LogRecallPage { entries: [] })`; it is never folded into refusal. Existing cross-Spirit fetch remains the distinct `ScopeViolation` outcome.
+The production consent adapter reads one fresh `CohortManifestState` snapshot. For a home team disclosing to a remote team, only the exact ordered grant `(home_team, remote_team, "log:recall")` admits the request. A reverse-only grant is not symmetric and is reported separately. The production read adapter is dependency-inverted through `CrossWallLogReadPort`: `maos-bin` derives the named shard with `transparency_log_path_for_tenant_mode`, validates the path and in-artifact `tenant_binding`, opens it SQLite read-only with `NOFOLLOW`, and returns emitter-scoped rows from that shard. `maos-iac` gains no `maos-audit`, `maos-cohort`, or `maos-loom-lite` dependency.
 
-This is the narrow federated capability ADR-013's revisit clause anticipated. It does not create an admin override, expose path-addressed `ranged_recall`, establish per-team Transparency Log isolation, or claim that refusal journaling is complete.
+Missing consent injection, no grant, reverse-only grant, stale lease, unavailable state, and missing read-port injection all fail closed as distinct typed `LogRecallError::ECrossWallRecallDenied` reasons. A legitimately empty remote page remains `Ok(LogRecallPage { entries: [] })`; it is never folded into refusal. Existing cross-Spirit fetch remains the distinct `ScopeViolation` outcome. Both a refusal and an allowed disclosure emit `FrameKind::CapabilityInvocation` under `log.recall.cross-wall`; the disclosure row names the remote team, the `log:recall` grant, and the boundary crossing before the read port moves data.
+
+This is the narrow federated capability ADR-013's revisit clause anticipated. It does not create an admin override or expose path-addressed `ranged_recall`. Ordinary tenant boot still refuses an artifact bound to another team; the consent-governed production traceback is the sole foreign-open path.
 
 ## Decision 3 — Citer authorization stays fail-closed; DAG traversal is corrected
 
@@ -47,7 +49,8 @@ Distillation depth is explicitly **unbounded** at v2.2. The Spirit-side "halt-an
 
 - V1 and v2 leaf hashes are frozen by byte-level goldens; v3 is additive.
 - Origin depth and intent lineage survive a team-wall apply and rebundle. This is origin evidence only, never authorization evidence.
-- Cross-wall recall consent is caller-legible and direction-sensitive. Empty success, no grant, reverse-only, stale state, and scope violation are distinguishable without string matching.
-- The manifest-backed consent adapter is injected only when verified cohort state and `MAOS_LOOM_HOME_TEAM` are both available; otherwise the builder remains absent and the method fails closed.
-- Per-team TL isolation and refusal journaling remain outside this decision. They must not be claimed by a gate or operational document until implemented.
-- No `maos-iac → maos-cohort` or `maos-iac → maos-loom-lite` dependency edge is introduced. `TeamId` and the consent trait remain in `maos-domain`.
+- Cross-wall recall consent is caller-legible and direction-sensitive. Empty success and all six typed refusals—missing provider, no grant, reverse-only, stale state, unavailable state, and missing read port—remain distinguishable without string matching.
+- The consent and remote-read adapters are injected only when verified cohort state and `MAOS_LOOM_HOME_TEAM` are both available; otherwise the builders remain absent and the production traceback fails closed.
+- Story 13.6d closes success-side cross-wall disclosure and refusal journaling for this capability. It does not claim generic refusal journaling for unrelated capabilities.
+- Per-team TL isolation remains enforced on ordinary boot: a foreign `tenant_binding` is refused. Only the consent-governed read adapter may open the named foreign shard, and only read-only/NOFOLLOW.
+- No `maos-iac → maos-audit`, `maos-iac → maos-cohort`, or `maos-iac → maos-loom-lite` dependency edge is introduced. `TeamId`, the consent trait, and the remote-read port remain in `maos-domain`.

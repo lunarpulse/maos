@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
-//! Stories 13.5d/13.5e — mediated production collective route plus the
-//! physical per-team Transparency Log boundary.
+//! Stories 13.5d/13.5e/13.6d — mediated production collective route, physical
+//! per-team Transparency Logs, and the consent-governed traceback successor.
 //!
 //! Hermetic route/audit legs are [`BindingClass::Blocking`] at development
 //! HEAD. Live Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence
@@ -16,7 +16,7 @@ use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition
 const GATE_NAME: &str = "check-reza-production-path";
 const ABSENT_SUCCESSORS: &[&str] = &[
     "11.4b audit escape-anomaly detector wiring",
-    "13.6 three-team product journey",
+    "13.6 Reza three-team traceback journey and NFR-Scale-5 evidence",
 ];
 
 struct TestLeg {

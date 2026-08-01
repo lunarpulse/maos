@@ -8,6 +8,19 @@ use crate::log_recall::{
 };
 use crate::team::TeamId;
 
+/// Reads emitter-scoped rows from the named remote team's audit artifact.
+///
+/// The implementation lives at the composition root; `maos-iac` depends only
+/// on this domain port and never on the audit storage crate.
+pub trait CrossWallLogReadPort: Send + Sync + 'static {
+    fn read_remote(
+        &self,
+        spirit_pid: u32,
+        remote_team: &TeamId,
+        filter: LogRecallFilter,
+    ) -> Result<LogRecallPage, LogRecallError>;
+}
+
 /// Participant-scoped, cursor-paginated read-side over the Transparency Log.
 ///
 /// Every call is scoped to the calling Spirit (emitter-side at v0.3-β;
