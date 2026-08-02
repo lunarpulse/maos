@@ -825,9 +825,7 @@ impl PrivateMemoryStore {
                         statat(&pid_dir, &namespace_name, AtFlags::SYMLINK_NOFOLLOW)
                             .map_err(Self::errno)?;
                     if !FileType::from_raw_mode(namespace_stat.st_mode).is_dir() {
-                        return Err(MemoryError::Io(std::io::Error::from(
-                            std::io::ErrorKind::InvalidData,
-                        )));
+                        return Err(Self::errno(Errno::NOTDIR));
                     }
                     let namespace_dir = Self::open_dir_component(&pid_dir, &namespace_name, false)?
                         .ok_or_else(|| {

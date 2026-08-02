@@ -88,13 +88,14 @@ On Unix, open the configured root once, then create/open each single sanitized p
 - `cargo test -p maos-kernel-core` -- 558 passed, 1 ignored; targeted 13.5j integration contracts passed 15/15 and 13.5i contracts passed 10/10.
 - `cargo test -p maos-compliance` -- 62 passed. `cargo test -p xtask` -- 538 passed, 1 ignored.
 - Full primary gate sweep passed: env contract (84 registered, 0 violations), serde handling (0 violations), service boundary, model-used, model-tier, dev-record completeness (125 stories), and review-findings resolution (134 stories).
-- `check-kernel-baseline` passed at 23519/23519; `kloc-check` passed with maos-kernel-core at 18173 below the unchanged 18248 ceiling.
+- `check-kernel-baseline` passed at 23517/23517; `kloc-check` passed with maos-kernel-core at 18171 below the unchanged 18248 ceiling.
 - `cargo deny check` passed advisories, bans, licenses, and sources; `cargo fmt --all -- --check` passed.
 - One initial full-kernel run observed the existing timing-sensitive journal-fsync P99 probe at 4215 microseconds versus its 1500-microsecond budget. The isolated probe passed immediately afterward, and the final full 558-test kernel suite passed.
+- Pushed run `30756780795` exposed one additional Reza corpus diagnostic contract: namespace non-directories now map to contextual `ENOTDIR`; both the two-case GDPR cascade corpus and the ten-case 13.5i erasure suite pass.
 
 ## Review Findings — 2026-08-02
 
-Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked diff from `4a952f81674672eab696ea676dfe38bb43268006` in parallel. Six unique findings were classified as patches; no intent gap, bad spec, or deferred work remained.
+Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked diff from `4a952f81674672eab696ea676dfe38bb43268006` in parallel. Their six unique findings and one pushed-CI follow-up were classified as patches; no intent gap, bad spec, or deferred work remained.
 
 - [x] **High / patch:** Preserve the prior durable spill set on every post-rename or stale-cleanup failure. Added hard-link-backed rollback transactions and delayed cache mutation until the directory commit succeeds.
 - [x] **High / patch:** Persist newly created PID and namespace entries. Parent directories are now fsynced after each successful `mkdirat`.
@@ -102,6 +103,7 @@ Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked d
 - [x] **Medium / patch:** Apply scan prefix, cache, and limit guards before decoding or deduplicating a disk key.
 - [x] **Medium / patch:** Treat conflicting duplicate values with equal modification times as ambiguous and fail without deleting either.
 - [x] **Medium / patch:** Surface failed temporary/backup cleanup alongside the primary pre-commit error; successful commits retain their result even if an unrecognized backup link cannot be reaped.
+- [x] **High / patch:** Preserve the established I/O error variant and directory context for hostile namespace nodes so the Reza deterministic GDPR cascade can distinguish structural filesystem failure.
 
 ## Suggested Review Order
 
@@ -180,3 +182,6 @@ Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked d
 
 - PID symlink erasure now fails closed while preserving the external target.
   [`private_forget_restart_13_5i.rs:258`](../../crates/maos-kernel-core/tests/private_forget_restart_13_5i.rs#L258)
+
+- The Reza cascade corpus retains actionable structural filesystem diagnostics.
+  [`gdpr_cascade_corpus_test.rs:342`](../../crates/maos-audit/tests/gdpr_cascade_corpus_test.rs#L342)

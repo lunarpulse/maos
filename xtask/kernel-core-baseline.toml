@@ -435,8 +435,8 @@
 #          because the comment above it would otherwise be false.
 #          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
 #          is NOT touched. All additive; no public symbols removed.
-# HISTORY: Post-review hardening (2026-08-02): 23596 -> 23519 physical lines
-#          (+118 physical lines from the 23401 Story 13.5j pin). The approved
+# HISTORY: Post-review hardening (2026-08-02): 23596 -> 23517 physical lines
+#          (+116 physical lines from the 23401 Story 13.5j pin). The approved
 #          spec-13-6c-ci-blockers-2 design now uses Unix directory-relative
 #          O_NOFOLLOW traversal, parent/file/directory fsync, serialized
 #          hard-link-backed rollback transactions, exclusive temporary files,
@@ -444,6 +444,6 @@
 #          prefix/limit-isolated scans. Behavioral contracts moved from private
 #          source-unit tests to public-adapter integration tests: 15 Story
 #          13.5j, 10 Story 13.5i, and the full 558-test kernel suite pass. The
-#          logical count is 18173, 75 below the unchanged 18248 ceiling; no
+#          logical count is 18171, 77 below the unchanged 18248 ceiling; no
 #          public symbols removed.
-src_lines = 23519
+src_lines = 23517

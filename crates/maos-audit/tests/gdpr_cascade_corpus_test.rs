@@ -343,7 +343,8 @@ fn gdpr_cascade_v0_corpus_replay() {
                 let error = outcome.expect_err("forced filesystem failure must propagate");
                 assert!(
                     error.to_string().contains("directory")
-                        || error.to_string().contains("Directory")
+                        || error.to_string().contains("Directory"),
+                    "unexpected filesystem failure: {error}"
                 );
             }
             other => panic!(
