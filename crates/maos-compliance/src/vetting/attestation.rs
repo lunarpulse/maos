@@ -132,7 +132,10 @@ pub struct VettingClaim {
 /// serialize in declaration order with definite lengths (see `canonical_cbor`
 /// rationale) so the encoding is byte-stable across hosts.
 pub fn encode_claim(claim: &VettingClaim) -> Vec<u8> {
-    serde_cbor::to_vec(claim).expect("VettingClaim is always CBOR-serializable")
+    match serde_cbor::to_vec(claim) {
+        Ok(bytes) => bytes,
+        Err(error) => panic!("VettingClaim CBOR encoding for attestation signing failed: {error}"),
+    }
 }
 
 /// Decode `claim_bytes` back to a [`VettingClaim`] (the VERIFY codec — the

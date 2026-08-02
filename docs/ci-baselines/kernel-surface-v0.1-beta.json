@@ -10,7 +10,7 @@
     {
       "kind": "const",
       "path": "maos_kernel_core::memory::REGISTERED_ERASURE_BACKENDS",
-      "signature_hash": "6888c75f7b9fbe02edbce76360a34e27f2ef261461757745866e4c9bfd5943e2"
+      "signature_hash": "fa883fa603a2de9b3d96eb628d616b60b30c3445056f01e01055fd244fa49b92"
     },
     {
       "kind": "const",
@@ -695,7 +695,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::private::PrivateMemoryStore",
-      "signature_hash": "53db96eef52166ec26baae298e7922b2d00f87c601822bb8f19cb37eba8cf1d9"
+      "signature_hash": "7809c45e3359062092c2be4216883bfaa8bd11f95a934766581c7cc0c850bbb1"
     },
     {
       "kind": "struct",

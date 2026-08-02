@@ -203,6 +203,10 @@ The physical delta is doc-heavy by design: the reasoning about *why* `read`'s pr
 
 ## Dev Agent Record
 
+### Agent Model Used
+
+`openai-codex/gpt-5.6-sol`
+
 ### Debug Log
 
 - Probe harness `zz_probe_13_5j.rs`: 6/6 RED at `04a6e72d`, 6/6 GREEN after the repair, deleted before commit.
@@ -227,10 +231,23 @@ The physical delta is doc-heavy by design: the reasoning about *why* `read`'s pr
 - No control is claimed for the `break` → `continue` change; it is not observable under `limit`.
 - ADR-059 Decision 12 opened, Residual 10 CLOSED, Decision 10's forward reference updated, Consequences amended.
 
+
+### Review Findings — 2026-08-01 backfill
+
+*bmad-code-review backfill reviewed `c2e55a25` on 2026-08-01: Blind Hunter + Acceptance Auditor.*
+
+- [x] [Review][Patch] Make overwrite persistence durable before advancing the cache; a spill failure must leave the previous durable/cache state intact [crates/maos-kernel-core/src/memory/private.rs]
+- [x] [Review][Patch] Use unique create-exclusive temporary spill files and serialize concurrent writes so one writer cannot replace or delete another writer's output [crates/maos-kernel-core/src/memory/private.rs]
+- [x] [Review][Patch] Deduplicate legacy spill files by logical key with latest-wins selection, returning exactly one authoritative value and safely removing obsolete duplicates [crates/maos-kernel-core/src/memory/private.rs]
+- [x] [Review][Patch] Perform spill I/O and deletion directory-relatively through no-follow handles so pid, namespace, and spill symlinks cannot escape containment [crates/maos-kernel-core/src/memory/private.rs]
+- [x] [Review][Patch] Surface metadata and lookup failures as `PrivateMemoryError`; never treat an unreadable directory or failed lookup as absence [crates/maos-kernel-core/src/memory/private.rs]
+- [x] [Review][Patch] Fsync the completed spill file and containing directory around atomic replacement so durable visibility survives a crash [crates/maos-kernel-core/src/memory/private.rs]
 ### File List
 
 - `_bmad-output/implementation-artifacts/13-5j-private-tier-stale-spill-duplicate-scan.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `crates/maos-kernel-core/Cargo.toml`
+- `crates/maos-kernel-core/tests/private_forget_restart_13_5i.rs`
 - `crates/maos-kernel-core/src/memory/private.rs`
 - `crates/maos-kernel-core/tests/private_spill_supersession_13_5j.rs`
 - `docs/adr/ADR-059-operator-authority-collective-erasure.md`
@@ -241,4 +258,5 @@ The physical delta is doc-heavy by design: the reasoning about *why* `read`'s pr
 
 | Date | Note |
 |---|---|
+| 2026-08-02 | CI-blocker review follow-up resolved the six 2026-08-01 findings and six additional Blind Hunter/Edge Case Hunter patches: descriptor-relative no-follow traversal, serialized hard-link-backed rollback transactions, exclusive temp files, parent/file/directory fsync, fail-closed hostile PID and equal-mtime handling, prefix-isolated scans, and explicit cleanup errors. Public-adapter integration coverage now carries the private-store contracts. Added safe `rustix` filesystem support and updated the measured kernel baseline without raising its logical-line ceiling. |
 | 2026-07-27 | Story created and implemented in one pass against `04a6e72d`. Preflight was a **probe harness, not a review**: six defects reproduced against running code before any design, including four the filed residual did not name. **Scope corrected upward** (2 → 6 defects, all on `write`/`read`/`scan`, all one family: the read surface disagreed with the erase surface 13.5i made authoritative). **Severity corrected downward** (filed "live" → latent-but-fully-wired; no shipped writer produces the trigger, traced to `halt/resolver.rs:170` and `decision_logger.rs:93`). Operator-ratified 2026-07-27 at the **measured** `+83 physical / +34 tokei`, after the code existed and M1–M6 were falsified. Ten `--exact` Blocking Reza legs. ADR-059 Decision 12 + Residual 10. Ceiling untouched (273 spare); `fkcs-baseline.toml` byte-untouched. |

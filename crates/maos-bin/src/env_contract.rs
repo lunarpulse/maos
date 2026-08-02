@@ -292,6 +292,31 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_VETTER_KEYRING",
+        purpose: "Path to the CBOR vetter-key lifecycle keyring required to verify a public-vetted target against the operator audit root (Story 13.4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_LEGAL_HOLD_PRINCIPAL",
+        purpose: "Principal identifier whose legal hold the operator one-shot control lists or releases; empty values are refused (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COLLECTIVE_ERASE_PID",
+        purpose: "Spirit PID whose collective-tier row is erased by the operator one-shot control; must be a u32 (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COLLECTIVE_ERASE_NAMESPACE",
+        purpose: "Collective namespace for the operator one-shot erase: default, coordination, or forgotten (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COLLECTIVE_ERASE_KEY",
+        purpose: "Collective row key required by the operator one-shot erase control (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_CROSS_TEAM_BASE_SEED",
         purpose: "Hex-encoded 32-byte root for cross-team key derivation. Story 13.3 read it only to derive PUBLIC row-verification keys; Story 13.6b widened it to the SIGN side for the crossing emitter, so a host holding it can produce a validly-signed bundle under ANY team's key — the applier's envelope/payload weld, not this seed, is what binds a crossing to its team (Stories 13.3/13.6b D-7)",
         stability: EnvStability::UserFacing,

@@ -325,13 +325,10 @@ fn scan_does_not_follow_a_namespace_directory_symlink() {
         std::fs::remove_dir_all(&ns_dir).expect("remove real namespace dir");
         std::os::unix::fs::symlink(&outside, &ns_dir).expect("plant namespace symlink");
 
-        let entries = memory
-            .scan(PID, MemoryTier::Private, &NS, "", 256)
-            .expect("scan");
+        let result = memory.scan(PID, MemoryTier::Private, &NS, "", 256);
         assert!(
-            entries.is_empty(),
-            "scan followed a namespace symlink out of the Spirit's area: {:?}",
-            entries.iter().map(|e| e.key.as_str()).collect::<Vec<_>>()
+            result.is_err(),
+            "scan must fail closed on a namespace symlink: {result:?}"
         );
     }
 }
@@ -351,12 +348,10 @@ fn read_does_not_follow_a_spill_symlink() {
         std::fs::remove_file(&spill).expect("remove real spill");
         std::os::unix::fs::symlink(&outside, &spill).expect("plant spill symlink");
 
-        let got = memory
-            .read(PID, MemoryTier::Private, &NS, "k")
-            .expect("read");
+        let result = memory.read(PID, MemoryTier::Private, &NS, "k");
         assert!(
-            got.is_none(),
-            "read followed a spill symlink out of the Spirit's area: {got:?}"
+            result.is_err(),
+            "read must fail closed on a spill symlink: {result:?}"
         );
     }
 }
@@ -453,5 +448,153 @@ fn digest_refs_are_not_duplicated_by_a_spilled_working_memory_entry() {
         payload.working_memory_digest_refs.as_slice(),
         &["frame-aaa".to_string()],
         "a signed decision frame must not claim the Spirit read one digest twice"
+    );
+}
+
+#[test]
+fn scan_ignores_malformed_spills_outside_the_requested_prefix() {
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    write_private(
+        &memory,
+        PID,
+        "wanted",
+        MemoryValue::Markdown("# wanted".into()),
+    );
+    std::fs::write(fx.ns_dir(PID).join("bad.txt"), [0xff]).expect("plant malformed text");
+
+    let entries = memory
+        .scan(PID, MemoryTier::Private, &NS, "wanted", 1)
+        .expect("excluded malformed spill must not affect the scan");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].key, "wanted");
+}
+
+#[test]
+fn equal_mtime_conflicting_spills_fail_without_deleting_either() {
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    write_private(&memory, PID, "k", MemoryValue::Markdown("# current".into()));
+    let namespace = fx.ns_dir(PID);
+    let markdown = namespace.join("k.md");
+    let text = namespace.join("k.txt");
+    std::fs::write(&text, "conflict").expect("plant conflicting spill");
+    let tied = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000);
+    std::fs::File::open(&markdown)
+        .expect("open markdown")
+        .set_modified(tied)
+        .expect("tie markdown mtime");
+    std::fs::File::open(&text)
+        .expect("open text")
+        .set_modified(tied)
+        .expect("tie text mtime");
+
+    let (_private2, restarted) = fx.open();
+    let result = restarted.read(PID, MemoryTier::Private, &NS, "k");
+    assert!(result.is_err(), "ambiguous versions must fail closed");
+    assert!(markdown.exists());
+    assert!(text.exists());
+}
+
+#[test]
+fn rejected_spill_update_preserves_cache_and_disk_without_temp_residue() {
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    write_private(&memory, PID, "k", big_json("OLD"));
+    std::fs::create_dir(fx.ns_dir(PID).join("k.bin")).expect("plant hostile spill directory");
+
+    let result = memory.write(PID, MemoryTier::Private, &NS, "k", big_blob("NEW"));
+    assert!(result.is_err(), "hostile spill node must reject the update");
+    assert_eq!(
+        memory
+            .read(PID, MemoryTier::Private, &NS, "k")
+            .expect("cached old value remains"),
+        Some(big_json("OLD"))
+    );
+    assert!(
+        spill_names(&fx.ns_dir(PID))
+            .iter()
+            .all(|name| !name.starts_with(".spill.")),
+        "failed transaction must clean temporary and backup names"
+    );
+
+    let (_private2, restarted) = fx.open();
+    assert_eq!(
+        restarted
+            .read(PID, MemoryTier::Private, &NS, "k")
+            .expect("durable old value remains"),
+        Some(big_json("OLD"))
+    );
+}
+
+#[test]
+fn concurrent_same_key_spills_leave_one_complete_durable_value() {
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    let barrier = Arc::new(std::sync::Barrier::new(8));
+    let workers: Vec<_> = (0_u8..8)
+        .map(|byte| {
+            let memory = Arc::clone(&memory);
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                memory.write(
+                    PID,
+                    MemoryTier::Private,
+                    &NS,
+                    "shared",
+                    MemoryValue::Blob(vec![byte; 8 * 1024]),
+                )
+            })
+        })
+        .collect();
+    for worker in workers {
+        worker.join().expect("worker joins").expect("spill write");
+    }
+
+    assert_eq!(spill_names(&fx.ns_dir(PID)), vec!["shared.bin"]);
+    let (_private2, restarted) = fx.open();
+    let Some(MemoryValue::Blob(value)) = restarted
+        .read(PID, MemoryTier::Private, &NS, "shared")
+        .expect("cold read")
+    else {
+        panic!("one complete blob must remain");
+    };
+    assert_eq!(value.len(), 8 * 1024);
+    assert!(value.iter().all(|byte| *byte == value[0]));
+}
+
+#[test]
+fn public_write_contract_rejects_path_syntax_only() {
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    for key in ["../escape", "a/b", r"a\b", "a\0b", "a\nb"] {
+        assert!(
+            memory
+                .write(
+                    PID,
+                    MemoryTier::Private,
+                    &NS,
+                    key,
+                    MemoryValue::Text("bad".into()),
+                )
+                .is_err(),
+            "unsafe key was accepted: {key:?}"
+        );
+    }
+    memory
+        .write(
+            PID,
+            MemoryTier::Private,
+            &NS,
+            "foo..bar",
+            MemoryValue::Text("ok".into()),
+        )
+        .expect("dot substring is not traversal");
+    assert_eq!(
+        memory
+            .read(PID, MemoryTier::Private, &NS, "foo..bar")
+            .expect("read accepted key"),
+        Some(MemoryValue::Text("ok".into()))
     );
 }

@@ -206,6 +206,28 @@ fn file_list_entries(lines: &[&str]) -> Vec<String> {
 /// first ` — ` / ` (` delimiter is cut so a path mentioned in the description
 /// is not double-counted.
 fn file_list_paths_on_line(trimmed: &str) -> Vec<String> {
+    // Story 13.5h records its populated file list as a Markdown table. Treat
+    // the first column exactly like a bullet path while rejecting the header
+    // and separator rows.
+    if trimmed.starts_with('|') {
+        let first = trimmed
+            .trim_matches('|')
+            .split('|')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_matches('`');
+        let is_separator = !first.is_empty()
+            && first
+                .chars()
+                .all(|character| character == '-' || character == ':');
+        if !first.eq_ignore_ascii_case("file")
+            && !is_separator
+            && (first.contains('/') || first.contains('.'))
+        {
+            return vec![first.to_string()];
+        }
+    }
     // Strip the bullet marker (`- `, `* `, or a bare `-`/`*` as in `-crates/…`).
     let after_bullet = trimmed
         .strip_prefix("- ")
@@ -666,6 +688,24 @@ mod tests {
             sprint.path().to_str().unwrap(),
             false,
             false
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn file_list_accepts_markdown_table_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "13-5h-x.md",
+            "---\ndev_model_used: glm-5.2\n---\n### Completion Notes\n- done\n### File List\n\n| File | Change |\n|---|---|\n| `crates/maos-kernel-core/src/memory/shared.rs` | Modified |\n",
+        );
+        let sprint = sprint_with("13-5h-x", "done");
+        assert!(run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
         )
         .is_ok());
     }

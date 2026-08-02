@@ -268,12 +268,11 @@ fn forget_does_not_follow_pid_directory_symlink() {
         std::fs::write(&outside_file, MARKDOWN_CANARY).expect("plant outside canary");
         symlink(&outside, fixture.fs_root.join("7")).expect("plant pid symlink");
 
-        let deleted = fixture
-            .fresh_private()
-            .forget_principal(PRINCIPAL)
-            .expect("symlink is skipped without escaping fs_root");
-
-        assert_eq!(deleted, 0);
+        let result = fixture.fresh_private().forget_principal(PRINCIPAL);
+        assert!(
+            result.is_err(),
+            "erasure must fail closed on a numeric PID symlink: {result:?}"
+        );
         assert_eq!(
             std::fs::read_to_string(&outside_file).expect("outside file survives"),
             MARKDOWN_CANARY

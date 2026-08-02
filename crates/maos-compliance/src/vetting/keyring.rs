@@ -105,7 +105,12 @@ impl<'de> serde::Deserialize<'de> for VetterKeyEvent {
 
 /// Encode a [`VetterKeyEventClaim`] to canonical CBOR.
 pub fn encode_event(claim: &VetterKeyEventClaim) -> Vec<u8> {
-    serde_cbor::to_vec(claim).expect("VetterKeyEventClaim is always CBOR-serializable")
+    match serde_cbor::to_vec(claim) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            panic!("VetterKeyEventClaim CBOR encoding for keyring signing failed: {error}")
+        }
+    }
 }
 
 /// Issue (sign) a vetter-key lifecycle event with the operator root seed.

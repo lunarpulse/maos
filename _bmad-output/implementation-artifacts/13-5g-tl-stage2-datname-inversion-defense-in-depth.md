@@ -262,6 +262,10 @@ Aggregate `kloc-check` measured `134423` at HEAD and passes. Slack is operating 
 
 ## Dev Agent Record
 
+### Agent Model Used
+
+`glm-5.2`
+
 ### Debug Log
 
 *(preflight probes, run at `c2e55a25`, harness deleted)*

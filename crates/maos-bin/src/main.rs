@@ -335,8 +335,12 @@ impl maos_compliance::TerminalObservationSink for TlYankObserver {
         &self,
         observation: &maos_compliance::RunningSpiritObservation,
     ) {
-        let payload =
-            serde_json::to_vec(observation).expect("RunningSpiritObservation is serializable");
+        let payload = match serde_json::to_vec(observation) {
+            Ok(payload) => payload,
+            Err(error) => panic!(
+                "RunningSpiritObservation serialization failed before transparency logging: {error}"
+            ),
+        };
         let _token = self.tl.insert_frame_event(
             maos_kernel_core::iac::transparency_log::FrameKind::SpiritRevoked,
             0,
@@ -8308,8 +8312,10 @@ fn run_uninstall_cascade(
             error: error.to_string(),
         },
     };
-    let payload =
-        serde_json::to_vec(&terminal).expect("serializing the uninstall terminal enum cannot fail");
+    let payload = match serde_json::to_vec(&terminal) {
+        Ok(payload) => payload,
+        Err(error) => panic!("serialize uninstall cascade terminal for durable audit: {error}"),
+    };
     // Trap 4: this append remains a fail-fast audit commit point. The adapter
     // panics on durable journal failure; catching unwind after partial erasure
     // would falsely imply a safely recoverable transaction.
@@ -12972,6 +12978,7 @@ mod story_13_5a_enterprise_daemon_seam {
             maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([7u8; 32]);
         let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
         let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+        // p1-allow: kernel-stack test proves direct production adapters are used in the kernel stack
         let capability = Arc::new(CapabilityRegistryAdapter::new(
             Arc::clone(&crypto),
             signing_key,
@@ -12982,6 +12989,7 @@ mod story_13_5a_enterprise_daemon_seam {
             Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
             Arc::new(TelemetryStreamAdapter::default()),
         ));
+        // p1-allow: kernel-stack test proves direct production adapters are used in the kernel stack
         let security = Arc::new(maos_kernel_core::security::SecurityManagerAdapter::new(
             Arc::clone(&policy),
         ));
