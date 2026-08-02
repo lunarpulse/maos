@@ -15,7 +15,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ed25519_dalek::SigningKey;
 use maos_a2a_core::{
@@ -40,8 +40,9 @@ use maos_loom_lite::replication::bundle::{
     build_replication_bundle_v2, verify_replication_bundle, CrossRegionReplicationBundle,
 };
 use maos_loom_lite::replication::leaf::CollectiveKvLeaf;
-use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
+use maos_loom_lite::store::{CollectiveRow, LoomLiteStore, StoreConfig};
 use maos_spirit_abi::identity::{HostId, SpiritId};
+use tokio_postgres::NoTls;
 
 const SHARE_ENV_KEYS: [&str; 7] = [
     "MAOS_CROSS_TEAM_SHARE_PEER",
@@ -949,6 +950,20 @@ fn pg_conn_team(team: &str) -> String {
         .unwrap_or_else(|_| panic!("{var} must be set for the live two-datname crossing legs"))
 }
 
+/// Raw client for one team's physical database. This oracle intentionally
+/// bypasses the Spirit-facing store guard only after the two real daemons have
+/// performed the crossing.
+async fn raw_connect_team(team: &str) -> tokio_postgres::Client {
+    let connection_string = pg_conn_team(team);
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .expect("raw Postgres connection");
+    tokio::spawn(async move {
+        let _ = connection.await;
+    });
+    client
+}
+
 fn datname_of(conn: &str) -> String {
     if let Some((_, rest)) = conn.split_once("dbname=") {
         return rest.split_whitespace().next().unwrap_or(rest).to_string();
@@ -1186,6 +1201,8 @@ async fn live_crossing_runs_through_two_daemon_processes() {
     let team_a_conn = pg_conn_team("team-a");
     let team_b_conn = pg_conn_team("team-b");
     assert_ne!(datname_of(&team_a_conn), datname_of(&team_b_conn));
+    let raw_source = raw_connect_team("team-a").await;
+    let raw_destination = raw_connect_team("team-b").await;
 
     let fixture = tempfile::tempdir().expect("two-daemon fixture");
     let identity_a = mint_daemon_identity(fixture.path(), "host-a");
@@ -1231,7 +1248,11 @@ async fn live_crossing_runs_through_two_daemon_processes() {
         format!("tls://127.0.0.1:{port_b}"),
         NONCE_B,
     );
-    let key = format!("daemon-crossing-{}", std::process::id());
+    let key_nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let key = format!("daemon-crossing-{}-{key_nonce}", std::process::id());
     let value = "crossed-through-both-daemons";
     let mut command_a = daemon_command(
         fixture.path(),
@@ -1251,31 +1272,44 @@ async fn live_crossing_runs_through_two_daemon_processes() {
     let (mut daemon_a, _port_a) =
         boot_daemon(command_a).unwrap_or_else(|error| panic!("team-a daemon failed: {error}"));
 
-    let source = LoomLiteStore::new(StoreConfig {
-        connection_string: team_a_conn,
-        home_region: "region-a".to_string(),
-        home_team: "team-a".to_string(),
-        ..StoreConfig::default()
-    })
-    .await
-    .expect("source store");
-    let destination = LoomLiteStore::new(StoreConfig {
-        connection_string: team_b_conn,
-        home_region: "region-a".to_string(),
-        home_team: "team-b".to_string(),
-        ..StoreConfig::default()
-    })
-    .await
-    .expect("destination store");
-    let expected = maos_domain::memory::MemoryValue::Text(value.to_string());
+    let is_expected_row = |row: &CollectiveRow| {
+        row.spirit_pid == 7
+            && row.namespace_kind == "default"
+            && row.namespace_detail == "xteam:team-a:"
+            && row.key == key
+            && row.value_kind == "text"
+            && row.value_data == value.as_bytes()
+            && row.source_region == "region-a"
+            && row.source_team.as_ref().map(TeamId::as_str) == Some("team-a")
+            && row.distillation_depth == Some(1)
+            && row.intent_lineage.is_some()
+    };
+    let has_re_attestation = |row: &CollectiveRow| {
+        let Ok(marker) = serde_json::from_str::<serde_json::Value>(&row.source_log_ref) else {
+            return false;
+        };
+        marker.as_object().is_some_and(|object| object.len() == 2)
+            && marker
+                .get("source_region")
+                .and_then(serde_json::Value::as_str)
+                == Some("region-a")
+            && marker
+                .get("merkle_root")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|root| {
+                    root.len() == 64 && root.bytes().all(|byte| byte.is_ascii_hexdigit())
+                })
+    };
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
-        if destination
-            .read(7, &maos_domain::memory::MemoryNamespace::Default, &key)
+        let destination_rows = LoomLiteStore::read_all_rows_from(&raw_destination)
             .await
-            .expect("read destination")
-            == Some(expected.clone())
-        {
+            .expect("read physical destination rows");
+        let destination_matches = destination_rows
+            .iter()
+            .filter(|row| is_expected_row(row) && has_re_attestation(row))
+            .count();
+        if destination_matches == 1 {
             break;
         }
         assert!(
@@ -1292,13 +1326,27 @@ async fn live_crossing_runs_through_two_daemon_processes() {
         );
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
+    let destination_rows = LoomLiteStore::read_all_rows_from(&raw_destination)
+        .await
+        .expect("read physical destination rows");
     assert_eq!(
-        source
-            .read(7, &maos_domain::memory::MemoryNamespace::Default, &key)
-            .await
-            .expect("read source"),
-        Some(expected),
-        "originate_team_row must persist the attested origin row before transport"
+        destination_rows
+            .iter()
+            .filter(|row| is_expected_row(row) && has_re_attestation(row))
+            .count(),
+        1,
+        "exactly the emitted value must land in team B's physical database"
+    );
+    let source_rows = LoomLiteStore::read_all_rows_from(&raw_source)
+        .await
+        .expect("read physical source rows");
+    assert_eq!(
+        source_rows
+            .iter()
+            .filter(|row| is_expected_row(row) && row.source_log_ref.is_empty())
+            .count(),
+        1,
+        "originate_team_row must persist exactly the attested origin row before transport"
     );
 }
 

@@ -42,7 +42,7 @@ use maos_a2a_core::PeerCertFingerprint;
 use maos_bin::tenant_map::TenantMapAdapter;
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
-    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, TeamEntry, COHORT_SCHEMA_V2,
+    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, TeamEntry, COHORT_SCHEMA_V4,
     RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::ports::registry::SpiritId;
@@ -58,7 +58,7 @@ const LISTEN_TIMEOUT: Duration = Duration::from_secs(90);
 const LISTENING_MARKER: &str = "cohort-a2a-daemon listening on ";
 
 // ─────────────────────────────────────────────────────────────────────────
-// Fixtures — a ≥2-member, signed, schema-v2, teams-bearing, unexpired manifest
+// Fixtures — a ≥2-member, signed, schema-v4, teams-bearing, unexpired manifest
 // naming the local host (D5/D16/D19). Mirrors `tenant_map_13_1.rs::signed_manifest`
 // (the proven 13.1 idiom); `datname` values are the ones the live Postgres must
 // carry so `connection_assignment_guard` matches (D16).
@@ -100,18 +100,20 @@ fn placeholder_fp() -> String {
 }
 
 fn signed_manifest(key: &SigningKey, version: u64, local_fingerprint: &str) -> String {
-    let members = [
-        ("host-a", local_fingerprint),
-        ("host-b", placeholder_fp().as_str()),
-    ]
-    .iter()
-    .map(|(host, fingerprint)| CohortMember {
-        host_id: (*host).to_string(),
-        fingerprint: (*fingerprint).to_string(),
-        roles: vec!["worker".to_string()],
-        team: None,
-    })
-    .collect();
+    let members = vec![
+        CohortMember {
+            host_id: "host-a".to_string(),
+            fingerprint: local_fingerprint.to_string(),
+            roles: vec!["worker".to_string()],
+            team: Some(TeamId::new("team-a").unwrap()),
+        },
+        CohortMember {
+            host_id: "host-b".to_string(),
+            fingerprint: placeholder_fp(),
+            roles: vec!["worker".to_string()],
+            team: Some(TeamId::new("team-b").unwrap()),
+        },
+    ];
     let teams = Some(vec![
         TeamEntry {
             team_id: TeamId::new("team-a").unwrap(),
@@ -127,7 +129,7 @@ fn signed_manifest(key: &SigningKey, version: u64, local_fingerprint: &str) -> S
         },
     ]);
     let manifest = CohortManifest {
-        schema_version: COHORT_SCHEMA_V2,
+        schema_version: COHORT_SCHEMA_V4,
         cohort_id: "cohort-tenant".to_string(),
         version,
         authority: CohortAuthority {
