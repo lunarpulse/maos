@@ -71,11 +71,15 @@ fn pg_conn() -> String {
 
 /// Per-team connection strings: the cross-team legs run against TWO physical
 /// databases (AC5's live 2-datname substrate), never one database standing
-/// in for both teams (13.3 review).
+/// in for both teams (13.3 review). Story 13.6c widens the axis to a THIRD
+/// team (`team-c`) so the three-team × three-region Reza substrate has a
+/// reader for every database it provisions — a provisioned database with no
+/// reader is this story's own failure mode (D-7).
 fn pg_conn_team(team: &str) -> String {
     let var = match team {
         "team-a" => "MAOS_TEST_POSTGRES_TEAM_A",
         "team-b" => "MAOS_TEST_POSTGRES_TEAM_B",
+        "team-c" => "MAOS_TEST_POSTGRES_TEAM_C",
         other => panic!("unknown team {other}"),
     };
     std::env::var(var).unwrap_or_else(|_| panic!("{var} must be set for cross-team live tests"))
@@ -242,6 +246,19 @@ async fn reset_collective_team(team: &str) {
     raw.execute("DELETE FROM collective_memory", &[])
         .await
         .expect("DELETE must succeed");
+}
+
+/// Distinct-datname witness for the TEAM axis (Story 13.6c): the team's
+/// `current_database()`. The three-team substrate asserts team-a ≠ team-b ≠
+/// team-c — three provisioned databases must be physically distinct, never
+/// aliases onto one (the role-disjoint rule, AC1).
+async fn current_database_team(team: &str) -> String {
+    let raw = raw_connect_team(team).await;
+    let row = raw
+        .query_one("SELECT current_database()", &[])
+        .await
+        .expect("current_database()");
+    row.get::<_, String>(0)
 }
 
 /// Read all leaves from a store for oracle comparison.
@@ -491,6 +508,34 @@ async fn exercise_cross_team_row_matrix() {
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn cross_team_crossing_lands_with_bound_source_team() {
     exercise_cross_team_row_matrix().await;
+}
+
+/// Story 13.6c (AC1) — the TEAM-axis distinct-datname witness. The Reza
+/// substrate provisions three team databases (`maos_team_{a,b,c}`); this
+/// proves they are physically distinct by `current_database()`, never aliases
+/// onto one database (the role-disjoint rule). It is the reader that gives
+/// `MAOS_TEST_POSTGRES_TEAM_C` a consumer — a provisioned database with no
+/// reader is this story's own failure mode (D-7). Mirrors the region-axis
+/// `three_region_*` topology-fraud negatives on the team axis.
+#[tokio::test]
+#[ignore = "requires three live team Postgres (set MAOS_TEST_POSTGRES_TEAM_{A,B,C})"]
+async fn three_team_databases_are_physically_distinct() {
+    let _g = guard();
+    let datname_a = current_database_team("team-a").await;
+    let datname_b = current_database_team("team-b").await;
+    let datname_c = current_database_team("team-c").await;
+    assert_ne!(
+        datname_a, datname_b,
+        "team-a and team-b share a database — role-disjoint violation (AC1)"
+    );
+    assert_ne!(
+        datname_a, datname_c,
+        "team-a and team-c share a database — role-disjoint violation (AC1)"
+    );
+    assert_ne!(
+        datname_b, datname_c,
+        "team-b and team-c share a database — role-disjoint violation (AC1)"
+    );
 }
 
 #[tokio::test]

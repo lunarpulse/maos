@@ -40,6 +40,8 @@ mod check_cohort_mesh;
 mod check_multi_tenant_loom;
 // Story 13.5d — Reza's mediated production collective route.
 mod check_reza_production_path;
+// Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
+mod check_loom_substrate_drift;
 // Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
 mod check_enterprise_pdp;
 // Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
@@ -808,6 +810,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
+    #[command(name = "check-loom-substrate-drift")]
+    CheckLoomSubstrateDrift {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
     #[command(name = "check-enterprise-pdp")]
     CheckEnterprisePdp {
@@ -1247,6 +1255,7 @@ fn main() {
         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
         Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),
         Commands::CheckRezaProductionPath { json } => check_reza_production_path::run(json),
+        Commands::CheckLoomSubstrateDrift { json } => check_loom_substrate_drift::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
         Commands::CheckVettingAttestation { json } => check_vetting_attestation::run(json),

@@ -23,6 +23,10 @@ const KNOWN_MODELS: &[&str] = &[
     "deepseek-v4-pro",
     "k2p6",
     "glm-5.1",
+    // glm-5.2 — frontier-class member of the Epic-11/E12 allowlist
+    // {opus-4-8/gpt-5.5/glm-5.2/equiv}; used by Stories 10.4a, 11.2b,
+    // 13.5g, 13.5i, 13.5j, 13.6c. Allowlist lagged (the Story 7.5a pattern).
+    "glm-5.2",
     // Epic 8 actual dev attributions (per each story's `### Agent Model Used`):
     // 8.13 shipped on openai/gpt-5.5; 8.14c on kimi-code/kimi-for-coding.
     "openai/gpt-5.5",

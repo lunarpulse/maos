@@ -200,7 +200,7 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 32517   # Story 13.6d policy grant: 31856->32517 (branch-point measured 31879 + ceil(2%)=638). Owns 13.6b's committed +23 overage; the 13.6d gate additions consume this authorized operating reserve. | prior: Story 13.6b named grant 31690->31856 (measured 31756 +100) for 13 Blocking crossing legs.
+xtask = 33270   # Story 13.6c named grant: 32517->33270 (measured 32617 + ceil(2%)=653). Driver: check-loom-substrate-drift gate (AC5) — env-consistency (D-4/D-7 catcher) + service-block drift controls + 6 tests incl. 3 proven-red mutation guards. ZERO kernel-core Δ @23401. | prior: Story 13.6d policy grant 31856->32517 (branch-point measured 31879 + ceil(2%)=638).
 # Story 6.5 — Phase 1 extraction
 maos-iac = 6888   # Story 13.6d final policy grant: 6606->6888 (measured 6753 + ceil(2%)=135). Driver: dependency-inverted cross-wall read routing, typed fail-closed refusal, pre-movement refusal/disclosure audit rows, and their mutation-capable controls. | prior: 2026-07-25 founder policy re-base 6500->6606 (measured 6476 + reserve 130).
 maos-audit = 6665   # Story 13.5g named grant: 6240->6665 (measured 6534, reserve 131 per 2% formula). Driver: in-artifact `tenant_binding` DDL + read/write/verify helpers + Phase A/B pure verdict + Display + AC1-AC4 unit tests — the story budget's "maos-audit: + helpers & DDL". Per kloc.toml CEILING RULE §"must never block a correctness or compliance repair"; ZERO kernel-core Δ @23401. | prior: 2026-07-25 founder policy re-base (Winston 2%): 6150->6240 (measured 6117, reserve 123); Story 13.5b review: 6100->6150 (measured 6_117 — teardown scope contract + UNCOVERED_STORES partition invariant)

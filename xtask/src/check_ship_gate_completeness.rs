@@ -60,6 +60,8 @@ const EXPECTED_GATES: &[&str] = &[
     "check-multi-tenant-loom",
     // Story 13.5d — Reza's mediated production collective route.
     "check-reza-production-path",
+    // Story 13.6c — workflow/reader env and Postgres service-block drift.
+    "check-loom-substrate-drift",
     // Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar).
     "check-enterprise-pdp",
     // Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate.
@@ -144,6 +146,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 | "check-enterprise-pdp"
                 // Story 13.5d — Reza's mediated production collective route.
                 | "check-reza-production-path"
+                // Story 13.6c — substrate configuration drift.
+                | "check-loom-substrate-drift"
                 // Story 12.6 — maos-bin-scoped environment-contract registry gate.
                 | "check-env-contract"
         );

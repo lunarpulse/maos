@@ -136,6 +136,9 @@ gates = [
     "check-env-contract",
     # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate; 7 hermetic blocking legs.
     "check-vetting-attestation",
+    # Story 13.6c — three-team/three-region CI substrate drift controls
+    # (env-consistency + service-block). Structural; blocks at every phase.
+    "check-loom-substrate-drift",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -350,6 +353,11 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 name = "check-vetting-attestation"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
 
+# Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
+# Structural (no Postgres); a substrate-config drift blocks at every phase.
+[[ship_gate]]
+name = "check-loom-substrate-drift"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 
 

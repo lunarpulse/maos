@@ -2610,6 +2610,29 @@ jobs:
   # blocking at v2.0 (absent/unmeasured → BLOCK).
   check-cross-region-consensus:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Story 13.6c — the consensus gate runs the WHOLE cross_region_live
+    # binary (32 #[ignore] tests broadcast to 4 legs). It keys on the
+    # SINGULAR MAOS_TEST_POSTGRES (check_cross_region_consensus.rs:308) and
+    # every reader in that file panics rather than skipping, so the job must
+    # export the FULL union: the shared stand-in (→ its own maos_shared,
+    # never aliased onto a team DB — the AC1 role-disjoint rule), the region
+    # axis, and the team axis (team-a/b only — the cross-team legs are
+    # two-team; TEAM_C has no reader here, D-7).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2618,7 +2641,22 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-cross-region-consensus-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision Loom substrate
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: |-
+            maos_team_b
+            maos_team_c
+            maos_shared
       - name: Run check-cross-region-consensus gate
+        env:
+          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_shared
+          MAOS_TEST_POSTGRES_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
+          MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_TEAM_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
         run: |
           set -o pipefail
           cargo run -p xtask -- check-cross-region-consensus --json 2>&1 | tee /tmp/cross-region-gate.json
@@ -2631,6 +2669,26 @@ jobs:
   # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-multi-region-slo:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Story 13.6c — the SLO gate filters to the three-region / roundtrip /
+    # region-identity legs, all on the REGION axis (pg_conn_for, A/B/C). It
+    # never reads the shared stand-in or the team axis, so its union is
+    # exactly MAOS_TEST_POSTGRES_{A,B,C} (AC2). maos_team_c is required: the
+    # three_region + live_read_region_identity legs home agents in region-c.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2639,7 +2697,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-multi-region-slo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision Loom substrate
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: |-
+            maos_team_b
+            maos_team_c
       - name: Run check-multi-region-slo gate
+        env:
+          MAOS_TEST_POSTGRES_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
         run: |
           set -o pipefail
           cargo run -p xtask -- check-multi-region-slo --json 2>&1 | tee /tmp/multi-region-slo-gate.json
@@ -2702,14 +2770,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-multi-tenant-loom-${{ hashFiles('**/Cargo.lock') }}
-      - name: Create team B database
-        env:
-          PGPASSWORD: postgres
-        run: psql -h localhost -U postgres -d maos_team_a -c 'CREATE DATABASE maos_team_b;'
+      - name: Provision Loom substrate
+        # Story 13.6c — third team database (maos_team_c). The two existing
+        # team DBs are unchanged; TEAM_C gains its reader (the three-team
+        # distinct-database leg) and MAOS_TEST_POSTGRES keeps its legacy
+        # alias onto maos_team_b (AC1: do not perturb what passes).
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: |-
+            maos_team_b
+            maos_team_c
       - name: Run check-multi-tenant-loom gate
         env:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
           MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_TEAM_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
           MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_team_b
         run: cargo run -p xtask -- check-multi-tenant-loom --json
   # Story 13.5d — Reza's mediated production collective route. Hermetic legs
@@ -2739,10 +2814,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-reza-production-path-${{ hashFiles('**/Cargo.lock') }}
-      - name: Create team B database
-        env:
-          PGPASSWORD: postgres
-        run: psql -h localhost -U postgres -d maos_team_a -c 'CREATE DATABASE maos_team_b;'
+      - name: Provision Loom substrate
+        # Story 13.6c — consolidated onto the shared composite action. The
+        # Reza substrate is UNCHANGED: two team DBs (maos_team_{a,b}), env
+        # TEAM_{A,B} only. It has no three-team leg and grows no third
+        # database (D-7: never provision a database with no reader).
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: maos_team_b
       # Story 13.5b null-control #22: these five GDPR suites previously had no
       # explicit CI invocation. Keep each file visible as an independent leg.
       - name: GDPR erasure smoke
@@ -2769,6 +2848,22 @@ jobs:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
           MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
         run: cargo run -p xtask -- check-reza-production-path --json
+  # Story 13.6c (AC5) — three-team/three-region CI substrate drift controls.
+  # Structural (no Postgres): env-consistency (D-4 catcher) + service-block
+  # drift. Blocks at every phase — a substrate-config drift is a config defect.
+  check-loom-substrate-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-loom-substrate-drift-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-loom-substrate-drift gate
+        run: cargo run -p xtask -- check-loom-substrate-drift --json
   # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
   # hermetic (in-process crypto + registry admission path); no live substrate.
   check-vetting-attestation:
@@ -2969,6 +3064,7 @@ jobs:
       - check-escape-detector
       - check-env-contract
       - check-vetting-attestation
+      - check-loom-substrate-drift
     if: always()
     steps:
       - name: Ship gate results summary
@@ -3007,6 +3103,7 @@ jobs:
           echo "| check-fkcs | ${{ needs.check-fkcs.result }} | cargo run -p xtask -- check-fkcs |"
           echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | cargo run -p xtask -- check-trial-attestation |"
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
+          echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -3039,6 +3136,7 @@ jobs:
           echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
+          echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           exit 1
 

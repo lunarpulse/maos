@@ -58,9 +58,17 @@ fn class_name(class: BindingClass) -> &'static str {
 }
 
 fn live_substrate_present() -> bool {
-    ["MAOS_TEST_POSTGRES_TEAM_A", "MAOS_TEST_POSTGRES_TEAM_B"]
-        .iter()
-        .all(|name| std::env::var(name).is_ok_and(|value| !value.trim().is_empty()))
+    // Story 13.6c: the three-team substrate requires TEAM_C too. A leg that
+    // needs the third team database must not be silently skipped because only
+    // the legacy two-team vars are checked — `three_team_databases_are_-
+    // physically_distinct` would otherwise run against a partial substrate.
+    [
+        "MAOS_TEST_POSTGRES_TEAM_A",
+        "MAOS_TEST_POSTGRES_TEAM_B",
+        "MAOS_TEST_POSTGRES_TEAM_C",
+    ]
+    .iter()
+    .all(|name| std::env::var(name).is_ok_and(|value| !value.trim().is_empty()))
 }
 
 fn run_test_leg(leg: &TestLeg, substrate_present: bool) -> LegResult {
@@ -253,6 +261,24 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--test",
                 "tenant_wall_live",
                 "tenant_wall_per_team_merkle_independence_mixed_v1_v2",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // ── Story 13.6c — three-team × three-region substrate reader.
+        // Proves the three provisioned team databases are physically distinct
+        // (current_database()), the reader that consumes TEAM_C (D-7).
+        TestLeg {
+            name: "three-team-databases-physically-distinct",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "three_team_databases_are_physically_distinct",
                 "--",
                 "--ignored",
                 "--exact",
