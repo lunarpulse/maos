@@ -34,6 +34,14 @@ runs:
         EXTRA_DATABASES: ${{ inputs.extra-databases }}
       run: |
         set -euo pipefail
+        # EH-2: an empty/whitespace-only list would provision no databases
+        # while the job's exported env keys still satisfy the drift gate — a
+        # dark substrate that stays CI-green. Invoking this action means at
+        # least one extra database must be materialized; refuse otherwise.
+        if [ -z "${EXTRA_DATABASES//[[:space:]]/}" ]; then
+          echo "provision-loom-substrate: extra-databases is empty or whitespace-only — refusing to provision a substrate with no databases" >&2
+          exit 1
+        fi
         for db in $EXTRA_DATABASES; do
           # Reject anything that is not a plain Postgres identifier so a
           # future malformed entry cannot become a psql injection vector.

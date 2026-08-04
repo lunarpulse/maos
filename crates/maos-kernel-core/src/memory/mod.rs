@@ -18,6 +18,8 @@ pub mod private;
 pub mod read_entry_point;
 pub mod self_telemetry;
 pub mod shared;
+#[cfg(any(test, debug_assertions))]
+pub mod spill_test_faults;
 pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
 
 pub use maos_domain::ports::MemoryManagerPort;

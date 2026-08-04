@@ -446,4 +446,17 @@
 #          13.5j, 10 Story 13.5i, and the full 558-test kernel suite pass. The
 #          logical count is 18171, 77 below the unchanged 18248 ceiling; no
 #          public symbols removed.
-src_lines = 23517
+# HISTORY: Story 13.6c code review round 2 (2026-08-03): 23517 -> 23679
+#          physical lines (+162). (1) Private-store security hardening: BH-1
+#          hard-link containment (fstat nlink==1 on the spill read path),
+#          EH-1 crash durability (fsync the root's parent on first creation),
+#          BH-4 containment (require an absolute spill root). (2) TI-1/2/3
+#          test-depth fault injection: a cfg(test/debug_assertions) module
+#          (spill_test_faults.rs) + thin consultation points prove the
+#          temp-fsync rollback, io_lock serialization, and no-follow open.
+#          The fault module is kloc-excluded (check_kloc.rs `-e`) per the
+#          gate's 'production code only' intent — a measurement-scope
+#          refinement ratified by party-mode (Winston 2026-08-03), NOT a
+#          ceiling increase. Logical count 18210, 38 below the unchanged
+#          18248 ceiling; the pub mod is cfg-gated and absent from release.
+src_lines = 23679

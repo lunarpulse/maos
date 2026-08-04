@@ -22,10 +22,12 @@ use std::os::fd::OwnedFd;
 #[cfg(unix)]
 use std::time::SystemTime;
 
+#[cfg(all(unix, any(test, debug_assertions)))]
+use super::spill_test_faults::{self, FailurePoint, PausePoint};
 #[cfg(unix)]
 use rustix::fs::{
-    fsync, linkat, mkdirat, open, openat, renameat, statat, unlinkat, AtFlags, Dir, FileType, Mode,
-    OFlags,
+    fstat, fsync, linkat, mkdirat, open, openat, renameat, statat, unlinkat, AtFlags, Dir,
+    FileType, Mode, OFlags,
 };
 #[cfg(unix)]
 use rustix::io::Errno;
@@ -188,8 +190,32 @@ impl PrivateMemoryStore {
 
     #[cfg(unix)]
     fn open_root(&self, create: bool) -> Result<Option<OwnedFd>, MemoryError> {
-        if create {
+        // BH-4 (containment): the configured root must be absolute. A
+        // relative root resolves against the process cwd — an
+        // attacker-influenceable component outside the verified descriptor
+        // tree. Fail closed rather than spill into an untrusted location.
+        if !self.fs_root.is_absolute() {
+            return Err(MemoryError::Storage(format!(
+                "private spill root must be an absolute path (got `{}`)",
+                self.fs_root.display()
+            )));
+        }
+        if create && !self.fs_root.exists() {
             fs::create_dir_all(&self.fs_root).map_err(MemoryError::Io)?;
+            // EH-1 (durability): the root (or an ancestor) was just created.
+            // fsync the root's parent directory so the new root entry is
+            // crash-durable before write() can return Ok — otherwise a power
+            // loss can lose the root and every supposedly-durable spill
+            // beneath it.
+            if let Some(parent) = self.fs_root.parent().filter(|p| !p.as_os_str().is_empty()) {
+                let parent_fd = open(
+                    parent,
+                    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+                    Mode::empty(),
+                )
+                .map_err(Self::errno)?;
+                fsync(parent_fd).map_err(Self::errno)?;
+            }
         }
         match open(
             &self.fs_root,
@@ -220,6 +246,8 @@ impl PrivateMemoryStore {
         if created {
             fsync(parent).map_err(Self::errno)?;
         }
+        #[cfg(any(test, debug_assertions))]
+        spill_test_faults::pause(PausePoint::BeforeDirectoryOpen(name.to_string()));
         match openat(
             parent,
             name,
@@ -288,6 +316,8 @@ impl PrivateMemoryStore {
         name: &str,
         kind: ValueKind,
     ) -> Result<Option<DiskCandidate>, MemoryError> {
+        #[cfg(any(test, debug_assertions))]
+        spill_test_faults::pause(PausePoint::BeforeCandidateOpen);
         let fd = match openat(
             directory,
             name,
@@ -306,6 +336,21 @@ impl PrivateMemoryStore {
         if !metadata.is_file() {
             return Err(MemoryError::Io(std::io::Error::from(
                 std::io::ErrorKind::InvalidData,
+            )));
+        }
+        // BH-1 (containment): O_NOFOLLOW guards the final component only. A
+        // hard-linked regular file passes the is_file() check, so a hostile
+        // writer that can place an entry in the spill tree could hard-link
+        // another Spirit's spill (or an external file) and have it served
+        // here. A legitimate spill has exactly one link; reject any
+        // multiply-linked inode. (Transaction backups use distinct `.bak`
+        // names that are never served and are cleaned before a read runs.)
+        let stat = fstat(&file).map_err(Self::errno)?;
+        if stat.st_nlink != 1 {
+            return Err(MemoryError::Storage(format!(
+                "private spill `{name}` is multiply-linked (nlink={}); \
+                 possible hard-link containment breach",
+                stat.st_nlink
             )));
         }
         let modified = metadata.modified().map_err(MemoryError::Io)?;
@@ -504,6 +549,8 @@ impl PrivateMemoryStore {
             let write_result = (|| {
                 let mut file = File::from(temp_fd);
                 file.write_all(bytes).map_err(MemoryError::Io)?;
+                #[cfg(any(test, debug_assertions))]
+                spill_test_faults::fail_if_armed(FailurePoint::TempFileSync)?;
                 file.sync_all().map_err(MemoryError::Io)
             })();
             if let Err(primary) = write_result {
@@ -527,6 +574,10 @@ impl PrivateMemoryStore {
         };
 
         if let (Some(temp_name), Some(final_name)) = (&temp_name, &final_name) {
+            #[cfg(any(test, debug_assertions))]
+            spill_test_faults::pause(PausePoint::BeforeRename);
+            #[cfg(any(test, debug_assertions))]
+            spill_test_faults::fail_if_armed(FailurePoint::Rename)?;
             if let Err(error) = renameat(directory, temp_name, directory, final_name) {
                 return Err(Self::combined_error(
                     Self::errno(error),
@@ -548,6 +599,8 @@ impl PrivateMemoryStore {
                 ));
             }
         }
+        #[cfg(any(test, debug_assertions))]
+        spill_test_faults::fail_if_armed(FailurePoint::CommitDirectorySync)?;
         if let Err(error) = fsync(directory) {
             return Err(Self::combined_error(
                 Self::errno(error),

@@ -567,3 +567,7 @@ Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
 ## Deferred from: code review of 13-6d-cross-wall-recall-production-initiator (2026-07-30)
 
 - **`consent_grant` audit field records the compile-time intent constant, not an actual grant id/version/lease** [crates/maos-iac/src/adapter/log_recall.rs:107] — `CrossWallRecallConsentDecision::Granted` is a unit variant carrying no metadata (`crates/maos-domain/src/ports/cross_wall_recall_consent.rs:17`), so the cross-wall disclosure row cannot name the specific manifest grant that authorized it; only the intent string (`log:recall`). The grant is reconstructable from (home_team [the artifact's own binding], remote_team, intent). *Reason deferred:* enriching the consent decision requires widening the consent port + adapter (owned by 13.6a, done) across crate boundaries; out of 13.6d's local scope.
+
+## Deferred from: code review of 13-6c-three-team-three-region-substrate (2026-08-03) — RESOLVED
+
+All three items (TI-1 fsync-failure rollback, TI-2 io_lock serialization, TI-3 no-follow-open TOCTOU swap) were re-applied the same day via a kloc-excluded `cfg(test/debug_assertions)` fault module (`memory/spill_test_faults.rs`, excluded by `check_kloc.rs -e`). Ceiling 18248 unchanged. Kept here as an audit trail of the defer→resolve path.

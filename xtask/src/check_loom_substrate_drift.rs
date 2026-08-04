@@ -29,9 +29,9 @@
 //!
 //! The Postgres `services:` block cannot be single-sourced (D-8: composite
 //! actions cannot define `services:`, Actions has no YAML anchors). Each job
-//! declares its own copy; this leg holds them byte-identical modulo
-//! `POSTGRES_DB` so a fifth job cannot land with a silently divergent
-//! substrate.
+//! declares its own copy; this leg holds every registered substrate block
+//! byte-identical modulo `POSTGRES_DB` and rejects an unregistered,
+//! service-bearing gate job before it can introduce a divergent fifth copy.
 
 use crate::gate_common::emit_command;
 use serde_json::Value;
@@ -76,6 +76,13 @@ const SLO_ROUTES: &[OracleRoute] = &[
         source: "crates/maos-loom-lite/tests/cross_region_live.rs",
         filters: &["three_region", "live_read_region_identity"],
     },
+    // This structural oracle runs as the whole `read_path_chokepoint` test
+    // binary. It has no Loom env reads today; select one test function so the
+    // route remains scanner-valid and authoritative if that changes.
+    OracleRoute {
+        source: "crates/maos-loom-lite/tests/read_path_chokepoint.rs",
+        filters: &["region_guard_wired_into_both_spirit_reads"],
+    },
     OracleRoute {
         source: "crates/maos-bench/tests/t_11_2b_cross_region_slo.rs",
         filters: &[
@@ -113,6 +120,20 @@ const MULTI_TENANT_ROUTES: &[OracleRoute] = &[
     OracleRoute {
         source: "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
         filters: &["live_crossing_runs_through_two_daemon_processes"],
+    },
+    OracleRoute {
+        source: "crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs",
+        filters: &["tenant_mode_boots_on_live_substrate"],
+    },
+];
+
+const REZA_ROUTES: &[OracleRoute] = &[
+    OracleRoute {
+        source: "crates/maos-loom-lite/tests/tenant_wall_live.rs",
+        filters: &[
+            "collective_principal_partition_refuses_write_and_replication_apply",
+            "collective_erase_moves_merkle_triple_and_blocks_stale_replication",
+        ],
     },
     OracleRoute {
         source: "crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs",
@@ -160,7 +181,7 @@ const CONTRACTS: &[Contract] = &[
         job: "check-reza-production-path",
         required: &["MAOS_TEST_POSTGRES_TEAM_A", "MAOS_TEST_POSTGRES_TEAM_B"],
         probe_source: "xtask/src/check_reza_production_path.rs",
-        oracle_routes: &[],
+        oracle_routes: REZA_ROUTES,
     },
 ];
 
@@ -347,6 +368,39 @@ fn exported_vars(workflow: &Value, job: &str) -> Result<BTreeSet<String>, String
     Ok(out)
 }
 
+fn uses_provisioner(job: &Value) -> bool {
+    job.get("steps")
+        .and_then(Value::as_array)
+        .is_some_and(|steps| {
+            steps
+                .iter()
+                .any(|step| step.get("uses").and_then(Value::as_str) == Some(PROVISION_ACTION))
+        })
+}
+
+fn is_service_bearing_gate_job(job: &Value) -> bool {
+    let has_postgres_service = job
+        .get("services")
+        .and_then(|services| services.get("postgres"))
+        .is_some();
+    let runs_gate = job
+        .get("steps")
+        .and_then(Value::as_array)
+        .is_some_and(|steps| {
+            steps.iter().any(|step| {
+                step.get("run").and_then(Value::as_str).is_some_and(|run| {
+                    run.lines().any(|line| {
+                        line.contains("cargo run")
+                            && line
+                                .split_ascii_whitespace()
+                                .any(|token| token.starts_with("check-"))
+                    })
+                })
+            })
+        });
+    has_postgres_service && runs_gate
+}
+
 fn discover_substrate_jobs(workflow: &Value) -> Result<BTreeSet<String>, String> {
     let jobs = workflow
         .get("jobs")
@@ -354,15 +408,7 @@ fn discover_substrate_jobs(workflow: &Value) -> Result<BTreeSet<String>, String>
         .ok_or_else(|| format!("{GATE_NAME}: workflow has no jobs map"))?;
     let mut discovered = BTreeSet::new();
     for (name, job) in jobs {
-        let uses_provisioner = job
-            .get("steps")
-            .and_then(Value::as_array)
-            .is_some_and(|steps| {
-                steps
-                    .iter()
-                    .any(|step| step.get("uses").and_then(Value::as_str) == Some(PROVISION_ACTION))
-            });
-        if uses_provisioner {
+        if uses_provisioner(job) || is_service_bearing_gate_job(job) {
             discovered.insert(name.clone());
         }
     }
@@ -469,15 +515,29 @@ fn run_service_block_drift(workflow: &Value) -> Result<(bool, Vec<String>), Stri
     let expected: BTreeSet<String> = CONTRACTS.iter().map(|c| c.job.to_string()).collect();
     let mut problems = Vec::new();
 
-    for job in expected.difference(&discovered) {
-        problems.push(format!(
-            "{job}: contracted substrate job does not use {PROVISION_ACTION}"
-        ));
+    for job in &expected {
+        let job_node = workflow["jobs"]
+            .get(job)
+            .ok_or_else(|| format!("{GATE_NAME}: job `{job}` not found"))?;
+        if !uses_provisioner(job_node) {
+            problems.push(format!(
+                "{job}: contracted substrate job does not use {PROVISION_ACTION}"
+            ));
+        }
     }
     for job in discovered.difference(&expected) {
-        problems.push(format!(
-            "{job}: uses {PROVISION_ACTION} but has no env contract"
-        ));
+        let job_node = workflow["jobs"]
+            .get(job)
+            .ok_or_else(|| format!("{GATE_NAME}: job `{job}` not found"))?;
+        if is_service_bearing_gate_job(job_node) && !uses_provisioner(job_node) {
+            problems.push(format!(
+                "{job}: declares services.postgres + runs a gate but is not registered as a substrate job"
+            ));
+        } else {
+            problems.push(format!(
+                "{job}: uses {PROVISION_ACTION} but has no env contract"
+            ));
+        }
     }
 
     let canonical_job = CONTRACTS[0].job;
@@ -538,8 +598,9 @@ pub fn run(json: bool) -> Result<(), String> {
             );
         } else {
             eprintln!(
-                "{GATE_NAME}: PASS — {} gates env-consistent, 4 service blocks byte-identical (modulo POSTGRES_DB)",
-                env_verdicts.len()
+                "{GATE_NAME}: PASS — {} gates env-consistent, {} registered service blocks byte-identical (modulo POSTGRES_DB)",
+                env_verdicts.len(),
+                CONTRACTS.len()
             );
         }
         return Ok(());
@@ -583,6 +644,30 @@ mod tests {
         format!("{}/../{path}", env!("CARGO_MANIFEST_DIR"))
     }
 
+    fn postgres_reading_tests_without_guard(file: &syn::File) -> BTreeSet<String> {
+        file.items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Fn(function)
+                    if function.attrs.iter().any(|attribute| {
+                        attribute.path().is_ident("test")
+                            || attribute
+                                .path()
+                                .segments
+                                .last()
+                                .is_some_and(|segment| segment.ident == "test")
+                    }) =>
+                {
+                    let mut visitor = SourceVisitor::default();
+                    visitor.visit_block(&function.block);
+                    (!visitor.reads.is_empty() && !visitor.calls.contains("guard"))
+                        .then(|| function.sig.ident.to_string())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     #[test]
     fn cross_region_live_reads_include_all_three_axes() {
         // The shared oracle file reads the shared, region, and team axes —
@@ -604,6 +689,75 @@ mod tests {
         assert!(reads.contains("MAOS_TEST_POSTGRES_B"));
         assert!(!reads.contains("MAOS_TEST_POSTGRES_C"));
         assert!(!reads.contains("MAOS_TEST_POSTGRES_TEAM_A"));
+    }
+
+    #[test]
+    fn slo_routes_cover_read_path_chokepoint() {
+        assert!(SLO_ROUTES.iter().any(|route| {
+            route.source == "crates/maos-loom-lite/tests/read_path_chokepoint.rs"
+                && route.filters == ["region_guard_wired_into_both_spirit_reads"]
+        }));
+    }
+
+    #[test]
+    fn reza_routes_trace_invoked_live_tests() {
+        let tenant_wall = REZA_ROUTES
+            .iter()
+            .find(|route| route.source == "crates/maos-loom-lite/tests/tenant_wall_live.rs")
+            .unwrap();
+        assert_eq!(
+            tenant_wall.filters,
+            &[
+                "collective_principal_partition_refuses_write_and_replication_apply",
+                "collective_erase_moves_merkle_triple_and_blocks_stale_replication",
+            ]
+        );
+        let daemon_smoke = REZA_ROUTES
+            .iter()
+            .find(|route| route.source == "crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs")
+            .unwrap();
+        assert_eq!(
+            daemon_smoke.filters,
+            &["tenant_mode_boots_on_live_substrate"]
+        );
+
+        let reads = REZA_ROUTES
+            .iter()
+            .try_fold(BTreeSet::new(), |mut reads, route| {
+                reads.extend(scan_reachable_reads(&ws(route.source), route.filters)?);
+                Ok::<_, String>(reads)
+            });
+        assert_eq!(
+            reads.unwrap(),
+            BTreeSet::from([
+                "MAOS_TEST_POSTGRES_TEAM_A".to_string(),
+                "MAOS_TEST_POSTGRES_TEAM_B".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn consensus_oracle_pg_tests_acquire_guard() {
+        let file =
+            parse_rust_source(&ws("crates/maos-loom-lite/tests/cross_region_live.rs")).unwrap();
+        assert!(
+            postgres_reading_tests_without_guard(&file).is_empty(),
+            "every Postgres-reading consensus test must acquire guard()"
+        );
+
+        let missing_guard = syn::parse_file(
+            r#"
+                #[tokio::test]
+                async fn reader_without_guard() {
+                    let _ = std::env::var("MAOS_TEST_POSTGRES_A");
+                }
+            "#,
+        )
+        .unwrap();
+        assert_eq!(
+            postgres_reading_tests_without_guard(&missing_guard),
+            BTreeSet::from(["reader_without_guard".to_string()])
+        );
     }
 
     #[test]
@@ -762,5 +916,24 @@ mod tests {
             .iter()
             .any(|problem| problem.contains("check-future-loom")
                 && problem.contains("no env contract")));
+    }
+
+    #[test]
+    fn service_block_drift_catches_manual_unregistered_fifth_gate_job() {
+        let mut wf = real_workflow();
+        let mut manual = wf["jobs"]["check-cross-region-consensus"].clone();
+        manual["steps"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|step| step.get("uses").and_then(Value::as_str) != Some(PROVISION_ACTION));
+        wf["jobs"]["check-manual-future-gate"] = manual;
+
+        let (green, problems) = run_service_block_drift(&wf).unwrap();
+        assert!(!green, "an unregistered manual substrate gate must RED");
+        assert!(problems.iter().any(|problem| {
+            problem.contains("check-manual-future-gate")
+                && problem.contains("declares services.postgres + runs a gate")
+                && problem.contains("not registered as a substrate job")
+        }));
     }
 }

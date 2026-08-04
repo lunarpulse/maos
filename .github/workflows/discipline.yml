@@ -1438,7 +1438,7 @@ jobs:
   # Story 6.2 AC7 — smoke-orchestrator-fanout-6-2 end-to-end demo arm.
   smoke-orchestrator-fanout-6-2:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1457,7 +1457,7 @@ jobs:
   # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
   smoke-a2a-loopback-6-3:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1477,7 +1477,7 @@ jobs:
   # demo (one fine-grained admit + one fine-grained code-mutation-directive deny).
   smoke-a2a-consent-vocab-8-7:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1497,7 +1497,7 @@ jobs:
   # demo (classified admit + absent-deny -32009 + non-canonical-deny -32009).
   smoke-a2a-fail-closed-8-8:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1545,7 +1545,7 @@ jobs:
   # NOT the in-process loopback shortcut).
   smoke-a2a-tcp-8-6:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1600,7 +1600,7 @@ jobs:
   # ConsentRupture detection + RateLimited frame emission.
   smoke-schedule-6-4:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2617,8 +2617,10 @@ jobs:
     # every reader in that file panics rather than skipping, so the job must
     # export the FULL union: the shared stand-in (→ its own maos_shared,
     # never aliased onto a team DB — the AC1 role-disjoint rule), the region
-    # axis, and the team axis (team-a/b only — the cross-team legs are
-    # two-team; TEAM_C has no reader here, D-7).
+    # axis, and the team axis. TEAM_C is required too: the whole binary
+    # includes the team-c reader added in AC1/T2 (review round 2 corrected
+    # the original "TEAM_C has no reader here" note — D-7 is about Reza, not
+    # the consensus gate; the drift contract requires TEAM_{A,B,C}).
     services:
       postgres:
         image: pgvector/pgvector:pg16

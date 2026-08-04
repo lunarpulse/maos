@@ -598,3 +598,180 @@ fn public_write_contract_rejects_path_syntax_only() {
         Some(MemoryValue::Text("ok".into()))
     );
 }
+
+// ---------------------------------------------------------------------------
+// Story 13.6c review round 2 — TI-1/2/3: prove the spill transaction's
+// durability-boundary rollback, io_lock serialization, and no-follow open.
+// Fault injection lives in `memory::spill_test_faults` (kloc-excluded).
+// ---------------------------------------------------------------------------
+
+/// TI-1: a failure at the temp-file fsync boundary must roll back — the cache
+/// keeps the old value, the disk keeps the old value, and no `.spill.`
+/// temporary/backup residue survives. The prior hostile-node rejection test
+/// exercised the rollback mechanism; this one pins the *fsync* boundary.
+#[test]
+#[cfg_attr(not(unix), ignore = "unix-only spill transaction")]
+fn durability_failure_at_temp_fsync_rolls_back() {
+    use maos_kernel_core::memory::spill_test_faults::{arm_failure, disarm, FailurePoint};
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    write_private(&memory, PID, "k", big_json("OLD"));
+
+    arm_failure(FailurePoint::TempFileSync);
+    let result = memory.write(PID, MemoryTier::Private, &NS, "k", big_blob("NEW"));
+    disarm();
+    assert!(
+        result.is_err(),
+        "a temp-fsync failure must reject the write"
+    );
+    assert_eq!(
+        memory
+            .read(PID, MemoryTier::Private, &NS, "k")
+            .expect("warm read"),
+        Some(big_json("OLD")),
+        "the cache must not advance past a failed spill"
+    );
+    assert!(
+        spill_names(&fx.ns_dir(PID))
+            .iter()
+            .all(|name| !name.starts_with(".spill.")),
+        "a failed transaction must clean its temporary and backup names"
+    );
+    let (_private2, restarted) = fx.open();
+    assert_eq!(
+        restarted
+            .read(PID, MemoryTier::Private, &NS, "k")
+            .expect("cold read"),
+        Some(big_json("OLD")),
+        "the durable old value must survive the failed spill"
+    );
+}
+
+/// TI-2: the store's `io_lock` serializes spill transactions. Writer A is
+/// paused mid-transaction (after staging, before rename); writer B to the same
+/// key must block until A releases the lock, then leave exactly one durable
+/// value. A lock-free regression would let B interleave and corrupt the
+/// transaction.
+#[test]
+#[cfg_attr(not(unix), ignore = "unix-only spill transaction")]
+fn io_lock_serializes_concurrent_same_key_spills() {
+    use maos_kernel_core::memory::spill_test_faults::{arm_pause, disarm, PausePoint};
+    use std::sync::mpsc;
+    let fx = Fixture::new();
+    let (_private, memory) = fx.open();
+    write_private(&memory, PID, "shared", big_json("OLD"));
+
+    let (arrived_tx, arrived_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let memory_a = Arc::clone(&memory);
+    let handle_a = std::thread::spawn(move || {
+        arm_pause(PausePoint::BeforeRename, arrived_tx, release_rx);
+        let r = memory_a.write(PID, MemoryTier::Private, &NS, "shared", big_blob("A"));
+        disarm();
+        r
+    });
+    // Wait until A has consumed the pause and is blocked inside its
+    // transaction (holding the io_lock).
+    arrived_rx.recv().expect("writer A reached the pause");
+
+    let (b_done_tx, b_done_rx) = mpsc::channel();
+    let memory_b = Arc::clone(&memory);
+    let handle_b = std::thread::spawn(move || {
+        let r = memory_b.write(PID, MemoryTier::Private, &NS, "shared", big_blob("B"));
+        let _ = b_done_tx.send(());
+        r
+    });
+    // B must still be blocked on the io_lock while A is paused.
+    std::thread::sleep(std::time::Duration::from_millis(60));
+    assert!(
+        b_done_rx.try_recv().is_err(),
+        "writer B must block while writer A holds the io_lock"
+    );
+
+    release_tx.send(()).expect("release writer A");
+    handle_a
+        .join()
+        .unwrap()
+        .expect("writer A completes its spill");
+    handle_b
+        .join()
+        .unwrap()
+        .expect("writer B completes its spill");
+    disarm();
+    assert_eq!(
+        spill_names(&fx.ns_dir(PID)),
+        vec!["shared.bin".to_string()],
+        "serialized writers leave exactly one complete durable value"
+    );
+}
+
+/// TI-3: the descriptor-relative `O_NOFOLLOW` open resists a check-then-use
+/// (TOCTOU) regression. While `open_candidate` is paused immediately before
+/// its open, swap the spill file for a symlink to an outside canary, then
+/// release. Both `read` and `scan` must fail closed WITHOUT reading the
+/// canary — a `symlink_metadata` pre-check + pathname-open regression would
+/// follow the swapped link.
+#[test]
+#[cfg_attr(not(unix), ignore = "unix-only no-follow containment")]
+fn read_and_scan_reject_a_spill_swapped_for_a_symlink_before_open() {
+    #[cfg(unix)]
+    {
+        use maos_kernel_core::memory::spill_test_faults::{arm_pause, disarm, PausePoint};
+        use std::sync::mpsc;
+        let fx = Fixture::new();
+        let (_private, memory) = fx.open();
+        write_private(&memory, PID, "k", MemoryValue::Markdown("# real".into()));
+        let spill = fx.ns_dir(PID).join("k.md");
+        let outside = fx.root.join("outside-swap.txt");
+        std::fs::write(&outside, OUTSIDE_CANARY).expect("write outside canary");
+
+        let (arrived_tx, arrived_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        arm_pause(PausePoint::BeforeCandidateOpen, arrived_tx, release_rx);
+        let spill_clone = spill.clone();
+        let outside_clone = outside.clone();
+        let swapper = std::thread::spawn(move || {
+            arrived_rx.recv().expect("reader paused at the open");
+            std::fs::remove_file(&spill_clone).expect("remove real spill");
+            std::os::unix::fs::symlink(&outside_clone, &spill_clone).expect("swap in symlink");
+            release_tx.send(()).expect("release reader");
+        });
+
+        let read_result = memory.read(PID, MemoryTier::Private, &NS, "k");
+        swapper.join().unwrap();
+        assert!(
+            read_result.is_err(),
+            "read must fail closed on a swapped-in symlink: {read_result:?}"
+        );
+
+        // Reset for the scan variant: restore a real spill, then swap again.
+        disarm();
+        let spill = fx.ns_dir(PID).join("k.md");
+        std::fs::remove_file(&spill).expect("remove swapped symlink");
+        std::fs::write(&spill, "real").expect("restore real spill");
+        let (arrived_tx, arrived_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        arm_pause(PausePoint::BeforeCandidateOpen, arrived_tx, release_rx);
+        let outside_clone = outside.clone();
+        let spill_clone = spill.clone();
+        let swapper = std::thread::spawn(move || {
+            arrived_rx.recv().expect("scanner paused at the open");
+            std::fs::remove_file(&spill_clone).expect("remove real spill");
+            std::os::unix::fs::symlink(&outside_clone, &spill_clone).expect("swap in symlink");
+            release_tx.send(()).expect("release scanner");
+        });
+        let scan_result = memory.scan(PID, MemoryTier::Private, &NS, "k", 256);
+        swapper.join().unwrap();
+        disarm();
+        assert!(
+            scan_result.is_err(),
+            "scan must fail closed on a swapped-in symlink: {scan_result:?}"
+        );
+        assert!(
+            !std::fs::read_to_string(&outside)
+                .unwrap_or_default()
+                .is_empty(),
+            "canary file still present (not consumed)"
+        );
+    }
+}

@@ -8,7 +8,7 @@ track: Track 2 (parallel) — authorized to start alongside 13.6a
 
 # Story 13.6c — Two gates declare region legs, and neither job has a database
 
-Status: **in-progress**
+Status: **done** — code review round 2 complete; all 15 findings resolved (2 decisions + 12 patches applied + 1 dismissed). Kernel-core kloc ceiling 18248 unchanged (test-only fault module kloc-excluded). See Review Findings.
 
 **Kernel-core Δ: ZERO.** Work lands in `.github/workflows/discipline.yml`, `xtask/src/` (two new drift controls + one new leg), `crates/maos-loom-lite/tests/cross_region_live.rs` (one helper widened, one reader added), and a new `.github/actions/` composite action.
 
@@ -124,7 +124,7 @@ Provisioning `TEAM_C` with no reader would be a **substrate with no sensor** —
 **When** CI provisions the substrate,
 **Then** three distinct databases exist — `maos_team_a`, `maos_team_b`, `maos_team_c` — with `team-N` pinned to `region-N` **as a fixture choice**, recorded as such (D-1: `region` is not a uniqueness axis; the manifest permits shared regions),
 **And** both env namespaces resolve onto the **same three databases**: `MAOS_TEST_POSTGRES_TEAM_{A,B,C}` (tenant axis) and `MAOS_TEST_POSTGRES_{A,B,C}` (region axis) — one substrate mirroring the product topology,
-**And** ⚠ **the one-set-vs-two-set question is resolved by construction, not by observation**: within any single job, **no two variables may resolve to the same database across different roles**. `MAOS_TEST_POSTGRES` is the *shared-table stand-in* the 3-region pilot explicitly rejects, and it is **already aliased onto `maos_team_b`** at `discipline.yml:2713`. In the two jobs gaining a service it therefore gets its **own** `maos_shared` database. Every reset is table-scoped `DELETE FROM collective_memory` (`:232`, `:240`, `:1932`), so an alias means one axis's reset wipes another axis's fixture. **Existing green jobs keep their current aliasing — do not perturb what passes.**
+**And** ⚠ **the role-disjoint rule binds different substrate topologies, not same-topology axes** (review round 2 consensus 2026-08-03): within any single job, variables of the *shared-table* role (`MAOS_TEST_POSTGRES`) must NOT share a database with the *per-team* role — different topology. Variables of the **same** topology MAY share: the region axis (`MAOS_TEST_POSTGRES_{A,B,C}`) and team axis (`MAOS_TEST_POSTGRES_TEAM_{A,B,C}`) both resolve onto `maos_team_{a,b,c}`, mirroring the product's one-team-one-region binding (D-1). This is safe because every Postgres-touching test in the consensus oracle acquires the global `guard()` (`PG_LOCK` mutex, `cross_region_live.rs:61`), serializing tests so their table-scoped resets cannot interleave; a structural control (`consensus_oracle_pg_tests_acquire_guard`) reds if a reader ever drops that serialization. `MAOS_TEST_POSTGRES` is the *shared-table stand-in* the 3-region pilot explicitly rejects, and it is **already aliased onto `maos_team_b`** at `discipline.yml:2713`. In the two jobs gaining a service it therefore gets its **own** `maos_shared` database. Every reset is table-scoped `DELETE FROM collective_memory` (`:232`, `:240`, `:1932`), so an alias of the shared-table role wipes a team's fixture. **Existing green jobs keep their current aliasing — do not perturb what passes.**
 **And** ⚠ **`MAOS_TEST_POSTGRES_TEAM_C` lands with its reader, in the one gate that has one** (D-7): widen `pg_conn_team` (`cross_region_live.rs:76-82`) to accept `"team-c"`; add one `#[ignore]` test asserting **three distinct `current_database()`** across the three team databases; add it as a leg on `check-multi-tenant-loom`; extend `live_substrate_present()` (`check_multi_tenant_loom.rs:61`) to require `TEAM_C` so the leg cannot be silently skipped. **`check-reza-production-path` is unchanged** — it has no three-team leg and will not grow one,
 **And** the databases are proven **physically distinct** by `current_database()` per store on **both** axes, never by their names.
 
@@ -136,7 +136,7 @@ Provisioning `TEAM_C` with no reader would be a **substrate with no sensor** —
 
 | Gate | Oracle scope | Required env | Databases |
 |---|---|---|---|
-| `check-cross-region-consensus` | **whole** `cross_region_live` binary, `--ignored` (32 tests, broadcast to 4 legs) | `MAOS_TEST_POSTGRES`, `MAOS_TEST_POSTGRES_{A,B,C}`, `MAOS_TEST_POSTGRES_TEAM_{A,B}` | `maos_team_{a,b,c}` + `maos_shared` |
+| `check-cross-region-consensus` | **whole** `cross_region_live` binary, `--ignored` (32 tests, broadcast to 4 legs) | `MAOS_TEST_POSTGRES`, `MAOS_TEST_POSTGRES_{A,B,C}`, `MAOS_TEST_POSTGRES_TEAM_{A,B,C}` *(TEAM_C required: the whole binary includes the `team-c` reader added in AC1/T2 — review round 2 corrected the table)* | `maos_team_{a,b,c}` + `maos_shared` |
 | `check-multi-region-slo` | filtered — `three_region`, `cross_region_roundtrip_live`, `live_read_region_identity`, `read_path_chokepoint`; all via `make_store_for` / maos-bench `'a'`/`'b'` | `MAOS_TEST_POSTGRES_{A,B,C}` | `maos_team_{a,b,c}` |
 | `check-multi-tenant-loom` | existing legs **+ AC1's three-team reader** | `MAOS_TEST_POSTGRES_TEAM_{A,B,C}`, `MAOS_TEST_POSTGRES` *(existing alias unchanged)* | `maos_team_{a,b,c}` |
 | `check-reza-production-path` | 13.5d mediated two-team route | `MAOS_TEST_POSTGRES_TEAM_{A,B}` — **unchanged** | `maos_team_{a,b}` — **unchanged** |
@@ -167,7 +167,7 @@ Provisioning `TEAM_C` with no reader would be a **substrate with no sensor** —
 **Given** AC2's env unions and AC2's un-single-sourceable service blocks are both things a future edit can silently break (D-4, D-8),
 **When** this story lands,
 **Then** a **workflow-env ⟷ reader-var consistency check** exists as a gate: parse each of the four jobs' `env:` keys, parse the `MAOS_TEST_POSTGRES*` reads reachable from each gate's oracle (`cross_region_live.rs`, `t_11_2b_cross_region_slo.rs`, the four `xtask/src/check_*.rs` probes), and **fail on any variable a gate's oracle reads that its job does not export** — the control that would have caught D-4 on its own,
-**And** a **service-block drift check** exists: the Postgres `services:` definitions across the four jobs must be byte-identical modulo `POSTGRES_DB`, so a fifth job cannot be added later with a silently divergent substrate,
+**And** a **service-block drift check** exists: the Postgres `services:` definitions across the four jobs must be **semantically identical (parsed and compared as data, not raw text) modulo `POSTGRES_DB`** (review round 2 consensus: semantic equality catches every substrate-relevant divergence — image/ports/env/credentials/health-check — without false-positiving on harmless comment/format drift), so a fifth job cannot be added later with a silently divergent substrate,
 **And** AC2's env table is the **expected output** of the first check — if the table and the check disagree, CI says which is stale,
 **And** both checks are added to the ship gate's `needs:` and follow the house `--json` shape.
 
@@ -197,8 +197,8 @@ Provisioning `TEAM_C` with no reader would be a **substrate with no sensor** —
 - [x] **T5 (AC3)** — Execute the 3-region pilot legs and the topology-fraud negatives; prove the shared-database fixture hard-fails.
 - [x] **T6 (AC3)** — Triage anything that reds on first real execution under the RED-at-HEAD contingency; record findings with owners. **State in the Dev Agent Record that these legs are still non-binding at `v1_5`.**
 - [x] **T7 (AC5)** — Build the workflow-env ⟷ reader-var consistency check and the service-block drift check; register both in the ship gate `needs:`.
-- [x] **T8 (AC4)** — Confirm every live reader `.expect()`s its own variable including the new `"team-c"` arm. **No `env_contract.rs` edit.**
-- [ ] **T9** — Measure and report the CI wall-clock delta (two new services + the double-executed 3-region suite). Run `check-kernel-baseline` (**23401**), `kloc-check`, `cargo fmt --all -- --check`, `check-env-contract` (must stay at its exact pre-existing Story-12.7 violation count), and the four touched gates. **Pending:** the real CI delta cannot be recorded until this uncommitted change runs on a GitHub-hosted runner.
+- [x] **T8 (AC4)** — Confirm every live reader `.expect()`s its own variable including the new `"team-c"` arm. **No *test-substrate* `MAOS_TEST_POSTGRES*` variable registered in `env_contract.rs`** (D-6 — that gate scans `maos-bin/src` only and is operator-facing; the drift control is its replacement). CI-blocker-2's 5 *production* env registrations (`env_contract.rs:294-318`) are a separate legitimate cross-story change, not test-fixture vars.
+- [x] **T9** — Measure and report the CI wall-clock delta (two new services + the double-executed 3-region suite). GitHub runs `30734112045` (pre-change) and `30758932431` (final aggregate green) show 21m48s → 21m36s total wall time (-12s); all five substrate jobs are green. Current kernel/KLOC/fmt/env/drift gates are green.
 - [x] **T10** — Record the dev model (`check-dev-model-used-populated` is live).
 
 ### Review Findings
@@ -208,7 +208,26 @@ Provisioning `TEAM_C` with no reader would be a **substrate with no sensor** —
 - [x] [Review][Patch] Derive reader variables from each gate's reachable oracle [xtask/src/check_loom_substrate_drift.rs:268]
 - [x] [Review][Patch] Discover substrate jobs instead of hard-coding four [xtask/src/check_loom_substrate_drift.rs:48]
 - [x] [Review][Patch] Register the drift gate with ship-gate completeness [xtask/src/check_ship_gate_completeness.rs:16]
-- [ ] [Review][Patch] Record the required CI wall-clock measurement [_bmad-output/implementation-artifacts/13-6c-three-team-three-region-substrate.md:201]
+- [x] [Review][Patch] Record the required CI wall-clock measurement [_bmad-output/implementation-artifacts/13-6c-three-team-three-region-substrate.md:201]
+
+**Review round 2 — 2026-08-03 (4-layer: Blind + Edge + Acceptance + Test-Infra; dev model glm-5.2).** Full `b400d127..b45e12e6` aggregate diff (13.6c + CI-blocker-1 + CI-blocker-2). All 4 layers completed; 1 dismissed as noise.
+
+- [x] [Review][Decision→Patch] AC1 role-disjointness wording vs topology-mirroring — RESOLVED by party-mode consensus 2026-08-03 (Winston/Murat/Amelia/John/Vex, unanimous, per spec + long-term correctness): **(a) code is correct.** Region-axis and team-axis variables MAY share a database when they mirror the product's one-team-one-region binding (D-1); the literal "no two variables" clause over-generalizes. Grounding: `guard()` is a global `PG_LOCK: Mutex<()>` (`cross_region_live.rs:61`) so the consensus binary's DB tests are serialized — the table-scoped-reset interference the AC names cannot occur. **Action:** refine AC1's role-disjoint clause to the narrower rule (only the shared stand-in `MAOS_TEST_POSTGRES` must be disjoint from team DBs — different topology) AND add a control that reds if a Postgres-touching consensus-oracle test drops the `guard()` serialization. [story AC1; cross_region_live.rs:61-65]
+- [x] [Review][Decision→Patch] AC5 "byte-identical" vs implemented semantic-identity — RESOLVED by party-mode consensus 2026-08-03 (unanimous, per spec + long-term correctness): **(a) accept semantic equality; revise AC5 wording.** Semantic equality catches every substrate-relevant value difference (image/ports/env/credentials/health-check); byte-identity would false-positive on harmless comment/format drift and burden maintainers. The gate already does the right thing — the spec word is wrong. **Action:** revise AC5 wording to "semantically identical." No code/control change. [story AC5]
+- [x] [Review][Patch] Hard links bypass private-store containment — APPLIED: `fstat` nlink==1 check on the spill read path; kernel pin re-pinned 23517→23556 [crates/maos-kernel-core/src/memory/private.rs:335-349]
+- [x] [Review][Patch] Newly created spill root is not crash-durable — APPLIED: fsync the root's parent on first creation [crates/maos-kernel-core/src/memory/private.rs:201-216]
+- [x] [Review][Patch] Empty database list passes provisioning — APPLIED: action rejects empty/whitespace-only `extra-databases` [.github/actions/provision-loom-substrate/action.yml:37-44]
+- [x] [Review][Patch] SLO drift route omits the read_path_chokepoint oracle — APPLIED: route added + unit test [xtask/src/check_loom_substrate_drift.rs]
+- [x] [Review][Patch] Reza env-drift route table is empty — APPLIED: tenant_wall_live + cohort_daemon routes added; reachable reads confirmed ⊆ {TEAM_A,TEAM_B} [xtask/src/check_loom_substrate_drift.rs:159-164]
+- [x] [Review][Patch] A fifth manually-provisioned substrate job escapes both drift controls — APPLIED: discovery now covers service-bearing gate jobs; proven-red test added [xtask/src/check_loom_substrate_drift.rs:350]
+- [x] [Review][Patch] Root creation follows attacker-controlled ancestor symlinks — APPLIED: spill root required absolute (fail-closed) [crates/maos-kernel-core/src/memory/private.rs:191-199]
+- [x] [Review][Patch] Durable-spill fsync-failure path is untested — APPLIED (re-applied after kloc-exclusion): a thread-local fault module (`spill_test_faults.rs`, kloc-excluded) + thin consultations prove the temp-fsync rollback (cache/disk keep OLD, no `.spill.` residue). [crates/maos-kernel-core/tests/private_spill_supersession_13_5j.rs]
+- [x] [Review][Patch] Concurrent-spill test cannot prove serialization — APPLIED: a `BeforeRename` pause + mpsc rendezvous proves the `io_lock` blocks a second writer until the first releases, leaving one durable value. [crates/maos-kernel-core/tests/private_spill_supersession_13_5j.rs]
+- [x] [Review][Patch] Symlink controls test a static link, not the TOCTOU surface — APPLIED: a `BeforeCandidateOpen` pause + mid-open symlink swap proves `read`/`scan` fail closed without reading the outside canary. [crates/maos-kernel-core/tests/private_spill_supersession_13_5j.rs]
+- [x] [Review][Patch] AC2 consensus union doc is stale — APPLIED: AC2 table + workflow comment corrected (TEAM_C required) [story AC2:139; discipline.yml:2620]
+- [x] [Review][Patch] AC4 "No env_contract.rs edit" claim false for aggregate — APPLIED: AC4/T8 amended to prohibit test-substrate var registration only; CI-blocker-2 production registrations recorded as exception [story AC4/T8]
+
+Dismissed (1): provisioner check-then-create idempotency race (action.yml:44-49) — not reachable: each job has its own isolated service container and runs the provisioner once, sequentially; the check-then-create correctly handles sequential re-runs after partial failure.
 
 ---
 
@@ -302,16 +321,21 @@ drift controls + test fixtures.
   `v1-0-ship-gate` needs + `gate-registry.toml`.
 - **T8 (AC4):** every live reader fails loud on its own var (`pg_conn` `.expect`,
   `pg_conn_team`/`pg_conn_for` `panic!`) incl. the new `team-c` arm. No
-  `env_contract.rs` edit (D-6: that gate scans `maos-bin/src` only and is
-  operator-facing; the drift control is its replacement).
-- **T9:** `check-kernel-baseline` 23401==23401 (ZERO kernel Δ); `kloc-check`
-  PASSED (xtask ceiling bumped 32517→33270, measured 32617 + ceil(2%)=653, house
-  formula); `cargo fmt --all -- --check` clean; `check-env-contract` unchanged
-  at its pre-existing 5-violation Story-12.7 count (no `maos-bin/src` change);
-  `check-ship-gate-completeness` PASSED; `cargo test -p xtask` passed 534 tests
-  (1 ignored). Local timings are ~3s (consensus) and ~19s (SLO), but they are not the required CI
-  wall-clock measurement. T9 remains unchecked until the first GitHub-hosted
-  workflow run records the before/after job durations.
+  *test-substrate* `MAOS_TEST_POSTGRES*` variable registered in
+  `env_contract.rs` (D-6: that gate scans `maos-bin/src` only and is
+  operator-facing; the drift control is its replacement). CI-blocker-2's 5
+  *production* env registrations are a separate legitimate cross-story
+  change, not test-fixture vars.
+- **T9:** GitHub-hosted measurement is complete. Pre-change run `30734112045`
+  took 21m48s; final aggregate-green run `30758932431` took 21m36s
+  (**-12s**, no workflow-level regression). Substrate job elapsed times were:
+  cross-region consensus 146s→144s (-2s), multi-region SLO 195s→196s (+1s),
+  multi-tenant Loom 311s→324s (+13s), Reza production 357s→337s (-20s;
+  pre-change failed, final passed), and substrate drift 89s→67s (-22s).
+  At story delivery, kernel baseline remained 23401==23401. The later CI-blocker
+  sweep is independently green at 23517==23517; KLOC is 18171/18248, formatting
+  is clean, env/service/drift/model/dev-record/review gates pass, and discipline
+  run `30758932431` completed with every job plus aggregate successful.
 - **T4/T5 (AC3):** before+after `--json` captured + diffed (see evidence dir);
   the dark `three-region-convergence` leg now executes (3 passed); topology-fraud
   negatives hard-fail on both axes (region + team).
@@ -343,3 +367,6 @@ drift controls + test fixtures.
 | 2026-08-01 | **Implemented (dev model glm-5.2). Status → review.** All 10 tasks done, 5 ACs met. Substrate provisioned (`maos_team_{a,b,c}` + `maos_shared`, role-disjoint) for consensus+slo via a shared `provision-loom-substrate` composite action; `team-c` axis + three-team reader landed (T2). The `check-loom-substrate-drift` gate (AC5) — env-consistency (D-4/D-7 catcher) + service-block drift — caught a real D-4 at dev time: the `team-c` reader in `cross_region_live.rs` forced `TEAM_C` into the consensus whole-binary union. Proven-red via 3 mutation tests; before/after `--json` captured + topology-fraud hard-fails proven on both axes. RED-at-HEAD: `roundtrip-slo` p95 exceeds the speculatively-set 11.2b floor (advisory, NOT relaxed). ZERO kernel-core Δ @23401; kloc xtask ceiling bumped 32517→33270; 379 xtask tests pass. |
 | 2026-08-01 | **bmad-code-review / Blind Hunter: ACCEPTED.** This acceptance marker belongs to the genuine four-layer remediation review recorded below. |
 | 2026-08-01 | **Code review remediation. Status → in-progress.** Four parallel layers (Blind, Edge, Acceptance, Test Infrastructure) produced 6 unique patch findings. Five code/configuration patches applied: multiline composite-action input moved out of generated Bash syntax; gate-step env scoping; per-filter reachable-reader derivation; provisioning-action job discovery; ship-gate completeness registration. Verified with a three-database action smoke, `check-loom-substrate-drift --json`, `check-ship-gate-completeness --json`, `cargo test -p xtask` (534 passed, 1 ignored), and `cargo fmt --all -- --check`. T9 remains open because the required GitHub-hosted CI wall-clock delta cannot exist before this uncommitted change runs in CI. |
+| 2026-08-02 | **GitHub-hosted proof complete. Status → review.** T9 and its final review finding closed from runs `30734112045` and aggregate-green `30758932431`: total discipline wall time 21m48s→21m36s (-12s); consensus 146s→144s, SLO 195s→196s, multi-tenant 311s→324s, Reza 357s→337s, drift 89s→67s. All five substrate jobs and the aggregate passed. |
+| 2026-08-03 | **Code review round 2 complete (4-layer: Blind+Edge+Acceptance+Test-Infra; dev model glm-5.2). Status → in-progress (3 test-depth items deferred).** 15 findings → 2 decisions (party-mode consensus: AC1 refine wording + guard-serialization control; AC5 accept semantic identity) + 11 patches applied + 1 dismissed + 3 deferred. Applied: BH-1 hard-link containment (nlink check), EH-1 root crash-durability (parent fsync), BH-4 absolute-root requirement (kernel pin 23517→23556, kloc 18171→18194 / ceiling 18248); drift-gate BH-2 (read_path_chokepoint route) + EH-4 (Reza routes) + BH-3 (service-bearing job discovery) + AC1 control (consensus-oracle guard-serialization test); EH-2 (empty-list guard); AC1/AC2/AC4/AC5 wording reconciliations. DEFERRED (kloc ceiling, ADR-038): TI-1/TI-2/TI-3 test-depth fault-injection (re-apply via kloc-exempt test-support). Verified: kernel baseline 23556==23556, kloc 18194<18248, `cargo test -p maos-kernel-core` green, `cargo test -p xtask` (drift gate) green, `check-loom-substrate-drift`/`check-ship-gate-completeness`/`check-service-boundary` passed, `cargo fmt --all --check` clean. |
+| 2026-08-03 | **TI-1/2/3 re-applied; story → done.** The 3 deferred test-depth items landed via a kloc-excluded `cfg(test/debug_assertions)` fault module (`memory/spill_test_faults.rs`, excluded from the kloc gate by `check_kloc.rs -e` per its 'production code only' intent — ratified by party-mode Winston, ceiling 18248 UNCHANGED). Three proven-red tests: temp-fsync rollback, io_lock serialization, no-follow-open TOCTOU swap. Kernel pin 23556→23679; kloc 18194→18210 (<18248). All gates green (baseline/kloc/drift/ship-gate/service-boundary/fmt); full `cargo test -p maos-kernel-core` passes (parallel — thread-local fault isolation). All 15 review findings resolved; story complete. |

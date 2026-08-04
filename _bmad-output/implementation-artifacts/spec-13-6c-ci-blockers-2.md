@@ -51,6 +51,7 @@ context:
 - `_bmad-output/implementation-artifacts/13-{5g,5i,5j,6c}-*.md` -- truthful model/review records.
 - `crates/maos-kernel-core/src/memory/private.rs`, `crates/maos-kernel-core/tests/private_{spill_supersession_13_5j,forget_restart_13_5i}.rs` -- private spill correctness, containment, concurrency, durability, and compatibility contracts.
 - `crates/maos-kernel-core/Cargo.toml`, `xtask/kernel-core-baseline.toml` -- safe filesystem dependency and measured kernel HISTORY evidence.
+- `.github/workflows/discipline.yml` -- cold-cache-safe timeout budgets for release-built smoke arms.
 
 ## Tasks & Acceptance
 
@@ -60,6 +61,7 @@ context:
 - [x] `kernel-surface-v0.1-beta.json` -- regenerate the ratified surface after confirming the backend registry expansion.
 - [x] model-gate sources and four story records -- share `blocked`/pre-dev status handling, add known frontier model aliases, record confirmed models, exact review markers, and the completed 13.5j review findings.
 - [x] `private.rs` and kernel evidence -- use safe rustix directory-relative no-follow operations, atomic unique-temp replacement with fsync, operation serialization, overwrite persistence, latest-wins dedupe, and fail-closed errors; add hostile-symlink, stale-duplicate, persistence, and concurrency tests.
+- [x] `discipline.yml` -- raise all six release-built smoke arms from five to ten minutes so successful binaries are not cancelled during cache post-processing.
 - [x] this spec -- record proof and commit the reviewed work once without co-author metadata.
 
 **Acceptance Criteria:**
@@ -92,10 +94,12 @@ On Unix, open the configured root once, then create/open each single sanitized p
 - `cargo deny check` passed advisories, bans, licenses, and sources; `cargo fmt --all -- --check` passed.
 - One initial full-kernel run observed the existing timing-sensitive journal-fsync P99 probe at 4215 microseconds versus its 1500-microsecond budget. The isolated probe passed immediately afterward, and the final full 558-test kernel suite passed.
 - Pushed run `30756780795` exposed one additional Reza corpus diagnostic contract: namespace non-directories now map to contextual `ENOTDIR`; both the two-case GDPR cascade corpus and the ten-case 13.5i erasure suite pass.
+- Pushed run `30757753723` passed every substantive gate, including Reza, but GitHub cancelled release-smoke jobs at the five-minute boundary during successful cache cleanup. All six equivalent release-built smoke arms now have ten-minute budgets.
+- Final pushed head `bd5084695b6e39c28ac27741531b906d19027697` is green: discipline run `30758932431` completed all 154 jobs successfully, and docs-site `30758932426` plus multi-provider `30758932434` also passed. Story 13.6c T9 now records the GitHub timing evidence and is synchronized to review.
 
 ## Review Findings — 2026-08-02
 
-Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked diff from `4a952f81674672eab696ea676dfe38bb43268006` in parallel. Their six unique findings and one pushed-CI follow-up were classified as patches; no intent gap, bad spec, or deferred work remained.
+Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked diff from `4a952f81674672eab696ea676dfe38bb43268006` in parallel. Their six unique findings and two pushed-CI follow-ups were classified as patches; no intent gap, bad spec, or deferred work remained.
 
 - [x] **High / patch:** Preserve the prior durable spill set on every post-rename or stale-cleanup failure. Added hard-link-backed rollback transactions and delayed cache mutation until the directory commit succeeds.
 - [x] **High / patch:** Persist newly created PID and namespace entries. Parent directories are now fsynced after each successful `mkdirat`.
@@ -104,6 +108,7 @@ Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked d
 - [x] **Medium / patch:** Treat conflicting duplicate values with equal modification times as ambiguous and fail without deleting either.
 - [x] **Medium / patch:** Surface failed temporary/backup cleanup alongside the primary pre-commit error; successful commits retain their result even if an unrecognized backup link cannot be reaped.
 - [x] **High / patch:** Preserve the established I/O error variant and directory context for hostile namespace nodes so the Reza deterministic GDPR cascade can distinguish structural filesystem failure.
+- [x] **High / patch:** Prevent successful release-smoke binaries from becoming aggregate failures when cold builds reach the five-minute timeout during cache post-processing.
 
 ## Suggested Review Order
 
@@ -185,3 +190,11 @@ Blind Hunter and Edge Case Hunter reviewed the complete tracked-plus-untracked d
 
 - The Reza cascade corpus retains actionable structural filesystem diagnostics.
   [`gdpr_cascade_corpus_test.rs:342`](../../crates/maos-audit/tests/gdpr_cascade_corpus_test.rs#L342)
+
+**Workflow reliability**
+
+- Six release-built smoke arms tolerate cold-cache compilation and post-processing.
+  [`discipline.yml:1441`](../../.github/workflows/discipline.yml#L1441)
+
+- Story T9 closes with measured before/after workflow and substrate-job timing.
+  [`13-6c-three-team-three-region-substrate.md:201`](13-6c-three-team-three-region-substrate.md#L201)
