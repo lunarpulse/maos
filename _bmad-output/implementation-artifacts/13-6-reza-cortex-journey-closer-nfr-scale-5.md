@@ -73,7 +73,7 @@ The module is correctly cfg-gated (`memory/mod.rs:21` `#[cfg(any(test, debug_ass
 
 `check-service-boundary` is in `aggregate`'s 122 `needs`. It is **not** in `deferred-work.md`. And 13.6c's change log (`13-6c…md:372`) claims *"All gates green (baseline/kloc/drift/ship-gate/**service-boundary**/fmt)"* at the very commit that reds it — a live instance of *a claim standing in for a control*, inside the epic that catalogued the shape.
 
-✅ **RESOLVED — see F-3.** It is a **gate bug**, and the fix is 8 lines the gate already contains in its P4 walk. Do **not** classify the symbols.
+✅ **RESOLVED AND FIXED — `accf763c`.** It was a **gate bug**: the P4 walk's cfg-skip was never given to the surface walk. Both walks now share `is_test_cfg_mod`, and the baseline's single mis-captured `::tests::` entry was removed. Gate PASSES; proven still a real control. **This defect is closed — it is no longer a starting condition.**
 
 ### D-1 — ⚠ NEW: the enforced lane cannot go green — because 13.6e added a third enforcement axis
 
@@ -99,7 +99,7 @@ So **with** Postgres the live legs are green-but-unsigned → `INDETERMINATE` �
 
 **Zero legs anywhere in this repo have ever reached `PROVEN_LIVE_SIGNED`.** That state is currently unwitnessed.
 
-✅ **RESOLVED — see F-1.** This is not a deadlock: `ledger_enforced()` is an **unsanctioned third enforcement axis** that violates `gate_common.rs:31-33`. The remedy is a workflow declaration (`MAOS_LEDGER_ENFORCE=0`, **measured**: exit 0, ledger still published), and the claim refusal is already correctly declared at `v2_2`. `PROVEN_LIVE_SIGNED` is unreachable in CI **by correct design** — it belongs to the operator-run lane this story is the first to execute.
+✅ **RESOLVED AND FIXED AT SOURCE — `c45df0be` (13.6e reopened).** Not a deadlock: the posture blocked on a state CI can never reach. `blocks_product_claim` now blocks `INDETERMINATE` only when the leg is actually RED, so a green-but-unsigned leg refuses the **claim** without blocking a **lane** — `epic-13:200`'s split. `ABSENT` semantics unchanged (measured on the enforced lane, no Postgres: exit 1, 15 ABSENT — the correct 'substrate did not come up' block). **This defect is closed — it is no longer a starting condition.** `PROVEN_LIVE_SIGNED` remains unreachable in CI **by correct design**; it belongs to the operator-run lane this story is the first to execute.
 
 ### D-2 — AC5's non-modification rule is unsatisfiable as written
 
@@ -393,8 +393,8 @@ Trap #1's actual wording is *"it never invents a missing mechanism **inside the 
 
 ## Tasks
 
-- [ ] **T0a (D-0/F-3)** — Port the existing cfg-skip from `walk_p4_mod`/`walk_p4_inline_item` (`check_service_boundary.rs:1093-1101`, `:1196-1202`) into `walk_mod:331`/`walk_inline_mod_item:425`; prove it red-then-green. File the gate bug in `deferred-work.md`; correct `13-6c…md:372`'s false "service-boundary green" claim. **Do not touch `kernel-api-classes.toml`.**
-- [ ] **T0b (D-1/F-1)** — Set `MAOS_LEDGER_ENFORCE=0` on the four journey-gate steps in `discipline.yml`; confirm each publishes its ledger and its `product_claim` unchanged. File three machinery findings against 13.6e: the third enforcement axis, the empty-string parse, and the three-team leg on a two-team gate. **Do not patch `evidence_ledger.rs`.**
+- [x] **T0a (D-0/F-3) — DONE `accf763c`.** Shared `is_test_cfg_mod` ported into both surface walks; the mis-captured `crypto::tests::MockCryptoProvider` removed from the ABI baseline (371→370, the only `::tests::` entry). `check-service-boundary: PASSED (0 violations)`. Proven a real control — a planted non-cfg-gated `pub fn` still reds it, restored byte-identically. Filed in `deferred-work.md`. `kernel-api-classes.toml` untouched.
+- [x] **T0b (D-1/F-1) — SUBSUMED, no workflow change needed.** Rather than declaring `MAOS_LEDGER_ENFORCE=0` around the defect, 13.6e was **reopened and the root cause fixed** (`c45df0be`): `blocks_product_claim` now blocks `INDETERMINATE` only when the leg is actually RED, so a green-but-unsigned leg refuses the **claim** without blocking a **lane**. `ABSENT` semantics are unchanged — measured on the enforced lane with no Postgres: **exit 1**, 83 `PROVEN_BLOCKING` + 15 `ABSENT`, which is the correct "substrate did not come up" block. All three machinery findings were fixed at source, not filed.
 - [ ] **T1 (AC1)** — Commit proven-red controls for all **three** topology-fraud limbs in the `check_loom_substrate_drift.rs:815-890` idiom; close or record the drift gate's value blindness (**axis-scoped**); document local setup for all four jobs; correct `cross_region_live.rs:12-17` and `migration_live.rs:12`; record (d) as already-closed.
 - [ ] **T2 (AC2)** — Write the composed topology down (6 processes, chain shape, shared `MAOS_HOME`); extend `cross_team_crossing_13_6b.rs:1204` from 2 → 3 daemons via a **new** 3-team builder.
 - [ ] **T3 (AC2)** — Per-site dead-wire falsification across **seven** targets incl. `main.rs:9459-9481`. Serialized, byte-identical restore.
