@@ -185,6 +185,18 @@ const CONTRACTS: &[Contract] = &[
     },
 ];
 
+/// Story 13.6e (AC1) — the LEDGER SET, derived from the contracts above.
+///
+/// The evidence ledger must judge exactly the journey-relevant gates, and
+/// `CONTRACTS` already names them. Declaring a second list of the same four
+/// gates would be the null control the ledger exists to remove, so
+/// `evidence_ledger::ledger_gates` reads this instead. The job-level escape
+/// control — a `services.postgres` job that runs a gate without a contract —
+/// is `run_service_block_drift` below and is not rebuilt there.
+pub(crate) fn contract_jobs() -> Vec<&'static str> {
+    CONTRACTS.iter().map(|c| c.job).collect()
+}
+
 // ---------------------------------------------------------------------------
 // Rust-source env-read scanner (syn AST).
 // ---------------------------------------------------------------------------

@@ -12,6 +12,9 @@ mod check_adr_040_accepted;
 mod check_air_gap;
 mod check_bare_review_findings;
 mod gate_common;
+// Story 13.6e — the evidence ledger (judge machinery for the four
+// journey-relevant gates). Depends on gate_common's projection.
+mod evidence_ledger;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
 mod check_dependency_closure;
 // Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port).

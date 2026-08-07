@@ -6,47 +6,21 @@
 //! Hermetic route/audit legs are [`BindingClass::Blocking`] at development
 //! HEAD. Live Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence
 //! emits a WOULD-HAVE-BLOCKED banner; presence makes any RED result blocking.
+//!
+//! Story 13.6e — this is a LEDGER-SET gate (derived from
+//! `check_loom_substrate_drift::CONTRACTS`). Every leg carries a projected
+//! [`crate::gate_common::EvidenceState`], the gate publishes a `product_claim`,
+//! and `ABSENT_SUCCESSORS` is no longer a hand-maintained const — it is derived
+//! from the legs that came back `ABSENT` this run.
 
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::process::Command;
+use crate::evidence_ledger::{
+    absent_successor, failed_successor_probe, finish_ledger_gate, run_exact_test_leg, BuildBinding,
+    EvidenceLeg, EvidenceVerifier, TestLeg,
+};
+use crate::gate_common::{read_disposition, BindingClass};
+use syn::visit::Visit;
 
-use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition, BindingClass};
-
-const GATE_NAME: &str = "check-reza-production-path";
-const ABSENT_SUCCESSORS: &[&str] = &[
-    "11.4b audit escape-anomaly detector wiring",
-    "13.6 Reza three-team traceback journey and NFR-Scale-5 evidence",
-];
-
-struct TestLeg {
-    name: &'static str,
-    class: BindingClass,
-    args: &'static [&'static str],
-}
-
-#[derive(serde::Serialize)]
-struct LegResult {
-    name: &'static str,
-    binding: &'static str,
-    attempted: bool,
-    substrate_present: bool,
-    green: bool,
-    detail: String,
-}
-
-impl LegResult {
-    fn blocks(&self, class: BindingClass) -> bool {
-        !self.green && dev_enforced_red_blocks(class, self.substrate_present)
-    }
-}
-
-fn class_name(class: BindingClass) -> &'static str {
-    match class {
-        BindingClass::Blocking => "blocking",
-        BindingClass::AdvisorySubstrate => "advisory-substrate",
-    }
-}
+pub(crate) const GATE_NAME: &str = "check-reza-production-path";
 
 fn live_substrate_present() -> bool {
     ["MAOS_TEST_POSTGRES_TEAM_A", "MAOS_TEST_POSTGRES_TEAM_B"]
@@ -54,60 +28,75 @@ fn live_substrate_present() -> bool {
         .all(|name| std::env::var(name).is_ok_and(|value| !value.trim().is_empty()))
 }
 
-fn run_test_leg(leg: &TestLeg, substrate_present: bool) -> LegResult {
-    if leg.class == BindingClass::AdvisorySubstrate && !substrate_present {
-        return LegResult {
-            name: leg.name,
-            binding: class_name(leg.class),
-            attempted: false,
-            substrate_present: false,
-            green: false,
-            detail: "two-datname Postgres substrate absent".to_string(),
-        };
-    }
+const ESCAPE_WIRING_LEG: &str = "audit-escape-anomaly-detector-wiring";
+const ESCAPE_WIRING_SOURCE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../crates/maos-bin/src/main.rs"
+);
+// ⚠ The three-team Reza journey successor is NOT registered here. This gate's
+// CI job provisions exactly two team databases (`maos_team_a`, `maos_team_b`)
+// and grows no third (D-7: never provision a database with no reader), so a
+// three-team control could never be earned on it. It lives on
+// `check-multi-tenant-loom`, whose contract already requires
+// `MAOS_TEST_POSTGRES_TEAM_{A,B,C}` and which already runs the same
+// `cross_team_crossing_13_6b` harness. Moved 2026-08-07 (Story 13.6e reopened).
 
-    let output = match Command::new("cargo").args(leg.args).output() {
-        Ok(output) => output,
-        Err(error) => {
-            return LegResult {
-                name: leg.name,
-                binding: class_name(leg.class),
-                attempted: true,
-                substrate_present,
-                green: false,
-                detail: format!("could not start cargo: {error}"),
-            };
+struct FunctionCallProbe<'a> {
+    name: &'a str,
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for FunctionCallProbe<'_> {
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(path) = call.func.as_ref() {
+            self.found |= path
+                .path
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == self.name);
         }
-    };
-    let transcript = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let non_vacuous = transcript.contains("running 1 test") && transcript.contains("1 passed");
-    LegResult {
-        name: leg.name,
-        binding: class_name(leg.class),
-        attempted: true,
-        substrate_present,
-        green: output.status.success() && non_vacuous,
-        detail: if !output.status.success() {
-            transcript
-        } else if !non_vacuous {
-            format!("vacuous: expected exactly one attempted passing test\n{transcript}")
-        } else {
-            "running 1 test; 1 passed".to_string()
-        },
+        syn::visit::visit_expr_call(self, call);
     }
 }
 
-fn write_step_summary(text: &str) {
-    if let Ok(path) = std::env::var("GITHUB_STEP_SUMMARY") {
-        let _ = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut file| writeln!(file, "{text}"));
+fn source_calls_function(source: &str, name: &str) -> Result<bool, String> {
+    let file =
+        syn::parse_file(source).map_err(|error| format!("cannot parse Rust source: {error}"))?;
+    let mut probe = FunctionCallProbe { name, found: false };
+    probe.visit_file(&file);
+    Ok(probe.found)
+}
+
+fn escape_wiring_successor(verifier: &EvidenceVerifier) -> EvidenceLeg {
+    const ORACLE: TestLeg = TestLeg {
+        name: ESCAPE_WIRING_LEG,
+        class: BindingClass::Blocking,
+        args: &[
+            "test",
+            "-p",
+            "maos-bin",
+            "--bin",
+            "maos",
+            "escape_detector_consumer::tests::consumer_reports_anomaly_for_unanticipated_kill_only",
+            "--",
+            "--exact",
+        ],
+    };
+    let present = std::fs::read_to_string(ESCAPE_WIRING_SOURCE)
+        .map_err(|error| format!("cannot inspect `{ESCAPE_WIRING_SOURCE}`: {error}"))
+        .and_then(|source| source_calls_function(&source, "report_escape_anomalies"));
+    match present {
+        Ok(true) => run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier),
+        Ok(false) => absent_successor(
+            ESCAPE_WIRING_LEG,
+            format!(
+                "11.4b audit escape-anomaly detector consumer is not called from \
+                 the production composition root ({ESCAPE_WIRING_SOURCE})"
+            ),
+            verifier,
+            GATE_NAME,
+        ),
+        Err(error) => failed_successor_probe(ESCAPE_WIRING_LEG, error, verifier, GATE_NAME),
     }
 }
 
@@ -1102,82 +1091,67 @@ pub fn run(json: bool) -> Result<(), String> {
             ],
         },
     ];
-    let legs: Vec<(BindingClass, LegResult)> = specs
+    let verifier = EvidenceVerifier::load(BuildBinding::for_run(GATE_NAME)?)?;
+    let mut legs: Vec<EvidenceLeg> = specs
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
-            (spec.class, run_test_leg(spec, substrate))
+            run_exact_test_leg(spec, substrate, GATE_NAME, &verifier)
         })
         .collect();
+    // AC5 ownership records. These disappear only when their own source probe
+    // exposes an oracle and that oracle proves the missing control.
+    legs.push(escape_wiring_successor(&verifier));
 
-    let blockers: Vec<&LegResult> = legs
-        .iter()
-        .filter_map(|(class, leg)| leg.blocks(*class).then_some(leg))
-        .collect();
-    let skipped_live: Vec<&LegResult> = legs
-        .iter()
-        .map(|(_, leg)| leg)
-        .filter(|leg| !leg.attempted)
-        .collect();
-    let oracle_green = legs.iter().all(|(_, leg)| leg.green);
+    finish_ledger_gate(
+        GATE_NAME,
+        "Reza Production Path Gate",
+        json,
+        &disposition,
+        legs,
+        &verifier,
+    )
+}
 
-    if !skipped_live.is_empty() {
-        let banner = format!(
-            "## ⚠️ Reza Production Path Gate: WOULD HAVE BLOCKED SHIP (v2.2)\n\
-             Live two-datname Postgres substrate was absent; skipped: {}.\n\
-             Hermetic legs still bind at HEAD. ABSENT successors: {}.",
-            skipped_live
-                .iter()
-                .map(|leg| leg.name)
-                .collect::<Vec<_>>()
-                .join(", "),
-            ABSENT_SUCCESSORS.join("; ")
-        );
-        emit_command(json, "warning", &banner.replace('\n', " "));
-        write_step_summary(&banner);
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    if !blockers.is_empty() {
-        let detail = blockers
-            .iter()
-            .map(|leg| format!("{}: {}", leg.name, leg.detail))
-            .collect::<Vec<_>>()
-            .join("\n");
-        emit_command(json, "error", &format!("{GATE_NAME} RED: {detail}"));
-        write_step_summary(&format!("## ❌ Reza Production Path Gate: RED\n{detail}"));
-    }
-
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "gate": GATE_NAME,
-                "passed": blockers.is_empty(),
-                "oracle_green": oracle_green,
-                "advisory": blockers.is_empty() && !oracle_green,
-                "disposition": disposition,
-                "legs": legs.iter().map(|(_, leg)| leg).collect::<Vec<_>>(),
-                "absent_successors": ABSENT_SUCCESSORS,
-            })
-        );
-    } else if blockers.is_empty() {
-        println!(
-            "{GATE_NAME}: PASSED ({}; {} absent successors declared)",
-            if oracle_green {
-                "oracle green"
-            } else {
-                "live substrate advisory"
+    fn verifier() -> EvidenceVerifier {
+        EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "test".to_string(),
+                nonce: "nonce".to_string(),
             },
-            ABSENT_SUCCESSORS.len()
-        );
+            None,
+        )
     }
 
-    if blockers.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "{GATE_NAME}: {} blocking leg(s) RED",
-            blockers.len()
-        ))
+    #[test]
+    fn successor_ownership_is_machine_read_and_non_required() {
+        for name in [ESCAPE_WIRING_LEG] {
+            let leg = absent_successor(
+                name,
+                "owner has not landed".to_string(),
+                &verifier(),
+                GATE_NAME,
+            );
+            assert_eq!(leg.state(), crate::gate_common::EvidenceState::Absent);
+            assert!(!leg.required);
+        }
+    }
+
+    #[test]
+    fn escape_wiring_probe_requires_a_real_call_expression() {
+        assert!(!source_calls_function(
+            "// report_escape_anomalies(path, manifests)",
+            "report_escape_anomalies"
+        )
+        .expect("comment parses"));
+        assert!(source_calls_function(
+            "fn main() { escape_detector_consumer::report_escape_anomalies(path, manifests); }",
+            "report_escape_anomalies"
+        )
+        .expect("call parses"));
     }
 }

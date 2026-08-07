@@ -35,6 +35,11 @@ use maos_audit::{
 use maos_bin::tenant_map::phase_a_preflight;
 use maos_domain::team::TeamId;
 
+// Story 13.6e (AC3) — the harness signs its own transcript record; the gate
+// only verifies. Shared signer, no new crate and no new dependency.
+#[path = "../../../tests/harness/evidence_record.rs"]
+mod evidence_record;
+
 /// Build a TL artifact with `rows` transparency_log rows and an optional
 /// in-artifact `tenant_binding` row + `.team` sidecar. Forces a WAL checkpoint
 /// + drop so the rows are durable before the read-only open (Trap 6: WAL).
@@ -243,6 +248,7 @@ fn phase_a_legacy_artifact_with_matching_sidecar_migrates() {
 #[tokio::test]
 #[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A (live Postgres)"]
 async fn phase_b_persisted_datname_vs_live_current_database() {
+    let _evidence = evidence_record::attest("phase_b_persisted_datname_vs_live_current_database");
     let conn_str = std::env::var("MAOS_TEST_POSTGRES_TEAM_A")
         .expect("MAOS_TEST_POSTGRES_TEAM_A must be set for the live Phase B leg");
     let store = maos_loom_lite::store::LoomLiteStore::new(maos_loom_lite::store::StoreConfig {

@@ -29,3 +29,8 @@ __pycache__/
 *.pyo
 *.egg-info/
 .pytest_cache/
+
+# Story 13.6e — per-run evidence-ledger artifacts (product_claim + per-leg
+# evidence states). Produced by every ledger-set gate run and uploaded by CI;
+# never committed.
+tests/reports/evidence-ledger-*.json

@@ -56,6 +56,11 @@ use maos_audit::sealed_export::{derive_pubkey, derive_region_pubkey, derive_team
 use maos_domain::ports::registry::SpiritId;
 use maos_domain::team::TeamId;
 
+// Story 13.6e (AC3) — the harness signs its own transcript record; the gate
+// only verifies. Shared signer, no new crate and no new dependency.
+#[path = "../../../tests/harness/evidence_record.rs"]
+mod evidence_record;
+
 /// Serialize tests on the shared Postgres instance (single
 /// `collective_memory` table).
 static PG_LOCK: Mutex<()> = Mutex::new(());
@@ -507,6 +512,7 @@ async fn exercise_cross_team_row_matrix() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn cross_team_crossing_lands_with_bound_source_team() {
+    let _evidence = evidence_record::attest("cross_team_crossing_lands_with_bound_source_team");
     exercise_cross_team_row_matrix().await;
 }
 
@@ -520,6 +526,7 @@ async fn cross_team_crossing_lands_with_bound_source_team() {
 #[tokio::test]
 #[ignore = "requires three live team Postgres (set MAOS_TEST_POSTGRES_TEAM_{A,B,C})"]
 async fn three_team_databases_are_physically_distinct() {
+    let _evidence = evidence_record::attest("three_team_databases_are_physically_distinct");
     let _g = guard();
     let datname_a = current_database_team("team-a").await;
     let datname_b = current_database_team("team-b").await;
@@ -541,6 +548,8 @@ async fn three_team_databases_are_physically_distinct() {
 #[tokio::test]
 #[ignore = "requires two live Postgres datnames (set MAOS_TEST_POSTGRES_TEAM_A/B)"]
 async fn v3_provenance_crosses_team_wall_and_survives_rebundle() {
+    let _evidence =
+        evidence_record::attest("v3_provenance_crosses_team_wall_and_survives_rebundle");
     let _g = guard();
     let team_a = TeamId::new("team-a").unwrap();
     let team_b = TeamId::new("team-b").unwrap();
@@ -745,12 +754,14 @@ async fn v3_provenance_crosses_team_wall_and_survives_rebundle() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn cross_team_clobber_refused() {
+    let _evidence = evidence_record::attest("cross_team_clobber_refused");
     exercise_cross_team_row_matrix().await;
 }
 
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn per_row_inclusion_verified_at_read_time() {
+    let _evidence = evidence_record::attest("per_row_inclusion_verified_at_read_time");
     exercise_cross_team_row_matrix().await;
 }
 
@@ -805,6 +816,7 @@ async fn asymmetric_consent_reverse_share_refused() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn unattested_cross_team_row_is_refused_at_read() {
+    let _evidence = evidence_record::attest("unattested_cross_team_row_is_refused_at_read");
     let _g = guard();
     let store = make_store("region-b").await;
     reset_collective(&store).await;
@@ -847,6 +859,7 @@ async fn unattested_cross_team_row_is_refused_at_read() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn reattest_copy_fails_then_reattest_succeeds() {
+    let _evidence = evidence_record::attest("reattest_copy_fails_then_reattest_succeeds");
     let _g = guard();
     let store_a = make_store("region-a").await;
     let store_b = make_store("region-b").await;
@@ -988,6 +1001,7 @@ async fn no_aead_sign_only_bundle() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn crdt_reorder_independence_oracle_converges() {
+    let _evidence = evidence_record::attest("crdt_reorder_independence_oracle_converges");
     let _g = guard();
     let store_a = make_store("region-a").await;
     let store_b = make_store("region-b").await;
@@ -1425,6 +1439,7 @@ async fn set_vs_sequence_not_conflated() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn region_identity_forge_rejected_count_moves() {
+    let _evidence = evidence_record::attest("region_identity_forge_rejected_count_moves");
     let _g = guard();
     let store = make_store("region-a").await;
     reset_collective(&store).await;
@@ -1542,6 +1557,7 @@ async fn region_keys_are_distinct() {
 #[tokio::test]
 #[ignore = "requires live Postgres (set MAOS_TEST_POSTGRES)"]
 async fn ap_degrade_real_partition() {
+    let _evidence = evidence_record::attest("ap_degrade_real_partition");
     let _g = guard();
 
     // Create a store pointing at a dead endpoint (the 10.4a pattern).
@@ -2040,6 +2056,7 @@ async fn home_write(store: &LoomLiteStore, pid: u32, home: &str) {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn three_region_convergence_all_three_equal() {
+    let _evidence = evidence_record::attest("three_region_convergence_all_three_equal");
     let _g = guard();
 
     // Three physically-distinct region databases.
@@ -2245,6 +2262,7 @@ async fn three_region_convergence_all_three_equal() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn three_region_reorder_independence() {
+    let _evidence = evidence_record::attest("three_region_reorder_independence");
     let _g = guard();
     let store_a = make_store_for('a', "region-a").await;
     let store_b = make_store_for('b', "region-b").await;
@@ -2360,6 +2378,7 @@ async fn three_region_reorder_independence() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn three_region_empty_set_is_na() {
+    let _evidence = evidence_record::attest("three_region_empty_set_is_na");
     let _g = guard();
     // Ensure the schema exists (init_schema is idempotent) before resetting.
     let _ = make_store_for('a', "region-a").await;
@@ -2415,6 +2434,7 @@ async fn three_region_empty_set_is_na() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn live_read_region_identity_foreign_refused() {
+    let _evidence = evidence_record::attest("live_read_region_identity_foreign_refused");
     let _g = guard();
     let store_a = make_store_for('a', "region-a").await;
     reset_collective_for('a').await;
@@ -2480,6 +2500,7 @@ async fn live_read_region_identity_foreign_refused() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn live_read_region_identity_reattested_served() {
+    let _evidence = evidence_record::attest("live_read_region_identity_reattested_served");
     let _g = guard();
     let store_a = make_store_for('a', "region-a").await;
     let store_b = make_store_for('b', "region-b").await;
@@ -2547,6 +2568,7 @@ async fn live_read_region_identity_reattested_served() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn live_read_region_identity_home_served() {
+    let _evidence = evidence_record::attest("live_read_region_identity_home_served");
     let _g = guard();
     let store_a = make_store_for('a', "region-a").await;
     reset_collective_for('a').await;
@@ -2593,6 +2615,7 @@ async fn live_read_region_identity_home_served() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn live_scan_region_identity_foreign_refused() {
+    let _evidence = evidence_record::attest("live_scan_region_identity_foreign_refused");
     let _g = guard();
     let store_a = make_store_for('a', "region-a").await;
     reset_collective_for('a').await;
@@ -2678,6 +2701,7 @@ async fn live_scan_region_identity_foreign_refused() {
 #[tokio::test]
 #[ignore = "requires three live Postgres (set MAOS_TEST_POSTGRES_{A,B,C})"]
 async fn live_read_region_identity_forged_stamp_served() {
+    let _evidence = evidence_record::attest("live_read_region_identity_forged_stamp_served");
     let _g = guard();
     let store_a = make_store_for('a', "region-a").await;
     reset_collective_for('a').await;

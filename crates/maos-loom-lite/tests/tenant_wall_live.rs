@@ -22,6 +22,11 @@ use maos_loom_lite::store::{LoomLiteStore, StoreConfig, StoreError};
 use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 use tokio_postgres::NoTls;
 
+// Story 13.6e (AC3) — the harness signs its own transcript record; the gate
+// only verifies. Shared signer, no new crate and no new dependency.
+#[path = "../../../tests/harness/evidence_record.rs"]
+mod evidence_record;
+
 static PG_LOCK: Mutex<()> = Mutex::new(());
 
 const TEAM_BASE_SEED: [u8; 32] = [0x42; 32];
@@ -259,6 +264,8 @@ async fn schema_initialization_is_serialized_across_pool_connections() {
 #[tokio::test]
 #[ignore = "requires two live Postgres databases"]
 async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
+    let _evidence =
+        evidence_record::attest("tenant_wall_two_datname_physical_absence_and_assignment_matrix");
     let _guard = guard();
     let raw_a = raw_connect(&team_a_conn()).await;
     let raw_b = raw_connect(&team_b_conn()).await;
@@ -372,6 +379,8 @@ async fn tenant_wall_two_datname_physical_absence_and_assignment_matrix() {
 #[tokio::test]
 #[ignore = "requires two live Postgres databases"]
 async fn spirit_collective_route_registered_pid_serves_only_own_team() {
+    let _evidence =
+        evidence_record::attest("spirit_collective_route_registered_pid_serves_only_own_team");
     let _guard = guard();
     let raw_a = raw_connect(&team_a_conn()).await;
     let raw_b = raw_connect(&team_b_conn()).await;
@@ -439,6 +448,7 @@ async fn spirit_collective_route_registered_pid_serves_only_own_team() {
 #[tokio::test]
 #[ignore = "requires two live Postgres databases"]
 async fn tenant_wall_d1_forged_stamp_is_still_served_boundary() {
+    let _evidence = evidence_record::attest("tenant_wall_d1_forged_stamp_is_still_served_boundary");
     let _guard = guard();
     let raw_a = raw_connect(&team_a_conn()).await;
     let raw_b = raw_connect(&team_b_conn()).await;
@@ -494,6 +504,7 @@ async fn tenant_wall_d1_forged_stamp_is_still_served_boundary() {
 #[tokio::test]
 #[ignore = "requires two live Postgres databases"]
 async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
+    let _evidence = evidence_record::attest("tenant_wall_per_team_merkle_independence_mixed_v1_v2");
     let _guard = guard();
     let raw_a = raw_connect(&team_a_conn()).await;
     let raw_b = raw_connect(&team_b_conn()).await;
@@ -647,6 +658,9 @@ async fn tenant_wall_per_team_merkle_independence_mixed_v1_v2() {
 #[tokio::test]
 #[ignore = "requires MAOS_TEST_POSTGRES_TEAM_A with pgvector"]
 async fn collective_principal_partition_refuses_write_and_replication_apply() {
+    let _evidence = evidence_record::attest(
+        "collective_principal_partition_refuses_write_and_replication_apply",
+    );
     let _guard = guard();
     let connection_string = team_a_conn();
     let raw = raw_connect(&connection_string).await;
@@ -718,6 +732,9 @@ async fn collective_principal_partition_refuses_write_and_replication_apply() {
 #[tokio::test]
 #[ignore = "requires MAOS_TEST_POSTGRES_TEAM_A with pgvector"]
 async fn collective_erase_moves_merkle_triple_and_blocks_stale_replication() {
+    let _evidence = evidence_record::attest(
+        "collective_erase_moves_merkle_triple_and_blocks_stale_replication",
+    );
     let _guard = guard();
     let connection_string = team_a_conn();
     let raw = raw_connect(&connection_string).await;

@@ -1,11 +1,15 @@
 #![forbid(unsafe_code)]
 
-//! Story 10.1a AC4 + Story 10.2 D3 — xtask CI lint with two checks:
+//! Story 10.1a AC4 + Story 10.2 D3 — xtask CI lint with three checks:
 //! 1. Asserts expected gate job names are present in the `v1.0-ship-gate` aggregate
 //!    job's `needs:` array in `discipline.yml`.
 //! 2. D3/F3→B: validates that every ship gate has a `[[ship_gate]]` entry in
 //!    `gate-registry.toml` with an explicit phase disposition — mechanizing the
 //!    advisory→blocking graduation so the "WILL block at v1.5" promise is testable.
+//! 3. Story 13.6e AC5: consumes the ledger-set gates' published `product_claim`
+//!    artifacts and refuses a ship badge asserted over `NOT_PROVEN` evidence.
+//!    Before this story the gate read only `discipline.yml` text and registry
+//!    text — it never validated anything CI actually produced.
 
 use std::path::Path;
 
@@ -87,6 +91,68 @@ const EXPECTED_GATES: &[&str] = &[
 /// Story-10.x ship gates), mechanizing their advisory→blocking graduation.
 const WEEKLY_ONLY_GATES: &[&str] = &["rto-drill", "check-rto-gate"];
 
+/// The four v1.0 infrastructure gates that predate the disposition registry.
+///
+/// Story 13.6e trap 8: this replaces a hand-maintained ALLOWLIST of gates that
+/// DO require a `[[ship_gate]]` row. That allowlist silently omitted six gates
+/// that were in `EXPECTED_GATES` — `check-multi-tenant-loom`, `check-fkcs`,
+/// `check-vetting-attestation`, `check-escape-detector`,
+/// `check-enterprise-identity`, `check-trial-attestation` — so their
+/// disposition was never validated. Inverting it to this four-name legacy
+/// denylist makes the requirement the DEFAULT: a gate added tomorrow is
+/// checked unless someone deliberately declares it pre-registry. Verified safe
+/// at `b568a052` — these four are the only `EXPECTED_GATES` entries with no
+/// `[[ship_gate]]` row, so nothing new reds.
+const LEGACY_PRE_REGISTRY_GATES: &[&str] = &[
+    "ccac-n600-ship-gate",
+    "nfr-rel-3-hsis-95pct",
+    "check-stability-matrix",
+    "check-breaking-md",
+];
+
+/// Story 13.6e (AC5) — the ledger's ship-badge control.
+///
+/// A ship badge is ASSERTED for a ledger-set gate when its registry disposition
+/// at `phase` is `blocking`: that is the product claiming the gate binds for
+/// ship. Asserting one while that gate's published ledger reports `NOT_PROVEN`
+/// is what this refuses.
+///
+/// It is deliberately conditioned on ASSERTION rather than on `NOT_PROVEN`
+/// alone. CI holds no operator key by ratified design (AC3), so every live leg
+/// is `INDETERMINATE` there and every ledger reads `NOT_PROVEN`; reddening on
+/// that would red all of CI and prove nothing. What may not happen is claiming
+/// ship over evidence nobody produced.
+fn ledger_ship_badge_problems(
+    ledgers: &[(String, String)],
+    dispositions: &std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    phase: &str,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for gate in crate::evidence_ledger::ledger_gates() {
+        let Some(disposition) = dispositions.get(gate) else {
+            continue;
+        };
+        let Some((_, claim)) = ledgers.iter().find(|(name, _)| name == gate) else {
+            problems.push(format!(
+                "{gate} published no valid evidence ledger at all (expected \
+                 {}/evidence-ledger-{gate}.json)",
+                crate::evidence_ledger::REPORT_DIR
+            ));
+            continue;
+        };
+        if !crate::gate_common::is_blocking_at(disposition, phase) {
+            continue;
+        }
+        if claim != "PROVEN" {
+            problems.push(format!(
+                "{gate} is `blocking` at {phase} — a ship badge is asserted — but its \
+                 published evidence ledger reports {claim}"
+            ));
+        }
+    }
+    problems
+}
+
 pub fn run(json: bool) -> Result<(), String> {
     let workflow_path = Path::new(".github/workflows/discipline.yml");
     let content = std::fs::read_to_string(workflow_path)
@@ -118,42 +184,13 @@ pub fn run(json: bool) -> Result<(), String> {
         .collect();
     let mut missing_disposition: Vec<&str> = Vec::new();
     for gate in EXPECTED_GATES {
-        // v1.0 infrastructure gates (ccac, hsis, stability, breaking) predate the
-        // disposition registry; only the Story-10.x ship gates require [[ship_gate]] entries.
-        let is_story10_ship_gate = matches!(
-            *gate,
-            "check-pentest-gate"
-                | "check-third-party-trial"
-                | "check-cross-form-equiv"
-                | "check-wasm-form-equiv"
-                | "check-red-team-gate"
-                | "windows-check"
-                | "check-migration-merkle"
-                | "check-live-bilateral-consent"
-                | "check-rotation-real-timing"
-                | "check-mobile-push-on-halt"
-                | "check-j4-latency"
-                | "check-skill-conformance"
-                // Story 11.2a (AC5) — cross-region convergent replication gate.
-                | "check-cross-region-consensus"
-                // Story 11.2b (AC5) — multi-region SLO gate.
-                | "check-multi-region-slo"
-                // Story 11.3 (AC5) — scale-envelope 25/30-host churn gate.
-                | "check-scale-churn"
-                // Story 12.1 (AC5) — cohort manifest + full-pairwise mesh.
-                | "check-cohort-mesh"
-                // Story 11.4a (AC5) — enterprise PDP integration gate.
-                | "check-enterprise-pdp"
-                // Story 13.5d — Reza's mediated production collective route.
-                | "check-reza-production-path"
-                // Story 13.6c — substrate configuration drift.
-                | "check-loom-substrate-drift"
-                // Story 12.6 — maos-bin-scoped environment-contract registry gate.
-                | "check-env-contract"
-        );
-        if (is_story10_ship_gate || WEEKLY_ONLY_GATES.contains(gate))
-            && !registry_names.contains(gate)
-        {
+        // Story 13.6e trap 8: DERIVED, not allowlisted. Every expected gate
+        // requires a `[[ship_gate]]` disposition unless it is one of the four
+        // v1.0 infrastructure gates that predate the registry.
+        if LEGACY_PRE_REGISTRY_GATES.contains(gate) {
+            continue;
+        }
+        if !registry_names.contains(gate) {
             missing_disposition.push(gate);
         }
     }
@@ -168,21 +205,56 @@ pub fn run(json: bool) -> Result<(), String> {
         return Err(msg);
     }
 
-    let passed = missing.is_empty();
+    // Story 13.6e AC5: the verdict travels. Consume the ledger-set gates'
+    // published `product_claim` artifacts (downloaded into `tests/reports/` by
+    // the workflow) and refuse a ship badge asserted over unproven evidence.
+    let dispositions: std::collections::HashMap<String, std::collections::HashMap<String, String>> =
+        registry
+            .ship_gates
+            .iter()
+            .map(|entry| (entry.name.clone(), entry.disposition.clone()))
+            .collect();
+    let (ledgers, mut ledger_problems): (Vec<(String, String)>, Vec<String>) =
+        match crate::evidence_ledger::load_published_ledgers(Path::new(
+            crate::evidence_ledger::REPORT_DIR,
+        )) {
+            Ok(ledgers) => (
+                ledgers
+                    .into_iter()
+                    .map(|ledger| (ledger.gate, ledger.product_claim))
+                    .collect(),
+                Vec::new(),
+            ),
+            Err(problems) => (Vec::new(), problems),
+        };
+    ledger_problems.extend(ledger_ship_badge_problems(
+        &ledgers,
+        &dispositions,
+        crate::gate_common::CURRENT_PHASE,
+    ));
+
+    let passed = missing.is_empty() && ledger_problems.is_empty();
 
     if json {
-        let missing_json: Vec<String> = missing.iter().map(|s| format!("\"{s}\"")).collect();
-        let found_json: Vec<String> = needs.iter().map(|s| format!("\"{s}\"")).collect();
         println!(
-            "{{\"passed\":{passed},\"expected_count\":{},\"found_count\":{},\"missing\":[{}],\"found\":[{}]}}",
-            EXPECTED_GATES.len(),
-            needs.len(),
-            missing_json.join(","),
-            found_json.join(","),
+            "{}",
+            serde_json::json!({
+                "passed": passed,
+                "expected_count": EXPECTED_GATES.len(),
+                "found_count": needs.len(),
+                "missing": missing,
+                "found": needs,
+                "ledger_set": crate::evidence_ledger::ledger_gates(),
+                "ledger_claims": ledgers
+                    .iter()
+                    .map(|(gate, claim)| serde_json::json!({ "gate": gate, "product_claim": claim }))
+                    .collect::<Vec<_>>(),
+                "ledger_problems": ledger_problems,
+            })
         );
     }
 
-    if !passed {
+    if !missing.is_empty() {
         let msg = format!(
             "v1.0-ship-gate completeness check FAILED: missing gates in needs: [{}]",
             missing.join(", ")
@@ -193,10 +265,23 @@ pub fn run(json: bool) -> Result<(), String> {
         return Err(msg);
     }
 
+    if !ledger_problems.is_empty() {
+        let msg = format!(
+            "ship badge REFUSED over unproven evidence (Story 13.6e AC5):\n- {}",
+            ledger_problems.join("\n- ")
+        );
+        if !json {
+            eprintln!("{msg}");
+        }
+        return Err(msg);
+    }
+
     if !json {
         eprintln!(
-            "v1.0-ship-gate completeness check PASSED: all {} expected gates present",
-            EXPECTED_GATES.len()
+            "v1.0-ship-gate completeness check PASSED: all {} expected gates present; \
+             {} ledger claim(s) read, none asserted over NOT_PROVEN evidence",
+            EXPECTED_GATES.len(),
+            ledgers.len()
         );
     }
     Ok(())
@@ -312,5 +397,126 @@ mod tests {
         assert_eq!(needs.len(), 3);
         // check-breaking-md is missing — the run() would fail.
         assert!(!needs.contains(&"check-breaking-md".to_string()));
+    }
+
+    fn dispositions(
+        rows: &[(&str, &str)],
+    ) -> std::collections::HashMap<String, std::collections::HashMap<String, String>> {
+        rows.iter()
+            .map(|(gate, at_v1_5)| {
+                let mut d = std::collections::HashMap::new();
+                d.insert("v1_5".to_string(), (*at_v1_5).to_string());
+                ((*gate).to_string(), d)
+            })
+            .collect()
+    }
+
+    /// AC5: with the badge NOT asserted (the ledger gates are advisory at
+    /// `v1_5` today), a `NOT_PROVEN` ledger is recorded and tolerated. CI holds
+    /// no operator key, so this is the every-run case — reddening on it would
+    /// red all of CI and prove nothing.
+    #[test]
+    fn advisory_gate_may_report_not_proven() {
+        let problems = ledger_ship_badge_problems(
+            &[(
+                "check-multi-region-slo".to_string(),
+                "NOT_PROVEN(roundtrip-slo=INDETERMINATE)".to_string(),
+            )],
+            &dispositions(&[("check-multi-region-slo", "advisory")]),
+            "v1_5",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    /// AC5: assert the badge — flip the gate to `blocking` at the current
+    /// phase — and the same `NOT_PROVEN` ledger reds. This is the control:
+    /// the product may not claim ship over evidence nobody produced.
+    #[test]
+    fn asserted_badge_over_not_proven_evidence_reds() {
+        let problems = ledger_ship_badge_problems(
+            &[(
+                "check-multi-region-slo".to_string(),
+                "NOT_PROVEN(roundtrip-slo=INDETERMINATE)".to_string(),
+            )],
+            &dispositions(&[("check-multi-region-slo", "blocking")]),
+            "v1_5",
+        );
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("NOT_PROVEN"), "{}", problems[0]);
+    }
+
+    /// AC5: an asserted badge with NO published ledger at all is the D-5 hole —
+    /// a claim with no channel. It reds too, so silence cannot pass for proof.
+    #[test]
+    fn asserted_badge_with_no_published_ledger_reds() {
+        let problems = ledger_ship_badge_problems(
+            &[],
+            &dispositions(&[("check-reza-production-path", "blocking")]),
+            "v1_5",
+        );
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            problems[0].contains("published no valid evidence ledger"),
+            "{}",
+            problems[0]
+        );
+    }
+
+    #[test]
+    fn advisory_gate_still_must_publish_its_ledger() {
+        let problems = ledger_ship_badge_problems(
+            &[],
+            &dispositions(&[("check-reza-production-path", "advisory")]),
+            "v1_5",
+        );
+        assert_eq!(problems.len(), 1, "{problems:?}");
+    }
+
+    /// A `PROVEN` ledger satisfies an asserted badge.
+    #[test]
+    fn asserted_badge_over_proven_evidence_passes() {
+        let problems = ledger_ship_badge_problems(
+            &[(
+                "check-reza-production-path".to_string(),
+                "PROVEN".to_string(),
+            )],
+            &dispositions(&[("check-reza-production-path", "blocking")]),
+            "v1_5",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    /// Trap 8: the six gates the old `is_story10_ship_gate` allowlist silently
+    /// omitted are now checked by default — and all of them already carry a
+    /// `[[ship_gate]]` row, so fixing the hole reds nothing at HEAD.
+    #[test]
+    fn every_expected_gate_but_the_four_legacy_ones_has_a_disposition() {
+        // Unit tests run with CWD = the crate root, not the workspace root.
+        let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
+        let registry: crate::corpus_types::ShipGateRegistry =
+            crate::corpus_types::load_toml(&registry_path).expect("registry loads");
+        let names: std::collections::HashSet<&str> = registry
+            .ship_gates
+            .iter()
+            .map(|e| e.name.as_str())
+            .collect();
+        let missing: Vec<&str> = EXPECTED_GATES
+            .iter()
+            .filter(|gate| !LEGACY_PRE_REGISTRY_GATES.contains(gate))
+            .filter(|gate| !names.contains(*gate))
+            .copied()
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "missing [[ship_gate]] rows: {missing:?}"
+        );
+        // And the legacy denylist really is the pre-registry set — none of the
+        // four has a row, so the exemption is not laundering a real gap.
+        for legacy in LEGACY_PRE_REGISTRY_GATES {
+            assert!(
+                !names.contains(legacy),
+                "{legacy} now HAS a disposition row — take it off the legacy list"
+            );
+        }
     }
 }

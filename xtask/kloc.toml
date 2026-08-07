@@ -200,7 +200,7 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 33270   # Story 13.6c named grant: 32517->33270 (measured 32617 + ceil(2%)=653). Driver: check-loom-substrate-drift gate (AC5) — env-consistency (D-4/D-7 catcher) + service-block drift controls + 6 tests incl. 3 proven-red mutation guards. ZERO kernel-core Δ @23401. | prior: Story 13.6d policy grant 31856->32517 (branch-point measured 31879 + ceil(2%)=638).
+xtask = 35931   # Story 13.6e remaining-review measured grant (FLAG-Winston authorization already granted at the formula, 2026-08-04): 34736->35931 (formatted measured 35226 + ceil(2%)=705). Driver: correctness repairs from the five-chunk adversarial review — fingerprint-bound FKCS hold, trusted run/leg evidence bindings, composite live-test verification, exact Family-B isolation, observational successor legs, and their non-vacuity controls. ZERO kernel-core Δ @23679; ZERO maos-audit Δ. | prior: Story 13.6e implementation grant 33270->34736 (measured 34054 + ceil(2%)=682): evidence ledger, sealed projection, four gate migrations, published-claim consumer. | prior: Story 13.6c 32517->33270; Story 13.6d 31856->32517.
 # Story 6.5 — Phase 1 extraction
 maos-iac = 6888   # Story 13.6d final policy grant: 6606->6888 (measured 6753 + ceil(2%)=135). Driver: dependency-inverted cross-wall read routing, typed fail-closed refusal, pre-movement refusal/disclosure audit rows, and their mutation-capable controls. | prior: 2026-07-25 founder policy re-base 6500->6606 (measured 6476 + reserve 130).
 maos-audit = 6665   # Story 13.5g named grant: 6240->6665 (measured 6534, reserve 131 per 2% formula). Driver: in-artifact `tenant_binding` DDL + read/write/verify helpers + Phase A/B pure verdict + Display + AC1-AC4 unit tests — the story budget's "maos-audit: + helpers & DDL". Per kloc.toml CEILING RULE §"must never block a correctness or compliance repair"; ZERO kernel-core Δ @23401. | prior: 2026-07-25 founder policy re-base (Winston 2%): 6150->6240 (measured 6117, reserve 123); Story 13.5b review: 6100->6150 (measured 6_117 — teardown scope contract + UNCOVERED_STORES partition invariant)
@@ -395,7 +395,7 @@ maos-telemetry = 612
 maos-wasm-host = 1129
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 140707   # Story 13.6d final policy grant: 139902->140707 (formatted final measured 137948 + ceil(2%)=2759). Includes the authorized zero-ceiling migration, 13.6b-owned committed overages, and 13.6d production read/audit/test surfaces.
+_aggregate_hardfail = 144224   # Story 13.6e remaining-review measured grant (authorized formula applies because aggregate actually breached): 140707->144224 (formatted measured 141396 + ceil(2%)=2828). Review correctness repairs only; ZERO kernel-core/maos-audit delta. | prior: Story 13.6d 139902->140707 (measured 137948 + ceil(2%)=2759).
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a

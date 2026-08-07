@@ -101,6 +101,126 @@ pub fn dev_enforced_red_blocks(class: BindingClass, substrate_present: bool) -> 
     }
 }
 
+// ---------------------------------------------------------------------------
+// Story 13.6e — the evidence ledger's ONE projection (AC1).
+//
+// `epic-13:200` requires every journey-relevant leg to emit exactly one
+// evidence state. Before this story the vocabulary existed only in prose and
+// the only machine-derived cousin — `oracle_green` — was computed by four
+// gates and gated nothing. The rule here is deliberately narrow:
+//
+//   * the state is DERIVED from what the gate observed, never annotated;
+//   * `EvidenceVerdict`'s inner field is private to this module, so no other
+//     module can mint a state without calling [`EvidenceVerdict::project`] —
+//     a leg that does not flow through the projection does not compile;
+//   * a signature is what makes a live leg PROVEN. "The env var was set" is
+//     not evidence that a substrate was reached (trap 5).
+// ---------------------------------------------------------------------------
+
+/// The four evidence states (`epic-13:200`). Distinct from [`BindingClass`]:
+/// binding is about ENFORCEMENT, evidence is about what was actually observed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EvidenceState {
+    /// Hermetic, reproducible, green. The artifact is the transcript ref; no
+    /// signature is required because CI can re-run the leg from source alone.
+    ProvenBlocking,
+    /// A live leg that ran green AND whose harness signed a transcript record
+    /// verifying against the operator-pinned key and bound to this build.
+    ProvenLiveSigned,
+    /// The leg never ran. `ABSENT` never becomes green.
+    Absent,
+    /// Everything else attempted: a RED leg, or green live evidence that is
+    /// unsigned (so unverifiable), or a signature that failed to verify.
+    Indeterminate,
+}
+
+impl EvidenceState {
+    /// The wire spelling used in every gate JSON and in the published ledger.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            EvidenceState::ProvenBlocking => "PROVEN_BLOCKING",
+            EvidenceState::ProvenLiveSigned => "PROVEN_LIVE_SIGNED",
+            EvidenceState::Absent => "ABSENT",
+            EvidenceState::Indeterminate => "INDETERMINATE",
+        }
+    }
+
+    /// The two states that carry evidence. A product claim may only rest on
+    /// these; `ABSENT`/`INDETERMINATE` never prove anything.
+    pub fn is_proven(self) -> bool {
+        matches!(
+            self,
+            EvidenceState::ProvenBlocking | EvidenceState::ProvenLiveSigned
+        )
+    }
+}
+
+impl serde::Serialize for EvidenceState {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+/// Exactly what the projection is allowed to look at — the fields a gate
+/// OBSERVED while running one leg. Nothing here is a judgement.
+#[derive(Clone, Copy, Debug)]
+pub struct LegOutcome {
+    pub class: BindingClass,
+    /// Did the leg's oracle actually execute this run?
+    pub attempted: bool,
+    pub green: bool,
+    /// A harness-emitted transcript record for this leg verified against the
+    /// operator-pinned public key AND bound to this build (commit + substrate
+    /// nonce). Never "the gate signed it afterwards" (trap 2), never "an env
+    /// var was non-empty" (trap 5).
+    pub signature_verified: bool,
+}
+
+/// A leg's evidence state — obtainable ONLY from [`EvidenceVerdict::project`].
+///
+/// The inner field is private to `gate_common`, so no gate module can name a
+/// state it did not derive. That is AC1's compile-error guarantee: a leg added
+/// to a ledger-set gate must produce an `EvidenceVerdict`, and the projection
+/// is the only thing in the crate that can make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EvidenceVerdict(EvidenceState);
+
+impl EvidenceVerdict {
+    /// THE projection (AC1's truth table), pure over observed outcome fields.
+    ///
+    /// | condition | state |
+    /// |---|---|
+    /// | `!attempted` | `ABSENT` |
+    /// | attempted, green, `Blocking` | `PROVEN_BLOCKING` |
+    /// | attempted, green, `AdvisorySubstrate`, signature verifies | `PROVEN_LIVE_SIGNED` |
+    /// | everything else attempted | `INDETERMINATE` |
+    pub fn project(outcome: LegOutcome) -> Self {
+        if !outcome.attempted {
+            return Self(EvidenceState::Absent);
+        }
+        if !outcome.green {
+            return Self(EvidenceState::Indeterminate);
+        }
+        match outcome.class {
+            BindingClass::Blocking => Self(EvidenceState::ProvenBlocking),
+            BindingClass::AdvisorySubstrate if outcome.signature_verified => {
+                Self(EvidenceState::ProvenLiveSigned)
+            }
+            BindingClass::AdvisorySubstrate => Self(EvidenceState::Indeterminate),
+        }
+    }
+
+    pub fn state(self) -> EvidenceState {
+        self.0
+    }
+}
+
+impl serde::Serialize for EvidenceVerdict {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
 #[cfg(test)]
 mod option_c_tests {
     use super::*;
@@ -141,6 +261,95 @@ mod option_c_tests {
         assert_eq!(phase_disposition(&d, "v2_2"), Some("blocking"));
         assert!(!is_blocking_at(&d, "v1_5"));
         assert!(is_blocking_at(&d, "v2_0"));
+    }
+}
+
+#[cfg(test)]
+mod evidence_projection_tests {
+    use super::*;
+
+    fn project(class: BindingClass, attempted: bool, green: bool, signed: bool) -> EvidenceState {
+        EvidenceVerdict::project(LegOutcome {
+            class,
+            attempted,
+            green,
+            signature_verified: signed,
+        })
+        .state()
+    }
+
+    /// AC1: the truth table, EXHAUSTIVELY — all 2×2×2×2 inputs. The projection
+    /// is the whole ledger's load-bearing function; a partial table here is the
+    /// same vacuity the ledger exists to remove.
+    #[test]
+    fn projection_truth_table_is_exhaustive() {
+        for class in [BindingClass::Blocking, BindingClass::AdvisorySubstrate] {
+            for green in [false, true] {
+                for signed in [false, true] {
+                    // Never attempted is ABSENT no matter what else is true —
+                    // including a signature, which cannot resurrect a leg that
+                    // did not run.
+                    assert_eq!(
+                        project(class, false, green, signed),
+                        EvidenceState::Absent,
+                        "!attempted must be ABSENT ({class:?}, green={green}, signed={signed})"
+                    );
+                }
+            }
+            // Attempted and RED is INDETERMINATE for both classes, signed or not:
+            // a signature attests that the harness ran, not that it passed.
+            assert_eq!(
+                project(class, true, false, false),
+                EvidenceState::Indeterminate
+            );
+            assert_eq!(
+                project(class, true, false, true),
+                EvidenceState::Indeterminate
+            );
+        }
+        // Hermetic + green = PROVEN_BLOCKING; no signature required, and a
+        // signature does not change the state.
+        assert_eq!(
+            project(BindingClass::Blocking, true, true, false),
+            EvidenceState::ProvenBlocking
+        );
+        assert_eq!(
+            project(BindingClass::Blocking, true, true, true),
+            EvidenceState::ProvenBlocking
+        );
+        // Live + green + verified signature = PROVEN_LIVE_SIGNED.
+        assert_eq!(
+            project(BindingClass::AdvisorySubstrate, true, true, true),
+            EvidenceState::ProvenLiveSigned
+        );
+        // Live + green + UNSIGNED = INDETERMINATE. This is the state CI lands
+        // in by ratified design (no operator key there) — recorded, never
+        // silently promoted.
+        assert_eq!(
+            project(BindingClass::AdvisorySubstrate, true, true, false),
+            EvidenceState::Indeterminate
+        );
+    }
+
+    #[test]
+    fn only_the_two_proven_states_carry_evidence() {
+        assert!(EvidenceState::ProvenBlocking.is_proven());
+        assert!(EvidenceState::ProvenLiveSigned.is_proven());
+        assert!(!EvidenceState::Absent.is_proven());
+        assert!(!EvidenceState::Indeterminate.is_proven());
+    }
+
+    #[test]
+    fn wire_spellings_match_the_epic_vocabulary() {
+        // `epic-13:200` names these four literals; the ledger artifact and the
+        // ship-gate consumer both key on them.
+        assert_eq!(EvidenceState::ProvenBlocking.as_str(), "PROVEN_BLOCKING");
+        assert_eq!(
+            EvidenceState::ProvenLiveSigned.as_str(),
+            "PROVEN_LIVE_SIGNED"
+        );
+        assert_eq!(EvidenceState::Absent.as_str(), "ABSENT");
+        assert_eq!(EvidenceState::Indeterminate.as_str(), "INDETERMINATE");
     }
 }
 

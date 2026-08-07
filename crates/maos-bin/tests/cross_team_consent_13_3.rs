@@ -32,6 +32,11 @@ use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
 use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 use maos_spirit_abi::identity::{HostId, SpiritId};
 
+// Story 13.6e (AC3) — the harness signs its own transcript record; the gate
+// only verifies. Shared signer, no new crate and no new dependency.
+#[path = "../../../tests/harness/evidence_record.rs"]
+mod evidence_record;
+
 struct RestoreMaosHome(Option<std::ffi::OsString>);
 
 impl Drop for RestoreMaosHome {
@@ -642,6 +647,7 @@ fn live_leaf(key: &str, value: &str) -> CollectiveKvLeaf {
 #[tokio::test]
 #[ignore = "requires live Postgres (MAOS_TEST_POSTGRES_TEAM_A/_B)"]
 async fn asymmetric_consent_reverse_share_refused() {
+    let _evidence = evidence_record::attest("asymmetric_consent_reverse_share_refused");
     let _g = LIVE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let clock = Arc::new(TestClock::default());
     let state = live_consent_state(Arc::clone(&clock));

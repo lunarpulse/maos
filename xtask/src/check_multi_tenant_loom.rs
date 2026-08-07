@@ -6,125 +6,250 @@
 //! Hermetic legs are [`BindingClass::Blocking`] at development HEAD. Live
 //! Postgres legs are [`BindingClass::AdvisorySubstrate`]: absence emits a
 //! WOULD-HAVE-BLOCKED banner; presence makes any RED result blocking.
+//!
+//! Story 13.6e — this is a LEDGER-SET gate (derived from
+//! `check_loom_substrate_drift::CONTRACTS`). Every leg carries a projected
+//! [`crate::gate_common::EvidenceState`], the gate publishes a `product_claim`,
+//! and `ABSENT_SUCCESSORS` is derived from the legs that came back `ABSENT`
+//! this run rather than hand-maintained (AC5).
 
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::process::Command;
+use crate::evidence_ledger::{
+    absent_successor, class_name, failed_successor_probe, finish_ledger_gate, run_exact_test_leg,
+    BuildBinding, EvidenceLeg, EvidenceVerifier, LegObservation, SignatureCheck, TestLeg,
+};
+use crate::gate_common::{read_disposition, BindingClass};
 
-use crate::gate_common::{dev_enforced_red_blocks, emit_command, read_disposition, BindingClass};
+pub(crate) const GATE_NAME: &str = "check-multi-tenant-loom";
 
-const GATE_NAME: &str = "check-multi-tenant-loom";
-/// Successors this gate declares ABSENT: a control this ADR names but that no
-/// leg here can yet bind.
-///
-/// **Empty is a claim, not a default.** Story 13.6b inverted the write-side
-/// dead-wire clause and Story 13.6d inverted the read-side clause; both now
-/// bind at HEAD. Remaining controls owned elsewhere are deliberately not
-/// laundered through this list:
-///
-///   * the kernel's collective-cause erasure (`Transport(_)` collapses all five
-///     causes at `kernel-core/src/memory/mod.rs`) — a kernel-core edit plus a
-///     FLAG-Winston conversation, owned by Story 13.6 to judge;
-///   * the three-team journey closer — Story 13.6.
-const ABSENT_SUCCESSORS: &[&str] = &[];
-
-struct TestLeg {
-    name: &'static str,
-    class: BindingClass,
-    args: &'static [&'static str],
-}
-
-#[derive(serde::Serialize)]
-struct LegResult {
-    name: &'static str,
-    binding: &'static str,
-    attempted: bool,
-    substrate_present: bool,
-    green: bool,
-    detail: String,
-}
-
-impl LegResult {
-    fn blocks(&self, class: BindingClass) -> bool {
-        !self.green && dev_enforced_red_blocks(class, self.substrate_present)
-    }
-}
-
-fn class_name(class: BindingClass) -> &'static str {
-    match class {
-        BindingClass::Blocking => "blocking",
-        BindingClass::AdvisorySubstrate => "advisory-substrate",
-    }
-}
-
+/// Story 13.6c: the three-team substrate requires TEAM_C too. A leg that needs
+/// the third team database must not be silently skipped because only the legacy
+/// two-team vars are checked — `three_team_databases_are_physically_distinct`
+/// would otherwise run against a partial substrate.
 fn live_substrate_present() -> bool {
-    // Story 13.6c: the three-team substrate requires TEAM_C too. A leg that
-    // needs the third team database must not be silently skipped because only
-    // the legacy two-team vars are checked — `three_team_databases_are_-
-    // physically_distinct` would otherwise run against a partial substrate.
     [
         "MAOS_TEST_POSTGRES_TEAM_A",
         "MAOS_TEST_POSTGRES_TEAM_B",
         "MAOS_TEST_POSTGRES_TEAM_C",
+        "MAOS_TEST_POSTGRES",
     ]
     .iter()
     .all(|name| std::env::var(name).is_ok_and(|value| !value.trim().is_empty()))
 }
 
-fn run_test_leg(leg: &TestLeg, substrate_present: bool) -> LegResult {
-    if leg.class == BindingClass::AdvisorySubstrate && !substrate_present {
-        return LegResult {
-            name: leg.name,
-            binding: class_name(leg.class),
-            attempted: false,
-            substrate_present: false,
-            green: false,
-            detail: "two-datname Postgres substrate absent".to_string(),
-        };
-    }
+/// Story 13.6e (AC5, T10) — the kernel collective-cause erasure control, in a
+/// form something reads.
+///
+/// Derived `ABSENT` comes from legs, so deleting the old ownership prose
+/// without a leg would delete the only in-code record of the control. This is
+/// the kernel leg. The three-team journey counterpart,
+/// `reza-three-team-three-region-journey`, is registered once — HERE, on the
+/// only ledger gate whose contract requires all three team databases.
+/// While kernel-core still collapses the causes this leg is `ABSENT`; once the
+/// source probe flips, a hermetic blocking oracle must prove the widening
+/// before the successor disappears.
+const KERNEL_COLLECTIVE_CAUSE_SOURCE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../crates/maos-kernel-core/src/memory/mod.rs"
+);
 
-    let output = match Command::new("cargo").args(leg.args).output() {
-        Ok(output) => output,
-        Err(error) => {
-            return LegResult {
-                name: leg.name,
-                binding: class_name(leg.class),
-                attempted: true,
-                substrate_present,
-                green: false,
-                detail: format!("could not start cargo: {error}"),
+const KERNEL_COLLECTIVE_CAUSE_COLLAPSE: &str =
+    "CollectivePortError::Transport(_) => CollectiveErrorKind::Transport";
+
+/// Conservative source oracle: at least two concrete `TransportCause`
+/// patterns must map to at least two distinct `CollectiveErrorKind` variants.
+/// Merely renaming `_` to a bound identifier still yields zero mappings.
+fn transport_cause_mapping_counts(source: &str) -> (usize, usize) {
+    let compact: String = source.chars().filter(|ch| !ch.is_whitespace()).collect();
+    let outer_marker = "CollectivePortError::Transport(";
+    let next_outer_marker = "CollectivePortError::";
+    let cause_marker = "TransportCause::";
+    let output_marker = "=>CollectiveErrorKind::";
+    let mut causes = std::collections::HashSet::new();
+    let mut outputs = std::collections::HashSet::new();
+    let mut outer_cursor = compact.as_str();
+
+    while let Some(outer_start) = outer_cursor.find(outer_marker) {
+        let arm = &outer_cursor[outer_start + outer_marker.len()..];
+        let arm_end = arm.find(next_outer_marker).unwrap_or(arm.len());
+        let mut cause_cursor = &arm[..arm_end];
+
+        while let Some(cause_start) = cause_cursor.find(cause_marker) {
+            let after_cause = &cause_cursor[cause_start + cause_marker.len()..];
+            let cause = after_cause
+                .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+                .next()
+                .unwrap_or_default();
+            let next_cause = after_cause.find(cause_marker).unwrap_or(after_cause.len());
+            let mapping = &after_cause[..next_cause];
+            if let Some(output_start) = mapping.find(output_marker) {
+                let output = &mapping[output_start + output_marker.len()..];
+                let output = output
+                    .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+                    .next()
+                    .unwrap_or_default();
+                if !cause.is_empty() && !output.is_empty() {
+                    causes.insert(cause.to_string());
+                    outputs.insert(output.to_string());
+                }
+            }
+            cause_cursor = if next_cause < after_cause.len() {
+                &after_cause[next_cause..]
+            } else {
+                ""
             };
         }
-    };
-    let transcript = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let non_vacuous = transcript.contains("running 1 test") && transcript.contains("1 passed");
-    LegResult {
-        name: leg.name,
-        binding: class_name(leg.class),
-        attempted: true,
-        substrate_present,
-        green: output.status.success() && non_vacuous,
-        detail: if !output.status.success() {
-            transcript
-        } else if !non_vacuous {
-            format!("vacuous: expected exactly one attempted passing test\n{transcript}")
-        } else {
-            "running 1 test; 1 passed".to_string()
-        },
+        outer_cursor = &arm[arm_end..];
     }
+    (causes.len(), outputs.len())
 }
 
-fn write_step_summary(text: &str) {
-    if let Ok(path) = std::env::var("GITHUB_STEP_SUMMARY") {
-        let _ = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut file| writeln!(file, "{text}"));
+fn kernel_distinguishes_collective_causes() -> Result<bool, String> {
+    let source = std::fs::read_to_string(KERNEL_COLLECTIVE_CAUSE_SOURCE).map_err(|error| {
+        format!("cannot read kernel collective-cause source `{KERNEL_COLLECTIVE_CAUSE_SOURCE}`: {error}")
+    })?;
+    let (causes, outputs) = transport_cause_mapping_counts(&source);
+    Ok(causes >= 2 && outputs >= 2)
+}
+
+const KERNEL_SUCCESSOR_LEG: &str = "kernel-collective-cause-distinguishable";
+
+const JOURNEY_LEG: &str = "reza-three-team-three-region-journey";
+const JOURNEY_TEST: &str = "reza_three_team_three_region_production_journey";
+const JOURNEY_SOURCE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../crates/maos-bin/tests/cross_team_crossing_13_6b.rs"
+);
+
+fn kernel_probe_error(error: String, verifier: &EvidenceVerifier) -> EvidenceLeg {
+    failed_successor_probe(KERNEL_SUCCESSOR_LEG, error, verifier, GATE_NAME)
+}
+
+fn journey_oracle_declared(source: &str) -> bool {
+    let marker = format!("fn {JOURNEY_TEST}");
+    let Some(function_start) = source.find(&marker) else {
+        return false;
+    };
+    let Some(body_start) = source[function_start..].find('{') else {
+        return false;
+    };
+    let body_start = function_start + body_start;
+    let preview_end = (body_start + 512).min(source.len());
+    let preview = &source[body_start..preview_end];
+    preview.contains("evidence_record::attest") && preview.contains(JOURNEY_TEST)
+}
+
+/// Story 13.6's three-team / three-region journey successor.
+///
+/// ⚠ **Registered HERE, not on `check-reza-production-path`.** Story 13.6e
+/// originally put it on the Reza gate, whose CI job provisions exactly two team
+/// databases — so a three-team control could never be earned there. This gate's
+/// contract already requires `MAOS_TEST_POSTGRES_TEAM_{A,B,C}` and it already
+/// runs the same `cross_team_crossing_13_6b` harness, so the leg is earnable
+/// without provisioning anything new. Moved 2026-08-07 (13.6e reopened).
+fn journey_successor(live_present: bool, verifier: &EvidenceVerifier) -> EvidenceLeg {
+    const ORACLE: TestLeg = TestLeg {
+        name: JOURNEY_LEG,
+        class: BindingClass::AdvisorySubstrate,
+        args: &[
+            "test",
+            "-p",
+            "maos-bin",
+            "--test",
+            "cross_team_crossing_13_6b",
+            JOURNEY_TEST,
+            "--",
+            "--ignored",
+            "--exact",
+        ],
+    };
+    let source = match std::fs::read_to_string(JOURNEY_SOURCE) {
+        Ok(source) => source,
+        Err(error) => {
+            return failed_successor_probe(
+                JOURNEY_LEG,
+                format!("cannot inspect `{JOURNEY_SOURCE}`: {error}"),
+                verifier,
+                GATE_NAME,
+            );
+        }
+    };
+    if !journey_oracle_declared(&source) {
+        return absent_successor(
+            JOURNEY_LEG,
+            format!(
+                "Story 13.6 has not declared the signed `{JOURNEY_TEST}` oracle \
+                 in the existing three-team harness `{JOURNEY_SOURCE}`"
+            ),
+            verifier,
+            GATE_NAME,
+        );
+    }
+    if !live_present || !verifier.key_available() {
+        return absent_successor(
+            JOURNEY_LEG,
+            "the signed Reza journey oracle exists but its three-team Postgres \
+             substrate or operator verification key is unavailable"
+                .to_string(),
+            verifier,
+            GATE_NAME,
+        );
+    }
+    let observed = run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier);
+    if observed.green && observed.state() != crate::gate_common::EvidenceState::ProvenLiveSigned {
+        return absent_successor(
+            JOURNEY_LEG,
+            format!(
+                "the journey oracle ran green without verified evidence: {}",
+                observed.detail
+            ),
+            verifier,
+            GATE_NAME,
+        );
+    }
+    observed
+}
+
+/// The leg itself: `ABSENT` until the kernel stops collapsing causes, then a
+/// hermetic blocking oracle proves the new behavior without requiring an
+/// operator signing key.
+fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
+    const ORACLE: TestLeg = TestLeg {
+        name: KERNEL_SUCCESSOR_LEG,
+        class: BindingClass::Blocking,
+        args: &[
+            "test",
+            "-p",
+            "xtask",
+            "--test",
+            "story_13_6e_evidence_ledger",
+            "kernel_collective_cause_is_distinguishable",
+            "--",
+            "--ignored",
+            "--exact",
+        ],
+    };
+    match kernel_distinguishes_collective_causes() {
+        Ok(true) => run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier),
+        Ok(false) => EvidenceLeg::observe(
+            LegObservation {
+                name: KERNEL_SUCCESSOR_LEG,
+                class: BindingClass::AdvisorySubstrate,
+                attempted: false,
+                substrate_present: false,
+                green: false,
+                detail: format!(
+                    "the kernel still collapses all eight collective causes into \
+                     `{KERNEL_COLLECTIVE_CAUSE_COLLAPSE}` ({KERNEL_COLLECTIVE_CAUSE_SOURCE}) — a \
+                     kernel-core edit plus a FLAG-Winston conversation, owned by Story 13.6"
+                ),
+                signature: SignatureCheck::default(),
+                passed: None,
+                failed: None,
+            },
+            verifier.binding(),
+            GATE_NAME,
+        ),
+        Err(error) => kernel_probe_error(error, verifier),
     }
 }
 
@@ -1592,20 +1717,20 @@ pub fn run(json: bool) -> Result<(), String> {
             ],
         },
     ];
-    let mut legs: Vec<(BindingClass, LegResult)> = specs
+    let verifier = EvidenceVerifier::load(BuildBinding::for_run(GATE_NAME)?)?;
+    let mut legs: Vec<EvidenceLeg> = specs
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
-            (spec.class, run_test_leg(spec, substrate))
+            run_exact_test_leg(spec, substrate, GATE_NAME, &verifier)
         })
         .collect();
 
     let kernel_report = crate::check_kernel_baseline::check()?;
-    legs.push((
-        BindingClass::Blocking,
-        LegResult {
+    legs.push(EvidenceLeg::observe(
+        LegObservation {
             name: "kernel-baseline-pinned",
-            binding: class_name(BindingClass::Blocking),
+            class: BindingClass::Blocking,
             attempted: true,
             substrate_present: true,
             green: kernel_report.passed,
@@ -1620,77 +1745,60 @@ pub fn run(json: bool) -> Result<(), String> {
                     kernel_report.actual_lines, kernel_report.pinned_lines
                 )
             },
+            signature: SignatureCheck::unverified(format!(
+                "in-process baseline check ({})",
+                class_name(BindingClass::Blocking)
+            )),
+            passed: None,
+            failed: None,
         },
+        verifier.binding(),
+        GATE_NAME,
     ));
 
-    let blockers: Vec<&LegResult> = legs
-        .iter()
-        .filter_map(|(class, leg)| leg.blocks(*class).then_some(leg))
-        .collect();
-    let skipped_live: Vec<&LegResult> = legs
-        .iter()
-        .map(|(_, leg)| leg)
-        .filter(|leg| !leg.attempted)
-        .collect();
-    let oracle_green = legs.iter().all(|(_, leg)| leg.green);
+    // AC5/T10: the ownership record the deleted `ABSENT_SUCCESSORS` doc comment
+    // used to carry, now a leg the projection can see.
+    legs.push(kernel_collective_cause_leg(&verifier));
+    legs.push(journey_successor(live_present, &verifier));
 
-    if !skipped_live.is_empty() {
-        let banner = format!(
-            "## ⚠️ Multi-Tenant Loom Gate: WOULD HAVE BLOCKED SHIP (v2.2)\n\
-             Live two-datname Postgres substrate was absent; skipped: {}.\n\
-             Hermetic legs still bind at HEAD. ABSENT successors: {}.",
-            skipped_live
-                .iter()
-                .map(|leg| leg.name)
-                .collect::<Vec<_>>()
-                .join(", "),
-            ABSENT_SUCCESSORS.join("; ")
-        );
-        emit_command(json, "warning", &banner.replace('\n', " "));
-        write_step_summary(&banner);
-    }
+    finish_ledger_gate(
+        GATE_NAME,
+        "Multi-Tenant Loom Gate",
+        json,
+        &disposition,
+        legs,
+        &verifier,
+    )
+}
 
-    if !blockers.is_empty() {
-        let detail = blockers
-            .iter()
-            .map(|leg| format!("{}: {}", leg.name, leg.detail))
-            .collect::<Vec<_>>()
-            .join("\n");
-        emit_command(json, "error", &format!("{GATE_NAME} RED: {detail}"));
-        write_step_summary(&format!("## ❌ Multi-Tenant Loom Gate: RED\n{detail}"));
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "gate": GATE_NAME,
-                "passed": blockers.is_empty(),
-                "oracle_green": oracle_green,
-                "advisory": blockers.is_empty() && !oracle_green,
-                "disposition": disposition,
-                "legs": legs.iter().map(|(_, leg)| leg).collect::<Vec<_>>(),
-                "absent_successors": ABSENT_SUCCESSORS,
-            })
-        );
-    } else if blockers.is_empty() {
-        println!(
-            "{GATE_NAME}: PASSED ({}; {} absent successors declared)",
-            if oracle_green {
-                "oracle green"
-            } else {
-                "live substrate advisory"
+    fn verifier() -> EvidenceVerifier {
+        EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "test".to_string(),
+                nonce: "nonce".to_string(),
             },
-            ABSENT_SUCCESSORS.len()
-        );
+            None,
+        )
     }
 
-    if blockers.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "{GATE_NAME}: {} blocking leg(s) RED",
-            blockers.len()
-        ))
+    #[test]
+    fn nested_transport_cause_match_is_detected() {
+        let nested = "CollectivePortError::Transport(cause) => match cause {
+            TransportCause::MapStale { .. } => CollectiveErrorKind::MapStale,
+            TransportCause::ConsentDenied { .. } => CollectiveErrorKind::ConsentDenied,
+        }";
+        assert_eq!(transport_cause_mapping_counts(nested), (2, 2));
+    }
+
+    #[test]
+    fn kernel_source_read_error_is_blocking_not_absent() {
+        let leg = kernel_probe_error("source unreadable".to_string(), &verifier());
+        assert!(leg.attempted);
+        assert_eq!(leg.binding, "blocking");
+        assert!(leg.blocks_dev_lane());
     }
 }

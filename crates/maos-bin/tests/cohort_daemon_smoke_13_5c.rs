@@ -51,6 +51,11 @@ use maos_domain::team::TeamId;
 use maos_loom_lite::tenant::{TenantMapError, TenantMapPort};
 use maos_spirit_abi::identity::HostId;
 
+// Story 13.6e (AC3) — the harness signs its own transcript record; the gate
+// only verifies. Shared signer, no new crate and no new dependency.
+#[path = "../../../tests/harness/evidence_record.rs"]
+mod evidence_record;
+
 /// A watchdog budget generous enough to absorb the ~2 200 lines of primary
 /// composition root a cohort-daemon process runs before the dispatch (D24),
 /// yet short enough that a hang FAILS rather than stalls CI.
@@ -687,6 +692,7 @@ fn psql_scalar(conn: &str, sql: &str) -> Result<String, String> {
 #[test]
 #[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A (live Postgres, datname maos_team_a)"]
 fn tenant_mode_boots_on_live_substrate() {
+    let _evidence = evidence_record::attest("tenant_mode_boots_on_live_substrate");
     let _guard = PG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let conn = std::env::var("MAOS_TEST_POSTGRES_TEAM_A")
         .expect("MAOS_TEST_POSTGRES_TEAM_A must be set for the live tenant-boot leg");

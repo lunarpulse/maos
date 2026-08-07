@@ -571,3 +571,71 @@ Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
 ## Deferred from: code review of 13-6c-three-team-three-region-substrate (2026-08-03) — RESOLVED
 
 All three items (TI-1 fsync-failure rollback, TI-2 io_lock serialization, TI-3 no-follow-open TOCTOU swap) were re-applied the same day via a kloc-excluded `cfg(test/debug_assertions)` fault module (`memory/spill_test_faults.rs`, excluded by `check_kloc.rs -e`). Ceiling 18248 unchanged. Kept here as an audit trail of the defer→resolve path.
+
+## Story 13.6e preflight — `roundtrip-slo` floor breach: MEASURED, DIAGNOSED and RESOLVED 2026-08-04
+
+> The tracking entry the RED-at-HEAD contingency (`13-6c…md:154`, from 10.4c D6 `10-4c…md:82`) required and that did not exist. **Operator chose option (B) — reduce the cost rather than re-base the floor. The floor was NOT touched and no control was removed.** Recorded with the full measurement chain, including a first hypothesis that measurement killed.
+
+### Outcome
+
+`check-multi-region-slo` is **`oracle_green: true`**, all five legs green, `roundtrip-slo` `passed: 2` (live + mutation). Clean p95 **17 802 µs / 17 866 µs** across two runs against the untouched **30 000 µs** floor. One test file changed; zero production lines.
+
+### What was actually wrong: the probe counted a verification step that had MOVED
+
+`verify_replication_bundle` is **7 137 µs** per call in this debug `cargo test` build. That single fact dominates everything — component attribution for one leg (p50 µs):
+
+| component | µs |
+|---|---|
+| `write_with_source` | 564 |
+| `read_all_rows_from` + `from_row` | 193 |
+| `build_replication_bundle` (Merkle + Ed25519 **sign**) | 230 |
+| **`verify_replication_bundle` (1 Ed25519 verify)** | **7 137** |
+| `apply_replication_bundle` (internal verify + 1 write) | 7 956 |
+| `apply` **minus** its internal verify | **819** |
+
+Four verifies per round trip × 7 137 = 28 548 µs of a 31 596 µs modelled round trip — **~90%**; modelled 31 596 vs measured 31 059, so the model closes. The 7 ms is the signature verification itself, not key derivation: `derive_region_pubkey` measures **102 µs** (HKDF alone 19 µs).
+
+**Root cause.** When this probe was written at 11.2b, `apply_replication_bundle` did **not** verify, so an explicit `verify_replication_bundle` before `apply` was genuinely part of the production path. **Story 13.2 moved verification INSIDE `apply`** (`bundle.rs:866` — before any store access, the Fork-4 payoff). The probe was never updated, so from 13.2 onward it performed **two verifies per leg where production performs one**. Production's sole caller of `apply_replication_bundle` — `crates/maos-bin/src/cross_team_crossing.rs:255` — calls it directly with no pre-verify.
+
+So the apparent **1.94×** regression was **~85% probe infidelity**. With the redundant verify removed, HEAD measures **17 802 µs against 11.2b's 16 535 µs = 1.08×** — ~8% genuine machinery growth over five stories, which is a healthy tripwire margin, not a regression. **Coverage is unchanged**: a bundle that fails verification makes `apply` return `SignatureVerificationFailed` and the `.expect` panics.
+
+### A hypothesis that measurement killed — recorded because the reasoning was persuasive and wrong
+
+The 5 → 17 SQL-statement expansion on the write path (`store.rs:619-708`: `BEGIN` + `pg_advisory_xact_lock` + erasure-tombstone `SELECT` + 18-column upsert + `COMMIT`) was the leading explanation, with arithmetic that appeared to fit. A probe harness measured it per-write (p50 µs, N=200):
+
+| variant | p50 | vs baseline |
+|---|---|---|
+| V0 autocommit, unprepared (11.2b shape) | 141 | 1.00× |
+| V1 full path, **unprepared** (HEAD shape) | 380 | **2.70×** |
+| V2 full path, **`prepare_cached`** | 178 | 1.26× |
+| V3 no advisory lock | 143 | 1.01× |
+| V4 no tombstone `SELECT` | 143 | 1.01× |
+
+**The controls are nearly free (~35 µs each); statement PARSING was the entire write-path cost.** But 3 writes × 239 µs = 0.7 ms against a 15.3 ms round-trip delta — it explained **under 5%** of the regression, which is what redirected the investigation to the verify count. *The arithmetic that "fit" fit because two wrong numbers were multiplied.*
+
+### Residuals — open, and none of them block
+
+- ~~**`cross_region_roundtrip_mutation`'s second assert is still non-discriminating**~~ — **CLOSED by Story 13.6e (T5) and the remaining evidence-producer review, 2026-08-04.** The old `p95 >= 14_000` passed below the clean baseline. The final oracle alternates adjacent clean/injected samples, computes each pair's saturating delta, and requires the paired-delta median to carry at least 14 ms of the fixed 15 ms injection. `paired_delta_oracle_requires_the_injection_on_a_majority_of_pairs` is the direct proven-red: an absent injection stays below 14 ms while the injected vector crosses it. The `roundtrip-slo` trusted mapping also requires both signed records — 29 ordinary gate proofs plus this mutation falsifier make 30 guards total.
+- **`prepare_cached` is an unclaimed, measured production win** — `deadpool_postgres::Client::prepare_cached` takes the write path from 2.70× to 1.26× with zero semantic change (`store.rs` currently passes `&str` to `query_one`/`query_opt`/`execute`, re-parsing every call). Worth ~200 µs/write. Not taken here: it is production code in `maos-loom-lite`, it is not needed to clear the floor, and it deserves its own story rather than a benchmark-driven drive-by. **Owner: maos-loom-lite performance maintainers. Close when a dedicated performance story either ships cached statements with the roundtrip tripwire unchanged or records a measured reason to decline the optimization.**
+- **This gate's absolute numbers are debug-build-dominated and always were** — ~7.1 ms per Ed25519 verify in `cargo test` debug versus roughly two orders of magnitude less in release. The floor is a *loopback regression tripwire, not a geo-SLO* (`ADR-049…md:125`), so a debug-build constant is legitimate as long as it stays a constant — but any future change to build mode invalidates the floor's provenance. `cross_region.rs:61-64` already demands rig + build mode be recorded with any change to the constant; **the constant did not change here.**
+
+### Also landed (required by the governing rule regardless of disposition)
+
+The diagnostic `eprintln!` in **both** `cross_region_roundtrip_live` and `..._mutation` moved **above** their asserts. Every assert panics, so emitting the distribution afterwards meant a RED run reported p95 and nothing else — the failure's shape was unmeasurable by construction, which is why "is this jitter?" stayed an opinion for two days. The distribution is what settled it: std_dev 499 µs and p95−p50 = 1 005 µs around a p50 that was *itself* over the floor — a uniform shift, not a tail. Both gate legs already pass `--nocapture`, so this surfaces in CI with no workflow change.
+
+---
+
+## Deferred from: Story 13.6e — evidence ledger, AC1's explicit non-goal (2026-08-04)
+
+> Recorded rather than silently skipped, per the story's AC1. The ledger covers the FOUR journey-relevant gates derived from `check_loom_substrate_drift`'s `CONTRACTS`. It does **not** cover the other eight Family-B gates, and it must not be read as "every gate emits an evidence state".
+
+- **Eight Family-B gates are outside the evidence ledger** [`xtask/src/check_scale_churn.rs`, `check_cohort_mesh.rs`, `check_enterprise_pdp.rs`, `check_enterprise_identity.rs`, `check_escape_detector.rs`, `check_trial_attestation.rs`, `check_vetting_attestation.rs`, `check_wasm_form_equiv.rs`] — each carries its own `{label, passed, failed, ran, [attempted,] green}` leg struct with no `binding`, no `substrate_present` and no evidence state, so none of them emits a `product_claim` and none of them publishes a ledger artifact. *Reason deferred:* 13.6e's ledger set is **derived** from the four `CONTRACTS` entries precisely so it cannot quietly grow; widening it is scope, not budget. **Owner: Epic-13 retrospective** (alongside the `maos-a2a-core` third-consecutive-unratified grant and the `xtask` decomposition question) — the retro should decide whether the ledger is a four-gate journey instrument or a workspace-wide one before anyone extends it.
+- **Two of those eight cannot express `ABSENT` at all** [`xtask/src/check_vetting_attestation.rs:31`, `xtask/src/check_wasm_form_equiv.rs:104`] — their `LegResult` has **no `attempted` field**, so "the leg never ran" and "the leg ran and produced nothing" are the same value. A projection cannot distinguish `ABSENT` from `INDETERMINATE` there without a struct change. Both gates are hermetic today, which is why the hole has not bitten; it becomes real the moment either grows a substrate-bound leg. **Owner: Epic-13 retrospective**, same decision.
+- **`check-kernel-baseline` prints its PASSED line to stdout** [`xtask/src/check_kernel_baseline.rs`] — every gate that reuses it as a leg (`check-cross-region-consensus`, `check-multi-region-slo`) therefore emits one non-JSON line before its `--json` payload. Pre-existing and harmless in CI (both jobs `tee` rather than parse), and 13.6e's ledger artifact is written to a file so it is unaffected. *Reason deferred:* fixing it changes a shared gate's output contract. **Owner: xtask gate-infrastructure maintainers. Close when `check-kernel-baseline --json` is machine-clean and both composite callers consume a quiet structured result without transcript parsing.**
+
+### The RED that closing `check_fkcs.rs:325` uncovered — HELD ADVISORY, not fixed, not re-pinned
+
+- **`check-fkcs`'s `admission-path-unmodified` leg has been RED since Story 13.4** [`xtask/fkcs-baseline.toml:22`, `crates/maos-registry/src/admission.rs`, `crates/maos-skill/src/admission.rs`] — 13.4 (FR37 vetting machinery, `148a33ee`) changed both admission sources and never re-pinned `admission_baseline.sha256`; the last re-pin was `5767cf0d` (Story 12.6). The gate's exit tested `blocking_now` while its JSON `passed` field tested `dev_blocks`, so it printed `"passed": false` and exited **0** — the one-identifier defect Story 13.6e's AC2 named. **Measured both ways at 13.6e:** with the original identifier the gate exits 0 over the same RED leg; with the fix it exits 1.
+  - **The harness is correct.** The admission path genuinely is not unmodified. Re-pinning here would re-can a fixture over another story's unreviewed admission-path change, which the governing rule (`13-6c…md:154`) forbids: *"Never re-can a fixture, never silently relax a floor."*
+  - **Disposition:** held advisory with a loud banner, a named owner and this entry. The hold is bound to the exact recorded baseline SHA-256 and current Story-13.4 worktree SHA-256; malformed baseline data, unreadable sources, or any later admission drift blocks instead of inheriting the hold. `check-fkcs` emits a `WOULD HAVE BLOCKED` banner and reports `held_advisory_legs` in JSON. The gate-level `advisory` field now matches its actual verdict.
+  - **Owner: Epic-13 retrospective, with Story 11.5 (FKCS infrastructure).** The decision is whether 13.4's admission-path change is frozen-kernel-conformant; if it is, re-pin `admission_baseline.sha256` and delete the hold entry — the gate then blocks on the leg again with no code change.

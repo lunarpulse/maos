@@ -44,6 +44,11 @@ use maos_loom_lite::store::{CollectiveRow, LoomLiteStore, StoreConfig};
 use maos_spirit_abi::identity::{HostId, SpiritId};
 use tokio_postgres::NoTls;
 
+// Story 13.6e (AC3) — the harness signs its own transcript record; the gate
+// only verifies. Shared signer, no new crate and no new dependency.
+#[path = "../../../tests/harness/evidence_record.rs"]
+mod evidence_record;
+
 const SHARE_ENV_KEYS: [&str; 7] = [
     "MAOS_CROSS_TEAM_SHARE_PEER",
     "MAOS_CROSS_TEAM_SHARE_TO_TEAM",
@@ -1197,6 +1202,7 @@ fn daemon_command(
 #[tokio::test]
 #[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A/_B (live Postgres)"]
 async fn live_crossing_runs_through_two_daemon_processes() {
+    let _evidence = evidence_record::attest("live_crossing_runs_through_two_daemon_processes");
     let _guard = LIVE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     let team_a_conn = pg_conn_team("team-a");
     let team_b_conn = pg_conn_team("team-b");
