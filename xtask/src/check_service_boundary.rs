@@ -395,7 +395,7 @@ fn walk_mod(
                     items.push(surface_item("use", &path, item));
                 }
             }
-            syn::Item::Mod(i) if is_pub(&i.vis) => {
+            syn::Item::Mod(i) if is_pub(&i.vis) && !is_test_cfg_mod(i) => {
                 // Recurse into pub mod for child items, but do NOT emit mod as surface item.
                 if let Some((_, content)) = &i.content {
                     let child_path = format!("{}::{}", mod_path, i.ident);
@@ -482,7 +482,7 @@ fn walk_inline_mod_item(
                 items.push(surface_item("use", &path, item));
             }
         }
-        syn::Item::Mod(i) if is_pub(&i.vis) => {
+        syn::Item::Mod(i) if is_pub(&i.vis) && !is_test_cfg_mod(i) => {
             // Recurse into inline pub mod, but do NOT emit mod as surface item.
             if let Some((_, content)) = &i.content {
                 let child_path = format!("{}::{}", mod_path, i.ident);
@@ -498,6 +498,33 @@ fn walk_inline_mod_item(
 
 fn is_pub(vis: &syn::Visibility) -> bool {
     matches!(vis, syn::Visibility::Public(_))
+}
+
+/// A `mod` gated behind a test-bearing `#[cfg(...)]` is NOT part of the shipped
+/// kernel surface: it does not exist in a release build.
+///
+/// The P4 walk has always applied this rule (`walk_p4_mod` /
+/// `walk_p4_inline_item`); the SURFACE walk never received it, so the two halves
+/// of this gate disagreed about the same module. It went unnoticed until Story
+/// 13.6c added `maos_kernel_core::memory::spill_test_faults` — the first `pub
+/// mod` under `#[cfg(any(test, debug_assertions))]` to reach the surface walk —
+/// whose five functions were then reported as unclassified public kernel API,
+/// reddening a blocking gate that is in `aggregate`'s needs.
+///
+/// Classifying them would have been the wrong fix: it would bless test
+/// fault-injection as permanent public kernel API and assert something false,
+/// since the symbols do not exist in a release build. `kloc_check` already
+/// excludes this module for the same reason. Predicate matched by substring,
+/// exactly as the P4 walk does, so `test`, `any(test, debug_assertions)` and
+/// `all(test, feature = "...")` are all covered.
+fn is_test_cfg_mod(item: &syn::ItemMod) -> bool {
+    item.attrs.iter().any(|attr| {
+        attr.meta.path().is_ident("cfg")
+            && attr
+                .meta
+                .require_list()
+                .is_ok_and(|list| list.tokens.to_string().contains("test"))
+    })
 }
 
 fn surface_item(kind: &str, path: &str, item: &syn::Item) -> SurfaceItem {

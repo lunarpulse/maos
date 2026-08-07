@@ -824,11 +824,6 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::security::crypto::tests::MockCryptoProvider",
-      "signature_hash": "946d5b90ae5fc142bf68b3cedbec830926f3d29385d02072b7adc4a5a326f836"
-    },
-    {
-      "kind": "struct",
       "path": "maos_kernel_core::security::operator_config::RegionSection",
       "signature_hash": "37136cdc53bf60a4ee09f1c12487e9f5d11097f909b54cec5330261b2fa7890d"
     },
