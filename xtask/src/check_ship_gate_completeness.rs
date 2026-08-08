@@ -110,6 +110,19 @@ const LEGACY_PRE_REGISTRY_GATES: &[&str] = &[
     "check-breaking-md",
 ];
 
+/// Is this invocation the one that DOWNLOADED the ledger artifacts?
+///
+/// Pure so it can be tested without mutating process env (these tests run in
+/// parallel). Only the ship-gate workflow step exports `MAOS_LEDGER_ARTIFACTS`;
+/// every other caller — including other jobs' tests that invoke this gate for
+/// its enrolment legs — gets `false` and a written skip reason.
+fn ledger_consumption_expected(value: Option<&str>) -> bool {
+    value.is_some_and(|value| {
+        let value = value.trim();
+        !value.is_empty() && value != "0" && !value.eq_ignore_ascii_case("false")
+    })
+}
+
 /// Story 13.6e (AC5) — the ledger's ship-badge control.
 ///
 /// A ship badge is ASSERTED for a ledger-set gate when its registry disposition
@@ -214,7 +227,18 @@ pub fn run(json: bool) -> Result<(), String> {
             .iter()
             .map(|entry| (entry.name.clone(), entry.disposition.clone()))
             .collect();
-    let (ledgers, mut ledger_problems): (Vec<(String, String)>, Vec<String>) =
+    // ⚠ Scoped to the job that actually DOWNLOADS the artifacts.
+    //
+    // This gate is also invoked as a subprocess by other jobs' tests (e.g.
+    // `trial_attestation_proven_red::ship_gate_completeness_enrolls_check_trial_attestation`),
+    // which assert the ENROLMENT half and have no ledger artifacts. Demanding
+    // ledgers unconditionally made this gate non-hermetic and red those callers.
+    // `MAOS_LEDGER_ARTIFACTS` is exported only on the ship-gate workflow step
+    // that runs `download-artifact`. When it is absent the ledger legs are
+    // SKIPPED and said so in the JSON — never silently passed.
+    let ledger_expected =
+        ledger_consumption_expected(std::env::var("MAOS_LEDGER_ARTIFACTS").ok().as_deref());
+    let (ledgers, mut ledger_problems): (Vec<(String, String)>, Vec<String>) = if ledger_expected {
         match crate::evidence_ledger::load_published_ledgers(Path::new(
             crate::evidence_ledger::REPORT_DIR,
         )) {
@@ -226,12 +250,17 @@ pub fn run(json: bool) -> Result<(), String> {
                 Vec::new(),
             ),
             Err(problems) => (Vec::new(), problems),
-        };
-    ledger_problems.extend(ledger_ship_badge_problems(
-        &ledgers,
-        &dispositions,
-        crate::gate_common::CURRENT_PHASE,
-    ));
+        }
+    } else {
+        (Vec::new(), Vec::new())
+    };
+    if ledger_expected {
+        ledger_problems.extend(ledger_ship_badge_problems(
+            &ledgers,
+            &dispositions,
+            crate::gate_common::CURRENT_PHASE,
+        ));
+    }
 
     let passed = missing.is_empty() && ledger_problems.is_empty();
 
@@ -245,6 +274,18 @@ pub fn run(json: bool) -> Result<(), String> {
                 "missing": missing,
                 "found": needs,
                 "ledger_set": crate::evidence_ledger::ledger_gates(),
+                // Never silently skipped: when false, the ledger legs did not
+                // run because this invocation is not the artifact-consuming job.
+                "ledger_consumed": ledger_expected,
+                "ledger_skip_reason": if ledger_expected {
+                    serde_json::Value::Null
+                } else {
+                    serde_json::Value::String(
+                        "MAOS_LEDGER_ARTIFACTS unset — not the artifact-consuming job; \
+                         ledger legs skipped, enrolment legs still enforced"
+                            .to_string(),
+                    )
+                },
                 "ledger_claims": ledgers
                     .iter()
                     .map(|(gate, claim)| serde_json::json!({ "gate": gate, "product_claim": claim }))
@@ -358,6 +399,29 @@ fn extract_ship_gate_needs(content: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    /// The ledger legs are scoped to the artifact-consuming job, and the
+    /// scoping is a real fence — not an accidental opt-out.
+    ///
+    /// Story 13.6e made this gate demand four published ledgers unconditionally,
+    /// which reddened every OTHER job that invokes it for its enrolment legs
+    /// (CI run 31193312117: `check-trial-attestation` failed with four
+    /// "published no valid evidence ledger at all" problems). Only the ship-gate
+    /// step exports `MAOS_LEDGER_ARTIFACTS`; everything else skips the ledger
+    /// legs and says so.
+    fn ledger_consumption_is_scoped_to_the_artifact_consuming_job() {
+        // Absent / blank / explicitly-off => not the consuming job.
+        assert!(!ledger_consumption_expected(None));
+        assert!(!ledger_consumption_expected(Some("")));
+        assert!(!ledger_consumption_expected(Some("   ")));
+        assert!(!ledger_consumption_expected(Some("0")));
+        assert!(!ledger_consumption_expected(Some("false")));
+        assert!(!ledger_consumption_expected(Some("FALSE")));
+        // The workflow's actual value, and any other non-empty value, arms it.
+        assert!(ledger_consumption_expected(Some("tests/reports")));
+        assert!(ledger_consumption_expected(Some("1")));
+    }
 
     #[test]
     fn extracts_needs_from_sample_yaml() {

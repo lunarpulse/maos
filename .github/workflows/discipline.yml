@@ -2056,6 +2056,11 @@ jobs:
           path: tests/reports/
           merge-multiple: true
       - name: Run check-ship-gate-completeness
+        # This is the ONLY job that downloads the ledger artifacts, so it is the
+        # only one that may demand them. Other jobs invoke this gate for its
+        # enrolment legs and report `ledger_consumed: false`.
+        env:
+          MAOS_LEDGER_ARTIFACTS: tests/reports
         run: cargo run -p xtask -- check-ship-gate-completeness --json
 
   # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit validation gate (discipline rail).
@@ -3025,6 +3030,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-fkcs-${{ hashFiles('**/Cargo.lock') }}
+      # `diff-oracle-derives` and `fault-inject-falsifiers` capture the REAL
+      # public API via `cargo public-api` (xtask/src/abi_diff.rs). Without these
+      # two steps the capture fails with "cargo-public-api not installed" and
+      # both legs go RED -- which is what happened once Story 13.6e closed this
+      # gate's blocking_now/dev_blocks divergence and the reds stopped being
+      # swallowed. Mirrors the abi-diff job exactly.
+      - name: Install nightly toolchain for cargo-public-api
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       - name: Run check-fkcs gate
         run: |
           set -o pipefail
