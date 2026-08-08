@@ -230,6 +230,15 @@ struct LegResult {
     green: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     held_advisory_reason: Option<&'static str>,
+    /// WHY this leg is RED, in the gate's own JSON.
+    ///
+    /// Added 2026-08-08 after CI run 31193312117: three legs went red in CI and
+    /// green locally, and the gate's output carried no reason at all — so the
+    /// failure could not be diagnosed from CI output, only guessed at. Several
+    /// legs were discarding a perfectly good `Err(String)` with `Err(_)`. A
+    /// control that cannot say why it fired is half a control.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
 }
 
 impl LegResult {
@@ -386,20 +395,33 @@ pub fn run(json: bool) -> Result<(), String> {
     // and exited 0 — the same one-identifier defect as D-2's two vacuity
     // mechanisms, on a hermetic gate. One identifier, closed here.
     if !blocking_reds.is_empty() && dev_blocks {
+        // Print WHY, not just WHICH. CI run 31193312117 reported three red legs
+        // with no reason attached, so the failure could only be guessed at from
+        // outside; the reasons existed and were being discarded.
         return Err(format!(
-            "{GATE_NAME}: BLOCKING — oracle RED: {}",
+            "{GATE_NAME}: BLOCKING — oracle RED: {}\n{}",
             blocking_reds
                 .iter()
                 .map(|leg| leg.label)
                 .collect::<Vec<_>>()
-                .join(", ")
+                .join(", "),
+            blocking_reds
+                .iter()
+                .map(|leg| format!(
+                    "  - {}: {}",
+                    leg.label,
+                    leg.detail.as_deref().unwrap_or("(no detail recorded)")
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
         ));
     }
     Ok(())
 }
 
 fn run_frozen_tag_consistency_leg() -> LegResult {
-    let green = frozen_tag_consistency().is_ok();
+    let outcome = frozen_tag_consistency();
+    let green = outcome.is_ok();
     LegResult {
         label: "frozen-tag-consistency",
         passed: u32::from(green),
@@ -408,6 +430,7 @@ fn run_frozen_tag_consistency_leg() -> LegResult {
         attempted: true,
         green,
         held_advisory_reason: None,
+        detail: outcome.err(),
     }
 }
 
@@ -416,7 +439,7 @@ fn run_diff_oracle_derives_leg() -> LegResult {
     // against itself. A frozen surface must derive kernel_unchanged=true, and
     // a forged (contradictory) self-report must be ignored, not trusted. No
     // hardcoded literals — `real_surface` spawns cargo-public-api.
-    let (green, ran) = match real_surface() {
+    let (green, ran, detail) = match real_surface() {
         Ok(surface) => {
             let positive = FkcsOracle::derive_positive(&surface);
             let forged = FkcsOracle::derive(
@@ -427,12 +450,22 @@ fn run_diff_oracle_derives_leg() -> LegResult {
                     abi_unchanged: false,
                 }),
             );
-            (
-                positive.kernel_unchanged && forged.kernel_unchanged && forged.ignored_self_report,
-                true,
-            )
+            let green =
+                positive.kernel_unchanged && forged.kernel_unchanged && forged.ignored_self_report;
+            let detail = (!green).then(|| {
+                format!(
+                    "oracle derivation disagreed: positive.kernel_unchanged={}, \
+                     forged.kernel_unchanged={}, forged.ignored_self_report={}",
+                    positive.kernel_unchanged, forged.kernel_unchanged, forged.ignored_self_report
+                )
+            });
+            (green, true, detail)
         }
-        Err(_) => (false, true),
+        Err(error) => (
+            false,
+            true,
+            Some(format!("surface capture failed: {error}")),
+        ),
     };
     LegResult {
         label: "diff-oracle-derives",
@@ -442,6 +475,7 @@ fn run_diff_oracle_derives_leg() -> LegResult {
         attempted: true,
         green,
         held_advisory_reason: None,
+        detail,
     }
 }
 
@@ -468,7 +502,7 @@ fn run_fault_inject_falsifiers_leg() -> LegResult {
     // mutations (line drift, ABI removal, host growth). The oracle MUST red
     // each one. Synthetic mutation around a real captured baseline — not a
     // hardcoded synthetic snapshot.
-    let (green, ran) = match real_surface() {
+    let (green, ran, detail) = match real_surface() {
         Ok(base) => {
             let kernel_fault = base.with_src_lines(base.src_lines + 1);
             let abi_fault = match base.abi_items.iter().next().cloned() {
@@ -479,9 +513,23 @@ fn run_fault_inject_falsifiers_leg() -> LegResult {
             let kernel_red = !FkcsOracle::derive(&base, &kernel_fault, None).kernel_unchanged;
             let abi_red = !FkcsOracle::derive(&base, &abi_fault, None).kernel_unchanged;
             let host_red = !FkcsOracle::derive(&base, &host_fault, None).kernel_unchanged;
-            (kernel_red && abi_red && host_red, true)
+            let green = kernel_red && abi_red && host_red;
+            // Name the falsifier that failed to fire — a falsifier that does not
+            // red on its own planted fault is the null control this leg exists
+            // to prevent, and "false" alone does not say which one.
+            let detail = (!green).then(|| {
+                format!(
+                    "falsifier(s) did not fire: kernel_drift_red={kernel_red}, \
+                     abi_removal_red={abi_red}, host_growth_red={host_red}"
+                )
+            });
+            (green, true, detail)
         }
-        Err(_) => (false, true),
+        Err(error) => (
+            false,
+            true,
+            Some(format!("surface capture failed: {error}")),
+        ),
     };
     LegResult {
         label: "fault-inject-falsifiers",
@@ -491,6 +539,7 @@ fn run_fault_inject_falsifiers_leg() -> LegResult {
         attempted: true,
         green,
         held_advisory_reason: None,
+        detail,
     }
 }
 
@@ -498,18 +547,31 @@ fn run_admission_path_unmodified_leg() -> LegResult {
     // Content semantics (literal AC3): the admission path is pinned by SHA-256
     // over the declared source files. Only the exact, recorded Story 13.4
     // baseline/current mismatch is held; every other failure blocks.
-    let (green, held_advisory_reason) = match FkcsBaseline::load_from_file(BASELINE_FILE) {
+    let (green, held_advisory_reason, detail) = match FkcsBaseline::load_from_file(BASELINE_FILE) {
         Ok(baseline) => match admission_path_observed_hash(&baseline) {
             Ok(computed) => {
                 let expected = baseline.admission_baseline.sha256.as_str();
+                let green = computed == expected;
+                let detail = (!green).then(|| {
+                    format!("admission-path SHA-256 mismatch: baseline pins {expected}, worktree computes {computed}")
+                });
                 (
-                    computed == expected,
+                    green,
                     known_admission_hold(expected, computed.as_str()),
+                    detail,
                 )
             }
-            Err(_) => (false, None),
+            Err(error) => (
+                false,
+                None,
+                Some(format!("cannot hash the admission path: {error}")),
+            ),
         },
-        Err(_) => (false, None),
+        Err(error) => (
+            false,
+            None,
+            Some(format!("cannot load {BASELINE_FILE}: {error}")),
+        ),
     };
     LegResult {
         label: "admission-path-unmodified",
@@ -519,6 +581,7 @@ fn run_admission_path_unmodified_leg() -> LegResult {
         attempted: true,
         green,
         held_advisory_reason,
+        detail,
     }
 }
 
@@ -526,6 +589,7 @@ fn run_release_graph_absence_leg() -> LegResult {
     let output = Command::new("cargo")
         .args(["tree", "-p", "maos-bin", "--edges", "normal"])
         .output();
+    let mut detail = None;
     let green = match output {
         Ok(out) if out.status.success() => {
             let tree = String::from_utf8_lossy(&out.stdout);
@@ -543,8 +607,26 @@ fn run_release_graph_absence_leg() -> LegResult {
                     .unwrap_or(false)
             })
         }
-        _ => false,
+        Ok(out) => {
+            detail = Some(format!(
+                "`cargo tree -p maos-bin` exited {}: {}",
+                out.status,
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
+            false
+        }
+        Err(error) => {
+            detail = Some(format!("cannot spawn `cargo tree`: {error}"));
+            false
+        }
     };
+    if !green && detail.is_none() {
+        detail = Some(
+            "dev-only fixture crate `maos-fkcs` is reachable from the `maos-bin` \
+             release dependency graph"
+                .to_string(),
+        );
+    }
     LegResult {
         label: "release-graph-absence",
         passed: u32::from(green),
@@ -553,13 +635,24 @@ fn run_release_graph_absence_leg() -> LegResult {
         attempted: true,
         green,
         held_advisory_reason: None,
+        detail,
     }
 }
 
 fn run_kernel_abi_leg() -> LegResult {
-    let green = crate::check_kernel_baseline::check()
+    let outcome = crate::check_kernel_baseline::check();
+    let green = outcome
+        .as_ref()
         .map(|report| report.passed)
         .unwrap_or(false);
+    let detail = match &outcome {
+        Ok(report) if !report.passed => Some(format!(
+            "kernel-core line count drifted: {} pins {}, live {}",
+            report.baseline_file, report.pinned_lines, report.actual_lines
+        )),
+        Ok(_) => None,
+        Err(error) => Some(format!("kernel baseline check failed: {error}")),
+    };
     LegResult {
         label: "kernel-abi-diff",
         passed: u32::from(green),
@@ -568,6 +661,7 @@ fn run_kernel_abi_leg() -> LegResult {
         attempted: true,
         green,
         held_advisory_reason: None,
+        detail,
     }
 }
 
@@ -586,7 +680,7 @@ fn cargo_test_leg(label: &'static str, pkg: &str, test_file: &str, filter: &str)
     ]);
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let output = cmd.output();
-    let (passed, failed, ran, green) = match output {
+    let (passed, failed, ran, green, detail) = match output {
         Ok(out) => {
             let combined = format!(
                 "{}{}",
@@ -597,14 +691,28 @@ fn cargo_test_leg(label: &'static str, pkg: &str, test_file: &str, filter: &str)
             let ran = combined
                 .lines()
                 .any(|line| line.trim().starts_with("test result:"));
-            (
-                passed,
-                failed,
-                ran,
-                out.status.success() && ran && passed >= 1 && failed == 0,
-            )
+            let green = out.status.success() && ran && passed >= 1 && failed == 0;
+            // On RED keep the tail of the real cargo transcript: the assertion
+            // that fired is the only thing that explains the leg. Bounded so a
+            // runaway build log cannot swamp the gate's JSON.
+            let detail = (!green).then(|| {
+                let tail: Vec<&str> = combined.lines().rev().take(20).collect();
+                let tail = tail.into_iter().rev().collect::<Vec<_>>().join("\n");
+                format!(
+                    "cargo test -p {pkg} --test {test_file} -- {filter} => \
+                     exit={:?}, ran={ran}, passed={passed}, failed={failed}\n{tail}",
+                    out.status.code()
+                )
+            });
+            (passed, failed, ran, green, detail)
         }
-        Err(_) => (0, 1, true, false),
+        Err(error) => (
+            0,
+            1,
+            true,
+            false,
+            Some(format!("cannot spawn cargo test for `{label}`: {error}")),
+        ),
     };
     LegResult {
         label,
@@ -614,6 +722,7 @@ fn cargo_test_leg(label: &'static str, pkg: &str, test_file: &str, filter: &str)
         attempted: true,
         green,
         held_advisory_reason: None,
+        detail,
     }
 }
 
