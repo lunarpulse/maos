@@ -1,7 +1,7 @@
 {
   "gate": "check-reza-production-path",
-  "commit": "5ca7ce5edfe2f57941fe6c666783ee627ee20a18",
-  "substrate_nonce": "check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+  "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+  "substrate_nonce": "check-reza-production-path.30b190.18cac653b7439bdf",
   "product_claim": "PROVEN",
   "operator_key_available": true,
   "operator_key_reason": "operator audit key loaded (MAOS_AUDIT_KEY precedence)",
@@ -17,7 +17,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/loom-scope-reaches-policy-table@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/loom-scope-reaches-policy-table@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "story_13_5d_loom_scope_reaches_policy_table"
       ],
@@ -32,7 +32,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/route-not-spirit-reachable@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/route-not-spirit-reachable@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "unit_tests::collective_route_is_fail_closed_until_wired_then_reaches_port"
       ],
@@ -47,7 +47,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/production-collective-single-source@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/production-collective-single-source@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "production_collective_calls_share_one_atomic_pid_binding"
       ],
@@ -62,7 +62,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/composition-root-does-not-seed-manifest-scopes@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/composition-root-does-not-seed-manifest-scopes@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "composition_root_does_not_seed_manifest_scopes"
       ],
@@ -77,7 +77,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/mediated-operation-correlation@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/mediated-operation-correlation@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "story_13_5d_request_route_row_audit_correlation"
       ],
@@ -92,7 +92,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-physical-team-paths@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-physical-team-paths@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::team_transparency_log_paths_are_physically_distinct"
       ],
@@ -107,7 +107,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-backup-restore-boundary@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-backup-restore-boundary@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "backup::tests::tenant_backup_round_trip_rejects_wrong_team"
       ],
@@ -122,7 +122,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-two-log-correlation@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-two-log-correlation@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs"
       ],
@@ -137,7 +137,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-correlation-producer-wired@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-correlation-producer-wired@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "audit::tests::digest_cross_team_action_correlates_via_request_id"
       ],
@@ -152,7 +152,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-cross-wall-historical-recall@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-cross-wall-historical-recall@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes"
       ],
@@ -167,7 +167,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-adversarial-paths@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-adversarial-paths@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tenant_transparency_log_adversarial_paths_fail_closed"
       ],
@@ -182,7 +182,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-integrity-residual@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-integrity-residual@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tenant_audit_tamper_residual_is_not_misreported_as_integrity"
       ],
@@ -197,7 +197,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-ranged-recall-spirit-filter@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-ranged-recall-spirit-filter@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "log_composition::tests::spirit_filter_scopes_transparency_log_across_boots"
       ],
@@ -212,7 +212,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-identity-writer-no-shard-mint@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-identity-writer-no-shard-mint@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "enterprise_identity::available_arm_tests::identity_asserted_does_not_mint_an_unvalidated_audit_shard"
       ],
@@ -227,7 +227,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-run-capture-writer-fails-closed@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-run-capture-writer-fails-closed@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl"
       ],
@@ -242,7 +242,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tenant-audit-restore-refuses-cross-team@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tenant-audit-restore-refuses-cross-team@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "backup::tests::validate_restore_target_team_refuses_cross_team_planting"
       ],
@@ -257,7 +257,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-tenant-binding-round-trip@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-round-trip@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_tenant_binding_round_trip"
       ],
@@ -272,7 +272,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-tenant-binding-read-only-missing-none@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-read-only-missing-none@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_tenant_binding_read_is_read_only_and_missing_reads_none"
       ],
@@ -287,7 +287,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-bound-match-proceeds@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-bound-match-proceeds@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_bound_match_proceeds"
       ],
@@ -302,7 +302,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-bound-foreign-refuses@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-bound-foreign-refuses@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_bound_foreign_refuses"
       ],
@@ -317,7 +317,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-corrupt-binding-refuses@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-corrupt-binding-refuses@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_corrupt_binding_refuses"
       ],
@@ -332,7 +332,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-fresh-needs-write@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-fresh-needs-write@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_fresh_artifact_needs_write"
       ],
@@ -347,7 +347,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-legacy-sidecar-migrates@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-legacy-sidecar-migrates@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_legacy_sidecar_migrates"
       ],
@@ -362,7 +362,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-foreign-history-refuses@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-foreign-history-refuses@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_foreign_history_without_sidecar_refuses"
       ],
@@ -377,7 +377,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-none-records@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-none-records@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_b_datname_none_records"
       ],
@@ -392,7 +392,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-match-proceeds@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-match-proceeds@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_b_datname_match_proceeds"
       ],
@@ -407,7 +407,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-drift-refuses@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-drift-refuses@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_b_datname_drift_refuses"
       ],
@@ -422,7 +422,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-refuses-foreign-shard-before-append@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-refuses-foreign-shard-before-append@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "phase_a_refuses_foreign_shard_with_history_before_append"
       ],
@@ -437,7 +437,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-refuses-artifact-bound-to-foreign-team@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-refuses-artifact-bound-to-foreign-team@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "phase_a_refuses_artifact_bound_to_foreign_team"
       ],
@@ -452,7 +452,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-legacy-sidecar-migrates-wiring@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-legacy-sidecar-migrates-wiring@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "phase_a_legacy_artifact_with_matching_sidecar_migrates"
       ],
@@ -467,7 +467,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-needs-write-then-proceeds-wiring@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-needs-write-then-proceeds-wiring@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "phase_a_needs_write_then_proceeds_after_binding_written"
       ],
@@ -482,21 +482,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-reza-production-path/tl-phase-b-persisted-datname-vs-live-current-database@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-b-persisted-datname-vs-live-current-database@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "phase_b_persisted_datname_vs_live_current_database"
       ],
       "signature_block": [
         {
-          "commit": "5ca7ce5edfe2f57941fe6c666783ee627ee20a18",
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
           "gate": "check-reza-production-path",
-          "nonce": "check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+          "nonce": "check-reza-production-path.30b190.18cac653b7439bdf",
           "test": "phase_b_persisted_datname_vs_live_current_database",
           "outcome": "PASSED",
-          "signature": "fed9cc6b4152c45d87bd9de731235ee28ff3beca689b95d5893750440fbaac6bfd870a701b890cc14d315b9d19c3cc458e370b490ca3acec54d1ee5c0122e50d"
+          "signature": "787dafa31323f726502516d8d768460b78e0518be67089c39d8ed99ec9018db2350dbba502963a166a34502fd121d8fddb4c36decb47cdf023f9681a5cbb0908"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [phase_b_persisted_datname_vs_live_current_database] signed PASSED outcomes; verified against the operator-pinned key and bound to 5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6"
+      "detail": "running 1 test; 1 passed; harness tests [phase_b_persisted_datname_vs_live_current_database] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf"
     },
     {
       "name": "tl-phase-a-verdict-whitespace-binding-refuses",
@@ -506,7 +506,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-whitespace-binding-refuses@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-whitespace-binding-refuses@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_phase_a_verdict_whitespace_binding_refuses"
       ],
@@ -521,7 +521,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-tenant-binding-read-fails-closed@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-read-fails-closed@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_tenant_binding_read_fails_closed_on_unreadable_artifact"
       ],
@@ -536,7 +536,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-tenant-binding-write-refuses-foreign-overwrite@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-write-refuses-foreign-overwrite@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_tenant_binding_write_refuses_foreign_binding_overwrite"
       ],
@@ -551,7 +551,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-tenant-binding-refuses-symlinked-artifact@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-refuses-symlinked-artifact@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tests::tl_tenant_binding_refuses_symlinked_artifact"
       ],
@@ -566,7 +566,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-boot-refuses-foreign-shard-before-open@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-boot-refuses-foreign-shard-before-open@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "boot_refuses_foreign_shard_before_opening_the_transparency_log"
       ],
@@ -581,7 +581,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/tl-boot-writes-binding-after-open@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/tl-boot-writes-binding-after-open@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "boot_writes_binding_after_open_for_a_legacy_shard"
       ],
@@ -596,7 +596,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-backend-partition@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-backend-partition@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "multi_backend_erasure_partition_invariant"
       ],
@@ -611,7 +611,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-kernel-forget-outcome-corpus@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-kernel-forget-outcome-corpus@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "gdpr_cascade_v0_corpus_replay"
       ],
@@ -626,7 +626,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-erased@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-erased@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "erased_uninstall_is_success_with_machine_receipt"
       ],
@@ -641,7 +641,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-held@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-held@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "held_uninstall_is_non_success_and_writes_no_complete_proof"
       ],
@@ -656,7 +656,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-not-found@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-not-found@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "not_found_uninstall_has_distinct_terminal_code"
       ],
@@ -671,7 +671,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-failed@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-failed@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "proof_write_failure_has_failed_terminal_code"
       ],
@@ -686,7 +686,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-regional-shared-verified-empty@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-regional-shared-verified-empty@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "regional_uninstall_attests_shared_tier_verified_empty"
       ],
@@ -701,7 +701,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-shared-pre-partition-residue-fail-closed@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-shared-pre-partition-residue-fail-closed@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "regional_uninstall_refuses_to_attest_pre_partition_shared_residue"
       ],
@@ -716,7 +716,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-mixed-held-partial-proof@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-mixed-held-partial-proof@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "mixed_held_uninstall_writes_partial_proof"
       ],
@@ -731,7 +731,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-filesystem-erasure-subprocess@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-filesystem-erasure-subprocess@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "private_tier_markdown_is_erased_by_the_forget_cascade"
       ],
@@ -746,7 +746,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-restart-markdown-erasure@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-restart-markdown-erasure@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "restart_forget_erases_markdown_content"
       ],
@@ -761,7 +761,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-restart-spill-erasure@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-restart-spill-erasure@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "restart_forget_erases_non_markdown_spill_content"
       ],
@@ -776,7 +776,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-proof-count@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-proof-count@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "restart_forget_reports_distinct_persisted_entry_count"
       ],
@@ -791,7 +791,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-exact-once-count@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-exact-once-count@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_counts_cached_and_spilled_value_exactly_once"
       ],
@@ -806,7 +806,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-bystander-retention@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-bystander-retention@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_preserves_bystander_and_default_namespace_content"
       ],
@@ -821,7 +821,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-symlink-containment@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-symlink-containment@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_does_not_follow_pid_directory_symlink"
       ],
@@ -836,7 +836,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-fail-closed-io@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-fail-closed-io@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_fails_closed_when_pid_directory_is_unreadable"
       ],
@@ -851,7 +851,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-inline-only-count@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-inline-only-count@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_counts_inline_only_entries_that_never_spill"
       ],
@@ -866,7 +866,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-namespace-symlink-containment@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-namespace-symlink-containment@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_does_not_follow_namespace_directory_symlink"
       ],
@@ -881,7 +881,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-private-logical-key-identity@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-private-logical-key-identity@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_counts_logical_keys_not_filesystem_nodes"
       ],
@@ -896,7 +896,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-spill-supersession-kind-change@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-spill-supersession-kind-change@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "write_unlinks_the_superseded_spill_when_the_kind_changes"
       ],
@@ -911,7 +911,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-spill-supersession-shrink@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-spill-supersession-shrink@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "write_unlinks_the_spill_when_the_value_shrinks_below_the_threshold"
       ],
@@ -926,7 +926,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-scan-logical-key-merge@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-scan-logical-key-merge@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "scan_returns_one_entry_for_a_key_held_in_cache_and_on_disk"
       ],
@@ -941,7 +941,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-scan-read-cardinality@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-scan-read-cardinality@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "a_read_does_not_change_scan_cardinality"
       ],
@@ -956,7 +956,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-scan-empty-key-recovery@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-scan-empty-key-recovery@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "scan_recovers_the_empty_key_from_its_spill_name"
       ],
@@ -971,7 +971,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-scan-junk-node-skip@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-scan-junk-node-skip@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "scan_skips_a_directory_that_looks_like_a_spill"
       ],
@@ -986,7 +986,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-scan-namespace-symlink-containment@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-scan-namespace-symlink-containment@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "scan_does_not_follow_a_namespace_directory_symlink"
       ],
@@ -1001,7 +1001,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-read-spill-symlink-containment@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-read-spill-symlink-containment@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "read_does_not_follow_a_spill_symlink"
       ],
@@ -1016,7 +1016,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-forget-legacy-residue-count@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-forget-legacy-residue-count@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "forget_counts_a_pre_existing_superseded_spill_once"
       ],
@@ -1031,7 +1031,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/private-signed-frame-digest-dedup@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/private-signed-frame-digest-dedup@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "digest_refs_are_not_duplicated_by_a_spilled_working_memory_entry"
       ],
@@ -1046,7 +1046,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-maosctl-forwards-terminal-exit-codes@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-maosctl-forwards-terminal-exit-codes@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "uninstall_forwards_erased_held_not_found_and_failed_codes"
       ],
@@ -1061,7 +1061,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-legal-hold-fail-closed@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-legal-hold-fail-closed@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "independently_opened_team_shard_cannot_answer_hold_absent"
       ],
@@ -1076,7 +1076,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-operator-erase-zero-spirit-reach@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-operator-erase-zero-spirit-reach@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "collective_erase_has_one_operator_route_and_zero_spirit_reach"
       ],
@@ -1091,7 +1091,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-reza-production-path/gdpr-one-sided-erase-reconciliation@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-one-sided-erase-reconciliation@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "story_13_5b_one_sided_collective_erase_is_red"
       ],
@@ -1106,21 +1106,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-reza-production-path/gdpr-collective-partition-live@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-collective-partition-live@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "collective_principal_partition_refuses_write_and_replication_apply"
       ],
       "signature_block": [
         {
-          "commit": "5ca7ce5edfe2f57941fe6c666783ee627ee20a18",
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
           "gate": "check-reza-production-path",
-          "nonce": "check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+          "nonce": "check-reza-production-path.30b190.18cac653b7439bdf",
           "test": "collective_principal_partition_refuses_write_and_replication_apply",
           "outcome": "PASSED",
-          "signature": "3df0c16b27318b62bfa81324b1e10b5c8508102bdc40778652b0050ef2c3bddfa1639a6a73cecf0856a1bb7d2af31b56ecd8b575b4e12703ca6faceb1df3160c"
+          "signature": "ac4e3ae86f4f4460ebd36f6795e2f292cd0a72d62c1e270e4b43e1acb2b5ace0f74a67617ef1fd771183843569278e23ab154e347f519a0aa465e42d401c7005"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [collective_principal_partition_refuses_write_and_replication_apply] signed PASSED outcomes; verified against the operator-pinned key and bound to 5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6"
+      "detail": "running 1 test; 1 passed; harness tests [collective_principal_partition_refuses_write_and_replication_apply] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf"
     },
     {
       "name": "gdpr-collective-erase-live",
@@ -1130,21 +1130,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-reza-production-path/gdpr-collective-erase-live@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/gdpr-collective-erase-live@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "collective_erase_moves_merkle_triple_and_blocks_stale_replication"
       ],
       "signature_block": [
         {
-          "commit": "5ca7ce5edfe2f57941fe6c666783ee627ee20a18",
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
           "gate": "check-reza-production-path",
-          "nonce": "check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+          "nonce": "check-reza-production-path.30b190.18cac653b7439bdf",
           "test": "collective_erase_moves_merkle_triple_and_blocks_stale_replication",
           "outcome": "PASSED",
-          "signature": "d17d05938126cb6bc63b494c0e62e4d0cc4c70a8ab274b8fa9bff091fbc668b9d9917ee569ed55ee05f91eda3772c08ac7eba4b5b7306ef41c42fc618cff6a0a"
+          "signature": "84d6f196cdb377188def82a91c37880e0c30ccd2f9342a6c8a238abf2f020fcc0aa7576c7de47e48aa0beac68fdfe1889302e7ea988d882599592226a2d28d0d"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [collective_erase_moves_merkle_triple_and_blocks_stale_replication] signed PASSED outcomes; verified against the operator-pinned key and bound to 5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6"
+      "detail": "running 1 test; 1 passed; harness tests [collective_erase_moves_merkle_triple_and_blocks_stale_replication] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf"
     },
     {
       "name": "spirit-route-and-tenant-audit-stage2-refusal-live",
@@ -1154,21 +1154,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-reza-production-path/spirit-route-and-tenant-audit-stage2-refusal-live@5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+      "artifact_ref": "check-reza-production-path/spirit-route-and-tenant-audit-stage2-refusal-live@ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf",
       "evidence_tests": [
         "tenant_mode_boots_on_live_substrate"
       ],
       "signature_block": [
         {
-          "commit": "5ca7ce5edfe2f57941fe6c666783ee627ee20a18",
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
           "gate": "check-reza-production-path",
-          "nonce": "check-reza-production-path.2ef75b.18cac3b6b1ff78e6",
+          "nonce": "check-reza-production-path.30b190.18cac653b7439bdf",
           "test": "tenant_mode_boots_on_live_substrate",
           "outcome": "PASSED",
-          "signature": "59c7827eb59fc676e487e49c23eacea0f522a027771d35567503957e967edc6b2cd24a008cb3c5d5e753a2f0ac5c4a78ed69ddcb419043e048784c3587e06507"
+          "signature": "856909701eaa1dd1f1f292d85f68a46bc80f5ca6b3a9b40cbd0fe108f6098ab5b71d6bc636d5017c85bc8da290d1244a48e49d0adc252ea06f62dd24fd3b3b02"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [tenant_mode_boots_on_live_substrate] signed PASSED outcomes; verified against the operator-pinned key and bound to 5ca7ce5edfe2f57941fe6c666783ee627ee20a18#check-reza-production-path.2ef75b.18cac3b6b1ff78e6"
+      "detail": "running 1 test; 1 passed; harness tests [tenant_mode_boots_on_live_substrate] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-reza-production-path.30b190.18cac653b7439bdf"
     },
     {
       "name": "audit-escape-anomaly-detector-wiring",

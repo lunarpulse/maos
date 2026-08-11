@@ -5,8 +5,10 @@
 **PROVEN — operator-lane, clean-commit, four-gate ledger set.**
 
 This file is the current evidence index. Current artifacts, all binding commit
-`5ca7ce5e` (clean worktree, no `+worktree:` digest):
+`ea9939d3` (clean worktree, no `+worktree:` digest), re-signed on the 2026-08-11
+operator lane by the `demo-reza` one-command scene run:
 
+- [`demo-reza-capture-2026-08-11.txt`](demo-reza-capture-2026-08-11.txt) — the verbatim operator-lane capture of `cargo run -p xtask -- demo-reza --provision`: substrate bring-up, the narrated six-process journey, the four gate verdicts (all exit 0), and the claim table. Workstation paths masked; content otherwise raw.
 - [`evidence-ledger-check-cross-region-consensus.json`](evidence-ledger-check-cross-region-consensus.json) — `product_claim: PROVEN`; all 4 live legs `PROVEN_LIVE_SIGNED`.
 - [`evidence-ledger-check-multi-region-slo.json`](evidence-ledger-check-multi-region-slo.json) — `product_claim: PROVEN`.
 - [`evidence-ledger-check-multi-tenant-loom.json`](evidence-ledger-check-multi-tenant-loom.json) — `product_claim: PROVEN`; the required `reza-three-team-three-region-journey` leg is `PROVEN_LIVE_SIGNED`: all six processes (3 daemons, `maos run`, `collective-erase`, `traceback`) executed through their production entries; the collective erase reconciled BOTH the destination crossed copy and the source origin row through the manifest-authorized `collective:erase` control; the traceback CLI reached the shipped `CrossWallLogReadAdapter` and returned the exact six-field minimum-disclosure DTO. The `cortex-fourteen-institution-isolation` leg is `PROVEN_LIVE_SIGNED`: fourteen independent institution authorities, signed manifests, physical datnames, typed cross-institution consent refusal, cross-authority clone rejection, and removal independence.
