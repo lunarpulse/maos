@@ -33,6 +33,9 @@ const ESCAPE_WIRING_SOURCE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../crates/maos-bin/src/main.rs"
 );
+/// Repo-relative rendering of `ESCAPE_WIRING_SOURCE` for operator-facing detail strings:
+/// published evidence must never embed a workstation path.
+const ESCAPE_WIRING_SOURCE_DISPLAY: &str = "crates/maos-bin/src/main.rs";
 // ⚠ The three-team Reza journey successor is NOT registered here. This gate's
 // CI job provisions exactly two team databases (`maos_team_a`, `maos_team_b`)
 // and grows no third (D-7: never provision a database with no reader), so a
@@ -83,7 +86,7 @@ fn escape_wiring_successor(verifier: &EvidenceVerifier) -> EvidenceLeg {
         ],
     };
     let present = std::fs::read_to_string(ESCAPE_WIRING_SOURCE)
-        .map_err(|error| format!("cannot inspect `{ESCAPE_WIRING_SOURCE}`: {error}"))
+        .map_err(|error| format!("cannot inspect `{ESCAPE_WIRING_SOURCE_DISPLAY}`: {error}"))
         .and_then(|source| source_calls_function(&source, "report_escape_anomalies"));
     match present {
         Ok(true) => run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier),
@@ -91,7 +94,7 @@ fn escape_wiring_successor(verifier: &EvidenceVerifier) -> EvidenceLeg {
             ESCAPE_WIRING_LEG,
             format!(
                 "11.4b audit escape-anomaly detector consumer is not called from \
-                 the production composition root ({ESCAPE_WIRING_SOURCE})"
+                 the production composition root ({ESCAPE_WIRING_SOURCE_DISPLAY})"
             ),
             verifier,
             GATE_NAME,

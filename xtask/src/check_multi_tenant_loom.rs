@@ -51,6 +51,9 @@ const KERNEL_COLLECTIVE_CAUSE_SOURCE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../crates/maos-kernel-core/src/memory/mod.rs"
 );
+/// Repo-relative rendering of `KERNEL_COLLECTIVE_CAUSE_SOURCE` for operator-facing detail strings:
+/// published evidence must never embed a workstation path.
+const KERNEL_COLLECTIVE_CAUSE_SOURCE_DISPLAY: &str = "crates/maos-kernel-core/src/memory/mod.rs";
 
 const KERNEL_COLLECTIVE_CAUSE_COLLAPSE: &str =
     "CollectivePortError::Transport(_) => CollectiveErrorKind::Transport";
@@ -105,7 +108,7 @@ fn transport_cause_mapping_counts(source: &str) -> (usize, usize) {
 
 fn kernel_distinguishes_collective_causes() -> Result<bool, String> {
     let source = std::fs::read_to_string(KERNEL_COLLECTIVE_CAUSE_SOURCE).map_err(|error| {
-        format!("cannot read kernel collective-cause source `{KERNEL_COLLECTIVE_CAUSE_SOURCE}`: {error}")
+        format!("cannot read kernel collective-cause source `{KERNEL_COLLECTIVE_CAUSE_SOURCE_DISPLAY}`: {error}")
     })?;
     let (causes, outputs) = transport_cause_mapping_counts(&source);
     Ok(causes >= 2 && outputs >= 2)
@@ -241,7 +244,7 @@ fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
                 green: false,
                 detail: format!(
                     "the kernel collapses ALL EIGHT `TransportCause` variants into the single \
-                     `{KERNEL_COLLECTIVE_CAUSE_COLLAPSE}` ({KERNEL_COLLECTIVE_CAUSE_SOURCE}) — \
+                     `{KERNEL_COLLECTIVE_CAUSE_COLLAPSE}` ({KERNEL_COLLECTIVE_CAUSE_SOURCE_DISPLAY}) — \
                      8 → 1, not 8 → 5. On the Spirit path six of those eight are reachable and \
                      all arrive as the one word `Transport`: MapStale, ConnectionMismatch, \
                      UnmappedSpirit, AttestationInvalid, PartitionRefused, \
