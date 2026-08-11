@@ -5,7 +5,7 @@
 **PROVEN — operator-lane, clean-commit, four-gate ledger set.**
 
 This file is the current evidence index. Current artifacts, all binding commit
-`fd1ce75c` (clean worktree, no `+worktree:` digest):
+`9160eecb` (clean worktree, no `+worktree:` digest):
 
 - [`evidence-ledger-check-cross-region-consensus.json`](evidence-ledger-check-cross-region-consensus.json) — `product_claim: PROVEN`; all 4 live legs `PROVEN_LIVE_SIGNED`.
 - [`evidence-ledger-check-multi-region-slo.json`](evidence-ledger-check-multi-region-slo.json) — `product_claim: PROVEN`.
@@ -60,7 +60,7 @@ the operator audit key, and contain no workstation or key paths.
 
 ## Current verification
 
-- All four substrate gates: `product_claim: PROVEN` @ `fd1ce75c`, exit 0, every required leg proven.
+- All four substrate gates: `product_claim: PROVEN` @ `9160eecb`, exit 0, every required leg proven.
 - `cargo run -q -p xtask -- check-ship-gate-completeness` — PASS; published ledgers consumed without problems.
 - `cargo run -q -p xtask -- check-loom-substrate-drift` — PASS.
 - `cargo run -q -p xtask -- check-dev-record-completeness --json` — owner sweep gate.
