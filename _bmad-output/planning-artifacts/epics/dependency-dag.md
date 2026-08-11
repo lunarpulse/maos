@@ -103,7 +103,7 @@ flowchart TD
     S132["13.2 cryptographic tenant boundary<br/>DONE but INERT"]
     S133["13.3 governed cross-team row<br/>READY-FOR-DEV"]
     S133B["13.3b provenance crosses the wall<br/>ADR-058 ports and amends ADR-013<br/>BLOCKED at preflight"]
-    S134["13.4 FR37 vetting machinery<br/>backlog, fully independent"]
+    S134["13.4 FR37 vetting machinery<br/>DONE, fully independent"]
     S135A["13.5a Enterprise reference Spirit<br/>backlog"]
     S135B["13.5b collective erasure and legal hold<br/>backlog, FLAG-Winston kernel arm"]
     S135C["13.5c single composition root<br/>THE UNBLOCKER: tenant mode boots<br/>READY-FOR-DEV, ZERO kernel delta"]
@@ -159,3 +159,44 @@ flowchart TD
 6. **MERGE-ORDER CONSTRAINT (not a dependency, but it bites the same way).** **Three** stories now rewrite the same 4-element array `ABSENT_SUCCESSORS` in `xtask/src/check_multi_tenant_loom.rs`: 13.5c (mandated by its closed preflight), 13.3b, and 13.5e. **Whichever lands second must rebase, not merge.** ⚠ Citation correction: 13.5c's story file cites the array at `:21`; it is at **`:22`** — 13.5e's citation is the correct one.
 
 **Also corrected on the diagram:** node labels now carry real preflight verdicts (13.3b **BLOCKED**, 13.5d **NEEDS-REWORK**, 13.5c/13.5e **READY-FOR-DEV**) instead of the uniform `drafted` they were generated with.
+
+## Epic 14 — v2.2 Hardening + Closers — cross-epic DAG
+
+```mermaid
+flowchart TD
+    S141["14.1 100-host churn scale envelope<br/>backlog — draft-ready-for-preflight"]
+    S142["14.2 10-host mTLS rotation chaos<br/>backlog — draft-ready-for-preflight"]
+    S143["14.3 ecosystem-readiness + v2.5 ledger<br/>backlog — draft-ready-for-preflight"]
+    S144["14.4 operational-surface sweep<br/>backlog — draft-ready-for-preflight"]
+    S145["14.5 backend + multi-provider sweep<br/>backlog — draft-ready-for-preflight"]
+    S146["14.6 ADR-057 ceiling instrument<br/>backlog — draft-ready-for-preflight"]
+    S147["14.7 shared env-contract registry<br/>backlog — draft-ready-for-preflight"]
+    S148["14.8 workspace env classification<br/>backlog — draft-ready-for-preflight"]
+    S149["14.9 secret-var governance<br/>backlog — draft-ready-for-preflight"]
+
+    S113["11.3"]
+    S104B["10.4b"]
+    S105["10.5"]
+    S115["11.5"]
+    S117["11.7"]
+    S134["13.4"]
+    S114C["11.4c<br/>ADR-005"]
+    A155["§15.5 successor instrument"]
+    S126["12.6"]
+
+    S141 --> S113
+    S142 --> S104B
+    S142 --> S105
+    S143 --> S115
+    S143 --> S117
+    S143 --> S134
+    S144 --> S117
+    S145 --> S114C
+    S146 --> A155
+    S147 --> S126
+    S148 --> S126
+    S149 --> S126
+
+    classDef backlog fill:#37474f,stroke:#90a4ae,stroke-width:2px,color:#ffffff
+    class S141,S142,S143,S144,S145,S146,S147,S148,S149 backlog
+```

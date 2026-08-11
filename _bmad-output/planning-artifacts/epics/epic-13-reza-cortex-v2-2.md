@@ -1,8 +1,6 @@
 # Epic 13 — Reza Single-Org Cross-Team Cortex (v2.2)
 
-**Status:** `in-progress — rescoped 2026-07-18 to ELEVEN stories` (was eight). 13.1 and 13.2 are **done**; 13.3 is **ready-for-dev**. Two evidence-driven rescopes landed the same day, both recorded in `sprint-change-proposal-2026-07-18.md`:
-- **H1 split** — 13.3's provenance half (flattened I11 chain, cross-wall `log.recall`) has **no ratified §15 home**, cites **two ADRs that do not exist** (`ADR-013`, `ADR-018`), and requires **reversing Story 8.10's citer-auth control**. Split to **13.3b**. 13.3's headline was also reframed on evidence: *"the row is production-real; the crossing is not."*
-- **13.5c scoping pass** — the old 13.5c owned **seven** concerns and was the only story with no ZERO-Δ claim; three consecutive mechanism stories had deferred every production wiring into it. Split to **13.5c / 13.5d / 13.5e**, with the consented-`log.recall` half handed to 13.3b and **NFR-Ops-11 explicitly served on the team axis only, not closed**.
+**Status:** `done — closed 2026-08-11`. `sprint-status.yaml` is authoritative: all 21 Epic 13 stories (13.1–13.6) are **done**; closure `9160eecb`, evidence bound to `5ca7ce5e`, HEAD `ea9939d3`.
 
 **The critical-path change:** **13.5c is now the unblocker.** Until it lands, `MAOS_LOOM_HOME_TEAM` is a hard boot failure — so 13.1's physical wall and 13.2's cryptographic wall are **inert in every bootable configuration**.
 
