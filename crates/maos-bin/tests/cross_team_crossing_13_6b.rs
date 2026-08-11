@@ -23,8 +23,8 @@ use maos_a2a_core::{
     CrossingRefusal, PeerCertFingerprint, PeerId,
 };
 use maos_bin::cross_team_crossing::{
-    crossing_frame, erase_frame, reconcile_home_team_with_manifest, CrossTeamCrossingAdapter,
-    CrossTeamCrossingControl, CrossTeamShareRequest,
+    crossing_frame, erase_frame_with_binding, reconcile_home_team_with_manifest,
+    CrossTeamCrossingAdapter, CrossTeamCrossingControl, CrossTeamShareRequest,
 };
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
@@ -901,7 +901,7 @@ fn crossing_control_round_trips_through_the_telemetry_idiom() {
     let decoded = CrossTeamCrossingControl::from_frame(&frame)
         .expect("a crossing frame is recognised")
         .expect("and decodes");
-    let CrossTeamCrossingControl::Share { to_team, bundle } = decoded else {
+    let CrossTeamCrossingControl::Share { to_team, bundle, .. } = decoded else {
         panic!("a share frame must decode as CrossTeamCrossingControl::Share");
     };
     assert_eq!(to_team, "team-c");
@@ -918,7 +918,7 @@ fn erase_control_carries_only_the_reconciliation_locator() {
         role: None,
     };
     let peer = HostId("host-a".to_string());
-    let frame = erase_frame(
+    let frame = erase_frame_with_binding(
         &from,
         &peer,
         1,
@@ -926,6 +926,14 @@ fn erase_control_carries_only_the_reconciliation_locator() {
         7,
         &maos_domain::memory::MemoryNamespace::Default,
         "crossed-key".to_string(),
+        "0123456789abcdef0123456789abcdef".to_string(),
+        maos_bin::cross_team_crossing::erase_locator_digest(
+            "team-a",
+            "team-b",
+            7,
+            "default",
+            "crossed-key",
+        ),
     )
     .expect("erase control encodes");
     assert_eq!(
@@ -952,6 +960,7 @@ fn erase_control_carries_only_the_reconciliation_locator() {
             spirit_pid: 7,
             namespace,
             key,
+            ..
         } if to_team == "team-a" && namespace == "default" && key == "crossed-key"
     ));
 }
@@ -996,7 +1005,7 @@ async fn erase_control_without_share_provenance_is_refused_before_store_access()
         SpiritId::from("spirit-a"),
         Arc::new(maos_iac::TransparencyLogAdapter::open_in_memory(13_600)),
     );
-    let frame = erase_frame(
+    let frame = erase_frame_with_binding(
         &FrameAddress {
             spirit_id: SpiritId::from("spirit-b"),
             host_id: Some(HostId("host-b".to_string())),
@@ -1008,6 +1017,14 @@ async fn erase_control_without_share_provenance_is_refused_before_store_access()
         7,
         &maos_domain::memory::MemoryNamespace::Default,
         "never-shared".to_string(),
+        "0123456789abcdef0123456789abcdef".to_string(),
+        maos_bin::cross_team_crossing::erase_locator_digest(
+            "team-a",
+            "team-b",
+            7,
+            "default",
+            "never-shared",
+        ),
     )
     .expect("erase control encodes");
     match adapter.apply_crossing("team-b", &frame).await {
@@ -2202,7 +2219,10 @@ fn crossed_row_matches(
 ) -> bool {
     row.spirit_pid == pid
         && row.namespace_kind == "default"
-        && row.namespace_detail == format!("xteam:{source_team}:")
+        && row
+            .namespace_detail
+            .starts_with(&format!("xteam:{source_team}:"))
+        && row.namespace_detail.contains(":xmeta:")
         && row.key == key
         && row.value_kind == "text"
         && row.value_data == value.as_bytes()
@@ -2591,7 +2611,7 @@ async fn reza_three_team_three_region_production_journey() {
     assert!(erase.status.success(), "{}", String::from_utf8_lossy(&erase.stderr));
     let erase_json: serde_json::Value =
         serde_json::from_slice(&erase.stdout).expect("collective erase JSON");
-    assert_eq!(erase_json["reconciliation"]["outcomes"][0]["status"], "erase_reconciled");
+    assert_eq!(erase_json["reconciliation"]["status"], "erase_reconciled");
     let destination_present = all_rows(&raw_b).await.iter().any(|row| row.key == key_ab);
     let source_present = all_rows(&raw_a).await.iter().any(|row| row.key == key_ab);
     assert!(erase_reconciliation_problem(source_present, destination_present).is_none());

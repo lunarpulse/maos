@@ -81,35 +81,89 @@ pub(crate) struct RowAttestation<'a> {
 }
 
 fn cross_team_namespace_detail(source_team: &TeamId, original_detail: &str) -> String {
-    format!(
+    cross_team_namespace_detail_with_metadata(source_team, original_detail, None, None, None)
+}
+
+fn cross_team_namespace_detail_with_metadata(
+    source_team: &TeamId,
+    original_detail: &str,
+    emitter_host: Option<&str>,
+    op_id: Option<&str>,
+    generation: Option<(i64, &str)>,
+) -> String {
+    let base = format!(
         "xteam:{}:{}",
         source_team.as_str(),
         hex::encode(original_detail.as_bytes())
-    )
+    );
+    match (emitter_host, op_id, generation) {
+        (Some(host), Some(op_id), Some((source_ts, source_region))) => format!(
+            "{base}:xmeta:{}:{op_id}:{source_ts}:{}",
+            hex::encode(host.as_bytes()),
+            hex::encode(source_region.as_bytes())
+        ),
+        _ => base,
+    }
 }
 
+/// Decode the logical namespace detail from both the original marker grammar
+/// and its additive `:xmeta:` extension.
 pub(crate) fn original_cross_team_namespace_detail(
     source_team: &TeamId,
     stored_detail: &str,
 ) -> Option<String> {
     let prefix = format!("xteam:{}:", source_team.as_str());
-    let encoded = stored_detail.strip_prefix(&prefix)?;
+    let encoded = stored_detail.strip_prefix(&prefix)?.split(':').next()?;
     let bytes = hex::decode(encoded).ok()?;
     String::from_utf8(bytes).ok()
 }
 
-/// Parse the `xteam:<team>:<hex(detail)>` marker written by
-/// [`cross_team_namespace_detail`], returning the claimed team and the
-/// original detail only when the shape is well-formed. The `xteam:` prefix is
-/// effectively reserved: a well-formed marker with a NULL `source_team` is a
-/// consistency violation (13.3 review) and the read path refuses it.
+/// The one-share identity and source generation pinned into a crossed row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrossedRowOrigin {
+    pub source_team: TeamId,
+    pub emitter_host: String,
+    pub op_id: String,
+    pub source_ts: i64,
+    pub source_region: String,
+}
+
 fn parse_cross_team_marker(stored_detail: &str) -> Option<(TeamId, String)> {
     let rest = stored_detail.strip_prefix("xteam:")?;
-    let (team, encoded) = rest.split_once(':')?;
+    let (team, encoded_and_metadata) = rest.split_once(':')?;
     let team = TeamId::new(team).ok()?;
+    let encoded = encoded_and_metadata.split(':').next()?;
     let bytes = hex::decode(encoded).ok()?;
     let detail = String::from_utf8(bytes).ok()?;
     Some((team, detail))
+}
+
+fn parse_crossed_row_origin(stored_detail: &str) -> Option<CrossedRowOrigin> {
+    let rest = stored_detail.strip_prefix("xteam:")?;
+    let (team, tail) = rest.split_once(':')?;
+    let source_team = TeamId::new(team).ok()?;
+    let mut parts = tail.split(':');
+    let _original_detail = parts.next()?;
+    if parts.next()? != "xmeta" {
+        return None;
+    }
+    let emitter_host = String::from_utf8(hex::decode(parts.next()?).ok()?).ok()?;
+    let op_id = parts.next()?.to_string();
+    if op_id.len() != 32 || !op_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let source_ts = parts.next()?.parse().ok()?;
+    let source_region = String::from_utf8(hex::decode(parts.next()?).ok()?).ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(CrossedRowOrigin {
+        source_team,
+        emitter_host,
+        op_id,
+        source_ts,
+        source_region,
+    })
 }
 
 fn reject_principal_namespace(namespace: &MemoryNamespace) -> Result<(), StoreError> {
@@ -710,27 +764,28 @@ impl LoomLiteStore {
         Ok(())
     }
 
-    /// Resolve the origin team for a crossed physical row before its local
-    /// destination copy is erased. The operator control uses this signed,
-    /// persisted provenance to route reconciliation; a native row deliberately
-    /// returns `None` because there is no remote origin to contact.
+    /// Resolve the complete one-share origin record for a crossed physical row.
+    ///
+    /// The legacy `xteam` prefix remains readable, but an unannotated row is
+    /// intentionally not reconciliation-eligible: it cannot bind an erase to
+    /// one specific share operation.
     pub async fn crossed_row_origin(
         &self,
         spirit_pid: u32,
         namespace: &MemoryNamespace,
         key: &str,
-    ) -> Result<Option<TeamId>, StoreError> {
+    ) -> Result<Option<CrossedRowOrigin>, StoreError> {
         self.team_guard(spirit_pid)?;
         reject_principal_namespace(namespace)?;
         let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
         let cross_team_pattern = format!(
-            "xteam:%:{}",
+            "xteam:%:{}%",
             hex::encode(logical_namespace_detail.as_bytes())
         );
         let client = self.get_client_with_timeout().await?;
         let row = client
             .query_opt(
-                "SELECT source_team
+                "SELECT namespace_detail, source_team
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
                    AND namespace_detail LIKE $3 AND key = $4
@@ -746,14 +801,126 @@ impl LoomLiteStore {
             )
             .await?;
         row.map(|row| {
-            let team: String = row.get(0);
-            TeamId::new(&team).map_err(|error| {
-                StoreError::Serialization(format!(
-                    "crossed row carries non-canonical source team {team:?}: {error}"
-                ))
-            })
+            let detail: String = row.get(0);
+            let persisted_team: String = row.get(1);
+            let origin = parse_crossed_row_origin(&detail).ok_or_else(|| {
+                StoreError::Serialization(
+                    "crossed row is missing a valid share-operation binding".to_string(),
+                )
+            })?;
+            if origin.source_team.as_str() != persisted_team {
+                return Err(StoreError::Serialization(
+                    "crossed row source-team marker disagrees with persisted source team".to_string(),
+                ));
+            }
+            Ok(origin)
         })
         .transpose()
+    }
+
+    /// Attach a share operation's identity to the physical crossed row that
+    /// just passed bundle verification. This is idempotent for a retry of the
+    /// same share and never annotates a different generation.
+    pub async fn annotate_crossed_row(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        origin: &CrossedRowOrigin,
+    ) -> Result<(), StoreError> {
+        reject_principal_namespace(namespace)?;
+        let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
+        let base_detail =
+            cross_team_namespace_detail(&origin.source_team, &logical_namespace_detail);
+        let annotated_detail = cross_team_namespace_detail_with_metadata(
+            &origin.source_team,
+            &logical_namespace_detail,
+            Some(&origin.emitter_host),
+            Some(&origin.op_id),
+            Some((origin.source_ts, &origin.source_region)),
+        );
+        let client = self.get_client_with_timeout().await?;
+        let changed = client
+            .execute(
+                "UPDATE collective_memory
+                 SET namespace_detail = $5
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4
+                   AND source_team = $6 AND source_ts = $7 AND source_region = $8",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &base_detail,
+                    &key,
+                    &annotated_detail,
+                    &origin.source_team.as_str(),
+                    &origin.source_ts,
+                    &origin.source_region,
+                ],
+            )
+            .await?;
+        if changed == 1 {
+            return Ok(());
+        }
+        let row = client
+            .query_opt(
+                "SELECT namespace_detail, source_team, source_ts, source_region
+                 FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &annotated_detail,
+                    &key,
+                ],
+            )
+            .await?;
+        match row {
+            Some(row)
+                if row.get::<_, String>(1) == origin.source_team.as_str()
+                    && row.get::<_, i64>(2) == origin.source_ts
+                    && row.get::<_, String>(3) == origin.source_region =>
+            {
+                Ok(())
+            }
+            _ => Err(StoreError::Serialization(
+                "crossed row changed before its share-operation binding was recorded".to_string(),
+            )),
+        }
+    }
+
+    /// Return the current native generation. `None` means that no native row
+    /// remains (including the idempotent tombstoned state).
+    pub async fn native_row_generation(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<(i64, String)>, StoreError> {
+        self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
+        let (namespace_kind, namespace_detail) = schema::namespace_to_parts(namespace);
+        let crossed_pattern = format!("xteam:%:{}%", hex::encode(namespace_detail.as_bytes()));
+        let client = self.get_client_with_timeout().await?;
+        client
+            .query_opt(
+                "SELECT source_ts, source_region FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND (namespace_detail = $3 OR namespace_detail LIKE $5) AND key = $4
+                 ORDER BY (namespace_detail = $3) DESC, source_ts DESC, source_region DESC
+                 LIMIT 1",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &namespace_detail,
+                    &key,
+                    &crossed_pattern,
+                ],
+            )
+            .await
+            .map(|row| row.map(|row| (row.get(0), row.get(1))))
+            .map_err(StoreError::from)
     }
 
     /// Erase one store-addressed row and record a CRDT-LWW tombstone.
@@ -884,7 +1051,7 @@ impl LoomLiteStore {
         self.team_guard(spirit_pid)?;
         reject_principal_namespace(namespace)?;
         let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
-        let physical_namespace_detail = format!(
+        let physical_namespace_prefix = format!(
             "xteam:{}:{}",
             source_team.as_str(),
             hex::encode(logical_namespace_detail.as_bytes())
@@ -900,23 +1067,27 @@ impl LoomLiteStore {
             .await?;
         let row = transaction
             .query_opt(
-                "SELECT source_ts, source_region
+                "SELECT namespace_detail, source_ts, source_region
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND namespace_detail = $3 AND key = $4 AND source_team = $5
+                   AND namespace_detail LIKE $3 AND key = $4 AND source_team = $5
                  FOR UPDATE",
                 &[
                     &(spirit_pid as i64),
                     &namespace_kind,
-                    &physical_namespace_detail,
+                    &format!("{physical_namespace_prefix}%"),
                     &key,
                     &source_team.as_str(),
                 ],
             )
             .await?;
+        let physical_namespace_detail = row
+            .as_ref()
+            .map(|row| row.get::<_, String>(0))
+            .unwrap_or(physical_namespace_prefix);
         let row_erasure_clock = row
             .as_ref()
-            .map(|row| (row.get::<_, i64>(0), row.get::<_, String>(1)));
+            .map(|row| (row.get::<_, i64>(1), row.get::<_, String>(2)));
         let deleted_rows = transaction
             .execute(
                 "DELETE FROM collective_memory
@@ -1731,6 +1902,32 @@ mod tests {
         assert_ne!(a, first_party);
         assert_ne!(a, b);
         assert_eq!(a, cross_team_namespace_detail(&team_a, &first_party));
+    }
+
+    #[test]
+    fn crossed_marker_preserves_logical_detail_and_binds_share_operation() {
+        let team = TeamId::new("team-a").unwrap();
+        let detail = cross_team_namespace_detail_with_metadata(
+            &team,
+            "detail",
+            Some("host-a"),
+            Some("0123456789abcdef0123456789abcdef"),
+            Some((42, "region-a")),
+        );
+        assert_eq!(
+            original_cross_team_namespace_detail(&team, &detail),
+            Some("detail".to_string())
+        );
+        assert_eq!(
+            parse_crossed_row_origin(&detail),
+            Some(CrossedRowOrigin {
+                source_team: team,
+                emitter_host: "host-a".to_string(),
+                op_id: "0123456789abcdef0123456789abcdef".to_string(),
+                source_ts: 42,
+                source_region: "region-a".to_string(),
+            })
+        );
     }
 
     /// Patch 1 (F18): the store-level typed refusals for a STALE map and an

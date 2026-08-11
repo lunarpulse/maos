@@ -5,7 +5,7 @@
 **PROVEN — operator-lane, clean-commit, four-gate ledger set.**
 
 This file is the current evidence index. Current artifacts, all binding commit
-`8d171b49` (clean worktree, no `+worktree:` digest):
+`0d8ea7af` (clean worktree, no `+worktree:` digest):
 
 - [`evidence-ledger-check-cross-region-consensus.json`](evidence-ledger-check-cross-region-consensus.json) — `product_claim: PROVEN`; all 4 live legs `PROVEN_LIVE_SIGNED`.
 - [`evidence-ledger-check-multi-region-slo.json`](evidence-ledger-check-multi-region-slo.json) — `product_claim: PROVEN`.
@@ -22,9 +22,16 @@ the operator audit key, and contain no workstation or key paths.
    one-shot; both reach their production dispatches instead of failing at
    tenant-map construction.
 2. **Two-sided erase reconciliation.** `CrossTeamCrossingControl::Erase`
-   travels the existing authenticated intake path, is authorized by the
-   directional `collective:erase` consent check, and reuses the guarded store
-   erase on each side. A typed refusal or transport failure fails the
+   travels the existing authenticated intake path under its own wire intent
+   (`collective:erase`, `IntentClass::Standard` — a share-only route cannot
+   carry it), is authorized by the directional `collective:erase` consent
+   check, and — closure-review repair — the origin side additionally requires
+   its own journaled `collective.host.cross-team-share` provenance matching
+   (spirit, requesting team, namespace, key) before any deletion, so a
+   team-level grant cannot erase a row that was never shared to the requester.
+   Reconciliation ACKs precede the local delete (remote tombstones are
+   idempotent, so retries recover), and the local delete targets the exact
+   crossed physical row. A typed refusal or transport failure fails the
    one-shot — never a silent one-sided erase. The planted one-sided oracle
    stays RED.
 3. **Ledger omission closed (Story 13.6e).**
@@ -36,9 +43,9 @@ the operator audit key, and contain no workstation or key paths.
    provisions fourteen independent institutions (distinct authority keys,
    signed V4 manifests, host→team→physical datname bindings) and proves
    isolation, clone rejection, and removal independence on the live substrate.
-5. **Chokepoint contract updated.** The team guard now covers five guarded
-   entry points (write, read, scan, crossed-row-origin lookup, erase); the
-   `five-site-chokepoint` leg proves it.
+5. **Chokepoint contract updated.** The team guard now covers six guarded
+   entry points (write, read, scan, crossed-row-origin lookup, generic erase,
+   exact crossed-row erase); the `six-site-chokepoint` leg proves it.
 6. **Publication hygiene.** Leg details render repo-relative source paths; no
    operator workstation paths appear outside signed transcript payloads.
 
@@ -53,7 +60,7 @@ the operator audit key, and contain no workstation or key paths.
 
 ## Current verification
 
-- All four substrate gates: `product_claim: PROVEN` @ `8d171b49`, exit 0, every required leg proven.
+- All four substrate gates: `product_claim: PROVEN` @ `0d8ea7af`, exit 0, every required leg proven.
 - `cargo run -q -p xtask -- check-ship-gate-completeness` — PASS; published ledgers consumed without problems.
 - `cargo run -q -p xtask -- check-loom-substrate-drift` — PASS.
 - `cargo run -q -p xtask -- check-dev-record-completeness --json` — owner sweep gate.

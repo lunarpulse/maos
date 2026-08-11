@@ -441,6 +441,13 @@ pub enum CrossingRefusal {
         to_team: String,
         intent: String,
     },
+    /// An erase control names a genuine share, but the native source row has
+    /// since advanced to a different CRDT generation.
+    StaleGeneration {
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
 }
 
 impl CrossingRefusal {
@@ -453,6 +460,7 @@ impl CrossingRefusal {
             Self::ConsentStale { .. } => "crossing_consent_stale",
             Self::StateUnavailable { .. } => "crossing_state_unavailable",
             Self::ApplyFailed { .. } => "crossing_apply_failed",
+            Self::StaleGeneration { .. } => "crossing_stale_generation",
         }
     }
 
@@ -478,6 +486,19 @@ impl CrossingRefusal {
                 }),
             ),
             Self::ConsentDenied {
+                from_team,
+                to_team,
+                intent,
+            } => (
+                crate::transport::json_rpc::CODE_CROSS_TEAM_CROSSING_REFUSED,
+                serde_json::json!({
+                    "reason": self.reason(),
+                    "from_team": from_team,
+                    "to_team": to_team,
+                    "intent": intent,
+                }),
+            ),
+            Self::StaleGeneration {
                 from_team,
                 to_team,
                 intent,

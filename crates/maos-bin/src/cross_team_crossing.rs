@@ -33,6 +33,7 @@
 //! disagree. Without it a truthful envelope plus a lying payload lands a row
 //! under an impersonated team with every shipped check green.
 
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 use maos_a2a_core::{
@@ -65,6 +66,10 @@ pub enum CrossTeamCrossingControl {
         /// this value to its own `store.config().home_team` through
         /// `CrossTeamApplyContext` before consent or persistence.
         to_team: String,
+        /// Unique share operation identity, pinned into every crossed row.
+        op_id: String,
+        /// The manifest host that emitted this operation.
+        emitter_host: String,
         bundle: CrossRegionReplicationBundle,
     },
     /// Reconcile an operator erase from a crossed destination to the team that
@@ -75,6 +80,8 @@ pub enum CrossTeamCrossingControl {
         spirit_pid: u32,
         namespace: String,
         key: String,
+        op_id: String,
+        locator_digest: String,
     },
 }
 
@@ -95,6 +102,17 @@ impl CrossTeamCrossingControl {
         } else {
             return None;
         };
+        let expected_class = if expected_erase {
+            maos_domain::invariants::i1::IntentClass::Standard
+        } else {
+            maos_domain::invariants::i1::IntentClass::Readonly
+        };
+        if frame.intent != expected_class {
+            return Some(Err(
+                "crossing control coarse intent class does not match its fine-grained intent"
+                    .into(),
+            ));
+        }
         if frame.kind != maos_spirit_abi::identity::FrameKind::TelemetryEvent {
             return Some(Err("crossing frame kind is not a telemetry event".into()));
         }
@@ -132,6 +150,36 @@ impl CrossTeamCrossingControl {
     }
 }
 
+
+/// SHA-256 commitment to an erase locator. Length-prefixing makes the
+/// canonical grammar unambiguous; the raw key is never used for audit matching.
+pub fn erase_locator_digest(
+    from_team: &str,
+    to_team: &str,
+    spirit_pid: u32,
+    namespace: &str,
+    key: &str,
+) -> String {
+    fn append(hasher: &mut Sha256, value: &[u8]) {
+        hasher.update(u32::try_from(value.len()).unwrap_or(u32::MAX).to_be_bytes());
+        hasher.update(value);
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"maos-cross-team-erase-locator-v1");
+    append(&mut hasher, from_team.as_bytes());
+    append(&mut hasher, to_team.as_bytes());
+    append(&mut hasher, &spirit_pid.to_be_bytes());
+    append(&mut hasher, namespace.as_bytes());
+    append(&mut hasher, key.as_bytes());
+    let digest = hex::encode(hasher.finalize());
+    digest
+        .as_bytes()
+        .chunks(16)
+        .map(std::str::from_utf8)
+        .collect::<Result<Vec<_>, _>>()
+        .expect("hex digest is UTF-8")
+        .join("-")
+}
 /// The applier: the composition root's store-owning implementation of the A2A
 /// crossing seam, and the **first production caller** of
 /// `apply_replication_bundle` → `CrossTeamConsentAdapter::is_granted`.
@@ -236,33 +284,50 @@ impl CrossTeamCrossingAdapter {
         }
     }
 
-    fn has_crossing_provenance(
+    fn share_provenance(
         transparency_log: &maos_iac::TransparencyLogAdapter,
         spirit_pid: u32,
-        authenticated_team: &str,
-        namespace: &str,
-        key: &str,
-    ) -> Result<bool, String> {
+        source_team: &str,
+        destination_team: &str,
+        op_id: &str,
+        locator_digest: &str,
+    ) -> Result<Option<(i64, String)>, String> {
         let entries = transparency_log
             .query_frames(FrameFilter {
                 spirit_pid: Some(spirit_pid),
                 ..FrameFilter::default()
             })
             .map_err(|error| format!("cross-team share provenance query failed: {error}"))?;
-        Ok(entries.into_iter().any(|entry| {
+        Ok(entries.into_iter().find_map(|entry| {
             if entry.intent != "collective.host.cross-team-share" {
-                return false;
+                return None;
             }
-            let Ok(payload) = serde_json::from_slice::<serde_json::Value>(&entry.payload_redacted)
-            else {
-                return false;
-            };
-            payload.get("to_team").and_then(serde_json::Value::as_str)
-                == Some(authenticated_team)
-                && payload.get("namespace").and_then(serde_json::Value::as_str) == Some(namespace)
-                && payload.get("key").and_then(serde_json::Value::as_str) == Some(key)
+            let payload = serde_json::from_slice::<serde_json::Value>(&entry.payload_redacted)
+                .ok()?;
+            (payload.get("from_team").and_then(serde_json::Value::as_str) == Some(source_team)
+                && payload.get("to_team").and_then(serde_json::Value::as_str)
+                    == Some(destination_team)
+                && payload
+                    .get("op_id")
+                    .and_then(serde_json::Value::as_str)
+                    .map(|recorded| recorded.replace('-', ""))
+                    .as_deref()
+                    == Some(op_id)
+                && payload
+                    .get("locator_digest")
+                    .and_then(serde_json::Value::as_str)
+                    == Some(locator_digest)
                 && payload.get("status").and_then(serde_json::Value::as_str)
-                    == Some("crossing_applied")
+                    == Some("crossing_applied"))
+            .then(|| {
+                Some((
+                    payload.get("source_ts")?.as_i64()?,
+                    payload
+                        .get("source_region")?
+                        .as_str()?
+                        .to_string(),
+                ))
+            })?
         }))
     }
 }
@@ -274,7 +339,12 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
             return CrossingOutcome::NotCrossing;
         };
         match decoded {
-            Ok(CrossTeamCrossingControl::Share { to_team, bundle }) => {
+            Ok(CrossTeamCrossingControl::Share {
+                to_team,
+                op_id,
+                emitter_host,
+                bundle,
+            }) => {
                 // ── AC3 / D-13: THE WELD ────────────────────────────────────
                 let payload_team = bundle
                     .source_team
@@ -313,6 +383,17 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                     });
                 }
 
+                if op_id.len() != 32
+                    || !op_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    || emitter_host.is_empty()
+                {
+                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: "crossing share has an invalid operation binding".to_string(),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                    });
+                }
                 let dest_region = self.store.config().home_region.clone();
                 let context =
                     CrossTeamApplyContext::new(&requested_team, COHORT_INTENT_COLLECTIVE_SHARE);
@@ -325,9 +406,56 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                 )
                 .await
                 {
-                    Ok(result) => CrossingOutcome::Applied {
-                        applied_count: result.applied_count,
-                    },
+                    Ok(result) => {
+                        for leaf in &bundle.leaves {
+                            let namespace = match maos_loom_lite::schema::parts_to_namespace(
+                                &leaf.namespace_kind,
+                                &leaf.namespace_detail,
+                            ) {
+                                Ok(namespace) => namespace,
+                                Err(error) => {
+                                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                                        reason: format!(
+                                            "crossing share namespace cannot be operation-bound: {error}"
+                                        ),
+                                        from_team: authenticated_team.to_string(),
+                                        to_team,
+                                        intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                                    })
+                                }
+                            };
+                            let origin = maos_loom_lite::store::CrossedRowOrigin {
+                                source_team: TeamId::new(authenticated_team)
+                                    .expect("authenticated team was canonicalized by the router"),
+                                emitter_host: emitter_host.clone(),
+                                op_id: op_id.clone(),
+                                source_ts: leaf.source_ts,
+                                source_region: leaf.source_region.clone(),
+                            };
+                            if let Err(error) = self
+                                .store
+                                .annotate_crossed_row(
+                                    u32::try_from(leaf.spirit_pid).unwrap_or(u32::MAX),
+                                    &namespace,
+                                    &leaf.key,
+                                    &origin,
+                                )
+                                .await
+                            {
+                                return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                                    reason: format!(
+                                        "crossing share operation binding failed: {error}"
+                                    ),
+                                    from_team: authenticated_team.to_string(),
+                                    to_team,
+                                    intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                                });
+                            }
+                        }
+                        CrossingOutcome::Applied {
+                            applied_count: result.applied_count,
+                        }
+                    }
                     Err(error) => {
                         if let Some(cause) = Self::local_cause(&error) {
                             eprintln!("maos: cross-team crossing refused at the applier: {cause:?}");
@@ -345,6 +473,8 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                 spirit_pid,
                 namespace,
                 key,
+                op_id,
+                locator_digest,
             }) => {
                 let requested_team = match TeamId::new(&to_team) {
                     Ok(team) => team,
@@ -434,12 +564,31 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                         })
                     }
                 };
-                let has_provenance = match Self::has_crossing_provenance(
-                    reconciliation.transparency_log.as_ref(),
-                    spirit_pid,
+                let expected_digest = erase_locator_digest(
+                    requested_team.as_str(),
                     authenticated_team,
+                    spirit_pid,
                     &namespace_name,
                     &key,
+                );
+                if locator_digest != expected_digest
+                    || op_id.len() != 32
+                    || !op_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+                {
+                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: "collective erase locator binding is invalid".to_string(),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+                    });
+                }
+                let provenance = match Self::share_provenance(
+                    reconciliation.transparency_log.as_ref(),
+                    spirit_pid,
+                    requested_team.as_str(),
+                    authenticated_team,
+                    &op_id,
+                    &locator_digest,
                 ) {
                     Ok(found) => found,
                     Err(reason) => {
@@ -451,14 +600,14 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                         })
                     }
                 };
-                if !has_provenance {
+                let Some((shared_source_ts, shared_source_region)) = provenance else {
                     return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
                         reason: "collective erase provenance not found".to_string(),
                         from_team: authenticated_team.to_string(),
                         to_team,
                         intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
                     });
-                }
+                };
                 // Provenance is verified before the guarded erase's tenant
                 // binding is established. A locator may fill an absent binding,
                 // but cannot overwrite a different receiver-owned binding.
@@ -473,15 +622,39 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                         intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
                     });
                 }
-                match self.store.erase(spirit_pid, &namespace, &key).await {
-                    Ok(receipt) => CrossingOutcome::Applied {
-                        applied_count: receipt.deleted_rows as usize,
+                match self
+                    .store
+                    .native_row_generation(spirit_pid, &namespace, &key)
+                    .await
+                {
+                    Ok(Some((source_ts, source_region)))
+                        if source_ts != shared_source_ts || source_region != shared_source_region =>
+                    {
+                        CrossingOutcome::Refused(CrossingRefusal::StaleGeneration {
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+                        })
+                    }
+                    Ok(Some(_)) => match self.store.erase(spirit_pid, &namespace, &key).await {
+                        Ok(receipt) => CrossingOutcome::Applied {
+                            applied_count: receipt.deleted_rows as usize,
+                        },
+                        Err(error) => CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                            reason: error.to_string(),
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+                        }),
                     },
+                    // The source row is already tombstoned. This exact operation
+                    // is therefore an idempotent replay, not a new deletion.
+                    Ok(None) => CrossingOutcome::Applied { applied_count: 0 },
                     Err(error) => CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
                         reason: error.to_string(),
                         from_team: authenticated_team.to_string(),
                         to_team,
-                        intent: "collective:erase".to_string(),
+                        intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
                     }),
                 }
             }
@@ -569,17 +742,35 @@ impl CrossTeamShareRequest {
 }
 
 /// Build the cohort A2A frame that carries a crossing to `peer`.
-///
-/// `prepare_outbound` (`maos-a2a-core/src/router.rs`) stamps
-/// `cohort_source_team` onto the wire request from **this host's own signed V4
-/// declaration** — never from anything reachable here — so the emitter cannot
-/// choose the team it speaks for even though it holds the signing seed. That is
-/// what makes the applier's weld a real binding rather than a self-report.
 pub fn crossing_frame(
     from: &maos_domain::frame::FrameAddress,
     peer: &maos_spirit_abi::identity::HostId,
     frame_seq: u64,
     to_team: &TeamId,
+    bundle: CrossRegionReplicationBundle,
+) -> Result<IacFrame, String> {
+    crossing_frame_with_binding(
+        from,
+        peer,
+        frame_seq,
+        to_team,
+        "00000000000000000000000000000000".to_string(),
+        from.host_id
+            .as_ref()
+            .map(|host| host.as_str().to_string())
+            .unwrap_or_else(|| "test-host".to_string()),
+        bundle,
+    )
+}
+
+/// Build a crossing frame with the operation binding emitted in production.
+pub fn crossing_frame_with_binding(
+    from: &maos_domain::frame::FrameAddress,
+    peer: &maos_spirit_abi::identity::HostId,
+    frame_seq: u64,
+    to_team: &TeamId,
+    op_id: String,
+    emitter_host: String,
     bundle: CrossRegionReplicationBundle,
 ) -> Result<IacFrame, String> {
     control_frame(
@@ -590,13 +781,15 @@ pub fn crossing_frame(
         maos_domain::invariants::i1::IntentClass::Readonly,
         CrossTeamCrossingControl::Share {
             to_team: to_team.as_str().to_string(),
+            op_id,
+            emitter_host,
             bundle,
         },
     )
 }
 
 /// Build an authenticated erase-reconciliation control for an origin team.
-pub fn erase_frame(
+pub fn erase_frame_with_binding(
     from: &maos_domain::frame::FrameAddress,
     peer: &maos_spirit_abi::identity::HostId,
     frame_seq: u64,
@@ -604,6 +797,8 @@ pub fn erase_frame(
     spirit_pid: u32,
     namespace: &MemoryNamespace,
     key: String,
+    op_id: String,
+    locator_digest: String,
 ) -> Result<IacFrame, String> {
     control_frame(
         from,
@@ -624,6 +819,8 @@ pub fn erase_frame(
             }
             .to_string(),
             key,
+            op_id,
+            locator_digest,
         },
     )
 }
@@ -712,49 +909,91 @@ pub fn reconcile_home_team_with_manifest(
 
 #[cfg(test)]
 mod tests {
-    use super::CrossTeamCrossingAdapter;
+    use super::{
+        erase_frame_with_binding, erase_locator_digest, CrossTeamCrossingAdapter,
+        CrossTeamCrossingControl,
+    };
+    use maos_domain::frame::FrameAddress;
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::memory::MemoryNamespace;
+    use maos_domain::team::TeamId;
+    use maos_spirit_abi::identity::{HostId, SpiritId};
     use maos_domain::invariants::i3::FrameOrigin;
     use maos_iac::{FrameKind, TransparencyLogAdapter};
 
     #[test]
     fn erase_provenance_requires_the_complete_applied_share_locator() {
         let audit = TransparencyLogAdapter::open_in_memory(13_600);
-        audit.insert_frame_event(
-            FrameKind::TelemetryEvent,
+        let digest = erase_locator_digest("team-a", "team-b", 7, "default", "k");
+        audit.insert_kernel_event_returning_id(
             7,
-            None,
             "collective.host.cross-team-share",
-            br#"{"to_team":"team-b","key":"k","status":"crossing_applied"}"#,
-            FrameOrigin::Kernel,
+            br#"{"from_team":"team-a","to_team":"team-b","op_id":"0123456789abcdef0123456789abcdef","locator_digest":"wrong","source_ts":1,"source_region":"r","status":"crossing_applied"}"#,
         );
-        assert!(
-            !CrossTeamCrossingAdapter::has_crossing_provenance(
-                &audit, 7, "team-b", "default", "k"
+        assert_eq!(
+            CrossTeamCrossingAdapter::share_provenance(
+                &audit,
+                7,
+                "team-a",
+                "team-b",
+                "0123456789abcdef0123456789abcdef",
+                &digest,
             )
             .expect("audit query"),
-            "a legacy/malformed share audit row must not authorize an erase"
+            None,
+            "a different locator digest must not authorize an erase"
         );
+        let payload = serde_json::json!({
+            "from_team": "team-a",
+            "to_team": "team-b",
+            "op_id": "0123456789abcdef-0123456789abcdef",
+            "locator_digest": digest,
+            "source_ts": 11,
+            "source_region": "region-a",
+            "status": "crossing_applied",
+        });
+        audit.insert_kernel_event_returning_id(
+            7,
+            "collective.host.cross-team-share",
+            payload.to_string().as_bytes(),
+        );
+        assert_eq!(
+            CrossTeamCrossingAdapter::share_provenance(
+                &audit,
+                7,
+                "team-a",
+                "team-b",
+                "0123456789abcdef0123456789abcdef",
+                &erase_locator_digest("team-a", "team-b", 7, "default", "k"),
+            )
+            .expect("audit query"),
+            Some((11, "region-a".to_string()))
+        );
+    }
 
-        audit.insert_frame_event(
-            FrameKind::TelemetryEvent,
+    #[test]
+    fn erase_frame_with_readonly_coarse_intent_is_refused() {
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("control"),
+            host_id: Some(HostId("host-b".to_string())),
+            role: None,
+        };
+        let mut frame = erase_frame_with_binding(
+            &from,
+            &HostId("host-a".to_string()),
+            1,
+            &TeamId::new("team-a").expect("canonical team"),
             7,
-            None,
-            "collective.host.cross-team-share",
-            br#"{"to_team":"team-b","namespace":"default","key":"k","status":"crossing_applied"}"#,
-            FrameOrigin::Kernel,
-        );
-        assert!(
-            CrossTeamCrossingAdapter::has_crossing_provenance(
-                &audit, 7, "team-b", "default", "k"
-            )
-            .expect("audit query")
-        );
-        assert!(
-            !CrossTeamCrossingAdapter::has_crossing_provenance(
-                &audit, 7, "team-a", "default", "k"
-            )
-            .expect("audit query"),
-            "the authenticated requesting team must match the recorded destination"
-        );
+            &MemoryNamespace::Default,
+            "k".to_string(),
+            "0123456789abcdef0123456789abcdef".to_string(),
+            erase_locator_digest("team-a", "team-b", 7, "default", "k"),
+        )
+        .expect("erase control encodes");
+        frame.intent = IntentClass::Readonly;
+        assert!(matches!(
+            CrossTeamCrossingControl::from_frame(&frame),
+            Some(Err(reason)) if reason.contains("coarse intent class")
+        ));
     }
 }

@@ -5098,7 +5098,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let audit_namespace = format!("{namespace:?}");
             let audit_key = key.clone();
             let (receipt, reconciliation) = match origin_team {
-                Some(origin_team) => {
+                Some(origin) => {
                     #[cfg(feature = "network")]
                     {
                         // Remote erase is tombstone-dominant and idempotent. Dispatch
@@ -5108,18 +5108,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let bootstrap = cohort_daemon.ok_or(
                             "collective erase of a crossed row requires MAOS_COHORT_DAEMON_CONFIG",
                         )?;
+                        let locator_digest = maos_bin::cross_team_crossing::erase_locator_digest(
+                            origin.source_team.as_str(),
+                            &store.config().home_team,
+                            spirit_pid,
+                            match &namespace {
+                                maos_domain::memory::MemoryNamespace::Default => "default",
+                                maos_domain::memory::MemoryNamespace::Coordination => "coordination",
+                                maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
+                                maos_domain::memory::MemoryNamespace::Principal { .. } => unreachable!(),
+                            },
+                            &audit_key,
+                        );
                         let reconciliation = emit_collective_erase_reconciliation(
                             Arc::clone(&transparency_log),
                             boot_nonce,
                             bootstrap,
-                            origin_team.clone(),
+                            origin.clone(),
+                            locator_digest,
                             spirit_pid,
                             &namespace,
                             audit_key.clone(),
                         )
                         .await?;
                         let receipt = store
-                            .erase_crossed_row(spirit_pid, &namespace, &key, &origin_team)
+                            .erase_crossed_row(
+                                spirit_pid,
+                                &namespace,
+                                &key,
+                                &origin.source_team,
+                            )
                             .await
                             .map_err(|error| format!("collective crossed-row erase failed: {error}"))?;
                         (receipt, reconciliation)
@@ -9917,6 +9935,8 @@ async fn emit_cross_team_share(
     transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2APeerRouter as _;
+    use sha2::Digest;
+
     let home_team = maos_domain::team::TeamId::new(&store.config().home_team)
         .map_err(|error| format!("crossing emitter: home team is not canonical: {error}"))?;
     if home_team == request.to_team {
@@ -9927,6 +9947,41 @@ async fn emit_cross_team_share(
         )
         .into());
     }
+    let emitter_host = runtime
+        .from
+        .host_id
+        .as_ref()
+        .ok_or("crossing emitter has no host identity")?
+        .as_str()
+        .to_string();
+    let namespace_name = match &request.namespace {
+        maos_domain::memory::MemoryNamespace::Default => "default",
+        maos_domain::memory::MemoryNamespace::Coordination => "coordination",
+        maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
+        maos_domain::memory::MemoryNamespace::Principal { .. } => unreachable!(
+            "principal namespace was rejected before a cross-team share is emitted"
+        ),
+    };
+    let mut operation_hasher = sha2::Sha256::new();
+    operation_hasher.update(b"maos-cross-team-share-operation-v1");
+    operation_hasher.update(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+            .to_be_bytes(),
+    );
+    operation_hasher.update(emitter_host.as_bytes());
+    operation_hasher.update(request.spirit_pid.to_be_bytes());
+    let operation_hash = operation_hasher.finalize();
+    let op_id = hex::encode(&operation_hash[..16]);
+    let locator_digest = maos_bin::cross_team_crossing::erase_locator_digest(
+        home_team.as_str(),
+        request.to_team.as_str(),
+        request.spirit_pid,
+        namespace_name,
+        &request.key,
+    );
     let bundle = maos_loom_lite::replication::bundle::originate_team_row(
         store,
         request.spirit_pid,
@@ -9944,12 +9999,19 @@ async fn emit_cross_team_share(
     )
     .await
     .map_err(|error| format!("crossing emitter: originate failed: {error}"))?;
+    let (source_ts, source_region) = bundle
+        .leaves
+        .first()
+        .map(|leaf| (leaf.source_ts, leaf.source_region.clone()))
+        .ok_or("crossing emitter originated an empty bundle")?;
     let peer = maos_spirit_abi::identity::HostId(request.peer.clone());
-    let frame = maos_bin::cross_team_crossing::crossing_frame(
+    let frame = maos_bin::cross_team_crossing::crossing_frame_with_binding(
         &runtime.from,
         &peer,
         1,
         &request.to_team,
+        op_id.clone(),
+        emitter_host.clone(),
         bundle,
     )?;
     let outcome = runtime.transport.route_outbound(frame, &peer).await;
@@ -9961,16 +10023,12 @@ async fn emit_cross_team_share(
         "from_team": home_team.as_str(),
         "to_team": request.to_team.as_str(),
         "intent": maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE,
-        "peer": request.peer,
-        "namespace": match request.namespace {
-            maos_domain::memory::MemoryNamespace::Default => "default",
-            maos_domain::memory::MemoryNamespace::Coordination => "coordination",
-            maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
-            maos_domain::memory::MemoryNamespace::Principal { .. } => unreachable!(
-                "principal namespace was rejected before a cross-team share is emitted"
-            ),
-        },
-        "key": request.key,
+        "emitter_host": emitter_host,
+        "op_id": format!("{}-{}", &op_id[..16], &op_id[16..]),
+        "namespace": namespace_name,
+        "locator_digest": locator_digest,
+        "source_ts": source_ts,
+        "source_region": source_region,
         "status": status,
         "detail": detail,
     });
@@ -9989,16 +10047,14 @@ async fn emit_cross_team_share(
     Ok(())
 }
 
-/// Send an erase-reconciliation control to every configured daemon for the
-/// origin team. A local deletion is not reported as complete until every
-/// authenticated peer ACKs; typed NACKs remain distinguishable in the durable
-/// operator journal.
+/// crossed row. Other origin-team members have no matching local TL event.
 #[cfg(feature = "network")]
 async fn emit_collective_erase_reconciliation(
     transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
     boot_nonce: u64,
     bootstrap: CohortDaemonBootstrap,
-    origin_team: maos_domain::team::TeamId,
+    origin: maos_loom_lite::store::CrossedRowOrigin,
+    locator_digest: String,
     spirit_pid: u32,
     namespace: &maos_domain::memory::MemoryNamespace,
     key: String,
@@ -10009,31 +10065,27 @@ async fn emit_collective_erase_reconciliation(
         .state
         .manifest()
         .map_err(|error| format!("collective erase manifest unavailable: {error}"))?;
-    let peers: Vec<maos_spirit_abi::identity::HostId> = manifest
-        .members
-        .iter()
-        .filter(|member| member.team.as_ref() == Some(&origin_team))
-        .map(|member| maos_spirit_abi::identity::HostId(member.host_id.clone()))
-        .collect();
-    if peers.is_empty() {
+    let peer = maos_spirit_abi::identity::HostId(origin.emitter_host.clone());
+    if !manifest.members.iter().any(|member| {
+        member.team.as_ref() == Some(&origin.source_team) && member.host_id == origin.emitter_host
+    }) {
         return Err(format!(
-            "collective erase reconciliation has no manifest member for origin team {}",
-            origin_team.as_str()
+            "collective erase reconciliation emitter host {} is not a member of origin team {}",
+            peer.as_str(),
+            origin.source_team.as_str()
         )
         .into());
     }
-    for peer in &peers {
-        if !bootstrap
-            .peers
-            .iter()
-            .any(|configured| configured.peer_id.as_str() == peer.as_str())
-        {
-            return Err(format!(
-                "collective erase reconciliation has no configured daemon route to {}",
-                peer.as_str()
-            )
-            .into());
-        }
+    if !bootstrap
+        .peers
+        .iter()
+        .any(|configured| configured.peer_id.as_str() == peer.as_str())
+    {
+        return Err(format!(
+            "collective erase reconciliation has no configured daemon route to emitter host {}",
+            peer.as_str()
+        )
+        .into());
     }
 
     let runtime = build_cohort_a2a_daemon_runtime(
@@ -10045,58 +10097,52 @@ async fn emit_collective_erase_reconciliation(
         None,
     )
     .await?;
-    // The route stamp, not an environment value, authenticates the source team.
-    // Its manifest declaration is checked by `prepare_outbound` and again by
-    // the receiver before the adapter evaluates `collective:erase`.
-    let mut outcomes = Vec::with_capacity(peers.len());
-    let mut failure = None;
-    for (offset, peer) in peers.iter().enumerate() {
-        let frame = maos_bin::cross_team_crossing::erase_frame(
-            &runtime.from,
-            peer,
-            u64::try_from(offset + 1).expect("peer count fits u64"),
-            &origin_team,
-            spirit_pid,
-            namespace,
-            key.clone(),
-        )?;
-        match runtime.transport.route_outbound(frame, peer).await {
-            Ok(()) => outcomes.push(serde_json::json!({
-                "peer": peer.as_str(),
-                "status": "erase_reconciled",
-            })),
-            Err(error) => {
-                let status = crossing_outcome_label(&error);
-                outcomes.push(serde_json::json!({
-                    "peer": peer.as_str(),
-                    "status": status,
-                    "detail": error.to_string(),
-                }));
-                failure = Some(format!(
-                    "collective erase reconciliation incomplete at {}: {}",
-                    peer.as_str(),
-                    error
-                ));
-            }
-        }
-    }
+    let frame = maos_bin::cross_team_crossing::erase_frame_with_binding(
+        &runtime.from,
+        &peer,
+        1,
+        &origin.source_team,
+        spirit_pid,
+        namespace,
+        key.clone(),
+        origin.op_id.clone(),
+        locator_digest.clone(),
+    )?;
+    let outcome = runtime.transport.route_outbound(frame, &peer).await;
     let shutdown = runtime.shutdown().await;
-    let audit_payload = serde_json::json!({
-        "origin_team": origin_team.as_str(),
-        "spirit_pid": spirit_pid,
-        "key": key,
-        "outcomes": outcomes,
-    });
+    let audit_payload = match &outcome {
+        Ok(()) => serde_json::json!({
+            "origin_team": origin.source_team.as_str(),
+            "emitter_host": peer.as_str(),
+            "spirit_pid": spirit_pid,
+            "op_id": origin.op_id,
+            "locator_digest": locator_digest,
+            "status": "erase_reconciled",
+        }),
+        Err(error) => serde_json::json!({
+            "origin_team": origin.source_team.as_str(),
+            "emitter_host": peer.as_str(),
+            "spirit_pid": spirit_pid,
+            "op_id": origin.op_id,
+            "locator_digest": locator_digest,
+            "status": crossing_outcome_label(error),
+            "detail": error.to_string(),
+        }),
+    };
     transparency_log.insert_kernel_event_returning_id(
         spirit_pid,
         "collective.host.cross-team-erase",
         audit_payload.to_string().as_bytes(),
     );
     shutdown?;
-    if let Some(error) = failure {
-        return Err(error.into());
-    }
-    Ok(audit_payload)
+    outcome.map_err(|error| {
+        format!(
+            "collective erase reconciliation incomplete at emitter host {}: {error}",
+            peer.as_str()
+        )
+        .into()
+    })
+    .map(|_| audit_payload)
 }
 
 /// Story 13.6b / AC2 — the emitter's stable discriminator for a refused
