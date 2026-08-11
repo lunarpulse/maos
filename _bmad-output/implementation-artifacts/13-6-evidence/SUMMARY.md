@@ -43,9 +43,9 @@ the operator audit key, and contain no workstation or key paths.
    provisions fourteen independent institutions (distinct authority keys,
    signed V4 manifests, host→team→physical datname bindings) and proves
    isolation, clone rejection, and removal independence on the live substrate.
-5. **Chokepoint contract updated.** The team guard now covers six guarded
+5. **Chokepoint contract updated.** The team guard now covers seven guarded
    entry points (write, read, scan, crossed-row-origin lookup, generic erase,
-   exact crossed-row erase); the `six-site-chokepoint` leg proves it.
+   exact crossed-row erase, crossed-row annotation); the `seven-site-chokepoint` leg proves it.
 6. **Publication hygiene.** Leg details render repo-relative source paths; no
    operator workstation paths appear outside signed transcript payloads.
 

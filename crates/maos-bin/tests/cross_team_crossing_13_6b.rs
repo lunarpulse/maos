@@ -1692,7 +1692,7 @@ async fn live_crossing_runs_through_two_daemon_processes() {
     let is_expected_row = |row: &CollectiveRow| {
         row.spirit_pid == 7
             && row.namespace_kind == "default"
-            && row.namespace_detail == "xteam:team-a:"
+            && row.namespace_detail.starts_with("xteam:team-a:")
             && row.key == key
             && row.value_kind == "text"
             && row.value_data == value.as_bytes()
@@ -1749,7 +1749,11 @@ async fn live_crossing_runs_through_two_daemon_processes() {
     assert_eq!(
         destination_rows
             .iter()
-            .filter(|row| is_expected_row(row) && has_re_attestation(row))
+            .filter(|row| {
+                is_expected_row(row)
+                    && row.namespace_detail.contains(":xmeta:")
+                    && has_re_attestation(row)
+            })
             .count(),
         1,
         "exactly the emitted value must land in team B's physical database"
