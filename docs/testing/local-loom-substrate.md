@@ -8,6 +8,29 @@ in-tree headers that *did* describe a local run
 `crates/maos-loom-lite/tests/migration_live.rs`) still named a singular
 `maos_test` database that CI stopped provisioning at 13.6c.
 
+## The one-command path
+
+If you only want to *watch the scene*, everything below is automated:
+
+```bash
+maosctl audit keygen --output ~/.config/maos/audit-signing.key   # once, if you have no key
+cargo run -p xtask -- demo-reza --provision
+```
+
+It probes the substrate and creates any missing database, exports the
+seven-variable contract for you (including the one ratified alias), runs the
+six-process Reza journey against the live substrate, shows what the two-sided
+erase left behind, runs all four gates, and prints the claim table with both
+required legs. Roughly two minutes; exit 0 only when the claim is `PROVEN`.
+
+`--journey-only` runs the scene and stops. `--skip-gates` adds the database
+observation but not the judges. `MAOS_DEMO_PG` overrides the connection base
+(default `postgresql://postgres:postgres@127.0.0.1:5432`).
+
+The runner is orchestration only — it re-derives nothing. The journey test is
+still the test and the four gates are still the judges. Read on when you need
+to drive them yourself, reproduce one gate exactly, or debug a red leg.
+
 This is the runbook for all four substrate-bearing gates:
 
 | Gate | Databases it needs | Variables the CI job exports |

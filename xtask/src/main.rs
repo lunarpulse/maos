@@ -105,6 +105,9 @@ mod corpus_types;
 mod coverage_matrix;
 mod coverage_matrix_nfr_test_3;
 mod example_spirit_regen;
+// Story 13.6 closure follow-on — the one-command Reza scene. Orchestration
+// only: it runs the journey test and the four gates, and narrates them.
+mod demo_reza;
 mod fs_walk;
 mod gen_abi_docs;
 mod gen_isolation_corpus;
@@ -915,6 +918,19 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Run the Reza Cortex scene end to end: substrate, journey, gates, verdict.
+    #[command(name = "demo-reza")]
+    DemoReza {
+        /// Create any missing substrate databases before running.
+        #[arg(long)]
+        provision: bool,
+        /// Run the journey but not the four gates.
+        #[arg(long)]
+        skip_gates: bool,
+        /// Run only the journey — no database observation, no gates, no ledger.
+        #[arg(long)]
+        journey_only: bool,
+    },
 }
 
 fn main() {
@@ -1266,6 +1282,11 @@ fn main() {
         Commands::CheckFkcs { json } => check_fkcs::run(json),
         Commands::CheckTrialAttestation { json } => check_trial_attestation::run(json),
         Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),
+        Commands::DemoReza {
+            provision,
+            skip_gates,
+            journey_only,
+        } => demo_reza::run(provision, skip_gates, journey_only),
     };
     if let Err(e) = result {
         eprintln!("{e}");
