@@ -455,6 +455,10 @@ mod tests {
             source_team: Some(TeamId::new("team-a").unwrap()),
             distillation_depth: Some(3),
             intent_lineage: Some(lineage.clone()),
+            cross_emitter_host: None,
+            cross_op_id: None,
+            cross_source_ts: None,
+            cross_source_region: None,
         };
         let leaf = CollectiveKvLeaf::from_row(&row);
         assert_eq!(leaf.source_region, "eu-central-1");
@@ -559,6 +563,10 @@ mod tests {
             source_team: None,
             distillation_depth: None,
             intent_lineage: None,
+            cross_emitter_host: None,
+            cross_op_id: None,
+            cross_source_ts: None,
+            cross_source_region: None,
         };
         let row2 = crate::store::CollectiveRow {
             source_log_ref: "ref-B".to_string(),

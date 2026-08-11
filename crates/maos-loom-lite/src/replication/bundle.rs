@@ -514,9 +514,12 @@ pub async fn originate_team_row(
                 ts: source_ts,
                 region: home_region.as_str(),
                 log_ref: "",
-                team: Some(home_team),
-                distillation_depth: Some(distillation_depth),
-                intent_lineage: Some(&intent_lineage),
+                // The source keeps its native physical address. The signed
+                // leaf carries the team identity; only a receiver persists a
+                // crossed xteam row.
+                team: None,
+                distillation_depth: None,
+                intent_lineage: None,
             },
             Some(&attestation),
         )

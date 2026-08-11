@@ -91,7 +91,7 @@ fn attestation_guard_wired_into_both_spirit_reads() {
 }
 
 #[test]
-fn team_guard_is_exactly_the_seven_guarded_entry_points() {
+fn team_guard_covers_all_public_store_entry_points() {
     for signature in [
         "pub async fn write(",
         "pub async fn read(",
@@ -99,6 +99,7 @@ fn team_guard_is_exactly_the_seven_guarded_entry_points() {
         "pub async fn crossed_row_origin(",
         "pub async fn native_row_generation(",
         "pub async fn erase(",
+        "pub async fn erase_at_generation(",
         "pub async fn erase_crossed_row(",
     ] {
         let body = function_body(STORE_SRC, signature);
@@ -111,8 +112,8 @@ fn team_guard_is_exactly_the_seven_guarded_entry_points() {
 
     assert_eq!(
         count_code_occurrences(STORE_SRC, "self.team_guard("),
-        7,
-        "team_guard must cover write, read, scan, crossed-row origin lookup, native generation lookup, generic erase, and exact crossed-row erase"
+        8,
+        "team_guard must cover every public data-store path"
     );
 
     for signature in ["pub async fn write_with_source(", "pub fn pool("] {

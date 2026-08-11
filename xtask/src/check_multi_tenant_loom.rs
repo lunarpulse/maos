@@ -266,7 +266,7 @@ fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
 }
 const SPECS: &[TestLeg] = &[
         TestLeg {
-            name: "seven-site-chokepoint",
+            name: "team-guard-chokepoint",
             class: BindingClass::Blocking,
             args: &[
                 "test",
@@ -274,7 +274,7 @@ const SPECS: &[TestLeg] = &[
                 "maos-loom-lite",
                 "--test",
                 "read_path_chokepoint",
-                "team_guard_is_exactly_the_seven_guarded_entry_points",
+                "team_guard_covers_all_public_store_entry_points",
                 "--",
                 "--exact",
             ],

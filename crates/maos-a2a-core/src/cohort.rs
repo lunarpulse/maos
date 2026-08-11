@@ -413,6 +413,14 @@ pub enum CrossingRefusal {
         envelope_team: String,
         payload_team: String,
     },
+    /// The share payload's emitter host does not match the TLS-bound frame
+    /// host, so its operation binding cannot be persisted.
+    EmitterHostUnbound {
+        emitter_host: String,
+        authenticated_host: String,
+        from_team: String,
+        to_team: String,
+    },
     /// The signed manifest holds no grant for the ordered pair + intent.
     ConsentDenied {
         from_team: String,
@@ -456,13 +464,14 @@ impl CrossingRefusal {
     pub fn reason(&self) -> &'static str {
         match self {
             Self::SourceTeamUnbound { .. } => "crossing_source_team_unbound",
+            Self::EmitterHostUnbound { .. } => "crossing_emitter_host_unbound",
             Self::ConsentDenied { .. } => "crossing_consent_denied",
             Self::ConsentStale { .. } => "crossing_consent_stale",
             Self::StateUnavailable { .. } => "crossing_state_unavailable",
             Self::ApplyFailed { .. } => "crossing_apply_failed",
             Self::StaleGeneration { .. } => "crossing_stale_generation",
-        }
     }
+        }
 
     /// The JSON-RPC code + `data` object this refusal travels as.
     ///
@@ -483,6 +492,22 @@ impl CrossingRefusal {
                     "reason": self.reason(),
                     "envelope_team": envelope_team,
                     "payload_team": payload_team,
+                }),
+            ),
+            Self::EmitterHostUnbound {
+                emitter_host,
+                authenticated_host,
+                from_team,
+                to_team,
+            } => (
+                crate::transport::json_rpc::CODE_CROSS_TEAM_CROSSING_REFUSED,
+                serde_json::json!({
+                    "reason": self.reason(),
+                    "emitter_host": emitter_host,
+                    "authenticated_host": authenticated_host,
+                    "from_team": from_team,
+                    "to_team": to_team,
+                    "intent": COHORT_INTENT_COLLECTIVE_SHARE,
                 }),
             ),
             Self::ConsentDenied {

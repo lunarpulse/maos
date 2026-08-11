@@ -61,6 +61,13 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     -- local row (byte-identical leaf); a value = re-attested cross-team copy.
     -- NOT in the UNIQUE key. Additive/nullable = the 9.2b idiom.
     source_team     TEXT,
+    -- Story 13.6: share-operation binding for crossed rows.  These nullable
+    -- columns preserve the stable xteam physical key and remain NULL for
+    -- native rows.
+    cross_emitter_host TEXT,
+    cross_op_id        TEXT,
+    cross_source_ts    BIGINT,
+    cross_source_region TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (spirit_pid, namespace_kind, namespace_detail, key),
     -- I11 (enforced-by-construction at the store layer): a pattern record
@@ -146,6 +153,30 @@ BEGIN
         WHERE table_name = 'collective_memory' AND column_name = 'inclusion_path'
     ) THEN
         ALTER TABLE collective_memory ADD COLUMN inclusion_path BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_emitter_host'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_emitter_host TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_op_id'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_op_id TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_source_ts'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_source_ts BIGINT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_source_region'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_source_region TEXT;
     END IF;
 END
 $$;

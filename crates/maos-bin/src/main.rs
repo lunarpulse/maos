@@ -5137,6 +5137,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 &namespace,
                                 &key,
                                 &origin.source_team,
+                                origin.source_ts,
+                                &origin.source_region,
                             )
                             .await
                             .map_err(|error| format!("collective crossed-row erase failed: {error}"))?;
@@ -9962,17 +9964,18 @@ async fn emit_cross_team_share(
             "principal namespace was rejected before a cross-team share is emitted"
         ),
     };
+    let mut operation_entropy = [0_u8; 16];
+    getrandom::fill(&mut operation_entropy)
+        .map_err(|error| format!("crossing emitter: operation randomness unavailable: {error}"))?;
     let mut operation_hasher = sha2::Sha256::new();
     operation_hasher.update(b"maos-cross-team-share-operation-v1");
-    operation_hasher.update(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
-            .to_be_bytes(),
-    );
+    operation_hasher.update(operation_entropy);
+    operation_hasher.update(home_team.as_str().as_bytes());
+    operation_hasher.update(request.to_team.as_str().as_bytes());
     operation_hasher.update(emitter_host.as_bytes());
     operation_hasher.update(request.spirit_pid.to_be_bytes());
+    operation_hasher.update(namespace_name.as_bytes());
+    operation_hasher.update(request.key.as_bytes());
     let operation_hash = operation_hasher.finalize();
     let op_id = hex::encode(&operation_hash[..16]);
     let locator_digest = maos_bin::cross_team_crossing::erase_locator_digest(
@@ -10108,6 +10111,7 @@ async fn emit_collective_erase_reconciliation(
         origin.op_id.clone(),
         locator_digest.clone(),
     )?;
+    let journal_op_id = format!("{}-{}", &origin.op_id[..16], &origin.op_id[16..]);
     let outcome = runtime.transport.route_outbound(frame, &peer).await;
     let shutdown = runtime.shutdown().await;
     let audit_payload = match &outcome {
@@ -10115,7 +10119,7 @@ async fn emit_collective_erase_reconciliation(
             "origin_team": origin.source_team.as_str(),
             "emitter_host": peer.as_str(),
             "spirit_pid": spirit_pid,
-            "op_id": origin.op_id,
+            "op_id": journal_op_id,
             "locator_digest": locator_digest,
             "status": "erase_reconciled",
         }),
@@ -10123,7 +10127,7 @@ async fn emit_collective_erase_reconciliation(
             "origin_team": origin.source_team.as_str(),
             "emitter_host": peer.as_str(),
             "spirit_pid": spirit_pid,
-            "op_id": origin.op_id,
+            "op_id": journal_op_id,
             "locator_digest": locator_digest,
             "status": crossing_outcome_label(error),
             "detail": error.to_string(),

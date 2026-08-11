@@ -394,6 +394,20 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                         intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
                     });
                 }
+                let authenticated_host = frame
+                    .from
+                    .host_id
+                    .as_ref()
+                    .map(|host| host.as_str())
+                    .unwrap_or("loopback");
+                if emitter_host != authenticated_host {
+                    return CrossingOutcome::Refused(CrossingRefusal::EmitterHostUnbound {
+                        emitter_host,
+                        authenticated_host: authenticated_host.to_string(),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                    });
+                }
                 let dest_region = self.store.config().home_region.clone();
                 let context =
                     CrossTeamApplyContext::new(&requested_team, COHORT_INTENT_COLLECTIVE_SHARE);
@@ -624,32 +638,25 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                 }
                 match self
                     .store
-                    .native_row_generation(spirit_pid, &namespace, &key)
+                    .erase_at_generation(
+                        spirit_pid,
+                        &namespace,
+                        &key,
+                        shared_source_ts,
+                        &shared_source_region,
+                    )
                     .await
                 {
-                    Ok(Some((source_ts, source_region)))
-                        if source_ts != shared_source_ts || source_region != shared_source_region =>
-                    {
+                    Ok(receipt) => CrossingOutcome::Applied {
+                        applied_count: receipt.deleted_rows as usize,
+                    },
+                    Err(maos_loom_lite::store::StoreError::StaleGeneration) => {
                         CrossingOutcome::Refused(CrossingRefusal::StaleGeneration {
                             from_team: authenticated_team.to_string(),
                             to_team,
                             intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
                         })
                     }
-                    Ok(Some(_)) => match self.store.erase(spirit_pid, &namespace, &key).await {
-                        Ok(receipt) => CrossingOutcome::Applied {
-                            applied_count: receipt.deleted_rows as usize,
-                        },
-                        Err(error) => CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
-                            reason: error.to_string(),
-                            from_team: authenticated_team.to_string(),
-                            to_team,
-                            intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
-                        }),
-                    },
-                    // The source row is already tombstoned. This exact operation
-                    // is therefore an idempotent replay, not a new deletion.
-                    Ok(None) => CrossingOutcome::Applied { applied_count: 0 },
                     Err(error) => CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
                         reason: error.to_string(),
                         from_team: authenticated_team.to_string(),

@@ -23,8 +23,9 @@ use maos_a2a_core::{
     CrossingRefusal, PeerCertFingerprint, PeerId,
 };
 use maos_bin::cross_team_crossing::{
-    crossing_frame, erase_frame_with_binding, reconcile_home_team_with_manifest,
-    CrossTeamCrossingAdapter, CrossTeamCrossingControl, CrossTeamShareRequest,
+    crossing_frame, crossing_frame_with_binding, erase_frame_with_binding,
+    reconcile_home_team_with_manifest, CrossTeamCrossingAdapter, CrossTeamCrossingControl,
+    CrossTeamShareRequest,
 };
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
@@ -747,6 +748,35 @@ async fn crossing_weld_refuses_a_forged_payload_team_before_apply() {
         ),
     }
 }
+#[tokio::test]
+async fn crossing_refuses_emitter_host_that_is_not_the_authenticated_frame_host() {
+    let seed = [0x42u8; 32];
+    let frame = crossing_frame_with_binding(
+        &control_from(),
+        &HostId("host-c".to_string()),
+        1,
+        &TeamId::new("team-c").expect("canonical team"),
+        "0123456789abcdef0123456789abcdef".to_string(),
+        "forged-host".to_string(),
+        seed_signed_bundle_claiming("team-a", &seed),
+    )
+    .expect("crossing frame encodes");
+    let adapter = CrossTeamCrossingAdapter::new(
+        dead_store("team-c").await,
+        TeamId::new("team-c").expect("canonical team"),
+        seed,
+    );
+
+    assert!(matches!(
+        adapter.apply_crossing("team-a", &frame).await,
+        CrossingOutcome::Refused(CrossingRefusal::EmitterHostUnbound {
+            emitter_host,
+            authenticated_host,
+            ..
+        }) if emitter_host == "forged-host" && authenticated_host == "host-a"
+    ));
+}
+
 
 /// Story 13.6b / AC3 — the weld is a BINDING, not a refuse-everything stub.
 ///
@@ -1751,7 +1781,10 @@ async fn live_crossing_runs_through_two_daemon_processes() {
             .iter()
             .filter(|row| {
                 is_expected_row(row)
-                    && row.namespace_detail.contains(":xmeta:")
+                    && row.cross_emitter_host.is_some()
+                    && row.cross_op_id.is_some()
+                    && row.cross_source_ts.is_some()
+                    && row.cross_source_region.is_some()
                     && has_re_attestation(row)
             })
             .count(),
@@ -1764,10 +1797,21 @@ async fn live_crossing_runs_through_two_daemon_processes() {
     assert_eq!(
         source_rows
             .iter()
-            .filter(|row| is_expected_row(row) && row.source_log_ref.is_empty())
+            .filter(|row| {
+                row.spirit_pid == 7
+                    && row.namespace_kind == "default"
+                    && row.namespace_detail.is_empty()
+                    && row.key == key
+                    && row.value_kind == "text"
+                    && row.value_data == value.as_bytes()
+                    && row.source_region == "region-a"
+                    && row.source_team.is_none()
+                    && row.cross_op_id.is_none()
+                    && row.source_log_ref.is_empty()
+            })
             .count(),
         1,
-        "originate_team_row must persist exactly the attested origin row before transport"
+        "originate_team_row must persist one native origin row before transport"
     );
 }
 
@@ -2018,6 +2062,8 @@ async fn live_destination_adapter_applies_and_refuses_expected_shapes() {
             &maos_domain::memory::MemoryNamespace::Default,
             "live-crossing",
             &TeamId::new("team-a").expect("canonical source team"),
+            1,
+            "region-a",
         )
         .await
         .expect("erase the selected crossed physical row");
@@ -2226,12 +2272,15 @@ fn crossed_row_matches(
         && row
             .namespace_detail
             .starts_with(&format!("xteam:{source_team}:"))
-        && row.namespace_detail.contains(":xmeta:")
         && row.key == key
         && row.value_kind == "text"
         && row.value_data == value.as_bytes()
         && row.source_region == journey_region(source_team)
         && row.source_team.as_ref().map(TeamId::as_str) == Some(source_team)
+        && row.cross_emitter_host.is_some()
+        && row.cross_op_id.is_some()
+        && row.cross_source_ts == Some(row.source_ts)
+        && row.cross_source_region.as_deref() == Some(row.source_region.as_str())
         && row.distillation_depth == Some(1)
         && row.intent_lineage.as_ref().is_some_and(|lineage| {
             let intents = lineage.as_slice();

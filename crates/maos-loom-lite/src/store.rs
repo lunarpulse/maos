@@ -81,39 +81,20 @@ pub(crate) struct RowAttestation<'a> {
 }
 
 fn cross_team_namespace_detail(source_team: &TeamId, original_detail: &str) -> String {
-    cross_team_namespace_detail_with_metadata(source_team, original_detail, None, None, None)
-}
-
-fn cross_team_namespace_detail_with_metadata(
-    source_team: &TeamId,
-    original_detail: &str,
-    emitter_host: Option<&str>,
-    op_id: Option<&str>,
-    generation: Option<(i64, &str)>,
-) -> String {
-    let base = format!(
+    format!(
         "xteam:{}:{}",
         source_team.as_str(),
         hex::encode(original_detail.as_bytes())
-    );
-    match (emitter_host, op_id, generation) {
-        (Some(host), Some(op_id), Some((source_ts, source_region))) => format!(
-            "{base}:xmeta:{}:{op_id}:{source_ts}:{}",
-            hex::encode(host.as_bytes()),
-            hex::encode(source_region.as_bytes())
-        ),
-        _ => base,
-    }
+    )
 }
 
-/// Decode the logical namespace detail from both the original marker grammar
-/// and its additive `:xmeta:` extension.
+/// Decode the logical namespace detail from the stable crossed-row marker.
 pub(crate) fn original_cross_team_namespace_detail(
     source_team: &TeamId,
     stored_detail: &str,
 ) -> Option<String> {
     let prefix = format!("xteam:{}:", source_team.as_str());
-    let encoded = stored_detail.strip_prefix(&prefix)?.split(':').next()?;
+    let encoded = stored_detail.strip_prefix(&prefix)?;
     let bytes = hex::decode(encoded).ok()?;
     String::from_utf8(bytes).ok()
 }
@@ -138,33 +119,6 @@ fn parse_cross_team_marker(stored_detail: &str) -> Option<(TeamId, String)> {
     Some((team, detail))
 }
 
-fn parse_crossed_row_origin(stored_detail: &str) -> Option<CrossedRowOrigin> {
-    let rest = stored_detail.strip_prefix("xteam:")?;
-    let (team, tail) = rest.split_once(':')?;
-    let source_team = TeamId::new(team).ok()?;
-    let mut parts = tail.split(':');
-    let _original_detail = parts.next()?;
-    if parts.next()? != "xmeta" {
-        return None;
-    }
-    let emitter_host = String::from_utf8(hex::decode(parts.next()?).ok()?).ok()?;
-    let op_id = parts.next()?.to_string();
-    if op_id.len() != 32 || !op_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return None;
-    }
-    let source_ts = parts.next()?.parse().ok()?;
-    let source_region = String::from_utf8(hex::decode(parts.next()?).ok()?).ok()?;
-    if parts.next().is_some() {
-        return None;
-    }
-    Some(CrossedRowOrigin {
-        source_team,
-        emitter_host,
-        op_id,
-        source_ts,
-        source_region,
-    })
-}
 
 fn reject_principal_namespace(namespace: &MemoryNamespace) -> Result<(), StoreError> {
     if let MemoryNamespace::Principal {
@@ -279,6 +233,8 @@ pub enum StoreError {
         erased_at_source_ts: i64,
         erased_at_source_region: String,
     },
+    #[error("collective row generation changed before erase")]
+    StaleGeneration,
 }
 
 impl From<tokio_postgres::Error> for StoreError {
@@ -712,9 +668,10 @@ impl LoomLiteStore {
                      value_kind, value_data, timestamp_ns, source_ts, source_region,
                      source_log_ref, source_team, distillation_depth, intent_lineage,
                      leaf_canonical_hash, merkle_root, region_sig,
-                     bundle_schema_version, inclusion_path)
+                     bundle_schema_version, inclusion_path,
+                     cross_emitter_host, cross_op_id, cross_source_ts, cross_source_region)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                         $13, $14, $15, $16, $17, $18)
+                         $13, $14, $15, $16, $17, $18, NULL, NULL, NULL, NULL)
                  ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
                  DO UPDATE SET
                      value_kind = EXCLUDED.value_kind,
@@ -730,7 +687,11 @@ impl LoomLiteStore {
                      merkle_root = EXCLUDED.merkle_root,
                      region_sig = EXCLUDED.region_sig,
                      bundle_schema_version = EXCLUDED.bundle_schema_version,
-                     inclusion_path = EXCLUDED.inclusion_path
+                     inclusion_path = EXCLUDED.inclusion_path,
+                     cross_emitter_host = NULL,
+                     cross_op_id = NULL,
+                     cross_source_ts = NULL,
+                     cross_source_region = NULL
                  WHERE collective_memory.source_team IS NOT DISTINCT FROM EXCLUDED.source_team
                    AND (
                        EXCLUDED.source_ts > collective_memory.source_ts
@@ -766,9 +727,8 @@ impl LoomLiteStore {
 
     /// Resolve the complete one-share origin record for a crossed physical row.
     ///
-    /// The legacy `xteam` prefix remains readable, but an unannotated row is
-    /// intentionally not reconciliation-eligible: it cannot bind an erase to
-    /// one specific share operation.
+    /// An unannotated crossed row is intentionally not reconciliation-eligible:
+    /// it cannot bind an erase to one specific share operation.
     pub async fn crossed_row_origin(
         &self,
         spirit_pid: u32,
@@ -779,13 +739,14 @@ impl LoomLiteStore {
         reject_principal_namespace(namespace)?;
         let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
         let cross_team_pattern = format!(
-            "xteam:%:{}%",
+            "xteam:%:{}",
             hex::encode(logical_namespace_detail.as_bytes())
         );
         let client = self.get_client_with_timeout().await?;
         let row = client
             .query_opt(
-                "SELECT namespace_detail, source_team
+                "SELECT namespace_detail, source_team, cross_emitter_host, cross_op_id,
+                        cross_source_ts, cross_source_region
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
                    AND namespace_detail LIKE $3 AND key = $4
@@ -803,24 +764,43 @@ impl LoomLiteStore {
         row.map(|row| {
             let detail: String = row.get(0);
             let persisted_team: String = row.get(1);
-            let origin = parse_crossed_row_origin(&detail).ok_or_else(|| {
-                StoreError::Serialization(
-                    "crossed row is missing a valid share-operation binding".to_string(),
-                )
+            let source_team = TeamId::new(&persisted_team).map_err(|error| {
+                StoreError::Serialization(format!("invalid crossed-row source team: {error}"))
             })?;
-            if origin.source_team.as_str() != persisted_team {
+            if detail != cross_team_namespace_detail(&source_team, &logical_namespace_detail) {
                 return Err(StoreError::Serialization(
-                    "crossed row source-team marker disagrees with persisted source team".to_string(),
+                    "crossed row marker disagrees with persisted source team".to_string(),
                 ));
             }
-            Ok(origin)
+            let (Some(emitter_host), Some(op_id), Some(source_ts), Some(source_region)) = (
+                row.get::<_, Option<String>>(2),
+                row.get::<_, Option<String>>(3),
+                row.get::<_, Option<i64>>(4),
+                row.get::<_, Option<String>>(5),
+            ) else {
+                return Err(StoreError::Serialization(
+                    "crossed row is missing a valid share-operation binding".to_string(),
+                ));
+            };
+            if op_id.len() != 32 || !op_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(StoreError::Serialization(
+                    "crossed row has an invalid share-operation identifier".to_string(),
+                ));
+            }
+            Ok(CrossedRowOrigin {
+                source_team,
+                emitter_host,
+                op_id,
+                source_ts,
+                source_region,
+            })
         })
         .transpose()
     }
 
-    /// Attach a share operation's identity to the physical crossed row that
-    /// just passed bundle verification. This is idempotent for a retry of the
-    /// same share and never annotates a different generation.
+    /// Attach a share operation's identity to the stable physical crossed row
+    /// that just passed bundle verification. This is idempotent for a retry of
+    /// the same share and never annotates a different generation.
     pub async fn annotate_crossed_row(
         &self,
         spirit_pid: u32,
@@ -830,63 +810,35 @@ impl LoomLiteStore {
     ) -> Result<(), StoreError> {
         reject_principal_namespace(namespace)?;
         let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
-        let base_detail =
-            cross_team_namespace_detail(&origin.source_team, &logical_namespace_detail);
-        let annotated_detail = cross_team_namespace_detail_with_metadata(
-            &origin.source_team,
-            &logical_namespace_detail,
-            Some(&origin.emitter_host),
-            Some(&origin.op_id),
-            Some((origin.source_ts, &origin.source_region)),
-        );
+        let detail = cross_team_namespace_detail(&origin.source_team, &logical_namespace_detail);
         let client = self.get_client_with_timeout().await?;
         let changed = client
             .execute(
                 "UPDATE collective_memory
-                 SET namespace_detail = $5
+                 SET cross_emitter_host = $5, cross_op_id = $6,
+                     cross_source_ts = $7, cross_source_region = $8
                  WHERE spirit_pid = $1 AND namespace_kind = $2
                    AND namespace_detail = $3 AND key = $4
-                   AND source_team = $6 AND source_ts = $7 AND source_region = $8",
+                   AND source_team = $9 AND source_ts = $7 AND source_region = $8",
                 &[
                     &(spirit_pid as i64),
                     &namespace_kind,
-                    &base_detail,
+                    &detail,
                     &key,
-                    &annotated_detail,
-                    &origin.source_team.as_str(),
+                    &origin.emitter_host,
+                    &origin.op_id,
                     &origin.source_ts,
                     &origin.source_region,
+                    &origin.source_team.as_str(),
                 ],
             )
             .await?;
         if changed == 1 {
-            return Ok(());
-        }
-        let row = client
-            .query_opt(
-                "SELECT namespace_detail, source_team, source_ts, source_region
-                 FROM collective_memory
-                 WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND namespace_detail = $3 AND key = $4",
-                &[
-                    &(spirit_pid as i64),
-                    &namespace_kind,
-                    &annotated_detail,
-                    &key,
-                ],
-            )
-            .await?;
-        match row {
-            Some(row)
-                if row.get::<_, String>(1) == origin.source_team.as_str()
-                    && row.get::<_, i64>(2) == origin.source_ts
-                    && row.get::<_, String>(3) == origin.source_region =>
-            {
-                Ok(())
-            }
-            _ => Err(StoreError::Serialization(
+            Ok(())
+        } else {
+            Err(StoreError::Serialization(
                 "crossed row changed before its share-operation binding was recorded".to_string(),
-            )),
+            ))
         }
     }
 
@@ -901,21 +853,17 @@ impl LoomLiteStore {
         self.team_guard(spirit_pid)?;
         reject_principal_namespace(namespace)?;
         let (namespace_kind, namespace_detail) = schema::namespace_to_parts(namespace);
-        let crossed_pattern = format!("xteam:%:{}%", hex::encode(namespace_detail.as_bytes()));
         let client = self.get_client_with_timeout().await?;
         client
             .query_opt(
                 "SELECT source_ts, source_region FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND (namespace_detail = $3 OR namespace_detail LIKE $5) AND key = $4
-                 ORDER BY (namespace_detail = $3) DESC, source_ts DESC, source_region DESC
-                 LIMIT 1",
+                   AND namespace_detail = $3 AND key = $4",
                 &[
                     &(spirit_pid as i64),
                     &namespace_kind,
                     &namespace_detail,
                     &key,
-                    &crossed_pattern,
                 ],
             )
             .await
@@ -1036,26 +984,136 @@ impl LoomLiteStore {
             tombstone_recorded: true,
         })
     }
+    /// Erase the native row only if it remains the generation named by a
+    /// verified reconciliation. The check and delete share the writer lock.
+    pub async fn erase_at_generation(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        expected_source_ts: i64,
+        expected_source_region: &str,
+    ) -> Result<CollectiveEraseReceipt, StoreError> {
+        self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
+        let (namespace_kind, namespace_detail) = schema::namespace_to_parts(namespace);
+        let lock_key = erasure_lock_key(spirit_pid, namespace_kind, &namespace_detail, key);
+        let mut client = self.get_client_with_timeout().await?;
+        let transaction = client.transaction().await?;
+        transaction
+            .query_one(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+        let row = transaction
+            .query_opt(
+                "SELECT source_ts, source_region FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4 AND source_team IS NULL
+                 FOR UPDATE",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &namespace_detail,
+                    &key,
+                ],
+            )
+            .await?;
+        if let Some(row) = row.as_ref() {
+            if row.get::<_, i64>(0) != expected_source_ts
+                || row.get::<_, String>(1) != expected_source_region
+            {
+                return Err(StoreError::StaleGeneration);
+            }
+        } else {
+            transaction.commit().await?;
+            return Ok(CollectiveEraseReceipt {
+                deleted_rows: 0,
+                tombstone_recorded: true,
+            });
+        }
+        let deleted_rows = transaction
+            .execute(
+                "DELETE FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4 AND source_team IS NULL
+                   AND source_ts = $5 AND source_region = $6",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &namespace_detail,
+                    &key,
+                    &expected_source_ts,
+                    &expected_source_region,
+                ],
+            )
+            .await?;
+        let now_ns = i64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        )
+        .unwrap_or(i64::MAX);
+        let (erased_at_source_ts, erased_at_source_region) = dominating_erasure_clock(
+            Some((expected_source_ts, expected_source_region)),
+            now_ns,
+            &self.config.home_region,
+        );
+        transaction
+            .execute(
+                "INSERT INTO collective_erasure_tombstones
+                    (spirit_pid, namespace_kind, namespace_detail, key,
+                     erased_at_source_ts, erased_at_source_region)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
+                 DO UPDATE SET
+                     erased_at_source_ts = EXCLUDED.erased_at_source_ts,
+                     erased_at_source_region = EXCLUDED.erased_at_source_region,
+                     created_at = NOW()
+                 WHERE EXCLUDED.erased_at_source_ts >
+                           collective_erasure_tombstones.erased_at_source_ts
+                    OR (EXCLUDED.erased_at_source_ts =
+                           collective_erasure_tombstones.erased_at_source_ts
+                        AND EXCLUDED.erased_at_source_region >
+                           collective_erasure_tombstones.erased_at_source_region)",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &namespace_detail,
+                    &key,
+                    &erased_at_source_ts,
+                    &erased_at_source_region,
+                ],
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(CollectiveEraseReceipt {
+            deleted_rows,
+            tombstone_recorded: true,
+        })
+    }
+
     /// Erase exactly the crossed physical row received from `source_team`.
     ///
-    /// Unlike [`Self::erase`], this never falls back to the native logical
-    /// address. Reconciliation has already selected a crossed row and must not
-    /// silently delete a same-key native row instead.
+    /// The expected generation is checked while holding the writer's advisory
+    /// lock and is repeated in the DELETE predicate, so a later generation
+    /// cannot be removed by a reconciliation for an earlier share.
     pub async fn erase_crossed_row(
         &self,
         spirit_pid: u32,
         namespace: &MemoryNamespace,
         key: &str,
         source_team: &TeamId,
+        expected_source_ts: i64,
+        expected_source_region: &str,
     ) -> Result<CollectiveEraseReceipt, StoreError> {
         self.team_guard(spirit_pid)?;
         reject_principal_namespace(namespace)?;
         let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
-        let physical_namespace_prefix = format!(
-            "xteam:{}:{}",
-            source_team.as_str(),
-            hex::encode(logical_namespace_detail.as_bytes())
-        );
+        let physical_namespace_detail =
+            cross_team_namespace_detail(source_team, &logical_namespace_detail);
         let lock_key = erasure_lock_key(spirit_pid, namespace_kind, &logical_namespace_detail, key);
         let mut client = self.get_client_with_timeout().await?;
         let transaction = client.transaction().await?;
@@ -1067,38 +1125,44 @@ impl LoomLiteStore {
             .await?;
         let row = transaction
             .query_opt(
-                "SELECT namespace_detail, source_ts, source_region
+                "SELECT source_ts, source_region
                  FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND namespace_detail LIKE $3 AND key = $4 AND source_team = $5
+                   AND namespace_detail = $3 AND key = $4 AND source_team = $5
                  FOR UPDATE",
-                &[
-                    &(spirit_pid as i64),
-                    &namespace_kind,
-                    &format!("{physical_namespace_prefix}%"),
-                    &key,
-                    &source_team.as_str(),
-                ],
-            )
-            .await?;
-        let physical_namespace_detail = row
-            .as_ref()
-            .map(|row| row.get::<_, String>(0))
-            .unwrap_or(physical_namespace_prefix);
-        let row_erasure_clock = row
-            .as_ref()
-            .map(|row| (row.get::<_, i64>(1), row.get::<_, String>(2)));
-        let deleted_rows = transaction
-            .execute(
-                "DELETE FROM collective_memory
-                 WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND namespace_detail = $3 AND key = $4 AND source_team = $5",
                 &[
                     &(spirit_pid as i64),
                     &namespace_kind,
                     &physical_namespace_detail,
                     &key,
                     &source_team.as_str(),
+                ],
+            )
+            .await?;
+        if let Some(row) = row.as_ref() {
+            if row.get::<_, i64>(0) != expected_source_ts
+                || row.get::<_, String>(1) != expected_source_region
+            {
+                return Err(StoreError::StaleGeneration);
+            }
+        }
+        let row_erasure_clock = row
+            .as_ref()
+            .map(|row| (row.get::<_, i64>(0), row.get::<_, String>(1)));
+        let deleted_rows = transaction
+            .execute(
+                "DELETE FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4 AND source_team = $5
+                   AND source_ts = $6 AND source_region = $7",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &physical_namespace_detail,
+                    &key,
+                    &source_team.as_str(),
+                    &expected_source_ts,
+                    &expected_source_region,
                 ],
             )
             .await?;
@@ -1646,7 +1710,8 @@ impl LoomLiteStore {
             .query(
                 "SELECT spirit_pid, namespace_kind, namespace_detail, key,
                         value_kind, value_data, source_region, source_ts, source_log_ref,
-                        source_team, distillation_depth, intent_lineage
+                        source_team, distillation_depth, intent_lineage,
+                        cross_emitter_host, cross_op_id, cross_source_ts, cross_source_region
                  FROM collective_memory
                  ORDER BY spirit_pid, namespace_kind, namespace_detail, key",
                 &[],
@@ -1686,6 +1751,10 @@ impl LoomLiteStore {
                 source_team,
                 distillation_depth,
                 intent_lineage,
+                cross_emitter_host: row.get(12),
+                cross_op_id: row.get(13),
+                cross_source_ts: row.get(14),
+                cross_source_region: row.get(15),
             });
         }
         Ok(out)
@@ -1740,6 +1809,11 @@ pub struct CollectiveRow {
     /// Story 13.3b: `None` preserves v1/v2; v3 carries both fields together.
     pub distillation_depth: Option<u32>,
     pub intent_lineage: Option<IntentLineage>,
+    /// Nullable share-operation binding copied only onto crossed rows.
+    pub cross_emitter_host: Option<String>,
+    pub cross_op_id: Option<String>,
+    pub cross_source_ts: Option<i64>,
+    pub cross_source_region: Option<String>,
 }
 
 impl From<StoreError> for MemoryError {
@@ -1905,29 +1979,14 @@ mod tests {
     }
 
     #[test]
-    fn crossed_marker_preserves_logical_detail_and_binds_share_operation() {
+    fn crossed_marker_preserves_logical_detail() {
         let team = TeamId::new("team-a").unwrap();
-        let detail = cross_team_namespace_detail_with_metadata(
-            &team,
-            "detail",
-            Some("host-a"),
-            Some("0123456789abcdef0123456789abcdef"),
-            Some((42, "region-a")),
-        );
+        let detail = cross_team_namespace_detail(&team, "detail");
         assert_eq!(
             original_cross_team_namespace_detail(&team, &detail),
             Some("detail".to_string())
         );
-        assert_eq!(
-            parse_crossed_row_origin(&detail),
-            Some(CrossedRowOrigin {
-                source_team: team,
-                emitter_host: "host-a".to_string(),
-                op_id: "0123456789abcdef0123456789abcdef".to_string(),
-                source_ts: 42,
-                source_region: "region-a".to_string(),
-            })
-        );
+        assert_eq!(detail, "xteam:team-a:64657461696c");
     }
 
     /// Patch 1 (F18): the store-level typed refusals for a STALE map and an
