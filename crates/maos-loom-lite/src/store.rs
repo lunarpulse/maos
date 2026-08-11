@@ -695,7 +695,7 @@ impl LoomLiteStore {
             }
         }
 
-        transaction
+        let changed = transaction
             .execute(
                 "INSERT INTO collective_memory
                     (spirit_pid, namespace_kind, namespace_detail, key,
@@ -726,7 +726,8 @@ impl LoomLiteStore {
                      cross_op_id = NULL,
                      cross_source_ts = NULL,
                      cross_source_region = NULL
-                 WHERE collective_memory.source_team IS NOT DISTINCT FROM EXCLUDED.source_team
+                 WHERE ($19 OR EXCLUDED.source_team IS NULL
+                        OR collective_memory.source_team IS NOT DISTINCT FROM EXCLUDED.source_team)
                    AND (
                        EXCLUDED.source_ts > collective_memory.source_ts
                        OR (EXCLUDED.source_ts = collective_memory.source_ts
@@ -751,9 +752,15 @@ impl LoomLiteStore {
                     &region_sig,
                     &bundle_schema_version,
                     &inclusion_path,
+                    &(!crossed),
                 ],
             )
             .await?;
+        if !crossed && changed != 1 {
+            return Err(StoreError::Serialization(
+                "native originated row did not replace its existing generation".to_string(),
+            ));
+        }
         transaction.commit().await?;
 
         Ok(())
@@ -1061,6 +1068,45 @@ impl LoomLiteStore {
                 return Err(StoreError::StaleGeneration);
             }
         } else {
+            let now_ns = i64::try_from(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos(),
+            )
+            .unwrap_or(i64::MAX);
+            let (erased_at_source_ts, erased_at_source_region) = dominating_erasure_clock(
+                Some((expected_source_ts, expected_source_region)),
+                now_ns,
+                &self.config.home_region,
+            );
+            transaction
+                .execute(
+                    "INSERT INTO collective_erasure_tombstones
+                        (spirit_pid, namespace_kind, namespace_detail, key,
+                         erased_at_source_ts, erased_at_source_region)
+                     VALUES ($1, $2, $3, $4, $5, $6)
+                     ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
+                     DO UPDATE SET
+                         erased_at_source_ts = EXCLUDED.erased_at_source_ts,
+                         erased_at_source_region = EXCLUDED.erased_at_source_region,
+                         created_at = NOW()
+                     WHERE EXCLUDED.erased_at_source_ts >
+                               collective_erasure_tombstones.erased_at_source_ts
+                        OR (EXCLUDED.erased_at_source_ts =
+                               collective_erasure_tombstones.erased_at_source_ts
+                            AND EXCLUDED.erased_at_source_region >
+                               collective_erasure_tombstones.erased_at_source_region)",
+                    &[
+                        &(spirit_pid as i64),
+                        &namespace_kind,
+                        &namespace_detail,
+                        &key,
+                        &erased_at_source_ts,
+                        &erased_at_source_region,
+                    ],
+                )
+                .await?;
             transaction.commit().await?;
             return Ok(CollectiveEraseReceipt {
                 deleted_rows: 0,

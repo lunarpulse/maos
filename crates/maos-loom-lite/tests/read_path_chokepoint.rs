@@ -90,39 +90,61 @@ fn attestation_guard_wired_into_both_spirit_reads() {
     );
 }
 
+fn public_store_method_name(signature: &str) -> &str {
+    signature
+        .strip_prefix("pub async fn ")
+        .or_else(|| signature.strip_prefix("pub fn "))
+        .expect("public method signature")
+        .split(['(', '<'])
+        .next()
+        .expect("method name")
+}
+
 #[test]
 fn team_guard_covers_all_public_store_entry_points() {
-    for signature in [
-        "pub async fn write(",
-        "pub async fn read(",
-        "pub async fn scan(",
-        "pub async fn crossed_row_origin(",
-        "pub async fn native_row_generation(",
-        "pub async fn erase(",
-        "pub async fn erase_at_generation(",
-        "pub async fn erase_crossed_row(",
-    ] {
-        let body = function_body(STORE_SRC, signature);
-        assert_eq!(
-            count_code_occurrences(body, "self.team_guard("),
-            1,
-            "{signature} must invoke team_guard exactly once before querying"
-        );
-    }
+    let store_impl = function_body(STORE_SRC, "impl LoomLiteStore {");
+    // These public seams are construction, composition, schema/provenance, or
+    // operator-only plumbing—not Spirit-addressed data access. Each exception
+    // is named so adding a new public method cannot silently bypass the guard.
+    let exemptions = [
+        ("new", "constructs a store before a Spirit exists"),
+        ("with_at_rest_seal", "composition-time builder"),
+        ("with_tenant_map", "composition-time builder"),
+        ("with_cross_team_consent", "composition-time builder"),
+        ("with_team_verifying_keys", "composition-time builder"),
+        ("at_rest_sealer", "seal posture accessor"),
+        ("init_schema", "operator schema initialization"),
+        ("current_database", "operator connection diagnostic"),
+        ("write_with_source", "verified replication apply seam"),
+        ("annotate_crossed_row", "verified apply's operation binding"),
+        ("read_all_rows_from", "internal provenance/readback helper"),
+        ("pool", "migration and physical-verification access"),
+        ("config", "configuration accessor"),
+    ];
 
-    assert_eq!(
-        count_code_occurrences(STORE_SRC, "self.team_guard("),
-        8,
-        "team_guard must cover every public data-store path"
-    );
+    let public_methods: Vec<_> = store_impl
+        .lines()
+        .map(str::trim_start)
+        .filter(|line| line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+        .collect();
+    assert!(!public_methods.is_empty(), "must discover public store methods");
 
-    for signature in ["pub async fn write_with_source(", "pub fn pool("] {
-        let body = function_body(STORE_SRC, signature);
-        assert_eq!(
-            count_code_occurrences(body, "self.team_guard("),
-            0,
-            "{signature} is deliberately unguarded"
-        );
+    for signature in public_methods {
+        let name = public_store_method_name(signature);
+        let body = function_body(store_impl, signature);
+        if let Some((_, reason)) = exemptions.iter().find(|(candidate, _)| *candidate == name) {
+            assert_eq!(
+                count_code_occurrences(body, "self.team_guard("),
+                0,
+                "{signature} is deliberately unguarded: {reason}"
+            );
+        } else {
+            assert_eq!(
+                count_code_occurrences(body, "self.team_guard("),
+                1,
+                "{signature} must invoke team_guard exactly once before querying"
+            );
+        }
     }
 }
 

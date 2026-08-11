@@ -1,7 +1,7 @@
 {
   "gate": "check-multi-tenant-loom",
-  "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
-  "substrate_nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+  "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
+  "substrate_nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
   "product_claim": "PROVEN",
   "operator_key_available": true,
   "operator_key_reason": "operator audit key loaded (MAOS_AUDIT_KEY precedence)",
@@ -10,16 +10,16 @@
   ],
   "legs": [
     {
-      "name": "seven-site-chokepoint",
+      "name": "team-guard-chokepoint",
       "binding": "blocking",
       "required": true,
       "attempted": true,
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/seven-site-chokepoint@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/team-guard-chokepoint@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
-        "team_guard_is_exactly_the_seven_guarded_entry_points"
+        "team_guard_covers_all_public_store_entry_points"
       ],
       "signature_block": [],
       "detail": "running 1 test; 1 passed; hermetic leg — reproducible from source, no signature required"
@@ -32,7 +32,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/tenant-map-hermetic-matrix@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/tenant-map-hermetic-matrix@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tenant_map_13_1_gate_matrix"
       ],
@@ -47,7 +47,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/manifest-option-a-plus-matrix@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/manifest-option-a-plus-matrix@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "manifest::tests::tenant_manifest_option_a_plus_gate_matrix"
       ],
@@ -62,21 +62,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/two-datname-physical-absence@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/two-datname-physical-absence@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tenant_wall_two_datname_physical_absence_and_assignment_matrix"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "tenant_wall_two_datname_physical_absence_and_assignment_matrix",
           "outcome": "PASSED",
-          "signature": "700891ca8e08ff9322b59ee16b7decfe55fd879fe555c77ec9b026f6bc2e5edb1529e5700c785ed4f3f52843089c6f7a66782c6a3341c59184ccd566d8fa150e"
+          "signature": "295fc113643b0cb957a622449820b4d3f1862f33ef4d8e79d145560337cd838c603efe15fe384f4d2fd964ab74f76658a910d56caf9ad0f96bec2d23744aed0a"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [tenant_wall_two_datname_physical_absence_and_assignment_matrix] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [tenant_wall_two_datname_physical_absence_and_assignment_matrix] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "d1-forged-stamp-served-boundary",
@@ -86,21 +86,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/d1-forged-stamp-served-boundary@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/d1-forged-stamp-served-boundary@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tenant_wall_d1_forged_stamp_is_still_served_boundary"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "tenant_wall_d1_forged_stamp_is_still_served_boundary",
           "outcome": "PASSED",
-          "signature": "c20038d6a342c94ae9a0bd78a8236f83404883d4788f378b06204bafa25126e43d788fb56a1def5d8ac55ec72f0ba0a964a33aaf8a9f74d7b32c1c485fcad907"
+          "signature": "a3f4e3fff6efcfc28e5fedbd9cdb962ce2304a9f459ff55cf0a77ac1d348f2cbeafc77aba5322cf92d9052cd8239f6c65717bb592aac7228f3d4c8c98f404e09"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [tenant_wall_d1_forged_stamp_is_still_served_boundary] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [tenant_wall_d1_forged_stamp_is_still_served_boundary] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "forged-team-stamp-refused-at-verify",
@@ -110,7 +110,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/forged-team-stamp-refused-at-verify@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/forged-team-stamp-refused-at-verify@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::bundle::tests::test_forged_team_stamp_refused_at_verify_same_region"
       ],
@@ -125,7 +125,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/apply-refuses-forged-bundle@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/apply-refuses-forged-bundle@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::bundle::tests::test_apply_refuses_forged_bundle_writes_zero_rows"
       ],
@@ -140,7 +140,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/team-identity-source-reflex@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/team-identity-source-reflex@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::bundle::tests::test_team_identity_source_reflex"
       ],
@@ -155,21 +155,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/per-team-merkle-independence@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/per-team-merkle-independence@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tenant_wall_per_team_merkle_independence_mixed_v1_v2"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "tenant_wall_per_team_merkle_independence_mixed_v1_v2",
           "outcome": "PASSED",
-          "signature": "13e41bc2bba2940773b17402f884210cc1cdcb93515a6fe16c9e83cde3891ec0ceddb8cf29022743afc47644b349f41eeeaabb0d5fd4d8f199d9ed05b7734904"
+          "signature": "ce0a211c3840f1e8d9ff068779cc2ac48ed7527fc6ab20337f79cb3ee1db7406242c9c9c1ff5ab10b09c8e9d71e579aeb705fe0950898281df4b29d579715209"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [tenant_wall_per_team_merkle_independence_mixed_v1_v2] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [tenant_wall_per_team_merkle_independence_mixed_v1_v2] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "three-team-databases-physically-distinct",
@@ -179,21 +179,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/three-team-databases-physically-distinct@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/three-team-databases-physically-distinct@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "three_team_databases_are_physically_distinct"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "three_team_databases_are_physically_distinct",
           "outcome": "PASSED",
-          "signature": "3c7cd2aac19d1d5bc0aa4898a2641c63fd7a08f8bb02ab862ba810b321291a08e71f5b72b52280835311ca7c48d9e346eda4bd3a35186dfe2ed9a028db409402"
+          "signature": "3ac6e95587fc8fd9068d584279c11cb2570c3f25cf4ff7453681002cb182c1394318688af693a8fb537245c69e52104be67f4b7333291f432e498dd7c2fe3a07"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [three_team_databases_are_physically_distinct] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [three_team_databases_are_physically_distinct] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "topology-fraud-region-datname-proven-red",
@@ -203,7 +203,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/topology-fraud-region-datname-proven-red@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/topology-fraud-region-datname-proven-red@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "topology_fraud_control_reds_on_a_collapsed_region_axis"
       ],
@@ -218,7 +218,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/topology-fraud-physical-absence-proven-red@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/topology-fraud-physical-absence-proven-red@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "topology_fraud_control_reds_on_a_pre_replication_row_that_is_present"
       ],
@@ -233,7 +233,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/topology-fraud-team-datname-proven-red@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/topology-fraud-team-datname-proven-red@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "topology_fraud_control_reds_on_a_collapsed_team_axis"
       ],
@@ -248,7 +248,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-wiring-sites-individually-falsifiable@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-wiring-sites-individually-falsifiable@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "every_crossing_wiring_site_is_individually_falsifiable"
       ],
@@ -263,21 +263,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/refused-crossing-operator-tail-and-repair@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/refused-crossing-operator-tail-and-repair@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair",
           "outcome": "PASSED",
-          "signature": "f084db3b35c664956dc92d3f2d8a7fd7dec237d6d268ab7063bfdb2a3703f8bd52ebf1b9c9549d5025c651dd34a63586721b59749bcf167dd06547420caf8401"
+          "signature": "2d4597a9b42340e97e5b42171a593f4961be67cf922111e7b36a46906f201df88515ada5c1c3250018c7c594e93d0f95e7645dcc1ea8d14e3411620c8a4fb402"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "cross-team-crossing-lands-with-bound-source-team",
@@ -287,21 +287,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/cross-team-crossing-lands-with-bound-source-team@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-team-crossing-lands-with-bound-source-team@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_team_crossing_lands_with_bound_source_team"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "cross_team_crossing_lands_with_bound_source_team",
           "outcome": "PASSED",
-          "signature": "35a9ebba4b3e69ecc13f81d43aa447abcd919a24b2353c240e191a2c2a709d6310dbd733a4966a8780956863f6896cd597cd0043a9b31477ebc106eb2bef7100"
+          "signature": "a9f1a97b9fb5d8c5dbd4066dd690bb25a6ea1514894dbdc7a89a70c80b2483dfbc2a93b1bae0171d19710b4ba2dc98b0eab7026010fe2138f361905a23f38a01"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [cross_team_crossing_lands_with_bound_source_team] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [cross_team_crossing_lands_with_bound_source_team] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "asymmetric-consent-reverse-share-refused",
@@ -311,21 +311,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/asymmetric-consent-reverse-share-refused@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/asymmetric-consent-reverse-share-refused@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "asymmetric_consent_reverse_share_refused"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "asymmetric_consent_reverse_share_refused",
           "outcome": "PASSED",
-          "signature": "dafb791ef84d47098255645fb7d2c1a7d0d990d8a7697fab296e4417aeb5b795189724600d785d12882b4e2e9d6882382d0d3dc4e8686a6c8d333eeaa5fc0d0e"
+          "signature": "3c467179e15803c36f379556a50ba1eb7c7746a7cd9208cd863749b6a54f2e4da4979e819be3d30e1dcc36410ed5a477ada1c72dbd4c146e3ff320bb692ed505"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [asymmetric_consent_reverse_share_refused] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [asymmetric_consent_reverse_share_refused] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "cross-team-clobber-refused",
@@ -335,21 +335,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/cross-team-clobber-refused@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-team-clobber-refused@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_team_clobber_refused"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "cross_team_clobber_refused",
           "outcome": "PASSED",
-          "signature": "3c9a8e1ae44c502f9232c442b62f6909a8801c0b68f854ae4554d2eefaa97f924c0e70db28d6ee3ad0f9d143f69e19948709f3fde62f7d486444f45d5427c10b"
+          "signature": "a6e2f60976ffb3aa55166e96670d058e84147eac9b065b0184d10b8274e3e8def8b5bd6b76f68839446acba3cdef9e50c01d5a62db8565da7e504fddcd421e09"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [cross_team_clobber_refused] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [cross_team_clobber_refused] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "per-row-inclusion-verified-at-read-time",
@@ -359,21 +359,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/per-row-inclusion-verified-at-read-time@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/per-row-inclusion-verified-at-read-time@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "per_row_inclusion_verified_at_read_time"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "per_row_inclusion_verified_at_read_time",
           "outcome": "PASSED",
-          "signature": "f5c350fcd1a1f56ddcda69ee64423455a78307d5896bf41bb321eb60c868c40884cbb197b82babb99ec80faabb904ee7608178a87a0fab049a574a6f7d1f150e"
+          "signature": "83a41714ee5b76ac326cf3ac412cd32d469416fded654ab134c5275d42f9d50fbd1e200958ffad15140fe2e13885f35c6d32f9b925fec224d7b53cd12f81170e"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [per_row_inclusion_verified_at_read_time] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [per_row_inclusion_verified_at_read_time] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "foreign-team-row-without-attestation-refused-at-read",
@@ -383,21 +383,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/foreign-team-row-without-attestation-refused-at-read@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/foreign-team-row-without-attestation-refused-at-read@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "unattested_cross_team_row_is_refused_at_read"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "unattested_cross_team_row_is_refused_at_read",
           "outcome": "PASSED",
-          "signature": "3fb12a1c5bb1bcfa2b521893764bef0cd938ced4166927f56859a205ede56693939ce5d57542050e6c34232343f37e5d82f9c4f22fbaa1b3e24f88be1bcfb408"
+          "signature": "b6397ea0c7b9b613ca73c4128af94ef7f7a0819cb9a234c1e9fd45603c326462cfc63dee9eaf70d38d45d02efcc9dc50120e5e687f82dee74d8f656be9d84909"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [unattested_cross_team_row_is_refused_at_read] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [unattested_cross_team_row_is_refused_at_read] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "cross-team-apply-requires-claimed-pair-verifying-key",
@@ -407,7 +407,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-team-apply-requires-claimed-pair-verifying-key@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-team-apply-requires-claimed-pair-verifying-key@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "apply_refuses_crossing_without_claimed_pair_verifying_key"
       ],
@@ -422,7 +422,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/tenant-consent-cause-taxonomy@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/tenant-consent-cause-taxonomy@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::tests::five_tenant_consent_causes_remain_distinguishable"
       ],
@@ -437,7 +437,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-has-production-initiator-both-endpoints@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-has-production-initiator-both-endpoints@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_has_a_production_initiator_at_both_endpoints"
       ],
@@ -452,7 +452,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-scan-closes-originate-team-row-hole@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-scan-closes-originate-team-row-hole@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_scan_closes_the_originate_team_row_hole"
       ],
@@ -467,7 +467,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/exactly-one-production-loom-lite-store@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/exactly-one-production-loom-lite-store@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "exactly_one_production_loom_lite_store_construction"
       ],
@@ -482,7 +482,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-payload-team-must-equal-authenticated-envelope@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-payload-team-must-equal-authenticated-envelope@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_weld_refuses_a_forged_payload_team_before_apply"
       ],
@@ -497,7 +497,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-weld-is-a-binding-not-a-refuse-all-stub@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-weld-is-a-binding-not-a-refuse-all-stub@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_weld_admits_the_authenticated_team_and_proceeds_to_apply"
       ],
@@ -512,7 +512,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-applier-ignores-non-crossing-frames@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-applier-ignores-non-crossing-frames@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_applier_ignores_frames_that_are_not_crossings"
       ],
@@ -527,7 +527,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-control-rides-the-telemetry-idiom@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-control-rides-the-telemetry-idiom@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_control_round_trips_through_the_telemetry_idiom"
       ],
@@ -542,7 +542,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/boot-refuses-home-team-manifest-disagreement@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/boot-refuses-home-team-manifest-disagreement@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "boot_refuses_a_home_team_that_disagrees_with_the_signed_manifest"
       ],
@@ -557,7 +557,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/boot-refuses-uncorroborated-home-team@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/boot-refuses-uncorroborated-home-team@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "boot_refuses_a_home_team_the_manifest_cannot_corroborate"
       ],
@@ -572,7 +572,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-weld-refusal-has-its-own-wire-code@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-weld-refusal-has-its-own-wire-code@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_source_team_unbound_survives_the_wire_under_its_own_code"
       ],
@@ -587,7 +587,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-consent-denial-reaches-the-emitter@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-consent-denial-reaches-the-emitter@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_consent_denial_reaches_the_emitter_with_the_ordered_pair"
       ],
@@ -602,7 +602,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-causes-stay-distinguishable-on-the-wire@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-causes-stay-distinguishable-on-the-wire@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_denial_staleness_and_unavailability_stay_distinguishable"
       ],
@@ -617,7 +617,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-applier-rejects-mismatched-frame-kind@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-applier-rejects-mismatched-frame-kind@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_applier_rejects_a_mismatched_frame_kind"
       ],
@@ -632,7 +632,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-binds-requested-destination-team@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-binds-requested-destination-team@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_applier_binds_the_requested_destination_team"
       ],
@@ -647,7 +647,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-unconsented-applier-refusal@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-unconsented-applier-refusal@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "unconsented_crossing_is_refused_at_the_destination_applier"
       ],
@@ -662,7 +662,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-seedless-relabel-refusal@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-seedless-relabel-refusal@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "seedless_source_team_relabel_is_refused_at_the_destination_applier"
       ],
@@ -677,7 +677,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-rejects-unreadable-peer-config@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-rejects-unreadable-peer-config@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_request_rejects_non_utf8_peer_configuration"
       ],
@@ -692,7 +692,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-rejects-unreadable-namespace-config@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-rejects-unreadable-namespace-config@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_request_rejects_non_utf8_namespace_configuration"
       ],
@@ -707,7 +707,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-rejects-empty-key@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-rejects-empty-key@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_request_rejects_an_empty_key"
       ],
@@ -722,7 +722,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-unavailable-applier-fails-closed@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-unavailable-applier-fails-closed@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "router::tests::verified_crossing_without_an_applier_fails_closed"
       ],
@@ -737,7 +737,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-stale-gate-keeps-typed-outcome@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-stale-gate-keeps-typed-outcome@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "router::tests::stale_crossing_gate_keeps_the_typed_stale_outcome"
       ],
@@ -752,21 +752,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/live-crossing-runs-through-two-daemons@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/live-crossing-runs-through-two-daemons@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "live_crossing_runs_through_two_daemon_processes"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "live_crossing_runs_through_two_daemon_processes",
           "outcome": "PASSED",
-          "signature": "097b4aab000ff15fb06dd6bf7bc7d8e7ee76cb5499853dfda68c537616b9866bf713f8d95cf7216a89facf46c18e1a6165fe476fc1cac89200f7625d666ae400"
+          "signature": "80472ad4530b64adb6f10ad81f8bb19e67d0e1ec37a80ba6d60f47802a03fc7593bb484e3fd5f8a98589ef2ab3eb37678741982586e946576d3210c5e27b930c"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [live_crossing_runs_through_two_daemon_processes] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [live_crossing_runs_through_two_daemon_processes] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "leaf-v3-preserves-v1-and-v2-goldens",
@@ -776,7 +776,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/leaf-v3-preserves-v1-and-v2-goldens@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/leaf-v3-preserves-v1-and-v2-goldens@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::leaf::tests::test_v3_provenance_is_additive_and_predecessors_stay_frozen"
       ],
@@ -791,7 +791,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/leaf-v3-golden@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/leaf-v3-golden@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::leaf::tests::test_v3_canonical_hash_golden"
       ],
@@ -806,21 +806,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/provenance-carries-across-two-stores@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/provenance-carries-across-two-stores@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "v3_provenance_crosses_team_wall_and_survives_rebundle"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "v3_provenance_crosses_team_wall_and_survives_rebundle",
           "outcome": "PASSED",
-          "signature": "467b7c9455d1f772f632be016f8fe430d15781a0e0e1185b4828769aca2418228e2e448cc3f9510fea801c4fefe919ba9c62d2404808a4f0371565311622d108"
+          "signature": "e99cd18b6787526f601be928e6efebbca1b3f49755c34a159944944d5b2c4354ba195d392ea19e507eed1559f9b8f99c657967ad781295151a0bd5c0cf90520c"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [v3_provenance_crosses_team_wall_and_survives_rebundle] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [v3_provenance_crosses_team_wall_and_survives_rebundle] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "leaf-origin-relabel-refused-at-build",
@@ -830,7 +830,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/leaf-origin-relabel-refused-at-build@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/leaf-origin-relabel-refused-at-build@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::bundle::tests::v2_builder_refuses_to_relabel_a_foreign_origin_leaf"
       ],
@@ -845,7 +845,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/first-party-promotion-still-permitted@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/first-party-promotion-still-permitted@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::bundle::tests::v2_builder_promotes_a_first_party_leaf_and_is_idempotent"
       ],
@@ -860,7 +860,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/leaf-v3-boundary-shift@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/leaf-v3-boundary-shift@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "replication::leaf::tests::test_source_team_v3_tail_boundary_shift_no_collision"
       ],
@@ -875,7 +875,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-refusal-distinguishable@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-refusal-distinguishable@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes"
       ],
@@ -890,7 +890,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-no-consent-provider@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-no-consent-provider@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_without_injected_consent_fails_closed"
       ],
@@ -905,7 +905,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-no-grant@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-no-grant@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_no_grant_is_observable"
       ],
@@ -920,7 +920,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-wrong-direction@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-wrong-direction@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_wrong_direction_is_observable"
       ],
@@ -935,7 +935,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-stale-state@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-stale-state@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_stale_state_is_observable"
       ],
@@ -950,7 +950,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-unavailable-state@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-unavailable-state@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_unavailable_state_is_observable"
       ],
@@ -965,7 +965,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-read-port-unavailable@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-read-port-unavailable@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_granted_without_read_port_fails_closed"
       ],
@@ -980,7 +980,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-local-emitter-scope@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-local-emitter-scope@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::recall_emitter_scope_only_returns_own_frames"
       ],
@@ -995,7 +995,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-ranged-recall-compile-pinned@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-ranged-recall-compile-pinned@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "researcher_recall_surface_cannot_import_unscoped_ranged_recall"
       ],
@@ -1010,7 +1010,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-manifest-direction@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-manifest-direction@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_recall_manifest_direction_and_staleness_are_typed"
       ],
@@ -1025,7 +1025,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-filter-no-team-dimension@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-filter-no-team-dimension@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "log_recall_filter_has_no_team_dimension"
       ],
@@ -1040,7 +1040,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-remote-artifact-read@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-remote-artifact-read@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_reader_returns_rows_from_the_named_bound_artifact"
       ],
@@ -1055,7 +1055,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-foreign-binding-refused@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-foreign-binding-refused@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_reader_refuses_a_path_whose_artifact_binding_names_another_team"
       ],
@@ -1070,7 +1070,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-read-only-open@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-read-only-open@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_reader_open_is_read_only_nofollow_and_non_migrating"
       ],
@@ -1085,7 +1085,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-remote-not-local@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-remote-not-local@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "consented_cross_wall_page_contains_remote_frames_and_no_local_frames"
       ],
@@ -1100,7 +1100,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-ordinary-foreign-open-refused@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-ordinary-foreign-open-refused@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "ordinary_boot_path_still_refuses_a_foreign_bound_artifact"
       ],
@@ -1115,7 +1115,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/diamond-provenance-flattens@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/diamond-provenance-flattens@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::distillate::tests::diamond_dependency_is_not_a_cycle"
       ],
@@ -1130,7 +1130,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/diamond-true-cycle-still-rejected@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/diamond-true-cycle-still-rejected@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cycle_detection"
       ],
@@ -1145,7 +1145,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-production-caller-live@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-production-caller-live@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_recall_has_production_caller_and_live_preconditions"
       ],
@@ -1160,7 +1160,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-signed-consent-live-path@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-signed-consent-live-path@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_recall_live_path_uses_verified_state_and_home_team"
       ],
@@ -1175,7 +1175,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-request-parser@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-request-parser@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tests::story_13_6d_parses_validated_cross_wall_traceback_request"
       ],
@@ -1190,7 +1190,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-request-parser-refuses-invalid@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-request-parser-refuses-invalid@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tests::story_13_6d_rejects_invalid_or_incomplete_traceback_request"
       ],
@@ -1205,7 +1205,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-refusal-and-disclosure-journaled@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-refusal-and-disclosure-journaled@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cross_wall_recall_refusals_and_disclosures_are_journaled"
       ],
@@ -1220,7 +1220,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-refusal-journal@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-refusal-journal@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_journals_refusal"
       ],
@@ -1235,7 +1235,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-disclosure-before-read@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cross-wall-recall-disclosure-before-read@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::log_recall::tests::cross_wall_recall_journals_disclosure_before_remote_read"
       ],
@@ -1250,7 +1250,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/digest-frame-ref-codec@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/digest-frame-ref-codec@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tests::frame_ref_codec_accepts_compact_and_colon_grouped_formats"
       ],
@@ -1265,7 +1265,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/digest-clause-source-redaction@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/digest-clause-source-redaction@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tests::real_writer_accepts_owned_evidence_and_rejects_peer_private_evidence"
       ],
@@ -1280,7 +1280,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/digest-clause-source-secret-scrub@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/digest-clause-source-secret-scrub@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "adapter::redaction::tests::clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets"
       ],
@@ -1295,7 +1295,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cohort-daemon-boots-and-serves@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cohort-daemon-boots-and-serves@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cohort_daemon_boots_and_serves"
       ],
@@ -1310,7 +1310,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cohort-daemon-per-boot-nonce-single-sourced@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cohort-daemon-per-boot-nonce-single-sourced@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "daemon_boot_rows_prove_per_boot_nonce_variance"
       ],
@@ -1325,7 +1325,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/non-daemon-does-not-enable-tenant-map@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/non-daemon-does-not-enable-tenant-map@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "non_daemon_process_with_config_refuses_unrefreshable"
       ],
@@ -1340,7 +1340,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/enterprise-governance-reaches-cohort-daemon@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/enterprise-governance-reaches-cohort-daemon@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "story_13_5a_enterprise_daemon_seam::story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon"
       ],
@@ -1355,7 +1355,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/enterprise-governance-daemon-dead-wire-negative@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/enterprise-governance-daemon-dead-wire-negative@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "story_13_5a_enterprise_daemon_seam::story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied"
       ],
@@ -1370,7 +1370,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/enterprise-governance-daemon-dispatch-threaded@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/enterprise-governance-daemon-dispatch-threaded@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime"
       ],
@@ -1385,21 +1385,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/tenant-mode-boots-live@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/tenant-mode-boots-live@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "tenant_mode_boots_on_live_substrate"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "tenant_mode_boots_on_live_substrate",
           "outcome": "PASSED",
-          "signature": "b5c8128bfe5c29d5ccee1a3a0e4fb5f13863692a228fcf9e36d2b2464ba9a03973f3cdeb5f01b7f529147346c2ea526d1d867899b72e8454dfc71ad7abba6e0e"
+          "signature": "b2dfc87beb0db4d919950c92cc2ff0739b1b9a163e5222ca4512801fba501f751343debdd6cd14007a545f2e09f7504b2664913e2fbc71c7df2c98564574280f"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [tenant_mode_boots_on_live_substrate] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [tenant_mode_boots_on_live_substrate] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "collective-store-tenant-wall-live",
@@ -1409,21 +1409,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/collective-store-tenant-wall-live@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/collective-store-tenant-wall-live@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "spirit_collective_route_registered_pid_serves_only_own_team"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "spirit_collective_route_registered_pid_serves_only_own_team",
           "outcome": "PASSED",
-          "signature": "5a06823870eb7e17270671ccc7d093febf27941fa29f1a796d611f2870e88c7cecf528be533f6dfe91486f914b9dd8e24f32a103d1264b4fe5600ef8a6ca170a"
+          "signature": "ad2031f09f582c862a446c9eea8fc5c4a45ca3e5e2f5f13d0695c0d0a78d85baf0772e364faea08dbfb6b56946415ce4ffc6f815ea980b862808afd944371600"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [spirit_collective_route_registered_pid_serves_only_own_team] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [spirit_collective_route_registered_pid_serves_only_own_team] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "manifest-v4-additive-over-three-predecessors",
@@ -1433,7 +1433,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/manifest-v4-additive-over-three-predecessors@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/manifest-v4-additive-over-three-predecessors@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "manifest::tests::v4_is_additive_over_all_three_frozen_predecessors"
       ],
@@ -1448,7 +1448,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/manifest-v4-golden@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/manifest-v4-golden@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "manifest::tests::v4_canonical_body_matches_frozen_golden"
       ],
@@ -1463,7 +1463,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/manifest-v4-member-team-signature-bound@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/manifest-v4-member-team-signature-bound@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "manifest::tests::v4_member_team_is_signature_bound_and_fail_closed"
       ],
@@ -1478,7 +1478,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/manifest-v4-member-team-negatives-typed@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/manifest-v4-member-team-negatives-typed@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "manifest::tests::v4_member_team_rejections_are_typed"
       ],
@@ -1493,7 +1493,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/cohort-v4-to-v3-downgrade-refused-and-audited@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cohort-v4-to-v3-downgrade-refused-and-audited@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "state::tests::signed_v4_cache_refuses_higher_version_v3_reissue_and_audits_it"
       ],
@@ -1508,7 +1508,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/team-identity-impersonation-refused@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/team-identity-impersonation-refused@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "impersonation_is_refused_at_the_accept_seam"
       ],
@@ -1523,7 +1523,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/team-identity-absence-refuses@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/team-identity-absence-refuses@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_without_a_verified_team_claim_is_refused"
       ],
@@ -1538,7 +1538,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/team-identity-emitter-self-check@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/team-identity-emitter-self-check@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "emitter_refuses_a_crossing_it_cannot_speak_for"
       ],
@@ -1553,7 +1553,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-intent-not-reserved-both-seams@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-intent-not-reserved-both-seams@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "crossing_intent_is_not_reserved_so_both_seams_consult_the_gate"
       ],
@@ -1568,7 +1568,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-gate-wired-at-composition-root@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-gate-wired-at-composition-root@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "production_composition_root_wires_a_real_cohort_gate"
       ],
@@ -1583,7 +1583,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/eviction-enforced-on-both-endpoints@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/eviction-enforced-on-both-endpoints@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "eviction_is_enforced_on_both_endpoints_and_restoring_membership_recovers"
       ],
@@ -1598,7 +1598,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/stale-cache-refuses-crossing@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/stale-cache-refuses-crossing@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "stale_cache_refuses_the_crossing_on_both_seams"
       ],
@@ -1613,7 +1613,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/crossing-defer-refused-on-both-seams@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/crossing-defer-refused-on-both-seams@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "derostered_crossing_is_refused_on_both_seams"
       ],
@@ -1628,7 +1628,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/bilateral-fallback-preserved-for-non-crossing-intents@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/bilateral-fallback-preserved-for-non-crossing-intents@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "bilateral_fallback_survives_for_every_non_crossing_intent"
       ],
@@ -1643,21 +1643,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/cortex-fourteen-institution-isolation@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/cortex-fourteen-institution-isolation@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "cortex_fourteen_institution_isolation_live"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "cortex_fourteen_institution_isolation_live",
           "outcome": "PASSED",
-          "signature": "4a393319fdb812cfe4ec011e9b5789682c1b77ae68c45df5f257d6952d6bfb2305dc65c254a18152f31ad793b6cbacf158daa28c83e6e96d5d206002a03cfb01"
+          "signature": "f5e1d845174f2299842736d3f550134310e9e401235479378420bbd92b995c022e6f062a620aa990175c62f6afa3d012552e30bdf47113eef339ea2e2471ab04"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [cortex_fourteen_institution_isolation_live] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [cortex_fourteen_institution_isolation_live] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     },
     {
       "name": "kernel-baseline-pinned",
@@ -1667,7 +1667,7 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_BLOCKING",
-      "artifact_ref": "check-multi-tenant-loom/kernel-baseline-pinned@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/kernel-baseline-pinned@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [],
       "signature_block": [],
       "detail": "kernel baseline actual=pinned=23679; in-process baseline check (blocking)"
@@ -1693,21 +1693,21 @@
       "substrate_present": true,
       "green": true,
       "evidence_state": "PROVEN_LIVE_SIGNED",
-      "artifact_ref": "check-multi-tenant-loom/reza-three-team-three-region-journey@f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+      "artifact_ref": "check-multi-tenant-loom/reza-three-team-three-region-journey@e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
       "evidence_tests": [
         "reza_three_team_three_region_production_journey"
       ],
       "signature_block": [
         {
-          "commit": "f4611f2e29680994fdaec5440081be4ce30c853f",
+          "commit": "e38185eb02aea5fee9b44f7e15e46e2eb31cafa8",
           "gate": "check-multi-tenant-loom",
-          "nonce": "check-multi-tenant-loom.1a5d24.18caab478d7556dd",
+          "nonce": "check-multi-tenant-loom.1ef59b.18caaea13a3f8d49",
           "test": "reza_three_team_three_region_production_journey",
           "outcome": "PASSED",
-          "signature": "2cfeeba4cee2121f2af10d093d98e08aaf55049fdd6adfa9a8ee24202e62c6452ef7308bf8615ef5760e0cb28ff6516a46e76f7d53430dd033200c1ca4cfd40e"
+          "signature": "22fe19eddeada04187effcc334d340c4cfb61776def5854c638b79e68629c385cf1187c019d2567fff4454a73476ed3fd034f6ba81e9317aeb803e7bc84f480e"
         }
       ],
-      "detail": "running 1 test; 1 passed; harness tests [reza_three_team_three_region_production_journey] signed PASSED outcomes; verified against the operator-pinned key and bound to f4611f2e29680994fdaec5440081be4ce30c853f#check-multi-tenant-loom.1a5d24.18caab478d7556dd"
+      "detail": "running 1 test; 1 passed; harness tests [reza_three_team_three_region_production_journey] signed PASSED outcomes; verified against the operator-pinned key and bound to e38185eb02aea5fee9b44f7e15e46e2eb31cafa8#check-multi-tenant-loom.1ef59b.18caaea13a3f8d49"
     }
   ]
 }
