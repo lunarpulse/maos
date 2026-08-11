@@ -1805,8 +1805,13 @@ async fn live_crossing_runs_through_two_daemon_processes() {
                     && row.value_kind == "text"
                     && row.value_data == value.as_bytes()
                     && row.source_region == "region-a"
-                    && row.source_team.is_none()
+                    && row.source_team.as_ref().map(TeamId::as_str) == Some("team-a")
+                    && row.distillation_depth == Some(1)
+                    && row.intent_lineage.is_some()
+                    && row.cross_emitter_host.is_none()
                     && row.cross_op_id.is_none()
+                    && row.cross_source_ts.is_none()
+                    && row.cross_source_region.is_none()
                     && row.source_log_ref.is_empty()
             })
             .count(),
