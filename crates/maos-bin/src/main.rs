@@ -5057,12 +5057,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|_| "MAOS_COLLECTIVE_ERASE_PID is required")?
                 .parse::<u32>()
                 .map_err(|_| "MAOS_COLLECTIVE_ERASE_PID must be a u32")?;
-            let tenant_map = tenant_spirit_map.as_ref().ok_or(
-                "collective erase requires a verified cohort tenant-map source",
-            )?;
-            let bootstrap = cohort_daemon.as_ref().ok_or(
-                "collective erase requires MAOS_COHORT_DAEMON_CONFIG",
-            )?;
+            let tenant_map = tenant_spirit_map
+                .as_ref()
+                .ok_or("collective erase requires a verified cohort tenant-map source")?;
+            let bootstrap = cohort_daemon
+                .as_ref()
+                .ok_or("collective erase requires MAOS_COHORT_DAEMON_CONFIG")?;
             maos_loom_lite::tenant::TenantMapPort::register_spirit(
                 tenant_map.as_ref(),
                 spirit_pid,
@@ -5114,9 +5114,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             spirit_pid,
                             match &namespace {
                                 maos_domain::memory::MemoryNamespace::Default => "default",
-                                maos_domain::memory::MemoryNamespace::Coordination => "coordination",
+                                maos_domain::memory::MemoryNamespace::Coordination => {
+                                    "coordination"
+                                }
                                 maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
-                                maos_domain::memory::MemoryNamespace::Principal { .. } => unreachable!(),
+                                maos_domain::memory::MemoryNamespace::Principal { .. } => {
+                                    unreachable!()
+                                }
                             },
                             &audit_key,
                         );
@@ -5141,7 +5145,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 &origin.source_region,
                             )
                             .await
-                            .map_err(|error| format!("collective crossed-row erase failed: {error}"))?;
+                            .map_err(|error| {
+                                format!("collective crossed-row erase failed: {error}")
+                            })?;
                         (receipt, reconciliation)
                     }
                     #[cfg(not(feature = "network"))]
@@ -9546,39 +9552,41 @@ async fn run_cohort_a2a_daemon(
     // this process owns, and installed before the accept loop spawns so no
     // inbound connection observes a legacy-applier window.
     let base_seed = maos_bin::cross_team_consent::cross_team_base_seed_from_env()?;
-    let crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>> =
-        match (collective_store.as_ref(), base_seed, tenant_spirit_map.as_ref()) {
-            (Some(store), Some(seed), Some(tenant_map)) => {
-                let home_team =
-                    maos_domain::team::TeamId::new(&store.config().home_team).map_err(|error| {
-                        format!("cohort daemon: MAOS_LOOM_HOME_TEAM is not canonical: {error}")
-                    })?;
-                let cross_team_consent = Arc::new(
-                    maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(Arc::clone(
-                        &bootstrap.state,
-                    )),
-                )
+    let crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>> = match (
+        collective_store.as_ref(),
+        base_seed,
+        tenant_spirit_map.as_ref(),
+    ) {
+        (Some(store), Some(seed), Some(tenant_map)) => {
+            let home_team =
+                maos_domain::team::TeamId::new(&store.config().home_team).map_err(|error| {
+                    format!("cohort daemon: MAOS_LOOM_HOME_TEAM is not canonical: {error}")
+                })?;
+            let cross_team_consent =
+                Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(
+                    Arc::clone(&bootstrap.state),
+                ))
                     as Arc<dyn maos_loom_lite::cross_team_consent::CrossTeamConsentPort>;
-                Some(Arc::new(
-                    maos_bin::cross_team_crossing::CrossTeamCrossingAdapter::new(
-                        Arc::clone(store),
-                        home_team,
-                        seed,
-                    )
-                    .with_erase_reconciliation(
-                        cross_team_consent,
-                        Arc::clone(tenant_map),
-                        bootstrap.control_spirit.clone(),
-                        Arc::clone(&transparency_log),
-                    ),
+            Some(Arc::new(
+                maos_bin::cross_team_crossing::CrossTeamCrossingAdapter::new(
+                    Arc::clone(store),
+                    home_team,
+                    seed,
                 )
-                    as Arc<dyn maos_a2a_core::CrossTeamCrossingPort>)
-            }
-            // Fail-closed shape, not a silent pass: without a store or without
-            // the seed the applier cannot verify a bundle at all, so the legacy
-            // port stays installed and a crossing frame is never applied.
-            _ => None,
-        };
+                .with_erase_reconciliation(
+                    cross_team_consent,
+                    Arc::clone(tenant_map),
+                    bootstrap.control_spirit.clone(),
+                    Arc::clone(&transparency_log),
+                ),
+            )
+                as Arc<dyn maos_a2a_core::CrossTeamCrossingPort>)
+        }
+        // Fail-closed shape, not a silent pass: without a store or without
+        // the seed the applier cannot verify a bundle at all, so the legacy
+        // port stays installed and a crossing frame is never applied.
+        _ => None,
+    };
     let runtime = build_cohort_a2a_daemon_runtime(
         Arc::clone(&transparency_log),
         boot_nonce,
@@ -9960,9 +9968,9 @@ async fn emit_cross_team_share(
         maos_domain::memory::MemoryNamespace::Default => "default",
         maos_domain::memory::MemoryNamespace::Coordination => "coordination",
         maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
-        maos_domain::memory::MemoryNamespace::Principal { .. } => unreachable!(
-            "principal namespace was rejected before a cross-team share is emitted"
-        ),
+        maos_domain::memory::MemoryNamespace::Principal { .. } => {
+            unreachable!("principal namespace was rejected before a cross-team share is emitted")
+        }
     };
     let mut operation_entropy = [0_u8; 16];
     getrandom::fill(&mut operation_entropy)
@@ -10139,14 +10147,15 @@ async fn emit_collective_erase_reconciliation(
         audit_payload.to_string().as_bytes(),
     );
     shutdown?;
-    outcome.map_err(|error| {
-        format!(
-            "collective erase reconciliation incomplete at emitter host {}: {error}",
-            peer.as_str()
-        )
-        .into()
-    })
-    .map(|_| audit_payload)
+    outcome
+        .map_err(|error| {
+            format!(
+                "collective erase reconciliation incomplete at emitter host {}: {error}",
+                peer.as_str()
+            )
+            .into()
+        })
+        .map(|_| audit_payload)
 }
 
 /// Story 13.6b / AC2 — the emitter's stable discriminator for a refused

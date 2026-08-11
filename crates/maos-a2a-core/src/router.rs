@@ -19,8 +19,7 @@ use crate::cohort::{
     DigestReadPort, DigestReplyObservation, HaltReceiptObserver, LegacyCohortManifestGate,
     LegacyCrossTeamCrossingPort, LegacyDigestReadPort, LegacyHaltReceiptObserver,
     COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ, CROSSING_EVENT_TYPE,
-    CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT,
-    RESERVED_INTENT_REISSUE,
+    CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
@@ -1362,7 +1361,8 @@ impl A2ARouterCore {
             let verdict = match verdict {
                 CohortConsentVerdict::Defer
                     if cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
-                        || cohort_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT) =>
+                        || cohort_intent
+                            .eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT) =>
                 {
                     CohortConsentVerdict::Deny(CohortConsentDenial::CrossingDeferRefused)
                 }
@@ -1581,7 +1581,8 @@ impl A2ARouterCore {
         // Story 12.1/12.3 cohort gate — including `NotCurrent` for a host a
         // signed reissue no longer rosters (D-12) — refuses an evicted applier
         // before any bundle touches the store.
-        let crossing_to_apply = ((team_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+        let crossing_to_apply = ((team_intent
+            .eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
             || team_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT))
             && Self::is_crossing_frame(&request.params))
         .then(|| claimed_team.map(|team| (team.to_string(), request.params.clone())))

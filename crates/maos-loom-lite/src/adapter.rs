@@ -190,11 +190,9 @@ pub fn store_error_to_port_error(error: StoreError) -> CollectivePortError {
             erased_at_source_ts,
             erased_at_source_region,
         }),
-        StoreError::StaleGeneration => {
-            CollectivePortError::Transport(TransportCause::Other {
-                reason: "collective row generation changed before erase".to_string(),
-            })
-        }
+        StoreError::StaleGeneration => CollectivePortError::Transport(TransportCause::Other {
+            reason: "collective row generation changed before erase".to_string(),
+        }),
         StoreError::TenantMapStale { team_id, reason } => {
             CollectivePortError::Transport(TransportCause::MapStale { team_id, reason })
         }

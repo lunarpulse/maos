@@ -36,20 +36,20 @@
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
+use crate::cross_team_consent::CROSS_TEAM_COLLECTIVE_ERASE_INTENT;
 use maos_a2a_core::{
     CrossTeamCrossingPort, CrossingOutcome, CrossingRefusal, COHORT_INTENT_COLLECTIVE_SHARE,
     CROSSING_EVENT_TYPE,
 };
-use maos_iac::FrameFilter;
 use maos_domain::frame::{FramePayload, IacFrame, TelemetryEventPayload};
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::team::TeamId;
+use maos_iac::FrameFilter;
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 use maos_loom_lite::replication::bundle::{
     apply_replication_bundle, BundleError, CrossRegionReplicationBundle, CrossTeamApplyContext,
 };
 use maos_loom_lite::store::{LoomLiteStore, StoreError};
-use crate::cross_team_consent::CROSS_TEAM_COLLECTIVE_ERASE_INTENT;
 
 /// The wire body of a cross-team crossing frame.
 ///
@@ -129,9 +129,10 @@ impl CrossTeamCrossingControl {
             serde_json::from_str::<Self>(&payload.data)
                 .map_err(|error| format!("crossing frame body is undecodable: {error}"))
                 .and_then(|control| {
-                    if matches!((&control, expected_erase),
-                        (Self::Erase { .. }, true) | (Self::Share { .. }, false))
-                    {
+                    if matches!(
+                        (&control, expected_erase),
+                        (Self::Erase { .. }, true) | (Self::Share { .. }, false)
+                    ) {
                         Ok(control)
                     } else {
                         Err("crossing control kind does not match its fine-grained intent".into())
@@ -149,7 +150,6 @@ impl CrossTeamCrossingControl {
         })
     }
 }
-
 
 /// SHA-256 commitment to an erase locator. Length-prefixing makes the
 /// canonical grammar unambiguous; the raw key is never used for audit matching.
@@ -302,8 +302,8 @@ impl CrossTeamCrossingAdapter {
             if entry.intent != "collective.host.cross-team-share" {
                 return None;
             }
-            let payload = serde_json::from_slice::<serde_json::Value>(&entry.payload_redacted)
-                .ok()?;
+            let payload =
+                serde_json::from_slice::<serde_json::Value>(&entry.payload_redacted).ok()?;
             (payload.get("from_team").and_then(serde_json::Value::as_str) == Some(source_team)
                 && payload.get("to_team").and_then(serde_json::Value::as_str)
                     == Some(destination_team)
@@ -322,10 +322,7 @@ impl CrossTeamCrossingAdapter {
             .then(|| {
                 Some((
                     payload.get("source_ts")?.as_i64()?,
-                    payload
-                        .get("source_region")?
-                        .as_str()?
-                        .to_string(),
+                    payload.get("source_region")?.as_str()?.to_string(),
                 ))
             })?
         }))
@@ -472,7 +469,9 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                     }
                     Err(error) => {
                         if let Some(cause) = Self::local_cause(&error) {
-                            eprintln!("maos: cross-team crossing refused at the applier: {cause:?}");
+                            eprintln!(
+                                "maos: cross-team crossing refused at the applier: {cause:?}"
+                            );
                         }
                         CrossingOutcome::Refused(Self::refusal_for(
                             error,
@@ -525,7 +524,9 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                     Ok(team) => team,
                     Err(error) => {
                         return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
-                            reason: format!("authenticated erase source team is not canonical: {error}"),
+                            reason: format!(
+                                "authenticated erase source team is not canonical: {error}"
+                            ),
                             from_team: authenticated_team.to_string(),
                             to_team,
                             intent: "collective:erase".to_string(),
@@ -913,7 +914,6 @@ pub fn reconcile_home_team_with_manifest(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
@@ -922,11 +922,11 @@ mod tests {
     };
     use maos_domain::frame::FrameAddress;
     use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i3::FrameOrigin;
     use maos_domain::memory::MemoryNamespace;
     use maos_domain::team::TeamId;
-    use maos_spirit_abi::identity::{HostId, SpiritId};
-    use maos_domain::invariants::i3::FrameOrigin;
     use maos_iac::{FrameKind, TransparencyLogAdapter};
+    use maos_spirit_abi::identity::{HostId, SpiritId};
 
     #[test]
     fn erase_provenance_requires_the_complete_applied_share_locator() {

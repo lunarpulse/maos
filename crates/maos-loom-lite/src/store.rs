@@ -119,7 +119,6 @@ fn parse_cross_team_marker(stored_detail: &str) -> Option<(TeamId, String)> {
     Some((team, detail))
 }
 
-
 fn reject_principal_namespace(namespace: &MemoryNamespace) -> Result<(), StoreError> {
     if let MemoryNamespace::Principal {
         principal_id,
@@ -570,7 +569,13 @@ impl LoomLiteStore {
         attestation: Option<&RowAttestation<'_>>,
     ) -> Result<(), StoreError> {
         self.write_with_source_attested_at(
-            spirit_pid, namespace, key, value, source, attestation, true,
+            spirit_pid,
+            namespace,
+            key,
+            value,
+            source,
+            attestation,
+            true,
         )
         .await
     }
@@ -586,7 +591,13 @@ impl LoomLiteStore {
         attestation: Option<&RowAttestation<'_>>,
     ) -> Result<(), StoreError> {
         self.write_with_source_attested_at(
-            spirit_pid, namespace, key, value, source, attestation, false,
+            spirit_pid,
+            namespace,
+            key,
+            value,
+            source,
+            attestation,
+            false,
         )
         .await
     }

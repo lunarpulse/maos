@@ -158,9 +158,7 @@ pub fn expected_ledger_legs(gate: &str) -> Option<Vec<&'static str>> {
         }
         "check-multi-region-slo" => Some(crate::check_multi_region_slo::ledger_leg_names()),
         "check-multi-tenant-loom" => Some(crate::check_multi_tenant_loom::ledger_leg_names()),
-        "check-reza-production-path" => {
-            Some(crate::check_reza_production_path::ledger_leg_names())
-        }
+        "check-reza-production-path" => Some(crate::check_reza_production_path::ledger_leg_names()),
         _ => None,
     }
 }
@@ -2118,7 +2116,8 @@ mod tests {
             .expect("complete tenant ledger includes the journey leg");
         journey.binding = "advisory-substrate".to_string();
         journey.evidence_state = "PROVEN_LIVE_SIGNED".to_string();
-        journey.evidence_tests = vec!["reza_three_team_three_region_production_journey".to_string()];
+        journey.evidence_tests =
+            vec!["reza_three_team_three_region_production_journey".to_string()];
         journey.signature_block = Vec::new();
         let error = ledger.validate_against(None).unwrap_err();
         assert!(error.contains("reprojects"), "{error}");

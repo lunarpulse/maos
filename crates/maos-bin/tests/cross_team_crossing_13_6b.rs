@@ -777,7 +777,6 @@ async fn crossing_refuses_emitter_host_that_is_not_the_authenticated_frame_host(
     ));
 }
 
-
 /// Story 13.6b / AC3 — the weld is a BINDING, not a refuse-everything stub.
 ///
 /// Without this control the leg above would pass against an applier that refuses
@@ -931,7 +930,10 @@ fn crossing_control_round_trips_through_the_telemetry_idiom() {
     let decoded = CrossTeamCrossingControl::from_frame(&frame)
         .expect("a crossing frame is recognised")
         .expect("and decodes");
-    let CrossTeamCrossingControl::Share { to_team, bundle, .. } = decoded else {
+    let CrossTeamCrossingControl::Share {
+        to_team, bundle, ..
+    } = decoded
+    else {
         panic!("a share frame must decode as CrossTeamCrossingControl::Share");
     };
     assert_eq!(to_team, "team-c");
@@ -1030,7 +1032,9 @@ async fn erase_control_without_share_provenance_is_refused_before_store_access()
         [0x42; 32],
     )
     .with_erase_reconciliation(
-        Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(state)),
+        Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(
+            state,
+        )),
         tenant_map,
         SpiritId::from("spirit-a"),
         Arc::new(maos_iac::TransparencyLogAdapter::open_in_memory(13_600)),
@@ -1061,7 +1065,9 @@ async fn erase_control_without_share_provenance_is_refused_before_store_access()
         CrossingOutcome::Refused(CrossingRefusal::ApplyFailed { reason, .. }) => {
             assert_eq!(reason, "collective erase provenance not found");
         }
-        other => panic!("unshared locator must receive the typed provenance refusal, got {other:?}"),
+        other => {
+            panic!("unshared locator must receive the typed provenance refusal, got {other:?}")
+        }
     }
 }
 
@@ -2242,7 +2248,7 @@ fn three_team_journey_manifest() -> CohortManifest {
             // only on `cross_team_admits(home_team, remote_team, "log:recall")`.
             grant("team-a", "team-b", "log:recall"),
         ],
-}
+    }
 }
 
 /// A CLI one-shot in the composed scene: same signed manifest, same shared
@@ -2630,7 +2636,10 @@ async fn reza_three_team_three_region_production_journey() {
 
     // ── PROCESS 4: `maos run <researcher-manifest>`.
     raw_a
-        .execute("DELETE FROM collective_memory WHERE key = $1", &[&RESEARCHER_ROUTE_KEY])
+        .execute(
+            "DELETE FROM collective_memory WHERE key = $1",
+            &[&RESEARCHER_ROUTE_KEY],
+        )
         .await
         .expect("clear researcher route");
     let researcher = journey_cli(&home, &conn_a, "team-a")
@@ -2638,9 +2647,16 @@ async fn reza_three_team_three_region_production_journey() {
         .args(["run", "spirits/researcher/manifest.toml", "--once"])
         .output()
         .expect("maos run researcher");
-    assert!(researcher.status.success(), "{}", String::from_utf8_lossy(&researcher.stderr));
+    assert!(
+        researcher.status.success(),
+        "{}",
+        String::from_utf8_lossy(&researcher.stderr)
+    );
     let route_rows: i64 = raw_a
-        .query_one("SELECT count(*) FROM collective_memory WHERE key = $1", &[&RESEARCHER_ROUTE_KEY])
+        .query_one(
+            "SELECT count(*) FROM collective_memory WHERE key = $1",
+            &[&RESEARCHER_ROUTE_KEY],
+        )
         .await
         .expect("count researcher route")
         .get(0);
@@ -2648,8 +2664,13 @@ async fn reza_three_team_three_region_production_journey() {
 
     // ── PROCESS 5: cohort-backed destination erase reconciles the source.
     let erase_config_b = write_daemon_file(
-        fixture.path(), "journey-erase-b", &manifest_path, &authority, &identity_b,
-        "host-b", "spirit-b",
+        fixture.path(),
+        "journey-erase-b",
+        &manifest_path,
+        &authority,
+        &identity_b,
+        "host-b",
+        "spirit-b",
         &[DaemonPeer {
             identity: &identity_a,
             host: "host-a",
@@ -2666,7 +2687,11 @@ async fn reza_three_team_three_region_production_journey() {
         .env("MAOS_COLLECTIVE_ERASE_KEY", &key_ab)
         .output()
         .expect("maos collective-erase");
-    assert!(erase.status.success(), "{}", String::from_utf8_lossy(&erase.stderr));
+    assert!(
+        erase.status.success(),
+        "{}",
+        String::from_utf8_lossy(&erase.stderr)
+    );
     let erase_json: serde_json::Value =
         serde_json::from_slice(&erase.stdout).expect("collective erase JSON");
     assert_eq!(erase_json["reconciliation"]["status"], "erase_reconciled");
@@ -2686,7 +2711,11 @@ async fn reza_three_team_three_region_production_journey() {
         .args(["traceback", "--team", "team-b", "--spirit-pid", "0"])
         .output()
         .expect("maos traceback");
-    assert!(traceback.status.success(), "{}", String::from_utf8_lossy(&traceback.stderr));
+    assert!(
+        traceback.status.success(),
+        "{}",
+        String::from_utf8_lossy(&traceback.stderr)
+    );
     let traceback_json: serde_json::Value =
         serde_json::from_slice(&traceback.stdout).expect("traceback JSON");
     assert_eq!(traceback_json["outcome"], "ok");
@@ -2717,7 +2746,11 @@ async fn reza_three_team_three_region_production_journey() {
         assert_eq!(
             fields,
             BTreeSet::from([
-                "frame_id", "timestamp_ns", "kind", "intent", "peer_spirit_pid",
+                "frame_id",
+                "timestamp_ns",
+                "kind",
+                "intent",
+                "peer_spirit_pid",
                 "payload_available",
             ])
         );
@@ -3088,8 +3121,8 @@ fn institution_witness(index: u8, datname: String, fingerprint: String) -> Insti
     let authority = [index; 32];
     let signing_key = SigningKey::from_bytes(&authority);
     let host = format!("institution-{index:02}-host");
-    let team = TeamId::new(&format!("institution-{index:02}-team"))
-        .expect("canonical institution team");
+    let team =
+        TeamId::new(&format!("institution-{index:02}-team")).expect("canonical institution team");
     let manifest = CohortManifest {
         schema_version: COHORT_SCHEMA_V4,
         cohort_id: format!("cortex-institution-{index:02}"),
@@ -3173,7 +3206,12 @@ async fn cortex_fourteen_institution_isolation_live() {
 
     let identity_fixture = tempfile::tempdir().expect("institution identities");
     let identities: Vec<DaemonIdentity> = (1_u8..=14)
-        .map(|index| mint_daemon_identity(identity_fixture.path(), &format!("institution-{index:02}-host")))
+        .map(|index| {
+            mint_daemon_identity(
+                identity_fixture.path(),
+                &format!("institution-{index:02}-host"),
+            )
+        })
         .collect();
     let mut witnesses: Vec<InstitutionWitness> = datnames
         .iter()
@@ -3199,7 +3237,10 @@ async fn cortex_fourteen_institution_isolation_live() {
             .expect("read institution current_database")
             .get(0);
         assert_eq!(actual, witness.datname);
-        let manifest = witness.state.manifest().expect("verified institution manifest");
+        let manifest = witness
+            .state
+            .manifest()
+            .expect("verified institution manifest");
         assert_eq!(
             manifest.team_of_host(&witness.host),
             Some(&witness.team),
@@ -3215,7 +3256,11 @@ async fn cortex_fourteen_institution_isolation_live() {
     let expected_authorities: BTreeSet<String> = witnesses
         .iter()
         .map(|witness| {
-            hex::encode(SigningKey::from_bytes(&witness.authority).verifying_key().to_bytes())
+            hex::encode(
+                SigningKey::from_bytes(&witness.authority)
+                    .verifying_key()
+                    .to_bytes(),
+            )
         })
         .collect();
     let observed_authorities: BTreeSet<String> = witnesses
@@ -3249,7 +3294,11 @@ async fn cortex_fourteen_institution_isolation_live() {
         14,
         "each independent institution must retain a distinct certificate identity witness"
     );
-    assert_eq!(expected_authorities.len(), 14, "fixture authorities must be unique");
+    assert_eq!(
+        expected_authorities.len(),
+        14,
+        "fixture authorities must be unique"
+    );
     assert_eq!(
         observed_authorities, expected_authorities,
         "all fourteen and only fourteen operator-pinned authority witnesses must reconcile"
@@ -3289,9 +3338,11 @@ async fn cortex_fourteen_institution_isolation_live() {
         foreign_bundle,
     )
     .expect("cross-institution frame encodes");
-    let target_applier =
-        CrossTeamCrossingAdapter::new(target_store, target.team.clone(), seed);
-    match target_applier.apply_crossing(foreign.team.as_str(), &foreign_frame).await {
+    let target_applier = CrossTeamCrossingAdapter::new(target_store, target.team.clone(), seed);
+    match target_applier
+        .apply_crossing(foreign.team.as_str(), &foreign_frame)
+        .await
+    {
         CrossingOutcome::Refused(CrossingRefusal::ConsentDenied {
             from_team,
             to_team,
@@ -3315,8 +3366,7 @@ async fn cortex_fourteen_institution_isolation_live() {
         .manifest()
         .expect("clone source manifest");
     let donor_key = SigningKey::from_bytes(&witnesses[0].authority);
-    cross_authority_clone.authority.keys =
-        vec![hex::encode(donor_key.verifying_key().to_bytes())];
+    cross_authority_clone.authority.keys = vec![hex::encode(donor_key.verifying_key().to_bytes())];
     let clone_toml = toml::to_string(&cross_authority_clone.signed_with(&donor_key))
         .expect("cross-authority clone serializes");
     let recipient_key = SigningKey::from_bytes(&witnesses[1].authority);
@@ -3359,14 +3409,12 @@ async fn cortex_fourteen_institution_isolation_live() {
     let mut tombstone = removed.state.manifest().expect("institution to revoke");
     tombstone.version = 2;
     tombstone.members.clear();
-    tombstone
-        .members
-        .push(maos_cohort::manifest::CohortMember {
-            host_id: "institution-01-retired".to_string(),
-            fingerprint: retired_identity.fingerprint.to_string(),
-            roles: vec!["worker".to_string()],
-            team: None,
-        });
+    tombstone.members.push(maos_cohort::manifest::CohortMember {
+        host_id: "institution-01-retired".to_string(),
+        fingerprint: retired_identity.fingerprint.to_string(),
+        roles: vec!["worker".to_string()],
+        team: None,
+    });
     tombstone.cross_team_consent.clear();
     let removal_key = SigningKey::from_bytes(&removed.authority);
     let tombstone_toml = toml::to_string(&tombstone.signed_with(&removal_key))

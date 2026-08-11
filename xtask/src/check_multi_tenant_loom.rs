@@ -1941,10 +1941,6 @@ pub fn ledger_leg_names() -> Vec<&'static str> {
     SPECS
         .iter()
         .map(|leg| leg.name)
-        .chain([
-            KERNEL_BASELINE_LEG,
-            KERNEL_SUCCESSOR_LEG,
-            JOURNEY_LEG,
-        ])
+        .chain([KERNEL_BASELINE_LEG, KERNEL_SUCCESSOR_LEG, JOURNEY_LEG])
         .collect()
 }

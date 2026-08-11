@@ -680,10 +680,10 @@ run and is filed with a live owner rather than patched here.
   `PartitionRefused`, `ErasureTombstoneDominates` — all reach the caller as the
   single word `Transport`.
   Successor: the machine-readable leg `kernel-collective-cause-distinguishable`
-  (`xtask/src/check_multi_tenant_loom.rs:114`), whose owner string Story 13.6
-  re-assigned away from itself. **Owner: Epic-13 retrospective** — the widening
-  is a kernel-core edit plus a FLAG-Winston conversation, outside this story's
-  ZERO-Δ fence.
+  (`xtask/src/check_multi_tenant_loom.rs:114`), whose owner string the Epic-13
+  closer re-assigned away from itself when it ruled the collapse.
+  **Owner: Epic-13 retrospective** — the widening is a kernel-core edit plus a
+  FLAG-Winston conversation, outside the closer's ZERO-Δ fence.
 
 ### `CrossWallRecallRefusal` collapses SIX variants into the token `refused`
 

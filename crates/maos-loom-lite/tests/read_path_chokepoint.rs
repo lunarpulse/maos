@@ -127,7 +127,10 @@ fn team_guard_covers_all_public_store_entry_points() {
         .map(str::trim_start)
         .filter(|line| line.starts_with("pub async fn ") || line.starts_with("pub fn "))
         .collect();
-    assert!(!public_methods.is_empty(), "must discover public store methods");
+    assert!(
+        !public_methods.is_empty(),
+        "must discover public store methods"
+    );
 
     for signature in public_methods {
         let name = public_store_method_name(signature);

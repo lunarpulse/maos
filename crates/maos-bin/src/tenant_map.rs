@@ -117,12 +117,12 @@ impl TenantMapAdapter {
         spirit_pid: u32,
         spirit_id: SpiritId,
     ) -> Result<(), TenantMapError> {
-        let mut bindings = self
-            .spirit_bindings
-            .lock()
-            .map_err(|_| TenantMapError::StateUnavailable {
-                reason: "spirit binding lock poisoned".to_string(),
-            })?;
+        let mut bindings =
+            self.spirit_bindings
+                .lock()
+                .map_err(|_| TenantMapError::StateUnavailable {
+                    reason: "spirit binding lock poisoned".to_string(),
+                })?;
         match bindings.get(&spirit_pid) {
             Some(bound) if bound != &spirit_id => Err(TenantMapError::StateUnavailable {
                 reason: format!(

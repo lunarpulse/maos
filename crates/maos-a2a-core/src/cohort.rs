@@ -470,8 +470,8 @@ impl CrossingRefusal {
             Self::StateUnavailable { .. } => "crossing_state_unavailable",
             Self::ApplyFailed { .. } => "crossing_apply_failed",
             Self::StaleGeneration { .. } => "crossing_stale_generation",
-    }
         }
+    }
 
     /// The JSON-RPC code + `data` object this refusal travels as.
     ///
