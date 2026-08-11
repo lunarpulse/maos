@@ -62,4 +62,18 @@ whitelist = [
     # its own DB path — NOT a duplicate shared-state instance. (Story 12.x cohort
     # mesh; surfaced by the first full-branch CI run over the Epic 11+12 line.)
     "TransparencyLogAdapter",
+
+    # CrossTeamConsentAdapter — one instance in the collective-store setup path
+    # and one in the cohort A2A daemon's crossing-port construction, where
+    # Story 13.6's `with_erase_reconciliation` needs the consent projection to
+    # authorize a two-sided erase. EXEMPTION PREMISE, and it is machine-checked:
+    # the adapter is a pure projection over shared state — `struct
+    # CrossTeamConsentAdapter { state: Arc<CohortManifestState> }`, exactly one
+    # field, and both sites clone the SAME `bootstrap.state` Arc. Two instances
+    # cannot diverge because neither owns anything to diverge with. If a field
+    # is ever added, that premise dies and this exemption must be re-argued —
+    # `cross_team_consent_adapter_is_a_pure_shared_state_projection`
+    # (crates/maos-bin/tests/cross_team_consent_13_3.rs) reds when the shape
+    # changes, so the exemption cannot rot silently. (Story 13.6 closure.)
+    "CrossTeamConsentAdapter",
 ]

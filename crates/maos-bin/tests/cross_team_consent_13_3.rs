@@ -741,3 +741,44 @@ async fn asymmetric_consent_reverse_share_refused() {
         Err(BundleError::ConsentStateStale { .. })
     ));
 }
+
+/// Story 13.6 closure — the falsifier behind a composition-root exemption.
+///
+/// `CrossTeamConsentAdapter` is constructed twice in `main.rs`: once in the
+/// collective-store setup and once in the cohort A2A daemon's crossing-port
+/// construction, where `with_erase_reconciliation` needs the consent
+/// projection to authorize a two-sided erase. `check-composition-root-
+/// completeness` exempts it in `xtask/composition-root-whitelist.toml`, and
+/// that exemption rests on ONE claim: the adapter owns no state of its own, so
+/// two instances over the same `bootstrap.state` Arc cannot diverge.
+///
+/// This test IS that claim. Add a second field — a cache, a clock, a counter —
+/// and the premise is false, the two instances become genuinely independent,
+/// and this reds so the exemption gets re-argued instead of rotting.
+#[test]
+fn cross_team_consent_adapter_is_a_pure_shared_state_projection() {
+    const ADAPTER_SRC: &str = include_str!("../src/cross_team_consent.rs");
+
+    let body = ADAPTER_SRC
+        .split_once("pub struct CrossTeamConsentAdapter {")
+        .expect("adapter struct is declared with a brace body")
+        .1
+        .split_once('}')
+        .expect("adapter struct body is terminated")
+        .0;
+
+    let fields: Vec<&str> = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//") && !line.starts_with('#'))
+        .collect();
+
+    assert_eq!(
+        fields,
+        vec!["state: Arc<CohortManifestState>,"],
+        "CrossTeamConsentAdapter must stay a pure projection over the shared \
+         manifest state — its composition-root duplicate-construction exemption \
+         (xtask/composition-root-whitelist.toml) is only sound while the adapter \
+         owns nothing that two instances could diverge on"
+    );
+}
