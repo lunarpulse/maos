@@ -2907,7 +2907,9 @@ async fn cortex_fourteen_institution_isolation_live() {
 
     let expected_authorities: BTreeSet<String> = witnesses
         .iter()
-        .map(|witness| hex::encode(witness.authority))
+        .map(|witness| {
+            hex::encode(SigningKey::from_bytes(&witness.authority).verifying_key().to_bytes())
+        })
         .collect();
     let observed_authorities: BTreeSet<String> = witnesses
         .iter()
@@ -3032,15 +3034,32 @@ async fn cortex_fourteen_institution_isolation_live() {
     );
 
     // Removing one independent institution releases only its own state. The
-    // remaining thirteen retain their original pin witness and deny the same
-    // foreign-team consent decision, proving revocation/removal does not mutate
-    // a shared authority or consent table.
+    // authority retires its original host identity by rotating to a fresh
+    // retirement sentinel member and revoking every cross-team consent grant;
+    // V4 manifests may not carry an empty member or team set, so retirement
+    // is expressed as identity rotation, not truncation. The remaining
+    // thirteen retain their original pin witness and deny the same
+    // foreign-team consent decision, proving revocation/removal does not
+    // mutate a shared authority or consent table.
     let removed = witnesses.remove(0);
-    let removed_authority = hex::encode(removed.authority);
+    let removed_authority = hex::encode(
+        SigningKey::from_bytes(&removed.authority)
+            .verifying_key()
+            .to_bytes(),
+    );
+    let original_host = removed.host.clone();
+    let retired_identity = mint_daemon_identity(identity_fixture.path(), "institution-01-retired");
     let mut tombstone = removed.state.manifest().expect("institution to revoke");
     tombstone.version = 2;
     tombstone.members.clear();
-    tombstone.teams = Some(Vec::new());
+    tombstone
+        .members
+        .push(maos_cohort::manifest::CohortMember {
+            host_id: "institution-01-retired".to_string(),
+            fingerprint: retired_identity.fingerprint.to_string(),
+            roles: vec!["worker".to_string()],
+            team: None,
+        });
     tombstone.cross_team_consent.clear();
     let removal_key = SigningKey::from_bytes(&removed.authority);
     let tombstone_toml = toml::to_string(&tombstone.signed_with(&removal_key))
@@ -3049,14 +3068,17 @@ async fn cortex_fourteen_institution_isolation_live() {
         .state
         .issue_reissue(&tombstone_toml)
         .expect("institution authority accepts its own removal reissue");
+    let retired_manifest = removed
+        .state
+        .manifest()
+        .expect("removed institution manifest");
     assert!(
-        removed
-            .state
-            .manifest()
-            .expect("removed institution manifest")
-            .members
-            .is_empty(),
-        "the removed institution must no longer expose a host identity"
+        retired_manifest.team_of_host(&original_host).is_none(),
+        "the removed institution must no longer expose its original host identity"
+    );
+    assert!(
+        retired_manifest.cross_team_consent.is_empty(),
+        "the removed institution must no longer grant cross-team consent"
     );
     drop(removed);
     assert_eq!(witnesses.len(), 13);
@@ -3064,7 +3086,11 @@ async fn cortex_fourteen_institution_isolation_live() {
         let manifest = witness.state.manifest().expect("remaining manifest");
         assert_eq!(
             manifest.authority.keys,
-            vec![hex::encode(witness.authority)],
+            vec![hex::encode(
+                SigningKey::from_bytes(&witness.authority)
+                    .verifying_key()
+                    .to_bytes()
+            )],
             "removing a peer institution must not alter another institution's pin"
         );
         assert_ne!(
