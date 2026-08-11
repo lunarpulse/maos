@@ -48,7 +48,8 @@ pub use cohort::{
     CohortReissueDisposition, CohortReissueRejection, ConsentRuptureSink, CrossTeamCrossingPort,
     CrossingOutcome, CrossingRefusal, DigestFrameClass, DigestReadPort, DigestReplyObservation,
     HaltReceiptObserver, COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ,
-    CROSSING_EVENT_TYPE, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    CROSSING_EVENT_TYPE, CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE,
 };
 pub use config::{A2AConfig, A2APeerConfig, A2AProfile};
 // Story 8.7 / AC2b — `A2AConsentEnvelope` was deleted (dead fail-open footgun).

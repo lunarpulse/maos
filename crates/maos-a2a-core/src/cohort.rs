@@ -29,6 +29,10 @@ pub const COHORT_INTENT_DIGEST_READ: &str = "cohort:digest-read";
 /// than changing any shipped bilateral behavior.
 pub const COHORT_INTENT_COLLECTIVE_SHARE: &str = "collective:share";
 
+/// The destructive companion to [`COHORT_INTENT_COLLECTIVE_SHARE`]. It remains
+/// non-reserved so ordinary directional A2A consent evaluates it.
+pub const CROSS_TEAM_COLLECTIVE_ERASE_INTENT: &str = "collective:erase";
+
 /// Synchronous, fail-closed persistence seam for consent ruptures.
 ///
 /// Implementations return only after the denial evidence is durable. Keeping

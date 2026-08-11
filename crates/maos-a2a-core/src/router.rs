@@ -19,7 +19,8 @@ use crate::cohort::{
     DigestReadPort, DigestReplyObservation, HaltReceiptObserver, LegacyCohortManifestGate,
     LegacyCrossTeamCrossingPort, LegacyDigestReadPort, LegacyHaltReceiptObserver,
     COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ, CROSSING_EVENT_TYPE,
-    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE,
 };
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
@@ -731,8 +732,11 @@ impl A2ARouterCore {
         // Story 13.6a — is this the cross-team crossing intent? Computed BEFORE
         // `frame` is consumed, and used three times below: the `Defer`-as-refusal
         // rule (AC4), the emitter self-check, and the source-team stamp (AC1/AC2).
-        let crossing =
-            Self::consent_match_key(&frame).eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE);
+        let crossing = {
+            let intent = Self::consent_match_key(&frame);
+            intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                || intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)
+        };
 
         // Story 13.6a review P2 — the Send-seam team declaration, captured from
         // the SAME locked manifest snapshot as the consent verdict below, so a
@@ -1357,7 +1361,8 @@ impl A2ARouterCore {
             // mixed-deployment bilateral fallback unchanged.
             let verdict = match verdict {
                 CohortConsentVerdict::Defer
-                    if cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE) =>
+                    if cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                        || cohort_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT) =>
                 {
                     CohortConsentVerdict::Deny(CohortConsentDenial::CrossingDeferRefused)
                 }
@@ -1371,14 +1376,15 @@ impl A2ARouterCore {
                         "cohort manifest is not current for peer {}",
                         peer_cfg.peer_id.as_str()
                     );
-                    if cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                    if (cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                        || cohort_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT))
                         && Self::is_crossing_frame(frame)
                     {
                         let refusal = CrossingRefusal::ConsentStale {
                             reason,
                             from_team: request.cohort_source_team.clone().unwrap_or_default(),
                             to_team: Self::crossing_to_team(frame),
-                            intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                            intent: cohort_intent,
                         };
                         return Self::crossing_refusal_nack(request.id, &refusal);
                     }
@@ -1534,6 +1540,7 @@ impl A2ARouterCore {
         let mut precomputed_verdict = None;
         if claimed_team.is_some()
             || team_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+            || team_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)
         {
             let peer = HostId(verified_peer.as_str().to_string());
             let (verdict, declared) = self.cohort_manifest_gate.consent_and_team(
@@ -1574,7 +1581,8 @@ impl A2ARouterCore {
         // Story 12.1/12.3 cohort gate — including `NotCurrent` for a host a
         // signed reissue no longer rosters (D-12) — refuses an evicted applier
         // before any bundle touches the store.
-        let crossing_to_apply = (team_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+        let crossing_to_apply = ((team_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+            || team_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT))
             && Self::is_crossing_frame(&request.params))
         .then(|| claimed_team.map(|team| (team.to_string(), request.params.clone())))
         .flatten();
@@ -1641,7 +1649,7 @@ impl A2ARouterCore {
                             reason: "cross-team crossing applier is not configured".to_string(),
                             from_team: authenticated_team,
                             to_team: Self::crossing_to_team(&frame),
-                            intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                            intent: Self::consent_match_key(&frame).to_string(),
                         };
                         response = Self::crossing_refusal_nack(response_id, &refusal);
                     }
@@ -1952,6 +1960,28 @@ mod tests {
         A2AJsonRpcRequest::new("iac.deliver", frame, 17).with_cohort_source_team("team-a")
     }
 
+    fn erase_crossing_frame() -> IacFrame {
+        let mut frame = crossing_request().params;
+        frame.intent = IntentClass::Standard;
+        let FramePayload::TelemetryEvent(payload) = &mut frame.payload else {
+            unreachable!("crossing fixture is telemetry");
+        };
+        payload.data = serde_json::json!({
+            "kind": "erase",
+            "to_team": "team-b",
+            "spirit_pid": 7,
+            "namespace": "default",
+            "key": "crossed-key"
+        })
+        .to_string();
+        frame
+            .consent_envelope
+            .as_mut()
+            .expect("crossing fixture has a consent envelope")
+            .intent_class = Some(A2AIntent::new(CROSS_TEAM_COLLECTIVE_ERASE_INTENT));
+        frame
+    }
+
     async fn crossing_core(verdict: CohortConsentVerdict) -> A2ARouterCore {
         let allow = ConsentAllowlists {
             send_allowlist: vec![A2AIntent::new(COHORT_INTENT_COLLECTIVE_SHARE)],
@@ -1960,6 +1990,35 @@ mod tests {
         pinned_core(allow)
             .await
             .with_cohort_manifest_gate(Arc::new(FixedCrossingGate(verdict)))
+    }
+
+    #[tokio::test]
+    async fn erase_crossing_is_denied_by_share_route_and_admitted_by_erase_route() {
+        let peer = HostId("loopback".to_string());
+        let share_only = crossing_core(CohortConsentVerdict::Admit).await;
+        let error = share_only
+            .prepare_outbound(erase_crossing_frame(), &peer, 0)
+            .await
+            .expect_err("a share-only route must reject an erase crossing");
+        assert!(matches!(
+            error,
+            A2AError::IntentDenied {
+                direction: IntentDirection::Send,
+                ..
+            }
+        ));
+
+        let erase_only = ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)],
+            accept_allowlist: vec![A2AIntent::new(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)],
+        };
+        let erase_route = pinned_core(erase_only)
+            .await
+            .with_cohort_manifest_gate(Arc::new(FixedCrossingGate(CohortConsentVerdict::Admit)));
+        erase_route
+            .prepare_outbound(erase_crossing_frame(), &peer, 0)
+            .await
+            .expect("an erase-only route must admit an erase crossing");
     }
 
     #[tokio::test]

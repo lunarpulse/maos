@@ -869,6 +869,115 @@ impl LoomLiteStore {
             tombstone_recorded: true,
         })
     }
+    /// Erase exactly the crossed physical row received from `source_team`.
+    ///
+    /// Unlike [`Self::erase`], this never falls back to the native logical
+    /// address. Reconciliation has already selected a crossed row and must not
+    /// silently delete a same-key native row instead.
+    pub async fn erase_crossed_row(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        source_team: &TeamId,
+    ) -> Result<CollectiveEraseReceipt, StoreError> {
+        self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
+        let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
+        let physical_namespace_detail = format!(
+            "xteam:{}:{}",
+            source_team.as_str(),
+            hex::encode(logical_namespace_detail.as_bytes())
+        );
+        let lock_key = erasure_lock_key(spirit_pid, namespace_kind, &logical_namespace_detail, key);
+        let mut client = self.get_client_with_timeout().await?;
+        let transaction = client.transaction().await?;
+        transaction
+            .query_one(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                &[&lock_key],
+            )
+            .await?;
+        let row = transaction
+            .query_opt(
+                "SELECT source_ts, source_region
+                 FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4 AND source_team = $5
+                 FOR UPDATE",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &physical_namespace_detail,
+                    &key,
+                    &source_team.as_str(),
+                ],
+            )
+            .await?;
+        let row_erasure_clock = row
+            .as_ref()
+            .map(|row| (row.get::<_, i64>(0), row.get::<_, String>(1)));
+        let deleted_rows = transaction
+            .execute(
+                "DELETE FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail = $3 AND key = $4 AND source_team = $5",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &physical_namespace_detail,
+                    &key,
+                    &source_team.as_str(),
+                ],
+            )
+            .await?;
+        let now_ns = i64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        )
+        .unwrap_or(i64::MAX);
+        let (erased_at_source_ts, erased_at_source_region) = dominating_erasure_clock(
+            row_erasure_clock
+                .as_ref()
+                .map(|(source_ts, source_region)| (*source_ts, source_region.as_str())),
+            now_ns,
+            &self.config.home_region,
+        );
+        transaction
+            .execute(
+                "INSERT INTO collective_erasure_tombstones
+                    (spirit_pid, namespace_kind, namespace_detail, key,
+                     erased_at_source_ts, erased_at_source_region)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (spirit_pid, namespace_kind, namespace_detail, key)
+                 DO UPDATE SET
+                     erased_at_source_ts = EXCLUDED.erased_at_source_ts,
+                     erased_at_source_region = EXCLUDED.erased_at_source_region,
+                     created_at = NOW()
+                 WHERE EXCLUDED.erased_at_source_ts >
+                           collective_erasure_tombstones.erased_at_source_ts
+                    OR (EXCLUDED.erased_at_source_ts =
+                           collective_erasure_tombstones.erased_at_source_ts
+                        AND EXCLUDED.erased_at_source_region >
+                           collective_erasure_tombstones.erased_at_source_region)",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &physical_namespace_detail,
+                    &key,
+                    &erased_at_source_ts,
+                    &erased_at_source_region,
+                ],
+            )
+            .await?;
+        transaction.commit().await?;
+        Ok(CollectiveEraseReceipt {
+            deleted_rows,
+            tombstone_recorded: true,
+        })
+    }
 
     /// Read a value from the collective store.
     ///

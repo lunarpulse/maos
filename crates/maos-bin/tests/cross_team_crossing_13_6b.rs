@@ -928,6 +928,20 @@ fn erase_control_carries_only_the_reconciliation_locator() {
         "crossed-key".to_string(),
     )
     .expect("erase control encodes");
+    assert_eq!(
+        frame.intent,
+        maos_domain::invariants::i1::IntentClass::Standard,
+        "erase controls must not inherit the share frame's read-only class"
+    );
+    assert_eq!(
+        frame
+            .consent_envelope
+            .as_ref()
+            .and_then(|envelope| envelope.intent_class.as_ref())
+            .map(|intent| intent.as_str()),
+        Some("collective:erase"),
+        "erase controls must carry the destructive fine-grained route intent"
+    );
     let decoded = CrossTeamCrossingControl::from_frame(&frame)
         .expect("erase control is recognized")
         .expect("erase control decodes");
@@ -940,6 +954,68 @@ fn erase_control_carries_only_the_reconciliation_locator() {
             key,
         } if to_team == "team-a" && namespace == "default" && key == "crossed-key"
     ));
+}
+
+/// A consent grant authorizes the relationship, not an arbitrary peer-chosen
+/// locator. The dead store makes any attempted deletion surface as a pool error;
+/// the distinct provenance refusal proves the handler stopped before touching it.
+#[tokio::test]
+async fn erase_control_without_share_provenance_is_refused_before_store_access() {
+    let signing_key = SigningKey::from_bytes(&[23; 32]);
+    let mut manifest = manifest_with(COHORT_SCHEMA_V4, Some("team-a"));
+    manifest.cross_team_consent.push(CrossTeamConsentGrant {
+        from_team: TeamId::new("team-b").expect("canonical team"),
+        to_team: TeamId::new("team-a").expect("canonical team"),
+        intent: "collective:erase".to_string(),
+    });
+    let signed = manifest.signed_with(&signing_key);
+    let signed_toml = toml::to_string(&signed).expect("signed manifest serializes");
+    let state = Arc::new(
+        CohortManifestState::load_with_clock(
+            HostId("host-a".to_string()),
+            &signed_toml,
+            PinnedAuthorityKeys::from_keys(vec![signing_key.verifying_key()])
+                .expect("pinned authority key"),
+            Arc::new(InMemoryCohortAuditSink::default()),
+            Arc::new(FixedClock),
+        )
+        .expect("verified manifest state"),
+    );
+    let tenant_map = Arc::new(
+        maos_bin::tenant_map::TenantMapAdapter::new(Arc::clone(&state), "host-a", true)
+            .expect("refreshable tenant map"),
+    );
+    let adapter = CrossTeamCrossingAdapter::new(
+        dead_store("team-a").await,
+        TeamId::new("team-a").expect("canonical team"),
+        [0x42; 32],
+    )
+    .with_erase_reconciliation(
+        Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(state)),
+        tenant_map,
+        SpiritId::from("spirit-a"),
+        Arc::new(maos_iac::TransparencyLogAdapter::open_in_memory(13_600)),
+    );
+    let frame = erase_frame(
+        &FrameAddress {
+            spirit_id: SpiritId::from("spirit-b"),
+            host_id: Some(HostId("host-b".to_string())),
+            role: None,
+        },
+        &HostId("host-a".to_string()),
+        1,
+        &TeamId::new("team-a").expect("canonical team"),
+        7,
+        &maos_domain::memory::MemoryNamespace::Default,
+        "never-shared".to_string(),
+    )
+    .expect("erase control encodes");
+    match adapter.apply_crossing("team-b", &frame).await {
+        CrossingOutcome::Refused(CrossingRefusal::ApplyFailed { reason, .. }) => {
+            assert_eq!(reason, "collective erase provenance not found");
+        }
+        other => panic!("unshared locator must receive the typed provenance refusal, got {other:?}"),
+    }
 }
 
 // ─── AC4 — one host, one team ───────────────────────────────────────────────
@@ -1901,6 +1977,52 @@ async fn live_destination_adapter_applies_and_refuses_expected_shapes() {
         None,
         "AC3: an impersonated crossing must leave no row behind"
     );
+
+    // A reconciliation path must erase the physical crossed row it resolved,
+    // even when a native row has the same logical address. Generic `erase`
+    // prefers native rows, so using it here would leave the crossed copy behind.
+    store_b
+        .write(
+            7,
+            &maos_domain::memory::MemoryNamespace::Default,
+            "live-crossing",
+            maos_domain::memory::MemoryValue::Text("native-wins-normal-read".to_string()),
+        )
+        .await
+        .expect("seed same-address native row");
+    let receipt = store_b
+        .erase_crossed_row(
+            7,
+            &maos_domain::memory::MemoryNamespace::Default,
+            "live-crossing",
+            &TeamId::new("team-a").expect("canonical source team"),
+        )
+        .await
+        .expect("erase the selected crossed physical row");
+    assert_eq!(receipt.deleted_rows, 1);
+    assert_eq!(
+        store_b
+            .read(
+                7,
+                &maos_domain::memory::MemoryNamespace::Default,
+                "live-crossing"
+            )
+            .await
+            .expect("read native survivor"),
+        Some(maos_domain::memory::MemoryValue::Text(
+            "native-wins-normal-read".to_string()
+        )),
+        "the same-address native row must survive crossed-row reconciliation"
+    );
+    let client = store_b.pool().get().await.expect("borrow team-b client");
+    let physical_rows = LoomLiteStore::read_all_rows_from(&**client)
+        .await
+        .expect("read physical rows");
+    assert!(
+        physical_rows.iter().all(|row| !(row.key == "live-crossing"
+            && row.namespace_detail.starts_with("xteam:team-a:"))),
+        "the crossed physical copy must be gone, never silently left behind"
+    );
 }
 
 // ─── Story 13.6 (AC2/AC3) — the composed Reza journey ───────────────────────
@@ -2750,6 +2872,87 @@ struct InstitutionWitness {
     state: Arc<CohortManifestState>,
 }
 
+/// Removes any successfully provisioned live-test databases during unwinding.
+///
+/// `Drop` cannot await, so it delegates the asynchronous Postgres work to a
+/// dedicated current-thread runtime. Cleanup errors are deliberately ignored
+/// here: a destructor must not replace the test's original failure.
+struct InstitutionDatabaseDropGuard {
+    base_connection: String,
+    datnames: Vec<String>,
+    armed: bool,
+}
+
+impl InstitutionDatabaseDropGuard {
+    fn new(base_connection: String) -> Self {
+        Self {
+            base_connection,
+            datnames: Vec::new(),
+            armed: true,
+        }
+    }
+
+    fn record_created(&mut self, datname: String) {
+        self.datnames.push(datname);
+    }
+
+    async fn remove_all(&self) -> Result<(), tokio_postgres::Error> {
+        let (client, connection) = tokio_postgres::connect(&self.base_connection, NoTls).await?;
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        for datname in &self.datnames {
+            client
+                .execute(&format!("DROP DATABASE {datname} WITH (FORCE)"), &[])
+                .await?;
+        }
+        Ok(())
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for InstitutionDatabaseDropGuard {
+    fn drop(&mut self) {
+        if !self.armed || self.datnames.is_empty() {
+            return;
+        }
+
+        let base_connection = self.base_connection.clone();
+        let datnames = std::mem::take(&mut self.datnames);
+        if let Ok(thread) = std::thread::Builder::new()
+            .name("institution-database-cleanup".to_string())
+            .spawn(move || {
+                let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                else {
+                    return;
+                };
+                runtime.block_on(async move {
+                    let Ok((client, connection)) =
+                        tokio_postgres::connect(&base_connection, NoTls).await
+                    else {
+                        return;
+                    };
+                    tokio::spawn(async move {
+                        let _ = connection.await;
+                    });
+                    for datname in datnames {
+                        let _ = client
+                            .execute(&format!("DROP DATABASE {datname} WITH (FORCE)"), &[])
+                            .await;
+                    }
+                });
+            })
+        {
+            let _ = thread.join();
+        }
+    }
+}
+
 fn institution_connection(base: &str, datname: &str) -> String {
     if let Some(offset) = base.find("dbname=") {
         let value_start = offset + "dbname=".len();
@@ -2855,6 +3058,7 @@ async fn cortex_fourteen_institution_isolation_live() {
         datnames.iter().all(|datname| datname.len() <= 63),
         "the ephemeral institution datnames must remain valid PostgreSQL identifiers"
     );
+    let mut database_guard = InstitutionDatabaseDropGuard::new(base_connection.clone());
 
     let admin = raw_connect_institution(&base_connection).await;
     for datname in &datnames {
@@ -2862,6 +3066,7 @@ async fn cortex_fourteen_institution_isolation_live() {
             .execute(&format!("CREATE DATABASE {datname}"), &[])
             .await
             .unwrap_or_else(|error| panic!("provision institution datname {datname}: {error}"));
+        database_guard.record_created(datname.clone());
     }
 
     let identity_fixture = tempfile::tempdir().expect("institution identities");
@@ -3107,10 +3312,9 @@ async fn cortex_fourteen_institution_isolation_live() {
         );
     }
 
-    for datname in &datnames {
-        admin
-            .execute(&format!("DROP DATABASE {datname} WITH (FORCE)"), &[])
-            .await
-            .unwrap_or_else(|error| panic!("remove institution datname {datname}: {error}"));
-    }
+    database_guard
+        .remove_all()
+        .await
+        .unwrap_or_else(|error| panic!("remove institution datnames: {error}"));
+    database_guard.disarm();
 }

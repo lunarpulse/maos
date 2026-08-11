@@ -109,6 +109,33 @@ impl TenantMapAdapter {
         }
         Ok(manifest)
     }
+    /// Bind a request PID only when it is currently unbound or already bound to
+    /// the same Spirit. Cross-team controls carry a locator, not authority to
+    /// replace a receiver's tenant binding.
+    pub fn bind_spirit_if_unbound_or_same(
+        &self,
+        spirit_pid: u32,
+        spirit_id: SpiritId,
+    ) -> Result<(), TenantMapError> {
+        let mut bindings = self
+            .spirit_bindings
+            .lock()
+            .map_err(|_| TenantMapError::StateUnavailable {
+                reason: "spirit binding lock poisoned".to_string(),
+            })?;
+        match bindings.get(&spirit_pid) {
+            Some(bound) if bound != &spirit_id => Err(TenantMapError::StateUnavailable {
+                reason: format!(
+                    "spirit PID {spirit_pid} is already bound to a different receiver Spirit"
+                ),
+            }),
+            Some(_) => Ok(()),
+            None => {
+                bindings.insert(spirit_pid, spirit_id);
+                Ok(())
+            }
+        }
+    }
 }
 
 impl TenantMapPort for TenantMapAdapter {

@@ -39,6 +39,7 @@ use maos_a2a_core::{
     CrossTeamCrossingPort, CrossingOutcome, CrossingRefusal, COHORT_INTENT_COLLECTIVE_SHARE,
     CROSSING_EVENT_TYPE,
 };
+use maos_iac::FrameFilter;
 use maos_domain::frame::{FramePayload, IacFrame, TelemetryEventPayload};
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::team::TeamId;
@@ -47,6 +48,7 @@ use maos_loom_lite::replication::bundle::{
     apply_replication_bundle, BundleError, CrossRegionReplicationBundle, CrossTeamApplyContext,
 };
 use maos_loom_lite::store::{LoomLiteStore, StoreError};
+use crate::cross_team_consent::CROSS_TEAM_COLLECTIVE_ERASE_INTENT;
 
 /// The wire body of a cross-team crossing frame.
 ///
@@ -86,9 +88,13 @@ impl CrossTeamCrossingControl {
             .as_ref()
             .and_then(|envelope| envelope.intent_class.as_ref())
             .map(|intent| intent.as_str())?;
-        if !intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE) {
+        let expected_erase = if intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE) {
+            false
+        } else if intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT) {
+            true
+        } else {
             return None;
-        }
+        };
         if frame.kind != maos_spirit_abi::identity::FrameKind::TelemetryEvent {
             return Some(Err("crossing frame kind is not a telemetry event".into()));
         }
@@ -102,8 +108,17 @@ impl CrossTeamCrossingControl {
             )));
         }
         Some(
-            serde_json::from_str(&payload.data)
-                .map_err(|error| format!("crossing frame body is undecodable: {error}")),
+            serde_json::from_str::<Self>(&payload.data)
+                .map_err(|error| format!("crossing frame body is undecodable: {error}"))
+                .and_then(|control| {
+                    if matches!((&control, expected_erase),
+                        (Self::Erase { .. }, true) | (Self::Share { .. }, false))
+                    {
+                        Ok(control)
+                    } else {
+                        Err("crossing control kind does not match its fine-grained intent".into())
+                    }
+                }),
         )
     }
 
@@ -131,6 +146,7 @@ struct EraseReconciliation {
     cross_team_consent: Arc<dyn CrossTeamConsentPort>,
     tenant_map: Arc<crate::tenant_map::TenantMapAdapter>,
     local_control_spirit: maos_domain::ports::registry::SpiritId,
+    transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
 }
 
 impl CrossTeamCrossingAdapter {
@@ -148,11 +164,13 @@ impl CrossTeamCrossingAdapter {
         cross_team_consent: Arc<dyn CrossTeamConsentPort>,
         tenant_map: Arc<crate::tenant_map::TenantMapAdapter>,
         local_control_spirit: maos_domain::ports::registry::SpiritId,
+        transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
     ) -> Self {
         self.erase_reconciliation = Some(EraseReconciliation {
             cross_team_consent,
             tenant_map,
             local_control_spirit,
+            transparency_log,
         });
         self
     }
@@ -216,6 +234,36 @@ impl CrossTeamCrossingAdapter {
                 intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
             },
         }
+    }
+
+    fn has_crossing_provenance(
+        transparency_log: &maos_iac::TransparencyLogAdapter,
+        spirit_pid: u32,
+        authenticated_team: &str,
+        namespace: &str,
+        key: &str,
+    ) -> Result<bool, String> {
+        let entries = transparency_log
+            .query_frames(FrameFilter {
+                spirit_pid: Some(spirit_pid),
+                ..FrameFilter::default()
+            })
+            .map_err(|error| format!("cross-team share provenance query failed: {error}"))?;
+        Ok(entries.into_iter().any(|entry| {
+            if entry.intent != "collective.host.cross-team-share" {
+                return false;
+            }
+            let Ok(payload) = serde_json::from_slice::<serde_json::Value>(&entry.payload_redacted)
+            else {
+                return false;
+            };
+            payload.get("to_team").and_then(serde_json::Value::as_str)
+                == Some(authenticated_team)
+                && payload.get("namespace").and_then(serde_json::Value::as_str) == Some(namespace)
+                && payload.get("key").and_then(serde_json::Value::as_str) == Some(key)
+                && payload.get("status").and_then(serde_json::Value::as_str)
+                    == Some("crossing_applied")
+        }))
     }
 }
 
@@ -370,27 +418,61 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
                         })
                     }
                 }
-                let namespace = match namespace.as_str() {
+                let namespace_name = namespace;
+                let namespace = match namespace_name.as_str() {
                     "default" => MemoryNamespace::Default,
                     "coordination" => MemoryNamespace::Coordination,
                     "forgotten" => MemoryNamespace::Forgotten,
                     _ => {
                         return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
-                            reason: format!("unsupported collective erase namespace {namespace:?}"),
+                            reason: format!(
+                                "unsupported collective erase namespace {namespace_name:?}"
+                            ),
                             from_team: authenticated_team.to_string(),
                             to_team,
-                            intent: "collective:erase".to_string(),
+                            intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
                         })
                     }
                 };
-                // The request is already TLS/team-bound and consented above.
-                // Bind its logical row owner to this receiver's signed control
-                // Spirit before reusing the normal guarded erase path.
-                maos_loom_lite::tenant::TenantMapPort::register_spirit(
-                    reconciliation.tenant_map.as_ref(),
+                let has_provenance = match Self::has_crossing_provenance(
+                    reconciliation.transparency_log.as_ref(),
+                    spirit_pid,
+                    authenticated_team,
+                    &namespace_name,
+                    &key,
+                ) {
+                    Ok(found) => found,
+                    Err(reason) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::StateUnavailable {
+                            reason,
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+                        })
+                    }
+                };
+                if !has_provenance {
+                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: "collective erase provenance not found".to_string(),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+                    });
+                }
+                // Provenance is verified before the guarded erase's tenant
+                // binding is established. A locator may fill an absent binding,
+                // but cannot overwrite a different receiver-owned binding.
+                if let Err(error) = reconciliation.tenant_map.bind_spirit_if_unbound_or_same(
                     spirit_pid,
                     reconciliation.local_control_spirit.clone(),
-                );
+                ) {
+                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: format!("collective erase receiver binding refused: {error}"),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+                    });
+                }
                 match self.store.erase(spirit_pid, &namespace, &key).await {
                     Ok(receipt) => CrossingOutcome::Applied {
                         applied_count: receipt.deleted_rows as usize,
@@ -504,6 +586,8 @@ pub fn crossing_frame(
         from,
         peer,
         frame_seq,
+        COHORT_INTENT_COLLECTIVE_SHARE,
+        maos_domain::invariants::i1::IntentClass::Readonly,
         CrossTeamCrossingControl::Share {
             to_team: to_team.as_str().to_string(),
             bundle,
@@ -525,6 +609,8 @@ pub fn erase_frame(
         from,
         peer,
         frame_seq,
+        CROSS_TEAM_COLLECTIVE_ERASE_INTENT,
+        maos_domain::invariants::i1::IntentClass::Standard,
         CrossTeamCrossingControl::Erase {
             to_team: to_team.as_str().to_string(),
             spirit_pid,
@@ -546,6 +632,8 @@ fn control_frame(
     from: &maos_domain::frame::FrameAddress,
     peer: &maos_spirit_abi::identity::HostId,
     frame_seq: u64,
+    fine_grained_intent: &str,
+    class: maos_domain::invariants::i1::IntentClass,
     control: CrossTeamCrossingControl,
 ) -> Result<IacFrame, String> {
     let payload = control.telemetry_payload()?;
@@ -564,13 +652,13 @@ fn control_frame(
         from: from.clone(),
         to: recipients,
         kind: maos_spirit_abi::identity::FrameKind::TelemetryEvent,
-        intent: maos_domain::invariants::i1::IntentClass::Readonly,
+        intent: class,
         payload: FramePayload::TelemetryEvent(payload),
         auto_marker: maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
         consent_envelope: Some(
             maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
                 from.clone(),
-                maos_domain::invariants::i8::A2AIntent::new(COHORT_INTENT_COLLECTIVE_SHARE),
+                maos_domain::invariants::i8::A2AIntent::new(fine_grained_intent),
             ),
         ),
         intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
@@ -618,5 +706,55 @@ pub fn reconcile_home_team_with_manifest(
              team for host {local_host} (pre-V4 schema, or a V4 member with no team) — absence \
              never permits: declare the member's team or unset the environment override"
         )),
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::CrossTeamCrossingAdapter;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_iac::{FrameKind, TransparencyLogAdapter};
+
+    #[test]
+    fn erase_provenance_requires_the_complete_applied_share_locator() {
+        let audit = TransparencyLogAdapter::open_in_memory(13_600);
+        audit.insert_frame_event(
+            FrameKind::TelemetryEvent,
+            7,
+            None,
+            "collective.host.cross-team-share",
+            br#"{"to_team":"team-b","key":"k","status":"crossing_applied"}"#,
+            FrameOrigin::Kernel,
+        );
+        assert!(
+            !CrossTeamCrossingAdapter::has_crossing_provenance(
+                &audit, 7, "team-b", "default", "k"
+            )
+            .expect("audit query"),
+            "a legacy/malformed share audit row must not authorize an erase"
+        );
+
+        audit.insert_frame_event(
+            FrameKind::TelemetryEvent,
+            7,
+            None,
+            "collective.host.cross-team-share",
+            br#"{"to_team":"team-b","namespace":"default","key":"k","status":"crossing_applied"}"#,
+            FrameOrigin::Kernel,
+        );
+        assert!(
+            CrossTeamCrossingAdapter::has_crossing_provenance(
+                &audit, 7, "team-b", "default", "k"
+            )
+            .expect("audit query")
+        );
+        assert!(
+            !CrossTeamCrossingAdapter::has_crossing_provenance(
+                &audit, 7, "team-a", "default", "k"
+            )
+            .expect("audit query"),
+            "the authenticated requesting team must match the recorded destination"
+        );
     }
 }

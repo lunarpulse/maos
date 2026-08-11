@@ -5096,31 +5096,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 .map_err(|error| format!("collective erase origin lookup failed: {error}"))?;
             let audit_namespace = format!("{namespace:?}");
-            let erase_namespace = namespace.clone();
             let audit_key = key.clone();
-            let receipt = tokio::task::spawn_blocking(move || {
-                port.erase(spirit_pid, &erase_namespace, &key)
-            })
-            .await
-            .map_err(|error| format!("collective erase worker failed: {error}"))?
-            .map_err(|error| format!("collective erase failed: {error}"))?;
-            let reconciliation = match origin_team {
+            let (receipt, reconciliation) = match origin_team {
                 Some(origin_team) => {
                     #[cfg(feature = "network")]
                     {
+                        // Remote erase is tombstone-dominant and idempotent. Dispatch
+                        // it before local deletion: if the remote ACK path fails,
+                        // retry still discovers this crossed physical row and can
+                        // safely resend before deleting it locally.
                         let bootstrap = cohort_daemon.ok_or(
                             "collective erase of a crossed row requires MAOS_COHORT_DAEMON_CONFIG",
                         )?;
-                        emit_collective_erase_reconciliation(
+                        let reconciliation = emit_collective_erase_reconciliation(
                             Arc::clone(&transparency_log),
                             boot_nonce,
                             bootstrap,
-                            origin_team,
+                            origin_team.clone(),
                             spirit_pid,
                             &namespace,
                             audit_key.clone(),
                         )
-                        .await?
+                        .await?;
+                        let receipt = store
+                            .erase_crossed_row(spirit_pid, &namespace, &key, &origin_team)
+                            .await
+                            .map_err(|error| format!("collective crossed-row erase failed: {error}"))?;
+                        (receipt, reconciliation)
                     }
                     #[cfg(not(feature = "network"))]
                     {
@@ -5129,7 +5131,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         );
                     }
                 }
-                None => serde_json::json!({ "status": "not_crossed" }),
+                None => {
+                    let erase_namespace = namespace.clone();
+                    let receipt = tokio::task::spawn_blocking(move || {
+                        port.erase(spirit_pid, &erase_namespace, &key)
+                    })
+                    .await
+                    .map_err(|error| format!("collective erase worker failed: {error}"))?
+                    .map_err(|error| format!("collective erase failed: {error}"))?;
+                    (receipt, serde_json::json!({ "status": "not_crossed" }))
+                }
             };
             let audit_payload = serde_json::json!({
                 "spirit_pid": spirit_pid,
@@ -9538,6 +9549,7 @@ async fn run_cohort_a2a_daemon(
                         cross_team_consent,
                         Arc::clone(tenant_map),
                         bootstrap.control_spirit.clone(),
+                        Arc::clone(&transparency_log),
                     ),
                 )
                     as Arc<dyn maos_a2a_core::CrossTeamCrossingPort>)
@@ -9950,6 +9962,14 @@ async fn emit_cross_team_share(
         "to_team": request.to_team.as_str(),
         "intent": maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE,
         "peer": request.peer,
+        "namespace": match request.namespace {
+            maos_domain::memory::MemoryNamespace::Default => "default",
+            maos_domain::memory::MemoryNamespace::Coordination => "coordination",
+            maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
+            maos_domain::memory::MemoryNamespace::Principal { .. } => unreachable!(
+                "principal namespace was rejected before a cross-team share is emitted"
+            ),
+        },
         "key": request.key,
         "status": status,
         "detail": detail,

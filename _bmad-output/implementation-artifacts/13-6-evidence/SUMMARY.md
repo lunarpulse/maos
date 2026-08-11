@@ -2,41 +2,59 @@
 
 ## Current status
 
-**`NOT_PROVEN` — review-corrected, unbound development-lane observation.**
+**PROVEN — operator-lane, clean-commit, four-gate ledger set.**
 
-This file is the current evidence index. Current observation:
+This file is the current evidence index. Current artifacts, all binding commit
+`8d171b49` (clean worktree, no `+worktree:` digest):
 
-- [`review-observation-check-multi-tenant-loom.json`](review-observation-check-multi-tenant-loom.json) — `publication_status: CURRENT_REVIEW_OBSERVATION_UNBOUND`; the required `reza-three-team-three-region-journey` is `ABSENT` and `product_claim` is `NOT_PROVEN`.
+- [`evidence-ledger-check-cross-region-consensus.json`](evidence-ledger-check-cross-region-consensus.json) — `product_claim: PROVEN`; all 4 live legs `PROVEN_LIVE_SIGNED`.
+- [`evidence-ledger-check-multi-region-slo.json`](evidence-ledger-check-multi-region-slo.json) — `product_claim: PROVEN`.
+- [`evidence-ledger-check-multi-tenant-loom.json`](evidence-ledger-check-multi-tenant-loom.json) — `product_claim: PROVEN`; the required `reza-three-team-three-region-journey` leg is `PROVEN_LIVE_SIGNED`: all six processes (3 daemons, `maos run`, `collective-erase`, `traceback`) executed through their production entries; the collective erase reconciled BOTH the destination crossed copy and the source origin row through the manifest-authorized `collective:erase` control; the traceback CLI reached the shipped `CrossWallLogReadAdapter` and returned the exact six-field minimum-disclosure DTO. The `cortex-fourteen-institution-isolation` leg is `PROVEN_LIVE_SIGNED`: fourteen independent institution authorities, signed manifests, physical datnames, typed cross-institution consent refusal, cross-authority clone rejection, and removal independence.
+- [`evidence-ledger-check-reza-production-path.json`](evidence-ledger-check-reza-production-path.json) — `product_claim: PROVEN`.
 
-The gate ran without an operator key or live PostgreSQL substrate. The
-observation deliberately publishes no raw dirty-worktree ledger, artifact
-references, workstation paths, or key paths: local binding hashes include
-untracked bytes before report generation, so copying or annotating that report
-would invalidate the digest it carried. A bound publication requires an
-immutable clean commit.
+All four ledgers carry the same commit, were produced on one operator run with
+the operator audit key, and contain no workstation or key paths.
 
-## Why the original proof was rejected
+## Closure repairs since the pre-review rejection
 
-The pre-review journey emitted a signed `PASSED` record even though the `collective-erase` and `traceback` child processes failed before reaching their production dispatches. Review removed that attestation. The required journey must remain `ABSENT` until all six specified processes execute through their production entries.
+1. **Six-process journey.** Tenant-mode bounded-refreshable classification now
+   covers the `traceback` CLI and the cohort-backed `collective-erase`
+   one-shot; both reach their production dispatches instead of failing at
+   tenant-map construction.
+2. **Two-sided erase reconciliation.** `CrossTeamCrossingControl::Erase`
+   travels the existing authenticated intake path, is authorized by the
+   directional `collective:erase` consent check, and reuses the guarded store
+   erase on each side. A typed refusal or transport failure fails the
+   one-shot — never a silent one-sided erase. The planted one-sided oracle
+   stays RED.
+3. **Ledger omission closed (Story 13.6e).**
+   `PublishedLedger::validate_against` now requires the exact gate-owned leg
+   set, derived per gate from the same declarations the gate executes — no
+   second hand-maintained list. Missing and unknown legs fail validation
+   before any claim comparison.
+4. **14-institution axis.** `cortex_fourteen_institution_isolation_live`
+   provisions fourteen independent institutions (distinct authority keys,
+   signed V4 manifests, host→team→physical datname bindings) and proves
+   isolation, clone rejection, and removal independence on the live substrate.
+5. **Chokepoint contract updated.** The team guard now covers five guarded
+   entry points (write, read, scan, crossed-row-origin lookup, erase); the
+   `five-site-chokepoint` leg proves it.
+6. **Publication hygiene.** Leg details render repo-relative source paths; no
+   operator workstation paths appear outside signed transcript payloads.
 
-## Superseded operator history
+## Superseded review and operator history
 
-These sanitized artifacts are retained only for audit history. Each carries
-`publication_status: SUPERSEDED_PRE_REVIEW`, and every filename includes
-`.pre-review` so `load_published_ledgers` rejects it by the gate/filename
-invariant:
-
-- [`evidence-ledger-check-multi-tenant-loom.pre-review.json`](evidence-ledger-check-multi-tenant-loom.pre-review.json)
-- [`evidence-ledger-check-cross-region-consensus.pre-review.json`](evidence-ledger-check-cross-region-consensus.pre-review.json)
-- [`evidence-ledger-check-multi-region-slo.pre-review.json`](evidence-ledger-check-multi-region-slo.pre-review.json)
-- [`evidence-ledger-check-reza-production-path.pre-review.json`](evidence-ledger-check-reza-production-path.pre-review.json)
-
-Their `PROVEN` claims bind their recorded rejected pre-review snapshots. They
-must not be aggregated or treated as evidence for the corrected Story 13.6
-state. Operator-local paths were sanitized outside signed transcript payloads.
+- [`review-observation-check-multi-tenant-loom.json`](review-observation-check-multi-tenant-loom.json) — the review-lane `CURRENT_REVIEW_OBSERVATION_UNBOUND` record from 2026-08-08, when the journey was still `ABSENT`. Retained for audit; superseded by the PROVEN ledgers above.
+- `evidence-ledger-*.pre-review.json` — the rejected pre-review operator
+  worktree artifacts, `publication_status: SUPERSEDED_PRE_REVIEW`. Their
+  filenames keep them non-ingestible by `load_published_ledgers`. Retained
+  only for audit history; they must not be aggregated or treated as evidence
+  for the current Story 13.6 state.
 
 ## Current verification
 
-- `cargo run -q -p xtask -- check-multi-tenant-loom --json` — local ignored report, exit 0; required journey `ABSENT`; `product_claim: NOT_PROVEN`. The sanitized observation above records these semantics without claiming a dirty-worktree binding.
-- `cargo run -q -p xtask -- check-dev-record-completeness --json` — pass; 31 owner assertions, 16 owned-but-deferred rows, zero violations.
-- The mandatory-leg omission vulnerability in published-ledger validation is filed against reopened Story 13.6e; Story 13.6's out-of-scope verifier patch was reverted.
+- All four substrate gates: `product_claim: PROVEN` @ `8d171b49`, exit 0, every required leg proven.
+- `cargo run -q -p xtask -- check-ship-gate-completeness` — PASS; published ledgers consumed without problems.
+- `cargo run -q -p xtask -- check-loom-substrate-drift` — PASS.
+- `cargo run -q -p xtask -- check-dev-record-completeness --json` — owner sweep gate.
+- Full xtask suite — 450 passed, 1 ignored.
