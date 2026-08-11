@@ -9,12 +9,25 @@
 //! `MAOS_TEST_POSTGRES` connection string so that an environment without
 //! Postgres reports them as *ignored* (never a silent pass).
 //!
-//! Run with a live backend:
+//! Run with a live backend. The substrate is FOUR databases on one server —
+//! `maos_shared` plus `maos_team_{a,b,c}` — and this binary reads the shared
+//! stand-in, the region axis and the team axis, so all seven variables must be
+//! exported (`docs/testing/local-loom-substrate.md` has the full runbook and
+//! the copy-pasteable block):
 //!
 //! ```text
-//! MAOS_TEST_POSTGRES="host=127.0.0.1 user=maos_test password=maos_test dbname=maos_test" \
+//! PG=postgresql://postgres:postgres@127.0.0.1:5432
+//! MAOS_TEST_POSTGRES="$PG/maos_shared" \
+//! MAOS_TEST_POSTGRES_A="$PG/maos_team_a"      MAOS_TEST_POSTGRES_TEAM_A="$PG/maos_team_a" \
+//! MAOS_TEST_POSTGRES_B="$PG/maos_team_b"      MAOS_TEST_POSTGRES_TEAM_B="$PG/maos_team_b" \
+//! MAOS_TEST_POSTGRES_C="$PG/maos_team_c"      MAOS_TEST_POSTGRES_TEAM_C="$PG/maos_team_c" \
 //!   cargo test -p maos-loom-lite --test cross_region_live -- --ignored --nocapture
 //! ```
+//!
+//! ⚠ The singular `MAOS_TEST_POSTGRES` is the SHARED stand-in and must be its
+//! own database (`maos_shared`), never aliased onto a team database — the AC1
+//! role-disjoint rule, held by `check-loom-substrate-drift`'s
+//! `topology-value-distinctness` leg.
 //!
 //! # Five oracle legs (mapped to gate legs in check_cross_region_consensus.rs)
 //!
@@ -60,6 +73,53 @@ use maos_domain::team::TeamId;
 // only verifies. Shared signer, no new crate and no new dependency.
 #[path = "../../../tests/harness/evidence_record.rs"]
 mod evidence_record;
+
+/// Story 13.6 (AC1) — the three topology-fraud limbs, as PURE oracles.
+///
+/// The limbs used to be inline `assert_ne!`s inside `#[ignore]`d live tests.
+/// 13.6e could machine-derive that the negative RAN; that it *reds on fraud*
+/// stayed prose in a SUMMARY.md and a one-off local exit-101. Extracting the
+/// judgement makes it falsifiable with no substrate at all, in the idiom
+/// `check_loom_substrate_drift.rs` already uses: take the real observation,
+/// plant one specific defect in an in-memory clone, assert not-green AND that
+/// the problem names the defect by token. Restore is by construction —
+/// nothing on disk is mutated, so there is no restore step to forget.
+mod topology_fraud {
+    /// Every pair on one uniqueness axis that resolved to the same physical
+    /// `current_database()`. A shared-table stand-in cannot fake three
+    /// distinct datnames, so a non-empty result IS the fraud.
+    pub fn distinct_datname_problems(axis: &str, observed: &[(&str, String)]) -> Vec<String> {
+        let mut problems = Vec::new();
+        for (index, (left_label, left)) in observed.iter().enumerate() {
+            for (right_label, right) in &observed[index + 1..] {
+                if left == right {
+                    problems.push(format!(
+                        "topology fraud: {left_label} and {right_label} share database \
+                         `{left}` — the {axis} axis must be physically distinct (F2)"
+                    ));
+                }
+            }
+        }
+        problems
+    }
+
+    /// The pre-replication physical-absence limb: a key written only to the
+    /// origin database must read back as ABSENT at the peer. A single shared
+    /// table structurally cannot express this — the row would be present.
+    pub fn physical_absence_problem(
+        peer: &str,
+        key: &str,
+        observed: Option<String>,
+    ) -> Option<String> {
+        observed.map(|value| {
+            format!(
+                "topology fraud: `{key}` was written only to the origin database yet \
+                 {peer} already returns `{value}` before replication — physical absence \
+                 is unexpressible on a single shared table (F2)"
+            )
+        })
+    }
+}
 
 /// Serialize tests on the shared Postgres instance (single
 /// `collective_memory` table).
@@ -528,20 +588,15 @@ async fn cross_team_crossing_lands_with_bound_source_team() {
 async fn three_team_databases_are_physically_distinct() {
     let _evidence = evidence_record::attest("three_team_databases_are_physically_distinct");
     let _g = guard();
-    let datname_a = current_database_team("team-a").await;
-    let datname_b = current_database_team("team-b").await;
-    let datname_c = current_database_team("team-c").await;
-    assert_ne!(
-        datname_a, datname_b,
-        "team-a and team-b share a database — role-disjoint violation (AC1)"
-    );
-    assert_ne!(
-        datname_a, datname_c,
-        "team-a and team-c share a database — role-disjoint violation (AC1)"
-    );
-    assert_ne!(
-        datname_b, datname_c,
-        "team-b and team-c share a database — role-disjoint violation (AC1)"
+    let observed = [
+        ("team-a", current_database_team("team-a").await),
+        ("team-b", current_database_team("team-b").await),
+        ("team-c", current_database_team("team-c").await),
+    ];
+    let problems = topology_fraud::distinct_datname_problems("team", &observed);
+    assert!(
+        problems.is_empty(),
+        "role-disjoint violation (AC1): {problems:?}"
     );
 }
 
@@ -2069,21 +2124,17 @@ async fn three_region_convergence_all_three_equal() {
 
     // ── NEGATIVE CONTROL #1: distinct-datname witness (F2) ───────────────
     // A shared-table stand-in cannot fake three distinct `current_database()`.
-    let datname_a = current_database_for('a').await;
-    let datname_b = current_database_for('b').await;
-    let datname_c = current_database_for('c').await;
-    assert_ne!(
-        datname_a, datname_b,
-        "region-a and region-b share a database — topology fraud (F2: three \
-         real Postgres required)"
-    );
-    assert_ne!(
-        datname_a, datname_c,
-        "region-a and region-c share a database — topology fraud (F2)"
-    );
-    assert_ne!(
-        datname_b, datname_c,
-        "region-b and region-c share a database — topology fraud (F2)"
+    // The judgement is `topology_fraud::distinct_datname_problems`, whose own
+    // proven-red control runs hermetically (Story 13.6 / AC1).
+    let observed = [
+        ("region-a", current_database_for('a').await),
+        ("region-b", current_database_for('b').await),
+        ("region-c", current_database_for('c').await),
+    ];
+    let problems = topology_fraud::distinct_datname_problems("region", &observed);
+    assert!(
+        problems.is_empty(),
+        "three real Postgres required: {problems:?}"
     );
 
     let region_a = Region::canonicalize("region-a").unwrap();
@@ -2140,10 +2191,15 @@ async fn three_region_convergence_all_three_equal() {
         .read(1, &MemoryNamespace::Default, "agent-1")
         .await
         .expect("read region-b");
-    assert_eq!(
-        absent, None,
-        "region-B must have ZERO rows for pid=1 (lives only in DB-A) before \
-         replication — physical-absence negative control (F2)"
+    let problem = topology_fraud::physical_absence_problem(
+        "region-b",
+        "agent-1",
+        absent.map(|value| format!("{value:?}")),
+    );
+    assert!(
+        problem.is_none(),
+        "physical-absence negative control (F2): {}",
+        problem.unwrap_or_default()
     );
 
     // Full-mesh mediated propagation: each region's pre-propagation leaves
@@ -2740,5 +2796,96 @@ async fn live_read_region_identity_forged_stamp_served() {
         "a foreign row with a forged non-empty source_log_ref IS served — \
          the read-path guard checks provenance-PRESENCE, not cryptographic \
          VALIDITY (documented residual threat, by design)"
+    );
+}
+
+// ─── Story 13.6 / AC1 — the three limbs, proven red without a substrate ─────
+//
+// Hermetic on purpose: these are the controls that make the live negatives
+// above falsifiable. Each plants ONE specific defect in an in-memory clone of
+// a real observation and asserts the oracle both reds AND names the defect by
+// token. Nothing on disk is touched, so restore is by construction.
+
+#[test]
+fn topology_fraud_control_reds_on_a_collapsed_region_axis() {
+    let honest = [
+        ("region-a", "maos_team_a".to_string()),
+        ("region-b", "maos_team_b".to_string()),
+        ("region-c", "maos_team_c".to_string()),
+    ];
+    assert!(
+        topology_fraud::distinct_datname_problems("region", &honest).is_empty(),
+        "the real three-region topology must be green"
+    );
+
+    let mut collapsed = honest;
+    collapsed[2].1 = "maos_team_a".to_string();
+    let problems = topology_fraud::distinct_datname_problems("region", &collapsed);
+    assert_eq!(
+        problems.len(),
+        1,
+        "exactly one pair collapsed: {problems:?}"
+    );
+    assert!(
+        problems[0].contains("topology fraud")
+            && problems[0].contains("region-a")
+            && problems[0].contains("region-c")
+            && problems[0].contains("maos_team_a")
+            && problems[0].contains("region axis"),
+        "the problem must name the defect by token: {}",
+        problems[0]
+    );
+}
+
+#[test]
+fn topology_fraud_control_reds_on_a_collapsed_team_axis() {
+    let honest = [
+        ("team-a", "maos_team_a".to_string()),
+        ("team-b", "maos_team_b".to_string()),
+        ("team-c", "maos_team_c".to_string()),
+    ];
+    assert!(
+        topology_fraud::distinct_datname_problems("team", &honest).is_empty(),
+        "the real three-team topology must be green"
+    );
+
+    // The single-shared-table stand-in this limb exists to refuse: every team
+    // resolves to one database, so all three pairs collide.
+    let shared = [
+        ("team-a", "maos_test".to_string()),
+        ("team-b", "maos_test".to_string()),
+        ("team-c", "maos_test".to_string()),
+    ];
+    let problems = topology_fraud::distinct_datname_problems("team", &shared);
+    assert_eq!(problems.len(), 3, "all three pairs must red: {problems:?}");
+    assert!(
+        problems
+            .iter()
+            .all(|problem| problem.contains("topology fraud")
+                && problem.contains("maos_test")
+                && problem.contains("team axis")),
+        "every problem must name the defect by token: {problems:?}"
+    );
+}
+
+#[test]
+fn topology_fraud_control_reds_on_a_pre_replication_row_that_is_present() {
+    assert!(
+        topology_fraud::physical_absence_problem("region-b", "agent-1", None).is_none(),
+        "an absent peer row is the honest observation"
+    );
+
+    let problem = topology_fraud::physical_absence_problem(
+        "region-b",
+        "agent-1",
+        Some("Text(\"home-a\")".to_string()),
+    )
+    .expect("a present peer row before replication MUST red");
+    assert!(
+        problem.contains("topology fraud")
+            && problem.contains("agent-1")
+            && problem.contains("region-b")
+            && problem.contains("before replication"),
+        "the problem must name the defect by token: {problem}"
     );
 }

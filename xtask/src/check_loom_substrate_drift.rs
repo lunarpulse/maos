@@ -32,6 +32,26 @@
 //! declares its own copy; this leg holds every registered substrate block
 //! byte-identical modulo `POSTGRES_DB` and rejects an unregistered,
 //! service-bearing gate job before it can introduce a divergent fifth copy.
+//!
+//! # Leg 3 — topology-value distinctness (Story 13.6 / AC1, the D-6b catcher)
+//!
+//! Legs 1 and 2 compare variable NAMES. Neither ever looked at a VALUE, so
+//! three exported variables could all name one database and the substrate's
+//! load-bearing claim — *three physically-distinct databases* — would stay
+//! green while a single shared table faked the whole topology. That is the
+//! fraud the live `three_region_*` / `three_team_*` negatives catch only when
+//! a live Postgres is present; this leg catches it from the declaration, with
+//! no substrate at all.
+//!
+//! The reconcile is AXIS-SCOPED, and it has to be: the substrate deliberately
+//! aliases ACROSS axes. `MAOS_TEST_POSTGRES_A` and `MAOS_TEST_POSTGRES_TEAM_A`
+//! are two names for `maos_team_a`, and `check-multi-tenant-loom` points the
+//! singular shared stand-in at `maos_team_b` on purpose. A naive all-distinct
+//! rule would false-red on both. So the rule is:
+//!   * every axis in [`TOPOLOGY_AXES`] is pairwise distinct WITHIN itself, and
+//!   * any other two exported keys that name one database must appear in
+//!     [`RATIFIED_ALIASES`] — which is itself held non-vacuous: a ratified
+//!     alias whose two keys have STOPPED colliding is a stale entry and reds.
 
 use crate::gate_common::emit_command;
 use serde_json::Value;
@@ -119,7 +139,15 @@ const MULTI_TENANT_ROUTES: &[OracleRoute] = &[
     },
     OracleRoute {
         source: "crates/maos-bin/tests/cross_team_crossing_13_6b.rs",
-        filters: &["live_crossing_runs_through_two_daemon_processes"],
+        filters: &[
+            "live_crossing_runs_through_two_daemon_processes",
+            "live_destination_adapter_applies_and_refuses_expected_shapes",
+            // Story 13.6 (AC2/AC4): the composed three-team journey and the
+            // refused-crossing / retry-repair leg. The journey is the reader
+            // that finally consumes TEAM_C from THIS harness.
+            "reza_three_team_three_region_production_journey",
+            "refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair",
+        ],
     },
     OracleRoute {
         source: "crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs",
@@ -195,6 +223,78 @@ const CONTRACTS: &[Contract] = &[
 /// is `run_service_block_drift` below and is not rebuilt there.
 pub(crate) fn contract_jobs() -> Vec<&'static str> {
     CONTRACTS.iter().map(|c| c.job).collect()
+}
+
+/// One uniqueness axis of the substrate topology (Story 13.6 / AC1).
+///
+/// ⚠ `TeamEntry.region` is a scalar and is NOT a uniqueness axis
+/// (`manifest.rs`'s `validate_team_map` rejects duplicate `team_id` and
+/// duplicate `datname`, nothing else). "Three teams × three regions" is
+/// THREE databases — not six, not nine — and these are the two names under
+/// which those same three databases are exported.
+struct TopologyAxis {
+    name: &'static str,
+    keys: &'static [&'static str],
+}
+
+const TOPOLOGY_AXES: &[TopologyAxis] = &[
+    TopologyAxis {
+        name: "region",
+        keys: &[
+            "MAOS_TEST_POSTGRES_A",
+            "MAOS_TEST_POSTGRES_B",
+            "MAOS_TEST_POSTGRES_C",
+        ],
+    },
+    TopologyAxis {
+        name: "team",
+        keys: &[
+            "MAOS_TEST_POSTGRES_TEAM_A",
+            "MAOS_TEST_POSTGRES_TEAM_B",
+            "MAOS_TEST_POSTGRES_TEAM_C",
+        ],
+    },
+];
+
+/// Cross-axis collisions that are RATIFIED, by job and by key pair.
+///
+/// Everything else that collides is topology fraud. The list is deliberately
+/// job-scoped: `check-cross-region-consensus` exports the shared stand-in as
+/// its own `maos_shared` (the AC1 role-disjoint rule), while
+/// `check-multi-tenant-loom` aliases the same variable onto team B's database.
+/// Making that a global exemption would delete the role-disjoint control.
+const RATIFIED_ALIASES: &[(&str, &str, &str)] = &[
+    // The region and team axes are two VIEWS of the same three databases: the
+    // signed `TeamEntry` carries one region and one datname, so `..._A` and
+    // `..._TEAM_A` necessarily name one physical database (13.6c AC1).
+    (
+        "check-cross-region-consensus",
+        "MAOS_TEST_POSTGRES_A",
+        "MAOS_TEST_POSTGRES_TEAM_A",
+    ),
+    (
+        "check-cross-region-consensus",
+        "MAOS_TEST_POSTGRES_B",
+        "MAOS_TEST_POSTGRES_TEAM_B",
+    ),
+    (
+        "check-cross-region-consensus",
+        "MAOS_TEST_POSTGRES_C",
+        "MAOS_TEST_POSTGRES_TEAM_C",
+    ),
+    // 13.6c: the loom gate keeps the legacy singular name pointed at team B's
+    // database so the pre-13.6c readers in the same binary still resolve.
+    (
+        "check-multi-tenant-loom",
+        "MAOS_TEST_POSTGRES",
+        "MAOS_TEST_POSTGRES_TEAM_B",
+    ),
+];
+
+fn alias_is_ratified(job: &str, left: &str, right: &str) -> bool {
+    RATIFIED_ALIASES.iter().any(|(alias_job, a, b)| {
+        *alias_job == job && ((*a == left && *b == right) || (*a == right && *b == left))
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -345,15 +445,53 @@ fn collect_env_keys(env: Option<&Value>, out: &mut BTreeSet<String>) {
     }
 }
 
-/// `MAOS_TEST_POSTGRES*` keys visible to the step that invokes the gate:
-/// job-level env plus that step's env. Env on sibling steps is not in scope.
-fn exported_vars(workflow: &Value, job: &str) -> Result<BTreeSet<String>, String> {
+/// The VALUES behind those keys (Story 13.6 / AC1). Same walk, same scope
+/// rule; only leg 3 consumes it, so leg 1's serialized shape is untouched.
+fn collect_env_values(env: Option<&Value>, out: &mut BTreeMap<String, String>) {
+    if let Some(env) = env.and_then(Value::as_object) {
+        for (key, value) in env {
+            if key.starts_with("MAOS_TEST_POSTGRES") {
+                if let Some(value) = value.as_str() {
+                    out.insert(key.clone(), value.to_string());
+                }
+            }
+        }
+    }
+}
+
+/// The database a `MAOS_TEST_POSTGRES*` connection string names.
+///
+/// Both shapes in the workflow are covered: a `postgresql://…/<datname>` URL
+/// and the libpq `dbname=<datname>` keyword form the local runbook uses. Empty
+/// values and strings that are not connection strings are not evidence of a
+/// physical database.
+fn datname_of_conn(conn: &str) -> Option<String> {
+    let conn = conn.trim();
+    if let Some((_, rest)) = conn.split_once("dbname=") {
+        let datname = rest.split_whitespace().next().unwrap_or(rest).trim();
+        return (!datname.is_empty()).then(|| datname.to_string());
+    }
+    let (_, after_scheme) = conn.split_once("://")?;
+    let (_, path) = after_scheme.rsplit_once('/')?;
+    let datname = path.split(['?', '#']).next().unwrap_or(path).trim();
+    (!datname.is_empty()).then(|| datname.to_string())
+}
+
+/// The env scopes visible to the step that invokes `job`'s gate: the job-level
+/// `env` block followed by that one step's `env` block. Env on sibling steps is
+/// deliberately out of scope.
+///
+/// Extracted so leg 1 (keys) and leg 3 (values) cannot drift on *which* step
+/// counts — two copies of that rule is the hazard this gate exists to catch.
+fn gate_env_scopes<'a>(workflow: &'a Value, job: &str) -> Result<Vec<&'a Value>, String> {
     let job_node = workflow
         .get("jobs")
         .and_then(|j| j.get(job))
         .ok_or_else(|| format!("{GATE_NAME}: job `{job}` not found"))?;
-    let mut out = BTreeSet::new();
-    collect_env_keys(job_node.get("env"), &mut out);
+    let mut scopes = Vec::new();
+    if let Some(env) = job_node.get("env") {
+        scopes.push(env);
+    }
 
     let steps = job_node
         .get("steps")
@@ -369,13 +507,33 @@ fn exported_vars(workflow: &Value, job: &str) -> Result<BTreeSet<String>, String
         });
         if invokes_gate {
             invocation_count += 1;
-            collect_env_keys(step.get("env"), &mut out);
+            if let Some(env) = step.get("env") {
+                scopes.push(env);
+            }
         }
     }
     if invocation_count != 1 {
         return Err(format!(
             "{GATE_NAME}: expected one `{job}` cargo-run step, found {invocation_count}"
         ));
+    }
+    Ok(scopes)
+}
+
+/// `MAOS_TEST_POSTGRES*` keys visible to the step that invokes the gate.
+fn exported_vars(workflow: &Value, job: &str) -> Result<BTreeSet<String>, String> {
+    let mut out = BTreeSet::new();
+    for env in gate_env_scopes(workflow, job)? {
+        collect_env_keys(Some(env), &mut out);
+    }
+    Ok(out)
+}
+
+/// The same keys with their connection strings (Story 13.6 / AC1, leg 3).
+fn exported_values(workflow: &Value, job: &str) -> Result<BTreeMap<String, String>, String> {
+    let mut out = BTreeMap::new();
+    for env in gate_env_scopes(workflow, job)? {
+        collect_env_values(Some(env), &mut out);
     }
     Ok(out)
 }
@@ -570,6 +728,108 @@ fn run_service_block_drift(workflow: &Value) -> Result<(bool, Vec<String>), Stri
 }
 
 // ---------------------------------------------------------------------------
+// Leg 3 — topology-value distinctness (Story 13.6 / AC1).
+// ---------------------------------------------------------------------------
+
+/// Every collision between two exported `MAOS_TEST_POSTGRES*` values in one
+/// job, judged axis-scoped, plus the staleness check on the ratified list.
+///
+/// Pure over `(job, exported)` so the proven-red controls can plant one
+/// specific defect in an in-memory clone of the real workflow and assert both
+/// that it reds AND that the problem names the defect by token.
+fn topology_value_problems(job: &str, exported: &BTreeMap<String, String>) -> Vec<String> {
+    let mut problems = Vec::new();
+    let Some(contract) = CONTRACTS.iter().find(|contract| contract.job == job) else {
+        return vec![format!(
+            "{job}: topology values have no registered substrate contract"
+        )];
+    };
+    let mut datnames = BTreeMap::new();
+    for key in contract.required {
+        match exported.get(*key).and_then(|conn| datname_of_conn(conn)) {
+            Some(datname) => {
+                datnames.insert(*key, datname);
+            }
+            None => problems.push(format!(
+                "{job}: topology value `{key}` is missing, empty, or not a database connection string"
+            )),
+        }
+    }
+
+    for axis in TOPOLOGY_AXES {
+        let active_keys: Vec<&str> = axis
+            .keys
+            .iter()
+            .copied()
+            .filter(|key| contract.required.contains(key))
+            .collect();
+        for (index, left) in active_keys.iter().enumerate() {
+            for right in &active_keys[index + 1..] {
+                match (datnames.get(left), datnames.get(right)) {
+                    (Some(a), Some(b)) if a == b => problems.push(format!(
+                        "{job}: topology fraud — {left} and {right} both name database `{a}`, \
+                         but the `{}` axis must be pairwise physically distinct",
+                        axis.name
+                    )),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    let on_axis = |key: &str| {
+        TOPOLOGY_AXES
+            .iter()
+            .find(|axis| axis.keys.contains(&key))
+            .map(|axis| axis.name)
+    };
+    let keys: Vec<&str> = datnames.keys().copied().collect();
+    for (index, left) in keys.iter().enumerate() {
+        for right in &keys[index + 1..] {
+            if on_axis(left).is_some() && on_axis(left) == on_axis(right) {
+                continue; // already judged by the axis rule above
+            }
+            if datnames[left] != datnames[right] || alias_is_ratified(job, left, right) {
+                continue;
+            }
+            problems.push(format!(
+                "{job}: topology fraud — {left} and {right} both name database `{}`, \
+                 and that cross-axis alias is not in RATIFIED_ALIASES (role-disjoint rule)",
+                datnames[left]
+            ));
+        }
+    }
+
+    for (alias_job, left, right) in RATIFIED_ALIASES
+        .iter()
+        .filter(|(alias_job, _, _)| *alias_job == job)
+    {
+        match (datnames.get(left), datnames.get(right)) {
+            (Some(a), Some(b)) if a == b => {}
+            (Some(a), Some(b)) => problems.push(format!(
+                "{alias_job}: RATIFIED_ALIASES still exempts {left}/{right} but they now name \
+                 `{a}` and `{b}` — a stale exemption is an exemption nobody re-earned"
+            )),
+            _ => problems.push(format!(
+                "{alias_job}: RATIFIED_ALIASES exempts {left}/{right} but the job no longer \
+                 exports both — delete the stale exemption"
+            )),
+        }
+    }
+
+    problems
+}
+
+fn run_topology_value_distinctness(workflow: &Value) -> Result<(bool, Vec<String>), String> {
+    let mut problems = Vec::new();
+    for contract in CONTRACTS {
+        let exported = exported_values(workflow, contract.job)?;
+        problems.extend(topology_value_problems(contract.job, &exported));
+    }
+    Ok((problems.is_empty(), problems))
+}
+
+// ---------------------------------------------------------------------------
 
 pub fn run(json: bool) -> Result<(), String> {
     let workflow = load_workflow()?;
@@ -579,7 +839,9 @@ pub fn run(json: bool) -> Result<(), String> {
 
     let (svc_green, svc_problems) = run_service_block_drift(&workflow)?;
 
-    let oracle_green = env_green && svc_green;
+    let (topology_green, topology_problems) = run_topology_value_distinctness(&workflow)?;
+
+    let oracle_green = env_green && svc_green && topology_green;
 
     let legs = serde_json::json!([{
         "name": "env-consistency",
@@ -595,6 +857,10 @@ pub fn run(json: bool) -> Result<(), String> {
         "name": "service-block-drift",
         "green": svc_green,
         "problems": svc_problems,
+    }, {
+        "name": "topology-value-distinctness",
+        "green": topology_green,
+        "problems": topology_problems,
     }]);
 
     if oracle_green {
@@ -610,8 +876,9 @@ pub fn run(json: bool) -> Result<(), String> {
             );
         } else {
             eprintln!(
-                "{GATE_NAME}: PASS — {} gates env-consistent, {} registered service blocks byte-identical (modulo POSTGRES_DB)",
+                "{GATE_NAME}: PASS — {} gates env-consistent, {} registered service blocks byte-identical (modulo POSTGRES_DB), {} axis-scoped topologies physically distinct",
                 env_verdicts.len(),
+                CONTRACTS.len(),
                 CONTRACTS.len()
             );
         }
@@ -625,6 +892,9 @@ pub fn run(json: bool) -> Result<(), String> {
         }
     }
     for p in &svc_problems {
+        detail.push_str(&format!("- {p}\n"));
+    }
+    for p in &topology_problems {
         detail.push_str(&format!("- {p}\n"));
     }
     let msg = format!("{GATE_NAME}: RED — substrate drift:\n{detail}");
@@ -887,6 +1157,148 @@ mod tests {
         let (green, problems) = run_service_block_drift(&wf).unwrap();
         assert!(!green, "service drift must RED");
         assert!(problems.iter().any(|p| p.contains("diverges")));
+    }
+
+    // ── Story 13.6 / AC1 — topology-value distinctness, proven-red per limb.
+
+    fn planted(job: &str, key: &str, datname: &str) -> Vec<String> {
+        let mut wf = real_workflow();
+        let steps = wf["jobs"][job]["steps"].as_array_mut().unwrap();
+        for step in steps {
+            if let Some(env) = step.get_mut("env").and_then(|e| e.as_object_mut()) {
+                if env.contains_key(key) {
+                    env.insert(
+                        key.to_string(),
+                        Value::String(format!(
+                            "postgresql://postgres:postgres@localhost:5432/{datname}"
+                        )),
+                    );
+                }
+            }
+        }
+        let exported = exported_values(&wf, job).unwrap();
+        topology_value_problems(job, &exported)
+    }
+
+    #[test]
+    fn real_topology_is_axis_distinct_and_its_aliases_are_ratified() {
+        // The false-red guard D-6(b) warns about: `_A`/`TEAM_A` alias onto
+        // maos_team_a by design, and the loom gate points the singular shared
+        // stand-in at maos_team_b. A naive all-distinct rule reds on both.
+        let (green, problems) = run_topology_value_distinctness(&real_workflow()).unwrap();
+        assert!(green, "the real substrate must be green: {problems:?}");
+    }
+
+    #[test]
+    fn topology_value_control_catches_a_collapsed_team_axis() {
+        // Limb 3 (`three_team_databases_are_physically_distinct`) as a
+        // hermetic control: collapse team B onto team A's database.
+        let problems = planted(
+            "check-multi-tenant-loom",
+            "MAOS_TEST_POSTGRES_TEAM_B",
+            "maos_team_a",
+        );
+        assert!(
+            problems.iter().any(|p| p.contains("topology fraud")
+                && p.contains("MAOS_TEST_POSTGRES_TEAM_B")
+                && p.contains("maos_team_a")
+                && p.contains("`team` axis")),
+            "a collapsed team axis must RED and name the defect: {problems:?}"
+        );
+    }
+
+    #[test]
+    fn topology_value_control_catches_a_collapsed_region_axis() {
+        // Limb 1 (`three_region_convergence_all_three_equal`'s distinct-datname
+        // witness) as a hermetic control: collapse region C onto region A.
+        let problems = planted(
+            "check-multi-region-slo",
+            "MAOS_TEST_POSTGRES_C",
+            "maos_team_a",
+        );
+        assert!(
+            problems.iter().any(|p| p.contains("topology fraud")
+                && p.contains("MAOS_TEST_POSTGRES_C")
+                && p.contains("maos_team_a")
+                && p.contains("`region` axis")),
+            "a collapsed region axis must RED and name the defect: {problems:?}"
+        );
+    }
+
+    #[test]
+    fn topology_value_control_catches_an_unratified_shared_standin_alias() {
+        // The role-disjoint rule: the consensus job's shared stand-in must be
+        // its own database, never a team's. Aliasing it onto maos_team_a is
+        // not in RATIFIED_ALIASES, so it must RED.
+        let problems = planted(
+            "check-cross-region-consensus",
+            "MAOS_TEST_POSTGRES",
+            "maos_team_a",
+        );
+        assert!(
+            problems.iter().any(|p| p.contains("topology fraud")
+                && p.contains("MAOS_TEST_POSTGRES ")
+                && p.contains("not in RATIFIED_ALIASES")),
+            "an unratified shared-stand-in alias must RED: {problems:?}"
+        );
+    }
+
+    #[test]
+    fn ratified_alias_list_is_held_non_vacuous() {
+        // An exemption nobody re-earned is an exemption that rots. Break the
+        // ratified `_A`/`TEAM_A` alias and the STALENESS arm must fire.
+        let problems = planted(
+            "check-cross-region-consensus",
+            "MAOS_TEST_POSTGRES_TEAM_A",
+            "maos_solo_a",
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("RATIFIED_ALIASES still exempts")
+                    && p.contains("MAOS_TEST_POSTGRES_A")),
+            "a stale ratified alias must RED: {problems:?}"
+        );
+    }
+
+    #[test]
+    fn datname_extraction_handles_both_connection_shapes() {
+        assert_eq!(
+            datname_of_conn("postgresql://postgres:postgres@localhost:5432/maos_team_c").as_deref(),
+            Some("maos_team_c")
+        );
+        assert_eq!(
+            datname_of_conn("host=127.0.0.1 user=maos_test dbname=maos_team_c").as_deref(),
+            Some("maos_team_c")
+        );
+        assert_eq!(datname_of_conn(""), None);
+        assert_eq!(datname_of_conn("maos_team_c"), None);
+    }
+
+    #[test]
+    fn topology_value_control_rejects_missing_and_empty_axis_values() {
+        let workflow = real_workflow();
+        let exported = exported_values(&workflow, "check-multi-region-slo").unwrap();
+
+        let mut missing = exported.clone();
+        missing.remove("MAOS_TEST_POSTGRES_C");
+        let problems = topology_value_problems("check-multi-region-slo", &missing);
+        assert!(
+            problems.iter().any(|problem| {
+                problem.contains("MAOS_TEST_POSTGRES_C") && problem.contains("missing")
+            }),
+            "a missing region database must RED by key: {problems:?}"
+        );
+
+        let mut empty = exported;
+        empty.insert("MAOS_TEST_POSTGRES_C".to_string(), String::new());
+        let problems = topology_value_problems("check-multi-region-slo", &empty);
+        assert!(
+            problems.iter().any(|problem| {
+                problem.contains("MAOS_TEST_POSTGRES_C") && problem.contains("empty")
+            }),
+            "an empty region database must RED by key: {problems:?}"
+        );
     }
 
     #[test]

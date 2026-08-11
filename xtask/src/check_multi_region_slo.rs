@@ -59,6 +59,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// `Commands` variant's `#[command(name = ...)]`).
 pub(crate) const GATE_NAME: &str = "check-multi-region-slo";
 
+/// Raw labels are the single source for both gate construction and ledger
+/// membership validation.
+const RAW_LEG_LABELS: [&str; 5] = [
+    "three-region-convergence",
+    "roundtrip-slo",
+    "halt-presence",
+    "live-read-region-identity",
+    "kernel-abi-diff",
+];
+
 /// One oracle leg's raw observation, before projection.
 struct RawLeg {
     label: &'static str,
@@ -233,7 +243,7 @@ fn errored(label: &'static str, class: BindingClass, substrate_present: bool) ->
 
 /// Leg 1: three-region convergence (live, 3 PG).
 fn run_three_region_convergence_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
-    let label = "three-region-convergence";
+    let label = RAW_LEG_LABELS[0];
     if !pg {
         return RawLeg::skipped(label);
     }
@@ -283,7 +293,7 @@ fn run_three_region_convergence_leg(pg: bool, verifier: &EvidenceVerifier) -> Ra
 /// requires BOTH the clean budget-met path AND the mutation that REDs the
 /// budget (the falsifier must move the number). Both are "pass" outcomes.
 fn run_roundtrip_slo_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
-    let label = "roundtrip-slo";
+    let label = RAW_LEG_LABELS[1];
     if !pg {
         return RawLeg::skipped(label);
     }
@@ -353,7 +363,7 @@ fn run_roundtrip_slo_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
 /// Hermetic, therefore [`BindingClass::Blocking`]: a RED here has always been a
 /// real defect and now hard-fails at HEAD instead of hiding behind the phase.
 fn run_halt_presence_leg(verifier: &EvidenceVerifier) -> RawLeg {
-    let label = "halt-presence";
+    let label = RAW_LEG_LABELS[2];
     match invoke_cargo_test(
         label,
         "maos-bench",
@@ -388,7 +398,7 @@ fn run_halt_presence_leg(verifier: &EvidenceVerifier) -> RawLeg {
 
 fn blocking_chokepoint_failure(run: CargoRun) -> RawLeg {
     RawLeg {
-        label: "live-read-region-identity",
+        label: RAW_LEG_LABELS[3],
         class: BindingClass::Blocking,
         substrate_present: true,
         passed: run.passed,
@@ -409,7 +419,7 @@ fn blocking_chokepoint_failure(run: CargoRun) -> RawLeg {
 /// `substrate_present` stays FALSE so the dev lane is not blocked by an
 /// unmeasurable half.
 fn run_live_read_region_identity_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
-    let label = "live-read-region-identity";
+    let label = RAW_LEG_LABELS[3];
     // The chokepoint ALWAYS runs (structural — no Postgres).
     let chokepoint = match invoke_cargo_test(
         label,
@@ -514,7 +524,7 @@ fn run_live_read_region_identity_leg(pg: bool, verifier: &EvidenceVerifier) -> R
 fn run_kernel_abi_leg() -> RawLeg {
     let green = crate::check_kernel_baseline::run(false).is_ok();
     RawLeg {
-        label: "kernel-abi-diff",
+        label: RAW_LEG_LABELS[4],
         class: BindingClass::Blocking,
         substrate_present: true,
         passed: u32::from(green),
@@ -736,4 +746,15 @@ mod tests {
         assert!(!leg.blocks_dev_lane());
         assert!(!leg.blocks_product_claim(false));
     }
+
+    #[test]
+    fn ledger_leg_names_are_derived_from_raw_labels() {
+        assert_eq!(ledger_leg_names(), RAW_LEG_LABELS.to_vec());
+    }
+}
+
+/// Complete ledger leg set, derived from the raw labels used to construct this
+/// gate's legs.
+pub fn ledger_leg_names() -> Vec<&'static str> {
+    RAW_LEG_LABELS.to_vec()
 }

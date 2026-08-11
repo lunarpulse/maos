@@ -1,0 +1,124 @@
+{
+  "absent_successors": [],
+  "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+  "gate": "check-cross-region-consensus",
+  "legs": [
+    {
+      "artifact_ref": "check-cross-region-consensus/reattestation-mediated@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [reattest_copy_fails_then_reattest_succeeds] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "reattest_copy_fails_then_reattest_succeeds"
+      ],
+      "green": true,
+      "name": "reattestation-mediated",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-cross-region-consensus",
+          "nonce": "check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+          "outcome": "PASSED",
+          "signature": "897e23fcc395b9ee711b00546333061495af9eee986ee35be6fab2d6da27611310b7cd2ed2fe268a34301b10804fc6b9d9b9e0657309eb22754e04f135026b0b",
+          "test": "reattest_copy_fails_then_reattest_succeeds"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-cross-region-consensus/convergence-oracle@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [crdt_reorder_independence_oracle_converges] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "crdt_reorder_independence_oracle_converges"
+      ],
+      "green": true,
+      "name": "convergence-oracle",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-cross-region-consensus",
+          "nonce": "check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+          "outcome": "PASSED",
+          "signature": "c5d755ebf1628e5b06efa52d99c0df011a7c69f33cb7b20e7afd321acd911c520f80417ae4b6173ca88f9cbaee2b33a3886363796317c28d475cb7dd30c96b0a",
+          "test": "crdt_reorder_independence_oracle_converges"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-cross-region-consensus/region-identity@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [region_identity_forge_rejected_count_moves] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "region_identity_forge_rejected_count_moves"
+      ],
+      "green": true,
+      "name": "region-identity",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-cross-region-consensus",
+          "nonce": "check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+          "outcome": "PASSED",
+          "signature": "2e2a70b95342f4435dc4857299a0c9ddf2887e5052008da8cf198be13d20c2f5bbc16655c9042bd54462d8268d4493c491ca02e8cecf7a06a6670e2c50e9f608",
+          "test": "region_identity_forge_rejected_count_moves"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-cross-region-consensus/ap-degrade@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [ap_degrade_real_partition] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "ap_degrade_real_partition"
+      ],
+      "green": true,
+      "name": "ap-degrade",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-cross-region-consensus",
+          "nonce": "check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+          "outcome": "PASSED",
+          "signature": "59549a3b2af1e8fda863c203872727bcabe301e77c62801d18d79805c9a2c28e8832f2b6964c5944e9a10b77715a3b44ce171658a2f27b62ee041423bc1c4a0a",
+          "test": "ap_degrade_real_partition"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-cross-region-consensus/kernel-abi-diff@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-cross-region-consensus.15d976.18c9d7a0b99cd52c",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "kernel baseline re-pin GREEN; no harness evidence record",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [],
+      "failed": 0,
+      "green": true,
+      "name": "kernel-abi-diff",
+      "passed": 1,
+      "required": false,
+      "signature_block": [],
+      "substrate_present": true
+    }
+  ],
+  "operator_key_available": true,
+  "operator_key_reason": "operator audit key loaded (MAOS_AUDIT_KEY precedence)",
+  "product_claim": "PROVEN",
+  "publication_note": "Historical operator artifact from the rejected pre-review Story 13.6 worktree. It is not current evidence for the corrected story.",
+  "publication_status": "SUPERSEDED_PRE_REVIEW",
+  "substrate_nonce": "check-cross-region-consensus.15d976.18c9d7a0b99cd52c"
+}

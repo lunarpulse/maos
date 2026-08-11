@@ -99,20 +99,7 @@ fn escape_wiring_successor(verifier: &EvidenceVerifier) -> EvidenceLeg {
         Err(error) => failed_successor_probe(ESCAPE_WIRING_LEG, error, verifier, GATE_NAME),
     }
 }
-
-pub fn run(json: bool) -> Result<(), String> {
-    let disposition = read_disposition(GATE_NAME)?;
-    if !matches!(
-        disposition.get("v2_2").map(String::as_str),
-        Some("blocking")
-    ) {
-        return Err(format!(
-            "{GATE_NAME}: registry defect — v2_2 disposition must be blocking"
-        ));
-    }
-
-    let live_present = live_substrate_present();
-    let specs = [
+const SPECS: &[TestLeg] = &[
         TestLeg {
             name: "loom-scope-reaches-policy-table",
             class: BindingClass::Blocking,
@@ -1091,8 +1078,21 @@ pub fn run(json: bool) -> Result<(), String> {
             ],
         },
     ];
+
+pub fn run(json: bool) -> Result<(), String> {
+    let disposition = read_disposition(GATE_NAME)?;
+    if !matches!(
+        disposition.get("v2_2").map(String::as_str),
+        Some("blocking")
+    ) {
+        return Err(format!(
+            "{GATE_NAME}: registry defect — v2_2 disposition must be blocking"
+        ));
+    }
+
+    let live_present = live_substrate_present();
     let verifier = EvidenceVerifier::load(BuildBinding::for_run(GATE_NAME)?)?;
-    let mut legs: Vec<EvidenceLeg> = specs
+    let mut legs: Vec<EvidenceLeg> = SPECS
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
@@ -1154,4 +1154,19 @@ mod tests {
         )
         .expect("call parses"));
     }
+
+    #[test]
+    fn ledger_leg_names_are_derived_from_specs() {
+        assert_eq!(ledger_leg_names().len(), SPECS.len() + 1);
+        assert_eq!(ledger_leg_names().last(), Some(&ESCAPE_WIRING_LEG));
+    }
+}
+
+/// Complete ledger leg set, derived from the production gate's own specs.
+pub fn ledger_leg_names() -> Vec<&'static str> {
+    SPECS
+        .iter()
+        .map(|leg| leg.name)
+        .chain(std::iter::once(ESCAPE_WIRING_LEG))
+        .collect()
 }

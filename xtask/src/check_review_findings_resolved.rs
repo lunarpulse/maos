@@ -23,7 +23,7 @@
 //! dominant pattern; pathological table formatting (escaped pipes, multi-line
 //! cells) is acceptable as v0.5-α deferred work.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -45,39 +45,6 @@ struct StoryReview {
     table_empty: bool,
     code_review_deferred_marker: bool,
     file_list_entries: HashSet<String>,
-}
-
-fn load_sprint_status(path: &str) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    let Ok(content) = fs::read_to_string(path) else {
-        return map;
-    };
-    // Crude YAML parser — sprint-status.yaml is simple `key: value` shape under `development_status:`.
-    let mut in_status_section = false;
-    for line in content.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("development_status:") {
-            in_status_section = true;
-            continue;
-        }
-        if in_status_section {
-            // Top-level key resets section.
-            if !line.starts_with(' ') && !line.starts_with('\t') && !line.is_empty() {
-                if !trimmed.starts_with('#') {
-                    in_status_section = false;
-                    continue;
-                }
-            }
-            if let Some((k, v)) = trimmed.split_once(':') {
-                let key = k.trim().to_string();
-                let value = v.trim().trim_matches(|c| c == '\'' || c == '"').to_string();
-                if !key.is_empty() && !value.is_empty() {
-                    map.insert(key, value);
-                }
-            }
-        }
-    }
-    map
 }
 
 fn story_key_from_filename(path: &Path) -> Option<String> {
@@ -225,7 +192,7 @@ fn is_bootstrap_story(story_key: &str) -> bool {
 }
 
 pub fn run(stories_dir: &str, sprint_status_path: &str, json: bool) -> Result<(), String> {
-    let sprint_status = load_sprint_status(sprint_status_path);
+    let sprint_status = crate::sprint_status::load_sprint_status(sprint_status_path);
     let dir = Path::new(stories_dir);
     if !dir.is_dir() {
         return Err(format!("stories_dir not found: {stories_dir}"));

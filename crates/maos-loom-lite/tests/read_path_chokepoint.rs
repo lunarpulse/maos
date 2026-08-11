@@ -91,11 +91,12 @@ fn attestation_guard_wired_into_both_spirit_reads() {
 }
 
 #[test]
-fn team_guard_is_exactly_the_four_guarded_entry_points() {
+fn team_guard_is_exactly_the_five_guarded_entry_points() {
     for signature in [
         "pub async fn write(",
         "pub async fn read(",
         "pub async fn scan(",
+        "pub async fn crossed_row_origin(",
         "pub async fn erase(",
     ] {
         let body = function_body(STORE_SRC, signature);
@@ -108,8 +109,8 @@ fn team_guard_is_exactly_the_four_guarded_entry_points() {
 
     assert_eq!(
         count_code_occurrences(STORE_SRC, "self.team_guard("),
-        4,
-        "team_guard must have exactly four call sites: write, read, scan, and erase"
+        5,
+        "team_guard must have exactly five call sites: write, read, scan, crossed-row origin lookup, and erase"
     );
 
     for signature in ["pub async fn write_with_source(", "pub fn pool("] {

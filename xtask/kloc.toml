@@ -317,14 +317,12 @@ maos-bench = 1631   # 2026-07-25 founder policy re-base (Winston 2%): 1550->1631
 #                                                     strictest_of). See NOTE.
 #
 # NOTE — the aggregate grew ~2.3k but the four LISTED crates account for only
-# ~240 of it. The balance is the F2 admission-promotion rework in maos-registry
-# (now ~3,515 LOC), which has NO per-crate ceiling. maos-registry is one of
-# ~20 real production crates absent from this file (maos-audit 5,783; maos-cohort
-# 4,297; maos-loom-lite 4,373; maos-eval 3,596; …), so their growth is disciplined
-# ONLY by the aggregate hardfail, never per-crate. That is a PRE-EXISTING
-# governance gap, not introduced by 13.4 — FLAG for the Epic-13 retrospective:
-# assign per-crate ceilings to the unlisted production crates so the aggregate
-# stops silently absorbing multi-KLOC growth. NOT fixed here (retro-scoped).
+# ~240 of it. The data gap is now closed: this file carries 49 keys and 0
+# unbudgeted measured roots after Story 13.6d's policy migration below. The
+# surviving defect is the CONTROL: `xtask/src/kloc_check.rs:229-235` silently
+# skips a measured root with no budget key, so a crate added tomorrow escapes
+# its per-crate ceiling exactly as before — live and unowned. (Corrected by
+# Story 13.6, 2026-08-08.)
 # -----------------------------------------------------------------------------
 # Story 13.5e tenant-audit-isolation re-baseline (2026-07-24) — NFR-Ops-11
 # -----------------------------------------------------------------------------
@@ -342,8 +340,10 @@ maos-bench = 1631   # 2026-07-25 founder policy re-base (Winston 2%): 1550->1631
 #   xtask            30600    30652     30750        check-reza-production-path tenant legs
 #   _aggregate       131000   131502    132000       + unlisted maos-audit (+260) & maos-cohort (+107)
 #
-# The unlisted-crate gap (block above) is re-confirmed: maos-audit and maos-cohort
-# absorbed ~370 with no per-crate ceiling. Still retro-scoped.
+# The former unlisted-crate data gap was superseded by Story 13.6d's policy
+# migration below, which assigned founder-formula ceilings to each discovered
+# source root. The surviving skip control is recorded in the corrected 13.4
+# note above. (Corrected by Story 13.6, 2026-08-08.)
 
 # -----------------------------------------------------------------------------
 # Story 13.5a enterprise-daemon-posture re-baseline (2026-07-25)
@@ -367,8 +367,10 @@ maos-bench = 1631   # 2026-07-25 founder policy re-base (Winston 2%): 1550->1631
 #                                                    xtask remains 30_700 ≤ 30_750
 #
 # This is a MEASURED re-base with a named driver, NOT an "advisory/pre-existing"
-# waiver (the 13.4 / 13.5e anti-pattern the Epic-13 retro flagged). It is also the
-# fourth consecutive story to breach kloc-at-"done"; the PROCESS FLAG above stands.
+# waiver (the 13.4 / 13.5e anti-pattern the Epic-13 retro flagged). It is the
+# fifth consecutive story to breach kloc-at-"done"; three re-bases occurred
+# inside Story 13.6e alone. The PROCESS FLAG above stands. (Corrected by Story
+# 13.6, 2026-08-08.)
 
 # Story 13.6d policy migration (FLAG-Winston authorized 2026-07-30): every
 # previously discovered-but-ungoverned Rust source root receives the founder

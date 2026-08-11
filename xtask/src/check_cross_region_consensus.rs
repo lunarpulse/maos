@@ -50,6 +50,8 @@ use crate::gate_common::{read_disposition, BindingClass};
 /// `Commands` variant's `#[command(name = ...)]`).
 pub(crate) const GATE_NAME: &str = "check-cross-region-consensus";
 
+const KERNEL_ABI_LEG: &str = "kernel-abi-diff";
+
 /// The four consensus oracles. Each runs by exact identity: the shared
 /// `cross_region_live` binary also contains three-region and multi-tenant tests
 /// with different substrate contracts, so broadcasting one unfiltered result
@@ -149,7 +151,7 @@ fn run_kernel_abi_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
     let green = crate::check_kernel_baseline::run(false).is_ok();
     EvidenceLeg::observe(
         LegObservation {
-            name: "kernel-abi-diff",
+            name: KERNEL_ABI_LEG,
             class: BindingClass::Blocking,
             attempted: true,
             substrate_present: true,
@@ -306,4 +308,19 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn ledger_leg_names_are_derived_from_live_legs() {
+        assert_eq!(ledger_leg_names().len(), LIVE_LEGS.len() + 1);
+        assert_eq!(ledger_leg_names().last(), Some(&KERNEL_ABI_LEG));
+    }
+}
+
+/// Complete ledger leg set, derived from the gate's own live-leg declarations.
+pub fn ledger_leg_names() -> Vec<&'static str> {
+    LIVE_LEGS
+        .iter()
+        .map(|leg| leg.name)
+        .chain(std::iter::once(KERNEL_ABI_LEG))
+        .collect()
 }

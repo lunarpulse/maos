@@ -113,6 +113,8 @@ fn kernel_distinguishes_collective_causes() -> Result<bool, String> {
 
 const KERNEL_SUCCESSOR_LEG: &str = "kernel-collective-cause-distinguishable";
 
+const KERNEL_BASELINE_LEG: &str = "kernel-baseline-pinned";
+
 const JOURNEY_LEG: &str = "reza-three-team-three-region-journey";
 const JOURNEY_TEST: &str = "reza_three_team_three_region_production_journey";
 const JOURNEY_SOURCE: &str = concat!(
@@ -238,9 +240,16 @@ fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
                 substrate_present: false,
                 green: false,
                 detail: format!(
-                    "the kernel still collapses all eight collective causes into \
-                     `{KERNEL_COLLECTIVE_CAUSE_COLLAPSE}` ({KERNEL_COLLECTIVE_CAUSE_SOURCE}) — a \
-                     kernel-core edit plus a FLAG-Winston conversation, owned by Story 13.6"
+                    "the kernel collapses ALL EIGHT `TransportCause` variants into the single \
+                     `{KERNEL_COLLECTIVE_CAUSE_COLLAPSE}` ({KERNEL_COLLECTIVE_CAUSE_SOURCE}) — \
+                     8 → 1, not 8 → 5. On the Spirit path six of those eight are reachable and \
+                     all arrive as the one word `Transport`: MapStale, ConnectionMismatch, \
+                     UnmappedSpirit, AttestationInvalid, PartitionRefused, \
+                     ErasureTombstoneDominates. Widening them needs a kernel-core edit plus a \
+                     FLAG-Winston conversation. Owner: Epic-13 retrospective — re-assigned by \
+                     Story 13.6 (2026-08-08), which RULED the claim and did not build the \
+                     mechanism; the prior string named Story 13.6 itself, which would have made \
+                     the machinery name a `done` story the day this story closed"
                 ),
                 signature: SignatureCheck::default(),
                 passed: None,
@@ -252,20 +261,7 @@ fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
         Err(error) => kernel_probe_error(error, verifier),
     }
 }
-
-pub fn run(json: bool) -> Result<(), String> {
-    let disposition = read_disposition(GATE_NAME)?;
-    if !matches!(
-        disposition.get("v2_2").map(String::as_str),
-        Some("blocking")
-    ) {
-        return Err(format!(
-            "{GATE_NAME}: registry defect — v2_2 disposition must be blocking"
-        ));
-    }
-
-    let live_present = live_substrate_present();
-    let specs = [
+const SPECS: &[TestLeg] = &[
         TestLeg {
             name: "four-site-chokepoint",
             class: BindingClass::Blocking,
@@ -404,6 +400,101 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--test",
                 "cross_region_live",
                 "three_team_databases_are_physically_distinct",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // ── Story 13.6 (AC1) — the topology-fraud negatives, PROVEN RED.
+        //
+        // 13.6e made "the negative RAN" machine-derived; that it *reds on
+        // fraud* was still prose in `13-6c-evidence/SUMMARY.md` plus a one-off
+        // local exit-101. These three hermetic legs close that: each plants one
+        // specific defect in an in-memory clone of a real observation and
+        // asserts the shared oracle both reds AND names the defect by token.
+        // Blocking, because a hermetic control that stops firing is always a
+        // real defect — and one leg per limb, so a break reds exactly the limb
+        // that broke (trap 11).
+        TestLeg {
+            name: "topology-fraud-region-datname-proven-red",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "topology_fraud_control_reds_on_a_collapsed_region_axis",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "topology-fraud-physical-absence-proven-red",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "topology_fraud_control_reds_on_a_pre_replication_row_that_is_present",
+                "--",
+                "--exact",
+            ],
+        },
+        TestLeg {
+            name: "topology-fraud-team-datname-proven-red",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-loom-lite",
+                "--test",
+                "cross_region_live",
+                "topology_fraud_control_reds_on_a_collapsed_team_axis",
+                "--",
+                "--exact",
+            ],
+        },
+        // ── Story 13.6 (AC2/T3) — the seven crossing wiring sites, each
+        // individually falsifiable against an in-memory clone. The seventh —
+        // the applier PORT CONSTRUCTION — was missing from the previous
+        // six-site control: delete it and every crossing NACKs
+        // `StateUnavailable` while all six text scans stay green.
+        TestLeg {
+            name: "crossing-wiring-sites-individually-falsifiable",
+            class: BindingClass::Blocking,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "every_crossing_wiring_site_is_individually_falsifiable",
+                "--",
+                "--exact",
+            ],
+        },
+        // ── Story 13.6 (AC4) — the refused-crossing OPERATOR TAIL and the
+        // retry/recovery slice. Nothing outside `main.rs` had ever read
+        // `crossing_outcome_label` or the TL `status` field for a refusal, and
+        // `retry|recover|repair` had zero hits across all three crossing test
+        // files. This leg reads both.
+        TestLeg {
+            name: "refused-crossing-operator-tail-and-repair",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair",
                 "--",
                 "--ignored",
                 "--exact",
@@ -1716,9 +1807,39 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        TestLeg {
+            name: "cortex-fourteen-institution-isolation",
+            class: BindingClass::AdvisorySubstrate,
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--features",
+                "network",
+                "--test",
+                "cross_team_crossing_13_6b",
+                "cortex_fourteen_institution_isolation_live",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
     ];
+
+pub fn run(json: bool) -> Result<(), String> {
+    let disposition = read_disposition(GATE_NAME)?;
+    if !matches!(
+        disposition.get("v2_2").map(String::as_str),
+        Some("blocking")
+    ) {
+        return Err(format!(
+            "{GATE_NAME}: registry defect — v2_2 disposition must be blocking"
+        ));
+    }
+
+    let live_present = live_substrate_present();
     let verifier = EvidenceVerifier::load(BuildBinding::for_run(GATE_NAME)?)?;
-    let mut legs: Vec<EvidenceLeg> = specs
+    let mut legs: Vec<EvidenceLeg> = SPECS
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
@@ -1729,7 +1850,7 @@ pub fn run(json: bool) -> Result<(), String> {
     let kernel_report = crate::check_kernel_baseline::check()?;
     legs.push(EvidenceLeg::observe(
         LegObservation {
-            name: "kernel-baseline-pinned",
+            name: KERNEL_BASELINE_LEG,
             class: BindingClass::Blocking,
             attempted: true,
             substrate_present: true,
@@ -1801,4 +1922,26 @@ mod tests {
         assert_eq!(leg.binding, "blocking");
         assert!(leg.blocks_dev_lane());
     }
+
+    #[test]
+    fn ledger_leg_names_are_derived_from_specs() {
+        assert_eq!(ledger_leg_names().len(), SPECS.len() + 3);
+        assert_eq!(
+            ledger_leg_names()[SPECS.len()..],
+            [KERNEL_BASELINE_LEG, KERNEL_SUCCESSOR_LEG, JOURNEY_LEG]
+        );
+    }
+}
+
+/// Complete ledger leg set, derived from the gate's own test declarations.
+pub fn ledger_leg_names() -> Vec<&'static str> {
+    SPECS
+        .iter()
+        .map(|leg| leg.name)
+        .chain([
+            KERNEL_BASELINE_LEG,
+            KERNEL_SUCCESSOR_LEG,
+            JOURNEY_LEG,
+        ])
+        .collect()
 }

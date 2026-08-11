@@ -23,7 +23,7 @@ use maos_a2a_core::{
     CrossingRefusal, PeerCertFingerprint, PeerId,
 };
 use maos_bin::cross_team_crossing::{
-    crossing_frame, reconcile_home_team_with_manifest, CrossTeamCrossingAdapter,
+    crossing_frame, erase_frame, reconcile_home_team_with_manifest, CrossTeamCrossingAdapter,
     CrossTeamCrossingControl, CrossTeamShareRequest,
 };
 use maos_cohort::{
@@ -41,6 +41,7 @@ use maos_loom_lite::replication::bundle::{
 };
 use maos_loom_lite::replication::leaf::CollectiveKvLeaf;
 use maos_loom_lite::store::{CollectiveRow, LoomLiteStore, StoreConfig};
+use maos_loom_lite::tenant::TenantMapPort;
 use maos_spirit_abi::identity::{HostId, SpiritId};
 use tokio_postgres::NoTls;
 
@@ -286,49 +287,148 @@ fn read_source(relative: &str) -> String {
 ///
 /// Breaking ANY hop reds this leg. AC5's composition-root test is therefore
 /// satisfied by construction rather than by inspection.
+/// `item_body`, but a MISSING declaration is a finding rather than a panic:
+/// the per-limb falsification below unwires a site by renaming its needle, and
+/// a renamed declaration must red the site it belongs to, not abort the test.
+fn item_body_opt<'a>(src: &'a str, signature: &str) -> Option<&'a str> {
+    src.contains(signature).then(|| item_body(src, signature))
+}
+
+/// Story 13.6 (AC2/T3) — the SEVEN wiring sites, as a pure oracle.
+///
+/// Extracted from the leg below so each site can be falsified per-limb against
+/// an in-memory clone: delete one needle, assert the problem that names that
+/// exact site appears, and let the clone go out of scope. Restore is by
+/// construction — nothing on disk is mutated, so there is no restore step to
+/// get wrong (the drift gate's idiom).
+///
+/// The previous draft of this leg listed six sites. The seventh — the applier
+/// PORT CONSTRUCTION at `main.rs:9460-9481` — was omitted: delete it and the
+/// runtime receives `None`, `handle_intake_verified` classifies every crossing
+/// frame as `CrossingOutcome::NotCrossing`, and `router.rs:1639-1646` NACKs
+/// `StateUnavailable`. The wire is dead and every text scan stays green.
+fn crossing_chain_problems(main_rs: &str, crossing_rs: &str, router_rs: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut require = |present: bool, site: &str, why: &str| {
+        if !present {
+            problems.push(format!("site {site}: {why}"));
+        }
+    };
+
+    // ── EMITTER: dispatch → daemon → emit → 13.3b seam → the one outbound path.
+    let dispatch = item_body_opt(main_rs, r#"if mode == "cohort-a2a-daemon""#).unwrap_or("");
+    require(
+        dispatch.contains("run_cohort_a2a_daemon("),
+        "1/dispatch-arm",
+        "D-14: the daemon must still be reachable from the MAOS_ONE_SHOT dispatch",
+    );
+    let daemon = item_body_opt(main_rs, "async fn run_cohort_a2a_daemon(").unwrap_or("");
+    require(
+        daemon.contains("emit_cross_team_share("),
+        "2/daemon-calls-emitter",
+        "AC1/AC5 (13.5g): the emitter must be reachable FROM INSIDE the daemon runtime — a \
+         crossing builder that merely exists in the file is dead wire",
+    );
+    let emitter = item_body_opt(main_rs, "async fn emit_cross_team_share(").unwrap_or("");
+    require(
+        emitter.contains("originate_team_row("),
+        "3/emitter-uses-13-3b-seam",
+        "D-6: the emitter must use the seam 13.3b left, not hand-roll leaf construction",
+    );
+    require(
+        emitter.contains("route_outbound("),
+        "4/emitter-uses-only-outbound-path",
+        "D-14: the crossing must leave through the ONLY production outbound A2A path, so \
+         `prepare_outbound` stamps cohort_source_team from the SIGNED declaration",
+    );
+
+    // ── APPLIER: the spoof-proof intake site → the port → apply → is_granted.
+    let intake = item_body_opt(router_rs, "pub async fn handle_intake_verified(").unwrap_or("");
+    require(
+        intake.contains("apply_crossing("),
+        "5/intake-calls-applier",
+        "D-8: the applier must hang off handle_intake_verified (12.3 P5r), never handle_intake",
+    );
+    require(
+        crossing_rs.contains("apply_replication_bundle("),
+        "6/applier-reaches-apply",
+        "AC1: the applier must reach apply_replication_bundle — D-1's is_granted call site gets \
+         its first non-test caller through it",
+    );
+
+    // ── SITE 7: the applier PORT, constructed from this process's one store and
+    // handed to the runtime before the accept loop spawns.
+    require(
+        daemon.contains("CrossTeamCrossingAdapter::new("),
+        "7a/port-constructed",
+        "AC2: the applier port must be CONSTRUCTED inside the daemon runtime — without it the \
+         runtime keeps the legacy port and every crossing frame NACKs StateUnavailable",
+    );
+    // Paren-balanced: the port must appear in the runtime builder's ARGUMENT
+    // LIST, not merely somewhere in the same function — dropping the hand-off
+    // while keeping `let crossing_port = ...` is exactly the refactor shape
+    // that leaves the wire dead.
+    let runtime_call_carries_port = daemon
+        .find("build_cohort_a2a_daemon_runtime(")
+        .map(|start| {
+            let tail = &daemon[start..];
+            let mut depth = 0usize;
+            let mut end = tail.len();
+            for (index, character) in tail.char_indices() {
+                match character {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = index;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            tail[..end].contains("crossing_port")
+        })
+        .unwrap_or(false);
+    require(
+        runtime_call_carries_port,
+        "7b/port-installed",
+        "AC2: the constructed applier port must be HANDED to the runtime builder before the \
+         accept loop spawns, so no inbound connection observes a legacy-applier window",
+    );
+    problems
+}
+
+/// Rename one call inside one item's body, leaving declarations and sibling
+/// wiring sites untouched. The meta-test must plant exactly one defect.
+fn unwire_in_item(source: &str, signature: &str, needle: &str) -> String {
+    let signature_start = source
+        .find(signature)
+        .unwrap_or_else(|| panic!("declaration `{signature}` not found"));
+    let body_start = source[signature_start..]
+        .find('{')
+        .map(|offset| signature_start + offset)
+        .unwrap_or_else(|| panic!("`{signature}` has no body"));
+    let body = item_body(source, signature);
+    let needle_start = body
+        .find(needle)
+        .map(|offset| body_start + offset)
+        .unwrap_or_else(|| panic!("`{needle}` not found inside `{signature}`"));
+    let mut unwired = source.to_string();
+    unwired.replace_range(needle_start..needle_start + needle.len(), "__unwired__(");
+    unwired
+}
+
 #[test]
 fn crossing_has_a_production_initiator_at_both_endpoints() {
     let main_rs = read_source("crates/maos-bin/src/main.rs");
     let crossing_rs = read_source("crates/maos-bin/src/cross_team_crossing.rs");
     let router_rs = read_source("crates/maos-a2a-core/src/router.rs");
 
-    // ── EMITTER: dispatch → daemon → emit → 13.3b seam → the one outbound path.
-    let dispatch = item_body(&main_rs, r#"if mode == "cohort-a2a-daemon""#);
+    let problems = crossing_chain_problems(&main_rs, &crossing_rs, &router_rs);
     assert!(
-        dispatch.contains("run_cohort_a2a_daemon("),
-        "D-14: the daemon must still be reachable from the MAOS_ONE_SHOT dispatch"
-    );
-    let daemon = item_body(&main_rs, "async fn run_cohort_a2a_daemon(");
-    assert!(
-        daemon.contains("emit_cross_team_share("),
-        "AC1/AC5 (13.5g): the emitter must be reachable FROM INSIDE the daemon runtime — a \
-         crossing builder that merely exists in the file is dead wire"
-    );
-    assert!(
-        daemon.contains("crossing_port"),
-        "AC1: the daemon must install the applier port before its accept loop spawns"
-    );
-    let emitter = item_body(&main_rs, "async fn emit_cross_team_share(");
-    assert!(
-        emitter.contains("originate_team_row("),
-        "D-6: the emitter must use the seam 13.3b left, not hand-roll leaf construction"
-    );
-    assert!(
-        emitter.contains("route_outbound("),
-        "D-14: the crossing must leave through the ONLY production outbound A2A path, so \
-         `prepare_outbound` stamps cohort_source_team from the SIGNED declaration"
-    );
-
-    // ── APPLIER: the spoof-proof intake site → the port → apply → is_granted.
-    let intake = item_body(&router_rs, "pub async fn handle_intake_verified(");
-    assert!(
-        intake.contains("apply_crossing("),
-        "D-8: the applier must hang off handle_intake_verified (12.3 P5r), never handle_intake"
-    );
-    assert!(
-        crossing_rs.contains("apply_replication_bundle("),
-        "AC1: the applier must reach apply_replication_bundle — D-1's is_granted call site gets \
-         its first non-test caller through it"
+        problems.is_empty(),
+        "the crossing call chain is broken: {problems:?}"
     );
 
     // ── The needle scan still runs, as the belt to that braces: no OTHER
@@ -355,6 +455,120 @@ fn crossing_has_a_production_initiator_at_both_endpoints() {
             "AC1: {allowed} no longer reaches the crossing; hits={hits:?}"
         );
     }
+}
+
+/// Story 13.6 (AC2/T3) — per-limb dead-wire falsification, serialized, seven
+/// sites, byte-identical restore by construction.
+#[test]
+fn every_crossing_wiring_site_is_individually_falsifiable() {
+    let main_rs = read_source("crates/maos-bin/src/main.rs");
+    let crossing_rs = read_source("crates/maos-bin/src/cross_team_crossing.rs");
+    let router_rs = read_source("crates/maos-a2a-core/src/router.rs");
+    assert!(
+        crossing_chain_problems(&main_rs, &crossing_rs, &router_rs).is_empty(),
+        "the real tree must be green before any limb is falsified"
+    );
+
+    // (site, file under test, containing item, call whose deletion unwires it)
+    let sites: [(&str, char, &str, &str); 7] = [
+        (
+            "1/dispatch-arm",
+            'm',
+            r#"if mode == "cohort-a2a-daemon""#,
+            "run_cohort_a2a_daemon(",
+        ),
+        (
+            "2/daemon-calls-emitter",
+            'm',
+            "async fn run_cohort_a2a_daemon(",
+            "emit_cross_team_share(",
+        ),
+        (
+            "3/emitter-uses-13-3b-seam",
+            'm',
+            "async fn emit_cross_team_share(",
+            "originate_team_row(",
+        ),
+        (
+            "4/emitter-uses-only-outbound-path",
+            'm',
+            "async fn emit_cross_team_share(",
+            "route_outbound(",
+        ),
+        (
+            "5/intake-calls-applier",
+            'r',
+            "pub async fn handle_intake_verified(",
+            "apply_crossing(",
+        ),
+        (
+            "6/applier-reaches-apply",
+            'c',
+            "async fn apply_crossing(",
+            "apply_replication_bundle(",
+        ),
+        (
+            "7a/port-constructed",
+            'm',
+            "async fn run_cohort_a2a_daemon(",
+            "CrossTeamCrossingAdapter::new(",
+        ),
+    ];
+    for (site, file, scope, needle) in sites {
+        let (mutated_main, mutated_crossing, mutated_router) = match file {
+            'm' => (
+                unwire_in_item(&main_rs, scope, needle),
+                crossing_rs.clone(),
+                router_rs.clone(),
+            ),
+            'c' => (
+                main_rs.clone(),
+                unwire_in_item(&crossing_rs, scope, needle),
+                router_rs.clone(),
+            ),
+            _ => (
+                main_rs.clone(),
+                crossing_rs.clone(),
+                unwire_in_item(&router_rs, scope, needle),
+            ),
+        };
+        let problems = crossing_chain_problems(&mutated_main, &mutated_crossing, &mutated_router);
+        assert_eq!(
+            problems.len(),
+            1,
+            "unwiring `{needle}` inside `{scope}` must plant exactly one defect: {problems:?}"
+        );
+        assert!(
+            problems[0].starts_with(&format!("site {site}")),
+            "deleting `{needle}` must red exactly {site}; got {problems:?}"
+        );
+    }
+
+    // Site 7b is the INSTALLATION, falsified separately: keep the construction
+    // and drop only the hand-off from the daemon runtime builder call.
+    let unwired = unwire_in_item(
+        &main_rs,
+        "async fn run_cohort_a2a_daemon(",
+        "        crossing_port,\n",
+    );
+    let problems = crossing_chain_problems(&unwired, &crossing_rs, &router_rs);
+    assert_eq!(
+        problems.len(),
+        1,
+        "dropping the runtime hand-off must plant exactly one defect: {problems:?}"
+    );
+    assert!(
+        problems[0].starts_with("site 7b/"),
+        "dropping the runtime hand-off must red 7b; got {problems:?}"
+    );
+
+    // Restore is by construction: every mutation lived in a local `String`.
+    assert_eq!(main_rs, read_source("crates/maos-bin/src/main.rs"));
+    assert_eq!(
+        crossing_rs,
+        read_source("crates/maos-bin/src/cross_team_crossing.rs")
+    );
+    assert_eq!(router_rs, read_source("crates/maos-a2a-core/src/router.rs"));
 }
 
 /// Story 13.6b / AC5 — the D-6b hole is CLOSED, and the closure is proven, not
@@ -687,11 +901,45 @@ fn crossing_control_round_trips_through_the_telemetry_idiom() {
     let decoded = CrossTeamCrossingControl::from_frame(&frame)
         .expect("a crossing frame is recognised")
         .expect("and decodes");
-    let CrossTeamCrossingControl::Share { to_team, bundle } = decoded;
+    let CrossTeamCrossingControl::Share { to_team, bundle } = decoded else {
+        panic!("a share frame must decode as CrossTeamCrossingControl::Share");
+    };
     assert_eq!(to_team, "team-c");
     assert_eq!(bundle.root, root, "the signed bytes must survive the wire");
     verify_replication_bundle(&bundle, &seed)
         .expect("the decoded bundle must still verify — the wire must not re-sign anything");
+}
+
+#[test]
+fn erase_control_carries_only_the_reconciliation_locator() {
+    let from = FrameAddress {
+        spirit_id: SpiritId::from("spirit-b"),
+        host_id: Some(HostId("host-b".to_string())),
+        role: None,
+    };
+    let peer = HostId("host-a".to_string());
+    let frame = erase_frame(
+        &from,
+        &peer,
+        1,
+        &TeamId::new("team-a").expect("canonical team"),
+        7,
+        &maos_domain::memory::MemoryNamespace::Default,
+        "crossed-key".to_string(),
+    )
+    .expect("erase control encodes");
+    let decoded = CrossTeamCrossingControl::from_frame(&frame)
+        .expect("erase control is recognized")
+        .expect("erase control decodes");
+    assert!(matches!(
+        decoded,
+        CrossTeamCrossingControl::Erase {
+            to_team,
+            spirit_pid: 7,
+            namespace,
+            key,
+        } if to_team == "team-a" && namespace == "default" && key == "crossed-key"
+    ));
 }
 
 // ─── AC4 — one host, one team ───────────────────────────────────────────────
@@ -945,10 +1193,13 @@ fn boot_refuses_a_home_team_the_manifest_cannot_corroborate() {
 
 static LIVE_LOCK: Mutex<()> = Mutex::new(());
 
+/// Story 13.6 (AC2) — the composed scene adds `team-c`, so the third
+/// provisioned database finally has a reader on this harness too.
 fn pg_conn_team(team: &str) -> String {
     let var = match team {
         "team-a" => "MAOS_TEST_POSTGRES_TEAM_A",
         "team-b" => "MAOS_TEST_POSTGRES_TEAM_B",
+        "team-c" => "MAOS_TEST_POSTGRES_TEAM_C",
         other => panic!("unknown team {other}"),
     };
     std::env::var(var)
@@ -1007,15 +1258,39 @@ fn mint_daemon_identity(dir: &Path, host: &str) -> DaemonIdentity {
     }
 }
 
+/// Sign one cohort manifest, stamping each member's real certificate
+/// fingerprint from `identities` (positional, member order).
+///
+/// Takes the manifest and a SLICE rather than two fixed identities: Story
+/// 13.6's composed scene runs THREE daemons, and hard-coding an arity here
+/// would force a second copy of the signing/serialization step.
 fn write_daemon_manifest(
     dir: &Path,
-    identity_a: &DaemonIdentity,
-    identity_b: &DaemonIdentity,
+    mut manifest: CohortManifest,
+    identities: &[&DaemonIdentity],
 ) -> (PathBuf, SigningKey) {
     let signing_key = SigningKey::from_bytes(&[23; 32]);
+    assert_eq!(
+        manifest.members.len(),
+        identities.len(),
+        "every cohort member needs a minted identity"
+    );
+    for (member, identity) in manifest.members.iter_mut().zip(identities) {
+        member.fingerprint = identity.fingerprint.to_string();
+    }
+    let signed = manifest.signed_with(&signing_key);
+    let path = dir.join("manifest.toml");
+    std::fs::write(
+        &path,
+        toml::to_string(&signed).expect("signed manifest serializes"),
+    )
+    .expect("write signed manifest");
+    (path, signing_key)
+}
+
+/// The 13.6b two-daemon crossing manifest: host-a (team-a) → host-b (team-b).
+fn two_team_crossing_manifest() -> CohortManifest {
     let mut manifest = manifest_with(COHORT_SCHEMA_V4, Some("team-a"));
-    manifest.members[0].fingerprint = identity_a.fingerprint.to_string();
-    manifest.members[1].fingerprint = identity_b.fingerprint.to_string();
     manifest.consent = ConsentMatrix {
         send: vec![ConsentTuple {
             peer: "host-b".to_string(),
@@ -1028,14 +1303,7 @@ fn write_daemon_manifest(
             intent: maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
         }],
     };
-    let signed = manifest.signed_with(&signing_key);
-    let path = dir.join("manifest.toml");
-    std::fs::write(
-        &path,
-        toml::to_string(&signed).expect("signed manifest serializes"),
-    )
-    .expect("write signed manifest");
-    (path, signing_key)
+    manifest
 }
 
 #[derive(serde::Serialize)]
@@ -1049,7 +1317,19 @@ struct DaemonFileConfig {
     digest_summary: maos_cohort::DigestSummary,
 }
 
-#[allow(clippy::too_many_arguments)]
+/// One configured peer of a daemon: who it is, where it listens, and the boot
+/// nonce its pin is bound to.
+///
+/// Story 13.6 (AC2): the middle daemon of the composed chain both ACCEPTS from
+/// host-a and SENDS to host-c, so `peers` and `peer_pins` — already `Vec` in
+/// the production config types — finally carry more than one entry.
+struct DaemonPeer<'a> {
+    identity: &'a DaemonIdentity,
+    host: &'a str,
+    endpoint: String,
+    boot_nonce: u64,
+}
+
 fn write_daemon_file(
     dir: &Path,
     tag: &str,
@@ -1058,10 +1338,7 @@ fn write_daemon_file(
     identity: &DaemonIdentity,
     local_host: &str,
     control_spirit: &str,
-    peer_identity: &DaemonIdentity,
-    peer_host: &str,
-    peer_endpoint: String,
-    peer_boot_nonce: u64,
+    peers: &[DaemonPeer<'_>],
 ) -> PathBuf {
     let intent = A2AIntent::new(maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE);
     let file = DaemonFileConfig {
@@ -1069,26 +1346,32 @@ fn write_daemon_file(
             listen_addr: "127.0.0.1:0".parse().expect("loopback listen address"),
             own_cert_chain: identity.cert.clone(),
             own_private_key: identity.private_key.clone(),
-            peer_pins: vec![maos_a2a_tcp::config::PinnedFingerprint {
-                peer_id: PeerId::new(peer_host),
-                fingerprint: peer_identity.fingerprint.clone(),
-                boot_nonce: peer_boot_nonce,
-            }],
+            peer_pins: peers
+                .iter()
+                .map(|peer| maos_a2a_tcp::config::PinnedFingerprint {
+                    peer_id: PeerId::new(peer.host),
+                    fingerprint: peer.identity.fingerprint.clone(),
+                    boot_nonce: peer.boot_nonce,
+                })
+                .collect(),
             handshake_timeout: Duration::from_secs(30),
             ca_roots: None,
         },
-        peers: vec![A2APeerConfig {
-            peer_id: PeerId::new(peer_host),
-            endpoint: peer_endpoint,
-            cert_fingerprint: peer_identity.fingerprint.clone(),
-            profile: A2AProfile::CrossHost,
-            allowlists: ConsentAllowlists {
-                send_allowlist: vec![intent.clone()],
-                accept_allowlist: vec![intent],
-            },
-            partition_timeout_secs: 30,
-            consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
-        }],
+        peers: peers
+            .iter()
+            .map(|peer| A2APeerConfig {
+                peer_id: PeerId::new(peer.host),
+                endpoint: peer.endpoint.clone(),
+                cert_fingerprint: peer.identity.fingerprint.clone(),
+                profile: A2AProfile::CrossHost,
+                allowlists: ConsentAllowlists {
+                    send_allowlist: vec![intent.clone()],
+                    accept_allowlist: vec![intent.clone()],
+                },
+                partition_timeout_secs: 30,
+                consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
+            })
+            .collect(),
         manifest_path: manifest_path.to_path_buf(),
         authority_keys: vec![hex::encode(authority.verifying_key().to_bytes())],
         local_host: local_host.to_string(),
@@ -1128,11 +1411,15 @@ fn boot_daemon(mut command: Command) -> Result<(RunningDaemon, u16), String> {
     thread::spawn(move || {
         let mut lines = BufReader::new(stderr);
         let mut line = String::new();
+        let mut readiness_open = true;
         while lines.read_line(&mut line).unwrap_or_default() != 0 {
-            if tx.send(line.clone()).is_err() {
-                break;
+            if readiness_open {
+                readiness_open = tx.send(std::mem::take(&mut line)).is_ok();
+            } else {
+                // Keep draining after readiness so a later daemon diagnostic
+                // cannot fill or close the child's stderr pipe.
+                line.clear();
             }
-            line.clear();
         }
     });
     let deadline = Instant::now() + DAEMON_LISTEN_TIMEOUT;
@@ -1171,12 +1458,21 @@ fn boot_daemon(mut command: Command) -> Result<(RunningDaemon, u16), String> {
     ))
 }
 
+/// Story 13.6 (AC2) — `region` is now a parameter, not a hard-coded
+/// `region-a`.
+///
+/// ⚠ The composed journey passes each daemon the region carried by its OWN
+/// signed `TeamEntry`, so the scene DERIVES the value that production merely
+/// assumes. Nothing in production reconciles `MAOS_REGION_HOME` against
+/// `TeamEntry.region` — that is a recorded finding, not something this story
+/// fixes (trap 1: 13.6 judges, it does not build).
 fn daemon_command(
     dir: &Path,
     tag: &str,
     config: &Path,
     postgres: &str,
     home_team: &str,
+    region: &str,
     boot_nonce: u64,
 ) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
@@ -1186,7 +1482,7 @@ fn daemon_command(
         .env("MAOS_COHORT_DAEMON_CONFIG", config)
         .env("MAOS_LOOM_POSTGRES", postgres)
         .env("MAOS_LOOM_HOME_TEAM", home_team)
-        .env("MAOS_REGION_HOME", "region-a")
+        .env("MAOS_REGION_HOME", region)
         .env("MAOS_CROSS_TEAM_BASE_SEED", "42".repeat(32))
         .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
         .env(
@@ -1196,6 +1492,18 @@ fn daemon_command(
         .env("MAOS_OLLAMA_URL", "skip")
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
+    // Child commands inherit the test runner's environment. Start every daemon
+    // with no share request; sender call sites opt in field by field.
+    for key in [
+        "MAOS_CROSS_TEAM_SHARE_PEER",
+        "MAOS_CROSS_TEAM_SHARE_TO_TEAM",
+        "MAOS_CROSS_TEAM_SHARE_PID",
+        "MAOS_CROSS_TEAM_SHARE_NAMESPACE",
+        "MAOS_CROSS_TEAM_SHARE_KEY",
+        "MAOS_CROSS_TEAM_SHARE_VALUE",
+    ] {
+        command.env_remove(key);
+    }
     command
 }
 
@@ -1213,8 +1521,11 @@ async fn live_crossing_runs_through_two_daemon_processes() {
     let fixture = tempfile::tempdir().expect("two-daemon fixture");
     let identity_a = mint_daemon_identity(fixture.path(), "host-a");
     let identity_b = mint_daemon_identity(fixture.path(), "host-b");
-    let (manifest_path, authority) =
-        write_daemon_manifest(fixture.path(), &identity_a, &identity_b);
+    let (manifest_path, authority) = write_daemon_manifest(
+        fixture.path(),
+        two_team_crossing_manifest(),
+        &[&identity_a, &identity_b],
+    );
     const NONCE_A: u64 = 13_600_001;
     const NONCE_B: u64 = 13_600_002;
 
@@ -1226,10 +1537,12 @@ async fn live_crossing_runs_through_two_daemon_processes() {
         &identity_b,
         "host-b",
         "spirit-b",
-        &identity_a,
-        "host-a",
-        "tls://127.0.0.1:1".to_string(),
-        NONCE_A,
+        &[DaemonPeer {
+            identity: &identity_a,
+            host: "host-a",
+            endpoint: "tls://127.0.0.1:1".to_string(),
+            boot_nonce: NONCE_A,
+        }],
     );
     let (mut daemon_b, port_b) = boot_daemon(daemon_command(
         fixture.path(),
@@ -1237,6 +1550,7 @@ async fn live_crossing_runs_through_two_daemon_processes() {
         &config_b,
         &team_b_conn,
         "team-b",
+        "region-a",
         NONCE_B,
     ))
     .unwrap_or_else(|error| panic!("team-b daemon failed: {error}"));
@@ -1249,10 +1563,12 @@ async fn live_crossing_runs_through_two_daemon_processes() {
         &identity_a,
         "host-a",
         "spirit-a",
-        &identity_b,
-        "host-b",
-        format!("tls://127.0.0.1:{port_b}"),
-        NONCE_B,
+        &[DaemonPeer {
+            identity: &identity_b,
+            host: "host-b",
+            endpoint: format!("tls://127.0.0.1:{port_b}"),
+            boot_nonce: NONCE_B,
+        }],
     );
     let key_nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1266,6 +1582,7 @@ async fn live_crossing_runs_through_two_daemon_processes() {
         &config_a,
         &team_a_conn,
         "team-a",
+        "region-a",
         NONCE_A,
     );
     command_a
@@ -1414,6 +1731,26 @@ async fn live_destination_adapter_applies_and_refuses_expected_shapes() {
         .with_cross_team_consent(Arc::new(
             maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(Arc::clone(&state)),
         ))
+        // Story 13.6: this leg was RED at HEAD on any live substrate — the
+        // store declared `home_team` but carried no tenant map, so
+        // `init_schema`'s `connection_assignment_guard` failed
+        // `TenantMapStale { reason: "tenant map is not configured" }` before a
+        // single assertion ran. A leg that could never be green is a null
+        // control; the repair is the production wiring, from the same signed
+        // manifest state the consent adapter already uses.
+        .with_tenant_map({
+            let map = Arc::new(
+                maos_bin::tenant_map::TenantMapAdapter::new(Arc::clone(&state), "host-b", true)
+                    .expect("tenant map from the signed manifest"),
+            );
+            // `team_guard(spirit_pid)` runs on every read/erase, so the pid the
+            // adapter legs use must be mapped to a Spirit team B's SIGNED entry
+            // lists — the registration the daemon performs for its control
+            // Spirit, done explicitly here because this leg drives the store
+            // directly rather than through a daemon boot.
+            map.register_spirit(7, SpiritId::from("spirit-b"));
+            map as Arc<dyn maos_loom_lite::tenant::TenantMapPort>
+        })
         .with_team_verifying_keys(verifying_keys),
     );
     store_b.init_schema().await.expect("team-b schema");
@@ -1464,7 +1801,29 @@ async fn live_destination_adapter_applies_and_refuses_expected_shapes() {
         ..StoreConfig::default()
     })
     .await
-    .expect("team-a store");
+    .expect("team-a store")
+    .with_tenant_map({
+        // Same repair as the team-B store above: a `home_team` store with no
+        // tenant map cannot pass `connection_assignment_guard`, so this half of
+        // the physical-absence control could never have run.
+        let state_a = Arc::new(
+            maos_cohort::CohortManifestState::load_with_clock(
+                HostId("host-a".to_string()),
+                &signed_toml,
+                maos_cohort::PinnedAuthorityKeys::from_keys(vec![signing_key.verifying_key()])
+                    .expect("pinned authority keys"),
+                Arc::new(maos_cohort::InMemoryCohortAuditSink::default()),
+                Arc::new(FixedClock),
+            )
+            .expect("verified manifest state for host-a"),
+        );
+        let map = Arc::new(
+            maos_bin::tenant_map::TenantMapAdapter::new(state_a, "host-a", true)
+                .expect("tenant map from the signed manifest"),
+        );
+        map.register_spirit(7, SpiritId::from("spirit-a"));
+        map as Arc<dyn maos_loom_lite::tenant::TenantMapPort>
+    });
     store_a.init_schema().await.expect("team-a schema");
     assert_eq!(
         store_a
@@ -1542,4 +1901,1190 @@ async fn live_destination_adapter_applies_and_refuses_expected_shapes() {
         None,
         "AC3: an impersonated crossing must leave no row behind"
     );
+}
+
+// ─── Story 13.6 (AC2/AC3) — the composed Reza journey ───────────────────────
+//
+// "One run" is structurally impossible: `CrossTeamShareRequest::from_env`
+// returns AT MOST ONE request and `run_cohort_a2a_daemon` calls the emitter
+// once, then parks on `ctrl_c()`. So the scene is ONE COMPOSED TOPOLOGY,
+// written down: **3 daemon processes + 3 CLI one-shot processes = 6**, under
+// one signed manifest, one authority key, one base seed, three distinct
+// datnames, and one SHARED `MAOS_HOME`.
+//
+// ⚠ The chain is A→B, B→C — TWO INDEPENDENT ORIGINATIONS, not a transitive
+// flow. `originate_team_row` mints a NEW row from B's own store stamped
+// `source_team=team-b`; nothing of team-a's row travels onward. The chain
+// shape is chosen precisely because it needs ZERO production lines: a true
+// hub from one host would need `from_env` to return more than one request,
+// which trap 1 forbids this story from building.
+//
+// The scene is genuinely THREE-REGION: each `TeamEntry.region` is distinct
+// `region-a` because `apply_replication_bundle` binds the destination region:
+// a genuinely cross-region crossing is REFUSED by the region axis, by design
+// (the 13.3 same-region reflex). The three-region half of the substrate lives
+// on the region-axis databases the SLO/consensus gates read, not on the
+// crossing. `daemon_command` now takes the region from each team's SIGNED
+// entry rather than a literal — production reconciles nothing here, and that
+// is a recorded finding.
+
+const JOURNEY_NONCE_A: u64 = 13_600_101;
+const JOURNEY_NONCE_B: u64 = 13_600_102;
+const JOURNEY_NONCE_C: u64 = 13_600_103;
+/// Each team's SIGNED home region. `TeamEntry.region` is authoritative and is
+/// what every daemon receives as `MAOS_REGION_HOME`, so the composed scene is
+/// genuinely three-region rather than three copies of one.
+fn journey_region(team: &str) -> &'static str {
+    match team {
+        "team-a" => "region-a",
+        "team-b" => "region-b",
+        "team-c" => "region-c",
+        other => panic!("unknown journey team {other}"),
+    }
+}
+const RESEARCHER_ROUTE_KEY: &str = "researcher/collective-route-ready";
+
+/// A THREE-team cohort manifest for the composed journey.
+///
+/// A NEW builder, not a widened `manifest_with`: that one has seven call sites
+/// across eighteen tests which all assert two-member / two-team shapes, so
+/// mutating it would rewrite unrelated legs to buy nothing.
+///
+/// Datnames are DERIVED from the live connection strings rather than written
+/// as literals — `connection_assignment_guard` proves
+/// `datname_for(home_team) == current_database()` at boot, so a literal that
+/// drifted from the substrate would surface as a confusing tenant refusal
+/// instead of a topology error.
+fn three_team_journey_manifest() -> CohortManifest {
+    let signing_key = SigningKey::from_bytes(&[23; 32]);
+    let team = |name: &str| TeamId::new(name).expect("canonical team");
+    let member = |host: &str, name: &str| CohortMember {
+        host_id: host.to_string(),
+        fingerprint: format!("sha256:{}", "ab".repeat(32)),
+        roles: vec!["worker".to_string()],
+        team: Some(team(name)),
+    };
+    let entry = |name: &str, members: Vec<SpiritId>| TeamEntry {
+        team_id: team(name),
+        region: Region::canonicalize(journey_region(name)).expect("canonical region"),
+        datname: datname_of(&pg_conn_team(name)),
+        members,
+    };
+    let share = maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE.to_string();
+    let tuple = |peer: &str| ConsentTuple {
+        peer: peer.to_string(),
+        role: "worker".to_string(),
+        intent: share.clone(),
+    };
+    let grant = |from: &str, to: &str, intent: &str| CrossTeamConsentGrant {
+        from_team: team(from),
+        to_team: team(to),
+        intent: intent.to_string(),
+    };
+    CohortManifest {
+        schema_version: COHORT_SCHEMA_V4,
+        cohort_id: "reza-journey-13-6".to_string(),
+        version: 1,
+        authority: CohortAuthority {
+            threshold: 1,
+            keys: vec![hex::encode(signing_key.verifying_key().to_bytes())],
+        },
+        members: vec![
+            member("host-a", "team-a"),
+            member("host-b", "team-b"),
+            member("host-c", "team-c"),
+        ],
+        consent: ConsentMatrix {
+            send: vec![tuple("host-a"), tuple("host-b"), tuple("host-c")],
+            accept: vec![tuple("host-a"), tuple("host-b")],
+        },
+        reserved_intents: vec![
+            RESERVED_INTENT_REISSUE.to_string(),
+            RESERVED_INTENT_HALT_RECEIPT.to_string(),
+        ],
+        t_stale_secs: 120,
+        teams: Some(vec![
+            // `researcher` is a declared member of team-a: the Spirit→
+            // collective route registers the loaded Spirit against its signed
+            // team, and an unlisted Spirit is refused `TenantSpiritUnmapped`.
+            entry(
+                "team-a",
+                vec![SpiritId::from("spirit-a"), SpiritId::from("researcher")],
+            ),
+            entry("team-b", vec![SpiritId::from("spirit-b")]),
+            entry("team-c", vec![SpiritId::from("spirit-c")]),
+        ]),
+        signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: vec![
+            grant("team-b", "team-a", "collective:erase"),
+            grant("team-a", "team-b", "collective:share"),
+            grant("team-b", "team-c", "collective:share"),
+            // The read side: `maos traceback --team team-b` runs from a
+            // home-team-a process, and `CrossWallRecallConsentAdapter` grants
+            // only on `cross_team_admits(home_team, remote_team, "log:recall")`.
+            grant("team-a", "team-b", "log:recall"),
+        ],
+}
+}
+
+/// A CLI one-shot in the composed scene: same signed manifest, same shared
+/// `MAOS_HOME`, same base seed — only the team, its signed region, and the
+/// mode change. Callers that need cohort-backed dispatch explicitly install
+/// their validated daemon config.
+fn journey_cli(home: &Path, postgres: &str, home_team: &str) -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
+        .env_remove("MAOS_ONE_SHOT")
+        .env("MAOS_HOME", home)
+        .env_remove("MAOS_AUDIT_DB")
+        .env("MAOS_LOOM_POSTGRES", postgres)
+        .env("MAOS_LOOM_HOME_TEAM", home_team)
+        .env("MAOS_REGION_HOME", journey_region(home_team))
+        .env("MAOS_CROSS_TEAM_BASE_SEED", "42".repeat(32))
+        .env("MAOS_OLLAMA_URL", "skip");
+    command
+}
+
+/// The provenance a crossed row must carry, and nothing more (AC3).
+fn crossed_row_matches(
+    row: &CollectiveRow,
+    pid: i64,
+    source_team: &str,
+    key: &str,
+    value: &str,
+) -> bool {
+    row.spirit_pid == pid
+        && row.namespace_kind == "default"
+        && row.namespace_detail == format!("xteam:{source_team}:")
+        && row.key == key
+        && row.value_kind == "text"
+        && row.value_data == value.as_bytes()
+        && row.source_region == journey_region(source_team)
+        && row.source_team.as_ref().map(TeamId::as_str) == Some(source_team)
+        && row.distillation_depth == Some(1)
+        && row.intent_lineage.as_ref().is_some_and(|lineage| {
+            let intents = lineage.as_slice();
+            intents.len() == 1
+                && intents[0].as_str() == maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE
+        })
+}
+
+/// The re-attestation marker is exactly `{source_region, merkle_root}` — two
+/// keys, no payload, no transparency-log reference. AC3's minimum-disclosure
+/// negative is that a THIRD key would fail this.
+fn re_attestation_is_minimal(row: &CollectiveRow, source_region: &str) -> bool {
+    let Ok(marker) = serde_json::from_str::<serde_json::Value>(&row.source_log_ref) else {
+        return false;
+    };
+    marker.as_object().is_some_and(|object| object.len() == 2)
+        && marker
+            .get("source_region")
+            .and_then(serde_json::Value::as_str)
+            == Some(source_region)
+        && marker
+            .get("merkle_root")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|root| root.len() == 64 && root.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
+async fn all_rows(client: &tokio_postgres::Client) -> Vec<CollectiveRow> {
+    LoomLiteStore::read_all_rows_from(client)
+        .await
+        .expect("read physical rows")
+}
+
+fn erase_reconciliation_problem(
+    source_present: bool,
+    destination_present: bool,
+) -> Option<&'static str> {
+    match (source_present, destination_present) {
+        (false, false) => None,
+        (true, false) => Some("one-sided erase: source row survived after destination erase"),
+        (false, true) => Some("erase left the destination row without its source row"),
+        (true, true) => Some("erase left both source and destination rows"),
+    }
+}
+
+#[test]
+fn one_sided_erase_is_red_on_reconciliation() {
+    let problem = erase_reconciliation_problem(true, false)
+        .expect("a one-sided erase must be a reconciliation failure");
+    assert!(
+        problem.contains("one-sided erase") && problem.contains("source row"),
+        "the reconciliation must name the one-sided defect: {problem}"
+    );
+    assert!(
+        erase_reconciliation_problem(false, false).is_none(),
+        "only a fully reconciled erase is green"
+    );
+}
+
+#[tokio::test]
+#[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A/_B/_C (live 3-team Postgres)"]
+async fn reza_three_team_three_region_production_journey() {
+    let _evidence = evidence_record::attest("reza_three_team_three_region_production_journey");
+    // probes into proof of the complete journey.
+    let _guard = LIVE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+
+    let conn_a = pg_conn_team("team-a");
+    let conn_b = pg_conn_team("team-b");
+    let conn_c = pg_conn_team("team-c");
+    let datnames = [
+        datname_of(&conn_a),
+        datname_of(&conn_b),
+        datname_of(&conn_c),
+    ];
+    for (index, left) in datnames.iter().enumerate() {
+        for right in &datnames[index + 1..] {
+            assert_ne!(
+                left, right,
+                "the composed journey needs three PHYSICALLY distinct databases"
+            );
+        }
+    }
+    let raw_a = raw_connect_team("team-a").await;
+    let raw_b = raw_connect_team("team-b").await;
+    let raw_c = raw_connect_team("team-c").await;
+
+    let fixture = tempfile::tempdir().expect("journey fixture");
+    // ONE shared MAOS_HOME across every process. Without it each process
+    // derives its own audit root and `maos traceback --team team-b` reads a
+    // path no daemon ever wrote (`transparency_log_path_for_team`).
+    let home = fixture.path().join("maos-home");
+    std::fs::create_dir_all(&home).expect("shared MAOS_HOME");
+    let team_b_tl = home
+        .join("audit")
+        .join("teams")
+        .join("team-b")
+        .join("transparency.sqlite");
+    assert!(
+        !team_b_tl.exists(),
+        "team B's tenant log must not exist before a daemon writes it"
+    );
+
+    let identity_a = mint_daemon_identity(fixture.path(), "host-a");
+    let identity_b = mint_daemon_identity(fixture.path(), "host-b");
+    let identity_c = mint_daemon_identity(fixture.path(), "host-c");
+    let (manifest_path, authority) = write_daemon_manifest(
+        fixture.path(),
+        three_team_journey_manifest(),
+        &[&identity_a, &identity_b, &identity_c],
+    );
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let key_ab = format!("reza-a-to-b-{}-{nonce}", std::process::id());
+    let key_bc = format!("reza-b-to-c-{}-{nonce}", std::process::id());
+    let value_ab = "team-a-distillate";
+    let value_bc = "team-b-distillate";
+
+    // ── PROCESS 1: the tail of the chain. host-c only ACCEPTS.
+    let config_c = write_daemon_file(
+        fixture.path(),
+        "journey-c",
+        &manifest_path,
+        &authority,
+        &identity_c,
+        "host-c",
+        "spirit-c",
+        &[DaemonPeer {
+            identity: &identity_b,
+            host: "host-b",
+            endpoint: "tls://127.0.0.1:1".to_string(),
+            boot_nonce: JOURNEY_NONCE_B,
+        }],
+    );
+    let mut command_c = daemon_command(
+        fixture.path(),
+        "journey-c",
+        &config_c,
+        &conn_c,
+        "team-c",
+        journey_region("team-c"),
+        JOURNEY_NONCE_C,
+    );
+    command_c
+        .env("MAOS_HOME", &home)
+        .env_remove("MAOS_AUDIT_DB");
+    let (mut daemon_c, port_c) =
+        boot_daemon(command_c).unwrap_or_else(|error| panic!("team-c daemon failed: {error}"));
+
+    // ── PROCESS 2: the middle. host-b ACCEPTS from host-a AND SENDS to host-c
+    // — the first configuration in this repo where `peers`/`peer_pins` carry
+    // two entries.
+    let config_b = write_daemon_file(
+        fixture.path(),
+        "journey-b",
+        &manifest_path,
+        &authority,
+        &identity_b,
+        "host-b",
+        "spirit-b",
+        &[
+            DaemonPeer {
+                identity: &identity_a,
+                host: "host-a",
+                endpoint: "tls://127.0.0.1:1".to_string(),
+                boot_nonce: JOURNEY_NONCE_A,
+            },
+            DaemonPeer {
+                identity: &identity_c,
+                host: "host-c",
+                endpoint: format!("tls://127.0.0.1:{port_c}"),
+                boot_nonce: JOURNEY_NONCE_C,
+            },
+        ],
+    );
+    let mut command_b = daemon_command(
+        fixture.path(),
+        "journey-b",
+        &config_b,
+        &conn_b,
+        "team-b",
+        journey_region("team-b"),
+        JOURNEY_NONCE_B,
+    );
+    command_b
+        .env("MAOS_HOME", &home)
+        .env_remove("MAOS_AUDIT_DB")
+        .env("MAOS_CROSS_TEAM_SHARE_PEER", "host-c")
+        .env("MAOS_CROSS_TEAM_SHARE_TO_TEAM", "team-c")
+        .env("MAOS_CROSS_TEAM_SHARE_PID", "8")
+        .env("MAOS_CROSS_TEAM_SHARE_NAMESPACE", "default")
+        .env("MAOS_CROSS_TEAM_SHARE_KEY", &key_bc)
+        .env("MAOS_CROSS_TEAM_SHARE_VALUE", value_bc);
+    let (mut daemon_b, port_b) =
+        boot_daemon(command_b).unwrap_or_else(|error| panic!("team-b daemon failed: {error}"));
+
+    // ── PROCESS 3: the head. host-a only SENDS.
+    let config_a = write_daemon_file(
+        fixture.path(),
+        "journey-a",
+        &manifest_path,
+        &authority,
+        &identity_a,
+        "host-a",
+        "spirit-a",
+        &[DaemonPeer {
+            identity: &identity_b,
+            host: "host-b",
+            endpoint: format!("tls://127.0.0.1:{port_b}"),
+            boot_nonce: JOURNEY_NONCE_B,
+        }],
+    );
+    let mut command_a = daemon_command(
+        fixture.path(),
+        "journey-a",
+        &config_a,
+        &conn_a,
+        "team-a",
+        journey_region("team-a"),
+        JOURNEY_NONCE_A,
+    );
+    command_a
+        .env("MAOS_HOME", &home)
+        .env_remove("MAOS_AUDIT_DB")
+        .env("MAOS_CROSS_TEAM_SHARE_PEER", "host-b")
+        .env("MAOS_CROSS_TEAM_SHARE_TO_TEAM", "team-b")
+        .env("MAOS_CROSS_TEAM_SHARE_PID", "7")
+        .env("MAOS_CROSS_TEAM_SHARE_NAMESPACE", "default")
+        .env("MAOS_CROSS_TEAM_SHARE_KEY", &key_ab)
+        .env("MAOS_CROSS_TEAM_SHARE_VALUE", value_ab);
+    let (mut daemon_a, port_a) =
+        boot_daemon(command_a).unwrap_or_else(|error| panic!("team-a daemon failed: {error}"));
+
+    // Both crossings land, each in the consumer team's OWN physical database.
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        let landed_b = all_rows(&raw_b)
+            .await
+            .iter()
+            .filter(|row| {
+                crossed_row_matches(row, 7, "team-a", &key_ab, value_ab)
+                    && re_attestation_is_minimal(row, journey_region("team-a"))
+            })
+            .count();
+        let landed_c = all_rows(&raw_c)
+            .await
+            .iter()
+            .filter(|row| {
+                crossed_row_matches(row, 8, "team-b", &key_bc, value_bc)
+                    && re_attestation_is_minimal(row, journey_region("team-b"))
+            })
+            .count();
+        if landed_b == 1 && landed_c == 1 {
+            break;
+        }
+        for (label, daemon) in [
+            ("team-a", &mut daemon_a),
+            ("team-b", &mut daemon_b),
+            ("team-c", &mut daemon_c),
+        ] {
+            assert!(
+                daemon.exited().is_none(),
+                "the {label} daemon exited before both crossings landed"
+            );
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the composed chain did not land within 60s (A→B {landed_b}, B→C {landed_c})"
+        );
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+
+    // AC3 — minimum disclosure, judged on the rows that actually crossed.
+    for (label, rows, source_team, key, value) in [
+        (
+            "team-b",
+            all_rows(&raw_b).await,
+            "team-a",
+            &key_ab,
+            value_ab,
+        ),
+        (
+            "team-c",
+            all_rows(&raw_c).await,
+            "team-b",
+            &key_bc,
+            value_bc,
+        ),
+    ] {
+        let crossed: Vec<&CollectiveRow> = rows
+            .iter()
+            .filter(|row| row.key == *key && row.source_team.is_some())
+            .collect();
+        assert_eq!(crossed.len(), 1, "{label}: exactly one crossed row");
+        let row = crossed[0];
+        assert!(
+            crossed_row_matches(
+                row,
+                if source_team == "team-a" { 7 } else { 8 },
+                source_team,
+                key,
+                value
+            ),
+            "{label}: the crossed row must carry exactly the five policy-allowed \
+             provenance fields"
+        );
+        assert!(
+            re_attestation_is_minimal(row, journey_region(source_team)),
+            "{label}: the re-attestation marker must be exactly \
+             {{source_region, merkle_root}} — a third key is a disclosure leak"
+        );
+        assert!(
+            !row.source_log_ref.contains(value),
+            "{label}: the raw payload must never appear in the provenance marker"
+        );
+        assert!(
+            !row.source_log_ref.contains("42424242"),
+            "{label}: the cross-team base seed must never ride the marker"
+        );
+    }
+
+    // The chain is TWO ORIGINATIONS: team-b's outbound row is stamped
+    // `source_team=team-b` from team-b's OWN store, and carries nothing of
+    // team-a's row. Say it in an assertion, not only in prose.
+    let team_b_rows = all_rows(&raw_b).await;
+    let originated_in_b = team_b_rows
+        .iter()
+        .filter(|row| row.key == key_bc && row.source_log_ref.is_empty())
+        .count();
+    assert_eq!(
+        originated_in_b, 1,
+        "team-b must persist its own attested origin row before transport"
+    );
+    assert!(
+        !team_b_rows
+            .iter()
+            .any(|row| row.key == key_bc && row.value_data == value_ab.as_bytes()),
+        "the B→C origination must not carry team-a's payload — the chain is not \
+         a transitive flow"
+    );
+
+    // ── PROCESS 4: `maos run <researcher-manifest>`.
+    raw_a
+        .execute("DELETE FROM collective_memory WHERE key = $1", &[&RESEARCHER_ROUTE_KEY])
+        .await
+        .expect("clear researcher route");
+    let researcher = journey_cli(&home, &conn_a, "team-a")
+        .env("MAOS_COHORT_DAEMON_CONFIG", &config_a)
+        .args(["run", "spirits/researcher/manifest.toml", "--once"])
+        .output()
+        .expect("maos run researcher");
+    assert!(researcher.status.success(), "{}", String::from_utf8_lossy(&researcher.stderr));
+    let route_rows: i64 = raw_a
+        .query_one("SELECT count(*) FROM collective_memory WHERE key = $1", &[&RESEARCHER_ROUTE_KEY])
+        .await
+        .expect("count researcher route")
+        .get(0);
+    assert_eq!(route_rows, 1);
+
+    // ── PROCESS 5: cohort-backed destination erase reconciles the source.
+    let erase_config_b = write_daemon_file(
+        fixture.path(), "journey-erase-b", &manifest_path, &authority, &identity_b,
+        "host-b", "spirit-b",
+        &[DaemonPeer {
+            identity: &identity_a,
+            host: "host-a",
+            endpoint: format!("tls://127.0.0.1:{port_a}"),
+            boot_nonce: JOURNEY_NONCE_A,
+        }],
+    );
+    let erase = journey_cli(&home, &conn_b, "team-b")
+        .env("MAOS_COHORT_DAEMON_CONFIG", &erase_config_b)
+        .env("MAOS_TEST_BOOT_NONCE", JOURNEY_NONCE_B.to_string())
+        .env("MAOS_ONE_SHOT", "collective-erase")
+        .env("MAOS_COLLECTIVE_ERASE_PID", "7")
+        .env("MAOS_COLLECTIVE_ERASE_NAMESPACE", "default")
+        .env("MAOS_COLLECTIVE_ERASE_KEY", &key_ab)
+        .output()
+        .expect("maos collective-erase");
+    assert!(erase.status.success(), "{}", String::from_utf8_lossy(&erase.stderr));
+    let erase_json: serde_json::Value =
+        serde_json::from_slice(&erase.stdout).expect("collective erase JSON");
+    assert_eq!(erase_json["reconciliation"]["outcomes"][0]["status"], "erase_reconciled");
+    let destination_present = all_rows(&raw_b).await.iter().any(|row| row.key == key_ab);
+    let source_present = all_rows(&raw_a).await.iter().any(|row| row.key == key_ab);
+    assert!(erase_reconciliation_problem(source_present, destination_present).is_none());
+
+    // Close the serving daemons before reading the tenant artifact.
+    drop(daemon_a);
+    drop(daemon_b);
+    drop(daemon_c);
+    assert!(team_b_tl.exists());
+
+    // ── PROCESS 6: consented production traceback.
+    let traceback = journey_cli(&home, &conn_a, "team-a")
+        .env("MAOS_COHORT_DAEMON_CONFIG", &config_a)
+        .args(["traceback", "--team", "team-b", "--spirit-pid", "0"])
+        .output()
+        .expect("maos traceback");
+    assert!(traceback.status.success(), "{}", String::from_utf8_lossy(&traceback.stderr));
+    let traceback_json: serde_json::Value =
+        serde_json::from_slice(&traceback.stdout).expect("traceback JSON");
+    assert_eq!(traceback_json["outcome"], "ok");
+
+    // The direct adapter proof is deliberately retained: remote entries expose
+    // exactly the six-field disclosure DTO and never payload bytes.
+    let _restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
+    std::env::set_var("MAOS_HOME", &home);
+    let page = {
+        use maos_domain::ports::CrossWallLogReadPort;
+        maos_bin::cross_wall_log_read::CrossWallLogReadAdapter::new(true)
+            .read_remote(
+                0,
+                &TeamId::new("team-b").expect("canonical team"),
+                maos_domain::log_recall::LogRecallFilter::default(),
+            )
+            .expect("read daemon-written tenant artifact")
+    };
+    assert!(!page.entries.is_empty());
+    for entry in &page.entries {
+        let object = serde_json::to_value(entry).expect("entry serializes");
+        let fields: BTreeSet<&str> = object
+            .as_object()
+            .expect("entry object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            fields,
+            BTreeSet::from([
+                "frame_id", "timestamp_ns", "kind", "intent", "peer_spirit_pid",
+                "payload_available",
+            ])
+        );
+        assert!(object["payload_available"].is_boolean());
+    }
+}
+
+struct RestoreMaosHome(Option<std::ffi::OsString>);
+
+impl Drop for RestoreMaosHome {
+    fn drop(&mut self) {
+        match &self.0 {
+            Some(value) => std::env::set_var("MAOS_HOME", value),
+            None => std::env::remove_var("MAOS_HOME"),
+        }
+    }
+}
+
+// ─── Story 13.6 (AC4) — the refused-crossing operator tail, and retry ───────
+//
+// The two slices measurement showed were genuinely uncovered:
+//   * NOTHING outside `main.rs` read `crossing_outcome_label` or the emitter's
+//     TL `status` field for a REFUSED crossing (`grep` → zero hits). The
+//     two-daemon live test exercised only the happy path.
+//   * `grep -rn "retry\|recover\|repair"` across all three crossing test files
+//     returned ZERO. "Retry succeeds only after a valid consent repair" had no
+//     coverage anywhere.
+
+/// Every `status` the emitter journaled to the tenant Transparency Log, oldest
+/// first. This is the operator's durable view of a crossing outcome — the
+/// field nothing has ever read back for a refusal.
+fn crossing_tl_statuses(db: &Path) -> Vec<String> {
+    let Ok(connection) = rusqlite::Connection::open(db) else {
+        return Vec::new();
+    };
+    let Ok(mut statement) = connection.prepare(
+        "SELECT payload_redacted FROM transparency_log \
+         WHERE intent = 'collective.host.cross-team-share' ORDER BY timestamp_ns ASC",
+    ) else {
+        return Vec::new();
+    };
+    let Ok(rows) = statement.query_map([], |row| row.get::<_, Vec<u8>>(0)) else {
+        return Vec::new();
+    };
+    rows.filter_map(Result::ok)
+        .filter_map(|payload| serde_json::from_slice::<serde_json::Value>(&payload).ok())
+        .filter_map(|payload| {
+            payload
+                .get("status")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .collect()
+}
+
+#[tokio::test]
+#[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A/_B (live Postgres)"]
+async fn refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair() {
+    let _evidence = evidence_record::attest(
+        "refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair",
+    );
+    let _guard = LIVE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let conn_a = pg_conn_team("team-a");
+    let conn_b = pg_conn_team("team-b");
+    assert_ne!(datname_of(&conn_a), datname_of(&conn_b));
+    let raw_b = raw_connect_team("team-b").await;
+
+    let fixture = tempfile::tempdir().expect("refusal fixture");
+    let home = fixture.path().join("maos-home");
+    std::fs::create_dir_all(&home).expect("shared MAOS_HOME");
+    let team_a_tl = home
+        .join("audit")
+        .join("teams")
+        .join("team-a")
+        .join("transparency.sqlite");
+    let identity_a = mint_daemon_identity(fixture.path(), "host-a");
+    let identity_b = mint_daemon_identity(fixture.path(), "host-b");
+    const NONCE_A: u64 = 13_600_201;
+    const NONCE_B: u64 = 13_600_202;
+
+    // The ONE defect: the signed manifest carries no `team-a → team-b`
+    // collective:share grant. Everything else — identities, pins, allowlists,
+    // teams — is the same configuration the happy-path leg uses.
+    let mut refusing = two_team_crossing_manifest();
+    refusing.cross_team_consent.clear();
+    let (manifest_path, authority) =
+        write_daemon_manifest(fixture.path(), refusing, &[&identity_a, &identity_b]);
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let key = format!("refused-crossing-{}-{nonce}", std::process::id());
+
+    let boot_pair = |manifest_path: &Path, authority: &SigningKey| {
+        let config_b = write_daemon_file(
+            fixture.path(),
+            "refusal-b",
+            manifest_path,
+            authority,
+            &identity_b,
+            "host-b",
+            "spirit-b",
+            &[DaemonPeer {
+                identity: &identity_a,
+                host: "host-a",
+                endpoint: "tls://127.0.0.1:1".to_string(),
+                boot_nonce: NONCE_A,
+            }],
+        );
+        let mut command_b = daemon_command(
+            fixture.path(),
+            "refusal-b",
+            &config_b,
+            &conn_b,
+            "team-b",
+            "region-a",
+            NONCE_B,
+        );
+        command_b
+            .env("MAOS_HOME", &home)
+            .env_remove("MAOS_AUDIT_DB");
+        let (daemon_b, port_b) =
+            boot_daemon(command_b).unwrap_or_else(|error| panic!("team-b daemon: {error}"));
+
+        let config_a = write_daemon_file(
+            fixture.path(),
+            "refusal-a",
+            manifest_path,
+            authority,
+            &identity_a,
+            "host-a",
+            "spirit-a",
+            &[DaemonPeer {
+                identity: &identity_b,
+                host: "host-b",
+                endpoint: format!("tls://127.0.0.1:{port_b}"),
+                boot_nonce: NONCE_B,
+            }],
+        );
+        let mut command_a = daemon_command(
+            fixture.path(),
+            "refusal-a",
+            &config_a,
+            &conn_a,
+            "team-a",
+            "region-a",
+            NONCE_A,
+        );
+        command_a
+            .env("MAOS_HOME", &home)
+            .env_remove("MAOS_AUDIT_DB")
+            .env("MAOS_CROSS_TEAM_SHARE_PEER", "host-b")
+            .env("MAOS_CROSS_TEAM_SHARE_TO_TEAM", "team-b")
+            .env("MAOS_CROSS_TEAM_SHARE_PID", "7")
+            .env("MAOS_CROSS_TEAM_SHARE_NAMESPACE", "default")
+            .env("MAOS_CROSS_TEAM_SHARE_KEY", &key)
+            .env("MAOS_CROSS_TEAM_SHARE_VALUE", "refused-then-repaired");
+        let (daemon_a, _port_a) =
+            boot_daemon(command_a).unwrap_or_else(|error| panic!("team-a daemon: {error}"));
+        (daemon_a, daemon_b)
+    };
+
+    async fn wait_for_statuses(db: &Path, count: usize) -> Vec<String> {
+        let deadline = Instant::now() + Duration::from_secs(45);
+        loop {
+            let statuses = crossing_tl_statuses(db);
+            if statuses.len() >= count {
+                return statuses;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the emitter journaled {} of {count} expected crossing outcomes",
+                statuses.len()
+            );
+            tokio::time::sleep(Duration::from_millis(150)).await;
+        }
+    }
+
+    // ── 1. The refusal, and the operator tail nothing has ever read.
+    let pair = boot_pair(&manifest_path, &authority);
+    let statuses = wait_for_statuses(&team_a_tl, 1).await;
+    drop(pair);
+    assert_eq!(
+        statuses[0], "crossing_consent_denied",
+        "the TL `status` field must carry the TYPED cause of a refusal, not a \
+         generic failure token"
+    );
+    assert!(
+        !all_rows(&raw_b).await.iter().any(|row| row.key == key),
+        "a refused crossing must leave no row in the destination team"
+    );
+
+    // ── 2. Retry WITHOUT a repair. The same request, a fresh process, the same
+    // refusal — a retry is not a remedy.
+    let pair = boot_pair(&manifest_path, &authority);
+    let statuses = wait_for_statuses(&team_a_tl, 2).await;
+    drop(pair);
+    assert_eq!(
+        statuses[1], "crossing_consent_denied",
+        "an unrepaired retry must reproduce the SAME typed refusal"
+    );
+    assert!(
+        !all_rows(&raw_b).await.iter().any(|row| row.key == key),
+        "an unrepaired retry must still leave no row in the destination team"
+    );
+
+    // ── 3. The repair: re-sign the manifest WITH the grant, at a new version,
+    // and retry. Only now may the crossing land.
+    let mut repaired = two_team_crossing_manifest();
+    repaired.version = 2;
+    let (repaired_path, repaired_authority) =
+        write_daemon_manifest(fixture.path(), repaired, &[&identity_a, &identity_b]);
+    let pair = boot_pair(&repaired_path, &repaired_authority);
+    let statuses = wait_for_statuses(&team_a_tl, 3).await;
+    drop(pair);
+    assert_eq!(
+        statuses[2], "crossing_applied",
+        "a retry AFTER a valid consent repair must succeed"
+    );
+    assert!(
+        all_rows(&raw_b)
+            .await
+            .iter()
+            .any(|row| row.key == key
+                && row.source_team.as_ref().map(TeamId::as_str) == Some("team-a")),
+        "the repaired retry must land the row in team B"
+    );
+
+    // The operator tail is TYPED across the whole sequence: the same request
+    // produced two distinguishable outcomes, and the distinction survived into
+    // the durable audit surface rather than only into a process's stdout.
+    let distinct: BTreeSet<&str> = statuses.iter().map(String::as_str).collect();
+    assert_eq!(
+        distinct,
+        BTreeSet::from(["crossing_consent_denied", "crossing_applied"]),
+        "refusal and success must stay distinguishable on the operator surface"
+    );
+}
+
+// ─── Story 13.6 (AC6) — the fourteen-institution Cortex axis ───────────────
+//
+// Reza's three teams are one institution. This leg deliberately models the
+// other axis as fourteen independent signed cohorts: no shared authority,
+// identity, host binding, team, or physical datname. It creates the fourteen
+// ephemeral datnames on the configured local Postgres server so the signed
+// topology is checked against a real substrate, then removes them before exit.
+
+struct InstitutionWitness {
+    authority: [u8; 32],
+    datname: String,
+    host: String,
+    team: TeamId,
+    state: Arc<CohortManifestState>,
+}
+
+fn institution_connection(base: &str, datname: &str) -> String {
+    if let Some(offset) = base.find("dbname=") {
+        let value_start = offset + "dbname=".len();
+        let value_end = base[value_start..]
+            .find(char::is_whitespace)
+            .map(|end| value_start + end)
+            .unwrap_or(base.len());
+        return format!("{}{}{}", &base[..value_start], datname, &base[value_end..]);
+    }
+    let (prefix, current_and_query) = base
+        .rsplit_once('/')
+        .unwrap_or_else(|| panic!("live Postgres connection has no dbname: {base}"));
+    let suffix = current_and_query
+        .find('?')
+        .map(|offset| &current_and_query[offset..])
+        .unwrap_or("");
+    format!("{prefix}/{datname}{suffix}")
+}
+
+async fn raw_connect_institution(connection_string: &str) -> tokio_postgres::Client {
+    let (client, connection) = tokio_postgres::connect(connection_string, NoTls)
+        .await
+        .expect("institution live Postgres connection");
+    tokio::spawn(async move {
+        let _ = connection.await;
+    });
+    client
+}
+
+fn institution_witness(index: u8, datname: String, fingerprint: String) -> InstitutionWitness {
+    let authority = [index; 32];
+    let signing_key = SigningKey::from_bytes(&authority);
+    let host = format!("institution-{index:02}-host");
+    let team = TeamId::new(&format!("institution-{index:02}-team"))
+        .expect("canonical institution team");
+    let manifest = CohortManifest {
+        schema_version: COHORT_SCHEMA_V4,
+        cohort_id: format!("cortex-institution-{index:02}"),
+        version: 1,
+        authority: CohortAuthority {
+            threshold: 1,
+            keys: vec![hex::encode(signing_key.verifying_key().to_bytes())],
+        },
+        members: vec![CohortMember {
+            host_id: host.clone(),
+            fingerprint,
+            roles: vec!["worker".to_string()],
+            team: Some(team.clone()),
+        }],
+        consent: ConsentMatrix::default(),
+        reserved_intents: vec![
+            RESERVED_INTENT_REISSUE.to_string(),
+            RESERVED_INTENT_HALT_RECEIPT.to_string(),
+        ],
+        t_stale_secs: 120,
+        teams: Some(vec![TeamEntry {
+            team_id: team.clone(),
+            region: Region::canonicalize("region-a").expect("canonical region"),
+            datname: datname.clone(),
+            members: vec![SpiritId::from(format!("institution-{index:02}-spirit"))],
+        }]),
+        signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
+    }
+    .signed_with(&signing_key);
+    let signed_toml = toml::to_string(&manifest).expect("institution manifest serializes");
+    let pins = PinnedAuthorityKeys::from_keys(vec![signing_key.verifying_key()])
+        .expect("one operator-pinned institution authority");
+    let state = Arc::new(
+        CohortManifestState::load_with_clock(
+            HostId(host.clone()),
+            &signed_toml,
+            pins,
+            Arc::new(InMemoryCohortAuditSink::default()),
+            Arc::new(FixedClock),
+        )
+        .expect("institution manifest verifies only under its pinned authority"),
+    );
+    InstitutionWitness {
+        authority,
+        datname,
+        host,
+        team,
+        state,
+    }
+}
+
+#[tokio::test]
+#[ignore = "AdvisorySubstrate: requires MAOS_TEST_POSTGRES_TEAM_A and a Postgres role permitted to CREATE/DROP DATABASE"]
+async fn cortex_fourteen_institution_isolation_live() {
+    let _evidence = evidence_record::attest("cortex_fourteen_institution_isolation_live");
+    let _guard = LIVE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    let base_connection = pg_conn_team("team-a");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let prefix = format!("maos_i136_{}_{nonce:x}", std::process::id());
+    let datnames: Vec<String> = (1_u8..=14)
+        .map(|index| format!("{prefix}_{index:02}"))
+        .collect();
+    assert!(
+        datnames.iter().all(|datname| datname.len() <= 63),
+        "the ephemeral institution datnames must remain valid PostgreSQL identifiers"
+    );
+
+    let admin = raw_connect_institution(&base_connection).await;
+    for datname in &datnames {
+        admin
+            .execute(&format!("CREATE DATABASE {datname}"), &[])
+            .await
+            .unwrap_or_else(|error| panic!("provision institution datname {datname}: {error}"));
+    }
+
+    let identity_fixture = tempfile::tempdir().expect("institution identities");
+    let identities: Vec<DaemonIdentity> = (1_u8..=14)
+        .map(|index| mint_daemon_identity(identity_fixture.path(), &format!("institution-{index:02}-host")))
+        .collect();
+    let mut witnesses: Vec<InstitutionWitness> = datnames
+        .iter()
+        .zip(&identities)
+        .enumerate()
+        .map(|(offset, (datname, identity))| {
+            institution_witness(
+                (offset + 1) as u8,
+                datname.clone(),
+                identity.fingerprint.to_string(),
+            )
+        })
+        .collect();
+
+    // The fourteen signed topology entries must bind to fourteen independently
+    // reachable physical databases, not fourteen hosts under one authority.
+    for witness in &witnesses {
+        let connection = institution_connection(&base_connection, &witness.datname);
+        let client = raw_connect_institution(&connection).await;
+        let actual: String = client
+            .query_one("SELECT current_database()", &[])
+            .await
+            .expect("read institution current_database")
+            .get(0);
+        assert_eq!(actual, witness.datname);
+        let manifest = witness.state.manifest().expect("verified institution manifest");
+        assert_eq!(
+            manifest.team_of_host(&witness.host),
+            Some(&witness.team),
+            "the signed host→team binding must remain inside its institution"
+        );
+        assert_eq!(
+            manifest.teams.as_ref().expect("institution team topology")[0].datname,
+            witness.datname,
+            "the signed team→datname binding must name the live institution database"
+        );
+    }
+
+    let expected_authorities: BTreeSet<String> = witnesses
+        .iter()
+        .map(|witness| hex::encode(witness.authority))
+        .collect();
+    let observed_authorities: BTreeSet<String> = witnesses
+        .iter()
+        .map(|witness| {
+            witness
+                .state
+                .manifest()
+                .expect("verified institution manifest")
+                .authority
+                .keys
+                .into_iter()
+                .next()
+                .expect("one declared authority")
+        })
+        .collect();
+    let identity_witnesses: BTreeSet<String> = witnesses
+        .iter()
+        .map(|witness| {
+            witness
+                .state
+                .manifest()
+                .expect("verified institution manifest")
+                .members[0]
+                .fingerprint
+                .clone()
+        })
+        .collect();
+    assert_eq!(
+        identity_witnesses.len(),
+        14,
+        "each independent institution must retain a distinct certificate identity witness"
+    );
+    assert_eq!(expected_authorities.len(), 14, "fixture authorities must be unique");
+    assert_eq!(
+        observed_authorities, expected_authorities,
+        "all fourteen and only fourteen operator-pinned authority witnesses must reconcile"
+    );
+
+    // A manifest is institution-local. A real crossing aimed at institution 1's
+    // live database but authenticated as institution 2 reaches the production
+    // applier and receives its typed consent refusal before any database write.
+    let target = &witnesses[0];
+    let foreign = &witnesses[1];
+    let target_store = Arc::new(
+        LoomLiteStore::new(StoreConfig {
+            connection_string: institution_connection(&base_connection, &target.datname),
+            home_region: "region-a".to_string(),
+            home_team: target.team.as_str().to_string(),
+            ..StoreConfig::default()
+        })
+        .await
+        .expect("target institution live store")
+        .with_cross_team_consent(Arc::new(
+            maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(Arc::clone(&target.state)),
+        )),
+    );
+    let seed = [0x13; 32];
+    let foreign_bundle = build_replication_bundle_v2(
+        vec![crossing_leaf("cross-institution-must-refuse", "isolated")],
+        &Region::canonicalize("region-a").expect("canonical region"),
+        &foreign.team,
+        &seed,
+    )
+    .expect("foreign institution can form a correctly signed bundle");
+    let foreign_frame = crossing_frame(
+        &control_from(),
+        &HostId(target.host.clone()),
+        14,
+        &target.team,
+        foreign_bundle,
+    )
+    .expect("cross-institution frame encodes");
+    let target_applier =
+        CrossTeamCrossingAdapter::new(target_store, target.team.clone(), seed);
+    match target_applier.apply_crossing(foreign.team.as_str(), &foreign_frame).await {
+        CrossingOutcome::Refused(CrossingRefusal::ConsentDenied {
+            from_team,
+            to_team,
+            intent,
+        }) => {
+            assert_eq!(from_team, foreign.team.as_str());
+            assert_eq!(to_team, target.team.as_str());
+            assert_eq!(intent, "collective:share");
+        }
+        other => panic!(
+            "a foreign institution's manifest must not authorize its crossing; got {other:?}"
+        ),
+    }
+
+    // Proven-red clone control: transplant institution 1's authority into
+    // institution 2's otherwise valid manifest and sign it with the donor.
+    // Institution 2's original operator pin rejects the forged topology before
+    // it can replace the independently reconciled witness.
+    let mut cross_authority_clone = witnesses[1]
+        .state
+        .manifest()
+        .expect("clone source manifest");
+    let donor_key = SigningKey::from_bytes(&witnesses[0].authority);
+    cross_authority_clone.authority.keys =
+        vec![hex::encode(donor_key.verifying_key().to_bytes())];
+    let clone_toml = toml::to_string(&cross_authority_clone.signed_with(&donor_key))
+        .expect("cross-authority clone serializes");
+    let recipient_key = SigningKey::from_bytes(&witnesses[1].authority);
+    let recipient_pins = PinnedAuthorityKeys::from_keys(vec![recipient_key.verifying_key()])
+        .expect("recipient's original authority pin");
+    assert!(
+        matches!(
+            CohortManifestState::load_with_clock(
+                HostId(witnesses[1].host.clone()),
+                &clone_toml,
+                recipient_pins,
+                Arc::new(InMemoryCohortAuditSink::default()),
+                Arc::new(FixedClock),
+            ),
+            Err(maos_cohort::CohortError::ECohortAuthorityUnpinned {
+                unpinned_count: 1,
+                ..
+            })
+        ),
+        "proven-red: a donor authority swapped into another institution's manifest \
+         must be rejected by that institution's original pin"
+    );
+
+    // Removing one independent institution releases only its own state. The
+    // remaining thirteen retain their original pin witness and deny the same
+    // foreign-team consent decision, proving revocation/removal does not mutate
+    // a shared authority or consent table.
+    let removed = witnesses.remove(0);
+    let removed_authority = hex::encode(removed.authority);
+    let mut tombstone = removed.state.manifest().expect("institution to revoke");
+    tombstone.version = 2;
+    tombstone.members.clear();
+    tombstone.teams = Some(Vec::new());
+    tombstone.cross_team_consent.clear();
+    let removal_key = SigningKey::from_bytes(&removed.authority);
+    let tombstone_toml = toml::to_string(&tombstone.signed_with(&removal_key))
+        .expect("institution removal manifest serializes");
+    removed
+        .state
+        .issue_reissue(&tombstone_toml)
+        .expect("institution authority accepts its own removal reissue");
+    assert!(
+        removed
+            .state
+            .manifest()
+            .expect("removed institution manifest")
+            .members
+            .is_empty(),
+        "the removed institution must no longer expose a host identity"
+    );
+    drop(removed);
+    assert_eq!(witnesses.len(), 13);
+    for witness in &witnesses {
+        let manifest = witness.state.manifest().expect("remaining manifest");
+        assert_eq!(
+            manifest.authority.keys,
+            vec![hex::encode(witness.authority)],
+            "removing a peer institution must not alter another institution's pin"
+        );
+        assert_ne!(
+            manifest.authority.keys[0], removed_authority,
+            "a remaining institution must retain its own authority witness"
+        );
+        assert!(
+            !manifest.cross_team_admits(
+                &witness.team,
+                &TeamId::new("institution-01-team").expect("canonical removed team"),
+                "collective:share",
+            ),
+            "removing an institution must not create consent in a remaining institution"
+        );
+    }
+
+    for datname in &datnames {
+        admin
+            .execute(&format!("DROP DATABASE {datname} WITH (FORCE)"), &[])
+            .await
+            .unwrap_or_else(|error| panic!("remove institution datname {datname}: {error}"));
+    }
 }

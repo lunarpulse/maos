@@ -10,6 +10,10 @@ use maos_domain::region::Region;
 use maos_domain::team::TeamId;
 use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 
+
+/// Directional manifest action required before a destination may ask an origin
+/// team to reconcile a collective erase.
+pub const CROSS_TEAM_COLLECTIVE_ERASE_INTENT: &str = "collective:erase";
 /// Composition-root adapter from the verified cohort lease to Loom-lite's
 /// consumer-owned directional consent seam.
 pub struct CrossTeamConsentAdapter {

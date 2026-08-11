@@ -74,7 +74,7 @@ pub const REPORT_DIR: &str = "tests/reports";
 
 /// AC2's required set, as a RULE rather than a hand-maintained list.
 ///
-/// The product claim depends on every ledger leg EXCEPT the five named here.
+/// The product claim depends on every ledger leg EXCEPT the four named here.
 /// Everything else is required BY CONSTRUCTION, so a leg added tomorrow is
 /// required unless someone deliberately names it — the fail-safe direction.
 /// This is the "required set is NAMED" record.
@@ -82,17 +82,22 @@ pub const REPORT_DIR: &str = "tests/reports";
 /// * `kernel-baseline-pinned` / `kernel-abi-diff` prove the KERNEL did not
 ///   drift. That is anti-drift hygiene, not evidence that the three-team
 ///   journey works.
-/// * The remaining three are DECLARED successor controls (AC5). They stay
+/// * The remaining two are DECLARED successor controls (AC5). They stay
 ///   machine-readable and appear in each run's derived successor ledger until
 ///   their own observational oracle proves them. They are exempt from
 ///   `required` because their named owner—not this ledger story—must build the
 ///   missing mechanism.
+///
+/// ⚠ Story 13.6 REMOVED `reza-three-team-three-region-journey` from this list
+/// (AC5's re-drawn machinery-vs-declarations rule). While it sat here, a
+/// proven journey contributed NOTHING to `product_claim`: the one leg that
+/// judges whether Reza's three teams can collaborate was exempt from the claim
+/// it exists to support. 13.6 wrote the oracle, so the exemption is spent.
 const NOT_REQUIRED_LEGS: &[&str] = &[
     "kernel-baseline-pinned",
     "kernel-abi-diff",
     "kernel-collective-cause-distinguishable",
     "audit-escape-anomaly-detector-wiring",
-    "reza-three-team-three-region-journey",
 ];
 
 /// Is the product claim dependent on this leg?
@@ -142,6 +147,22 @@ pub fn ledger_enforced() -> bool {
 /// this derivation exists to prevent.
 pub fn ledger_gates() -> Vec<&'static str> {
     crate::check_loom_substrate_drift::contract_jobs()
+}
+
+/// Complete gate-owned ledger legs. Each gate derives this from its existing
+/// construction declarations, so publication cannot omit an unmentioned leg.
+pub fn expected_ledger_legs(gate: &str) -> Option<Vec<&'static str>> {
+    match gate {
+        "check-cross-region-consensus" => {
+            Some(crate::check_cross_region_consensus::ledger_leg_names())
+        }
+        "check-multi-region-slo" => Some(crate::check_multi_region_slo::ledger_leg_names()),
+        "check-multi-tenant-loom" => Some(crate::check_multi_tenant_loom::ledger_leg_names()),
+        "check-reza-production-path" => {
+            Some(crate::check_reza_production_path::ledger_leg_names())
+        }
+        _ => None,
+    }
 }
 
 /// Trusted gate/leg → harness-test bindings used when a published artifact is
@@ -209,6 +230,9 @@ pub fn trusted_evidence_tests(gate: &str, leg: &str) -> Option<&'static [&'stati
         ("check-multi-tenant-loom", "live-crossing-runs-through-two-daemons") => {
             Some(&["live_crossing_runs_through_two_daemon_processes"])
         }
+        ("check-multi-tenant-loom", "refused-crossing-operator-tail-and-repair") => {
+            Some(&["refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair"])
+        }
         ("check-multi-tenant-loom", "provenance-carries-across-two-stores") => {
             Some(&["v3_provenance_crosses_team_wall_and_survives_rebundle"])
         }
@@ -232,6 +256,9 @@ pub fn trusted_evidence_tests(gate: &str, leg: &str) -> Option<&'static [&'stati
         }
         ("check-multi-tenant-loom", "reza-three-team-three-region-journey") => {
             Some(&["reza_three_team_three_region_production_journey"])
+        }
+        ("check-multi-tenant-loom", "cortex-fourteen-institution-isolation") => {
+            Some(&["cortex_fourteen_institution_isolation_live"])
         }
         _ => None,
     }
@@ -1252,6 +1279,43 @@ impl PublishedLedger {
             if !names.insert(leg.name.as_str()) {
                 return Err(format!("{} ledger repeats leg `{}`", self.gate, leg.name));
             }
+        }
+
+        let expected_names = expected_ledger_legs(&self.gate).ok_or_else(|| {
+            format!(
+                "{} ledger gate is registered but has no gate-owned leg declaration",
+                self.gate
+            )
+        })?;
+        let expected_set: std::collections::HashSet<&str> =
+            expected_names.iter().copied().collect();
+        let missing: Vec<&str> = expected_names
+            .iter()
+            .copied()
+            .filter(|name| !names.contains(name))
+            .collect();
+        if !missing.is_empty() {
+            return Err(format!(
+                "{} ledger is missing gate-owned leg(s): {}",
+                self.gate,
+                missing.join(", ")
+            ));
+        }
+        let unknown: Vec<&str> = self
+            .legs
+            .iter()
+            .map(|leg| leg.name.as_str())
+            .filter(|name| !expected_set.contains(name))
+            .collect();
+        if !unknown.is_empty() {
+            return Err(format!(
+                "{} ledger contains unknown leg(s): {}",
+                self.gate,
+                unknown.join(", ")
+            ));
+        }
+
+        for leg in &self.legs {
             if !leg.attempted && leg.green {
                 return Err(format!(
                     "{}:{} is green although it was not attempted",
@@ -1815,7 +1879,7 @@ mod tests {
                 attempted: false,
                 substrate_present: false,
                 green: false,
-                detail: "the kernel still collapses all five collective causes".to_string(),
+                detail: "the kernel still collapses all eight collective causes".to_string(),
                 signature: SignatureCheck::default(),
                 passed: None,
                 failed: None,
@@ -1980,17 +2044,10 @@ mod tests {
 
     #[test]
     fn published_claim_is_rederived_from_full_ledger() {
-        let valid = published_hermetic(
-            "PROVEN",
-            "PROVEN_BLOCKING",
-            Some(binding().artifact_ref(
-                "check-reza-production-path",
-                "loom-scope-reaches-policy-table",
-            )),
-        );
+        let valid = published_full_hermetic("check-reza-production-path");
         valid
             .validate_against(None)
-            .expect("consistent hermetic ledger");
+            .expect("complete consistent hermetic ledger");
 
         let bare = r#"{"gate":"check-reza-production-path","product_claim":"PROVEN"}"#;
         assert!(
@@ -1998,11 +2055,9 @@ mod tests {
             "a two-field claim is not a ledger"
         );
 
-        let stale = published_hermetic(
-            "PROVEN",
-            "PROVEN_BLOCKING",
-            Some("check-reza-production-path/loom-scope-reaches-policy-table@deadbeef#old".into()),
-        );
+        let mut stale = published_full_hermetic("check-reza-production-path");
+        stale.legs[0].artifact_ref =
+            Some("check-reza-production-path/loom-scope-reaches-policy-table@deadbeef#old".into());
         assert!(stale
             .validate_against(None)
             .unwrap_err()
@@ -2010,38 +2065,63 @@ mod tests {
     }
 
     #[test]
+    fn published_ledger_rejects_missing_required_gate_owned_leg() {
+        let mut ledger = published_full_hermetic("check-reza-production-path");
+        let missing = "loom-scope-reaches-policy-table";
+        assert!(leg_is_required(missing));
+        ledger.legs.retain(|leg| leg.name != missing);
+        let error = ledger.validate_against(None).unwrap_err();
+        assert!(error.contains("missing gate-owned leg(s)"), "{error}");
+        assert!(error.contains(missing), "{error}");
+    }
+
+    #[test]
+    fn published_ledger_rejects_unknown_gate_leg() {
+        let mut ledger = published_full_hermetic("check-reza-production-path");
+        ledger.legs.push(PublishedLeg {
+            name: "unrecognized-leg".to_string(),
+            binding: "blocking".to_string(),
+            required: true,
+            attempted: true,
+            substrate_present: true,
+            green: true,
+            evidence_state: "PROVEN_BLOCKING".to_string(),
+            artifact_ref: Some(
+                binding().artifact_ref("check-reza-production-path", "unrecognized-leg"),
+            ),
+            evidence_tests: Vec::new(),
+            signature_block: Vec::new(),
+        });
+        let error = ledger.validate_against(None).unwrap_err();
+        assert!(error.contains("unknown leg(s)"), "{error}");
+        assert!(error.contains("unrecognized-leg"), "{error}");
+    }
+
+    #[test]
+    fn missing_journey_leg_refuses_proven_claim_before_claim_comparison() {
+        let mut ledger = published_full_hermetic("check-multi-tenant-loom");
+        let journey = "reza-three-team-three-region-journey";
+        ledger.legs.retain(|leg| leg.name != journey);
+        let error = ledger.validate_against(None).unwrap_err();
+        assert!(error.contains("missing gate-owned leg(s)"), "{error}");
+        assert!(error.contains(journey), "{error}");
+        assert!(!error.contains("product_claim"), "{error}");
+    }
+
+    #[test]
     fn serialized_empty_signature_cannot_claim_proven() {
-        let record = SignedTranscript {
-            payload: payload(),
-            signature: String::new(),
-        };
-        let ledger = PublishedLedger {
-            gate: "check-multi-tenant-loom".to_string(),
-            commit: binding().commit,
-            substrate_nonce: binding().nonce,
-            product_claim: "PROVEN".to_string(),
-            legs: vec![PublishedLeg {
-                name: "gdpr-collective-erase-live".to_string(),
-                binding: "advisory-substrate".to_string(),
-                required: true,
-                attempted: true,
-                substrate_present: true,
-                green: true,
-                evidence_state: "PROVEN_LIVE_SIGNED".to_string(),
-                artifact_ref: Some(
-                    binding().artifact_ref("check-multi-tenant-loom", "gdpr-collective-erase-live"),
-                ),
-                evidence_tests: vec!["tenant_wall_live".to_string()],
-                signature_block: vec![record],
-            }],
-        };
-        assert!(
-            ledger
-                .validate_against(None)
-                .unwrap_err()
-                .contains("trusted harness-test binding"),
-            "serialized evidence is reverified before accepting PROVEN"
-        );
+        let mut ledger = published_full_hermetic("check-multi-tenant-loom");
+        let journey = ledger
+            .legs
+            .iter_mut()
+            .find(|leg| leg.name == "reza-three-team-three-region-journey")
+            .expect("complete tenant ledger includes the journey leg");
+        journey.binding = "advisory-substrate".to_string();
+        journey.evidence_state = "PROVEN_LIVE_SIGNED".to_string();
+        journey.evidence_tests = vec!["reza_three_team_three_region_production_journey".to_string()];
+        journey.signature_block = Vec::new();
+        let error = ledger.validate_against(None).unwrap_err();
+        assert!(error.contains("reprojects"), "{error}");
     }
 
     fn published_hermetic(
@@ -2066,6 +2146,32 @@ mod tests {
                 evidence_tests: Vec::new(),
                 signature_block: Vec::new(),
             }],
+        }
+    }
+
+    fn published_full_hermetic(gate: &str) -> PublishedLedger {
+        let binding = binding();
+        PublishedLedger {
+            gate: gate.to_string(),
+            commit: binding.commit.clone(),
+            substrate_nonce: binding.nonce.clone(),
+            product_claim: "PROVEN".to_string(),
+            legs: expected_ledger_legs(gate)
+                .expect("known test gate has a gate-owned leg declaration")
+                .into_iter()
+                .map(|name| PublishedLeg {
+                    name: name.to_string(),
+                    binding: "blocking".to_string(),
+                    required: leg_is_required(name),
+                    attempted: true,
+                    substrate_present: true,
+                    green: true,
+                    evidence_state: "PROVEN_BLOCKING".to_string(),
+                    artifact_ref: Some(binding.artifact_ref(gate, name)),
+                    evidence_tests: Vec::new(),
+                    signature_block: Vec::new(),
+                })
+                .collect(),
         }
     }
 
@@ -2120,7 +2226,7 @@ mod tests {
                 attempted: false,
                 substrate_present: false,
                 green: false,
-                detail: "the kernel still collapses all five collective causes".to_string(),
+                detail: "the kernel still collapses all eight collective causes".to_string(),
                 signature: SignatureCheck::default(),
                 passed: None,
                 failed: None,
@@ -2131,7 +2237,7 @@ mod tests {
         let derived = absent_successors(std::slice::from_ref(&absent));
         assert_eq!(derived.len(), 1);
         assert!(derived[0].starts_with("kernel-collective-cause-distinguishable: "));
-        assert!(derived[0].contains("collapses all five collective causes"));
+        assert!(derived[0].contains("collapses all eight collective causes"));
     }
 
     fn leg_with(signature: SignatureCheck) -> EvidenceLeg {

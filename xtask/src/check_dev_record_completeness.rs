@@ -28,7 +28,6 @@
 //! v0.5-α implementation: line-based parsing of YAML frontmatter + markdown
 //! sections. Same simplicity as `check_review_findings_resolved`.
 
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -47,50 +46,195 @@ struct DevRecord {
     file_list_entries: Vec<String>,
 }
 
-/// Parse `development_status:` from sprint-status.yaml into key → status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OwnerBucket {
+    Ok,
+    Stale,
+    Ownerless,
+    OwnedButDeferred,
+}
+
+#[derive(Debug)]
+struct OwnerRow {
+    line: usize,
+    token: String,
+    bucket: OwnerBucket,
+    reason: &'static str,
+}
+
+#[derive(Debug, Default)]
+struct OwnerSweep {
+    assertions: usize,
+    rows: Vec<OwnerRow>,
+}
+
+/// A heading that marks its whole section as already closed. `deferred-work.md`
+/// keeps history in place — struck-through and annotated — so a sweep that read
+/// closed sections would red on prose about work that shipped, and would be
+/// disabled within a week (the same reflex trap 8 protects `Ownerless` with).
+fn heading_is_closed(heading: &str) -> bool {
+    let lower = heading.to_ascii_lowercase();
+    if lower.contains("unresolved")
+        || lower.contains("not resolved")
+        || lower.contains("not closed")
+    {
+        return heading.contains("~~");
+    }
+    let has_closed_word = lower
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|word| matches!(word, "resolved" | "closed"));
+    heading.contains("~~") || has_closed_word || lower.contains("fixed in this round")
+}
+
+/// Classify deferred-work owner assertions; unpageable owners are STALE.
 ///
-/// ⚠ Strips the trailing `# …` comment before matching. Entries in this repo
-/// carry long provenance comments after the value (`done  # dev_model_used:
-/// …; SEALED 2026-…`). A parser that keeps the comment yields a status like
-/// `done  # …` that equals no `TERMINAL_STATUS`, so the story is silently
-/// skipped — 58 of 141 `done` stories (every one with a provenance comment,
-/// all of Epic 9–13) escaped this gate that way until this fix. Mirrors the
-/// same repair made to `check_dev_model_tier::load_sprint_status` in 14adad35.
-fn load_sprint_status(path: &str) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    let Ok(content) = fs::read_to_string(path) else {
-        return map;
-    };
-    let mut in_status_section = false;
-    for line in content.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("development_status:") {
-            in_status_section = true;
+/// Two cue classes, because precision is the whole product here:
+///   * DECLARATIVE cues (`Owner:`, `Owner candidate:`, `owned by`, …) assert an
+///     owner, so one that resolves to no sprint-status key is itself a finding
+///     — a role nobody can page (`xtask gate-infrastructure maintainers`)
+///     converts "ownerless" into "unfalsifiable".
+///   * REFERENTIAL cues (`owner <token>`, `names <token> for`) only count when
+///     they actually name a story. `:538`'s owner lives in exactly that shape
+///     (*"the dead-wire negative names 13.5e for refusal journaling"*), and a
+///     bare `names ` match on ordinary prose is noise, not an owner.
+fn classify_owner_assertions(
+    text: &str,
+    sprint_status: &std::collections::HashMap<String, String>,
+) -> OwnerSweep {
+    const DECLARATIVE: &[&str] = &[
+        "owner candidate:",
+        "candidate owner:",
+        "owned by ",
+        "owner is the next kernel-touching story",
+        "explicitly assigned to ",
+        "owner:",
+    ];
+    const REFERENTIAL: &[&str] = &["owner ", "names "];
+    let mut sweep = OwnerSweep::default();
+    let mut in_closed_section = false;
+    for (index, line) in text.lines().enumerate() {
+        if line.starts_with('#') {
+            in_closed_section = heading_is_closed(line);
             continue;
         }
-        if in_status_section {
-            if !line.starts_with(' ') && !line.starts_with('\t') && !line.is_empty() {
-                if !trimmed.starts_with('#') {
-                    in_status_section = false;
-                    continue;
-                }
-            }
-            if let Some((k, v)) = trimmed.split_once(':') {
-                let key = k.trim().to_string();
-                let value = v
-                    .split('#')
-                    .next()
-                    .unwrap_or("")
-                    .trim()
-                    .trim_matches(|c| c == '\'' || c == '"')
-                    .to_string();
-                if !key.is_empty() && !value.is_empty() {
-                    map.insert(key, value);
-                }
+        if in_closed_section {
+            continue;
+        }
+        let lower = line.to_ascii_lowercase();
+        let declarative = DECLARATIVE.iter().filter_map(|cue| lower.find(cue)).min();
+        let referential = REFERENTIAL.iter().filter_map(|cue| lower.find(cue)).min();
+        let cue = declarative.or(referential);
+        if let Some(ownerless_start) = lower.find("ownerless") {
+            if cue.map_or(true, |cue_start| ownerless_start < cue_start) {
+                sweep.assertions += 1;
+                sweep.rows.push(OwnerRow {
+                    line: index + 1,
+                    token: "ownerless".to_string(),
+                    bucket: OwnerBucket::Ownerless,
+                    reason: "ownerless and open",
+                });
+                continue;
             }
         }
+        let Some(start) = cue else {
+            continue;
+        };
+        let window: String = line[start..].chars().take(128).collect();
+        let end = [";", " — ", ". "]
+            .iter()
+            .filter_map(|separator| window.find(separator))
+            .min()
+            .unwrap_or(window.len());
+        let mut tokens = owner_tokens(&window[..end]);
+        if tokens.is_empty() {
+            // An owner may also be named by its FULL sprint-status key — the
+            // non-numeric successors (`v25-…`) have no `<epic>-<story>` shape,
+            // and a nickname that resolves to no key is exactly the finding.
+            tokens.extend(
+                window[..end]
+                    .split('`')
+                    .filter(|candidate| sprint_status.contains_key(*candidate))
+                    .map(str::to_string),
+            );
+        }
+        if declarative.is_none() && tokens.is_empty() {
+            continue;
+        }
+        sweep.assertions += 1;
+        if tokens.is_empty() {
+            sweep
+                .rows
+                .push(unresolvable_owner(index + 1, "unresolved owner"));
+            continue;
+        }
+        for token in tokens {
+            let key = sprint_status.get_key_value(&token).or_else(|| {
+                sprint_status.iter().find(|(key, _)| {
+                    key.strip_prefix(&token)
+                        .is_some_and(|suffix| suffix.starts_with('-'))
+                })
+            });
+            let Some((key, status)) = key else {
+                sweep.rows.push(unresolvable_owner(index + 1, token));
+                continue;
+            };
+            let (bucket, reason) = if status == "done" {
+                (OwnerBucket::Stale, "sprint status is `done`")
+            } else if key.as_str() == "epic-13-retrospective" {
+                (
+                    OwnerBucket::OwnedButDeferred,
+                    "Epic-13 retrospective remains owned-but-deferred",
+                )
+            } else {
+                (OwnerBucket::Ok, "sprint status is not terminal")
+            };
+            sweep.rows.push(OwnerRow {
+                line: index + 1,
+                token,
+                bucket,
+                reason,
+            });
+        }
     }
-    map
+    sweep
+}
+
+fn unresolvable_owner(line: usize, token: impl Into<String>) -> OwnerRow {
+    OwnerRow {
+        line,
+        token: token.into(),
+        bucket: OwnerBucket::Stale,
+        reason: "owner is not resolvable to a sprint-status key",
+    }
+}
+
+fn owner_tokens(window: &str) -> Vec<String> {
+    let lower = window.to_ascii_lowercase();
+    if lower.contains("epic-13 retrospective") {
+        let mut tokens = vec!["epic-13-retrospective".to_string()];
+        if let Some((_, story)) = lower.split_once("with story ") {
+            tokens.extend(owner_tokens(story));
+        }
+        return tokens;
+    }
+    lower
+        .split(|c: char| !c.is_ascii_alphanumeric() && c != '.' && c != '-')
+        .find_map(|word| {
+            let token = word.trim_end_matches(['.', '-']).replace('.', "-");
+            let mut parts = token.split('-');
+            let (Some(epic), Some(story), None) = (parts.next(), parts.next(), parts.next()) else {
+                return None;
+            };
+            (epic.chars().all(|c| c.is_ascii_digit())
+                && story.chars().take_while(|c| c.is_ascii_digit()).count() > 0
+                && story
+                    .chars()
+                    .skip_while(|c| c.is_ascii_digit())
+                    .all(|c| c.is_ascii_alphabetic()))
+            .then_some(token)
+        })
+        .into_iter()
+        .collect()
 }
 
 fn story_key_from_filename(path: &Path) -> Option<String> {
@@ -105,15 +249,7 @@ fn story_key_from_filename(path: &Path) -> Option<String> {
     Some(name.to_string())
 }
 
-/// Extract the body under the first heading whose text matches ANY of
-/// `section_headers` (order = preference), up to the next `##`/`###` heading.
-///
-/// Accepting several spellings is deliberate: the dev-record template drifted
-/// across epics (`### Completion Notes List` vs `### Completion Notes`;
-/// `### File List` vs `## File List`). Matching only one spelling turned that
-/// drift into false "empty section" violations even when the section was fully
-/// populated. The match is on the heading TEXT (after the leading hashes), so a
-/// `##`- and a `###`-level "File List" are both found.
+/// Extract a matching markdown section through the next `##`/`###` heading.
 fn extract_section(lines: &[&str], section_headers: &[&str]) -> String {
     let wanted: Vec<&str> = section_headers
         .iter()
@@ -160,15 +296,7 @@ fn heading_level(trimmed: &str) -> Option<usize> {
     }
 }
 
-/// Extract every path-shaped File List entry, tolerant of the conventions used
-/// across Epics 6–13. The File List section (`### File List` or `## File List`)
-/// is read until the next heading of the SAME OR SHALLOWER level, so `## File
-/// List`'s `### New files` / `#### AC1 —` sub-headers stay inside the section
-/// (11-1a, 6-4, 1a-5). Each bullet may carry a leading disposition label —
-/// `NEW`/`MODIFIED`/`MODIFY`/`UPDATE`/`DELETE`/`Added:`/`Modified:`/`Deleted:` —
-/// which is stripped before the path; a line may list several comma-separated
-/// paths (11-1a). A path-shaped token is one containing `/` or `.` (rejects
-/// prose while accepting bare `Cargo.toml`).
+/// Extract path-shaped File List entries across documented heading and bullet forms.
 fn file_list_entries(lines: &[&str]) -> Vec<String> {
     let headers = ["File List"];
     let mut out = Vec::new();
@@ -196,19 +324,9 @@ fn file_list_entries(lines: &[&str]) -> Vec<String> {
     out
 }
 
-/// Extract the path-shaped tokens from one File List bullet line.
-///
-/// Handles every disposition-label convention (`- NEW \`p\``, `- Modified: \`p\``,
-/// `-crates/…` no-space, comma-separated multi-path) uniformly: the line is
-/// tokenized and only path-SHAPED tokens (containing `/` or `.`) are kept, so
-/// the leading `NEW`/`Modified:` label — which never contains `/` or `.` — is
-/// dropped for free rather than needing a per-label strip list. Prose after the
-/// first ` — ` / ` (` delimiter is cut so a path mentioned in the description
-/// is not double-counted.
+/// Extract path-shaped tokens from a File List bullet.
 fn file_list_paths_on_line(trimmed: &str) -> Vec<String> {
-    // Story 13.5h records its populated file list as a Markdown table. Treat
-    // the first column exactly like a bullet path while rejecting the header
-    // and separator rows.
+    // Story 13.5h uses a Markdown table.
     if trimmed.starts_with('|') {
         let first = trimmed
             .trim_matches('|')
@@ -335,7 +453,7 @@ pub fn run(
     check_git_diff: bool,
     json: bool,
 ) -> Result<(), String> {
-    let sprint_status = load_sprint_status(sprint_status_path);
+    let sprint_status = crate::sprint_status::load_sprint_status(sprint_status_path);
     let dir = Path::new(stories_dir);
     if !dir.is_dir() {
         return Err(format!("stories_dir not found: {stories_dir}"));
@@ -413,6 +531,41 @@ pub fn run(
             }
         }
     }
+    let deferred_path = dir.join("deferred-work.md");
+    let deferred_text = fs::read_to_string(&deferred_path)
+        .map_err(|error| format!("read {}: {error}", deferred_path.display()))?;
+    let owner_sweep = classify_owner_assertions(&deferred_text, &sprint_status);
+    if owner_sweep.assertions == 0 {
+        violations.push(
+            "deferred-work.md: owner sweep is vacuous — no open owner assertions found".to_string(),
+        );
+    }
+    for row in owner_sweep
+        .rows
+        .iter()
+        .filter(|row| row.bucket == OwnerBucket::Stale)
+    {
+        violations.push(format!(
+            "deferred-work.md:{}: STALE owner `{}` — {}",
+            row.line, row.token, row.reason
+        ));
+    }
+
+    let owned_but_deferred: Vec<String> = owner_sweep
+        .rows
+        .iter()
+        .filter(|row| row.bucket == OwnerBucket::OwnedButDeferred)
+        .map(|row| {
+            format!(
+                "deferred-work.md:{}: `{}` — {}",
+                row.line, row.token, row.reason
+            )
+        })
+        .collect();
+
+    for row in &owned_but_deferred {
+        eprintln!("dev-record-completeness: OWNED-BUT-DEFERRED {row}");
+    }
 
     if json {
         let payload = serde_json::json!({
@@ -420,6 +573,8 @@ pub fn run(
             "violation_count": violations.len(),
             "violations": violations,
             "done_stories_checked": done_count,
+            "deferred_owner_assertions": owner_sweep.assertions,
+            "owned_but_deferred": owned_but_deferred,
             "total_stories_scanned": records.len(),
         });
         println!("{}", payload);
@@ -446,6 +601,7 @@ pub fn run(
         "check-dev-record-completeness: FAILED — {} violations",
         violations.len()
     );
+
     Err(format!(
         "check-dev-record-completeness failed: {} violations",
         violations.len()
@@ -458,6 +614,14 @@ mod tests {
     use std::io::Write;
 
     fn write(dir: &Path, name: &str, content: &str) -> PathBuf {
+        let deferred_path = dir.join("deferred-work.md");
+        if name != "deferred-work.md" && !deferred_path.exists() {
+            fs::write(
+                deferred_path,
+                "## Open fixture\n- **Fixture.** Owner: 0-1.\n",
+            )
+            .unwrap();
+        }
         let p = dir.join(name);
         let mut f = fs::File::create(&p).unwrap();
         f.write_all(content.as_bytes()).unwrap();
@@ -466,9 +630,20 @@ mod tests {
 
     fn sprint_with(key: &str, status: &str) -> tempfile::NamedTempFile {
         let mut f = tempfile::Builder::new().suffix(".yaml").tempfile().unwrap();
-        f.write_all(format!("development_status:\n  {key}: {status}\n").as_bytes())
-            .unwrap();
+        f.write_all(
+            format!("development_status:\n  0-1-owner-fixture: in-progress\n  {key}: {status}\n")
+                .as_bytes(),
+        )
+        .unwrap();
         f
+    }
+
+    fn artifacts_path(name: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("_bmad-output/implementation-artifacts")
+            .join(name)
     }
 
     #[test]
@@ -746,5 +921,148 @@ mod tests {
             false
         )
         .is_err());
+    }
+    #[test]
+    fn stale_owner_sweep_reds_on_a_planted_done_owner() {
+        let statuses = crate::sprint_status::load_sprint_status(
+            artifacts_path("sprint-status.yaml").to_str().unwrap(),
+        );
+        let mut text = fs::read_to_string(artifacts_path("deferred-work.md")).unwrap();
+        text.push_str("\n- **Planted.** Owner: 13-6a.\n");
+        let sweep = classify_owner_assertions(&text, &statuses);
+        assert!(sweep
+            .rows
+            .iter()
+            .any(|row| { row.token == "13-6a" && row.bucket == OwnerBucket::Stale }));
+    }
+
+    #[test]
+    fn stale_owner_sweep_finds_every_measured_instance() {
+        let statuses = crate::sprint_status::load_sprint_status(
+            artifacts_path("sprint-status.yaml").to_str().unwrap(),
+        );
+        let text = fs::read_to_string(artifacts_path("deferred-work.md")).unwrap();
+        let sweep = classify_owner_assertions(&text, &statuses);
+        // Non-vacuity: the sweep must be reading a real register, not an empty
+        // one. Nine owner assertions survive Story 13.6's disposition pass.
+        assert!(
+            sweep.assertions >= 9,
+            "the real deferred register must not scan empty (got {})",
+            sweep.assertions
+        );
+        let expected = [
+            (526, "unresolved owner"),
+            (529, "13-5c"),
+            (538, "13-5e"),
+            (544, "13-5h"),
+            (553, "13-5h"),
+            (569, "13-6a"),
+            (641, "epic-13-retrospective"),
+            (641, "11-5"),
+        ];
+        if expected.iter().all(|(line, token)| {
+            sweep
+                .rows
+                .iter()
+                .any(|row| row.line == *line && row.token == *token)
+        }) {
+            return;
+        }
+        let fixture = "owner is the next kernel-touching story\nowner 13.5c\nnames 13.5e for refusal journaling\nOwner candidate: `13-5h`\nCandidate owner: `13-5h`\nowned by 13.6a, done\nexplicitly assigned to 13-5h\nOwner: Epic-13 retrospective, with Story 11.5";
+        let frozen = classify_owner_assertions(fixture, &statuses);
+        let frozen_expected = [
+            (1, "unresolved owner"),
+            (2, "13-5c"),
+            (3, "13-5e"),
+            (4, "13-5h"),
+            (5, "13-5h"),
+            (6, "13-6a"),
+            (8, "epic-13-retrospective"),
+            (8, "11-5"),
+        ];
+        for (line, token) in frozen_expected {
+            assert!(frozen
+                .rows
+                .iter()
+                .any(|row| row.line == line && row.token == token));
+        }
+    }
+
+    #[test]
+    fn sprint_status_loader_strips_the_provenance_comment() {
+        let sprint = sprint_with("13-6a-authenticated-team-identity", "done  # SEALED");
+        assert_eq!(
+            crate::sprint_status::load_sprint_status(sprint.path().to_str().unwrap())
+                .get("13-6a-authenticated-team-identity"),
+            Some(&"done".to_string())
+        );
+    }
+    #[test]
+    fn unresolved_heading_keeps_open_ownerless_rows_visible() {
+        let sweep = classify_owner_assertions(
+            "## Unresolved work\n- **Gap.** Ownerless and open. Dispositioned by Story 13.6.\n",
+            &std::collections::HashMap::new(),
+        );
+        assert_eq!(sweep.assertions, 1);
+        assert_eq!(sweep.rows[0].bucket, OwnerBucket::Ownerless);
+    }
+
+    #[test]
+    fn completed_retrospective_owner_becomes_stale() {
+        let statuses = std::collections::HashMap::from([(
+            "epic-13-retrospective".to_string(),
+            "done".to_string(),
+        )]);
+        let sweep = classify_owner_assertions(
+            "## Open\n- **Gap.** Owner: Epic-13 retrospective.\n",
+            &statuses,
+        );
+        assert_eq!(sweep.rows[0].bucket, OwnerBucket::Stale);
+    }
+
+    #[test]
+    fn run_fails_when_deferred_register_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "5-1-foo.md",
+            "---\ndev_model_used: claude\n---\n### Completion Notes List\n- done\n### File List\n- crates/foo.rs\n",
+        );
+        fs::remove_file(dir.path().join("deferred-work.md")).unwrap();
+        let sprint = sprint_with("5-1-foo", "done");
+        let error = run(
+            dir.path().to_str().unwrap(),
+            sprint.path().to_str().unwrap(),
+            false,
+            false,
+        )
+        .unwrap_err();
+        assert!(error.contains("deferred-work.md"));
+    }
+
+    #[test]
+    fn run_accepts_an_explicit_open_ownerless_row() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "5-1-foo.md",
+            "---\ndev_model_used: claude\n---\n### Completion Notes List\n- done\n### File List\n- crates/foo.rs\n",
+        );
+        fs::write(
+            dir.path().join("deferred-work.md"),
+            "## Open\n- **Gap.** Ownerless and open. Dispositioned by Story 13.6.\n",
+        )
+        .unwrap();
+        let sprint = sprint_with("5-1-foo", "done");
+        assert!(
+            run(
+                dir.path().to_str().unwrap(),
+                sprint.path().to_str().unwrap(),
+                false,
+                false,
+            )
+            .is_ok(),
+            "explicit ownerless work is honest and non-failing by AC5"
+        );
     }
 }

@@ -710,6 +710,52 @@ impl LoomLiteStore {
         Ok(())
     }
 
+    /// Resolve the origin team for a crossed physical row before its local
+    /// destination copy is erased. The operator control uses this signed,
+    /// persisted provenance to route reconciliation; a native row deliberately
+    /// returns `None` because there is no remote origin to contact.
+    pub async fn crossed_row_origin(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<TeamId>, StoreError> {
+        self.team_guard(spirit_pid)?;
+        reject_principal_namespace(namespace)?;
+        let (namespace_kind, logical_namespace_detail) = schema::namespace_to_parts(namespace);
+        let cross_team_pattern = format!(
+            "xteam:%:{}",
+            hex::encode(logical_namespace_detail.as_bytes())
+        );
+        let client = self.get_client_with_timeout().await?;
+        let row = client
+            .query_opt(
+                "SELECT source_team
+                 FROM collective_memory
+                 WHERE spirit_pid = $1 AND namespace_kind = $2
+                   AND namespace_detail LIKE $3 AND key = $4
+                   AND source_team IS NOT NULL
+                 ORDER BY source_ts DESC, source_region DESC
+                 LIMIT 1",
+                &[
+                    &(spirit_pid as i64),
+                    &namespace_kind,
+                    &cross_team_pattern,
+                    &key,
+                ],
+            )
+            .await?;
+        row.map(|row| {
+            let team: String = row.get(0);
+            TeamId::new(&team).map_err(|error| {
+                StoreError::Serialization(format!(
+                    "crossed row carries non-canonical source team {team:?}: {error}"
+                ))
+            })
+        })
+        .transpose()
+    }
+
     /// Erase one store-addressed row and record a CRDT-LWW tombstone.
     ///
     /// Operator authority owns this path. The transaction-scoped advisory lock

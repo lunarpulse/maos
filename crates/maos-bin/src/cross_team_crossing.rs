@@ -42,6 +42,7 @@ use maos_a2a_core::{
 use maos_domain::frame::{FramePayload, IacFrame, TelemetryEventPayload};
 use maos_domain::memory::{MemoryNamespace, MemoryValue};
 use maos_domain::team::TeamId;
+use maos_loom_lite::cross_team_consent::{CrossTeamConsentError, CrossTeamConsentPort};
 use maos_loom_lite::replication::bundle::{
     apply_replication_bundle, BundleError, CrossRegionReplicationBundle, CrossTeamApplyContext,
 };
@@ -63,6 +64,15 @@ pub enum CrossTeamCrossingControl {
         /// `CrossTeamApplyContext` before consent or persistence.
         to_team: String,
         bundle: CrossRegionReplicationBundle,
+    },
+    /// Reconcile an operator erase from a crossed destination to the team that
+    /// owns the origin row. `to_team` is validated against the receiving store;
+    /// the authenticated envelope team—not a body claim—authorizes the action.
+    Erase {
+        to_team: String,
+        spirit_pid: u32,
+        namespace: String,
+        key: String,
     },
 }
 
@@ -114,6 +124,13 @@ pub struct CrossTeamCrossingAdapter {
     store: Arc<LoomLiteStore>,
     home_team: TeamId,
     base_seed: [u8; 32],
+    erase_reconciliation: Option<EraseReconciliation>,
+}
+
+struct EraseReconciliation {
+    cross_team_consent: Arc<dyn CrossTeamConsentPort>,
+    tenant_map: Arc<crate::tenant_map::TenantMapAdapter>,
+    local_control_spirit: maos_domain::ports::registry::SpiritId,
 }
 
 impl CrossTeamCrossingAdapter {
@@ -122,7 +139,22 @@ impl CrossTeamCrossingAdapter {
             store,
             home_team,
             base_seed,
+            erase_reconciliation: None,
         }
+    }
+
+    pub fn with_erase_reconciliation(
+        mut self,
+        cross_team_consent: Arc<dyn CrossTeamConsentPort>,
+        tenant_map: Arc<crate::tenant_map::TenantMapAdapter>,
+        local_control_spirit: maos_domain::ports::registry::SpiritId,
+    ) -> Self {
+        self.erase_reconciliation = Some(EraseReconciliation {
+            cross_team_consent,
+            tenant_map,
+            local_control_spirit,
+        });
+        self
     }
 
     /// Story 13.6b / AC2 — keep the five-cause matrix alive **inside the applier
@@ -193,87 +225,190 @@ impl CrossTeamCrossingPort for CrossTeamCrossingAdapter {
         let Some(decoded) = CrossTeamCrossingControl::from_frame(frame) else {
             return CrossingOutcome::NotCrossing;
         };
-        let CrossTeamCrossingControl::Share { to_team, bundle } = match decoded {
-            Ok(control) => control,
-            Err(reason) => {
-                return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
-                    reason,
-                    from_team: authenticated_team.to_string(),
-                    to_team: String::new(),
-                    intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
-                })
-            }
-        };
-
-        // ── AC3 / D-13: THE WELD ────────────────────────────────────────────
-        // `authenticated_team` is the envelope claim the router has already
-        // proven the TLS-verified peer speaks for under the signed V4 manifest.
-        // `bundle.source_team` is the field `is_granted` will decide from. If
-        // they differ, the emitter stamped a truthful envelope and signed a
-        // lying payload — the seed-holding forger of D-10, which the shipped
-        // relabel negative structurally cannot reach because its signature
-        // verifies correctly. Refuse HERE, before any apply.
-        let payload_team = bundle
-            .source_team
-            .as_ref()
-            .map(|team| team.as_str().to_string())
-            .unwrap_or_default();
-        if payload_team != authenticated_team {
-            return CrossingOutcome::Refused(CrossingRefusal::SourceTeamUnbound {
-                envelope_team: authenticated_team.to_string(),
-                payload_team,
-            });
-        }
-
-        let requested_team = match TeamId::new(&to_team) {
-            Ok(team) => team,
-            Err(error) => {
-                return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
-                    reason: format!("crossing destination team is not canonical: {error}"),
-                    from_team: authenticated_team.to_string(),
-                    to_team,
-                    intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
-                })
-            }
-        };
-
-        if requested_team != self.home_team {
-            return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
-                reason: format!(
-                    "destination team mismatch: store={}, requested={}",
-                    self.home_team.as_str(),
-                    requested_team.as_str()
-                ),
-                from_team: authenticated_team.to_string(),
-                to_team,
-                intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
-            });
-        }
-
-        let dest_region = self.store.config().home_region.clone();
-        let context = CrossTeamApplyContext::new(&requested_team, COHORT_INTENT_COLLECTIVE_SHARE);
-        match apply_replication_bundle(
-            &bundle,
-            &self.store,
-            &dest_region,
-            Some(context),
-            &self.base_seed,
-        )
-        .await
-        {
-            Ok(result) => CrossingOutcome::Applied {
-                applied_count: result.applied_count,
-            },
-            Err(error) => {
-                if let Some(cause) = Self::local_cause(&error) {
-                    eprintln!("maos: cross-team crossing refused at the applier: {cause:?}");
+        match decoded {
+            Ok(CrossTeamCrossingControl::Share { to_team, bundle }) => {
+                // ── AC3 / D-13: THE WELD ────────────────────────────────────
+                let payload_team = bundle
+                    .source_team
+                    .as_ref()
+                    .map(|team| team.as_str().to_string())
+                    .unwrap_or_default();
+                if payload_team != authenticated_team {
+                    return CrossingOutcome::Refused(CrossingRefusal::SourceTeamUnbound {
+                        envelope_team: authenticated_team.to_string(),
+                        payload_team,
+                    });
                 }
-                CrossingOutcome::Refused(Self::refusal_for(
-                    error,
-                    authenticated_team,
-                    requested_team.as_str(),
-                ))
+
+                let requested_team = match TeamId::new(&to_team) {
+                    Ok(team) => team,
+                    Err(error) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                            reason: format!("crossing destination team is not canonical: {error}"),
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                        })
+                    }
+                };
+
+                if requested_team != self.home_team {
+                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: format!(
+                            "destination team mismatch: store={}, requested={}",
+                            self.home_team.as_str(),
+                            requested_team.as_str()
+                        ),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+                    });
+                }
+
+                let dest_region = self.store.config().home_region.clone();
+                let context =
+                    CrossTeamApplyContext::new(&requested_team, COHORT_INTENT_COLLECTIVE_SHARE);
+                match apply_replication_bundle(
+                    &bundle,
+                    &self.store,
+                    &dest_region,
+                    Some(context),
+                    &self.base_seed,
+                )
+                .await
+                {
+                    Ok(result) => CrossingOutcome::Applied {
+                        applied_count: result.applied_count,
+                    },
+                    Err(error) => {
+                        if let Some(cause) = Self::local_cause(&error) {
+                            eprintln!("maos: cross-team crossing refused at the applier: {cause:?}");
+                        }
+                        CrossingOutcome::Refused(Self::refusal_for(
+                            error,
+                            authenticated_team,
+                            requested_team.as_str(),
+                        ))
+                    }
+                }
             }
+            Ok(CrossTeamCrossingControl::Erase {
+                to_team,
+                spirit_pid,
+                namespace,
+                key,
+            }) => {
+                let requested_team = match TeamId::new(&to_team) {
+                    Ok(team) => team,
+                    Err(error) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                            reason: format!("erase destination team is not canonical: {error}"),
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: "collective:erase".to_string(),
+                        })
+                    }
+                };
+                if requested_team != self.home_team {
+                    return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: format!(
+                            "erase destination team mismatch: store={}, requested={}",
+                            self.home_team.as_str(),
+                            requested_team.as_str()
+                        ),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: "collective:erase".to_string(),
+                    });
+                }
+                let Some(reconciliation) = self.erase_reconciliation.as_ref() else {
+                    return CrossingOutcome::Refused(CrossingRefusal::StateUnavailable {
+                        reason: "collective erase reconciliation is not configured".to_string(),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: "collective:erase".to_string(),
+                    });
+                };
+                let from_team = match TeamId::new(authenticated_team) {
+                    Ok(team) => team,
+                    Err(error) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                            reason: format!("authenticated erase source team is not canonical: {error}"),
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: "collective:erase".to_string(),
+                        })
+                    }
+                };
+                match reconciliation.cross_team_consent.is_granted(
+                    &from_team,
+                    &requested_team,
+                    "collective:erase",
+                ) {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::ConsentDenied {
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: "collective:erase".to_string(),
+                        })
+                    }
+                    Err(CrossTeamConsentError::Stale { reason }) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::ConsentStale {
+                            reason,
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: "collective:erase".to_string(),
+                        })
+                    }
+                    Err(CrossTeamConsentError::StateUnavailable { reason }) => {
+                        return CrossingOutcome::Refused(CrossingRefusal::StateUnavailable {
+                            reason,
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: "collective:erase".to_string(),
+                        })
+                    }
+                }
+                let namespace = match namespace.as_str() {
+                    "default" => MemoryNamespace::Default,
+                    "coordination" => MemoryNamespace::Coordination,
+                    "forgotten" => MemoryNamespace::Forgotten,
+                    _ => {
+                        return CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                            reason: format!("unsupported collective erase namespace {namespace:?}"),
+                            from_team: authenticated_team.to_string(),
+                            to_team,
+                            intent: "collective:erase".to_string(),
+                        })
+                    }
+                };
+                // The request is already TLS/team-bound and consented above.
+                // Bind its logical row owner to this receiver's signed control
+                // Spirit before reusing the normal guarded erase path.
+                maos_loom_lite::tenant::TenantMapPort::register_spirit(
+                    reconciliation.tenant_map.as_ref(),
+                    spirit_pid,
+                    reconciliation.local_control_spirit.clone(),
+                );
+                match self.store.erase(spirit_pid, &namespace, &key).await {
+                    Ok(receipt) => CrossingOutcome::Applied {
+                        applied_count: receipt.deleted_rows as usize,
+                    },
+                    Err(error) => CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                        reason: error.to_string(),
+                        from_team: authenticated_team.to_string(),
+                        to_team,
+                        intent: "collective:erase".to_string(),
+                    }),
+                }
+            }
+            Err(reason) => CrossingOutcome::Refused(CrossingRefusal::ApplyFailed {
+                reason,
+                from_team: authenticated_team.to_string(),
+                to_team: String::new(),
+                intent: COHORT_INTENT_COLLECTIVE_SHARE.to_string(),
+            }),
         }
     }
 }
@@ -365,11 +500,55 @@ pub fn crossing_frame(
     to_team: &TeamId,
     bundle: CrossRegionReplicationBundle,
 ) -> Result<IacFrame, String> {
-    let payload = CrossTeamCrossingControl::Share {
-        to_team: to_team.as_str().to_string(),
-        bundle,
-    }
-    .telemetry_payload()?;
+    control_frame(
+        from,
+        peer,
+        frame_seq,
+        CrossTeamCrossingControl::Share {
+            to_team: to_team.as_str().to_string(),
+            bundle,
+        },
+    )
+}
+
+/// Build an authenticated erase-reconciliation control for an origin team.
+pub fn erase_frame(
+    from: &maos_domain::frame::FrameAddress,
+    peer: &maos_spirit_abi::identity::HostId,
+    frame_seq: u64,
+    to_team: &TeamId,
+    spirit_pid: u32,
+    namespace: &MemoryNamespace,
+    key: String,
+) -> Result<IacFrame, String> {
+    control_frame(
+        from,
+        peer,
+        frame_seq,
+        CrossTeamCrossingControl::Erase {
+            to_team: to_team.as_str().to_string(),
+            spirit_pid,
+            namespace: match namespace {
+                MemoryNamespace::Default => "default",
+                MemoryNamespace::Coordination => "coordination",
+                MemoryNamespace::Forgotten => "forgotten",
+                MemoryNamespace::Principal { .. } => {
+                    return Err("principal namespace is not collective-erasable".to_string())
+                }
+            }
+            .to_string(),
+            key,
+        },
+    )
+}
+
+fn control_frame(
+    from: &maos_domain::frame::FrameAddress,
+    peer: &maos_spirit_abi::identity::HostId,
+    frame_seq: u64,
+    control: CrossTeamCrossingControl,
+) -> Result<IacFrame, String> {
+    let payload = control.telemetry_payload()?;
     let mut frame_id = [0u8; 16];
     frame_id[8..].copy_from_slice(&frame_seq.to_be_bytes());
     let mut recipients = smallvec::SmallVec::new();

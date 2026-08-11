@@ -114,6 +114,7 @@ mod kloc_check;
 mod nfr_onb_1_gate;
 mod rebaseline_check;
 mod release_verify;
+mod sprint_status;
 mod stability_matrix;
 mod templates_regen;
 
