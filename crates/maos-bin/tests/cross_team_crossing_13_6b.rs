@@ -1417,6 +1417,7 @@ fn write_daemon_file(
     peers: &[DaemonPeer<'_>],
 ) -> PathBuf {
     let intent = A2AIntent::new(maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE);
+    let erase_intent = A2AIntent::new(maos_a2a_core::CROSS_TEAM_COLLECTIVE_ERASE_INTENT);
     let file = DaemonFileConfig {
         tcp: maos_a2a_tcp::TcpA2AConfig {
             listen_addr: "127.0.0.1:0".parse().expect("loopback listen address"),
@@ -1441,8 +1442,8 @@ fn write_daemon_file(
                 cert_fingerprint: peer.identity.fingerprint.clone(),
                 profile: A2AProfile::CrossHost,
                 allowlists: ConsentAllowlists {
-                    send_allowlist: vec![intent.clone()],
-                    accept_allowlist: vec![intent.clone()],
+                    send_allowlist: vec![intent.clone(), erase_intent.clone()],
+                    accept_allowlist: vec![intent.clone(), erase_intent.clone()],
                 },
                 partition_timeout_secs: 30,
                 consent_ttl_secs: maos_a2a_core::config::DEFAULT_CONSENT_TTL_SECS,
@@ -2098,6 +2099,16 @@ fn three_team_journey_manifest() -> CohortManifest {
         role: "worker".to_string(),
         intent: share.clone(),
     };
+    // Transport-matrix entries for the erase control: team-b's one-shot SENDS
+    // `collective:erase`, team-a's daemon ACCEPTS it. The wire intent is
+    // distinct from share (Story 13.6 closure review F4), so the matrix must
+    // name it explicitly — a share-only route must not carry a destructive
+    // control.
+    let erase_tuple = |peer: &str| ConsentTuple {
+        peer: peer.to_string(),
+        role: "worker".to_string(),
+        intent: maos_a2a_core::CROSS_TEAM_COLLECTIVE_ERASE_INTENT.to_string(),
+    };
     let grant = |from: &str, to: &str, intent: &str| CrossTeamConsentGrant {
         from_team: team(from),
         to_team: team(to),
@@ -2117,8 +2128,21 @@ fn three_team_journey_manifest() -> CohortManifest {
             member("host-c", "team-c"),
         ],
         consent: ConsentMatrix {
-            send: vec![tuple("host-a"), tuple("host-b"), tuple("host-c")],
-            accept: vec![tuple("host-a"), tuple("host-b")],
+            send: vec![
+                tuple("host-a"),
+                tuple("host-b"),
+                tuple("host-c"),
+                // send tuples key the RECEIVER: team-b's erase one-shot sends
+                // `collective:erase` TO host-a.
+                erase_tuple("host-a"),
+            ],
+            accept: vec![
+                tuple("host-a"),
+                tuple("host-b"),
+                // accept tuples key the SENDER: host-a's daemon admits the
+                // erase control FROM host-b.
+                erase_tuple("host-b"),
+            ],
         },
         reserved_intents: vec![
             RESERVED_INTENT_REISSUE.to_string(),
