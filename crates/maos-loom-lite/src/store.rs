@@ -569,6 +569,38 @@ impl LoomLiteStore {
         source: WriteSource<'_>,
         attestation: Option<&RowAttestation<'_>>,
     ) -> Result<(), StoreError> {
+        self.write_with_source_attested_at(
+            spirit_pid, namespace, key, value, source, attestation, true,
+        )
+        .await
+    }
+
+    /// Persist an attested first-party source row at its native address.
+    pub(crate) async fn write_native_with_source_attested(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        source: WriteSource<'_>,
+        attestation: Option<&RowAttestation<'_>>,
+    ) -> Result<(), StoreError> {
+        self.write_with_source_attested_at(
+            spirit_pid, namespace, key, value, source, attestation, false,
+        )
+        .await
+    }
+
+    async fn write_with_source_attested_at(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        source: WriteSource<'_>,
+        attestation: Option<&RowAttestation<'_>>,
+        crossed: bool,
+    ) -> Result<(), StoreError> {
         reject_principal_namespace(namespace)?;
         // Provenance tuple validation (13.3b review): the row decoder accepts
         // only (depth 0, NULL lineage) or (depth >= 1, lineage); any other
@@ -595,8 +627,10 @@ impl LoomLiteStore {
         }
         let (ns_kind, logical_ns_detail) = schema::namespace_to_parts(namespace);
         let mut ns_detail = logical_ns_detail.clone();
-        if let Some(source_team) = source.team {
-            ns_detail = cross_team_namespace_detail(source_team, &ns_detail);
+        if crossed {
+            if let Some(source_team) = source.team {
+                ns_detail = cross_team_namespace_detail(source_team, &ns_detail);
+            }
         }
         let (val_kind, val_data) =
             schema::value_to_parts(&value).map_err(StoreError::Serialization)?;
@@ -1010,7 +1044,7 @@ impl LoomLiteStore {
             .query_opt(
                 "SELECT source_ts, source_region FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND namespace_detail = $3 AND key = $4 AND source_team IS NULL
+                   AND namespace_detail = $3 AND key = $4
                  FOR UPDATE",
                 &[
                     &(spirit_pid as i64),
@@ -1037,7 +1071,7 @@ impl LoomLiteStore {
             .execute(
                 "DELETE FROM collective_memory
                  WHERE spirit_pid = $1 AND namespace_kind = $2
-                   AND namespace_detail = $3 AND key = $4 AND source_team IS NULL
+                   AND namespace_detail = $3 AND key = $4
                    AND source_ts = $5 AND source_region = $6",
                 &[
                     &(spirit_pid as i64),

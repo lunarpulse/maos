@@ -626,7 +626,7 @@ async fn v3_provenance_crosses_team_wall_and_survives_rebundle() {
     // ORIGINATE through the production seam (13.3b review): the chain must
     // be born on a real write path, not hand-constructed — a hand-built
     // leaf can carry shapes no production row ever would.
-    originate_team_row(
+    let bundle = originate_team_row(
         &store_a,
         73,
         &MemoryNamespace::Default,
@@ -648,19 +648,20 @@ async fn v3_provenance_crosses_team_wall_and_survives_rebundle() {
         .expect("originated row is servable at the origin");
     assert_eq!(served, MemoryValue::Text("cross-wall".to_string()));
 
-    // Cross A→B from the ORIGIN's real persisted row.
+    // Cross the signed production bundle minted alongside the native source
+    // row. The source storage row retains signed provenance but its physical
+    // address is native; only a receiver uses an xteam marker.
     let rows_a = LoomLiteStore::read_all_rows_from(&raw_connect_team("team-a").await)
         .await
         .expect("read origin rows");
     let origin_row = rows_a
         .iter()
         .find(|row| row.key == "v3-provenance")
-        .expect("v3 row present at origin");
-    let leaf = CollectiveKvLeaf::from_row(origin_row);
-    assert_eq!(leaf.source_team, Some(team_a.clone()));
-    assert_eq!(leaf.distillation_depth, Some(2));
-    let bundle = build_replication_bundle_v2(vec![leaf], &region, &team_a, &BASE_SEED)
-        .expect("a first-party team-a bundle builds");
+        .expect("native row present at origin");
+    assert_eq!(origin_row.source_team, Some(team_a.clone()));
+    assert!(origin_row.namespace_detail.is_empty());
+    assert_eq!(bundle.leaves[0].source_team, Some(team_a.clone()));
+    assert_eq!(bundle.leaves[0].distillation_depth, Some(2));
     apply_replication_bundle(
         &bundle,
         &store_b,

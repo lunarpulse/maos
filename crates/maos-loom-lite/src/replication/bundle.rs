@@ -505,7 +505,7 @@ pub async fn originate_team_row(
         inclusion_proof: &inclusion_proof,
     };
     store
-        .write_with_source_attested(
+        .write_native_with_source_attested(
             spirit_pid,
             namespace,
             key,
@@ -514,12 +514,11 @@ pub async fn originate_team_row(
                 ts: source_ts,
                 region: home_region.as_str(),
                 log_ref: "",
-                // The source keeps its native physical address. The signed
-                // leaf carries the team identity; only a receiver persists a
-                // crossed xteam row.
-                team: None,
-                distillation_depth: None,
-                intent_lineage: None,
+                // The source preserves its signed provenance while retaining
+                // its native physical address. Only a receiver writes xteam.
+                team: Some(home_team),
+                distillation_depth: Some(distillation_depth),
+                intent_lineage: Some(&intent_lineage),
             },
             Some(&attestation),
         )
