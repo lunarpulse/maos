@@ -46,6 +46,8 @@ pub enum SiemError {
     Encode(#[from] serde_json::Error),
     #[error("SIEM audit read failed: {0}")]
     Audit(#[from] maos_audit::AuditError),
+    #[error("SIEM projection failed: {0}")]
+    Projection(#[from] SiemProjectionError),
     /// Local file-sink I/O failure. Surface, never silently drop — buffering /
     /// backpressure is the caller's responsibility (wired in `maos-bin`).
     #[error("SIEM sink I/O failed: {0}")]
@@ -310,6 +312,34 @@ pub fn forward_to_file(
 ) -> Result<usize, SiemError> {
     let records = export_from_tl(db_path, filter)?;
     append_records_to_file(&records, sink_path)?;
+    Ok(records.len())
+}
+
+/// Forward a redacted Transparency Log tail through the injected projection
+/// port before appending it to the localhost sink.
+///
+/// This is the composition-root injection seam: tests and alternate
+/// enterprise adapters observe the actual projection call rather than a
+/// health probe while the default [`forward_to_file`] path remains unchanged.
+pub fn forward_to_file_with_port(
+    db_path: &Path,
+    filter: AuditFilter,
+    sink_path: &Path,
+    port: &dyn SiemProjectionPort,
+) -> Result<usize, SiemError> {
+    use std::io::Write;
+
+    let records = export_from_tl(db_path, filter)?;
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(sink_path)?;
+    for record in &records {
+        let projected = port.project_redacted_entry(&record.ndjson)?;
+        file.write_all(projected.as_bytes())?;
+        file.write_all(b"\n")?;
+    }
+    file.flush()?;
     Ok(records.len())
 }
 

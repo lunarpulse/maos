@@ -37,7 +37,7 @@ use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_cohort::{
     CohortAuthority, CohortClock, CohortDistributor, CohortManifest, CohortManifestState,
     CohortMember, ConsentMatrix, ConsentTuple, InMemoryCohortAuditSink, ManifestSignature,
-    PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
+    PinnedAuthorityKeys, COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::frame::FrameAddress;
 use maos_domain::invariants::i1::IntentClass;
@@ -275,7 +275,7 @@ fn signed_cohort_manifest(
     host_b_fp: &maos_a2a_core::PeerCertFingerprint,
 ) -> String {
     let manifest = CohortManifest {
-        schema_version: SCHEMA_VERSION,
+        schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-12-1-recovery".into(),
         version,
         authority: CohortAuthority {
@@ -287,11 +287,13 @@ fn signed_cohort_manifest(
                 host_id: "host_a".into(),
                 fingerprint: host_a_fp.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: host_b_fp.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {
@@ -325,7 +327,9 @@ fn signed_cohort_manifest(
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
         t_stale_secs: 30,
+        teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(signer);
     toml::to_string(&manifest).expect("cohort recovery manifest serializes")

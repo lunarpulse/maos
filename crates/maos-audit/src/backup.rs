@@ -37,7 +37,10 @@ pub enum BackupError {
 /// Returns an error if any `frame_id` blob is not exactly 16 bytes (instead of
 /// panicking).
 pub fn compute_merkle_root(db_path: &Path) -> Result<[u8; 32], BackupError> {
-    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let conn = Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
     let mut stmt = conn.prepare("SELECT frame_id FROM transparency_log ORDER BY frame_id")?;
     let frame_ids: Vec<[u8; 16]> = stmt
         .query_map([], |row| {
@@ -104,7 +107,10 @@ pub fn verify_rpo(
 
 /// Read the latest `timestamp_ns` from the Transparency Log.
 pub fn latest_timestamp(db_path: &Path) -> Result<Option<u64>, BackupError> {
-    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let conn = Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
     let ts: Option<u64> = conn.query_row(
         "SELECT MAX(timestamp_ns) FROM transparency_log",
         [],
@@ -168,8 +174,11 @@ CREATE TABLE IF NOT EXISTS transparency_log (
     /// `maos-audit` tests so the read-only crate can verify its own read-only
     /// functions without taking a production dependency on `maos-cli`.
     fn backup_for_test(source_path: &Path, dest_path: &Path) {
-        let src =
-            Connection::open_with_flags(source_path, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let src = Connection::open_with_flags(
+            source_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .unwrap();
         let mut dst = Connection::open(dest_path).unwrap();
         let backup = rusqlite::backup::Backup::new(&src, &mut dst).unwrap();
         backup

@@ -1,0 +1,182 @@
+{
+  "gate": "check-multi-region-slo",
+  "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+  "substrate_nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+  "product_claim": "PROVEN",
+  "operator_key_available": true,
+  "operator_key_reason": "operator audit key loaded (MAOS_AUDIT_KEY precedence)",
+  "absent_successors": [],
+  "legs": [
+    {
+      "name": "three-region-convergence",
+      "binding": "advisory-substrate",
+      "required": true,
+      "attempted": true,
+      "substrate_present": true,
+      "green": true,
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "artifact_ref": "check-multi-region-slo/three-region-convergence@ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e",
+      "evidence_tests": [
+        "three_region_convergence_all_three_equal",
+        "three_region_reorder_independence",
+        "three_region_empty_set_is_na"
+      ],
+      "signature_block": [
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "three_region_convergence_all_three_equal",
+          "outcome": "PASSED",
+          "signature": "bd38404bc116e5c32404378172197340392e3877ee94636448e09980016b936bbcb79be4bd531269cfc7741d49f68a6c407c40b1e2f915afc75e3c494ba92d08"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "three_region_reorder_independence",
+          "outcome": "PASSED",
+          "signature": "3e202f80fabf337780a276e67e13831d871432eaa4b84b51c88e14affe5a76f252f5e4517d664e4f60fd77df89fd45d8fffe085575e919020861e85d9ff7e00a"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "three_region_empty_set_is_na",
+          "outcome": "PASSED",
+          "signature": "ff1dd1f14041087b4e299807ecf64c1506025221da37fb8787edf51d2ba6c2922f194cbf4a137feaf099fd441be57434483a8726549d6dceecd0f782d8359e04"
+        }
+      ],
+      "passed": 3,
+      "failed": 0,
+      "detail": "3 passed, 0 failed (ran=true); harness tests [three_region_convergence_all_three_equal, three_region_reorder_independence, three_region_empty_set_is_na] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e"
+    },
+    {
+      "name": "roundtrip-slo",
+      "binding": "advisory-substrate",
+      "required": true,
+      "attempted": true,
+      "substrate_present": true,
+      "green": true,
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "artifact_ref": "check-multi-region-slo/roundtrip-slo@ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e",
+      "evidence_tests": [
+        "cross_region_roundtrip_live",
+        "cross_region_roundtrip_mutation"
+      ],
+      "signature_block": [
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "cross_region_roundtrip_live",
+          "outcome": "PASSED",
+          "signature": "41a5edf97ba50f3745c9665b526a09085073ffc5c0f0bd493d5e3d795adfa8db10419e8f880777fd340212a1970315318721bda43cbc348f8b2ed53800952f0a"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "cross_region_roundtrip_mutation",
+          "outcome": "PASSED",
+          "signature": "f6aeb3920d071282e658a2b21a2de1a1d12013c6fa0855de4049a93784a60257396647b1a096a75fcbdb23e958daff09dea8b6ae62db5ad8ccd0c5485373a80d"
+        }
+      ],
+      "passed": 2,
+      "failed": 0,
+      "detail": "2 passed, 0 failed (ran=true); harness tests [cross_region_roundtrip_live, cross_region_roundtrip_mutation] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e"
+    },
+    {
+      "name": "halt-presence",
+      "binding": "blocking",
+      "required": true,
+      "attempted": true,
+      "substrate_present": true,
+      "green": true,
+      "evidence_state": "PROVEN_BLOCKING",
+      "artifact_ref": "check-multi-region-slo/halt-presence@ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e",
+      "evidence_tests": [],
+      "signature_block": [],
+      "passed": 2,
+      "failed": 0,
+      "detail": "2 passed, 0 failed (ran=true); hermetic leg — reproducible from source, no signature required"
+    },
+    {
+      "name": "live-read-region-identity",
+      "binding": "advisory-substrate",
+      "required": true,
+      "attempted": true,
+      "substrate_present": true,
+      "green": true,
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "artifact_ref": "check-multi-region-slo/live-read-region-identity@ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e",
+      "evidence_tests": [
+        "live_read_region_identity_foreign_refused",
+        "live_read_region_identity_reattested_served",
+        "live_read_region_identity_home_served",
+        "live_scan_region_identity_foreign_refused",
+        "live_read_region_identity_forged_stamp_served"
+      ],
+      "signature_block": [
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "live_read_region_identity_foreign_refused",
+          "outcome": "PASSED",
+          "signature": "9f18b6115bbb4f05c85fb729b3cd2d83f84cbeb764bc75b277bba41b583341463a0f4798a3aec980ddc00b2b977bbca520b7b0cc9bf79fbe1cbb971262aef908"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "live_read_region_identity_reattested_served",
+          "outcome": "PASSED",
+          "signature": "38061c60c5a8cd32a01f401d524855529f875885fc69a517aac2b68c3bcceb09dd0614919e39f8113924c5883f77767153d3fbea5019c0de156dd8744dc5b409"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "live_read_region_identity_home_served",
+          "outcome": "PASSED",
+          "signature": "b584e2f24946e06c7b26d912062f0419ec8f762f20083c143fff7cf38b9fada338ffc2e9a059790dfc99de47de32c508da401df5240d603077178206b58c960b"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "live_scan_region_identity_foreign_refused",
+          "outcome": "PASSED",
+          "signature": "cd7541f67673aafefec32e6d79af6143f4a659acb01883e02259a8755d6c911fd80838275aa2e165a79a3c52782bad4b1b73d0e96647d2f26023a9c402f5dc05"
+        },
+        {
+          "commit": "ea9939d303860afd70f4d42833d4350457c70370",
+          "gate": "check-multi-region-slo",
+          "nonce": "check-multi-region-slo.308e96.18cac6469c2d5f7e",
+          "test": "live_read_region_identity_forged_stamp_served",
+          "outcome": "PASSED",
+          "signature": "cebeea0e3a7e91ce9dcf7b85676624ce76c8daffe10b8b165a3fe3484cd92a46746e0cb269c159e9960f7004471a6e94f82683fab1ed25ace097393d2a0f6007"
+        }
+      ],
+      "passed": 11,
+      "failed": 0,
+      "detail": "11 passed, 0 failed (ran=true); harness tests [live_read_region_identity_foreign_refused, live_read_region_identity_reattested_served, live_read_region_identity_home_served, live_scan_region_identity_foreign_refused, live_read_region_identity_forged_stamp_served] signed PASSED outcomes; verified against the operator-pinned key and bound to ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e"
+    },
+    {
+      "name": "kernel-abi-diff",
+      "binding": "blocking",
+      "required": false,
+      "attempted": true,
+      "substrate_present": true,
+      "green": true,
+      "evidence_state": "PROVEN_BLOCKING",
+      "artifact_ref": "check-multi-region-slo/kernel-abi-diff@ea9939d303860afd70f4d42833d4350457c70370#check-multi-region-slo.308e96.18cac6469c2d5f7e",
+      "evidence_tests": [],
+      "signature_block": [],
+      "passed": 1,
+      "failed": 0,
+      "detail": "1 passed, 0 failed (ran=true); no harness evidence record"
+    }
+  ]
+}

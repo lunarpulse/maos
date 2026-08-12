@@ -45,7 +45,7 @@ jobs:
     # builds a synthetic SQLite TL and migrates it into this Postgres instance.
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

@@ -60,6 +60,30 @@ pub const CODE_CONSENT_GRANTER_MISMATCH: i32 = -32008;
 /// `ConsentUnclassifiedAtPeer` are the typed mirrors. Additive constant
 /// (next after 8.9's -32008; AC6 abi-diff Added-only).
 pub const CODE_CONSENT_UNCLASSIFIED: i32 = -32009;
+/// Story 13.6a (AC2) — the TLS-verified peer does not speak for the team the
+/// frame claims as its crossing source. DISTINCT from
+/// `CODE_PEER_IDENTITY_MISMATCH` (-32007), which is the *host* axis: the two
+/// failures must never collapse into one code, or an audit cannot tell a
+/// confused-deputy attempt from a cross-team impersonation attempt.
+/// `A2AError::CohortTeamIdentityRefused` is the typed mirror.
+pub const CODE_TEAM_IDENTITY_MISMATCH: i32 = -32010;
+/// Story 13.6b (AC3 / D-13) — the crossing PAYLOAD's `source_team` is not the
+/// team the mesh authenticated on the ENVELOPE. DISTINCT from
+/// `CODE_TEAM_IDENTITY_MISMATCH` (-32010), which fires on a LYING envelope:
+/// here the envelope is truthful and the payload lies, so a seed-holding
+/// emitter's bundle signature verifies correctly and only the envelope/payload
+/// weld can refuse it. Collapsing the two would make an impersonation bypass
+/// look like a misconfigured roster. `A2AError::CrossingSourceTeamUnbound` is
+/// the typed mirror.
+pub const CODE_CROSSING_SOURCE_TEAM_UNBOUND: i32 = -32011;
+/// Story 13.6b (AC2) — the applier refused an AUTHENTICATED crossing on its
+/// own merits: no manifest grant for the ordered pair + intent, a stale consent
+/// lease, unreachable consent state, or a failed apply. The `data` object
+/// carries `reason` / `from_team` / `to_team` / `intent` so the emitter can tell
+/// denial from staleness from unavailability — the three outcomes D-15 measured
+/// as indistinguishable because `TransportCause` has never crossed a socket.
+/// `A2AError::CrossTeamCrossingRefused` is the typed mirror.
+pub const CODE_CROSS_TEAM_CROSSING_REFUSED: i32 = -32012;
 pub const CODE_INTERNAL: i32 = -32099;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +107,12 @@ pub struct A2AJsonRpcRequest {
     /// Sender's accepted cohort-manifest version at the frame decision point.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cohort_manifest_version: Option<u64>,
+    /// Story 13.6a — the team this frame speaks for. STAMPED by
+    /// `prepare_outbound` from the sender's own V4 manifest declaration (never
+    /// from caller-supplied input), and verified at intake against the
+    /// TLS-verified peer's declaration. Absent for every pre-V4 deployment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cohort_source_team: Option<String>,
 }
 
 /// JSON-RPC 2.0 response. Untagged (field-based) deserialization
@@ -136,6 +166,7 @@ impl A2AJsonRpcRequest {
             boot_nonce: 0,
             cohort_acting_role: None,
             cohort_manifest_version: None,
+            cohort_source_team: None,
         }
     }
 
@@ -156,6 +187,11 @@ impl A2AJsonRpcRequest {
 
     pub fn with_cohort_manifest_version(mut self, manifest_version: u64) -> Self {
         self.cohort_manifest_version = Some(manifest_version);
+        self
+    }
+
+    pub fn with_cohort_source_team(mut self, source_team: impl Into<String>) -> Self {
+        self.cohort_source_team = Some(source_team.into());
         self
     }
 

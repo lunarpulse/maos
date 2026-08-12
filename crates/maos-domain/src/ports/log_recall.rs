@@ -3,7 +3,23 @@
 //! Log-recall port trait — participant-scoped, cursor-paginated read-side over
 //! the Transparency Log with on-demand payload fetch and A2A consent honoring.
 
-use crate::log_recall::{LogFetchResponse, LogRecallError, LogRecallFilter, LogRecallPage};
+use crate::log_recall::{
+    CrossWallRecallRefusal, LogFetchResponse, LogRecallError, LogRecallFilter, LogRecallPage,
+};
+use crate::team::TeamId;
+
+/// Reads emitter-scoped rows from the named remote team's audit artifact.
+///
+/// The implementation lives at the composition root; `maos-iac` depends only
+/// on this domain port and never on the audit storage crate.
+pub trait CrossWallLogReadPort: Send + Sync + 'static {
+    fn read_remote(
+        &self,
+        spirit_pid: u32,
+        remote_team: &TeamId,
+        filter: LogRecallFilter,
+    ) -> Result<LogRecallPage, LogRecallError>;
+}
 
 /// Participant-scoped, cursor-paginated read-side over the Transparency Log.
 ///
@@ -25,4 +41,20 @@ pub trait LogRecallPort: Send + Sync + 'static {
         spirit_pid: u32,
         frame_id: [u8; 16],
     ) -> Result<LogFetchResponse, LogRecallError>;
+
+    /// Recall emitter-scoped rows only after proving a fresh directional
+    /// consent grant for the remote `team`.
+    /// Class: data-movement
+    fn recall_cross_wall(
+        &self,
+        spirit_pid: u32,
+        team: &TeamId,
+        filter: LogRecallFilter,
+    ) -> Result<LogRecallPage, LogRecallError> {
+        let _ = (spirit_pid, filter);
+        Err(LogRecallError::ECrossWallRecallDenied {
+            team: team.clone(),
+            reason: CrossWallRecallRefusal::NoConsentProvider,
+        })
+    }
 }

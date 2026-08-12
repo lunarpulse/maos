@@ -15,24 +15,28 @@
 
 use crate::cohort::{
     CohortConsentDenial, CohortConsentSeam, CohortConsentVerdict, CohortManifestGate,
-    ConsentRuptureSink, DigestFrameClass, DigestReadPort, DigestReplyObservation,
-    HaltReceiptObserver, LegacyCohortManifestGate, LegacyDigestReadPort, LegacyHaltReceiptObserver,
-    COHORT_INTENT_DIGEST_READ, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    ConsentRuptureSink, CrossTeamCrossingPort, CrossingOutcome, CrossingRefusal, DigestFrameClass,
+    DigestReadPort, DigestReplyObservation, HaltReceiptObserver, LegacyCohortManifestGate,
+    LegacyCrossTeamCrossingPort, LegacyDigestReadPort, LegacyHaltReceiptObserver,
+    COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ, CROSSING_EVENT_TYPE,
+    CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
 use crate::error::{A2AError, IntentDirection, UnclassifiedReason};
-use crate::identity::PeerId;
+use crate::identity::{PeerCertFingerprint, PeerId};
 use crate::tofu::TofuPinStore;
 use crate::transport::json_rpc::{
     A2AJsonRpcRequest, A2AJsonRpcResponse, AckBody, CODE_CONSENT_EXPIRED,
-    CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_INTENT_DENIED, CODE_INTERNAL,
+    CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_CROSSING_SOURCE_TEAM_UNBOUND,
+    CODE_CROSS_TEAM_CROSSING_REFUSED, CODE_INTENT_DENIED, CODE_INTERNAL,
     CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED, CODE_SPIRIT_RESTART_DETECTED,
+    CODE_TEAM_IDENTITY_MISMATCH,
 };
 use crate::transport::logical_clock::LamportClock;
 use async_trait::async_trait;
 use dashmap::DashMap;
-use maos_domain::frame::IacFrame;
+use maos_domain::frame::{FramePayload, IacFrame};
 use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i8::{A2AIntent, MAX_CANONICAL_INTENT_LEN};
 use maos_spirit_abi::identity::HostId;
@@ -150,6 +154,22 @@ pub struct A2ARouterCore {
     /// correlated-reply send/accept exemptions WITHOUT touching the unchanged
     /// `send_admits`/`accept_admits` seam bodies (AC2).
     digest_read_port: Arc<dyn DigestReadPort>,
+    /// Story 13.6b — out-of-kernel cross-team crossing applier. The legacy
+    /// default classifies every frame as `NotCrossing`, so non-cohort
+    /// deployments and every pre-13.6b test are byte-for-byte unaffected;
+    /// cohort composition injects the adapter that owns the single
+    /// `LoomLiteStore` (D-5). Reached ONLY from `handle_intake_verified`, only
+    /// after the intake body ACKs, and only with a team this router has already
+    /// authenticated against the signed V4 manifest (D-13).
+    crossing_port: Arc<dyn CrossTeamCrossingPort>,
+    /// Story 13.6a (review P1) — this host's own TLS leaf fingerprint, wired by
+    /// the transport at bind from the loaded identity chain. The Send-seam team
+    /// declaration is returned only when this equals the signed
+    /// `CohortMember.fingerprint` for the local host, so a signed reissue that
+    /// rotates the local fingerprint away stops this host from originating a
+    /// crossing until the operator realigns. `None` (non-cohort deployments)
+    /// fails closed exactly like an unauthenticated endpoint.
+    local_leaf_fingerprint: Option<PeerCertFingerprint>,
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
     intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<IacFrame>>>>,
@@ -199,9 +219,11 @@ impl A2ARouterCore {
             rupture_sink: Arc::new(tokio::sync::Mutex::new(None)),
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
+            local_leaf_fingerprint: None,
             cohort_manifest_gate: Arc::new(LegacyCohortManifestGate),
             halt_receipt_observer: Arc::new(LegacyHaltReceiptObserver),
             digest_read_port: Arc::new(LegacyDigestReadPort),
+            crossing_port: Arc::new(LegacyCrossTeamCrossingPort),
             warned_entries: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
         })
     }
@@ -226,6 +248,14 @@ impl A2ARouterCore {
         self
     }
 
+    /// Story 13.6a (review P1) — wire the local TLS leaf fingerprint the
+    /// Send-seam team binding is checked against. Builder, same discipline as
+    /// [`Self::with_cohort_manifest_gate`].
+    pub fn with_local_leaf_fingerprint(mut self, fingerprint: PeerCertFingerprint) -> Self {
+        self.local_leaf_fingerprint = Some(fingerprint);
+        self
+    }
+
     /// Story 12.3 — inject the out-of-kernel halt-receipt presence observer.
     /// A builder (mirrors [`Self::with_cohort_manifest_gate`]) so the daemon
     /// wires it in one step with the SAME `CohortManifestState` used for the
@@ -243,6 +273,65 @@ impl A2ARouterCore {
     pub fn with_digest_read_port(mut self, port: Arc<dyn DigestReadPort>) -> Self {
         self.digest_read_port = port;
         self
+    }
+
+    /// Story 13.6b — inject the out-of-kernel cross-team crossing applier.
+    /// A builder (mirrors [`Self::with_digest_read_port`]) so the daemon wires
+    /// it before the accept loop spawns and no inbound connection observes a
+    /// legacy-applier window (12.4a's P7c).
+    pub fn with_cross_team_crossing_port(mut self, port: Arc<dyn CrossTeamCrossingPort>) -> Self {
+        self.crossing_port = port;
+        self
+    }
+
+    /// Read a string field out of a NACK `data` object, defaulting to empty.
+    /// Shared by the two Story 13.6b `interpret_response` arms.
+    fn nack_str(data: Option<&serde_json::Value>, key: &str) -> String {
+        data.and_then(|d| d.get(key))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    }
+
+    /// Extract the operator-requested destination from a crossing control body
+    /// without depending on the composition-root control type.
+    fn crossing_to_team(frame: &IacFrame) -> String {
+        let FramePayload::TelemetryEvent(payload) = &frame.payload else {
+            return String::new();
+        };
+        serde_json::from_str::<serde_json::Value>(&payload.data)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("to_team")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_default()
+    }
+
+    fn is_crossing_frame(frame: &IacFrame) -> bool {
+        matches!(
+            &frame.payload,
+            FramePayload::TelemetryEvent(payload) if payload.event_type == CROSSING_EVENT_TYPE
+        )
+    }
+
+    /// Story 13.6b / AC2+AC3 — the wire NACK for an applier refusal. The code +
+    /// `data` taxonomy lives on [`CrossingRefusal::wire`].
+    ///
+    /// `pub` so the refusal contract is provable through the public surface: the
+    /// legs that assert AC3's weld rides its OWN code, and that denied / stale /
+    /// unavailable stay three distinct emitter-side outcomes, exercise THIS
+    /// production shaping rather than a hand-built NACK that could drift from it.
+    pub fn crossing_refusal_nack(id: u64, refusal: &CrossingRefusal) -> A2AJsonRpcResponse {
+        let (code, data) = refusal.wire();
+        A2AJsonRpcResponse::nack_with_data(
+            id,
+            code,
+            format!("cross-team crossing refused: {}", refusal.reason()),
+            data,
+        )
     }
 
     /// The "now" used for consent-envelope expiry: the pinned test clock if set,
@@ -639,6 +728,20 @@ impl A2ARouterCore {
                     if self.digest_read_port.authorize_reply_send(peer, &request_id)
             );
 
+        // Story 13.6a — is this the cross-team crossing intent? Computed BEFORE
+        // `frame` is consumed, and used three times below: the `Defer`-as-refusal
+        // rule (AC4), the emitter self-check, and the source-team stamp (AC1/AC2).
+        let crossing = {
+            let intent = Self::consent_match_key(&frame);
+            intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                || intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)
+        };
+
+        // Story 13.6a review P2 — the Send-seam team declaration, captured from
+        // the SAME locked manifest snapshot as the consent verdict below, so a
+        // hot reissue cannot change the local host's team between the consent
+        // decision and the source-team stamp.
+        let mut send_team_declaration: Option<String> = None;
         let cohort_context = if digest_reply_send_exempt {
             None
         } else {
@@ -660,13 +763,32 @@ impl A2ARouterCore {
             if Self::is_reserved_cohort_intent(&intent) {
                 None
             } else {
-                match self.cohort_consent_decision(
+                // Review P1/P2 — ONE gate call, ONE locked snapshot: the
+                // verdict decides consent, the declaration stamps the team, and
+                // the declaration is returned only when this host's own leaf
+                // fingerprint equals its signed `CohortMember.fingerprint`.
+                let (verdict, declaration) = self.cohort_manifest_gate.consent_and_team(
                     CohortConsentSeam::Send,
                     peer,
+                    self.local_leaf_fingerprint.as_ref(),
                     None,
                     &intent,
                     None,
-                ) {
+                );
+                send_team_declaration = declaration;
+                match verdict {
+                    // Story 13.6a / AC4 — on the crossing intent ONLY, `Defer`
+                    // is a refusal, routed through the SHIPPED `Deny` path under
+                    // its own attributable cause. `Defer` is returned BEFORE the
+                    // gate's self-membership check and is otherwise a pass, which
+                    // is correct for 12.1's bilateral path and wrong for a
+                    // crossing. Every other intent is byte-for-byte unchanged.
+                    CohortConsentVerdict::Defer if crossing => {
+                        return Err(A2AError::CohortConsentDenied {
+                            direction: IntentDirection::Send,
+                            reason: CohortConsentDenial::CrossingDeferRefused,
+                        });
+                    }
                     CohortConsentVerdict::Defer => None,
                     CohortConsentVerdict::AdmitOutbound {
                         acting_role,
@@ -687,6 +809,36 @@ impl A2ARouterCore {
                     }
                 }
             }
+        };
+
+        // Story 13.6a / AC1+AC2 — the emitter-side team binding. The stamp the
+        // receiver checks is read from THIS host's own signed V4 declaration,
+        // never from caller-supplied input, so a compromised caller cannot pick
+        // the team it speaks for. Fail-closed: a member with no declared team
+        // cannot originate a crossing at all.
+        let source_team_stamp = match (crossing, send_team_declaration) {
+            (true, Some(team)) => Some(team),
+            // Fail-closed: a member with no signed declaration — or one whose
+            // local leaf no longer equals the signed `CohortMember.fingerprint`
+            // after a rotation — cannot originate a crossing at all.
+            (true, None) => {
+                return Err(A2AError::CohortTeamIdentityRefused {
+                    direction: IntentDirection::Send,
+                    // The failing endpoint is the LOCAL emitter (the Send-seam
+                    // declaration looks up `self.local_host` in the gate), never
+                    // the destination — name the frame's own origin so the audit
+                    // record points at the member whose manifest row is missing.
+                    host: frame
+                        .from
+                        .host_id
+                        .as_ref()
+                        .map(|host| host.as_str().to_string())
+                        .unwrap_or_else(|| "<unknown>".to_string()),
+                    claimed_team: None,
+                    declared: None,
+                });
+            }
+            (false, _) => None,
         };
 
         // (2) TOFU pin verify — ensure the peer's cert fingerprint matches the
@@ -727,6 +879,9 @@ impl A2ARouterCore {
             request = request
                 .with_cohort_acting_role(acting_role)
                 .with_cohort_manifest_version(manifest_version);
+        }
+        if let Some(source_team) = source_team_stamp {
+            request = request.with_cohort_source_team(source_team);
         }
         Ok((request, peer_cfg, frame_id))
     }
@@ -827,6 +982,70 @@ impl A2ARouterCore {
                         reason,
                     })
                 }
+                // Story 13.6a / AC2 — the receiver refused the frame's team
+                // claim at its accept seam. Decode the claim/declaration pair
+                // into the typed mirror (NOT the transport-failure catch-all),
+                // so an audit can tell a cross-team impersonation refusal from
+                // an unrelated fault — the same distinction AC2 draws between
+                // -32010 and -32007 on the emit side.
+                CODE_TEAM_IDENTITY_MISMATCH => {
+                    let (host, claimed_team, declared) = n
+                        .error
+                        .data
+                        .as_ref()
+                        .map(|d| {
+                            (
+                                d.get("peer")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or_default()
+                                    .to_string(),
+                                d.get("claimed_team")
+                                    .and_then(|v| v.as_str())
+                                    .map(str::to_string),
+                                d.get("declared_team")
+                                    .and_then(|v| v.as_str())
+                                    .map(str::to_string),
+                            )
+                        })
+                        .unwrap_or_default();
+                    Err(A2AError::CohortTeamIdentityRefused {
+                        // The local operation that failed was the SEND; the
+                        // refusal itself happened at the peer's accept seam.
+                        direction: IntentDirection::Send,
+                        host: if host.is_empty() {
+                            peer.as_str().to_string()
+                        } else {
+                            host
+                        },
+                        claimed_team,
+                        declared,
+                    })
+                }
+                // Story 13.6b / AC3 — the applier refused because the crossing
+                // PAYLOAD named a team the mesh did not authenticate. Its own
+                // typed mirror: never folded into -32012's honest-but-ungranted
+                // refusal, and never into the transport catch-all.
+                CODE_CROSSING_SOURCE_TEAM_UNBOUND => {
+                    let data = n.error.data.as_ref();
+                    Err(A2AError::CrossingSourceTeamUnbound {
+                        envelope_team: Self::nack_str(data, "envelope_team"),
+                        payload_team: Self::nack_str(data, "payload_team"),
+                    })
+                }
+                // Story 13.6b / AC2 — the applier refused an AUTHENTICATED
+                // crossing on its own merits. The ordered pair + intent + the
+                // stable reason token keep denied / stale / unavailable three
+                // distinct observable outcomes at the emitter (D-15).
+                CODE_CROSS_TEAM_CROSSING_REFUSED => {
+                    let data = n.error.data.as_ref();
+                    Err(A2AError::CrossTeamCrossingRefused {
+                        reason: Self::nack_str(data, "reason"),
+                        detail: Self::nack_str(data, "detail"),
+                        from_team: Self::nack_str(data, "from_team"),
+                        to_team: Self::nack_str(data, "to_team"),
+                        intent: Self::nack_str(data, "intent"),
+                    })
+                }
                 _ => Err(A2AError::TransportFailed(n.error.message)),
             },
         }
@@ -838,6 +1057,21 @@ impl A2ARouterCore {
     /// directly; the TCP transport calls it from its per-connection read loop
     /// after `A2AJsonRpcRequest::try_from_bytes` decodes the framed bytes.
     pub async fn handle_intake(&self, request: A2AJsonRpcRequest) -> A2AJsonRpcResponse {
+        self.handle_intake_inner(request, None).await
+    }
+
+    /// The shared intake body. `precomputed_verdict` is the Accept-seam consent
+    /// verdict [`Self::handle_intake_verified`] already read from the SAME
+    /// locked manifest snapshot as the team declaration (Story 13.6a review
+    /// P2), so admission cannot race a hot reissue that changed the host's team
+    /// between the identity check and the consent decision. `None` — every
+    /// direct caller — re-decides from a fresh snapshot, byte-for-byte the
+    /// pre-existing behavior.
+    async fn handle_intake_inner(
+        &self,
+        request: A2AJsonRpcRequest,
+        precomputed_verdict: Option<CohortConsentVerdict>,
+    ) -> A2AJsonRpcResponse {
         // Validate framing
         if let Err(err) = request.validate() {
             return A2AJsonRpcResponse::Nack(crate::transport::json_rpc::NackResponse {
@@ -1105,24 +1339,56 @@ impl A2ARouterCore {
 
         let cohort_intent = Self::consent_match_key(frame);
         if !Self::is_reserved_cohort_intent(&cohort_intent) {
-            match self.cohort_consent_decision(
-                CohortConsentSeam::Accept,
-                &peer_host,
-                request.cohort_acting_role.as_deref(),
-                &cohort_intent,
-                request.cohort_manifest_version,
-            ) {
+            let verdict = match precomputed_verdict {
+                // Story 13.6a review P2 — the verdict handle_intake_verified
+                // read from the SAME snapshot as the team declaration.
+                Some(verdict) => verdict,
+                None => self.cohort_consent_decision(
+                    CohortConsentSeam::Accept,
+                    &peer_host,
+                    request.cohort_acting_role.as_deref(),
+                    &cohort_intent,
+                    request.cohort_manifest_version,
+                ),
+            };
+            // Story 13.6a / AC4 — `Defer` is returned BEFORE the gate's
+            // self-membership check and is otherwise a PASS, so a sender the
+            // roster has legitimately dropped could push a crossing into a
+            // healthy applier. On the crossing intent ONLY it becomes a refusal,
+            // reusing the SHIPPED `Deny` path (rupture emission + typed data)
+            // under its own attributable cause; every other intent keeps 12.1's
+            // mixed-deployment bilateral fallback unchanged.
+            let verdict = match verdict {
+                CohortConsentVerdict::Defer
+                    if cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                        || cohort_intent
+                            .eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT) =>
+                {
+                    CohortConsentVerdict::Deny(CohortConsentDenial::CrossingDeferRefused)
+                }
+                other => other,
+            };
+            match verdict {
                 CohortConsentVerdict::Defer => {}
                 CohortConsentVerdict::Admit | CohortConsentVerdict::AdmitOutbound { .. } => {}
                 CohortConsentVerdict::NotCurrent => {
-                    return A2AJsonRpcResponse::nack(
-                        request.id,
-                        CODE_INTERNAL,
-                        format!(
-                            "cohort manifest is not current for peer {}",
-                            peer_cfg.peer_id.as_str()
-                        ),
+                    let reason = format!(
+                        "cohort manifest is not current for peer {}",
+                        peer_cfg.peer_id.as_str()
                     );
+                    if (cohort_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+                        || cohort_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT))
+                        && Self::is_crossing_frame(frame)
+                    {
+                        let refusal = CrossingRefusal::ConsentStale {
+                            reason,
+                            from_team: request.cohort_source_team.clone().unwrap_or_default(),
+                            to_team: Self::crossing_to_team(frame),
+                            intent: cohort_intent,
+                        };
+                        return Self::crossing_refusal_nack(request.id, &refusal);
+                    }
+                    return A2AJsonRpcResponse::nack(request.id, CODE_INTERNAL, reason);
                 }
                 CohortConsentVerdict::Deny(reason) => {
                     let data = Self::cohort_denial_data(&reason);
@@ -1219,10 +1485,17 @@ impl A2ARouterCore {
     /// Returns `(response, binding_passed)` so the transport layer can
     /// decide whether to increment `intake_entered` without reverse-engineering
     /// the NACK error code (Story 8.9 / AC1.2).
+    /// `peer_leaf_fingerprint` is the TLS-negotiated leaf fingerprint of the
+    /// client that presented `verified_peer` (Story 13.6a review P1): the team
+    /// declaration is returned by the gate only when it equals the signed
+    /// `CohortMember.fingerprint`, so a peer cannot speak a host's team on a
+    /// certificate the signed manifest does not name — including a stale
+    /// certificate after a fingerprint rotation by reissue.
     pub async fn handle_intake_verified(
         &self,
         request: A2AJsonRpcRequest,
         verified_peer: &PeerId,
+        peer_leaf_fingerprint: Option<&PeerCertFingerprint>,
     ) -> (A2AJsonRpcResponse, bool) {
         // Bind the wire identity to the TLS-verified peer.
         // Framing validation is performed by the shared `handle_intake` body;
@@ -1246,6 +1519,74 @@ impl A2ARouterCore {
             );
             return (resp, false);
         }
+
+        // Story 13.6a / AC2 — the TEAM axis, bound at the SAME spoof-proof site
+        // as the host axis above and reported under its OWN code so the two
+        // never collapse. A frame that claims a source team is refused unless the
+        // TLS-verified peer speaks for that team under the signed V4 manifest;
+        // the crossing intent additionally REQUIRES a claim, so absence refuses.
+        //
+        // This is the binding a shared replication seed cannot forge: the claim
+        // is checked against `CohortMember.team`, gated on the negotiated leaf
+        // fingerprint EQUALING the signed `CohortMember.fingerprint` —
+        // operator-pinned, cert-bound, not derived from `base_seed`.
+        //
+        // Review P2: the consent verdict is computed by the SAME gate call, from
+        // the SAME locked manifest snapshot as the declaration, and threaded
+        // into `handle_intake_inner` so the admission decision cannot race a hot
+        // reissue that changes the host's team between the two checks.
+        let claimed_team = request.cohort_source_team.as_deref();
+        let team_intent = Self::consent_match_key(&request.params);
+        let mut precomputed_verdict = None;
+        if claimed_team.is_some()
+            || team_intent.eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+            || team_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)
+        {
+            let peer = HostId(verified_peer.as_str().to_string());
+            let (verdict, declared) = self.cohort_manifest_gate.consent_and_team(
+                CohortConsentSeam::Accept,
+                &peer,
+                peer_leaf_fingerprint,
+                request.cohort_acting_role.as_deref(),
+                &team_intent,
+                request.cohort_manifest_version,
+            );
+            if declared.is_none() || declared.as_deref() != claimed_team {
+                let resp = A2AJsonRpcResponse::nack_with_data(
+                    request.id,
+                    CODE_TEAM_IDENTITY_MISMATCH,
+                    format!(
+                        "TLS-verified peer {} does not speak for claimed source team {}",
+                        verified_peer.as_str(),
+                        claimed_team.unwrap_or("<none>")
+                    ),
+                    serde_json::json!({
+                        "peer": verified_peer.as_str(),
+                        "claimed_team": claimed_team,
+                        "declared_team": declared,
+                    }),
+                );
+                return (resp, true);
+            }
+            precomputed_verdict = Some(verdict);
+        }
+
+        // Story 13.6b / AC1+AC3 — retain the crossing frame together with the
+        // team the block above just AUTHENTICATED, so the applier decides
+        // consent from a team the mesh PROVED rather than one the payload
+        // asserts. `claimed_team` is `Some` here by construction: the crossing
+        // intent forces the check above, and absence already refused.
+        //
+        // The apply itself runs only after `handle_intake_inner` ACKs, so the
+        // Story 12.1/12.3 cohort gate — including `NotCurrent` for a host a
+        // signed reissue no longer rosters (D-12) — refuses an evicted applier
+        // before any bundle touches the store.
+        let crossing_to_apply = ((team_intent
+            .eq_ignore_ascii_case(COHORT_INTENT_COLLECTIVE_SHARE)
+            || team_intent.eq_ignore_ascii_case(CROSS_TEAM_COLLECTIVE_ERASE_INTENT))
+            && Self::is_crossing_frame(&request.params))
+        .then(|| claimed_team.map(|team| (team.to_string(), request.params.clone())))
+        .flatten();
 
         // Story 12.3 (P5r/P8) — retain the TLS-bound member and the receipt
         // frame while the shared body applies framing and consent validation.
@@ -1277,7 +1618,7 @@ impl A2ARouterCore {
                 _ => None,
             });
         let response_id = request.id;
-        let mut response = self.handle_intake(request).await;
+        let mut response = self.handle_intake_inner(request, precomputed_verdict).await;
         if matches!(&response, A2AJsonRpcResponse::Ack(_)) {
             if let Some((member, frame)) = receipt_to_observe {
                 self.halt_receipt_observer.observe_receipt(&member, &frame);
@@ -1292,6 +1633,27 @@ impl A2ARouterCore {
                         CODE_INTERNAL,
                         format!("digest request audit/state transition failed: {error}"),
                     );
+                }
+            }
+            if let Some((authenticated_team, frame)) = crossing_to_apply {
+                match self
+                    .crossing_port
+                    .apply_crossing(&authenticated_team, &frame)
+                    .await
+                {
+                    CrossingOutcome::Applied { .. } => {}
+                    CrossingOutcome::Refused(refusal) => {
+                        response = Self::crossing_refusal_nack(response_id, &refusal);
+                    }
+                    CrossingOutcome::NotCrossing => {
+                        let refusal = CrossingRefusal::StateUnavailable {
+                            reason: "cross-team crossing applier is not configured".to_string(),
+                            from_team: authenticated_team,
+                            to_team: Self::crossing_to_team(&frame),
+                            intent: Self::consent_match_key(&frame).to_string(),
+                        };
+                        response = Self::crossing_refusal_nack(response_id, &refusal);
+                    }
                 }
             }
         }
@@ -1387,6 +1749,23 @@ pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
                 "cohort consent denied ({direction:?}) for peer {peer}: {reason}"
             ))
         }
+        // Story 13.6a — the team-identity refusal rides the SAME generic
+        // route-failure port type (no new kernel variant; the 8.9/8.8 pattern).
+        // Its `Display` already names the claimed and manifest-declared teams.
+        error @ A2AError::CohortTeamIdentityRefused { .. } => {
+            IacBusError::CrossHostRouteFailure(format!("{error} (peer {peer})"))
+        }
+        // Story 13.6b — both crossing refusals ride the SAME generic
+        // route-failure port type. No new `IacBusError` variant, so
+        // `maos-kernel-core` stays byte-identical (Trap 10's sibling on the
+        // A2A axis) and the ZERO-Δ pin holds. Their `Display` impls already
+        // name the envelope/payload pair and the ordered pair + intent, so the
+        // three-way distinction survives into the message even though the port
+        // type is shared.
+        error @ (A2AError::CrossingSourceTeamUnbound { .. }
+        | A2AError::CrossTeamCrossingRefused { .. }) => {
+            IacBusError::CrossHostRouteFailure(format!("{error} (peer {peer})"))
+        }
         // Story 8.8 — fail-closed unclassified-consent denials map to the generic
         // route-failure port type (no new kernel variant; `maos-kernel-core` stays
         // byte-identical — the 8.9 pattern). The reason + direction/peer are
@@ -1411,8 +1790,10 @@ mod tests {
     use crate::identity::PeerCertFingerprint;
     use crate::identity::PeerId;
     use crate::tofu::InMemoryTofuPinStore;
+    use crate::{CohortReissueDisposition, CohortReissueRejection};
     use maos_domain::frame::{
         FrameAddress, FramePayload, PosturePreferences, RuptureReason, TaskAssignPayload,
+        TelemetryEventPayload,
     };
     use maos_domain::invariants::i1::IntentClass;
     use maos_domain::invariants::i13::IntentLineage;
@@ -1433,6 +1814,41 @@ mod tests {
                 .map_err(|_| "recording rupture sink lock poisoned".to_string())?
                 .push(frame.clone());
             Ok(())
+        }
+    }
+
+    struct FixedCrossingGate(CohortConsentVerdict);
+
+    impl CohortManifestGate for FixedCrossingGate {
+        fn consent_decision(
+            &self,
+            _seam: CohortConsentSeam,
+            _counterparty: &HostId,
+            _acting_role: Option<&str>,
+            _intent: &str,
+            _sender_manifest_version: Option<u64>,
+        ) -> CohortConsentVerdict {
+            self.0.clone()
+        }
+
+        fn apply_reissue(
+            &self,
+            _verified_peer: &HostId,
+            _frame: &IacFrame,
+        ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
+            Ok(CohortReissueDisposition::PullRequested)
+        }
+
+        fn consent_and_team(
+            &self,
+            _seam: CohortConsentSeam,
+            _counterparty: &HostId,
+            _endpoint_fingerprint: Option<&PeerCertFingerprint>,
+            _acting_role: Option<&str>,
+            _intent: &str,
+            _sender_manifest_version: Option<u64>,
+        ) -> (CohortConsentVerdict, Option<String>) {
+            (self.0.clone(), Some("team-a".to_string()))
         }
     }
 
@@ -1504,6 +1920,154 @@ mod tests {
         // use classified frames (`make_frame` populates a canonical `intent_class`).
         // Fail-closed deny coverage lives in `tests/fail_closed_8_8.rs`.
         A2ARouterCore::new(vec![cfg], tofu)
+    }
+
+    fn crossing_request() -> A2AJsonRpcRequest {
+        let from = FrameAddress {
+            spirit_id: SpiritId::from("cohort-control"),
+            host_id: Some(HostId("loopback".to_string())),
+            role: None,
+        };
+        let frame = IacFrame {
+            frame_id: [7u8; 16],
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: from.clone(),
+            to: smallvec![FrameAddress {
+                spirit_id: SpiritId::from("cohort-control"),
+                host_id: Some(HostId("receiver".to_string())),
+                role: None,
+            }],
+            kind: FrameKind::TelemetryEvent,
+            intent: IntentClass::Readonly,
+            payload: FramePayload::TelemetryEvent(TelemetryEventPayload {
+                event_type: crate::cohort::CROSSING_EVENT_TYPE.to_string(),
+                data: serde_json::json!({
+                    "kind": "share",
+                    "to_team": "team-b",
+                    "bundle": {}
+                })
+                .to_string(),
+            }),
+            auto_marker: FrameOrigin::SpiritAuto,
+            consent_envelope: Some(
+                maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+                    from,
+                    A2AIntent::new(COHORT_INTENT_COLLECTIVE_SHARE),
+                ),
+            ),
+            intent_lineage: IntentLineage::default(),
+        };
+        A2AJsonRpcRequest::new("iac.deliver", frame, 17).with_cohort_source_team("team-a")
+    }
+
+    fn erase_crossing_frame() -> IacFrame {
+        let mut frame = crossing_request().params;
+        frame.intent = IntentClass::Standard;
+        let FramePayload::TelemetryEvent(payload) = &mut frame.payload else {
+            unreachable!("crossing fixture is telemetry");
+        };
+        payload.data = serde_json::json!({
+            "kind": "erase",
+            "to_team": "team-b",
+            "spirit_pid": 7,
+            "namespace": "default",
+            "key": "crossed-key"
+        })
+        .to_string();
+        frame
+            .consent_envelope
+            .as_mut()
+            .expect("crossing fixture has a consent envelope")
+            .intent_class = Some(A2AIntent::new(CROSS_TEAM_COLLECTIVE_ERASE_INTENT));
+        frame
+    }
+
+    async fn crossing_core(verdict: CohortConsentVerdict) -> A2ARouterCore {
+        let allow = ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(COHORT_INTENT_COLLECTIVE_SHARE)],
+            accept_allowlist: vec![A2AIntent::new(COHORT_INTENT_COLLECTIVE_SHARE)],
+        };
+        pinned_core(allow)
+            .await
+            .with_cohort_manifest_gate(Arc::new(FixedCrossingGate(verdict)))
+    }
+
+    #[tokio::test]
+    async fn erase_crossing_is_denied_by_share_route_and_admitted_by_erase_route() {
+        let peer = HostId("loopback".to_string());
+        let share_only = crossing_core(CohortConsentVerdict::Admit).await;
+        let error = share_only
+            .prepare_outbound(erase_crossing_frame(), &peer, 0)
+            .await
+            .expect_err("a share-only route must reject an erase crossing");
+        assert!(matches!(
+            error,
+            A2AError::IntentDenied {
+                direction: IntentDirection::Send,
+                ..
+            }
+        ));
+
+        let erase_only = ConsentAllowlists {
+            send_allowlist: vec![A2AIntent::new(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)],
+            accept_allowlist: vec![A2AIntent::new(CROSS_TEAM_COLLECTIVE_ERASE_INTENT)],
+        };
+        let erase_route = pinned_core(erase_only)
+            .await
+            .with_cohort_manifest_gate(Arc::new(FixedCrossingGate(CohortConsentVerdict::Admit)));
+        erase_route
+            .prepare_outbound(erase_crossing_frame(), &peer, 0)
+            .await
+            .expect("an erase-only route must admit an erase crossing");
+    }
+
+    #[tokio::test]
+    async fn verified_crossing_without_an_applier_fails_closed() {
+        let core = crossing_core(CohortConsentVerdict::Admit).await;
+        let fingerprint = PeerCertFingerprint::from_cert_der(b"x");
+        let (response, bound) = core
+            .handle_intake_verified(
+                crossing_request(),
+                &PeerId::new("loopback"),
+                Some(&fingerprint),
+            )
+            .await;
+        assert!(bound);
+        match response {
+            A2AJsonRpcResponse::Nack(nack) => {
+                assert_eq!(nack.error.code, CODE_CROSS_TEAM_CROSSING_REFUSED);
+                let data = nack.error.data.expect("typed crossing data");
+                assert_eq!(data["reason"], "crossing_state_unavailable");
+                assert_eq!(data["from_team"], "team-a");
+                assert_eq!(data["to_team"], "team-b");
+            }
+            other => panic!("an unavailable applier must NACK, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn stale_crossing_gate_keeps_the_typed_stale_outcome() {
+        let core = crossing_core(CohortConsentVerdict::NotCurrent).await;
+        let fingerprint = PeerCertFingerprint::from_cert_der(b"x");
+        let (response, bound) = core
+            .handle_intake_verified(
+                crossing_request(),
+                &PeerId::new("loopback"),
+                Some(&fingerprint),
+            )
+            .await;
+        assert!(bound);
+        match response {
+            A2AJsonRpcResponse::Nack(nack) => {
+                assert_eq!(nack.error.code, CODE_CROSS_TEAM_CROSSING_REFUSED);
+                let data = nack.error.data.expect("typed crossing data");
+                assert_eq!(data["reason"], "crossing_consent_stale");
+                assert_eq!(data["from_team"], "team-a");
+                assert_eq!(data["to_team"], "team-b");
+            }
+            other => panic!("a stale crossing must retain its typed outcome, got {other:?}"),
+        }
     }
 
     #[tokio::test]

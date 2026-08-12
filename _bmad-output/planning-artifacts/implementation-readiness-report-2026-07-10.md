@@ -40,7 +40,7 @@ inputDocuments:
 | Check | Verdict |
 |-------|---------|
 | All FRs defined + homed | ✅ 65 FRs; **FR37 was the only unserved FR → now homed at E13.4**. Zero unserved. |
-| NFRs complete for v2.2 | ✅ delta re-targeted NFR-Scale-2/Rel-7/Scale-5 → v2.2; NFR-Ops-11/Tenancy-1 → v2.2 (all mapped). |
+| NFRs complete for v2.2 | ⚠️ delta NFR-Scale-2/Rel-7/Scale-5 is mapped; NFR-Ops-11 is served only on the team axis by E13.1/E13.5e. Operator namespace, signing-key, and GDPR-erasure axes remain open. |
 | Journeys served | ✅ J0/J-Butler/J-Researcher/J1/J4/J6 done; **J3 → E12, Reza → E13** now homed. |
 | Testability | ✅ requirements are mechanically testable (project's gate discipline); each v2.2 gate has a named proven-red. |
 | Delta integrity | ✅ `[DELTA-2026-07-06]` folded into sharded prd; "No FR/NFR weakened or removed." |
@@ -51,7 +51,7 @@ inputDocuments:
 
 Every v2.2 residual requirement traces to a story (full map in `epics/requirements-inventory.md`):
 
-- **FR37** → E13.4 · **J3** → E12.4 · **Reza** → E13.6 · **NFR-Scale-2/Rel-7** (100-host) → E14.1 · **NFR-Sec-13** (10-host rotation) → E14.2 · **NFR-Scale-5** → E13.6 · **NFR-Ops-11/Tenancy-1** → E13.1/13.2 · **v2.0 sweep** → E14.4/14.5 · **NFR-Maint-1 ceiling** → E14.6.
+- **FR37** → E13.4 · **J3** → E12.4 · **Reza** → E13.6 · **NFR-Scale-2/Rel-7** (100-host) → E14.1 · **NFR-Sec-13** (10-host rotation) → E14.2 · **NFR-Scale-5** → E13.6 · **NFR-Ops-11 team axis** → E13.1/13.5e (**full operator NFR remains open**) · **v2.0 sweep** → E14.4/14.5 · **NFR-Maint-1 ceiling** → E14.6.
 - **ADR coverage:** ADR-054 (E12) · ADR-055/056 (E13) · ADR-057 (E14) — all ratified §15.11.
 
 **Dependency integrity:** ✅ every dependency resolves to a `done` epic (0–11) or an earlier v2.2 story. No forward/circular dependency. Critical path: **E12 → E13** (E13 needs the E12 org manifest); E14.1/14.2 parallel-able (depend on done 11.x), **E14.3 waits on E13.4**.

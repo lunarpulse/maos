@@ -48,7 +48,7 @@ use maos_domain::ports::capability::CapError;
 use maos_domain::ports::crypto::CryptoProvider;
 
 use crate::telemetry::TelemetryStreamAdapter;
-use cap_audit::Sender;
+use cap_audit::{Sender, VerifyOutcome};
 use cap_policy::PolicyTable;
 use cap_quota::CapQuotaTracker;
 use cap_tokens::CapTokensShardRing;
@@ -230,16 +230,7 @@ impl CapabilityRegistryAdapter {
         &self.working_memory
     }
 
-    /// Verify and audit a capability token.
-    pub fn verify_and_audit(
-        &self,
-        token: &CapabilityToken,
-        posture_hash: [u8; 32],
-        sandbox: SandboxTier,
-    ) -> Result<(), CapError> {
-        let result = self.tokens.verify(token, posture_hash, sandbox);
-        let outcome = cap_audit::VerifyOutcome::from_result(&result);
-
+    pub(crate) fn record_verification(&self, token: &CapabilityToken, outcome: VerifyOutcome) {
         if self
             .audit
             .try_send(cap_audit::CapAuditEvent::Verify {
@@ -251,7 +242,17 @@ impl CapabilityRegistryAdapter {
         {
             cap_audit::record_drop();
         }
+    }
 
+    /// Verify and audit a capability token.
+    pub fn verify_and_audit(
+        &self,
+        token: &CapabilityToken,
+        posture_hash: [u8; 32],
+        sandbox: SandboxTier,
+    ) -> Result<(), CapError> {
+        let result = self.tokens.verify(token, posture_hash, sandbox);
+        self.record_verification(token, VerifyOutcome::from_result(&result));
         result
     }
 }

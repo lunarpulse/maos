@@ -38,6 +38,11 @@ mod env_contract;
 mod escape_detector_consumer;
 #[cfg(feature = "network")]
 mod migration_plan;
+// J1 Tier-2 bridge (T2) — the swappable Worker-CLI adapter (codex/claude/fixture
+// share one trait). Composition-root only; runtime.rs stays CLI-agnostic (ZERO
+// kernel-Δ). Declared here, NOT in api.rs (not a kernel-core adapter).
+#[cfg(feature = "network")]
+mod worker_cli;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -78,6 +83,96 @@ use maos_providers::AnthropicProvider;
 
 fn worker_thread_count() -> usize {
     available_parallelism().map(usize::from).unwrap_or(1)
+}
+
+fn resolved_transparency_log_path() -> std::path::PathBuf {
+    let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").ok();
+    let path = maos_audit::transparency_log_path_for_tenant_mode(
+        std::env::var_os("MAOS_LOOM_POSTGRES").is_some(),
+        home_team.as_deref(),
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("maos: invalid tenant Transparency Log path: {error}");
+        std::process::exit(2);
+    });
+    maos_audit::validate_transparency_log_path(&path).unwrap_or_else(|error| {
+        eprintln!("maos: unsafe tenant Transparency Log path: {error}");
+        std::process::exit(2);
+    });
+    path
+}
+
+#[cfg(feature = "network")]
+fn enforce_vetted_upgrade_precondition(
+    spirit_id: &str,
+    target_manifest_path: &std::path::Path,
+    attestation_env: &str,
+) -> Result<(), String> {
+    let target_manifest = std::fs::read(target_manifest_path).map_err(|error| {
+        format!(
+            "read upgrade target manifest {}: {error}",
+            target_manifest_path.display()
+        )
+    })?;
+    let target_tier = maos_manifest::parse_manifest_trust_tier(&target_manifest)
+        .map_err(|error| format!("parse upgrade target trust_tier: {error}"))?;
+    let text = std::str::from_utf8(&target_manifest)
+        .map_err(|error| format!("upgrade target manifest is not UTF-8: {error}"))?;
+    let root: toml::Value =
+        toml::from_str(text).map_err(|error| format!("parse upgrade target TOML: {error}"))?;
+    let manifest_section = root
+        .get("class")
+        .or_else(|| root.get("spirit"))
+        .ok_or_else(|| "upgrade target manifest lacks [class] or [spirit]".to_string())?;
+    let manifest_spirit_id = manifest_section
+        .get("name")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| "upgrade target manifest lacks string name".to_string())?;
+    let target_version = manifest_section
+        .get("version")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| "upgrade target manifest lacks string version".to_string())?;
+    if manifest_spirit_id != spirit_id {
+        return Err(format!(
+            "upgrade target manifest names '{manifest_spirit_id}', expected '{spirit_id}'"
+        ));
+    }
+    if target_tier != maos_spirit_abi::compliance::TrustTier::PublicVetted {
+        return Ok(());
+    }
+
+    let attestation_path = std::env::var(attestation_env)
+        .map_err(|_| format!("{attestation_env} is required for a public-vetted target"))?;
+    let attestation_bytes = std::fs::read(&attestation_path)
+        .map_err(|error| format!("read vetting attestation {attestation_path}: {error}"))?;
+    let attestation: maos_compliance::VettingAttestation =
+        serde_cbor::from_slice(&attestation_bytes)
+            .map_err(|error| format!("decode vetting attestation: {error}"))?;
+    let keyring_path = std::env::var("MAOS_VETTER_KEYRING")
+        .map_err(|_| "MAOS_VETTER_KEYRING is required for a public-vetted target".to_string())?;
+    let keyring_bytes = std::fs::read(&keyring_path)
+        .map_err(|error| format!("read vetter keyring {keyring_path}: {error}"))?;
+    let keyring: maos_compliance::VetterKeyring = serde_cbor::from_slice(&keyring_bytes)
+        .map_err(|error| format!("decode vetter keyring: {error}"))?;
+    let operator_seed = maos_domain::audit_key::load_audit_key_seed(&None)
+        .map_err(|error| format!("load configured operator audit root: {error}"))?;
+    let operator_root = maos_domain::audit_key::derive_audit_public_key(&operator_seed);
+    let now_unix_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| format!("system clock precedes Unix epoch: {error}"))?
+        .as_millis() as u64;
+
+    maos_compliance::evaluate_upgrade_precondition(
+        true,
+        &target_manifest,
+        Some(&attestation),
+        &keyring,
+        &operator_root,
+        spirit_id,
+        target_version,
+        now_unix_ms,
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[cfg(feature = "network")]
@@ -151,6 +246,75 @@ fn issue_enterprise_governed_capability(
     Ok(token)
 }
 
+/// Story 11.4c / 13.5a — ONE SIEM export tick against a shared in-memory
+/// watermark.
+///
+/// Extracted from the inline `default-server` consumer so the
+/// `cohort-a2a-daemon` — which returns from the dispatch long before that
+/// spawn is reached — can forward through the identical code path instead of
+/// running SIEM-blind (the 13.5a dead-wire).
+///
+/// H5: the watermark is process-local and resets on restart. Callers may claim
+/// once-per-record within ONE daemon lifetime, never exactly-once across
+/// restarts.
+#[cfg(feature = "network")]
+fn forward_audit_to_siem_once(
+    runtime: &maos_bin::enterprise_identity::EnterpriseRuntime,
+    watermark: &std::sync::Mutex<Option<u64>>,
+) -> Result<usize, String> {
+    let mut watermark = watermark
+        .lock()
+        .map_err(|_| "SIEM export watermark poisoned".to_string())?;
+    let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+    let mut filter = maos_audit::AuditFilter::default();
+    if let Some(since) = *watermark {
+        filter.since_ns = Some(since.saturating_add(1));
+    }
+    let forwarded = runtime
+        .forward_audit_to_siem(filter)
+        .map_err(|error| error.to_string())?;
+    *watermark = Some(now_ns);
+    Ok(forwarded)
+}
+
+/// Story 11.4c — the periodic SIEM export consumer. Periodically snapshots a
+/// live-WAL Transparency Log into a transactionally consistent quiesced copy,
+/// forwards redacted records to the configured localhost sink
+/// (`MAOS_SIEM_FILE`), and advances a serialized in-memory watermark. On
+/// sink-down the runtime surfaces a buffered + operator-visible error (never a
+/// silent drop). Network/HTTPS sinks are additive-deferred and MUST be TLS-only
+/// when introduced (ADR-051); a persistent max-ts watermark is the production
+/// follow-up.
+///
+/// Story 13.5a threads the SAME spawn into `cohort-a2a-daemon` mode.
+#[cfg(feature = "network")]
+fn spawn_siem_export_consumer(
+    runtime: Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
+    watermark: Arc<std::sync::Mutex<Option<u64>>>,
+    cancel: CancellationToken,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        interval.tick().await; // skip the immediate first tick
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = interval.tick() => {
+                    match forward_audit_to_siem_once(&runtime, &watermark) {
+                        Ok(n) if n > 0 => eprintln!(
+                            "maos: SIEM export forwarded {n} record(s) to the localhost sink (Story 11.4c)"
+                        ),
+                        Ok(_) => {}
+                        Err(e) => eprintln!(
+                            "maos: SIEM export forward failed — records buffered, operator action required: {e}"
+                        ),
+                    }
+                }
+            }
+        }
+    })
+}
+
 #[cfg(feature = "network")]
 /// YankObserver that writes `FrameKind::SpiritRevoked` rows to the
 /// Transparency Log so every propagated yank is auditable (Story 7.2).
@@ -162,6 +326,29 @@ struct TlYankObserver {
 impl TlYankObserver {
     fn new(tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>) -> Self {
         Self { tl }
+    }
+}
+
+#[cfg(feature = "network")]
+impl maos_compliance::TerminalObservationSink for TlYankObserver {
+    fn journal_terminal_observation(
+        &self,
+        observation: &maos_compliance::RunningSpiritObservation,
+    ) {
+        let payload = match serde_json::to_vec(observation) {
+            Ok(payload) => payload,
+            Err(error) => panic!(
+                "RunningSpiritObservation serialization failed before transparency logging: {error}"
+            ),
+        };
+        let _token = self.tl.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::SpiritRevoked,
+            0,
+            None,
+            "vetting-terminal-observation",
+            &payload,
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
     }
 }
 
@@ -185,6 +372,21 @@ impl maos_registry::yank::YankObserver for TlYankObserver {
             "yank-poller:remote-yank-propagated",
             payload.to_string().as_bytes(),
             maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+        let detected_at_unix_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis() as u64)
+            .unwrap_or(0);
+        let _observation = maos_compliance::observe_running_spirit(
+            entry.spirit_id.as_str().to_owned(),
+            entry.version.clone(),
+            None,
+            &maos_compliance::TerminalInputs {
+                registry_yanked: true,
+                ..Default::default()
+            },
+            detected_at_unix_ms,
+            self,
         );
     }
 }
@@ -277,6 +479,59 @@ fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunA
                 .into(),
         ),
     }
+}
+
+#[cfg(feature = "network")]
+fn parse_cross_wall_traceback_args<I: IntoIterator<Item = String>>(
+    args: I,
+) -> Result<Option<maos_domain::log_recall::CrossWallRecallRequest>, String> {
+    let mut args = args.into_iter();
+    if args.next().as_deref() != Some("traceback") {
+        return Ok(None);
+    }
+    let mut remote_team = None;
+    let mut spirit_pid = None;
+    let mut limit = maos_domain::log_recall::LogRecallFilter::MAX_LIMIT;
+    while let Some(argument) = args.next() {
+        match argument.as_str() {
+            "--team" => remote_team = args.next(),
+            "--spirit-pid" => {
+                spirit_pid = Some(
+                    args.next()
+                        .ok_or_else(|| "maos traceback: --spirit-pid requires a value".to_string())?
+                        .parse::<u32>()
+                        .map_err(|error| {
+                            format!("maos traceback: invalid --spirit-pid: {error}")
+                        })?,
+                );
+            }
+            "--limit" => {
+                limit = args
+                    .next()
+                    .ok_or_else(|| "maos traceback: --limit requires a value".to_string())?
+                    .parse::<usize>()
+                    .map_err(|error| format!("maos traceback: invalid --limit: {error}"))?;
+            }
+            other => return Err(format!("maos traceback: unknown argument '{other}'")),
+        }
+    }
+    let remote_team =
+        remote_team.ok_or_else(|| "maos traceback: --team is required".to_string())?;
+    let spirit_pid =
+        spirit_pid.ok_or_else(|| "maos traceback: --spirit-pid is required".to_string())?;
+    let filter = maos_domain::log_recall::LogRecallFilter::new(None, None, None, limit, None, None);
+    maos_domain::log_recall::CrossWallRecallRequest::new(spirit_pid, &remote_team, filter)
+        .map(Some)
+        .map_err(|error| format!("maos traceback: {error}"))
+}
+
+#[cfg(feature = "network")]
+fn run_cross_wall_traceback(
+    port: &dyn maos_domain::ports::LogRecallPort,
+    request: maos_domain::log_recall::CrossWallRecallRequest,
+) -> Result<maos_domain::log_recall::LogRecallPage, maos_domain::log_recall::LogRecallError> {
+    let (spirit_pid, remote_team, filter) = request.into_parts();
+    port.recall_cross_wall(spirit_pid, &remote_team, filter)
 }
 
 /// Which reference Spirit a manifest's `[class].name` selects. Construction is
@@ -395,6 +650,7 @@ fn caps_required_or_empty(
         mcp: maos_kernel_core::security::McpCapabilities {
             servers: Vec::new(),
         },
+        loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
     })
 }
 
@@ -515,6 +771,173 @@ fn resolve_cli_binary(command: &str) -> Result<String, String> {
 /// `FrameKind::CliSubprocessOutput=21` row, and on exit revokes the cap-token
 /// with `RevokeReason::CliSubprocessExit`. Composition-root only — the kernel
 /// receives a constructed handle and decides no topology.
+/// Follow-up ID for the deferred packet-level egress enforcement. Run one records
+/// egress `declared-not-enforced`; enforced egress is an Epic-14 v2.0 hardening.
+#[cfg(feature = "network")]
+const EGRESS_ENFORCEMENT_FOLLOWUP: &str = "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT";
+
+/// The built-in HOST grant for the hermetic fixture Worker. Host-side and
+/// image-keyed — the host independently grants THIS known image; it never echoes
+/// the manifest's self-declared fields (the AC5 trust-direction inversion).
+#[cfg(feature = "network")]
+fn builtin_fixture_grant() -> maos_domain::host_grant::HostGrant {
+    maos_domain::host_grant::HostGrant {
+        attested_image: "worker-cli-fixture".to_string(),
+        signing_key_id: "MAOS Project".to_string(),
+        permitted_tier: maos_domain::invariants::i9::SandboxTier::T3,
+        permitted_egress_destinations: vec![], // hermetic: no egress
+    }
+}
+
+/// Parse an operator `MAOS_HOST_GRANTS` TOML file into host grants. Schema:
+/// ```toml
+/// [[grant]]
+/// attested_image = "codex"
+/// signing_key_id = "OpenAI"
+/// permitted_tier = "T3"
+/// permitted_egress_destinations = ["api.openai.com"]
+/// ```
+/// A grant missing a required field is an ERROR — never a silent admit.
+#[cfg(feature = "network")]
+fn parse_host_grants_toml(text: &str) -> Result<Vec<maos_domain::host_grant::HostGrant>, String> {
+    let root: toml::Value = toml::from_str(text).map_err(|e| format!("toml parse: {e}"))?;
+    let Some(arr) = root.get("grant").and_then(|g| g.as_array()) else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::with_capacity(arr.len());
+    for (i, g) in arr.iter().enumerate() {
+        let attested_image = g
+            .get("attested_image")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("grant[{i}]: missing attested_image"))?
+            .to_string();
+        let signing_key_id = g
+            .get("signing_key_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| format!("grant[{i}]: missing signing_key_id"))?
+            .to_string();
+        let permitted_tier = match g.get("permitted_tier").and_then(|v| v.as_str()) {
+            Some(s) => parse_sandbox_tier(s)?,
+            None => maos_domain::invariants::i9::SandboxTier::T3,
+        };
+        let permitted_egress_destinations = g
+            .get("permitted_egress_destinations")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_str().map(String::from))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        out.push(maos_domain::host_grant::HostGrant {
+            attested_image,
+            signing_key_id,
+            permitted_tier,
+            permitted_egress_destinations,
+        });
+    }
+    Ok(out)
+}
+
+/// Load the HOST-MANAGED grant allowlist (replaces the v0.9 self-grant). The
+/// built-in fixture grant keeps the hermetic path green; the operator adds real
+/// agent-CLI grants (codex/claude + egress) via a `MAOS_HOST_GRANTS` TOML file.
+/// A manifest whose (image, author) matches no grant fails CLOSED at
+/// `resolve_cli_wrapper_tier` — never self-granted.
+#[cfg(feature = "network")]
+fn load_host_grant_allowlist() -> maos_domain::host_grant::StaticHostGrantAllowlist {
+    let mut grants = vec![builtin_fixture_grant()];
+    if let Some(path) = std::env::var_os("MAOS_HOST_GRANTS") {
+        let display = std::path::Path::new(&path).display().to_string();
+        match std::fs::read_to_string(&path) {
+            Ok(text) => match parse_host_grants_toml(&text) {
+                Ok(mut extra) => grants.append(&mut extra),
+                Err(e) => eprintln!(
+                    "maos run: MAOS_HOST_GRANTS parse error ({display}): {e}; \
+                     using built-in grants only (real agent CLIs will fail closed)"
+                ),
+            },
+            Err(e) => eprintln!(
+                "maos run: MAOS_HOST_GRANTS unreadable ({display}): {e}; \
+                 using built-in grants only (real agent CLIs will fail closed)"
+            ),
+        }
+    }
+    maos_domain::host_grant::StaticHostGrantAllowlist::new(grants)
+}
+
+#[cfg(all(test, feature = "network"))]
+mod host_grant_tests {
+    use super::*;
+    use maos_domain::host_grant::{HostGrantAllowlist, StaticHostGrantAllowlist};
+    use maos_domain::invariants::i9::SandboxTier;
+    use maos_kernel_core::lifecycle::cli_wrapper::resolve_cli_wrapper_tier;
+
+    #[test]
+    fn builtin_allowlist_grants_the_fixture_only() {
+        // No MAOS_HOST_GRANTS in the test env → built-in fixture grant only.
+        let al = load_host_grant_allowlist();
+        assert!(
+            al.lookup("worker-cli-fixture", "MAOS Project").is_some(),
+            "the built-in host grant must cover the hermetic fixture"
+        );
+        assert!(
+            al.lookup("codex", "OpenAI").is_none(),
+            "codex must NOT be granted without an operator MAOS_HOST_GRANTS entry"
+        );
+    }
+
+    #[test]
+    fn a_manifest_cannot_self_grant_an_unlisted_image() {
+        // Trust-direction proof: a manifest claiming to be `codex` is NOT granted
+        // by the host allowlist → fail closed. Under the old self-grant it would
+        // have auto-granted itself.
+        let al = StaticHostGrantAllowlist::new(vec![builtin_fixture_grant()]);
+        assert!(
+            resolve_cli_wrapper_tier(SandboxTier::T3, "codex", "anyone", &al).is_err(),
+            "an unlisted image must fail closed, not self-grant"
+        );
+        assert!(matches!(
+            resolve_cli_wrapper_tier(SandboxTier::T3, "worker-cli-fixture", "MAOS Project", &al),
+            Ok(t) if t == SandboxTier::T3
+        ));
+    }
+
+    #[test]
+    fn operator_grants_file_parses_real_cli_with_egress() {
+        let toml = r#"
+[[grant]]
+attested_image = "codex"
+signing_key_id = "OpenAI"
+permitted_tier = "T3"
+permitted_egress_destinations = ["api.openai.com"]
+"#;
+        let grants = parse_host_grants_toml(toml).expect("valid grants file parses");
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].attested_image, "codex");
+        assert_eq!(
+            grants[0].permitted_egress_destinations,
+            vec!["api.openai.com".to_string()]
+        );
+        assert_eq!(grants[0].permitted_tier, SandboxTier::T3);
+    }
+
+    #[test]
+    fn malformed_grants_file_errors_never_silently_admits() {
+        assert!(
+            parse_host_grants_toml("[[grant]]\nsigning_key_id = \"x\"\n").is_err(),
+            "a grant missing attested_image must error, never silently admit"
+        );
+    }
+}
+
+/// The default Worker task when the operator sets no `MAOS_WORKER_TASK`. Kept
+/// deterministic so the hermetic fixture path stays bit-stable in CI (the
+/// fixture ignores the task text; the live run overrides it via the env var).
+#[cfg(feature = "network")]
+const DEFAULT_WORKER_TASK: &str =
+    "founder-loop: acknowledge the delegated assignment and report completion";
+
 #[cfg(feature = "network")]
 fn run_cli_wrapper_manifest(
     manifest_root: &toml::Value,
@@ -525,7 +948,7 @@ fn run_cli_wrapper_manifest(
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use maos_domain::host_grant::{HostGrant, StaticHostGrantAllowlist};
+    use maos_domain::host_grant::HostGrantAllowlist;
     use maos_domain::invariants::i9::SandboxTier;
     use maos_kernel_core::lifecycle::cli_wrapper::{
         admit_cli_wrapper_journaled, argv_prefix_hash, reject_respawn_with_context,
@@ -556,19 +979,13 @@ fn run_cli_wrapper_manifest(
     // 3. AC1 FORK C — fail loud at load on the deferred respawn_with_context.
     reject_respawn_with_context(&config).map_err(|e| format!("maos run: {e}"))?;
 
-    // 4. AC5 FORK A — host-grant tier gate. The allowlist is operator config
-    //    (host-side), keyed on attested-image + signing-key — NOT in the
-    //    artifact.
-    //
-    //    ⚠ SEAM: the allowlist below is SELF-GRANTING — populated from the
-    //    manifest's own `command` and `author.name`, so every manifest
-    //    auto-grants itself. The architecture (HostGrant / HostGrantAllowlist
-    //    trait / resolve_tier_grant) is generalized for 8.14b/c reuse; only
-    //    the POPULATION SOURCE is v0.9-only. Epic 9 MUST replace this with an
-    //    operator-managed grant source (host-grants.toml or equivalent).
-    //    Until then, AC5 FORK A's trust-direction gate is structurally correct
-    //    but NOT enforced: the artifact effectively decides its own tier.
-    //    See: host_grant.rs module doc, Cross-Impact #2.
+    // 4. AC5 FORK A — host-grant tier gate (T3: self-grant KILLED). The manifest
+    //    supplies only the REQUEST (its claimed image + author); the allowlist is
+    //    HOST-MANAGED (built-in fixture grant + operator `MAOS_HOST_GRANTS` file),
+    //    never populated from the manifest's own fields. A (image, author) that
+    //    matches no host grant fails CLOSED at `resolve_cli_wrapper_tier`
+    //    (ECliWrapperTierNotGranted) — the artifact can no longer decide its own
+    //    tier. See host_grant.rs module doc + `load_host_grant_allowlist`.
     let attested_image = config.command.clone();
     let signing_key_id = manifest_root
         .get("author")
@@ -576,19 +993,32 @@ fn run_cli_wrapper_manifest(
         .and_then(|n| n.as_str())
         .unwrap_or("unknown")
         .to_string();
-    let allowlist = StaticHostGrantAllowlist::new(vec![HostGrant {
-        attested_image: attested_image.clone(),
-        signing_key_id: signing_key_id.clone(),
-        permitted_tier: SandboxTier::T3,
-        // Enforced egress allowlisting is recorded as a follow-up (Cross-Impact
-        // #3): 8.12 lands the grant seam + fail-closed error; the live-CLI path
-        // uses the T3 network-permitted variant. No silent gap — see Completion
-        // Notes for enforced-vs-declared.
-        permitted_egress_destinations: vec![],
-    }]);
+    let allowlist = load_host_grant_allowlist();
     let granted_tier =
         resolve_cli_wrapper_tier(requested_tier, &attested_image, &signing_key_id, &allowlist)
             .map_err(|e| format!("maos run: {e}"))?;
+
+    // Egress disposition (spec c3): run one records egress `declared-not-enforced`
+    // with a follow-up ID; enforced packet-level egress is an Epic-14 v2.0
+    // hardening. The permitted destinations come from the HOST grant, not the
+    // manifest.
+    let permitted_egress = allowlist
+        .lookup(&attested_image, &signing_key_id)
+        .map(|g| g.permitted_egress_destinations.clone())
+        .unwrap_or_default();
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "host_grant_disposition",
+            "attested_image": attested_image,
+            "signing_key_id": signing_key_id,
+            "granted_tier": format!("{granted_tier:?}"),
+            "egress": "declared-not-enforced",
+            "egress_enforced": false,
+            "permitted_egress": permitted_egress,
+            "egress_followup": EGRESS_ENFORCEMENT_FOLLOWUP,
+        })
+    );
 
     // 5. Resolve the CLI binary path; pin it into the config for the probe.
     let resolved = resolve_cli_binary(&config.command)?;
@@ -615,9 +1045,84 @@ fn run_cli_wrapper_manifest(
         None => resolved,
     };
 
-    // 6. Journaled admission (Story 7.4 path: probe + shape assert + T3 floor).
-    admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
-        .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+    // T2/T1 — select the swappable Worker-CLI adapter by resolved binary and
+    // route the typed task into its argv. An unsupported wrapper fails CLOSED
+    // here, before the admission probe or any spawn (spec: "refuse before
+    // probe/spawn"; "fail closed on ... unsupported wrappers").
+    let worker_cli = worker_cli::select_worker_cli(&resolved).ok_or_else(|| {
+        format!(
+            "maos run: unsupported cli_wrapper command '{resolved}'; supported worker CLIs: {:?}",
+            worker_cli::SUPPORTED_WORKER_CLIS
+        )
+    })?;
+    // T5 — CI/local split: a real agent CLI needs MAOS_LIVE_AGENT (local opt-in);
+    // the fixture always runs. CI never sets the flag, so CI cannot spawn a paid
+    // agent — the paid path is physically local-only. Fails closed before spawn.
+    let live_agent = std::env::var_os("MAOS_LIVE_AGENT").is_some_and(|v| !v.is_empty());
+    worker_cli::live_agent_gate(worker_cli.name(), live_agent)
+        .map_err(|e| format!("maos run: {e}"))?;
+    // T5 — clean-home invariant on the live path: refuse an ambient auth file
+    // (codex's ~/.codex/auth.json) that would shadow the injected API key with a
+    // token MAOS never holds (redaction unattestable). The child inherits HOME
+    // (the bridge does not clear the env), so this is a real footgun.
+    if live_agent {
+        if let Some(home) = std::env::var_os("HOME") {
+            if let Err(p) =
+                worker_cli::refuse_ambient_auth(worker_cli.as_ref(), std::path::Path::new(&home))
+            {
+                return Err(format!(
+                    "maos run: ambient auth file {} present in the sandbox home — refusing the \
+                     live run. It shadows the injected API key with a token MAOS never holds, so \
+                     redaction is unattestable (a failed Tier-2). Wipe it or use a clean sandbox home.",
+                    p.display()
+                )
+                .into());
+            }
+        }
+    }
+    let worker_task =
+        std::env::var("MAOS_WORKER_TASK").unwrap_or_else(|_| DEFAULT_WORKER_TASK.to_string());
+    let task_args = worker_cli.argv(&worker_task);
+    // Non-secret CLI env only (e.g. codex CODEX_NON_INTERACTIVE). Credentials are
+    // injected host-side on the live path, never in this argv/env shaping code.
+    let worker_env = worker_cli.nonsecret_env();
+
+    // 6. Admission — adapter-aware. The hermetic fixture speaks the kernel's
+    //    Story 7.4 `--maos-bridge-probe` output-shape handshake, so it uses the
+    //    journaled kernel path (probe + shape assert + T3 floor). A real
+    //    adapter-backed CLI (codex/claude) does NOT implement that handshake —
+    //    it exits non-zero on the probe flag, which is why the fixture was the
+    //    only worker that ever admitted. For real CLIs the WorkerCli adapter's
+    //    `parse_completion` IS the output-shape contract (verified at COMPLETION),
+    //    so admission runs a liveness probe and re-asserts the T3 floor here.
+    match worker_cli.probe_strategy() {
+        worker_cli::ProbeStrategy::BridgeHandshake => {
+            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
+                .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+        }
+        worker_cli::ProbeStrategy::Liveness { argv } => {
+            // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
+            // this; preserve it on the real-CLI path).
+            if !matches!(granted_tier, maos_domain::invariants::i9::SandboxTier::T3) {
+                return Err(format!(
+                    "maos run: cli_wrapper admission failed: {} requires SandboxTier::T3, \
+                     host-granted {granted_tier:?}",
+                    worker_cli.name()
+                )
+                .into());
+            }
+            worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
+                .map_err(|e| {
+                    format!("maos run: cli_wrapper admission failed: liveness probe: {e}")
+                })?;
+            eprintln!(
+                "maos run: cli_wrapper '{}' admitted via liveness probe (real adapter-backed CLI; \
+                 output shape is verified at completion by the {} adapter, not a bridge handshake)",
+                resolved,
+                worker_cli.name()
+            );
+        }
+    }
 
     // 7. Issue the Scope::CliSubprocessSpawn cap-token (binds argv_prefix_hash).
     //    Mediation requires the operator policy to grant `proc.exec` for the CLI
@@ -658,11 +1163,12 @@ fn run_cli_wrapper_manifest(
         }
     };
 
-    // 8. Spawn the REAL bridge (no probe flag → the worker runs its task).
+    // 8. Spawn the REAL bridge. The typed task is routed as the trailing argv
+    //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
     let spec = BridgeSpawnSpec {
         program: resolved,
         argv_prefix: config.argv_prefix.clone(),
-        task_args: vec![],
+        task_args,
         expected_argv_prefix_hash: aph,
         from_spirit_id: "worker".to_string(),
         stdio_shape: config.posture.stdio_shape,
@@ -670,8 +1176,14 @@ fn run_cli_wrapper_manifest(
         shutdown_signal: config.posture.shutdown_signal.clone(),
         channel_capacity: 256,
         backpressure: Backpressure::Block,
-        env: vec![],
+        env: worker_env,
     };
+    // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
+    // rows (the adapter's oracle reads the persisted evidence, not the raw exit).
+    let worker_run_since_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
     let mut bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
     let child_pid = bridge.child_pid();
     println!(
@@ -717,6 +1229,67 @@ fn run_cli_wrapper_manifest(
         exit.cause,
         pump.stdout_lines + pump.stderr_lines
     );
+
+    // T2/T1 — completion is decided by the adapter over the JOURNALED Worker
+    // output (redacted at insert), never by the raw exit code. Reconstruct the
+    // Worker's stdout/stderr from the CliSubprocessOutput rows this run wrote,
+    // then let the adapter's per-CLI oracle rule. The last stdout frame is the
+    // Worker-produced Transparency Log reference a digest would cite.
+    let worker_exit = match exit.cause.exit_code() {
+        Some(code) => worker_cli::WorkerExit::Exited(code),
+        None => worker_cli::WorkerExit::Crashed,
+    };
+    let mut wc_stdout: Vec<String> = Vec::new();
+    let mut wc_stderr: Vec<String> = Vec::new();
+    let mut completion_tl_ref: Option<[u8; 16]> = None;
+    match transparency_log.query_frames(FrameFilter {
+        kind: Some(FrameKind::CliSubprocessOutput),
+        since_ns: Some(worker_run_since_ns),
+        ..Default::default()
+    }) {
+        Ok(rows) => {
+            for row in &rows {
+                if row.from_spirit_id != "worker" {
+                    continue;
+                }
+                let Ok(v) = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
+                else {
+                    continue;
+                };
+                let line = v
+                    .get("line")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                match v.get("stream").and_then(|s| s.as_str()) {
+                    Some("stdout") => {
+                        completion_tl_ref = Some(row.frame_id);
+                        wc_stdout.push(line);
+                    }
+                    Some("stderr") => wc_stderr.push(line),
+                    _ => {}
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("maos run: could not read worker output rows for completion: {e}")
+        }
+    }
+    let completion = worker_cli.parse_completion(&wc_stdout, &wc_stderr, worker_exit);
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "worker_completion",
+            "worker_cli": worker_cli.name(),
+            "completion": completion.label(),
+            "completed": completion.is_completed(),
+            // Non-secret: the last stdout CliSubprocessOutput frame_id (hex) — the
+            // Worker-produced TL reference a digest cites. `null` if none captured.
+            "completion_tl_ref":
+                completion_tl_ref.map(|id| id.iter().map(|b| format!("{b:02x}")).collect::<String>()),
+        })
+    );
+
     Ok(())
 }
 
@@ -1191,6 +1764,143 @@ impl LiveResearcherMcpPort {
     }
 }
 
+#[cfg(feature = "network")]
+/// Story 13.5d — Researcher's synchronous collective port. One atomic binding
+/// supplies the registered, token-issued, and kernel-call pid.
+struct LiveResearcherCollectivePort {
+    spirit_pid: std::sync::atomic::AtomicU32,
+    memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+    capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+}
+
+#[cfg(feature = "network")]
+impl LiveResearcherCollectivePort {
+    fn new(
+        memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+        capability: Arc<CapabilityRegistryAdapter>,
+        enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+        enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    ) -> Self {
+        Self {
+            spirit_pid: std::sync::atomic::AtomicU32::new(0),
+            memory,
+            capability,
+            enterprise_runtime,
+            enterprise_pdp_runtime,
+        }
+    }
+
+    fn issue(
+        &self,
+        spirit_pid: u32,
+        scope: Scope,
+        intent_class: IntentClass,
+    ) -> Result<CapabilityToken, researcher::ResearcherCollectiveError> {
+        issue_enterprise_governed_capability(
+            self.capability.as_ref(),
+            self.enterprise_runtime.as_deref(),
+            self.enterprise_pdp_runtime.as_ref(),
+            spirit_pid,
+            scope,
+            60,
+            [0u8; 32],
+            intent_class,
+        )
+        .map_err(researcher::ResearcherCollectiveError::Denied)
+    }
+}
+
+#[cfg(feature = "network")]
+impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
+    fn collective_write(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        key: &str,
+        value: maos_domain::memory::MemoryValue,
+    ) -> Result<(), researcher::ResearcherCollectiveError> {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomWrite, IntentClass::HighPrivilege)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.write".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        self.memory
+            .collective_write(
+                spirit_pid,
+                namespace,
+                key,
+                value,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+
+    fn collective_read(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<maos_domain::memory::MemoryValue>, researcher::ResearcherCollectiveError>
+    {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomRead, IntentClass::Readonly)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.read".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        self.memory
+            .collective_read(
+                spirit_pid,
+                namespace,
+                key,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+
+    fn collective_scan(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        prefix: &str,
+        limit: usize,
+    ) -> Result<Vec<maos_domain::memory::MemoryEntry>, researcher::ResearcherCollectiveError> {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomScan, IntentClass::Readonly)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": prefix}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.scan".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        self.memory
+            .collective_scan(
+                spirit_pid,
+                namespace,
+                prefix,
+                limit,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+}
+
 /// Emit a `FrameKind::GovernanceEvent` with a `VetterKeyPayload` to the
 /// Transparency Log. Consolidates the formerly copy-pasted emission blocks
 /// (Story 9.3b review — VetterKey emission coverage).
@@ -1386,7 +2096,7 @@ fn air_gap_run(_args: &[String]) {
     // AC-4: the substrate boots, runs, and produces a Transparency Log entry
     // even with networking compiled out. Real offline inference is a v1.0/9.4b
     // follow-up; at v0.5 we write a no-op TL entry and emit a clear diagnostic.
-    let tl_path = maos_audit::default_transparency_log_path();
+    let tl_path = resolved_transparency_log_path();
     if let Some(parent) = tl_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -1425,7 +2135,7 @@ fn air_gap_backup(args: &[String]) {
     match args[0].as_str() {
         "create" => {
             let dest = std::path::Path::new(&args[1]);
-            let source = maos_audit::default_transparency_log_path();
+            let source = resolved_transparency_log_path();
             match maos_cli::backup::backup_transparency_log(&source, dest) {
                 Ok(()) => {
                     eprintln!("backup created: {}", dest.display());
@@ -1437,7 +2147,7 @@ fn air_gap_backup(args: &[String]) {
             }
         }
         "verify" => {
-            let source = maos_audit::default_transparency_log_path();
+            let source = resolved_transparency_log_path();
             let backup_path = std::path::Path::new(&args[1]);
             match air_gap_verify_backup(&source, backup_path) {
                 Ok(()) => eprintln!("backup verified: cold-restore Merkle roots match"),
@@ -1454,6 +2164,15 @@ fn air_gap_backup(args: &[String]) {
             }
             let backup_path = std::path::Path::new(&args[1]);
             let target_path = std::path::Path::new(&args[2]);
+            // D3 (code review): refuse a cross-team restore BEFORE copying.
+            // A tenanted backup must land at its own team's path; this stops
+            // planting team-A's rows onto team-B's shard path.
+            if let Err(error) =
+                maos_cli::backup::validate_restore_target_team(backup_path, target_path)
+            {
+                eprintln!("restore refused (team mismatch): {error}");
+                std::process::exit(1);
+            }
             match maos_cli::backup::backup_transparency_log(backup_path, target_path) {
                 Ok(()) => {}
                 Err(e) => {
@@ -1481,8 +2200,23 @@ fn air_gap_verify_backup(
     source_path: &std::path::Path,
     backup_path: &std::path::Path,
 ) -> Result<(), String> {
-    let restored = maos_cli::backup::cold_restore_to_temp(backup_path)
-        .map_err(|e| format!("cold restore failed: {e}"))?;
+    let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").ok();
+    let restored = if std::env::var_os("MAOS_LOOM_POSTGRES").is_some() {
+        match home_team
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            Some(team) => {
+                let team = maos_domain::team::TeamId::new(team)
+                    .map_err(|error| format!("invalid restore team: {error}"))?;
+                maos_cli::backup::cold_restore_to_temp_for_team(backup_path, &team)
+            }
+            None => maos_cli::backup::cold_restore_to_temp(backup_path),
+        }
+    } else {
+        maos_cli::backup::cold_restore_to_temp(backup_path)
+    }
+    .map_err(|e| format!("cold restore failed: {e}"))?;
     let source_root = maos_audit::backup::compute_merkle_root(source_path)
         .map_err(|e| format!("source Merkle root failed: {e}"))?;
     let restored_root = maos_audit::backup::compute_merkle_root(&restored)
@@ -1503,7 +2237,7 @@ fn air_gap_audit(args: &[String]) {
         eprintln!("usage: maos audit query");
         std::process::exit(1);
     }
-    let tl_path = maos_audit::default_transparency_log_path();
+    let tl_path = resolved_transparency_log_path();
     match maos_audit::backup::compute_merkle_root(&tl_path) {
         Ok(root) => {
             eprintln!("air-gap audit query: TL path = {}", tl_path.display());
@@ -1649,6 +2383,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    let cross_wall_traceback = match parse_cross_wall_traceback_args(std::env::args().skip(1)) {
+        Ok(args) => args,
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+    };
     // Story 8.14a — dispatch `maos init`, `maos shell`, `maos audit query`.
     let mut shell_mode = false;
     let mut audit_spirit: Option<String> = None;
@@ -1707,6 +2448,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return Err("expected subcommand: query".into());
                 }
             }
+            Some("traceback") => {}
             Some("shell") => {
                 for a in args {
                     if a == "--plain" {
@@ -1730,16 +2472,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
     // construction below (after all dependent adapters are initialized).
 
-    // Story 4.3 — construct real MemoryManagerAdapter with Private + Shared + Principal stores.
-    // Resolve paths first so both memory and TL share the same DB location.
-    let audit_db_path = maos_audit::default_transparency_log_path();
-    if let Some(parent) = audit_db_path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!(
-                "maos: failed to create audit DB parent directory {}: {e}",
-                parent.display()
-            );
-            return Err(format!("audit-db parent create failed: {e}").into());
+    // Keep Host-wide memory/index/hold semantics on the global artifact. Only
+    // the Transparency Log and its audit readers move to the physical team
+    // shard selected by the tenancy-active composition root.
+    let memory_db_path = maos_audit::default_transparency_log_path();
+    let audit_db_path = resolved_transparency_log_path();
+    for (label, path) in [("memory", &memory_db_path), ("audit", &audit_db_path)] {
+        if let Some(parent) = path.parent() {
+            if let Err(error) = std::fs::create_dir_all(parent) {
+                return Err(format!(
+                    "maos: failed to create {label} DB parent {}: {error}",
+                    parent.display()
+                )
+                .into());
+            }
+        }
+    }
+
+    // Story 13.5g — PHASE A: in-artifact tenant binding preflight. Runs only in
+    // tenant mode (MAOS_LOOM_POSTGRES set + a canonical MAOS_LOOM_HOME_TEAM),
+    // strictly before the Transparency Log is opened, so a foreign-bound
+    // artifact is refused BEFORE the first append (closes D-4). Read-only: a
+    // refused boot never mutates the other team's artifact. A non-canonical home
+    // team is left for the composition-root match arm below to hard-fail on.
+    let tenant_env_team: Option<maos_domain::team::TeamId> =
+        if std::env::var_os("MAOS_LOOM_POSTGRES").is_some() {
+            std::env::var("MAOS_LOOM_HOME_TEAM")
+                .ok()
+                .filter(|team| !team.trim().is_empty())
+                .and_then(|team| maos_domain::team::TeamId::new(&team).ok())
+        } else {
+            None
+        };
+    let mut pending_tenant_binding_write: Option<maos_domain::team::TeamId> = None;
+    if let Some(env_team) = tenant_env_team.as_ref() {
+        match maos_bin::tenant_map::phase_a_preflight(&audit_db_path, env_team) {
+            Ok(maos_audit::TenantBindingPhaseADecision::Proceed) => {}
+            Ok(maos_audit::TenantBindingPhaseADecision::NeedsWrite) => {
+                pending_tenant_binding_write = Some(env_team.clone());
+            }
+            Ok(maos_audit::TenantBindingPhaseADecision::Refuse(refusal)) => {
+                return Err(format!(
+                    "maos: tenant Transparency Log refused before open (Phase A): {refusal}"
+                )
+                .into());
+            }
+            Err(error) => {
+                return Err(
+                    format!("maos: tenant Transparency Log Phase A read failed: {error}").into(),
+                );
+            }
         }
     }
 
@@ -1757,11 +2539,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         4 * 1024,
     ));
     let shared_store = Arc::new(
-        maos_kernel_core::memory::shared::SharedMemoryStore::open(&audit_db_path)
+        maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db_path)
             .map_err(|e| format!("failed to open shared memory store: {e}"))?,
     );
     let principal_index = Arc::new(
-        maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&audit_db_path)
+        maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db_path)
             .map_err(|e| format!("failed to open principal index: {e}"))?,
     );
 
@@ -1802,10 +2584,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
     let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
     let quota = maos_kernel_core::capability::cap_quota::CapQuotaTracker::new();
-    let boot_nonce: u64 = {
-        let mut buf = [0u8; 8];
-        getrandom::fill(&mut buf).expect("failed to generate boot nonce");
-        u64::from_ne_bytes(buf) & 0x7FFF_FFFF_FFFF_FFFF // mask high bit → always fits i64 (SQLite stores boot_nonce as signed 64-bit)
+    let boot_nonce: u64 = match cfg!(debug_assertions)
+        .then(|| std::env::var("MAOS_TEST_BOOT_NONCE").ok())
+        .flatten()
+    {
+        Some(value) => value
+            .parse::<u64>()
+            .map_err(|_| "MAOS_TEST_BOOT_NONCE must be a u64")?,
+        None => {
+            let mut buf = [0u8; 8];
+            getrandom::fill(&mut buf).expect("failed to generate boot nonce");
+            // Mask the high bit: SQLite stores boot_nonce as signed i64.
+            u64::from_ne_bytes(buf) & 0x7FFF_FFFF_FFFF_FFFF
+        }
     };
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let capability = Arc::new(CapabilityRegistryAdapter::new(
@@ -1926,86 +2717,240 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(maos_kernel_core::orchestrator::OrchestratorBufferRegistry::new());
     eprintln!("maos: orchestrator buffer registry initialized (Story 3.4)");
 
-    // Transparency Log — shared across services (Story 1b.1).
-    // The audit_db_path is resolved above (line ~108) so memory stores and TL
-    // share the same DB file location.
+    // Transparency Log — shared across services within this one-team process.
+    // Host-wide memory/index state remains on `memory_db_path`; the audit
+    // adapter receives the team shard selected above.
     let transparency_log = Arc::new(
-        maos_kernel_core::iac::TransparencyLogAdapter::open(&audit_db_path, boot_nonce).map_err(
-            |e| {
-                format!(
-                    "failed to open audit DB at {}: {e}",
-                    audit_db_path.display()
-                )
-            },
-        )?,
+        maos_kernel_core::iac::TransparencyLogAdapter::open_with_global_legal_holds(
+            &audit_db_path,
+            &memory_db_path,
+            boot_nonce,
+        )
+        .map_err(|error| {
+            format!(
+                "failed to open audit DB at {} with Host-global legal holds {}: {error}",
+                audit_db_path.display(),
+                memory_db_path.display()
+            )
+        })?,
     );
     eprintln!(
         "maos: Transparency Log opened on-disk at {}",
         audit_db_path.display()
     );
 
+    // Story 13.5g — write the in-artifact tenant_binding row for a fresh or
+    // legacy-migrated artifact (Phase A NeedsWrite), now that the TL is open.
+    // datname stays NULL here; Phase B (after init_schema) records the live
+    // current_database() on the first tenant boot (AC4).
+    if let Some(team) = pending_tenant_binding_write.as_ref() {
+        maos_audit::write_tenant_binding(&audit_db_path, team, None).map_err(|error| {
+            format!("maos: tenant Transparency Log binding write failed: {error}")
+        })?;
+    }
+
+    // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
+    // already ran this entire root; it must NOT open a second Transparency Log
+    // or reload the manifest (D1/D2).  When MAOS_COHORT_DAEMON_CONFIG is set,
+    // read the daemon config and load the verified cohort manifest state HERE —
+    // above the collective store — so (a) the tenant map is built from it and
+    // 13.1's wall goes live, and (b) the SAME Arc reaches the daemon dispatch
+    // below.  A malformed config is a hard error ONLY in cohort-a2a-daemon mode
+    // (K1 guard): a stale daemon TOML must not fail unrelated modes' boots.
+    let cohort_daemon = cohort_daemon_bootstrap(&transparency_log)?;
+
     // Story 10.4a — construct the collective-tier port (Loom-lite, user-space)
     // + inject the capability registry for I1/I2 mediation.  Configured from
     // MAOS_LOOM_POSTGRES; when absent the collective tier is disabled (ops
     // return CollectiveNotYetAvailable).  The port goes LIVE here so the
     // de-stub is not inert in production (AC1 review Decision A).
-    let collective_port: Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>> =
-        match std::env::var("MAOS_LOOM_POSTGRES") {
-            Ok(conn_str) => {
-                let home_region_str = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
+    // Story 13.6b — the CONCRETE store rides out alongside the port. The
+    // crossing applier needs `apply_replication_bundle`, which is a Loom-lite
+    // API and not on `CollectiveMemoryPort` (that port has no `share` verb at
+    // all — Residual 7), so the trait object cannot carry it. This is still
+    // exactly ONE `LoomLiteStore::new` in the process (D-5): the same `Arc` the
+    // adapter holds, cloned, never a second construction.
+    let (collective_port, tenant_spirit_map, collective_store): (
+        Option<Arc<dyn maos_domain::ports::CollectiveMemoryPort>>,
+        Option<Arc<maos_bin::tenant_map::TenantMapAdapter>>,
+        Option<Arc<maos_loom_lite::store::LoomLiteStore>>,
+    ) = match std::env::var("MAOS_LOOM_POSTGRES") {
+        Ok(conn_str) => {
+            let home_region_str = maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
                     .home_region
                     .as_ref()
                     .map(|r| r.as_str().to_string())
                     .unwrap_or_default();
-                let cfg = maos_loom_lite::store::StoreConfig {
-                    connection_string: conn_str,
-                    home_region: home_region_str,
-                    ..Default::default()
-                };
-                match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
-                    Ok(store) => {
-                        // Story 11.4c — inject the at-rest envelope seal when
-                        // org-KMS is configured (real AEAD ciphertext on the
-                        // collective store; None → byte-identical Option-A
-                        // plaintext, the v1.5 default preserved).
-                        let store = match enterprise_runtime
-                            .as_ref()
-                            .and_then(|rt| rt.at_rest_seal_hook())
-                        {
-                            Some(hook) => store.with_at_rest_seal(Some(hook)),
-                            None => store,
-                        };
-                        let store = Arc::new(store);
-                        if let Err(e) = store.init_schema().await {
-                            eprintln!(
-                                "maos: warn: loom-lite schema init failed (collective tier disabled): {e}"
-                            );
-                            None
-                        } else {
-                            let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
-                                store,
-                                tokio::runtime::Handle::current(),
-                                std::time::Duration::from_secs(5),
-                            ));
-                            eprintln!("maos: collective tier (Loom-lite) initialized");
-                            Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>)
+            let home_team = std::env::var("MAOS_LOOM_HOME_TEAM").map_err(|_| {
+                "maos: MAOS_LOOM_HOME_TEAM is required when MAOS_LOOM_POSTGRES is set"
+            })?;
+            if home_team.trim().is_empty() {
+                return Err(
+                    "maos: MAOS_LOOM_HOME_TEAM must not be empty when MAOS_LOOM_POSTGRES is set"
+                        .into(),
+                );
+            }
+            let validated_home_team = maos_domain::team::TeamId::new(&home_team)
+                .map_err(|error| format!("maos: MAOS_LOOM_HOME_TEAM is not canonical: {error}"))?;
+            // The verified cohort state is safe as a tenant-map source in two
+            // bounded cases: the daemon refreshes it continuously, while
+            // `maos run --once` exits before the signed snapshot can age past
+            // its lease. Continuous non-daemon runs remain fail-closed because
+            // they do not own the cohort refresh service.
+            // Kept inside the MAOS_LOOM_POSTGRES arm: hosts without a
+            // collective tier must not acquire a tenant-map dependency.
+            let tenant_spirit_map = match cohort_daemon.as_ref() {
+                Some(bootstrap) => {
+                    let daemon_mode =
+                        std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
+                    let traceback_mode = cross_wall_traceback.is_some();
+                    let collective_erase_mode =
+                        std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("collective-erase");
+                    let bounded_once = run_args.as_ref().is_some_and(|run| run.once);
+                    let refreshable =
+                        daemon_mode || bounded_once || traceback_mode || collective_erase_mode;
+                    Some(Arc::new(
+                        maos_bin::tenant_map::TenantMapAdapter::new(
+                            Arc::clone(&bootstrap.state),
+                            bootstrap.local_host.as_str(),
+                            refreshable,
+                        )
+                        .map_err(|error| {
+                            format!("maos: tenant map construction failed: {error}")
+                        })?,
+                    ))
+                }
+                None => None,
+            };
+            let tenant_source = tenant_spirit_map
+                .as_ref()
+                .map(|map| Arc::clone(map) as Arc<dyn maos_loom_lite::tenant::TenantMapPort>);
+            let tenant_map = maos_bin::tenant_map::tenant_map_for_store(&home_team, tenant_source)
+                .map_err(|error| format!("maos: tenant map construction failed: {error}"))?;
+            let cross_team_consent = cohort_daemon.as_ref().map(|bootstrap| {
+                Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(
+                    Arc::clone(&bootstrap.state),
+                ))
+                    as Arc<dyn maos_loom_lite::cross_team_consent::CrossTeamConsentPort>
+            });
+            let team_verifying_keys = match cohort_daemon.as_ref() {
+                Some(bootstrap) => {
+                    maos_bin::cross_team_consent::team_verifying_keys_from_env(&bootstrap.state)
+                        .map_err(|error| {
+                            format!("maos: team verifying-key setup failed: {error}")
+                        })?
+                }
+                None => Default::default(),
+            };
+            let cfg = maos_loom_lite::store::StoreConfig {
+                connection_string: conn_str,
+                home_region: home_region_str,
+                home_team: home_team.clone(),
+                ..Default::default()
+            };
+            match maos_loom_lite::store::LoomLiteStore::new(cfg).await {
+                Ok(store) => {
+                    // Story 11.4c — inject the at-rest envelope seal when
+                    // org-KMS is configured (real AEAD ciphertext on the
+                    // collective store; None → byte-identical Option-A
+                    // plaintext, the v1.5 default preserved).
+                    let store = match enterprise_runtime
+                        .as_ref()
+                        .and_then(|rt| rt.at_rest_seal_hook())
+                    {
+                        Some(hook) => store.with_at_rest_seal(Some(hook)),
+                        None => store,
+                    };
+                    let store = match tenant_map.as_ref() {
+                        Some(map) => store.with_tenant_map(Arc::clone(map)),
+                        None => store,
+                    };
+                    let store = match cross_team_consent {
+                        Some(consent) => store.with_cross_team_consent(consent),
+                        None => store,
+                    };
+                    let store = store.with_team_verifying_keys(team_verifying_keys);
+                    let store = Arc::new(store);
+                    if let Err(e) = store.init_schema().await {
+                        return Err(format!("maos: loom-lite schema init failed: {e}").into());
+                    } else {
+                        // Story 13.5g — PHASE B: persisted datname vs live
+                        // current_database(). The real Stage-2: the persisted
+                        // value comes from a PREVIOUS boot, so unlike the retired
+                        // reconcile (D-1) it is NOT entailed by the same-boot
+                        // connection_assignment_guard. Arms on the 2nd tenant
+                        // boot; the 1st records the datname (AC4).
+                        let live_datname = store.current_database().await.map_err(|error| {
+                            format!(
+                                "maos: tenant Transparency Log Phase B live datname read failed: {error}"
+                            )
+                        })?;
+                        let phase_b_read = maos_audit::read_tenant_artifact(&audit_db_path)
+                            .map_err(|error| {
+                                format!(
+                                    "maos: tenant Transparency Log Phase B read failed: {error}"
+                                )
+                            })?;
+                        match maos_audit::verify_datname_binding(
+                            phase_b_read.binding_datname.as_deref(),
+                            &live_datname,
+                        ) {
+                            maos_audit::DatnameBindingDecision::Proceed => {}
+                            maos_audit::DatnameBindingDecision::RecordFirstDatname => {
+                                maos_audit::write_tenant_binding(
+                                    &audit_db_path,
+                                    &validated_home_team,
+                                    Some(&live_datname),
+                                )
+                                .map_err(|error| {
+                                    format!(
+                                        "maos: tenant Transparency Log Phase B datname record failed: {error}"
+                                    )
+                                })?;
+                            }
+                            maos_audit::DatnameBindingDecision::RefuseDatnameDrift {
+                                persisted,
+                                live,
+                            } => {
+                                return Err(format!(
+                                    "maos: tenant Transparency Log refused: persisted datname \
+                                     {persisted} != live {live} (Phase B drift)"
+                                )
+                                .into());
+                            }
                         }
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "maos: warn: loom-lite store init failed (collective tier disabled): {e}"
-                        );
-                        None
+                        maos_bin::tenant_map::bind_tenant_audit_artifact(
+                            &audit_db_path,
+                            &validated_home_team,
+                        )
+                        .map_err(|error| {
+                            format!("maos: tenant Transparency Log binding failed: {error}")
+                        })?;
+                        let adapter = Arc::new(maos_loom_lite::adapter::LoomLiteAdapter::new(
+                            Arc::clone(&store),
+                            tokio::runtime::Handle::current(),
+                            std::time::Duration::from_secs(5),
+                        ));
+                        eprintln!("maos: collective tier (Loom-lite) initialized");
+                        (
+                            Some(adapter as Arc<dyn maos_domain::ports::CollectiveMemoryPort>),
+                            tenant_spirit_map,
+                            Some(store),
+                        )
                     }
                 }
+                Err(e) => {
+                    return Err(format!("maos: loom-lite store init failed: {e}").into());
+                }
             }
-            Err(_) => {
-                eprintln!(
+        }
+        Err(_) => {
+            eprintln!(
                     "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
                 );
-                None
-            }
-        };
+            (None, None, None)
+        }
+    };
 
     // Story 11.1a — construct the SpiritHostPort (ADR-031). `None` when the
     // `wasm-host` feature is off (the export-control default, AC6) or when
@@ -2072,7 +3017,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // write to Principal namespaces.
         .with_principal_write_enforcement()
         // Story 10.4a — collective tier (Loom-lite) + I1/I2 mediation.
-        .with_collective_port(collective_port)
+        .with_collective_port(collective_port.clone())
         .with_capabilities(Some(Arc::clone(&capability))),
     );
 
@@ -2086,10 +3031,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     eprintln!("maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)");
 
-    // Story 4.4 — LogRecallAdapter + DistillateWriter (log-recall + I11 audit chain).
-    let log_recall_adapter = Arc::new(maos_kernel_core::iac::log_recall::LogRecallAdapter::new(
-        Arc::clone(&transparency_log),
-    ));
+    // Story 4.4 / 13.3b — LogRecallAdapter + directional manifest-consent seam.
+    let mut log_recall =
+        maos_kernel_core::iac::log_recall::LogRecallAdapter::new(Arc::clone(&transparency_log));
+    if let (Some(bootstrap), Ok(home_team)) =
+        (cohort_daemon.as_ref(), std::env::var("MAOS_LOOM_HOME_TEAM"))
+    {
+        let home_team = maos_domain::team::TeamId::new(&home_team).map_err(|error| {
+            format!("maos: invalid MAOS_LOOM_HOME_TEAM for cross-wall recall: {error}")
+        })?;
+        log_recall = log_recall.with_cross_wall_consent(Arc::new(
+            maos_bin::cross_team_consent::CrossWallRecallConsentAdapter::new(
+                Arc::clone(&bootstrap.state),
+                home_team,
+            ),
+        ));
+        // The cross-wall read resolves per-team shards, which only exist under
+        // the collective tier (ADR-055 §4: MAOS_LOOM_POSTGRES + home team). With
+        // Postgres absent, leave the read port unattached so `recall_cross_wall`
+        // fails closed (ReadPortUnavailable) instead of deriving the global
+        // artifact and returning the caller's own rows under a remote label.
+        if std::env::var_os("MAOS_LOOM_POSTGRES").is_some() {
+            log_recall = log_recall.with_cross_wall_read(Arc::new(
+                maos_bin::cross_wall_log_read::CrossWallLogReadAdapter::new(true),
+            ));
+        }
+    }
+    let log_recall_adapter = Arc::new(log_recall);
+    if let Some(request) = cross_wall_traceback {
+        let remote_team = request.remote_team().to_string();
+        let spirit_pid = request.spirit_pid();
+        match run_cross_wall_traceback(log_recall_adapter.as_ref(), request) {
+            Ok(page) => {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "surface": "cross_wall_traceback",
+                        "outcome": "ok",
+                        "remote_team": remote_team,
+                        "spirit_pid": spirit_pid,
+                        "page": page,
+                    })
+                );
+                return Ok(());
+            }
+            Err(error) => {
+                let outcome = matches!(
+                    &error,
+                    maos_domain::log_recall::LogRecallError::ECrossWallRecallDenied { .. }
+                )
+                .then_some("refused")
+                .unwrap_or("error");
+                eprintln!(
+                    "{}",
+                    serde_json::json!({
+                        "surface": "cross_wall_traceback",
+                        "outcome": outcome,
+                        "remote_team": remote_team,
+                        "spirit_pid": spirit_pid,
+                        "error": error.to_string(),
+                    })
+                );
+                return Err(error.into());
+            }
+        }
+    }
     let memory_any: Arc<dyn std::any::Any + Send + Sync> =
         Arc::clone(&memory) as Arc<dyn std::any::Any + Send + Sync>;
     let distillate_writer = Arc::new(maos_kernel_core::iac::distillate::DistillateWriter::new(
@@ -2496,7 +3502,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let manifest_root: toml::Value = manifest_toml
                 .parse()
                 .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
-
             let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
                 &toml::to_string(&manifest_root["sandbox"]).unwrap_or_default(),
             )?;
@@ -2518,6 +3523,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &toml::to_string(&manifest_root["class"]).unwrap_or_default(),
             )?;
+            let caps_required =
+                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
             let posture_section =
                 maos_kernel_core::security::manifest::PostureSection::from_toml_str(
                     &toml::to_string(&manifest_root["posture"]).unwrap_or_default(),
@@ -2710,6 +3717,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new("."));
             let mut loaded_pids: Vec<(String, u32)> = Vec::with_capacity(topology_entries.len());
+            // T1 — host-authorized CliWrapper Developer-Workers admitted as
+            // topology members (not scheduler class Spirits). Tracked separately
+            // for the drain event.
+            let mut loaded_workers: Vec<String> = Vec::new();
             for entry in topology_entries {
                 let child_path = {
                     let p = std::path::PathBuf::from(&entry);
@@ -2731,12 +3742,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         child_path.display()
                     )
                 })?;
+                // T1 — a [cli_wrapper] topology member is a host-authorized
+                // Developer-Worker (NOT a scheduler class Spirit). Admit it
+                // through the SAME host-grant + adapter + bridge path as the
+                // standalone run (T2/T3), routing + running its delegated task,
+                // then continue loading the class Spirits. (Continuous/halt-resume
+                // of a long-running worker is T4; --once runs it to completion.)
                 if child_root.get("cli_wrapper").is_some() {
-                    return Err(format!(
-                        "maos run: topology entry {} is [cli_wrapper]; class Spirits only in topology manifests",
-                        child_path.display()
-                    )
-                    .into());
+                    if child_root.get("class").is_some() {
+                        return Err(format!(
+                            "maos run: topology entry {} declares both [cli_wrapper] and [class] — \
+                             mutually exclusive (architecture §6.7, EManifestSchemaConflict)",
+                            child_path.display()
+                        )
+                        .into());
+                    }
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "event": "topology_worker_admit",
+                            "manifest": child_path.display().to_string(),
+                            "topology": true,
+                        })
+                    );
+                    run_cli_wrapper_manifest(
+                        &child_root,
+                        &run,
+                        Arc::clone(&transparency_log),
+                        Arc::clone(&capability),
+                        spirit_host.clone(),
+                        enterprise_runtime.clone(),
+                        enterprise_pdp_runtime.as_ref(),
+                    )?;
+                    loaded_workers.push(child_path.display().to_string());
+                    continue;
                 }
                 let child_extract = |section: &str| -> Result<String, Box<dyn std::error::Error>> {
                     let v = child_root.get(section).ok_or_else(|| {
@@ -2768,7 +3807,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
                     &child_extract("resources")?,
                 )?;
-                let caps_required = caps_required_or_empty(&child_root)?;
+                let caps_required = caps_required_or_empty(&child_root)?
+                    .degrade_for_schema_version(class_section.manifest_schema_version);
                 let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
                     &child_extract("output_shape")?,
                 )?;
@@ -3024,7 +4064,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     serde_json::json!({
                         "event": "drain",
                         "topology": true,
-                        "spirits": loaded_pids.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>()
+                        "spirits": loaded_pids.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(),
+                        "workers": loaded_workers,
                     })
                 );
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -3046,11 +4087,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("maos run: topology --once complete — exiting cleanly");
                 return Ok(());
             }
-            // Patch 6 — topology continuous mode is not yet implemented.
-            // Fail explicitly rather than silently falling through to the
-            // single-Spirit serving loop (which is guarded by topology().is_none()).
-            return Err(
-                "maos run: topology continuous mode is not yet supported; use --once".into(),
+            // T4 — topology CONTINUOUS service. Fall through to the shared serving
+            // loop below: the IdleWatchdog drives `on_idle` for every loaded
+            // topology Spirit against real time, `ctrl_c`/SIGTERM trigger the safe
+            // drain, and the halt registry + resume machinery are already wired
+            // (same infrastructure the single-Spirit non-`--once` path uses). The
+            // Developer-Worker ran its delegated task to completion during load
+            // (above), so no in-flight delegation can be preempted by a shutdown
+            // or halt. `MAOS_ONE_SHOT` is unset on the `maos run` path, so the
+            // lifecycle-verb block below is skipped.
+            eprintln!(
+                "maos run: topology '{}' loaded ({} class Spirit(s) + {} worker(s)) — \
+                 entering continuous serving loop (ctrl_c/SIGTERM for safe shutdown)",
+                run.manifest_path,
+                loaded_pids.len(),
+                loaded_workers.len()
             );
         }
 
@@ -3094,7 +4145,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 maos_kernel_core::security::SandboxConfig::from_toml_str(&extract("sandbox")?)?;
             let resource_caps =
                 maos_kernel_core::security::ResourceCaps::from_toml_str(&extract("resources")?)?;
-            let caps_required = caps_required_or_empty(&manifest_root)?;
+            let caps_required = caps_required_or_empty(&manifest_root)?
+                .degrade_for_schema_version(class_section.manifest_schema_version);
             let output_shape =
                 maos_kernel_core::security::OutputShape::from_toml_str(&extract("output_shape")?)?;
             let posture_section = PostureSection::from_toml_str(&extract("posture")?)
@@ -3206,6 +4258,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut halt_receipt_handle: Option<
                 Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
             > = None;
+            let mut researcher_collective_failure: Option<Arc<std::sync::atomic::AtomicBool>> =
+                None;
 
             // JB-5 — shared output channel for output_shape validation (only
             // populated for Butler-class Spirits).
@@ -3444,6 +4498,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let mut researcher = researcher::Researcher::new();
                     let mut researcher_mcp_ref: Option<Arc<LiveResearcherMcpPort>> = None;
+                    let researcher_collective_ref = collective_port.as_ref().map(|_| {
+                        Arc::new(LiveResearcherCollectivePort::new(
+                            Arc::clone(&memory),
+                            Arc::clone(&capability),
+                            enterprise_runtime.clone(),
+                            enterprise_pdp_runtime.clone(),
+                        ))
+                    });
+                    if let Some(port) = researcher_collective_ref.as_ref() {
+                        researcher =
+                            researcher
+                                .with_collective_port(Arc::clone(port)
+                                    as Arc<dyn researcher::ResearcherCollectivePort>);
+                        researcher_collective_failure =
+                            Some(researcher.collective_route_failure_flag());
+                    }
                     if run.live {
                         // Story 8.14c — wire LiveResearcherMcpPort + LogRecallPort when --live.
                         use maos_domain::ports::mcp::McpTransportId;
@@ -3690,6 +4760,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         mcp.spirit_pid
                             .store(pid, std::sync::atomic::Ordering::SeqCst);
                     }
+                    if let Some(port) = researcher_collective_ref.as_ref() {
+                        port.spirit_pid
+                            .store(pid, std::sync::atomic::Ordering::SeqCst);
+                        if let Some(map) = tenant_spirit_map.as_ref() {
+                            let bound_pid =
+                                port.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+                            maos_loom_lite::tenant::TenantMapPort::register_spirit(
+                                map.as_ref(),
+                                bound_pid,
+                                maos_domain::ports::registry::SpiritId::from(spirit_id.as_str()),
+                            );
+                        }
+                    }
                     pid
                 }
                 LoadedSpiritKind::Orchestrator => scheduler
@@ -3814,6 +4897,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "{}",
                     serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                 );
+                if kind == LoadedSpiritKind::Researcher
+                    && researcher_collective_failure
+                        .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
+                {
+                    return Err(
+                        "maos run: researcher collective readiness round-trip failed".into(),
+                    );
+                }
                 if kind == LoadedSpiritKind::Digest {
                     let home = std::env::var_os("MAOS_HOME")
                         .map(std::path::PathBuf::from)
@@ -3924,6 +5015,182 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // cap-audit drain (the 1b.5b drain stays only in the `hello-spirit`
     // arm). They write exactly one Lifecycle Journal entry and exit.
     if let Ok(mode) = std::env::var("MAOS_ONE_SHOT") {
+        if mode == "legal-hold-list" {
+            let holds = transparency_log
+                .list_legal_holds()
+                .map_err(|error| format!("legal-hold list failed: {error}"))?;
+            println!(
+                "{}",
+                serde_json::to_string(&holds)
+                    .map_err(|error| format!("legal-hold list encode failed: {error}"))?
+            );
+            return Ok(());
+        }
+        if mode == "legal-hold-release" {
+            let principal = std::env::var("MAOS_LEGAL_HOLD_PRINCIPAL")
+                .map_err(|_| "MAOS_LEGAL_HOLD_PRINCIPAL is required")?;
+            if principal.trim().is_empty() {
+                return Err("MAOS_LEGAL_HOLD_PRINCIPAL must not be empty".into());
+            }
+            let released = transparency_log
+                .release_legal_hold(principal.trim())
+                .map_err(|error| format!("legal-hold release failed: {error}"))?;
+            println!(
+                "{}",
+                serde_json::json!({
+                    "principal_id": principal.trim(),
+                    "released": released,
+                    "auto_erased": false
+                })
+            );
+            return Ok(());
+        }
+        if mode == "collective-erase" {
+            let port = collective_port
+                .as_ref()
+                .cloned()
+                .ok_or("collective erase requires MAOS_LOOM_POSTGRES")?;
+            let store = collective_store
+                .as_ref()
+                .ok_or("collective erase requires a configured Loom-lite store")?;
+            let spirit_pid = std::env::var("MAOS_COLLECTIVE_ERASE_PID")
+                .map_err(|_| "MAOS_COLLECTIVE_ERASE_PID is required")?
+                .parse::<u32>()
+                .map_err(|_| "MAOS_COLLECTIVE_ERASE_PID must be a u32")?;
+            let tenant_map = tenant_spirit_map
+                .as_ref()
+                .ok_or("collective erase requires a verified cohort tenant-map source")?;
+            let bootstrap = cohort_daemon
+                .as_ref()
+                .ok_or("collective erase requires MAOS_COHORT_DAEMON_CONFIG")?;
+            maos_loom_lite::tenant::TenantMapPort::register_spirit(
+                tenant_map.as_ref(),
+                spirit_pid,
+                bootstrap.control_spirit.clone(),
+            );
+            let namespace = match std::env::var("MAOS_COLLECTIVE_ERASE_NAMESPACE")
+                .as_deref()
+                .unwrap_or("default")
+            {
+                "default" => maos_domain::memory::MemoryNamespace::Default,
+                "coordination" => maos_domain::memory::MemoryNamespace::Coordination,
+                "forgotten" => maos_domain::memory::MemoryNamespace::Forgotten,
+                "principal" => {
+                    return Err(
+                        "principal namespace is partitioned out of collective storage".into(),
+                    )
+                }
+                other => {
+                    return Err(
+                        format!("unsupported MAOS_COLLECTIVE_ERASE_NAMESPACE '{other}'").into(),
+                    )
+                }
+            };
+            let key = std::env::var("MAOS_COLLECTIVE_ERASE_KEY")
+                .map_err(|_| "MAOS_COLLECTIVE_ERASE_KEY is required")?;
+            // A crossed row tells us which origin-team daemon must reconcile.
+            // Resolve this signed provenance before the local erase removes it;
+            // native rows deliberately have no remote side to contact.
+            let origin_team = store
+                .crossed_row_origin(spirit_pid, &namespace, &key)
+                .await
+                .map_err(|error| format!("collective erase origin lookup failed: {error}"))?;
+            let audit_namespace = format!("{namespace:?}");
+            let audit_key = key.clone();
+            let (receipt, reconciliation) = match origin_team {
+                Some(origin) => {
+                    #[cfg(feature = "network")]
+                    {
+                        // Remote erase is tombstone-dominant and idempotent. Dispatch
+                        // it before local deletion: if the remote ACK path fails,
+                        // retry still discovers this crossed physical row and can
+                        // safely resend before deleting it locally.
+                        let bootstrap = cohort_daemon.ok_or(
+                            "collective erase of a crossed row requires MAOS_COHORT_DAEMON_CONFIG",
+                        )?;
+                        let locator_digest = maos_bin::cross_team_crossing::erase_locator_digest(
+                            origin.source_team.as_str(),
+                            &store.config().home_team,
+                            spirit_pid,
+                            match &namespace {
+                                maos_domain::memory::MemoryNamespace::Default => "default",
+                                maos_domain::memory::MemoryNamespace::Coordination => {
+                                    "coordination"
+                                }
+                                maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
+                                maos_domain::memory::MemoryNamespace::Principal { .. } => {
+                                    unreachable!()
+                                }
+                            },
+                            &audit_key,
+                        );
+                        let reconciliation = emit_collective_erase_reconciliation(
+                            Arc::clone(&transparency_log),
+                            boot_nonce,
+                            bootstrap,
+                            origin.clone(),
+                            locator_digest,
+                            spirit_pid,
+                            &namespace,
+                            audit_key.clone(),
+                        )
+                        .await?;
+                        let receipt = store
+                            .erase_crossed_row(
+                                spirit_pid,
+                                &namespace,
+                                &key,
+                                &origin.source_team,
+                                origin.source_ts,
+                                &origin.source_region,
+                            )
+                            .await
+                            .map_err(|error| {
+                                format!("collective crossed-row erase failed: {error}")
+                            })?;
+                        (receipt, reconciliation)
+                    }
+                    #[cfg(not(feature = "network"))]
+                    {
+                        return Err(
+                            "collective erase reconciliation requires the network feature".into(),
+                        );
+                    }
+                }
+                None => {
+                    let erase_namespace = namespace.clone();
+                    let receipt = tokio::task::spawn_blocking(move || {
+                        port.erase(spirit_pid, &erase_namespace, &key)
+                    })
+                    .await
+                    .map_err(|error| format!("collective erase worker failed: {error}"))?
+                    .map_err(|error| format!("collective erase failed: {error}"))?;
+                    (receipt, serde_json::json!({ "status": "not_crossed" }))
+                }
+            };
+            let audit_payload = serde_json::json!({
+                "spirit_pid": spirit_pid,
+                "namespace": audit_namespace,
+                "key": audit_key,
+                "receipt": &receipt,
+                "reconciliation": reconciliation,
+            });
+            let audit_frame_id = transparency_log.insert_kernel_event_returning_id(
+                spirit_pid,
+                "collective.operator.erase",
+                audit_payload.to_string().as_bytes(),
+            );
+            println!(
+                "{}",
+                serde_json::json!({
+                    "receipt": receipt,
+                    "reconciliation": audit_payload["reconciliation"],
+                    "audit_frame_id": hex::encode(audit_frame_id),
+                })
+            );
+            return Ok(());
+        }
+
         // Lifecycle verbs are handled first — they're cheap and exit
         // without engaging the Inference Port / capability registry.
         if let Some(event) = match mode.as_str() {
@@ -3938,63 +5205,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // by `SecurityManagerAdapter::admit_spirit`.
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
 
-            let journal_path = maos_audit::default_journal_path();
-            if let Some(parent) = journal_path.parent() {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    eprintln!(
-                        "maos: failed to create journal parent directory {}: {e}",
-                        parent.display()
-                    );
-                    return Err(format!("journal parent create failed: {e}").into());
-                }
-            }
-            let adapter =
-                maos_kernel_core::journal::JournalAdapter::open(&journal_path).map_err(|e| {
-                    format!(
-                        "failed to open Lifecycle Journal at {}: {e}",
-                        journal_path.display()
-                    )
-                })?;
             let spirit_id =
                 std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "hello-spirit".into());
-            adapter.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(
-                maos_domain::invariants::i10::LifecycleEntry {
-                    timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-                    lifecycle_event: event,
-                    spirit_id: spirit_id.clone(),
-                    payload: None,
-                    effective_sandbox_tier: None,
-                },
-            ));
-            // Adapter's `Drop` impl signals the drain thread and fsyncs
-            // (journal/mod.rs:195-203). No cap-audit drain required.
-            drop(adapter);
+            if mode == "uninstall" {
+                let mut terminal = run_uninstall_cascade(
+                    &spirit_id,
+                    memory.as_ref(),
+                    capability.as_ref(),
+                    &transparency_log,
+                    &audit_db_path,
+                    &memory_db_path,
+                );
+                // ADR-059 Decision 6 — only a successful erase writes the
+                // uninstall lifecycle success. 13.5b review: a journal failure
+                // on that path becomes the terminal, never a bare exit 1 hiding
+                // behind an already-printed `erased` receipt.
+                if terminal.exit_code() == 0 {
+                    if let Err(error) = append_lifecycle_journal(event, &spirit_id) {
+                        terminal = UninstallCascadeTerminal::Failed {
+                            spirit_id: spirit_id.clone(),
+                            error,
+                        };
+                    }
+                }
+                let exit_code = terminal.exit_code();
+                println!(
+                    "{}",
+                    serde_json::to_string(&terminal)
+                        .map_err(|error| format!("uninstall terminal encode failed: {error}"))?
+                );
+                std::io::Write::flush(&mut std::io::stdout())
+                    .map_err(|error| format!("uninstall terminal flush failed: {error}"))?;
+                // Always exit explicitly: the terminal receipt on stdout and the
+                // process exit code are one contract and must not diverge.
+                std::process::exit(exit_code);
+            }
+
+            let journal_path = append_lifecycle_journal(event, &spirit_id)?;
 
             // Diagnostic copy mirrors the AC1 table verbatim.
             let diag = match mode.as_str() {
                 "start" => "started",
                 "stop" => "stopped",
                 "unload" => "unloaded",
-                "uninstall" => "uninstalled",
+                "uninstall" => unreachable!("uninstall exits above with its terminal receipt"),
                 _ => unreachable!(),
             };
             eprintln!(
                 "maos: {diag} {spirit_id} (journal: {})",
                 journal_path.display()
             );
-            if mode == "uninstall" {
-                let proof_path = run_uninstall_cascade(
-                    &spirit_id,
-                    memory.as_ref(),
-                    capability.as_ref(),
-                    &transparency_log,
-                    &audit_db_path,
-                )
-                .map_err(|e| format!("uninstall cascade failed: {e}"))?;
-                println!(
-                    "{{\"status\":\"uninstalled\",\"spirit_id\":\"{spirit_id}\",\"proof_path\":\"{proof_path}\"}}"
-                );
-            }
             return Ok(());
         }
 
@@ -4159,6 +5419,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &extract_section(&manifest_root, "class")?,
             )?;
+            let caps_required =
+                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
 
             // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
             let _spec = security
@@ -5038,6 +6300,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let to_manifest = std::env::var("MAOS_HOTSWAP_TO_MANIFEST")
                 .unwrap_or_else(|_| "spirits/hello-spirit/manifest.toml".into());
 
+            if let Err(rejection) = enforce_vetted_upgrade_precondition(
+                &spirit_id,
+                std::path::Path::new(&to_manifest),
+                "MAOS_HOTSWAP_TO_ATTESTATION",
+            ) {
+                let out = serde_json::json!({
+                    "verdict": "VettingPreconditionFailed",
+                    "cause": rejection,
+                });
+                println!("{out}");
+                eprintln!(
+                    "maos: hot-swap-precheck {spirit_id} ({from_version} -> {to_manifest}) — vetting precondition failed: {rejection}"
+                );
+                std::process::exit(2);
+            }
+
             // Load a minimal placeholder spirit so resolve_pid succeeds.
             struct PrecheckSpirit;
             impl maos_spirit_abi::lifecycle::Spirit for PrecheckSpirit {}
@@ -5304,6 +6582,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let policy = policy_str
                 .parse::<maos_kernel_core::lifecycle::UpgradePolicy>()
                 .map_err(|e| format!("invalid upgrade policy: {e}"))?;
+            enforce_vetted_upgrade_precondition(
+                &spirit_id,
+                std::path::Path::new(&manifest_path),
+                "MAOS_UPGRADE_TO_ATTESTATION",
+            )
+            .map_err(|error| format!("upgrade vetting precondition failed: {error}"))?;
 
             if std::env::var_os("MAOS_UPGRADE_PLAN").is_some() {
                 let from_version = std::env::var("MAOS_UPGRADE_FROM_VERSION")
@@ -6561,7 +7845,33 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "network")]
         if mode == "cohort-a2a-daemon" {
-            return run_cohort_a2a_daemon_from_env().await;
+            // Story 13.5a — close the dead-wire: the `EnterpriseRuntime`
+            // constructed above never reached the daemon, so every collective
+            // read this process served ran with no SSO principal, no PDP
+            // mediation, no at-rest seal, and no SIEM forward. Build the
+            // enterprise daemon posture HERE and thread it through.
+            let enterprise_posture_required =
+                enterprise_runtime.is_some() || enterprise_pdp_runtime.is_some();
+            let enterprise_daemon_governance = build_enterprise_daemon_governance(
+                security.as_ref(),
+                &capability,
+                &transparency_log,
+                std::path::Path::new("spirits"),
+                shared_journal.as_ref(),
+                enterprise_runtime.as_ref(),
+                enterprise_pdp_runtime.as_ref(),
+                cohort_daemon.as_ref(),
+            )?;
+            return run_cohort_a2a_daemon(
+                Arc::clone(&transparency_log),
+                boot_nonce,
+                cohort_daemon,
+                enterprise_posture_required,
+                enterprise_daemon_governance,
+                collective_store.clone(),
+                tenant_spirit_map.clone(),
+            )
+            .await;
         }
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
@@ -6713,6 +8023,8 @@ description = "smoke test spirit successor"
             let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
                 &extract_section(&manifest_root, "class")?,
             )?;
+            let caps_required =
+                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
 
             // Open the Lifecycle Journal for admission (the Load event).
             let journal_path = maos_audit::default_journal_path();
@@ -6835,44 +8147,13 @@ description = "smoke test spirit successor"
         handle
     });
 
-    // Story 11.4c — SIEM export consumer. Periodically tails the (quiesced)
-    // Transparency Log read-only and forwards redacted records to the
-    // configured localhost sink (MAOS_SIEM_FILE) with a wall-clock watermark
-    // (since_ns) so each record is forwarded once. On sink-down the runtime
-    // surfaces a buffered + operator-visible error (never a silent drop).
-    // Network/HTTPS sinks are additive-deferred and MUST be TLS-only when
-    // introduced (ADR-051); a persistent max-ts watermark is the production
-    // follow-up (this v2.0 reference uses the per-tick wall clock).
+    // Story 11.4c — SIEM export consumer (see `spawn_siem_export_consumer`).
     let _siem_forward_handle = enterprise_runtime.as_ref().map(|rt| {
-        let rt = Arc::clone(rt);
-        let cancel = cancel.clone();
-        tokio::spawn(async move {
-            let mut last_forwarded_ns: Option<u64> = None;
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-            interval.tick().await; // skip the immediate first tick
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    _ = interval.tick() => {
-                        let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
-                        let mut filter = maos_audit::AuditFilter::default();
-                        if let Some(since) = last_forwarded_ns {
-                            filter.since_ns = Some(since.saturating_add(1));
-                        }
-                        match rt.forward_audit_to_siem(filter) {
-                            Ok(n) if n > 0 => eprintln!(
-                                "maos: SIEM export forwarded {n} record(s) to the localhost sink (Story 11.4c)"
-                            ),
-                            Ok(_) => {}
-                            Err(e) => eprintln!(
-                                "maos: SIEM export forward failed — records buffered, operator action required: {e}"
-                            ),
-                        }
-                        last_forwarded_ns = Some(now_ns);
-                    }
-                }
-            }
-        })
+        spawn_siem_export_consumer(
+            Arc::clone(rt),
+            Arc::new(std::sync::Mutex::new(None)),
+            cancel.clone(),
+        )
     });
     if enterprise_runtime.is_some() {
         eprintln!("maos: SIEM export consumer spawned (Story 11.4c)");
@@ -7004,19 +8285,152 @@ description = "smoke test spirit successor"
 }
 
 #[cfg(feature = "network")]
-/// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "outcome", rename_all = "snake_case")]
+enum UninstallCascadeTerminal {
+    Erased {
+        spirit_id: String,
+        proof_path: String,
+        erased_principals: u64,
+    },
+    /// A durable legal hold suspended at least one principal.
+    ///
+    /// Story 13.5b review: this terminal MUST carry what the run actually did.
+    /// The cascade erases unheld principals before it discovers a held one, so
+    /// a bare "held" would report destruction as if nothing had happened.
+    Held {
+        spirit_id: String,
+        /// Principals the hold suspended — nothing was erased for these.
+        held_principal_ids: Vec<String>,
+        /// Principals this same run DID erase. Non-empty means data is gone.
+        erased_principal_ids: Vec<String>,
+        /// Partial proof bundle, present iff `erased_principal_ids` is
+        /// non-empty. NEVER a complete-erasure artifact — the held principals
+        /// appear inside it as `CategoryStatus::CoverageGap`, and no regional
+        /// teardown receipt is written for a held run.
+        proof_path: Option<String>,
+        deleted_entries: u64,
+        revoked_tokens: u64,
+    },
+    NotFound {
+        spirit_id: String,
+    },
+    Failed {
+        spirit_id: String,
+        error: String,
+    },
+}
+
+#[cfg(feature = "network")]
+impl UninstallCascadeTerminal {
+    fn exit_code(&self) -> i32 {
+        match self {
+            Self::Erased { .. } => 0,
+            Self::Held { .. } => 3,
+            Self::NotFound { .. } => 4,
+            Self::Failed { .. } => 5,
+        }
+    }
+
+    fn intent(&self) -> &'static str {
+        match self {
+            Self::Erased { .. } => "principal.uninstall.erased",
+            Self::Held { .. } => "principal.uninstall.held",
+            Self::NotFound { .. } => "principal.uninstall.not-found",
+            Self::Failed { .. } => "principal.uninstall.failed",
+        }
+    }
+}
+
+/// Append one Lifecycle Journal transition and return the journal path.
 ///
-/// Resolves the spirit name to its pid(s), forgets every principal
-/// namespace associated with those pids, revokes all capability tokens,
-/// builds a signed Merkle proof, and persists the bundle to the
-/// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
+/// Extracted in the 13.5b review so the uninstall path can treat a journal
+/// failure as a `Failed` terminal instead of an exit code that contradicts the
+/// terminal receipt already printed on stdout.
+#[cfg(feature = "network")]
+fn append_lifecycle_journal(
+    event: maos_domain::invariants::i10::LifecycleEvent,
+    spirit_id: &str,
+) -> Result<std::path::PathBuf, String> {
+    let journal_path = maos_audit::default_journal_path();
+    if let Some(parent) = journal_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "failed to create journal parent directory {}: {e}",
+                parent.display()
+            )
+        })?;
+    }
+    let adapter = maos_kernel_core::journal::JournalAdapter::open(&journal_path).map_err(|e| {
+        format!(
+            "failed to open Lifecycle Journal at {}: {e}",
+            journal_path.display()
+        )
+    })?;
+    adapter.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(
+        maos_domain::invariants::i10::LifecycleEntry {
+            timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+            lifecycle_event: event,
+            spirit_id: spirit_id.to_string(),
+            payload: None,
+            effective_sandbox_tier: None,
+        },
+    ));
+    // Adapter's `Drop` impl signals the drain thread and fsyncs
+    // (journal/mod.rs:195-203). No cap-audit drain required.
+    drop(adapter);
+    Ok(journal_path)
+}
+
+#[cfg(feature = "network")]
 fn run_uninstall_cascade(
     spirit_id: &str,
     memory: &maos_kernel_core::memory::MemoryManagerAdapter,
     capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
     transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
     audit_db_path: &std::path::Path,
-) -> Result<String, Box<dyn std::error::Error>> {
+    memory_db_path: &std::path::Path,
+) -> UninstallCascadeTerminal {
+    let terminal = match run_uninstall_cascade_inner(
+        spirit_id,
+        memory,
+        capability,
+        transparency_log,
+        audit_db_path,
+        memory_db_path,
+    ) {
+        Ok(terminal) => terminal,
+        Err(error) => UninstallCascadeTerminal::Failed {
+            spirit_id: spirit_id.to_string(),
+            error: error.to_string(),
+        },
+    };
+    let payload = match serde_json::to_vec(&terminal) {
+        Ok(payload) => payload,
+        Err(error) => panic!("serialize uninstall cascade terminal for durable audit: {error}"),
+    };
+    // Trap 4: this append remains a fail-fast audit commit point. The adapter
+    // panics on durable journal failure; catching unwind after partial erasure
+    // would falsely imply a safely recoverable transaction.
+    transparency_log.insert_kernel_event_returning_id(0, terminal.intent(), &payload);
+    terminal
+}
+
+#[cfg(feature = "network")]
+/// Story 9.2 — real uninstall cascade + proof-of-erasure emission.
+///
+/// Resolves the spirit name to its pid(s), forgets every principal
+/// namespace associated with those pids, revokes all capability tokens,
+/// builds a signed Merkle proof, and persists the bundle to the
+/// `MAOS_ERASURE_PROOFS_DIR` / XDG default.
+fn run_uninstall_cascade_inner(
+    spirit_id: &str,
+    memory: &maos_kernel_core::memory::MemoryManagerAdapter,
+    capability: &maos_kernel_core::capability::CapabilityRegistryAdapter,
+    transparency_log: &maos_kernel_core::iac::TransparencyLogAdapter,
+    audit_db_path: &std::path::Path,
+    memory_db_path: &std::path::Path,
+) -> Result<UninstallCascadeTerminal, Box<dyn std::error::Error>> {
     use maos_audit::erasure::proof::{
         build_erasure_proof, write_proof_bundle, CategoryStatus, ErasureCategory,
     };
@@ -7030,7 +8444,9 @@ fn run_uninstall_cascade(
     let incarnations = maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false)
         .map_err(|e| format!("failed to resolve spirit '{spirit_id}': {e}"))?;
     if incarnations.is_empty() {
-        return Err(format!("no incarnation found for spirit '{spirit_id}'").into());
+        return Ok(UninstallCascadeTerminal::NotFound {
+            spirit_id: spirit_id.to_string(),
+        });
     }
 
     let mut total_deleted_entries: u64 = 0;
@@ -7039,6 +8455,15 @@ fn run_uninstall_cascade(
     let mut all_principal_ids: Vec<String> = Vec::new();
     let mut erased_distillate_frame_ids: Vec<[u8; 16]> = Vec::new();
     let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
+    let mut stores_covered = std::collections::BTreeSet::<String>::new();
+    let mut held_principal_ids: Vec<String> = Vec::new();
+
+    // Verify Shared before any destructive operation. A second SQLite open can
+    // fail even while the process's long-lived store connection remains usable
+    // (for example after a permission change); failing here preserves the
+    // invariant that every post-erasure exit has a signed proof.
+    let shared_principal_rows = maos_audit::shared_tier_principal_row_count(memory_db_path)
+        .map_err(|e| format!("failed to verify shared-tier principal emptiness: {e}"))?;
 
     for (_boot_nonce, spirit_pid) in &incarnations {
         let spirit_pid = *spirit_pid;
@@ -7048,6 +8473,10 @@ fn run_uninstall_cascade(
         let principal_ids = transparency_log
             .principal_ids_for_spirit_pid(spirit_pid)
             .map_err(|e| format!("failed to list principals for pid {spirit_pid}: {e}"))?;
+        // NOTE (13.5b review): do NOT `continue` on an empty principal list.
+        // Token revocation below is unconditional per incarnation, and skipping
+        // it left an uninstalled identity holding live capability tokens. The
+        // inner loop over an empty vec is already a no-op.
         for principal_id in &principal_ids {
             match memory.forget_with_reason(principal_id, None) {
                 Ok(maos_domain::memory::ForgetOutcome::Erased {
@@ -7058,6 +8487,8 @@ fn run_uninstall_cascade(
                     total_deleted_entries += receipt.deleted_entries;
                     total_deleted_index_rows += receipt.deleted_index_rows;
                     all_principal_ids.push(principal_id.clone());
+                    stores_covered.insert("private".into());
+                    stores_covered.insert("principal_index".into());
                     // Collect the scrubbed distillate frames for the proof.
                     for hex_id in redacted_distillate_frame_ids {
                         if let Ok(bytes) = hex::decode(&hex_id) {
@@ -7085,6 +8516,7 @@ fn run_uninstall_cascade(
                         "maos: uninstall blocked by legal hold for principal {}: {:?}",
                         principal_id, hold
                     );
+                    held_principal_ids.push(principal_id.clone());
                 }
                 Err(e) => {
                     return Err(format!("forget failed for principal {principal_id}: {e}").into());
@@ -7095,6 +8527,28 @@ fn run_uninstall_cascade(
         // Revoke all capability tokens for the spirit.
         total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid).unwrap_or(0);
     }
+
+    if all_principal_ids.is_empty() && shared_principal_rows == 0 {
+        if held_principal_ids.is_empty() {
+            return Ok(UninstallCascadeTerminal::NotFound {
+                spirit_id: spirit_id.to_string(),
+            });
+        }
+        // Held, and this run destroyed no principal data — so there is nothing
+        // to attest and no proof is written. "No proof" keeps meaning "nothing
+        // happened", which is exactly how an operator reads it.
+        return Ok(UninstallCascadeTerminal::Held {
+            spirit_id: spirit_id.to_string(),
+            held_principal_ids,
+            erased_principal_ids: Vec::new(),
+            proof_path: None,
+            deleted_entries: 0,
+            revoked_tokens: total_revoked_tokens as u64,
+        });
+    }
+    // Past this point the cascade either destroyed principal data or found
+    // pre-partition Shared residue that requires a signed CoverageGap. Every
+    // exit below must therefore produce a signed artifact describing reality.
 
     // Capture post-erasure tree leaves.
     let post_frame_ids = transparency_log
@@ -7116,7 +8570,27 @@ fn run_uninstall_cascade(
             )
         })?;
 
-    let categories = vec![
+    // The Shared partition stops new principal rows from entering; this
+    // preflight count distinguishes that future guarantee from pre-existing
+    // residue, which is unreachable but not erased.
+    let (shared_status, shared_failure) = if shared_principal_rows == 0 {
+        stores_covered.insert("shared".into());
+        (CategoryStatus::VerifiedEmpty, None)
+    } else {
+        let reason = format!(
+            "shared tier holds {shared_principal_rows} pre-partition principal row(s); the \
+             Story 13.5h partition makes them unreachable but there is no delete path, so \
+             they are NOT erased"
+        );
+        (
+            CategoryStatus::CoverageGap {
+                reason: reason.clone(),
+            },
+            Some(reason),
+        )
+    };
+
+    let mut categories = vec![
         ErasureCategory {
             name: "memory_namespace".into(),
             status: CategoryStatus::Removed {
@@ -7134,6 +8608,10 @@ fn run_uninstall_cascade(
             status: CategoryStatus::Removed {
                 count: total_revoked_tokens as u64,
             },
+        },
+        ErasureCategory {
+            name: "shared".into(),
+            status: shared_status,
         },
         ErasureCategory {
             name: "principal_frames".into(),
@@ -7158,6 +8636,20 @@ fn run_uninstall_cascade(
             },
         },
     ];
+    // 13.5b review: a mixed run erased some principals and was suspended on
+    // others. The held ones are an explicit coverage gap inside the same signed
+    // bundle, so the artifact can never be read as a complete erasure.
+    if !held_principal_ids.is_empty() {
+        categories.push(ErasureCategory {
+            name: "legal_hold".into(),
+            status: CategoryStatus::CoverageGap {
+                reason: format!(
+                    "suspended by durable legal hold, not erased: {}",
+                    held_principal_ids.join(", ")
+                ),
+            },
+        });
+    }
 
     // P23: stamp the proof with the LATEST incarnation's pid (the current
     // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
@@ -7181,6 +8673,16 @@ fn run_uninstall_cascade(
     let proof_path = write_proof_bundle(&proof, &proof_dir)
         .map_err(|e| format!("failed to write erasure proof: {e}"))?;
 
+    // Shared residue is an incomplete uninstall on every deployment shape, not
+    // only when regional receipt construction happens to consume
+    // `stores_covered`. The signed partial proof remains available for recovery.
+    if let Some(reason) = shared_failure {
+        return Ok(UninstallCascadeTerminal::Failed {
+            spirit_id: spirit_id.to_string(),
+            error: format!("{reason}; partial erasure proof: {}", proof_path.display()),
+        });
+    }
+
     // Story 9.4b AC-13/AC-14/AC-15 — when the deployment is region-pinned, emit
     // the two-phase regional teardown receipt alongside the proof:
     //   (a) the forget cascade just completed IS the real erasure over the
@@ -7192,16 +8694,20 @@ fn run_uninstall_cascade(
     // Fail-closed: a teardown that cannot attest BOTH phases is an error, never
     // a silent success (AC-14). The receipt is HOME-key-signed, hence
     // region-NEUTRAL — it survives the region decommission (AC-10/AC-15).
+    //
+    // 13.5b review: a held run is NOT a teardown. It leaves principal rows
+    // deliberately in place, so it must never emit a regional teardown receipt
+    // — the partial proof above is its only artifact.
     if let Some(region) =
         maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
             .home_region
+            .filter(|_| held_principal_ids.is_empty())
     {
         use maos_audit::erasure::regional_teardown::{
             build_regional_teardown_receipt, decommission_region_key, ForgetCascadeAttestation,
-            REQUIRED_STORES,
         };
         let forget = ForgetCascadeAttestation::from_outcome(
-            REQUIRED_STORES.iter().map(|s| s.to_string()).collect(),
+            stores_covered.iter().cloned().collect(),
             all_principal_ids.len() as u64,
         )
         .map_err(|e| format!("regional teardown failed (fail-closed): {e}"))?;
@@ -7225,7 +8731,22 @@ fn run_uninstall_cascade(
             .map_err(|e| format!("failed to write teardown receipt: {e}"))?;
     }
 
-    Ok(proof_path.to_string_lossy().to_string())
+    if !held_principal_ids.is_empty() {
+        return Ok(UninstallCascadeTerminal::Held {
+            spirit_id: spirit_id.to_string(),
+            held_principal_ids,
+            erased_principal_ids: all_principal_ids,
+            proof_path: Some(proof_path.to_string_lossy().to_string()),
+            deleted_entries: total_deleted_entries,
+            revoked_tokens: total_revoked_tokens as u64,
+        });
+    }
+
+    Ok(UninstallCascadeTerminal::Erased {
+        spirit_id: spirit_id.to_string(),
+        proof_path: proof_path.to_string_lossy().to_string(),
+        erased_principals: all_principal_ids.len() as u64,
+    })
 }
 
 #[cfg(feature = "network")]
@@ -7553,21 +9074,63 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 struct CohortDaemonFileConfig {
     tcp: maos_a2a_tcp::TcpA2AConfig,
     peers: Vec<maos_a2a_core::A2APeerConfig>,
-    own_boot_nonce: u64,
     manifest_path: std::path::PathBuf,
     authority_keys: Vec<String>,
     local_host: String,
     control_spirit: String,
-    transparency_log_path: std::path::PathBuf,
     digest_summary: maos_cohort::DigestSummary,
 }
 
+// Story 13.5c — everything the cohort-a2a-daemon needs from its config file,
+// plus the verified manifest state loaded from it.  Constructed at the
+// composition root (~main.rs:2268) so the tenant map is built from the SAME
+// `Arc<CohortManifestState>` the daemon later refreshes.  The daemon no longer
+// owns a Transparency Log or a boot nonce — it receives the primary root's
+// (D1/D2/D3).
 #[cfg(feature = "network")]
-async fn run_cohort_a2a_daemon_from_env() -> Result<(), Box<dyn std::error::Error>> {
-    use maos_a2a_core::router::A2ATransport as _;
-    let config_path = std::env::var("MAOS_COHORT_DAEMON_CONFIG")
-        .map_err(|_| "MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
-    let config_text = std::fs::read_to_string(&config_path)
+struct CohortDaemonBootstrap {
+    state: std::sync::Arc<maos_cohort::CohortManifestState>,
+    tcp: maos_a2a_tcp::TcpA2AConfig,
+    peers: Vec<maos_a2a_core::A2APeerConfig>,
+    local_host: maos_spirit_abi::identity::HostId,
+    control_spirit: maos_spirit_abi::identity::SpiritId,
+    digest_summary: maos_cohort::DigestSummary,
+}
+
+// Story 13.5c — read MAOS_COHORT_DAEMON_CONFIG (if set) and load the verified
+// cohort state under the PRIMARY Transparency Log.  Returns `None` when the env
+// var is unset.  A malformed/unverifiable config is a hard boot error ONLY in
+// cohort-a2a-daemon mode; other modes log and continue with `None` (tenant mode
+// then refuses via SourceUnavailable at the store) so a stale TOML never bricks
+// an unrelated boot (K1 guard).
+#[cfg(feature = "network")]
+fn cohort_daemon_bootstrap(
+    transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+) -> Result<Option<CohortDaemonBootstrap>, Box<dyn std::error::Error>> {
+    let config_path = match std::env::var("MAOS_COHORT_DAEMON_CONFIG") {
+        Ok(path) => path,
+        Err(_) => return Ok(None),
+    };
+    let in_daemon_mode = std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
+    match load_cohort_daemon_bootstrap(&config_path, std::sync::Arc::clone(transparency_log)) {
+        Ok(bootstrap) => Ok(Some(bootstrap)),
+        Err(error) if in_daemon_mode => Err(error),
+        Err(error) => {
+            eprintln!(
+                "maos: cohort daemon config present but not loadable ({error}); tenant mode \
+                 will refuse until a valid config runs in cohort-a2a-daemon mode"
+            );
+            Ok(None)
+        }
+    }
+}
+
+#[cfg(feature = "network")]
+fn load_cohort_daemon_bootstrap(
+    config_path: &str,
+    transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+) -> Result<CohortDaemonBootstrap, Box<dyn std::error::Error>> {
+    let config_text = std::fs::read_to_string(config_path)
         .map_err(|error| format!("read cohort daemon config {config_path}: {error}"))?;
     let file: CohortDaemonFileConfig = toml::from_str(&config_text)
         .map_err(|error| format!("parse cohort daemon config {config_path}: {error}"))?;
@@ -7577,61 +9140,548 @@ async fn run_cohort_a2a_daemon_from_env() -> Result<(), Box<dyn std::error::Erro
             file.manifest_path.display()
         )
     })?;
-    let transparency_log = std::sync::Arc::new(
-        maos_iac::TransparencyLogAdapter::open(&file.transparency_log_path, file.own_boot_nonce)
-            .map_err(|error| {
-                format!(
-                    "open cohort transparency log {}: {error}",
-                    file.transparency_log_path.display()
-                )
-            })?,
-    );
-    let runtime = build_cohort_a2a_daemon_runtime(
-        CohortDaemonConfig {
-            manifest_toml,
-            pinned_authority_keys: maos_cohort::PinnedAuthorityKeys::from_hex(
-                &file.authority_keys,
-            )?,
-            local_host: maos_spirit_abi::identity::HostId(file.local_host),
-            control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
-            transparency_log,
-            digest_summary: file.digest_summary,
-        },
-        file.tcp,
-        file.peers,
-        file.own_boot_nonce,
-    )
-    .await?;
-    eprintln!(
-        "cohort-a2a-daemon listening on {}",
-        runtime
-            .transport
-            .local_addr()
-            .ok_or("cohort daemon transport did not expose a listener")?
-    );
-    tokio::signal::ctrl_c().await?;
-    runtime.shutdown().await
+    let local_host = maos_spirit_abi::identity::HostId(file.local_host);
+    // The manifest-audit sink writes to the PRIMARY Transparency Log (opened at
+    // main.rs:2254), so the daemon and the rest of the root share one log and
+    // one boot nonce (AC1/D2).
+    let audit = std::sync::Arc::new(maos_cohort::CohortTransparencyLogSink::new(
+        transparency_log,
+    ));
+    let state = std::sync::Arc::new(maos_cohort::CohortManifestState::load(
+        local_host.clone(),
+        &manifest_toml,
+        maos_cohort::PinnedAuthorityKeys::from_hex(&file.authority_keys)?,
+        audit,
+    )?);
+    Ok(CohortDaemonBootstrap {
+        state,
+        tcp: file.tcp,
+        peers: file.peers,
+        local_host,
+        control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
+        digest_summary: file.digest_summary,
+    })
+}
+
+/// Story 13.5a — the `cohort-a2a-daemon` control-Spirit pid.
+///
+/// The composition-root convention for a single-Spirit admission (the same pid
+/// `main.rs` already admits and issues under on the one-shot / `spirit-spawn`
+/// arms). H4: enterprise PDP subject-deny binds per-`spirit_pid`, so with one
+/// control pid the daemon posture is governed as ONE subject — per daemon, not
+/// per tenant Spirit.
+#[cfg(feature = "network")]
+const DAEMON_CONTROL_SPIRIT_PID: u32 = 0;
+
+/// Story 13.5a — TTL for the capability minted per governed collective read
+/// served by the daemon. Short-lived: the token authorizes exactly the digest
+/// read being admitted, and nothing outlives the admit.
+#[cfg(feature = "network")]
+const DAEMON_GOVERNED_READ_TTL_SECS: u32 = 60;
+
+/// Story 13.5a — the enterprise-governed daemon **posture**.
+///
+/// NOT a Spirit and NOT a Spirit crate (AC2): the enterprise subsystems live
+/// behind `maos-bin`-only dependencies, so no Spirit can compose them. This is
+/// the already-composed `EnterpriseRuntime` + `EnterprisePdpRuntime` +
+/// collective-store at-rest seal, bound to ONE admitted control-Spirit pid and
+/// applied at the daemon's collective-operation seam.
+#[cfg(feature = "network")]
+struct EnterpriseDaemonGovernance {
+    capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    /// The collective store's at-rest sealer — built from the SAME
+    /// `EnterpriseRuntime::at_rest_seal_hook()` `Arc` closure installed on
+    /// `LoomLiteStore` at the composition root, held in the SAME
+    /// `AtRestSealer` wrapper `LoomLiteStore::with_at_rest_seal` uses, so the
+    /// seal, its fail-closed error semantics, and its
+    /// `None`-means-byte-identical-plaintext posture are the store's.
+    at_rest: maos_loom_lite::seal::AtRestSealer,
+    transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
+    control_spirit: String,
+    spirit_pid: u32,
+    siem_watermark: Arc<std::sync::Mutex<Option<u64>>>,
 }
 
 #[cfg(feature = "network")]
-struct CohortDaemonConfig {
-    manifest_toml: String,
-    pinned_authority_keys: maos_cohort::PinnedAuthorityKeys,
-    local_host: maos_spirit_abi::identity::HostId,
-    control_spirit: maos_spirit_abi::identity::SpiritId,
+impl EnterpriseDaemonGovernance {
+    /// Run the full enterprise chain for ONE collective operation served by the
+    /// daemon: **SSO principal → Enterprise PDP → kernel mint →
+    /// `identity.asserted` persist → at-rest seal → SIEM forward**.
+    ///
+    /// Every stage is the production implementation, reused not re-implemented:
+    /// the first four are `issue_enterprise_governed_capability`, the fifth is
+    /// the collective store's at-rest hook, the sixth is the same
+    /// `forward_audit_to_siem` tick the export consumer runs.
+    ///
+    /// Fails CLOSED at every stage — the caller turns an `Err` into a NACK, so
+    /// an ungovernable collective read is refused, never silently served.
+    fn govern_collective_read(&self, requester: &str, request_id: &str) -> Result<(), String> {
+        let token = issue_enterprise_governed_capability(
+            self.capability.as_ref(),
+            self.enterprise_runtime.as_deref(),
+            self.enterprise_pdp_runtime.as_ref(),
+            self.spirit_pid,
+            Scope::LoomRead,
+            DAEMON_GOVERNED_READ_TTL_SECS,
+            [0u8; 32],
+            IntentClass::Standard,
+        )?;
+        let record = serde_json::json!({
+            "control_spirit": self.control_spirit,
+            "spirit_pid": self.spirit_pid,
+            "requester": requester,
+            "request_id": request_id,
+            "capability_key": maos_domain::ports::policy_decision::scope_action_key(&Scope::LoomRead),
+            "token_id": hex::encode(token.token_id.0),
+        })
+        .to_string();
+        // At-rest: ciphertext under a configured KMS posture, byte-identical
+        // plaintext under `None`, and a REFUSED read on seal error — never a
+        // plaintext row under a configured seal posture.
+        let sealed = self.at_rest.seal(record.as_bytes()).map_err(|error| {
+            format!("at-rest seal refused the governed collective read: {error}")
+        })?;
+        // Correlated to the cohort `DigestReadRequested` row by request_id
+        // (the 13.5f join), and a raw kind-`TelemetryEvent` row — no new kernel
+        // `FrameKind`, no kernel-core delta (H6). Hex so the ciphertext survives
+        // the Transparency Log's text projections unchanged.
+        let _logged = self.transparency_log.insert_frame_event_with_correlation(
+            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+            self.spirit_pid,
+            None,
+            request_id,
+            "cohort:digest-read-governed",
+            hex::encode(&sealed).as_bytes(),
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+        // SIEM is the projection stage, and it runs AFTER the record is
+        // durably in the Transparency Log. A sink failure is therefore
+        // operator-visible and buffered (the row is already journaled), never
+        // silent — and never a refusal, because refusing the read would not
+        // improve auditability and would take the daemon down with the sink.
+        // This is the 11.4c posture the periodic consumer already runs under.
+        //
+        if let Some(runtime) = self
+            .enterprise_runtime
+            .as_ref()
+            .filter(|runtime| runtime.siem_configured())
+        {
+            match forward_audit_to_siem_once(runtime, &self.siem_watermark) {
+                Ok(n) if n > 0 => eprintln!(
+                    "maos: SIEM export forwarded {n} record(s) for governed collective read {request_id}"
+                ),
+                Ok(_) => {}
+                Err(error) => eprintln!(
+                    "maos: SIEM export for governed collective read {request_id} failed — \
+                     records buffered in the Transparency Log, operator action required: {error}"
+                ),
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Story 13.5a — the governed decorator over the daemon's collective-serve
+/// seam.
+///
+/// `note_admitted_request` is the daemon's collective-operation chokepoint.
+/// The inner state atomically rejects malformed, duplicate, and over-capacity
+/// requests before running the governance guard; only a new admissible request
+/// may mint a capability and publish the reply obligation.
+#[cfg(feature = "network")]
+struct EnterpriseGovernedDigestReadPort {
+    inner: Arc<dyn maos_a2a_core::DigestReadPort>,
+    governance: Arc<EnterpriseDaemonGovernance>,
+}
+
+#[cfg(feature = "network")]
+impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
+    fn classify(&self, frame: &maos_domain::frame::IacFrame) -> maos_a2a_core::DigestFrameClass {
+        self.inner.classify(frame)
+    }
+
+    fn note_admitted_request_guarded(
+        &self,
+        requester: &maos_spirit_abi::identity::HostId,
+        request_id: &str,
+        frame: &maos_domain::frame::IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
+    ) -> Result<(), String> {
+        self.inner
+            .note_admitted_request_guarded(requester, request_id, frame, &mut || {
+                before_commit()?;
+                self.governance
+                    .govern_collective_read(requester.as_str(), request_id)
+            })
+    }
+
+    fn authorize_reply_send(
+        &self,
+        peer: &maos_spirit_abi::identity::HostId,
+        request_id: &str,
+    ) -> bool {
+        self.inner.authorize_reply_send(peer, request_id)
+    }
+
+    fn observe_reply(
+        &self,
+        peer: &maos_spirit_abi::identity::HostId,
+        frame: &maos_domain::frame::IacFrame,
+    ) -> Result<maos_a2a_core::DigestReplyObservation, String> {
+        self.inner.observe_reply(peer, frame)
+    }
+}
+
+/// Story 13.5a — admit the daemon's control Spirit through the CANONICAL
+/// admission path so its manifest-declared `loom.*` grants land in the policy
+/// table the kernel consults at mint time.
+///
+/// The composition root never seeds the manifest-derived policy table directly
+/// (that negative is gated, and its guard is a literal source scan — do not name
+/// the field here); the only supported route is a manifest that declares
+/// `[capabilities.required.loom] read = true`. A control Spirit without it
+/// boots fine and then refuses every governed collective read — fail-closed,
+/// loudly, at the seam.
+#[cfg(feature = "network")]
+fn admit_daemon_control_spirit(
+    security: &maos_kernel_core::security::SecurityManagerAdapter,
+    spirits_root: &std::path::Path,
+    journal: &maos_kernel_core::journal::JournalAdapter,
+    spirit_pid: u32,
+    spirit_id: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let manifest_path = spirits_root.join(spirit_id).join("manifest.toml");
+    let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|error| {
+        format!(
+            "enterprise daemon posture: control Spirit manifest {} is unreadable: {error}",
+            manifest_path.display()
+        )
+    })?;
+    let manifest_root: toml::Value = toml::from_str(&manifest_toml)
+        .map_err(|error| format!("control Spirit manifest TOML parse error: {error}"))?;
+    let section = |name: &str| -> Result<String, String> {
+        let value = manifest_root
+            .get(name)
+            .ok_or_else(|| format!("control Spirit manifest is missing section [{name}]"))?;
+        toml::to_string(value).map_err(|error| format!("serialize [{name}]: {error}"))
+    };
+    let sandbox_cfg =
+        maos_kernel_core::security::SandboxConfig::from_toml_str(&section("sandbox")?)?;
+    let resource_caps =
+        maos_kernel_core::security::ResourceCaps::from_toml_str(&section("resources")?)?;
+    let caps_required = {
+        let value = manifest_root
+            .get("capabilities")
+            .and_then(|caps| caps.get("required"))
+            .ok_or("control Spirit manifest is missing [capabilities.required]")?;
+        let text = toml::to_string(value)
+            .map_err(|error| format!("serialize [capabilities.required]: {error}"))?;
+        maos_kernel_core::security::CapabilitiesRequired::from_toml_str(&text)?
+    };
+    let output_shape =
+        maos_kernel_core::security::OutputShape::from_toml_str(&section("output_shape")?)?;
+    let posture_section =
+        maos_kernel_core::security::manifest::PostureSection::from_toml_str(&section("posture")?)
+            .map_err(|error| format!("posture parse: {error}"))?;
+    let epistemic_policy = manifest_root
+        .get("epistemic_policy")
+        .map(|value| {
+            let text = toml::to_string(value)
+                .map_err(|error| format!("epistemic_policy serialize: {error}"))?;
+            maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&text)
+                .map_err(|error| format!("epistemic_policy parse: {error}"))
+        })
+        .transpose()?;
+    let class_section =
+        maos_kernel_core::security::ClassSection::from_toml_str(&section("class")?)?;
+    let caps_required =
+        caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
+
+    security.admit_spirit(
+        spirit_pid,
+        spirit_id,
+        &sandbox_cfg,
+        &resource_caps,
+        &caps_required,
+        Some(&output_shape),
+        journal,
+        &posture_section,
+        epistemic_policy.as_ref(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(&class_section),
+    )?;
+    Ok(())
+}
+
+/// Story 13.5a — build the enterprise daemon posture at the composition root.
+///
+/// `None` when no enterprise subsystem is configured (`MAOS_SSO_*` /
+/// `MAOS_PDP_POLICY*` / `MAOS_KMS_*` / `MAOS_SIEM_*` all absent) — the daemon
+/// then behaves exactly as it did before this story. `Some` closes the
+/// dead-wire: the already-constructed `EnterpriseRuntime` finally reaches the
+/// daemon.
+#[cfg(feature = "network")]
+fn build_enterprise_daemon_governance(
+    security: &maos_kernel_core::security::SecurityManagerAdapter,
+    capability: &Arc<CapabilityRegistryAdapter>,
+    transparency_log: &Arc<maos_iac::TransparencyLogAdapter>,
+    spirits_root: &std::path::Path,
+    journal: &maos_kernel_core::journal::JournalAdapter,
+    enterprise_runtime: Option<&Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    bootstrap: Option<&CohortDaemonBootstrap>,
+) -> Result<Option<Arc<EnterpriseDaemonGovernance>>, Box<dyn std::error::Error>> {
+    let configured = enterprise_runtime.is_some() || enterprise_pdp_runtime.is_some();
+    let Some(bootstrap) = bootstrap else {
+        return Ok(None);
+    };
+    if !configured {
+        eprintln!(
+            "maos: cohort-a2a-daemon collective reads are UNGOVERNED — set \
+             MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* (and MAOS_PDP_POLICY*) to attach the \
+             enterprise daemon posture (Story 13.5a)"
+        );
+        return Ok(None);
+    }
+
+    let control_spirit = bootstrap.control_spirit.as_str().to_string();
+    admit_daemon_control_spirit(
+        security,
+        spirits_root,
+        journal,
+        DAEMON_CONTROL_SPIRIT_PID,
+        &control_spirit,
+    )?;
+
+    let seal_hook = enterprise_runtime.and_then(|runtime| runtime.at_rest_seal_hook());
+    if enterprise_runtime.is_some_and(|runtime| runtime.kms_configured()) && seal_hook.is_none() {
+        return Err(
+            "enterprise daemon posture: MAOS_KMS_* is configured but no healthy at-rest \
+             seal hook is available; refusing to start rather than persisting plaintext"
+                .into(),
+        );
+    }
+    let at_rest = maos_loom_lite::seal::AtRestSealer::new(seal_hook);
+    eprintln!(
+        "maos: cohort-a2a-daemon collective reads are ENTERPRISE-GOVERNED (Story 13.5a) — \
+         control spirit {control_spirit} pid {DAEMON_CONTROL_SPIRIT_PID}, sso={}, pdp={}, \
+         at-rest-seal={}, siem={}",
+        enterprise_runtime.is_some_and(|runtime| runtime.sso_configured()),
+        enterprise_pdp_runtime.is_some(),
+        at_rest.is_configured(),
+        enterprise_runtime.is_some_and(|runtime| runtime.siem_configured()),
+    );
+    Ok(Some(Arc::new(EnterpriseDaemonGovernance {
+        capability: Arc::clone(capability),
+        enterprise_runtime: enterprise_runtime.cloned(),
+        enterprise_pdp_runtime: enterprise_pdp_runtime.cloned(),
+        at_rest,
+        transparency_log: Arc::clone(transparency_log),
+        control_spirit,
+        spirit_pid: DAEMON_CONTROL_SPIRIT_PID,
+        siem_watermark: Arc::new(std::sync::Mutex::new(None)),
+    })))
+}
+
+#[cfg(feature = "network")]
+fn validate_enterprise_daemon_wiring(
+    enterprise_posture_required: bool,
+    governance: &Option<Arc<EnterpriseDaemonGovernance>>,
+) -> Result<(), String> {
+    match (enterprise_posture_required, governance.is_some()) {
+        (true, false) => Err(
+            "enterprise daemon posture is configured but the governed digest-read port is \
+             unwired; refusing to serve"
+                .to_string(),
+        ),
+        (false, true) => Err(
+            "enterprise daemon governance was supplied without a configured enterprise posture"
+                .to_string(),
+        ),
+        _ => Ok(()),
+    }
+}
+
+#[cfg(feature = "network")]
+async fn run_cohort_a2a_daemon(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
-    digest_summary: maos_cohort::DigestSummary,
+    boot_nonce: u64,
+    bootstrap: Option<CohortDaemonBootstrap>,
+    enterprise_posture_required: bool,
+    enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>,
+    // Story 13.6b — the SINGLE `LoomLiteStore` this process constructed (D-5).
+    // `None` when `MAOS_LOOM_POSTGRES` is unset: the daemon then serves with no
+    // crossing applier and no crossing emitter, byte-for-byte as before.
+    collective_store: Option<Arc<maos_loom_lite::store::LoomLiteStore>>,
+    tenant_spirit_map: Option<Arc<maos_bin::tenant_map::TenantMapAdapter>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2ATransport as _;
+    // The state is loaded at the composition root when the config is present;
+    // its absence here means MAOS_COHORT_DAEMON_CONFIG was unset — the pre-13.5c
+    // typed error, preserved.
+    let bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
+    // Story 13.5a — the SIEM export consumer previously never ran in daemon
+    // mode (the dispatch returns above its spawn). It shares the posture's
+    // watermark so the per-operation forward at the seam and the periodic tail
+    // never re-forward the same record within this daemon lifetime (H5).
+    let siem_cancel = tokio_util::sync::CancellationToken::new();
+    let _siem_forward_handle = enterprise_daemon_governance
+        .as_ref()
+        .and_then(|governance| {
+            governance
+                .enterprise_runtime
+                .as_ref()
+                .map(|runtime| (governance, runtime))
+        })
+        .filter(|(_, runtime)| runtime.siem_configured())
+        .map(|(governance, runtime)| {
+            spawn_siem_export_consumer(
+                Arc::clone(runtime),
+                Arc::clone(&governance.siem_watermark),
+                siem_cancel.clone(),
+            )
+        });
+    // Story 13.6b / AC1 — the applier port is built HERE, from the one store
+    // this process owns, and installed before the accept loop spawns so no
+    // inbound connection observes a legacy-applier window.
+    let base_seed = maos_bin::cross_team_consent::cross_team_base_seed_from_env()?;
+    let crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>> = match (
+        collective_store.as_ref(),
+        base_seed,
+        tenant_spirit_map.as_ref(),
+    ) {
+        (Some(store), Some(seed), Some(tenant_map)) => {
+            let home_team =
+                maos_domain::team::TeamId::new(&store.config().home_team).map_err(|error| {
+                    format!("cohort daemon: MAOS_LOOM_HOME_TEAM is not canonical: {error}")
+                })?;
+            let cross_team_consent =
+                Arc::new(maos_bin::cross_team_consent::CrossTeamConsentAdapter::new(
+                    Arc::clone(&bootstrap.state),
+                ))
+                    as Arc<dyn maos_loom_lite::cross_team_consent::CrossTeamConsentPort>;
+            Some(Arc::new(
+                maos_bin::cross_team_crossing::CrossTeamCrossingAdapter::new(
+                    Arc::clone(store),
+                    home_team,
+                    seed,
+                )
+                .with_erase_reconciliation(
+                    cross_team_consent,
+                    Arc::clone(tenant_map),
+                    bootstrap.control_spirit.clone(),
+                    Arc::clone(&transparency_log),
+                ),
+            )
+                as Arc<dyn maos_a2a_core::CrossTeamCrossingPort>)
+        }
+        // Fail-closed shape, not a silent pass: without a store or without
+        // the seed the applier cannot verify a bundle at all, so the legacy
+        // port stays installed and a crossing frame is never applied.
+        _ => None,
+    };
+    let runtime = build_cohort_a2a_daemon_runtime(
+        Arc::clone(&transparency_log),
+        boot_nonce,
+        bootstrap,
+        enterprise_posture_required,
+        enterprise_daemon_governance,
+        crossing_port,
+    )
+    .await?;
+    runtime.assert_collective_serve_port_fails_closed()?;
+    let listen_addr = runtime
+        .transport
+        .local_addr()
+        .ok_or("cohort daemon transport did not expose a listener")?;
+    // Persist one bounded lifecycle record per real daemon boot. Besides giving
+    // operators an auditable restart trail, the row is stamped by the primary
+    // Transparency Log with the same per-boot nonce threaded into the transport.
+    let _logged = transparency_log.insert_frame_event(
+        maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+        0,
+        None,
+        "cohort:daemon-started",
+        br#"{"event":"daemon_started"}"#,
+        maos_domain::invariants::i3::FrameOrigin::Kernel,
+    );
+    eprintln!("cohort-a2a-daemon listening on {listen_addr}");
+    // ── Story 13.6b / AC1 — THE PRODUCTION WRITE-SIDE CROSSING INITIATOR ──
+    //
+    // It lives HERE, inside the daemon runtime, and nowhere else. D-14 measured
+    // why: `prepare_outbound` (`maos-a2a-tcp/src/transport.rs`) is the only
+    // non-test outbound A2A send in the workspace, its transport is constructed
+    // only by `build_cohort_a2a_daemon_runtime`, and the sibling
+    // `MAOS_ONE_SHOT` arms return from the dispatch thousands of lines before
+    // any transport, peer pin, or manifest gate exists. A one-shot emitter
+    // cannot send an authenticated cohort frame; this one can, because by this
+    // point the listener is live, the pins are loaded, and the signed manifest
+    // has been reconciled against the operator's config (AC4).
+    //
+    // A refused crossing is journaled and reported, NOT fatal: the daemon's job
+    // is to serve the mesh, and an operator's unconsented share request must not
+    // take the node down.
+    if let Some(request) = maos_bin::cross_team_crossing::CrossTeamShareRequest::from_env()? {
+        let store = collective_store
+            .as_ref()
+            .ok_or("MAOS_CROSS_TEAM_SHARE_PEER requires MAOS_LOOM_POSTGRES")?;
+        let seed =
+            base_seed.ok_or("MAOS_CROSS_TEAM_SHARE_PEER requires MAOS_CROSS_TEAM_BASE_SEED")?;
+        emit_cross_team_share(&runtime, store, &seed, request, &transparency_log).await?;
+    }
+    tokio::signal::ctrl_c().await?;
+    siem_cancel.cancel();
+    runtime.shutdown().await
 }
 
 #[cfg(feature = "network")]
 struct CohortDaemonRuntime {
     transport: std::sync::Arc<maos_a2a_tcp::TcpA2ATransport>,
+    /// Story 13.5a — the collective-serve port this boot actually installed
+    /// into the router. Retained (not rebuilt) so the daemon's governance
+    /// posture is observable from the booted runtime: under an enterprise
+    /// posture this is the `EnterpriseGovernedDigestReadPort`, otherwise the
+    /// bare `CohortManifestState`. It is the SAME `Arc` handed to
+    /// `bind_with_cohort_wiring_and_digest`.
+    digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort>,
+    /// Story 13.6b — the control-Spirit address every outbound cohort frame is
+    /// stamped `from`. Retained (not rebuilt) so the crossing emitter uses the
+    /// SAME identity the manifest distributor does.
+    from: maos_domain::frame::FrameAddress,
     cancel: tokio_util::sync::CancellationToken,
     service: tokio::task::JoinHandle<Result<(), maos_cohort::CohortError>>,
 }
 
 #[cfg(feature = "network")]
 impl CohortDaemonRuntime {
+    /// Story 13.5a — boot self-check on the collective-serve port this daemon
+    /// installed: authorizing a correlated reply for a request nobody admitted
+    /// MUST be false on every posture (bare state or enterprise-governed
+    /// decorator). A port that says `true` here would let an unsolicited push
+    /// masquerade as an owed reply, so the daemon refuses to serve rather than
+    /// binding with it.
+    fn assert_collective_serve_port_fails_closed(&self) -> Result<(), String> {
+        let probe = maos_spirit_abi::identity::HostId("maos:boot-probe".to_string());
+        if self
+            .digest_port
+            .authorize_reply_send(&probe, "maos:boot-probe")
+        {
+            return Err(
+                "cohort daemon collective-serve port authorized a reply for an unadmitted \
+                 request at boot — refusing to serve"
+                    .to_string(),
+            );
+        }
+        Ok(())
+    }
+
     async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
         self.cancel.cancel();
         self.service
@@ -7642,61 +9692,176 @@ impl CohortDaemonRuntime {
 }
 
 #[cfg(feature = "network")]
+/// Story 13.6a (review P1) — reconcile the operator-configured transport
+/// identity against the signed cohort manifest, FAIL-CLOSED, before any
+/// transport is started. Two independent config surfaces name certificates —
+/// `tcp.peer_pins` (the handshake verifier's oracle) and `file.peers`
+/// (the frame-level TOFU records) — and neither is derived from the manifest.
+/// Without this check a pin that names a cohort member but presents a
+/// certificate the manifest does NOT sign for that member silently overrides
+/// a manifest-time fact with a config-time fact (the D-5(4) asymmetry):
+/// a signed reissue that rotates a member's fingerprint would not revoke the
+/// stale certificate. Disagreement is a boot error, never a warning.
+fn reconcile_transport_identity_with_manifest(
+    state: &std::sync::Arc<maos_cohort::CohortManifestState>,
+    tcp_config: &maos_a2a_tcp::TcpA2AConfig,
+    peer_configs: &[maos_a2a_core::A2APeerConfig],
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::PeerCertFingerprint;
+
+    let manifest = state.manifest().map_err(|error| {
+        format!("cohort identity reconciliation cannot read the verified manifest: {error}")
+    })?;
+    let signed_fingerprint = |host_id: &str| -> Option<PeerCertFingerprint> {
+        manifest
+            .members
+            .iter()
+            .find(|member| member.host_id == host_id)
+            .and_then(|member| PeerCertFingerprint::parse(&member.fingerprint))
+    };
+
+    // (a) Every handshake pin that names a cohort member must carry exactly
+    // the certificate the manifest signs for that member. Pins for non-members
+    // are the 12.1 mixed-deployment bilateral path and are out of scope.
+    for pin in &tcp_config.peer_pins {
+        if let Some(signed) = signed_fingerprint(pin.peer_id.as_str()) {
+            if pin.fingerprint != signed {
+                return Err(format!(
+                    "tcp.peer_pins entry for cohort member {} does not match the signed \
+                     manifest fingerprint (pin {pin:?}, manifest {signed:?}) — reconcile \
+                     the pin configuration with the signed manifest",
+                    pin.peer_id.as_str(),
+                    pin = pin.fingerprint,
+                    signed = signed,
+                )
+                .into());
+            }
+        }
+    }
+    // (b) Every frame-level peer record that names a cohort member must carry
+    // the same signed certificate.
+    for peer in peer_configs {
+        if let Some(signed) = signed_fingerprint(peer.peer_id.as_str()) {
+            if peer.cert_fingerprint != signed {
+                return Err(format!(
+                    "file.peers entry for cohort member {} does not match the signed \
+                     manifest fingerprint (configured {configured:?}, manifest {signed:?}) \
+                     — reconcile the peer configuration with the signed manifest",
+                    peer.peer_id.as_str(),
+                    configured = peer.cert_fingerprint,
+                    signed = signed,
+                )
+                .into());
+            }
+        }
+    }
+    // (c) This host's own leaf must equal its own signed member fingerprint —
+    // the local half of the same binding.
+    if let Some(signed_own) = signed_fingerprint(state.local_host().as_str()) {
+        let (own_chain, _own_key) = tcp_config.load_identity()?;
+        let own_leaf = own_chain
+            .first()
+            .ok_or("cohort daemon identity chain is empty")?;
+        let own_fingerprint = PeerCertFingerprint::from_cert_der(own_leaf.as_ref());
+        if own_fingerprint != signed_own {
+            return Err(format!(
+                "the daemon's own certificate does not match the signed manifest fingerprint \
+                 for {} (loaded {own_fingerprint:?}, manifest {signed_own:?}) — the identity \
+                 on disk is stale relative to the signed manifest",
+                state.local_host().as_str(),
+            )
+            .into());
+        }
+    }
+    // (d) Story 13.6b / AC4 — THE TEAM AXIS, one field over from the
+    // certificate axis above and argued by this function's own doctrine:
+    // "a config-time fact silently overrides a manifest-time fact …
+    // Disagreement is a boot error, never a warning."
+    //
+    // The comparison itself lives in
+    // `maos_bin::cross_team_crossing::reconcile_home_team_with_manifest` so it
+    // is reachable from a hermetic leg without standing up a TLS config.
+    if let Ok(env_team) = std::env::var("MAOS_LOOM_HOME_TEAM") {
+        maos_bin::cross_team_crossing::reconcile_home_team_with_manifest(
+            &manifest,
+            state.local_host().as_str(),
+            &env_team,
+        )?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "network")]
 async fn build_cohort_a2a_daemon_runtime(
-    cohort: CohortDaemonConfig,
-    tcp_config: maos_a2a_tcp::TcpA2AConfig,
-    peer_configs: Vec<maos_a2a_core::A2APeerConfig>,
-    own_boot_nonce: u64,
+    transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+    boot_nonce: u64,
+    bootstrap: CohortDaemonBootstrap,
+    enterprise_posture_required: bool,
+    enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>,
+    // Story 13.6b — the cross-team crossing applier. `None` installs the
+    // legacy no-op port, so a node without a collective store never applies a
+    // crossing.
+    crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
 ) -> Result<CohortDaemonRuntime, Box<dyn std::error::Error>> {
+    validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
+    let CohortDaemonBootstrap {
+        state,
+        tcp: tcp_config,
+        peers: peer_configs,
+        local_host,
+        control_spirit,
+        digest_summary,
+    } = bootstrap;
     let pull_peers: Vec<maos_spirit_abi::identity::HostId> = peer_configs
         .iter()
         .map(|peer| maos_spirit_abi::identity::HostId(peer.peer_id.as_str().to_string()))
         .collect();
-    // Story 12.4a / AC4 — retain the TL handle before it is moved into the
-    // manifest-audit sink, so the rupture-journal drain can write to it too.
-    let transparency_log = cohort.transparency_log.clone();
-    let audit = std::sync::Arc::new(maos_cohort::CohortTransparencyLogSink::new(
-        cohort.transparency_log,
-    ));
-    let state = std::sync::Arc::new(maos_cohort::CohortManifestState::load(
-        cohort.local_host.clone(),
-        &cohort.manifest_toml,
-        cohort.pinned_authority_keys,
-        audit,
-    )?);
+    // Story 13.6a (review P1) — fail the boot on any config-vs-manifest
+    // identity disagreement BEFORE the transport starts.
+    reconcile_transport_identity_with_manifest(&state, &tcp_config, &peer_configs)?;
     // Story 12.3 — wire the gate AND the halt-receipt observer as the SAME
-    // CohortManifestState (P7b single-object wiring). The transport-level
-    // Fact-3 test proves this injection is load-bearing (P7c — no cohort daemon
-    // smoke exists to prove it here).
+    // CohortManifestState (P7b single-object wiring) the tenant map also holds.
     let gate: std::sync::Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
     let observer: std::sync::Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
-    // Story 12.4a — wire the digest-read correlation port as the SAME state
-    // (P7b single-object wiring), so the correlated-reply send/accept exemptions
-    // are authorized on the live wire.
-    let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> = state.clone();
+    // Story 12.4a — digest-read correlation port, same state.
+    // Story 13.5a — under an enterprise daemon posture the port is DECORATED so
+    // every collective read the daemon admits runs the governance chain first
+    // and fails closed (NACK) when any arm refuses. Without a posture the port
+    // is the bare state, byte-for-byte the pre-13.5a wiring.
+    let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> =
+        match enterprise_daemon_governance {
+            Some(governance) => std::sync::Arc::new(EnterpriseGovernedDigestReadPort {
+                inner: state.clone(),
+                governance,
+            }),
+            None => state.clone(),
+        };
+    // Story 13.5c — the rupture journal writes to the PRIMARY Transparency Log
+    // (the daemon no longer opens its own).
     let rupture_sink: std::sync::Arc<dyn maos_a2a_core::ConsentRuptureSink> =
         std::sync::Arc::new(maos_cohort::CohortRuptureLogSink::new(transparency_log));
     let transport = std::sync::Arc::new(
-        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_digest(
+        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_crossing(
             tcp_config,
             peer_configs,
-            own_boot_nonce,
+            boot_nonce,
             maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
             maos_a2a_core::HandshakeRetryPolicy::default(),
             None,
             None,
             Some(gate),
             Some(observer),
-            Some(digest_port),
+            Some(std::sync::Arc::clone(&digest_port)),
             Some(rupture_sink),
+            crossing_port,
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,
     );
     let router: std::sync::Arc<dyn maos_a2a_core::router::A2APeerRouter> = transport.clone();
     let from = maos_domain::frame::FrameAddress {
-        spirit_id: cohort.control_spirit,
-        host_id: Some(cohort.local_host),
+        spirit_id: control_spirit,
+        host_id: Some(local_host),
         role: None,
     };
     let distributor = std::sync::Arc::new(maos_cohort::CohortDistributor::new(
@@ -7707,18 +9872,14 @@ async fn build_cohort_a2a_daemon_runtime(
     let digest_distributor = std::sync::Arc::new(maos_cohort::CohortDigestDistributor::new(
         state.clone(),
         router,
-        from,
+        from.clone(),
     ));
-    let digest_summary = cohort.digest_summary;
     let cancel = tokio_util::sync::CancellationToken::new();
     let service_cancel = cancel.child_token();
     let refresh_state = state.clone();
     let service = tokio::spawn(async move {
         // Pull-on-connect fallback: each configured bilateral peer is contacted
         // through the reserved control path once the local listener is live.
-        // Failed pulls remain observable and retry before the signed stale lease
-        // expires; ordinary traffic still fails closed if confirmation never
-        // arrives.
         for peer in &pull_peers {
             if let Err(error) = distributor.pull_from(peer).await {
                 eprintln!(
@@ -7754,9 +9915,268 @@ async fn build_cohort_a2a_daemon_runtime(
     });
     Ok(CohortDaemonRuntime {
         transport,
+        digest_port,
+        from,
         cancel,
         service,
     })
+}
+
+/// Story 13.6b / AC1+AC2 — emit one allowed cross-team share and report the
+/// outcome in a way an operator can act on.
+///
+/// Three things make this the *production* initiator rather than a demo:
+///   1. it uses the seam 13.3b left (`originate_team_row`), so the row is BORN
+///      attested in this team's own database and the bytes on the wire are the
+///      bytes that were signed — no hand-rolled leaf, no second signature;
+///   2. it sends through `route_outbound`, so `prepare_outbound` stamps
+///      `cohort_source_team` from this host's own SIGNED V4 declaration and the
+///      emitter cannot choose the team it speaks for even while holding the seed;
+///   3. the refusal it reports is a typed, attributable outcome
+///      (`crossing_outcome_label`), so a consent denial, a stale lease, and an
+///      unreachable state stay three distinct observations at the emitter — the
+///      distinction D-15 measured as absent everywhere in the architecture.
+#[cfg(feature = "network")]
+async fn emit_cross_team_share(
+    runtime: &CohortDaemonRuntime,
+    store: &Arc<maos_loom_lite::store::LoomLiteStore>,
+    base_seed: &[u8; 32],
+    request: maos_bin::cross_team_crossing::CrossTeamShareRequest,
+    transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2APeerRouter as _;
+    use sha2::Digest;
+
+    let home_team = maos_domain::team::TeamId::new(&store.config().home_team)
+        .map_err(|error| format!("crossing emitter: home team is not canonical: {error}"))?;
+    if home_team == request.to_team {
+        return Err(format!(
+            "crossing emitter: MAOS_CROSS_TEAM_SHARE_TO_TEAM={} equals this host's own team \
+             — a crossing must cross",
+            request.to_team.as_str()
+        )
+        .into());
+    }
+    let emitter_host = runtime
+        .from
+        .host_id
+        .as_ref()
+        .ok_or("crossing emitter has no host identity")?
+        .as_str()
+        .to_string();
+    let namespace_name = match &request.namespace {
+        maos_domain::memory::MemoryNamespace::Default => "default",
+        maos_domain::memory::MemoryNamespace::Coordination => "coordination",
+        maos_domain::memory::MemoryNamespace::Forgotten => "forgotten",
+        maos_domain::memory::MemoryNamespace::Principal { .. } => {
+            unreachable!("principal namespace was rejected before a cross-team share is emitted")
+        }
+    };
+    let mut operation_entropy = [0_u8; 16];
+    getrandom::fill(&mut operation_entropy)
+        .map_err(|error| format!("crossing emitter: operation randomness unavailable: {error}"))?;
+    let mut operation_hasher = sha2::Sha256::new();
+    operation_hasher.update(b"maos-cross-team-share-operation-v1");
+    operation_hasher.update(operation_entropy);
+    operation_hasher.update(home_team.as_str().as_bytes());
+    operation_hasher.update(request.to_team.as_str().as_bytes());
+    operation_hasher.update(emitter_host.as_bytes());
+    operation_hasher.update(request.spirit_pid.to_be_bytes());
+    operation_hasher.update(namespace_name.as_bytes());
+    operation_hasher.update(request.key.as_bytes());
+    let operation_hash = operation_hasher.finalize();
+    let op_id = hex::encode(&operation_hash[..16]);
+    let locator_digest = maos_bin::cross_team_crossing::erase_locator_digest(
+        home_team.as_str(),
+        request.to_team.as_str(),
+        request.spirit_pid,
+        namespace_name,
+        &request.key,
+    );
+    let bundle = maos_loom_lite::replication::bundle::originate_team_row(
+        store,
+        request.spirit_pid,
+        &request.namespace,
+        &request.key,
+        request.value.clone(),
+        1,
+        maos_domain::invariants::i13::IntentLineage::new(vec![
+            maos_domain::invariants::i8::A2AIntent::new(
+                maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE,
+            ),
+        ]),
+        &home_team,
+        base_seed,
+    )
+    .await
+    .map_err(|error| format!("crossing emitter: originate failed: {error}"))?;
+    let (source_ts, source_region) = bundle
+        .leaves
+        .first()
+        .map(|leaf| (leaf.source_ts, leaf.source_region.clone()))
+        .ok_or("crossing emitter originated an empty bundle")?;
+    let peer = maos_spirit_abi::identity::HostId(request.peer.clone());
+    let frame = maos_bin::cross_team_crossing::crossing_frame_with_binding(
+        &runtime.from,
+        &peer,
+        1,
+        &request.to_team,
+        op_id.clone(),
+        emitter_host.clone(),
+        bundle,
+    )?;
+    let outcome = runtime.transport.route_outbound(frame, &peer).await;
+    let (status, detail) = match &outcome {
+        Ok(()) => ("crossing_applied", String::new()),
+        Err(error) => (crossing_outcome_label(error), error.to_string()),
+    };
+    let audit_payload = serde_json::json!({
+        "from_team": home_team.as_str(),
+        "to_team": request.to_team.as_str(),
+        "intent": maos_a2a_core::COHORT_INTENT_COLLECTIVE_SHARE,
+        "emitter_host": emitter_host,
+        "op_id": format!("{}-{}", &op_id[..16], &op_id[16..]),
+        "namespace": namespace_name,
+        "locator_digest": locator_digest,
+        "source_ts": source_ts,
+        "source_region": source_region,
+        "status": status,
+        "detail": detail,
+    });
+    let audit_frame_id = transparency_log.insert_kernel_event_returning_id(
+        request.spirit_pid,
+        "collective.host.cross-team-share",
+        audit_payload.to_string().as_bytes(),
+    );
+    println!(
+        "{}",
+        serde_json::json!({
+            "crossing": audit_payload,
+            "audit_frame_id": hex::encode(audit_frame_id),
+        })
+    );
+    Ok(())
+}
+
+/// crossed row. Other origin-team members have no matching local TL event.
+#[cfg(feature = "network")]
+async fn emit_collective_erase_reconciliation(
+    transparency_log: Arc<maos_iac::TransparencyLogAdapter>,
+    boot_nonce: u64,
+    bootstrap: CohortDaemonBootstrap,
+    origin: maos_loom_lite::store::CrossedRowOrigin,
+    locator_digest: String,
+    spirit_pid: u32,
+    namespace: &maos_domain::memory::MemoryNamespace,
+    key: String,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    use maos_a2a_core::router::A2APeerRouter as _;
+
+    let manifest = bootstrap
+        .state
+        .manifest()
+        .map_err(|error| format!("collective erase manifest unavailable: {error}"))?;
+    let peer = maos_spirit_abi::identity::HostId(origin.emitter_host.clone());
+    if !manifest.members.iter().any(|member| {
+        member.team.as_ref() == Some(&origin.source_team) && member.host_id == origin.emitter_host
+    }) {
+        return Err(format!(
+            "collective erase reconciliation emitter host {} is not a member of origin team {}",
+            peer.as_str(),
+            origin.source_team.as_str()
+        )
+        .into());
+    }
+    if !bootstrap
+        .peers
+        .iter()
+        .any(|configured| configured.peer_id.as_str() == peer.as_str())
+    {
+        return Err(format!(
+            "collective erase reconciliation has no configured daemon route to emitter host {}",
+            peer.as_str()
+        )
+        .into());
+    }
+
+    let runtime = build_cohort_a2a_daemon_runtime(
+        Arc::clone(&transparency_log),
+        boot_nonce,
+        bootstrap,
+        false,
+        None,
+        None,
+    )
+    .await?;
+    let frame = maos_bin::cross_team_crossing::erase_frame_with_binding(
+        &runtime.from,
+        &peer,
+        1,
+        &origin.source_team,
+        spirit_pid,
+        namespace,
+        key.clone(),
+        origin.op_id.clone(),
+        locator_digest.clone(),
+    )?;
+    let journal_op_id = format!("{}-{}", &origin.op_id[..16], &origin.op_id[16..]);
+    let outcome = runtime.transport.route_outbound(frame, &peer).await;
+    let shutdown = runtime.shutdown().await;
+    let audit_payload = match &outcome {
+        Ok(()) => serde_json::json!({
+            "origin_team": origin.source_team.as_str(),
+            "emitter_host": peer.as_str(),
+            "spirit_pid": spirit_pid,
+            "op_id": journal_op_id,
+            "locator_digest": locator_digest,
+            "status": "erase_reconciled",
+        }),
+        Err(error) => serde_json::json!({
+            "origin_team": origin.source_team.as_str(),
+            "emitter_host": peer.as_str(),
+            "spirit_pid": spirit_pid,
+            "op_id": journal_op_id,
+            "locator_digest": locator_digest,
+            "status": crossing_outcome_label(error),
+            "detail": error.to_string(),
+        }),
+    };
+    transparency_log.insert_kernel_event_returning_id(
+        spirit_pid,
+        "collective.host.cross-team-erase",
+        audit_payload.to_string().as_bytes(),
+    );
+    shutdown?;
+    outcome
+        .map_err(|error| {
+            format!(
+                "collective erase reconciliation incomplete at emitter host {}: {error}",
+                peer.as_str()
+            )
+            .into()
+        })
+        .map(|_| audit_payload)
+}
+
+/// Story 13.6b / AC2 — the emitter's stable discriminator for a refused
+/// crossing. Each arm is a DIFFERENT observable outcome: a manifest denial, a
+/// stale consent lease, an unreachable consent state, the AC3 impersonation
+/// weld, the 13.6a envelope binding, and everything else. Collapsing any two
+/// would recreate exactly the erasure D-15 measured at the kernel boundary.
+#[cfg(feature = "network")]
+fn crossing_outcome_label(error: &maos_a2a_core::A2AError) -> &'static str {
+    match error {
+        maos_a2a_core::A2AError::CrossTeamCrossingRefused { reason, .. } => match reason.as_str() {
+            "crossing_consent_denied" => "crossing_consent_denied",
+            "crossing_consent_stale" => "crossing_consent_stale",
+            "crossing_state_unavailable" => "crossing_state_unavailable",
+            _ => "crossing_apply_failed",
+        },
+        maos_a2a_core::A2AError::CrossingSourceTeamUnbound { .. } => "crossing_source_team_unbound",
+        maos_a2a_core::A2AError::CohortTeamIdentityRefused { .. } => "team_identity_mismatch",
+        maos_a2a_core::A2AError::CohortConsentDenied { .. } => "cohort_consent_denied",
+        _ => "transport_failure",
+    }
 }
 
 #[cfg(feature = "network")]
@@ -9800,6 +12220,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
     let empty_caps = CapabilitiesRequired {
         provider: ProviderCapabilities { complete: vec![] },
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
+        loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
     };
     let posture =
         PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")?;
@@ -10063,6 +12484,39 @@ async fn smoke_compliance_7_3() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(all(test, feature = "network"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn story_13_6d_parses_validated_cross_wall_traceback_request() {
+        let request = parse_cross_wall_traceback_args(
+            [
+                "traceback",
+                "--team",
+                "team-b",
+                "--spirit-pid",
+                "42",
+                "--limit",
+                "7",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(request.remote_team().as_str(), "team-b");
+        assert_eq!(request.spirit_pid(), 42);
+        assert_eq!(request.filter().limit, 7);
+    }
+
+    #[test]
+    fn story_13_6d_rejects_invalid_or_incomplete_traceback_request() {
+        for args in [
+            vec!["traceback", "--team", "TEAM-B", "--spirit-pid", "42"],
+            vec!["traceback", "--team", "team-b"],
+            vec!["traceback", "--spirit-pid", "42"],
+        ] {
+            assert!(parse_cross_wall_traceback_args(args.into_iter().map(str::to_string)).is_err());
+        }
+    }
 
     #[test]
     fn story_9_6_classifies_founder_and_diagnostic_spirits() {
@@ -10377,5 +12831,1072 @@ mod tests {
         // topology --once and single-Spirit fire paths.
         let result = maos_kernel_core::scheduler::pick_next_spirit_from_slice(&[]);
         assert!(result.is_none(), "empty slice must yield None");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Story 13.5a — enterprise governance at the cohort-a2a-daemon seam.
+//
+// The load-bearing proof: no test in this repo drove SSO → PDP → kernel mint →
+// `identity.asserted` → at-rest seal → SIEM forward as ONE lifecycle, and none
+// drove it from a BOOTED daemon. Before this story the `EnterpriseRuntime` was
+// constructed at the composition root and never reached `cohort-a2a-daemon`
+// mode at all.
+//
+// Every arm below runs production code. The only injected things are the four
+// ports (`IdentityAssertionPort` / `KeyManagementPort` / `SiemProjectionPort` /
+// `PolicyDecisionPort`), delivered through the SAME `EnterpriseRuntime::
+// from_ports` the production `from_env` lands in. The at-rest arm is reached
+// through `EnterpriseRuntime::at_rest_seal_hook()` — the accessor
+// `LoomLiteStore::with_at_rest_seal` consumes — NEVER the zero-production-caller
+// `seal_row_at_rest` / `issue_under_principal` (H3).
+// ─────────────────────────────────────────────────────────────────────────
+#[cfg(all(test, feature = "network"))]
+mod story_13_5a_enterprise_daemon_seam {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    use ed25519_dalek::SigningKey;
+    use maos_a2a_core::router::A2ATransport as _;
+    use maos_cohort::{
+        CohortAuthority, CohortDigestDistributor, CohortManifest, CohortMember, ConsentMatrix,
+        ConsentTuple, DigestReadControl, DigestSummary, InMemoryCohortAuditSink, ManifestSignature,
+        PinnedAuthorityKeys, COHORT_SCHEMA_V2, RESERVED_INTENT_HALT_RECEIPT,
+        RESERVED_INTENT_REISSUE,
+    };
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_domain::ports::identity_assertion::{
+        AuthenticatedPrincipal, IdentityAssertionPort, IdentityError,
+    };
+    use maos_domain::ports::key_management::{KeyManagementPort, KmsError};
+    use maos_domain::ports::policy_decision::{
+        PolicyDecisionError, PolicyDecisionPort, PolicyDecisionRequest, PolicyVerdict,
+    };
+    use maos_domain::ports::siem_projection::{SiemProjectionError, SiemProjectionPort};
+    use maos_domain::region::Region;
+    use maos_domain::team::TeamId;
+    use maos_spirit_abi::identity::HostId;
+
+    /// The control Spirit the daemon governs under. `researcher` is the
+    /// reference Spirit whose manifest already declares
+    /// `[capabilities.required.loom] read = true` (Story 13.5d), so the
+    /// canonical admission path lands `Scope::LoomRead` in the policy table.
+    /// This is AC4's worked example, executed: enterprise governance attached
+    /// to an EXISTING reference Spirit run under the daemon — no new Spirit.
+    const CONTROL_SPIRIT: &str = "researcher";
+    const REQUESTER: &str = "host-b";
+    const DAEMON_BOOT_NONCE: u64 = 13_5000;
+    const CLIENT_BOOT_NONCE: u64 = 13_5001;
+    const ASSERTION: &str = "story-13-5a-daemon-operator-assertion";
+
+    /// `issue_enterprise_governed_capability` reads `MAOS_SSO_ASSERTION` from
+    /// the process environment, and admission resolves its Lifecycle Journal
+    /// from `MAOS_HOME`. Both are process-global, so every 13.5a test holds
+    /// this lock for its whole body — the tests never run concurrently with
+    /// each other, and nothing else in this binary reads `MAOS_SSO_*`.
+    fn env_lock() -> MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
+    }
+
+    // ── recording ports ──────────────────────────────────────────────────
+
+    #[derive(Default)]
+    struct RecordingSso {
+        verifies: AtomicUsize,
+    }
+
+    impl IdentityAssertionPort for RecordingSso {
+        fn verify(&self, assertion: &str) -> Result<AuthenticatedPrincipal, IdentityError> {
+            self.verifies.fetch_add(1, Ordering::SeqCst);
+            if assertion != ASSERTION {
+                return Err(IdentityError::SignatureInvalid);
+            }
+            let mut attributes = HashMap::new();
+            attributes.insert("role".to_string(), "cohort-operator".to_string());
+            Ok(AuthenticatedPrincipal {
+                subject: "daemon-operator@maos.example".to_string(),
+                issuer: "https://idp.maos.example".to_string(),
+                audience: "maos-cohort-daemon".to_string(),
+                attributes,
+            })
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    struct RecordingKms {
+        inner: maos_secrets::LocalMasterKeyKms,
+        wraps: AtomicUsize,
+    }
+
+    impl RecordingKms {
+        fn new() -> Self {
+            Self {
+                inner: maos_secrets::LocalMasterKeyKms::from_master_key(&[0x5au8; 32])
+                    .expect("local master key"),
+                wraps: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl KeyManagementPort for RecordingKms {
+        fn wrap_data_key(&self, data_key: &[u8]) -> Result<Vec<u8>, KmsError> {
+            self.wraps.fetch_add(1, Ordering::SeqCst);
+            self.inner.wrap_data_key(data_key)
+        }
+
+        fn unwrap_data_key(&self, wrapped_data_key: &[u8]) -> Result<Vec<u8>, KmsError> {
+            self.inner.unwrap_data_key(wrapped_data_key)
+        }
+
+        fn is_healthy(&self) -> bool {
+            self.inner.is_healthy()
+        }
+    }
+
+    struct RecordingPdp {
+        verdict: PolicyVerdict,
+        evaluations: AtomicUsize,
+    }
+
+    impl RecordingPdp {
+        fn new(verdict: PolicyVerdict) -> Self {
+            Self {
+                verdict,
+                evaluations: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl PolicyDecisionPort for RecordingPdp {
+        fn load_policy(&self, _policy_text: &str) -> Result<(), PolicyDecisionError> {
+            Ok(())
+        }
+
+        fn evaluate(
+            &self,
+            requests: &[PolicyDecisionRequest],
+        ) -> Result<Vec<PolicyVerdict>, PolicyDecisionError> {
+            self.evaluations.fetch_add(requests.len(), Ordering::SeqCst);
+            Ok(vec![self.verdict; requests.len()])
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingSiem {
+        projections: AtomicUsize,
+    }
+
+    impl SiemProjectionPort for RecordingSiem {
+        fn project_redacted_entry(
+            &self,
+            redacted_entry_json: &str,
+        ) -> Result<String, SiemProjectionError> {
+            self.projections.fetch_add(1, Ordering::SeqCst);
+            maos_siem::SiemExporter.project_redacted_entry(redacted_entry_json)
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    /// Every recording arm of the governance chain, retained so a leg can read
+    /// the counters after the round-trip.
+    struct RecordingPorts {
+        sso: Arc<RecordingSso>,
+        kms: Arc<RecordingKms>,
+        pdp: Arc<RecordingPdp>,
+        siem: Arc<RecordingSiem>,
+    }
+
+    impl RecordingPorts {
+        fn new(verdict: PolicyVerdict) -> Self {
+            Self {
+                sso: Arc::new(RecordingSso::default()),
+                kms: Arc::new(RecordingKms::new()),
+                pdp: Arc::new(RecordingPdp::new(verdict)),
+                siem: Arc::new(RecordingSiem::default()),
+            }
+        }
+
+        fn counts(&self) -> (usize, usize, usize, usize) {
+            (
+                self.sso.verifies.load(Ordering::SeqCst),
+                self.pdp.evaluations.load(Ordering::SeqCst),
+                self.kms.wraps.load(Ordering::SeqCst),
+                self.siem.projections.load(Ordering::SeqCst),
+            )
+        }
+    }
+
+    // ── hermetic daemon fixture ──────────────────────────────────────────
+
+    struct Fixture {
+        dir: PathBuf,
+        config_path: PathBuf,
+        audit_db: PathBuf,
+        siem_sink: PathBuf,
+        home: PathBuf,
+        server_fingerprint: maos_a2a_core::PeerCertFingerprint,
+        client_cert_path: PathBuf,
+        client_key_path: PathBuf,
+        client_fingerprint: maos_a2a_core::PeerCertFingerprint,
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    fn signing_key() -> SigningKey {
+        SigningKey::from_bytes(&[13; 32])
+    }
+
+    fn authority_key_hex(key: &SigningKey) -> String {
+        hex::encode(key.verifying_key().to_bytes())
+    }
+
+    /// A signed, schema-v2, teams-bearing 2-member manifest naming the local
+    /// host — the `cohort_daemon_smoke_13_5c.rs` fixture idiom.
+    fn signed_manifest(
+        key: &SigningKey,
+        server_fingerprint: &maos_a2a_core::PeerCertFingerprint,
+        client_fingerprint: &maos_a2a_core::PeerCertFingerprint,
+    ) -> String {
+        let members = vec![
+            CohortMember {
+                host_id: "host-a".to_string(),
+                fingerprint: server_fingerprint.wire(),
+                roles: vec!["worker".to_string()],
+                team: None,
+            },
+            CohortMember {
+                host_id: REQUESTER.to_string(),
+                fingerprint: client_fingerprint.wire(),
+                roles: vec!["worker".to_string()],
+                team: None,
+            },
+        ];
+        let teams = Some(vec![maos_cohort::TeamEntry {
+            team_id: TeamId::new("team-a").unwrap(),
+            region: Region::canonicalize("region-a").unwrap(),
+            datname: "maos_team_a".to_string(),
+            members: vec![maos_domain::ports::registry::SpiritId::from(CONTROL_SPIRIT)],
+        }]);
+        let manifest = CohortManifest {
+            schema_version: COHORT_SCHEMA_V2,
+            cohort_id: "cohort-13-5a".to_string(),
+            version: 1,
+            authority: CohortAuthority {
+                threshold: 1,
+                keys: vec![authority_key_hex(key)],
+            },
+            members,
+            consent: ConsentMatrix {
+                send: ["host-a", REQUESTER]
+                    .into_iter()
+                    .map(|peer| ConsentTuple {
+                        peer: peer.to_string(),
+                        role: "worker".to_string(),
+                        intent: maos_a2a_core::COHORT_INTENT_DIGEST_READ.to_string(),
+                    })
+                    .collect(),
+                accept: ["host-a", REQUESTER]
+                    .into_iter()
+                    .map(|peer| ConsentTuple {
+                        peer: peer.to_string(),
+                        role: "worker".to_string(),
+                        intent: maos_a2a_core::COHORT_INTENT_DIGEST_READ.to_string(),
+                    })
+                    .collect(),
+            },
+            reserved_intents: vec![
+                RESERVED_INTENT_REISSUE.to_string(),
+                RESERVED_INTENT_HALT_RECEIPT.to_string(),
+            ],
+            t_stale_secs: 120,
+            teams,
+            signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
+        }
+        .signed_with(key);
+        toml::to_string(&manifest).unwrap()
+    }
+
+    fn write_identity(
+        dir: &std::path::Path,
+        name: &str,
+    ) -> (PathBuf, PathBuf, maos_a2a_core::PeerCertFingerprint) {
+        let key = rcgen::KeyPair::generate().expect("rcgen keypair");
+        let params =
+            rcgen::CertificateParams::new(vec!["127.0.0.1".to_string()]).expect("rcgen params");
+        let cert = params.self_signed(&key).expect("rcgen self-signed");
+        let cert_path = dir.join(format!("{name}.cert.pem"));
+        let key_path = dir.join(format!("{name}.key.pem"));
+        std::fs::write(&cert_path, cert.pem()).expect("write cert pem");
+        std::fs::write(&key_path, key.serialize_pem()).expect("write key pem");
+        let fingerprint = maos_a2a_core::PeerCertFingerprint::from_cert_der(cert.der().as_ref());
+        (cert_path, key_path, fingerprint)
+    }
+
+    fn fixture(tag: &str) -> Fixture {
+        let dir = std::env::temp_dir().join(format!(
+            "maos-story-13-5a-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id(),
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create fixture dir");
+        let (server_cert_path, server_key_path, server_fingerprint) =
+            write_identity(&dir, "server");
+        let (client_cert_path, client_key_path, client_fingerprint) =
+            write_identity(&dir, "client");
+        let key = signing_key();
+        let manifest_path = dir.join("manifest.toml");
+        std::fs::write(
+            &manifest_path,
+            signed_manifest(&key, &server_fingerprint, &client_fingerprint),
+        )
+        .expect("write manifest");
+
+        let config = format!(
+            "manifest_path = '{manifest}'\n\
+             authority_keys = ['{authority}']\n\
+             local_host = 'host-a'\n\
+             control_spirit = '{CONTROL_SPIRIT}'\n\
+             peers = []\n\
+             \n\
+             [tcp]\n\
+             listen_addr = '127.0.0.1:0'\n\
+             own_cert_chain = '{cert}'\n\
+             own_private_key = '{private_key}'\n\
+             peer_pins = []\n\
+             \n\
+             [digest_summary]\n\
+             frames = 0\n\
+             halts = 0\n\
+             conflicts = 0\n",
+            manifest = manifest_path.display(),
+            authority = authority_key_hex(&key),
+            cert = server_cert_path.display(),
+            private_key = server_key_path.display(),
+        );
+        let config_path = dir.join("daemon.toml");
+        std::fs::write(&config_path, config).expect("write daemon config");
+        let home = dir.join("home");
+        std::fs::create_dir_all(home.join("journal")).expect("create journal home");
+        Fixture {
+            audit_db: dir.join("transparency.sqlite"),
+            siem_sink: dir.join("siem.ndjson"),
+            config_path,
+            home,
+            dir,
+            server_fingerprint,
+            client_cert_path,
+            client_key_path,
+            client_fingerprint,
+        }
+    }
+
+    /// The kernel stack the composition root builds: ONE `PolicyTable` shared
+    /// by the capability registry (mint-time gate) and the security manager
+    /// (admission). Nothing seeds the manifest-derived policy table by hand —
+    /// admission is its only writer.
+    #[allow(clippy::type_complexity)]
+    fn kernel_stack(
+        boot_nonce: u64,
+    ) -> (
+        Arc<CapabilityRegistryAdapter>,
+        Arc<maos_kernel_core::security::SecurityManagerAdapter>,
+        tokio::sync::mpsc::Receiver<maos_kernel_core::capability::cap_audit::CapAuditEvent>,
+    ) {
+        let crypto: Arc<dyn maos_domain::ports::CryptoProvider> =
+            Arc::new(maos_kernel_core::security::RingCryptoProvider);
+        let signing_key =
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([7u8; 32]);
+        let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
+        let (audit_tx, audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+        // p1-allow: kernel-stack test proves direct production adapters are used in the kernel stack
+        let capability = Arc::new(CapabilityRegistryAdapter::new(
+            Arc::clone(&crypto),
+            signing_key,
+            boot_nonce,
+            Arc::clone(&policy),
+            audit_tx,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(TelemetryStreamAdapter::default()),
+        ));
+        // p1-allow: kernel-stack test proves direct production adapters are used in the kernel stack
+        let security = Arc::new(maos_kernel_core::security::SecurityManagerAdapter::new(
+            Arc::clone(&policy),
+        ));
+        (capability, security, audit_rx)
+    }
+
+    fn enterprise_runtime(
+        ports: &RecordingPorts,
+        fixture: &Fixture,
+        boot_nonce: u64,
+    ) -> Arc<maos_bin::enterprise_identity::EnterpriseRuntime> {
+        let crypto: Arc<dyn maos_domain::ports::CryptoProvider> =
+            Arc::new(maos_kernel_core::security::RingCryptoProvider);
+        Arc::new(
+            maos_bin::enterprise_identity::EnterpriseRuntime::from_ports(
+                maos_bin::enterprise_identity::EnterpriseConfig::empty()
+                    .with_sso_available()
+                    .with_kms_available()
+                    .with_siem_available(),
+                Some(Arc::clone(&ports.sso) as Arc<dyn IdentityAssertionPort>),
+                Some(Arc::clone(&ports.kms) as Arc<dyn KeyManagementPort>),
+                Some(Arc::clone(&ports.siem) as Arc<dyn SiemProjectionPort>),
+                Some(crypto),
+                Some(fixture.audit_db.clone()),
+                Some(fixture.siem_sink.clone()),
+                boot_nonce,
+            ),
+        )
+    }
+
+    fn pdp_runtime(ports: &RecordingPorts) -> enterprise_pdp_runtime::EnterprisePdpRuntime {
+        enterprise_pdp_runtime::EnterprisePdpRuntime::new(
+            Arc::clone(&ports.pdp) as Arc<dyn PolicyDecisionPort>,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            enterprise_pdp_runtime::DEFAULT_REFRESH_INTERVAL,
+            enterprise_pdp_runtime::DEFAULT_STALENESS_TTL,
+        )
+        .expect("enterprise PDP runtime")
+    }
+
+    /// One inbound `cohort:digest-read` REQUEST frame, byte-shaped exactly as
+    /// `CohortDigestDistributor::request_read` puts it on the wire.
+    fn digest_request_frame(request_id: &str) -> maos_domain::frame::IacFrame {
+        let payload = DigestReadControl::Request {
+            request_id: request_id.to_string(),
+            scope: maos_cohort::DIGEST_DAILY_SCOPE.to_string(),
+        }
+        .telemetry_payload()
+        .expect("digest request payload");
+        let from = maos_domain::frame::FrameAddress {
+            spirit_id: maos_spirit_abi::identity::SpiritId::from(CONTROL_SPIRIT),
+            host_id: Some(HostId(REQUESTER.to_string())),
+            role: None,
+        };
+        let mut recipients = smallvec::SmallVec::new();
+        recipients.push(maos_domain::frame::FrameAddress {
+            spirit_id: maos_spirit_abi::identity::SpiritId::from(CONTROL_SPIRIT),
+            host_id: Some(HostId("host-a".to_string())),
+            role: None,
+        });
+        maos_domain::frame::IacFrame {
+            frame_id: [0u8; 16],
+            timestamp_ns: 0,
+            logical_clock: 0,
+            from: from.clone(),
+            to: recipients,
+            kind: maos_spirit_abi::identity::FrameKind::TelemetryEvent,
+            intent: IntentClass::Readonly,
+            payload: maos_domain::frame::FramePayload::TelemetryEvent(payload),
+            auto_marker: maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+            consent_envelope: Some(
+                maos_domain::frame::ConsentEnvelope::with_fine_grained_intent(
+                    from,
+                    maos_domain::invariants::i8::A2AIntent::new(
+                        maos_a2a_core::COHORT_INTENT_DIGEST_READ,
+                    ),
+                ),
+            ),
+            intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum TestWiring {
+        Full,
+        PdpOnly,
+        RequiredUnwired,
+    }
+
+    fn reserve_loopback_addr() -> std::net::SocketAddr {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve client address");
+        listener.local_addr().expect("reserved client address")
+    }
+
+    fn peer_config(
+        peer_id: &str,
+        endpoint: std::net::SocketAddr,
+        fingerprint: &maos_a2a_core::PeerCertFingerprint,
+    ) -> maos_a2a_core::A2APeerConfig {
+        maos_a2a_core::A2APeerConfig {
+            peer_id: maos_a2a_core::PeerId::new(peer_id),
+            endpoint: format!("tls://{endpoint}"),
+            cert_fingerprint: fingerprint.clone(),
+            profile: maos_a2a_core::A2AProfile::CrossHost,
+            allowlists: maos_a2a_core::ConsentAllowlists {
+                send_allowlist: vec![A2AIntent::new(maos_a2a_core::COHORT_INTENT_DIGEST_READ)],
+                accept_allowlist: vec![A2AIntent::new(maos_a2a_core::COHORT_INTENT_DIGEST_READ)],
+            },
+            partition_timeout_secs: 5,
+            consent_ttl_secs: 300,
+        }
+    }
+
+    fn client_state(fixture: &Fixture) -> Arc<maos_cohort::CohortManifestState> {
+        let authority = signing_key();
+        Arc::new(
+            maos_cohort::CohortManifestState::load(
+                HostId(REQUESTER.to_string()),
+                &signed_manifest(
+                    &authority,
+                    &fixture.server_fingerprint,
+                    &fixture.client_fingerprint,
+                ),
+                PinnedAuthorityKeys::from_keys(vec![authority.verifying_key()])
+                    .expect("client authority pins"),
+                Arc::new(InMemoryCohortAuditSink::default()),
+            )
+            .expect("client cohort state"),
+        )
+    }
+
+    /// Boot a real target daemon plus a real second mTLS endpoint, then send a
+    /// digest read through `route_outbound` → TLS → `handle_intake_verified` →
+    /// consent → the installed governed port and wait for the daemon's real
+    /// correlated digest reply to return over the reverse mTLS connection.
+    async fn boot_and_drive(
+        fixture: &Fixture,
+        wiring: TestWiring,
+        ports: &RecordingPorts,
+    ) -> Result<(), String> {
+        let transparency_log = Arc::new(
+            maos_kernel_core::iac::TransparencyLogAdapter::open(
+                &fixture.audit_db,
+                DAEMON_BOOT_NONCE,
+            )
+            .expect("open transparency log"),
+        );
+        let mut bootstrap = load_cohort_daemon_bootstrap(
+            fixture.config_path.to_str().expect("utf-8 config path"),
+            Arc::clone(&transparency_log),
+        )
+        .expect("cohort daemon bootstrap");
+        let client_addr = reserve_loopback_addr();
+        bootstrap
+            .tcp
+            .peer_pins
+            .push(maos_a2a_tcp::PinnedFingerprint {
+                peer_id: maos_a2a_core::PeerId::new(REQUESTER),
+                fingerprint: fixture.client_fingerprint.clone(),
+                boot_nonce: CLIENT_BOOT_NONCE,
+            });
+        bootstrap.peers.push(peer_config(
+            REQUESTER,
+            client_addr,
+            &fixture.client_fingerprint,
+        ));
+
+        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE);
+        let runtime = matches!(wiring, TestWiring::Full)
+            .then(|| enterprise_runtime(ports, fixture, DAEMON_BOOT_NONCE));
+        let pdp =
+            matches!(wiring, TestWiring::Full | TestWiring::PdpOnly).then(|| pdp_runtime(ports));
+        let journal_path = fixture.home.join("journal").join("lifecycle.ndjson");
+        let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
+            .map_err(|error| format!("test journal open failed: {error}"))?;
+        let governance = if matches!(wiring, TestWiring::RequiredUnwired) {
+            None
+        } else {
+            build_enterprise_daemon_governance(
+                security.as_ref(),
+                &capability,
+                &transparency_log,
+                &workspace_root().join("spirits"),
+                &journal,
+                runtime.as_ref(),
+                pdp.as_ref(),
+                Some(&bootstrap),
+            )
+            .map_err(|error| error.to_string())?
+        };
+
+        let daemon = build_cohort_a2a_daemon_runtime(
+            Arc::clone(&transparency_log),
+            DAEMON_BOOT_NONCE,
+            bootstrap,
+            true,
+            governance,
+            None,
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+        daemon
+            .assert_collective_serve_port_fails_closed()
+            .map_err(|error| format!("boot self-check: {error}"))?;
+        let daemon_addr = daemon
+            .transport
+            .local_addr()
+            .ok_or_else(|| "daemon listener address absent".to_string())?;
+
+        let state = client_state(fixture);
+        let client_tcp = maos_a2a_tcp::TcpA2AConfig {
+            listen_addr: client_addr,
+            own_cert_chain: fixture.client_cert_path.clone(),
+            own_private_key: fixture.client_key_path.clone(),
+            peer_pins: vec![maos_a2a_tcp::PinnedFingerprint {
+                peer_id: maos_a2a_core::PeerId::new("host-a"),
+                fingerprint: fixture.server_fingerprint.clone(),
+                boot_nonce: DAEMON_BOOT_NONCE,
+            }],
+            handshake_timeout: std::time::Duration::from_secs(5),
+            ca_roots: None,
+        };
+        let gate: Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
+        let observer: Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();
+        let digest_port: Arc<dyn maos_a2a_core::DigestReadPort> = state.clone();
+        let client_transport = Arc::new(
+            maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_digest(
+                client_tcp,
+                vec![peer_config(
+                    "host-a",
+                    daemon_addr,
+                    &fixture.server_fingerprint,
+                )],
+                CLIENT_BOOT_NONCE,
+                maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(5)),
+                maos_a2a_core::HandshakeRetryPolicy::default(),
+                None,
+                None,
+                Some(gate),
+                Some(observer),
+                Some(digest_port),
+                None,
+            )
+            .await
+            .map_err(|error| format!("client transport bind failed: {error}"))?,
+        );
+        let router: Arc<dyn maos_a2a_core::router::A2APeerRouter> = client_transport.clone();
+        let distributor = CohortDigestDistributor::new(
+            Arc::clone(&state),
+            router,
+            maos_domain::frame::FrameAddress {
+                spirit_id: maos_spirit_abi::identity::SpiritId::from(CONTROL_SPIRIT),
+                host_id: Some(HostId(REQUESTER.to_string())),
+                role: None,
+            },
+        );
+        let target = HostId("host-a".to_string());
+        let request = distributor
+            .request_read(&target, maos_cohort::DIGEST_DAILY_SCOPE)
+            .await;
+        let request_id = match request {
+            Ok(request_id) => request_id,
+            Err(error) => {
+                drop(distributor);
+                drop(client_transport);
+                daemon
+                    .shutdown()
+                    .await
+                    .map_err(|shutdown| format!("{error}; shutdown failed: {shutdown}"))?;
+                return Err(error.to_string());
+            }
+        };
+
+        let expected = DigestSummary {
+            frames: 0,
+            halts: 0,
+            conflicts: 0,
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if state.digest_summary(&target, &request_id) == Some(expected.clone()) {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .map_err(|_| "timed out waiting for the daemon's correlated digest reply".to_string())?;
+
+        if matches!(wiring, TestWiring::Full) {
+            let sink = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
+            if sink.trim().is_empty() {
+                return Err(
+                    "the live daemon lifecycle did not forward governed rows to SIEM".to_string(),
+                );
+            }
+        }
+
+        drop(distributor);
+        drop(client_transport);
+        daemon
+            .shutdown()
+            .await
+            .map_err(|error| format!("daemon shutdown failed: {error}"))?;
+        drop(journal);
+        drop(transparency_log);
+        Ok(())
+    }
+
+    fn set_process_env(_fixture: &Fixture) {
+        // The kernel token clock is process-global and initialized by `main`;
+        // a unit test in the binary target must arm it exactly as the
+        // composition root does before any mint or TTL check.
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        std::env::set_var("MAOS_SSO_ASSERTION", ASSERTION);
+    }
+
+    // ── AC3 / AC5 leg 1 — the reach leg ──────────────────────────────────
+
+    /// AC3 — ONE governed collective round-trip through a BOOTED
+    /// `build_cohort_a2a_daemon_runtime`, with every arm of the chain proven
+    /// fired: SSO verify, PDP evaluate, kernel mint + `identity.asserted` row,
+    /// at-rest AEAD (real ciphertext, reached via `at_rest_seal_hook`), and a
+    /// SIEM forward that lands records in the localhost sink.
+    #[tokio::test]
+    async fn story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon() {
+        let _guard = env_lock();
+        let fixture = fixture("reach");
+        set_process_env(&fixture);
+        let ports = RecordingPorts::new(PolicyVerdict::Allow);
+
+        // AC5 proven-red: the reach leg itself observes the production dispatch,
+        // so deleting the enterprise argument reds this runtime leg and the
+        // dedicated source-inspection leg.
+        let source = include_str!("main.rs");
+        let dispatch_start = source
+            .find(r#"if mode == "cohort-a2a-daemon""#)
+            .expect("cohort daemon dispatch");
+        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 2_000)];
+        assert!(
+            dispatch.contains("build_enterprise_daemon_governance(")
+                && dispatch.contains("enterprise_posture_required,")
+                && dispatch.contains("enterprise_daemon_governance,"),
+            "production dispatch no longer threads the required enterprise posture"
+        );
+
+        boot_and_drive(&fixture, TestWiring::Full, &ports)
+            .await
+            .expect("a fully governed collective read must be admitted");
+
+        let (sso, pdp, kms, siem) = ports.counts();
+        assert!(sso >= 1, "SSO principal verification never fired");
+        assert!(pdp >= 1, "enterprise PDP evaluation never fired");
+        assert!(kms >= 1, "at-rest seal never reached the KMS port");
+        assert!(siem >= 1, "SIEM projection port never projected a record");
+
+        // `identity.asserted` — a raw kind-30 row, never a kernel FrameKind (H6).
+        let entries = maos_audit::query(
+            &fixture.audit_db,
+            maos_audit::AuditFilter {
+                kind: Some("identity.asserted".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("query identity.asserted");
+        assert!(
+            !entries.is_empty(),
+            "the governed mint must persist an identity.asserted provenance row"
+        );
+
+        // At-rest: the governed grant landed as REAL ciphertext, not the
+        // plaintext record. A `None` hook would have written the record verbatim.
+        let governed_rows = maos_audit::query(
+            &fixture.audit_db,
+            maos_audit::AuditFilter {
+                intent_contains: Some("cohort:digest-read-governed".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("query governed collective-read rows");
+        assert_eq!(
+            governed_rows.len(),
+            1,
+            "exactly one sealed governed-collective-read row per admitted request"
+        );
+
+        // SIEM was forwarded by the live daemon operation itself. No
+        // post-shutdown runtime or quiesced-copy helper participates.
+        let sink = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
+        assert!(
+            !sink.trim().is_empty(),
+            "the governed daemon lifecycle must land records in the SIEM sink"
+        );
+    }
+
+    // ── AC5 leg 2 — the two-sided dead-wire negative ─────────────────────
+
+    /// AC5 leg 2 — two-sided. (a) Enterprise configuration with the governed
+    /// port unwired refuses daemon boot; (b) PDP-only configuration reaches and
+    /// enforces the PDP; (c) configured-down KMS refuses plaintext fallback;
+    /// (d) wired PDP deny refuses the read; (e) wired allow reaches every arm.
+    #[tokio::test]
+    async fn story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied() {
+        let _guard = env_lock();
+
+        // (a) REQUIRED + UNWIRED — restoring the old dead-wire must fail closed.
+        let unwired_fixture = fixture("unwired");
+        set_process_env(&unwired_fixture);
+        let unwired_ports = RecordingPorts::new(PolicyVerdict::Allow);
+        let refusal = boot_and_drive(
+            &unwired_fixture,
+            TestWiring::RequiredUnwired,
+            &unwired_ports,
+        )
+        .await
+        .expect_err("configured enterprise posture must not boot unwired");
+        assert!(
+            refusal.contains("configured but the governed digest-read port is unwired"),
+            "unwired refusal must identify the dead-wire; got: {refusal}"
+        );
+        assert_eq!(unwired_ports.counts(), (0, 0, 0, 0));
+
+        // (b) PDP-ONLY — MAOS_PDP_POLICY* alone still attaches governance.
+        let pdp_only_fixture = fixture("pdp-only");
+        set_process_env(&pdp_only_fixture);
+        let pdp_only_ports = RecordingPorts::new(PolicyVerdict::Deny);
+        let refusal = boot_and_drive(&pdp_only_fixture, TestWiring::PdpOnly, &pdp_only_ports)
+            .await
+            .expect_err("PDP-only posture must enforce its deny");
+        assert!(
+            refusal.contains("enterprise PDP denied capability issuance"),
+            "PDP-only refusal must come from the configured PDP; got: {refusal}"
+        );
+        let (sso, pdp, kms, siem) = pdp_only_ports.counts();
+        assert_eq!((sso, kms, siem), (0, 0, 0));
+        assert!(pdp >= 1, "PDP-only posture bypassed the configured PDP");
+
+        // (c) CONFIGURED-DOWN KMS — startup refuses rather than installing the
+        // plaintext `AtRestSealer::new(None)` posture.
+        let kms_fixture = fixture("kms-down");
+        let transparency_log = Arc::new(
+            maos_kernel_core::iac::TransparencyLogAdapter::open(
+                &kms_fixture.audit_db,
+                DAEMON_BOOT_NONCE,
+            )
+            .expect("KMS test transparency log"),
+        );
+        let bootstrap = load_cohort_daemon_bootstrap(
+            kms_fixture
+                .config_path
+                .to_str()
+                .expect("utf-8 KMS fixture path"),
+            Arc::clone(&transparency_log),
+        )
+        .expect("KMS test bootstrap");
+        let (capability, security, _audit_rx) = kernel_stack(DAEMON_BOOT_NONCE);
+        let kms_down = Arc::new(
+            maos_bin::enterprise_identity::EnterpriseRuntime::from_config(
+                &maos_bin::enterprise_identity::EnterpriseConfig::empty().with_kms_down(),
+            )
+            .expect("configured-down runtime"),
+        );
+        let journal = maos_kernel_core::journal::JournalAdapter::open(
+            &kms_fixture.home.join("journal").join("lifecycle.ndjson"),
+        )
+        .expect("KMS test journal");
+        let refusal = match build_enterprise_daemon_governance(
+            security.as_ref(),
+            &capability,
+            &transparency_log,
+            &workspace_root().join("spirits"),
+            &journal,
+            Some(&kms_down),
+            None,
+            Some(&bootstrap),
+        ) {
+            Ok(_) => panic!("configured-down KMS must refuse posture construction"),
+            Err(error) => error,
+        };
+        assert!(
+            refusal.to_string().contains("no healthy at-rest seal hook"),
+            "KMS refusal must identify the unavailable seal hook; got: {refusal}"
+        );
+
+        // (d) WIRED + PDP deny — fail closed after SSO/PDP, before KMS.
+        let denied_fixture = fixture("denied");
+        set_process_env(&denied_fixture);
+        let denied_ports = RecordingPorts::new(PolicyVerdict::Deny);
+        let denied = boot_and_drive(&denied_fixture, TestWiring::Full, &denied_ports).await;
+        let refusal = denied.expect_err("a PDP deny must refuse the collective read");
+        assert!(
+            refusal.contains("enterprise PDP denied capability issuance"),
+            "the refusal must name the PDP denial; got: {refusal}"
+        );
+        let (denied_sso, denied_pdp, denied_kms, _) = denied_ports.counts();
+        assert!(
+            denied_sso >= 1 && denied_pdp >= 1,
+            "SSO and PDP must both run before the refusal"
+        );
+        assert_eq!(
+            denied_kms, 0,
+            "a refused read must never reach the at-rest seal"
+        );
+
+        // (e) WIRED + allow — every arm fires.
+        let wired_fixture = fixture("wired");
+        set_process_env(&wired_fixture);
+        let wired_ports = RecordingPorts::new(PolicyVerdict::Allow);
+        boot_and_drive(&wired_fixture, TestWiring::Full, &wired_ports)
+            .await
+            .expect("a governed collective read must be admitted");
+        let (sso, pdp, kms, siem) = wired_ports.counts();
+        assert!(
+            sso >= 1 && pdp >= 1 && kms >= 1,
+            "wired daemon must reach SSO, PDP, and KMS"
+        );
+        assert!(
+            siem >= 1,
+            "wired daemon must project at least one SIEM record"
+        );
+    }
+
+    // ── H4 — the per-Spirit PDP binding is live at the daemon issuance pid ──
+
+    /// H4 — a PDP rule that denies only the daemon control pid must refuse the
+    /// daemon read while allowing the same action for another pid.
+    #[tokio::test]
+    async fn story_13_5a_pdp_subject_binding_uses_the_daemon_issuance_pid() {
+        let _guard = env_lock();
+
+        #[derive(Default)]
+        struct PidRecordingPdp {
+            seen: Mutex<Vec<(u32, String)>>,
+        }
+
+        impl PolicyDecisionPort for PidRecordingPdp {
+            fn load_policy(&self, _policy_text: &str) -> Result<(), PolicyDecisionError> {
+                Ok(())
+            }
+
+            fn evaluate(
+                &self,
+                requests: &[PolicyDecisionRequest],
+            ) -> Result<Vec<PolicyVerdict>, PolicyDecisionError> {
+                let mut seen = self.seen.lock().expect("pdp recorder");
+                Ok(requests
+                    .iter()
+                    .map(|request| {
+                        seen.push((request.spirit_pid, request.capability_key.clone()));
+                        if request.spirit_pid == DAEMON_CONTROL_SPIRIT_PID {
+                            PolicyVerdict::Deny
+                        } else {
+                            PolicyVerdict::Allow
+                        }
+                    })
+                    .collect())
+            }
+
+            fn is_healthy(&self) -> bool {
+                true
+            }
+        }
+
+        let fixture = fixture("pid-binding");
+        set_process_env(&fixture);
+        let boot_nonce = 13_5002_u64;
+        let transparency_log = Arc::new(
+            maos_kernel_core::iac::TransparencyLogAdapter::open(&fixture.audit_db, boot_nonce)
+                .expect("open transparency log"),
+        );
+        let bootstrap = load_cohort_daemon_bootstrap(
+            fixture.config_path.to_str().expect("utf-8 config path"),
+            Arc::clone(&transparency_log),
+        )
+        .expect("cohort daemon bootstrap");
+        let (capability, security, _audit_rx) = kernel_stack(boot_nonce);
+        let ports = RecordingPorts::new(PolicyVerdict::Allow);
+        let runtime = enterprise_runtime(&ports, &fixture, boot_nonce);
+        let recorder = Arc::new(PidRecordingPdp::default());
+        let pdp = enterprise_pdp_runtime::EnterprisePdpRuntime::new(
+            Arc::clone(&recorder) as Arc<dyn PolicyDecisionPort>,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            enterprise_pdp_runtime::DEFAULT_REFRESH_INTERVAL,
+            enterprise_pdp_runtime::DEFAULT_STALENESS_TTL,
+        )
+        .expect("enterprise PDP runtime");
+        let other_subject = recorder
+            .evaluate(&[PolicyDecisionRequest {
+                spirit_pid: DAEMON_CONTROL_SPIRIT_PID + 1,
+                capability_key: "loom.read".to_string(),
+                principal_attributes: None,
+            }])
+            .expect("other-subject PDP evaluation");
+        assert_eq!(
+            other_subject,
+            vec![PolicyVerdict::Allow],
+            "the rule must deny only the daemon control pid"
+        );
+        let journal = maos_kernel_core::journal::JournalAdapter::open(
+            &fixture.home.join("journal").join("lifecycle.ndjson"),
+        )
+        .expect("PID test journal");
+
+        let governance = build_enterprise_daemon_governance(
+            security.as_ref(),
+            &capability,
+            &transparency_log,
+            &workspace_root().join("spirits"),
+            &journal,
+            Some(&runtime),
+            Some(&pdp),
+            Some(&bootstrap),
+        )
+        .expect("enterprise daemon governance")
+        .expect("posture present");
+
+        let daemon = build_cohort_a2a_daemon_runtime(
+            Arc::clone(&transparency_log),
+            boot_nonce,
+            bootstrap,
+            true,
+            Some(governance),
+            None,
+        )
+        .await
+        .expect("cohort daemon runtime");
+        let request_id = "host-b:story-13-5a-pid";
+        let refusal = daemon
+            .digest_port
+            .note_admitted_request(
+                &HostId(REQUESTER.to_string()),
+                request_id,
+                &digest_request_frame(request_id),
+            )
+            .expect_err("daemon-pid subject deny must refuse the collective read");
+        assert!(
+            refusal.contains("enterprise PDP denied capability issuance"),
+            "subject-specific refusal must come from the PDP; got: {refusal}"
+        );
+        daemon.cancel.cancel();
+        let _ = daemon.service.await;
+
+        let seen = recorder.seen.lock().expect("pdp recorder").clone();
+        assert_eq!(
+            seen,
+            vec![
+                (DAEMON_CONTROL_SPIRIT_PID + 1, "loom.read".to_string()),
+                (DAEMON_CONTROL_SPIRIT_PID, "loom.read".to_string()),
+            ],
+            "PDP must allow another pid and deny the daemon control pid for the same action"
+        );
     }
 }

@@ -13,7 +13,7 @@ review_status: machine
 - [cancellation Module](./cancellation) — 훅에 사용되는 `CancellationSignal`
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 라이프사이클 훅 트레이트 — kernel과 Spirit 사이의
 인프로세스 Rust 트레이트 계약.

@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Cohort manifest schema v1 — the signed TOML roster that drives a full-
+//! Cohort manifest schemas v1/v2 (F4 Option A+) — the signed TOML roster that drives a full-
 //! pairwise A2A mesh (Story 12.1 / Task 1).
 //!
 //! A cohort manifest declares the members (each pinned to its §7.2 mTLS
@@ -38,6 +38,9 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier};
 use maos_a2a_core::{A2APeerConfig, A2AProfile, ConsentAllowlists, PeerCertFingerprint, PeerId};
 use maos_domain::invariants::i8::A2AIntent;
+use maos_domain::ports::registry::SpiritId;
+use maos_domain::region::Region;
+use maos_domain::team::TeamId;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CohortError;
@@ -45,11 +48,28 @@ use crate::pin::PinnedAuthorityKeys;
 
 /// Frozen manifest schema version. Bumping is a wire-format change that MUST
 /// be gated by an ADR.
-pub const SCHEMA_VERSION: u64 = 1;
+pub const COHORT_SCHEMA_V1: u64 = 1;
+pub const COHORT_SCHEMA_V2: u64 = 2;
+pub const COHORT_SCHEMA_V3: u64 = 3;
+/// Story 13.6a — the per-member operator-signed team declaration. A new
+/// schema, not an optional field: `to_canonical_bytes` writes ONE shared
+/// pre-image and `deny_unknown_fields` is on, so any new signed field is a
+/// wire-format change by construction (there is no "just add an optional
+/// field" shortcut).
+pub const COHORT_SCHEMA_V4: u64 = 4;
+pub const SUPPORTED_COHORT_SCHEMAS: [u64; 4] = [
+    COHORT_SCHEMA_V1,
+    COHORT_SCHEMA_V2,
+    COHORT_SCHEMA_V3,
+    COHORT_SCHEMA_V4,
+];
 
 /// Domain separator bound into every cohort-manifest signature. Pinned — never
 /// change without an ADR, because doing so re-keys every in-flight manifest.
-pub const SIG_DOMAIN: &[u8] = b"maos.cohort-manifest.v1";
+pub const SIG_DOMAIN_V1: &[u8] = b"maos.cohort-manifest.v1";
+pub const SIG_DOMAIN_V2: &[u8] = b"maos.cohort-manifest.v2";
+pub const SIG_DOMAIN_V3: &[u8] = b"maos.cohort-manifest.v3";
+pub const SIG_DOMAIN_V4: &[u8] = b"maos.cohort-manifest.v4";
 
 /// The two schema-mandatory reserved always-allowlisted intent subtypes
 /// (colon-kebab — the dotted arch-text form FAILS `A2AIntent::is_canonical`
@@ -106,6 +126,13 @@ pub struct CohortAuthority {
 }
 
 /// A cohort member — pinned to its §7.2 mTLS cert fingerprint.
+///
+/// Story 13.6a: `team` is the operator-signed answer to *"which team does this
+/// host speak for?"* — the edge that did not exist before V4. [`CohortMember`]
+/// is the **host** axis and [`TeamEntry::members`] is the **Spirit** axis, so
+/// neither could answer it. The binding is safe against a shared signing seed
+/// precisely because it rides `fingerprint`: operator-pinned, cert-bound, and
+/// NOT derived from `base_seed`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CohortMember {
@@ -113,6 +140,22 @@ pub struct CohortMember {
     /// `sha256:<hex64>` wire form, validated by `PeerCertFingerprint::parse`.
     pub fingerprint: String,
     pub roles: Vec<String>,
+    /// Schema-v4 per-member team declaration. Absent for v1/v2/v3 and omitted
+    /// from their serialized/canonical bodies to preserve byte compatibility.
+    /// Absence is **fail-closed**: a member with no declared team speaks for no
+    /// team and cannot originate a crossing ([`CohortManifest::team_of_host`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<TeamId>,
+}
+
+/// Operator-authoritative team placement and stable Spirit membership.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TeamEntry {
+    pub team_id: TeamId,
+    pub region: Region,
+    pub datname: String,
+    pub members: Vec<SpiritId>,
 }
 
 /// A single `(peer, role, intent)` consent grant. Appears in either the
@@ -124,6 +167,17 @@ pub struct ConsentTuple {
     pub peer: String,
     /// MUST be a role some member declares (RR-min referential integrity).
     pub role: String,
+    /// A canonical A2A intent (`A2AIntent::is_canonical`).
+    pub intent: String,
+}
+
+/// A directional cross-team consent grant. Reversing either endpoint produces
+/// a different grant; `(A, B, intent)` never admits `(B, A, intent)`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CrossTeamConsentGrant {
+    pub from_team: TeamId,
+    pub to_team: TeamId,
     /// A canonical A2A intent (`A2AIntent::is_canonical`).
     pub intent: String,
 }
@@ -149,7 +203,7 @@ pub struct ManifestSignature {
     pub sig: String,
 }
 
-/// A signed cohort manifest (schema v1).
+/// A signed cohort manifest (schema v1, v2, or v3).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CohortManifest {
@@ -164,6 +218,12 @@ pub struct CohortManifest {
     pub reserved_intents: Vec<String>,
     #[serde(default = "default_t_stale_secs")]
     pub t_stale_secs: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub teams: Option<Vec<TeamEntry>>,
+    /// Schema-v3 directional team grants. Empty for v1/v2 and omitted from
+    /// their serialized/canonical bodies to preserve byte compatibility.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cross_team_consent: Vec<CrossTeamConsentGrant>,
     pub signature: ManifestSignature,
 }
 
@@ -171,35 +231,40 @@ impl CohortManifest {
     /// Serialize the manifest BODY (everything except the signature block)
     /// into the pinned canonical byte form. Build/verify MUST stay symmetric.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(256);
-        buf.extend_from_slice(SIG_DOMAIN);
+        let mut buf = Vec::with_capacity(512);
+        let signature_domain = match self.schema_version {
+            COHORT_SCHEMA_V1 => SIG_DOMAIN_V1,
+            COHORT_SCHEMA_V2 => SIG_DOMAIN_V2,
+            COHORT_SCHEMA_V3 => SIG_DOMAIN_V3,
+            COHORT_SCHEMA_V4 => SIG_DOMAIN_V4,
+            _ => b"maos.cohort-manifest.unsupported".as_slice(),
+        };
+        buf.extend_from_slice(signature_domain);
         buf.extend_from_slice(&self.schema_version.to_be_bytes());
         write_lp_bytes(&mut buf, self.cohort_id.as_bytes());
         buf.extend_from_slice(&self.version.to_be_bytes());
         buf.extend_from_slice(&self.t_stale_secs.to_be_bytes());
         buf.extend_from_slice(&self.authority.threshold.to_be_bytes());
 
-        // Authority keys: set semantics — sort the lowercased hex so key
-        // declaration order never perturbs the signature.
         let mut keys_sorted: Vec<String> = self
             .authority
             .keys
             .iter()
-            .map(|k| k.to_lowercase())
+            .map(|key| key.to_lowercase())
             .collect();
         keys_sorted.sort_unstable();
         buf.extend_from_slice(&(keys_sorted.len() as u32).to_be_bytes());
-        for k in &keys_sorted {
-            write_lp_bytes(&mut buf, k.as_bytes());
+        for key in &keys_sorted {
+            write_lp_bytes(&mut buf, key.as_bytes());
         }
 
         buf.extend_from_slice(&(self.members.len() as u32).to_be_bytes());
-        for m in &self.members {
-            write_lp_bytes(&mut buf, m.host_id.as_bytes());
-            write_lp_bytes(&mut buf, m.fingerprint.as_bytes());
-            buf.extend_from_slice(&(m.roles.len() as u32).to_be_bytes());
-            for r in &m.roles {
-                write_lp_bytes(&mut buf, r.as_bytes());
+        for member in &self.members {
+            write_lp_bytes(&mut buf, member.host_id.as_bytes());
+            write_lp_bytes(&mut buf, member.fingerprint.as_bytes());
+            buf.extend_from_slice(&(member.roles.len() as u32).to_be_bytes());
+            for role in &member.roles {
+                write_lp_bytes(&mut buf, role.as_bytes());
             }
         }
 
@@ -207,8 +272,65 @@ impl CohortManifest {
         canonicalize_consent_table(&mut buf, &self.consent.accept);
 
         buf.extend_from_slice(&(self.reserved_intents.len() as u32).to_be_bytes());
-        for ri in &self.reserved_intents {
-            write_lp_bytes(&mut buf, ri.as_bytes());
+        for reserved_intent in &self.reserved_intents {
+            write_lp_bytes(&mut buf, reserved_intent.as_bytes());
+        }
+
+        if matches!(
+            self.schema_version,
+            COHORT_SCHEMA_V2 | COHORT_SCHEMA_V3 | COHORT_SCHEMA_V4
+        ) {
+            let mut teams: Vec<&TeamEntry> =
+                self.teams.as_deref().unwrap_or_default().iter().collect();
+            teams.sort_unstable_by(|left, right| left.team_id.cmp(&right.team_id));
+            buf.extend_from_slice(&(teams.len() as u32).to_be_bytes());
+            for team in teams {
+                write_lp_bytes(&mut buf, team.team_id.as_str().as_bytes());
+                write_lp_bytes(&mut buf, team.region.as_str().as_bytes());
+                write_lp_bytes(&mut buf, team.datname.as_bytes());
+                let mut members: Vec<&SpiritId> = team.members.iter().collect();
+                members.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+                buf.extend_from_slice(&(members.len() as u32).to_be_bytes());
+                for member in members {
+                    write_lp_bytes(&mut buf, member.as_str().as_bytes());
+                }
+            }
+        }
+
+        if matches!(self.schema_version, COHORT_SCHEMA_V3 | COHORT_SCHEMA_V4) {
+            let mut grants: Vec<&CrossTeamConsentGrant> = self.cross_team_consent.iter().collect();
+            grants.sort_unstable_by(|left, right| {
+                (&left.from_team, &left.to_team, left.intent.as_str()).cmp(&(
+                    &right.from_team,
+                    &right.to_team,
+                    right.intent.as_str(),
+                ))
+            });
+            buf.extend_from_slice(&(grants.len() as u32).to_be_bytes());
+            for grant in grants {
+                write_lp_bytes(&mut buf, grant.from_team.as_str().as_bytes());
+                write_lp_bytes(&mut buf, grant.to_team.as_str().as_bytes());
+                write_lp_bytes(&mut buf, grant.intent.as_bytes());
+            }
+        }
+
+        // Story 13.6a — the V4 tail: the per-member team declaration, appended
+        // AFTER every predecessor section so v1/v2/v3 pre-images are
+        // byte-identical BY CONSTRUCTION (the 9.2b additive idiom, now over
+        // three frozen predecessors). `host_id` is re-written inside the tail so
+        // the edge is bound to the host by name, not by positional index.
+        if self.schema_version == COHORT_SCHEMA_V4 {
+            buf.extend_from_slice(&(self.members.len() as u32).to_be_bytes());
+            for member in &self.members {
+                write_lp_bytes(&mut buf, member.host_id.as_bytes());
+                match member.team.as_ref() {
+                    Some(team) => {
+                        buf.push(1);
+                        write_lp_bytes(&mut buf, team.as_str().as_bytes());
+                    }
+                    None => buf.push(0),
+                }
+            }
         }
 
         buf
@@ -236,15 +358,61 @@ impl CohortManifest {
         src: &str,
         pinned: &PinnedAuthorityKeys,
     ) -> Result<Self, CohortError> {
-        let mut manifest: CohortManifest =
-            toml::from_str(src).map_err(|e| CohortError::ParseError(e.to_string()))?;
+        let preparse: toml::Value =
+            toml::from_str(src).map_err(|error| CohortError::ParseError(error.to_string()))?;
+        if let Some(schema_version) = preparse
+            .get("schema_version")
+            .and_then(toml::Value::as_integer)
+            .and_then(|value| u64::try_from(value).ok())
+        {
+            if !SUPPORTED_COHORT_SCHEMAS.contains(&schema_version) {
+                return Err(CohortError::EUnsupportedSchemaVersion {
+                    got: schema_version,
+                    supported: SUPPORTED_COHORT_SCHEMAS.to_vec(),
+                });
+            }
+        }
 
-        if manifest.schema_version != SCHEMA_VERSION {
-            return Err(CohortError::EUnsupportedSchemaVersion {
-                got: manifest.schema_version,
-                expected: SCHEMA_VERSION,
+        let mut manifest: CohortManifest =
+            toml::from_str(src).map_err(|error| CohortError::ParseError(error.to_string()))?;
+
+        match (manifest.schema_version, manifest.teams.as_ref()) {
+            (COHORT_SCHEMA_V1, None) => {}
+            (COHORT_SCHEMA_V2 | COHORT_SCHEMA_V3 | COHORT_SCHEMA_V4, Some(teams))
+                if !teams.is_empty() => {}
+            (schema_version, teams) => {
+                let teams_state = match teams {
+                    None => "absent",
+                    Some(teams) if teams.is_empty() => "empty",
+                    Some(_) => "present",
+                };
+                return Err(CohortError::ECohortSchemaTeamsMismatch {
+                    schema_version,
+                    teams_state,
+                });
+            }
+        }
+        if !matches!(manifest.schema_version, COHORT_SCHEMA_V3 | COHORT_SCHEMA_V4)
+            && !manifest.cross_team_consent.is_empty()
+        {
+            return Err(CohortError::ECohortSchemaCrossTeamConsentMismatch {
+                schema_version: manifest.schema_version,
             });
         }
+        // Story 13.6a — the per-member team edge exists ONLY at V4. A pre-V4
+        // manifest carrying one is refused rather than silently ignored: an
+        // ignored declaration is an unsigned declaration on the shared
+        // pre-image, and the whole point of V4 is that the edge is signed.
+        if manifest.schema_version != COHORT_SCHEMA_V4 {
+            if let Some(member) = manifest.members.iter().find(|m| m.team.is_some()) {
+                return Err(CohortError::ECohortSchemaMemberTeamMismatch {
+                    schema_version: manifest.schema_version,
+                    host_id: member.host_id.clone(),
+                });
+            }
+        }
+        validate_team_map(&manifest)?;
+        validate_cross_team_consent(&manifest)?;
         if manifest.version < 1 {
             return Err(CohortError::EVersionNotPositive {
                 version: manifest.version,
@@ -464,6 +632,32 @@ impl CohortManifest {
         }
         Ok(edges)
     }
+    /// Return whether this signed manifest grants the exact directional
+    /// `(from_team, to_team, intent)` crossing.
+    pub fn cross_team_admits(&self, from_team: &TeamId, to_team: &TeamId, intent: &str) -> bool {
+        matches!(self.schema_version, COHORT_SCHEMA_V3 | COHORT_SCHEMA_V4)
+            && self.cross_team_consent.iter().any(|grant| {
+                &grant.from_team == from_team && &grant.to_team == to_team && grant.intent == intent
+            })
+    }
+
+    /// The operator-signed team a declared member speaks for (Story 13.6a).
+    ///
+    /// **Fail-closed by construction:** `None` for every pre-V4 schema and for
+    /// any V4 member that declares no team. A caller that cannot obtain a team
+    /// here MUST refuse — absence never permits. This is the only host→team
+    /// edge in the system that a peer can check, because it rides the
+    /// operator-pinned `fingerprint` axis rather than the shared signing seed.
+    pub fn team_of_host(&self, host_id: &str) -> Option<&TeamId> {
+        if self.schema_version != COHORT_SCHEMA_V4 {
+            return None;
+        }
+        self.members
+            .iter()
+            .find(|member| member.host_id == host_id)?
+            .team
+            .as_ref()
+    }
 }
 
 /// Append a 4-byte big-endian length prefix followed by the bytes (the
@@ -482,6 +676,136 @@ fn canonicalize_consent_table(buf: &mut Vec<u8>, table: &[ConsentTuple]) {
         write_lp_bytes(buf, t.role.as_bytes());
         write_lp_bytes(buf, t.intent.as_bytes());
     }
+}
+
+fn validate_cross_team_consent(manifest: &CohortManifest) -> Result<(), CohortError> {
+    let declared_teams: std::collections::BTreeSet<&TeamId> = manifest
+        .teams
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(|team| &team.team_id)
+        .collect();
+    let mut seen = std::collections::BTreeSet::new();
+    for grant in &manifest.cross_team_consent {
+        if !declared_teams.contains(&grant.from_team) {
+            return Err(CohortError::ECrossTeamConsentFromTeamUnknown {
+                team_id: grant.from_team.as_str().to_string(),
+            });
+        }
+        if !declared_teams.contains(&grant.to_team) {
+            return Err(CohortError::ECrossTeamConsentToTeamUnknown {
+                team_id: grant.to_team.as_str().to_string(),
+            });
+        }
+        if grant.from_team == grant.to_team {
+            return Err(CohortError::ECrossTeamConsentSelfGrant {
+                team_id: grant.from_team.as_str().to_string(),
+            });
+        }
+        if !A2AIntent::new(&grant.intent).is_canonical() {
+            return Err(CohortError::ECrossTeamConsentIntentNotCanonical {
+                intent: grant.intent.clone(),
+            });
+        }
+        let key = (
+            grant.from_team.as_str(),
+            grant.to_team.as_str(),
+            grant.intent.as_str(),
+        );
+        if !seen.insert(key) {
+            return Err(CohortError::EDuplicateCrossTeamConsent {
+                from_team: grant.from_team.as_str().to_string(),
+                to_team: grant.to_team.as_str().to_string(),
+                intent: grant.intent.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_team_map(manifest: &CohortManifest) -> Result<(), CohortError> {
+    let Some(teams) = manifest.teams.as_deref() else {
+        return Ok(());
+    };
+
+    let mut team_ids = std::collections::BTreeSet::new();
+    let mut datnames = std::collections::BTreeSet::new();
+    let mut spirit_owners = std::collections::BTreeMap::<String, String>::new();
+
+    for team in teams {
+        let team_id = team.team_id.as_str();
+        if !team_ids.insert(team_id.to_string()) {
+            return Err(CohortError::EDuplicateTeamId {
+                team_id: team_id.to_string(),
+            });
+        }
+        if !datnames.insert(team.datname.clone()) {
+            return Err(CohortError::EDuplicateTeamDatname {
+                datname: team.datname.clone(),
+            });
+        }
+        if team.members.is_empty() {
+            return Err(CohortError::EEmptyTeamMembers {
+                team_id: team_id.to_string(),
+            });
+        }
+
+        let canonical_region = Region::canonicalize(team.region.as_str()).map_err(|_| {
+            CohortError::ETeamRegionNotCanonical {
+                team_id: team_id.to_string(),
+                region: team.region.as_str().to_string(),
+            }
+        })?;
+        if canonical_region.as_str() != team.region.as_str() {
+            return Err(CohortError::ETeamRegionNotCanonical {
+                team_id: team_id.to_string(),
+                region: team.region.as_str().to_string(),
+            });
+        }
+
+        let datname = team.datname.as_bytes();
+        let valid_datname = (1..=63).contains(&datname.len())
+            && matches!(datname.first(), Some(b'a'..=b'z' | b'_'))
+            && datname
+                .iter()
+                .skip(1)
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_');
+        if !valid_datname {
+            return Err(CohortError::ETeamDatnameInvalid {
+                team_id: team_id.to_string(),
+                datname: team.datname.clone(),
+            });
+        }
+
+        for spirit in &team.members {
+            if let Some(first_team) =
+                spirit_owners.insert(spirit.as_str().to_string(), team_id.to_string())
+            {
+                return Err(CohortError::ESpiritInMultipleTeams {
+                    spirit_id: spirit.as_str().to_string(),
+                    first_team,
+                    second_team: team_id.to_string(),
+                });
+            }
+        }
+    }
+
+    // Story 13.6a — a member may only speak for a team the SAME signed body
+    // declares. Without this a V4 manifest could bind a host to a team name the
+    // tenant map has never heard of, and the seam would authenticate a claim
+    // that resolves to no datname.
+    for member in &manifest.members {
+        if let Some(team) = member.team.as_ref() {
+            if !team_ids.contains(team.as_str()) {
+                return Err(CohortError::ECohortMemberTeamUnknown {
+                    host_id: member.host_id.clone(),
+                    team_id: team.as_str().to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Referential-integrity + canonicality validation for one consent table:
@@ -538,7 +862,7 @@ mod tests {
     /// A minimal valid N=3 cohort manifest body (signature filled by signing).
     fn sample_manifest_body() -> CohortManifest {
         CohortManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: COHORT_SCHEMA_V1,
             cohort_id: "marcus-team-nexus".to_string(),
             version: 1,
             authority: CohortAuthority {
@@ -550,16 +874,19 @@ mod tests {
                     host_id: "host-a".to_string(),
                     fingerprint: FP_A.to_string(),
                     roles: vec!["coordinator".to_string()],
+                    team: None,
                 },
                 CohortMember {
                     host_id: "host-b".to_string(),
                     fingerprint: FP_B.to_string(),
                     roles: vec!["worker".to_string()],
+                    team: None,
                 },
                 CohortMember {
                     host_id: "host-c".to_string(),
                     fingerprint: FP_C.to_string(),
                     roles: vec!["worker".to_string(), "reviewer".to_string()],
+                    team: None,
                 },
             ],
             consent: ConsentMatrix {
@@ -579,12 +906,34 @@ mod tests {
                 RESERVED_INTENT_HALT_RECEIPT.to_string(),
             ],
             t_stale_secs: T_STALE_DEFAULT,
+            teams: None,
             signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
         }
     }
 
     fn signed_sample() -> CohortManifest {
         sample_manifest_body().signed_with(&signing_key(1))
+    }
+
+    fn tenant_manifest_body() -> CohortManifest {
+        let mut manifest = sample_manifest_body();
+        manifest.schema_version = COHORT_SCHEMA_V2;
+        manifest.teams = Some(vec![
+            TeamEntry {
+                team_id: TeamId::new("team-a").unwrap(),
+                region: Region::canonicalize("region-a").unwrap(),
+                datname: "maos_team_a".to_string(),
+                members: vec![SpiritId::from("spirit-a"), SpiritId::from("spirit-b")],
+            },
+            TeamEntry {
+                team_id: TeamId::new("team-b").unwrap(),
+                region: Region::canonicalize("region-b").unwrap(),
+                datname: "maos_team_b".to_string(),
+                members: vec![SpiritId::from("spirit-c")],
+            },
+        ]);
+        manifest
     }
 
     fn pinned_authority() -> PinnedAuthorityKeys {
@@ -707,19 +1056,18 @@ mod tests {
     // ── Rejection legs (each asserts the SPECIFIC error discriminant) ───────
 
     #[test]
-    fn reject_bad_schema_version() {
-        // schema_version is a required field; mutate via re-serialization.
-        let mut m = signed_sample();
-        m.schema_version = 2;
-        let toml_str = toml::to_string(&m).unwrap();
-        let pinned = pinned_authority();
-        let err = CohortManifest::parse_and_validate(&toml_str, &pinned).unwrap_err();
+    fn reject_unknown_schema_before_strict_field_validation() {
+        let mut manifest = tenant_manifest_body().signed_with(&signing_key(1));
+        manifest.schema_version = 5;
+        let mut toml_str = toml::to_string(&manifest).unwrap();
+        toml_str.push_str("\nunknown_v5_field = true\n");
+        let err = CohortManifest::parse_and_validate(&toml_str, &pinned_authority()).unwrap_err();
         assert!(matches!(
             err,
             CohortError::EUnsupportedSchemaVersion {
-                got: 2,
-                expected: 1
-            }
+                got: 5,
+                ref supported
+            } if supported == &SUPPORTED_COHORT_SCHEMAS
         ));
     }
 
@@ -1030,6 +1378,7 @@ mod tests {
                 host_id: format!("host-{i}"),
                 fingerprint: fp_for(i),
                 roles: vec!["edge".to_string()],
+                team: None,
             })
             .collect();
         // For each member-as-peer, one send + one accept tuple. The projection
@@ -1043,7 +1392,7 @@ mod tests {
             .collect();
         let accept = send.clone();
         CohortManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: COHORT_SCHEMA_V1,
             cohort_id: "task2-mesh".to_string(),
             version: 1,
             authority: CohortAuthority {
@@ -1057,7 +1406,9 @@ mod tests {
                 RESERVED_INTENT_HALT_RECEIPT.to_string(),
             ],
             t_stale_secs: T_STALE_DEFAULT,
+            teams: None,
             signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
         }
     }
 
@@ -1137,7 +1488,7 @@ mod tests {
         // reciprocal edge toward host-0 has empty allowlists. This proves the
         // projection filters by counterparty peer, direction-correct.
         let m = CohortManifest {
-            schema_version: SCHEMA_VERSION,
+            schema_version: COHORT_SCHEMA_V1,
             cohort_id: "asym".to_string(),
             version: 1,
             authority: CohortAuthority {
@@ -1149,11 +1500,13 @@ mod tests {
                     host_id: "host-0".to_string(),
                     fingerprint: fp_for(0),
                     roles: vec!["edge".to_string()],
+                    team: None,
                 },
                 CohortMember {
                     host_id: "host-1".to_string(),
                     fingerprint: fp_for(1),
                     roles: vec!["edge".to_string()],
+                    team: None,
                 },
             ],
             consent: ConsentMatrix {
@@ -1173,7 +1526,9 @@ mod tests {
                 RESERVED_INTENT_HALT_RECEIPT.to_string(),
             ],
             t_stale_secs: T_STALE_DEFAULT,
+            teams: None,
             signature: ManifestSignature { sig: String::new() },
+            cross_team_consent: Vec::new(),
         }
         .signed_with(&signing_key(1));
 
@@ -1248,5 +1603,484 @@ mod tests {
             .expect("signed manifest verifies under the pinned authority");
         let cfgs = m.peer_configs_for("host-0").expect("peer configs");
         assert_eq!(cfgs.len(), 3 - 1);
+    }
+
+    #[test]
+    fn v1_canonical_body_matches_frozen_golden() {
+        let bytes = sample_manifest_body().to_canonical_bytes();
+        assert_eq!(bytes.len(), 640);
+        assert_eq!(
+            hex::encode(sample_manifest_body().canonical_hash()),
+            "835573a8356c3affa382c5b5a14405dc3cc0b0f070c86d6c123103b20883712a"
+        );
+    }
+
+    #[test]
+    fn v2_canonical_body_matches_frozen_golden() {
+        let manifest = tenant_manifest_body();
+        let bytes = manifest.to_canonical_bytes();
+        assert_eq!(bytes.len(), 762);
+        assert_eq!(
+            hex::encode(manifest.canonical_hash()),
+            "7bd7b8b04542f82ab9aef087b3a8335ad104c72fff9169cc95f465652c255d0d"
+        );
+    }
+
+    fn v3_manifest_body() -> CohortManifest {
+        let mut manifest = tenant_manifest_body();
+        manifest.schema_version = COHORT_SCHEMA_V3;
+        manifest.cross_team_consent = vec![CrossTeamConsentGrant {
+            from_team: TeamId::new("team-a").unwrap(),
+            to_team: TeamId::new("team-b").unwrap(),
+            intent: "collective:share".to_string(),
+        }];
+        manifest
+    }
+
+    #[test]
+    fn v3_canonical_body_matches_frozen_golden() {
+        let manifest = v3_manifest_body();
+        assert_eq!(manifest.to_canonical_bytes().len(), 806);
+        assert_eq!(
+            hex::encode(manifest.canonical_hash()),
+            "d2bde45949a292810f799c5772bef858a50ffbb8c0c44ee127613ac1ba150d20"
+        );
+    }
+
+    /// Story 13.6a — the V4 fixture: `host-a` speaks for `team-a`, `host-b` for
+    /// `team-b`, and `host-c` declares NO team (the fail-closed member that
+    /// `team_of_host` must refuse to answer for).
+    fn v4_manifest_body() -> CohortManifest {
+        let mut manifest = v3_manifest_body();
+        manifest.schema_version = COHORT_SCHEMA_V4;
+        manifest.members[0].team = Some(TeamId::new("team-a").unwrap());
+        manifest.members[1].team = Some(TeamId::new("team-b").unwrap());
+        manifest
+    }
+
+    #[test]
+    fn v4_canonical_body_matches_frozen_golden() {
+        let manifest = v4_manifest_body();
+        assert_eq!(manifest.to_canonical_bytes().len(), 863);
+        assert_eq!(
+            hex::encode(manifest.canonical_hash()),
+            "a8b4c40d51025ae6b8949fa49de5b62e50e70323b186c3a7a7f21bfeffeedb1b"
+        );
+    }
+
+    /// AC1 — v1, v2 AND v3 canonical bytes are byte-identical by construction.
+    /// The three pinned goldens above are the byte-identity proof; this leg adds
+    /// the STRUCTURAL claim that makes it hold by construction rather than by
+    /// luck: after the domain + `schema_version` scalar, a V4 pre-image repeats
+    /// every predecessor section byte-for-byte and only then APPENDS its tail.
+    #[test]
+    fn v4_is_additive_over_all_three_frozen_predecessors() {
+        v1_canonical_body_matches_frozen_golden();
+        v2_canonical_body_matches_frozen_golden();
+        v3_canonical_body_matches_frozen_golden();
+
+        assert_eq!(SIG_DOMAIN_V3.len(), SIG_DOMAIN_V4.len());
+        assert_ne!(SIG_DOMAIN_V3, SIG_DOMAIN_V4);
+
+        let v3 = v3_manifest_body();
+        let mut retagged = v3.clone();
+        retagged.schema_version = COHORT_SCHEMA_V4;
+        let v3_bytes = v3.to_canonical_bytes();
+        let v4_bytes = retagged.to_canonical_bytes();
+        // Skip the domain separator and the 8-byte `schema_version` scalar —
+        // those are the two fields a schema bump is *supposed* to move.
+        let head = SIG_DOMAIN_V3.len() + 8;
+        assert!(
+            v4_bytes.len() > v3_bytes.len(),
+            "the V4 tail must be present"
+        );
+        assert_eq!(
+            &v4_bytes[head..v3_bytes.len()],
+            &v3_bytes[head..],
+            "V4 must APPEND a tail, never reshape a predecessor section"
+        );
+    }
+
+    #[test]
+    fn v4_member_team_is_signature_bound_and_fail_closed() {
+        let pinned = pinned_authority();
+        let signed = v4_manifest_body().signed_with(&signing_key(1));
+        let encoded = toml::to_string(&signed).unwrap();
+        let parsed = CohortManifest::parse_and_validate(&encoded, &pinned).unwrap();
+        parsed.verify_signature(&pinned).unwrap();
+
+        // The declared edge is readable, and the UNDECLARED member is refused —
+        // absence never permits.
+        assert_eq!(
+            parsed.team_of_host("host-a").map(TeamId::as_str),
+            Some("team-a")
+        );
+        assert_eq!(
+            parsed.team_of_host("host-b").map(TeamId::as_str),
+            Some("team-b")
+        );
+        assert!(parsed.team_of_host("host-c").is_none());
+        assert!(parsed.team_of_host("host-unknown").is_none());
+
+        // Fail-closed on every frozen predecessor: a pre-V4 manifest can never
+        // answer the team question, even for a host it declares.
+        for predecessor in [
+            sample_manifest_body(),
+            tenant_manifest_body(),
+            v3_manifest_body(),
+        ] {
+            assert!(predecessor.team_of_host("host-a").is_none());
+        }
+
+        // Post-sign mutation of the tail breaks the signature: the edge is
+        // operator-signed, not advisory metadata.
+        let mut relabelled = signed.clone();
+        relabelled.members[0].team = Some(TeamId::new("team-b").unwrap());
+        assert!(relabelled.verify_signature(&pinned).is_err());
+        let mut erased = signed;
+        erased.members[0].team = None;
+        assert!(erased.verify_signature(&pinned).is_err());
+    }
+
+    #[test]
+    fn v4_member_team_rejections_are_typed() {
+        let pinned = pinned_authority();
+
+        // A team the same signed body never declares.
+        let mut unknown = v4_manifest_body();
+        unknown.members[0].team = Some(TeamId::new("team-z").unwrap());
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&toml::to_string(&unknown).unwrap(), &pinned)
+                .unwrap_err(),
+            CohortError::ECohortMemberTeamUnknown { .. }
+        ));
+
+        // The edge exists only at V4 — a pre-V4 carrier is refused, not ignored.
+        // Each case is reduced to a body that is otherwise VALID for its schema,
+        // so the per-member team declaration is the sole remaining defect.
+        for schema in [COHORT_SCHEMA_V1, COHORT_SCHEMA_V2, COHORT_SCHEMA_V3] {
+            let mut early = v4_manifest_body();
+            early.schema_version = schema;
+            if schema != COHORT_SCHEMA_V3 {
+                early.cross_team_consent.clear();
+            }
+            if schema == COHORT_SCHEMA_V1 {
+                early.teams = None;
+            }
+            assert!(
+                matches!(
+                    CohortManifest::parse_and_validate(&toml::to_string(&early).unwrap(), &pinned)
+                        .unwrap_err(),
+                    CohortError::ECohortSchemaMemberTeamMismatch { .. }
+                ),
+                "schema v{schema} must refuse a per-member team declaration"
+            );
+        }
+
+        // V4 keeps every V2/V3 team-shape invariant.
+        let mut no_teams = v4_manifest_body();
+        no_teams.teams = None;
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&toml::to_string(&no_teams).unwrap(), &pinned)
+                .unwrap_err(),
+            CohortError::ECohortSchemaTeamsMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn v3_canonical_body_signs_teams_and_ordered_consent() {
+        let pinned = pinned_authority();
+        let v2_len = tenant_manifest_body().to_canonical_bytes().len();
+        let signed = v3_manifest_body().signed_with(&signing_key(1));
+        assert!(signed.to_canonical_bytes().len() > v2_len);
+        assert_ne!(SIG_DOMAIN_V3, SIG_DOMAIN_V2);
+        let encoded = toml::to_string(&signed).unwrap();
+        let parsed = CohortManifest::parse_and_validate(&encoded, &pinned).unwrap();
+        parsed.verify_signature(&pinned).unwrap();
+        assert!(parsed.cross_team_admits(
+            &TeamId::new("team-a").unwrap(),
+            &TeamId::new("team-b").unwrap(),
+            "collective:share",
+        ));
+        assert!(!parsed.cross_team_admits(
+            &TeamId::new("team-b").unwrap(),
+            &TeamId::new("team-a").unwrap(),
+            "collective:share",
+        ));
+
+        let mut mutated_team = signed;
+        mutated_team.teams.as_mut().unwrap()[0].datname = "maos_team_substituted".to_string();
+        assert!(mutated_team.verify_signature(&pinned).is_err());
+    }
+
+    #[test]
+    fn v3_cross_team_consent_rejections_are_typed() {
+        let pinned = pinned_authority();
+        let mut cases = Vec::new();
+
+        let mut unknown_from = v3_manifest_body();
+        unknown_from.cross_team_consent[0].from_team = TeamId::new("team-z").unwrap();
+        cases.push((unknown_from, "from"));
+        let mut unknown_to = v3_manifest_body();
+        unknown_to.cross_team_consent[0].to_team = TeamId::new("team-z").unwrap();
+        cases.push((unknown_to, "to"));
+        let mut self_grant = v3_manifest_body();
+        self_grant.cross_team_consent[0].to_team = TeamId::new("team-a").unwrap();
+        cases.push((self_grant, "self"));
+        let mut bad_intent = v3_manifest_body();
+        bad_intent.cross_team_consent[0].intent = "NOT CANONICAL".to_string();
+        cases.push((bad_intent, "intent"));
+        let mut duplicate = v3_manifest_body();
+        duplicate
+            .cross_team_consent
+            .push(duplicate.cross_team_consent[0].clone());
+        cases.push((duplicate, "duplicate"));
+
+        for (manifest, expected) in cases {
+            let error =
+                CohortManifest::parse_and_validate(&toml::to_string(&manifest).unwrap(), &pinned)
+                    .unwrap_err();
+            assert!(
+                matches!(
+                    (expected, error),
+                    ("from", CohortError::ECrossTeamConsentFromTeamUnknown { .. })
+                        | ("to", CohortError::ECrossTeamConsentToTeamUnknown { .. })
+                        | ("self", CohortError::ECrossTeamConsentSelfGrant { .. })
+                        | (
+                            "intent",
+                            CohortError::ECrossTeamConsentIntentNotCanonical { .. }
+                        )
+                        | ("duplicate", CohortError::EDuplicateCrossTeamConsent { .. })
+                ),
+                "unexpected typed error for {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_schemas_round_trip_and_verify_with_distinct_domains() {
+        let pinned = pinned_authority();
+        for manifest in [
+            sample_manifest_body().signed_with(&signing_key(1)),
+            tenant_manifest_body().signed_with(&signing_key(1)),
+            v3_manifest_body().signed_with(&signing_key(1)),
+            v4_manifest_body().signed_with(&signing_key(1)),
+        ] {
+            let encoded = toml::to_string(&manifest).unwrap();
+            let parsed = CohortManifest::parse_and_validate(&encoded, &pinned).unwrap();
+            parsed.verify_signature(&pinned).unwrap();
+        }
+        for (left, right) in [
+            (SIG_DOMAIN_V1, SIG_DOMAIN_V2),
+            (SIG_DOMAIN_V1, SIG_DOMAIN_V3),
+            (SIG_DOMAIN_V1, SIG_DOMAIN_V4),
+            (SIG_DOMAIN_V2, SIG_DOMAIN_V3),
+            (SIG_DOMAIN_V2, SIG_DOMAIN_V4),
+            (SIG_DOMAIN_V3, SIG_DOMAIN_V4),
+        ] {
+            assert_ne!(left, right);
+        }
+    }
+
+    #[test]
+    fn schema_and_team_shape_are_exact_biconditionals() {
+        let pinned = pinned_authority();
+        let cases = [
+            {
+                let mut manifest = tenant_manifest_body();
+                manifest.schema_version = COHORT_SCHEMA_V1;
+                manifest
+            },
+            {
+                let mut manifest = tenant_manifest_body();
+                manifest.teams = None;
+                manifest
+            },
+            {
+                let mut manifest = tenant_manifest_body();
+                manifest.teams = Some(Vec::new());
+                manifest
+            },
+            {
+                let mut manifest = v3_manifest_body();
+                manifest.teams = None;
+                manifest
+            },
+            {
+                let mut manifest = v3_manifest_body();
+                manifest.teams = Some(Vec::new());
+                manifest
+            },
+            {
+                let mut manifest = v4_manifest_body();
+                manifest.teams = None;
+                manifest
+            },
+            {
+                let mut manifest = v4_manifest_body();
+                manifest.teams = Some(Vec::new());
+                manifest
+            },
+        ];
+        for manifest in cases {
+            let err =
+                CohortManifest::parse_and_validate(&toml::to_string(&manifest).unwrap(), &pinned)
+                    .unwrap_err();
+            assert!(matches!(
+                err,
+                CohortError::ECohortSchemaTeamsMismatch { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn v2_canonicalization_sorts_teams_and_members_without_mutation() {
+        let original = tenant_manifest_body();
+        let mut reordered = original.clone();
+        reordered.teams.as_mut().unwrap().reverse();
+        reordered.teams.as_mut().unwrap()[1].members.reverse();
+        let before = reordered.teams.clone();
+        assert_eq!(original.canonical_hash(), reordered.canonical_hash());
+        assert_eq!(
+            before.unwrap()[0].team_id,
+            reordered.teams.unwrap()[0].team_id,
+            "canonicalization must not mutate declaration order"
+        );
+    }
+
+    #[test]
+    fn team_identity_and_placement_negatives_are_typed() {
+        let pinned = pinned_authority();
+
+        let mut duplicate_team = tenant_manifest_body();
+        duplicate_team.teams.as_mut().unwrap()[1].team_id = TeamId::new("team-a").unwrap();
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&toml::to_string(&duplicate_team).unwrap(), &pinned)
+                .unwrap_err(),
+            CohortError::EDuplicateTeamId { .. }
+        ));
+
+        let mut duplicate_datname = tenant_manifest_body();
+        duplicate_datname.teams.as_mut().unwrap()[1].datname = "maos_team_a".to_string();
+        assert!(matches!(
+            CohortManifest::parse_and_validate(
+                &toml::to_string(&duplicate_datname).unwrap(),
+                &pinned
+            )
+            .unwrap_err(),
+            CohortError::EDuplicateTeamDatname { .. }
+        ));
+
+        let mut empty_members = tenant_manifest_body();
+        empty_members.teams.as_mut().unwrap()[0].members.clear();
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&toml::to_string(&empty_members).unwrap(), &pinned)
+                .unwrap_err(),
+            CohortError::EEmptyTeamMembers { .. }
+        ));
+
+        let mut overlap = tenant_manifest_body();
+        overlap.teams.as_mut().unwrap()[1]
+            .members
+            .push(SpiritId::from("spirit-a"));
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&toml::to_string(&overlap).unwrap(), &pinned)
+                .unwrap_err(),
+            CohortError::ESpiritInMultipleTeams { .. }
+        ));
+
+        let mut bad_datname = tenant_manifest_body();
+        bad_datname.teams.as_mut().unwrap()[0].datname = "Bad-Name".to_string();
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&toml::to_string(&bad_datname).unwrap(), &pinned)
+                .unwrap_err(),
+            CohortError::ETeamDatnameInvalid { .. }
+        ));
+    }
+
+    #[test]
+    fn noncanonical_region_and_team_id_are_rejected() {
+        let pinned = pinned_authority();
+        let encoded = toml::to_string(&tenant_manifest_body()).unwrap();
+        let bad_region = encoded.replacen("region = \"region-a\"", "region = \"REGION-A\"", 1);
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&bad_region, &pinned).unwrap_err(),
+            CohortError::ETeamRegionNotCanonical { .. }
+        ));
+        let bad_team = encoded.replacen("team_id = \"team-a\"", "team_id = \"TEAM-A\"", 1);
+        assert!(matches!(
+            CohortManifest::parse_and_validate(&bad_team, &pinned).unwrap_err(),
+            CohortError::ParseError(_)
+        ));
+    }
+
+    #[test]
+    fn every_v2_team_field_is_signature_bound_and_domains_do_not_cross() {
+        let pinned = pinned_authority();
+        let signed_v1 = sample_manifest_body().signed_with(&signing_key(1));
+        let signed_v2 = tenant_manifest_body().signed_with(&signing_key(1));
+        let mut v2_with_v1_signature = signed_v2.clone();
+        v2_with_v1_signature.signature = signed_v1.signature.clone();
+        assert!(v2_with_v1_signature.verify_signature(&pinned).is_err());
+        let mut v1_with_v2_signature = signed_v1.clone();
+        v1_with_v2_signature.signature = signed_v2.signature.clone();
+        assert!(v1_with_v2_signature.verify_signature(&pinned).is_err());
+
+        let mut mutations = Vec::new();
+        let mut team_id = signed_v2.clone();
+        team_id.teams.as_mut().unwrap()[0].team_id = TeamId::new("team-z").unwrap();
+        mutations.push(team_id);
+        let mut region = signed_v2.clone();
+        region.teams.as_mut().unwrap()[0].region = Region::canonicalize("region-z").unwrap();
+        mutations.push(region);
+        let mut datname = signed_v2.clone();
+        datname.teams.as_mut().unwrap()[0].datname = "maos_team_z".to_string();
+        mutations.push(datname);
+        let mut member = signed_v2;
+        member.teams.as_mut().unwrap()[0].members[0] = SpiritId::from("spirit-z");
+        mutations.push(member);
+        assert!(mutations
+            .iter()
+            .all(|manifest| manifest.verify_signature(&pinned).is_err()));
+    }
+
+    #[test]
+    fn deny_unknown_fields_applies_to_all_schemas() {
+        let pinned = pinned_authority();
+        for manifest in [
+            sample_manifest_body(),
+            tenant_manifest_body(),
+            v3_manifest_body(),
+            v4_manifest_body(),
+        ] {
+            let mut encoded = toml::to_string(&manifest).unwrap();
+            encoded.push_str("\nunknown_field = 1\n");
+            assert!(matches!(
+                CohortManifest::parse_and_validate(&encoded, &pinned).unwrap_err(),
+                CohortError::ParseError(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn tenant_manifest_option_a_plus_gate_matrix() {
+        v1_canonical_body_matches_frozen_golden();
+        v2_canonical_body_matches_frozen_golden();
+        all_schemas_round_trip_and_verify_with_distinct_domains();
+        schema_and_team_shape_are_exact_biconditionals();
+        reject_unknown_schema_before_strict_field_validation();
+        v2_canonicalization_sorts_teams_and_members_without_mutation();
+        team_identity_and_placement_negatives_are_typed();
+        noncanonical_region_and_team_id_are_rejected();
+        every_v2_team_field_is_signature_bound_and_domains_do_not_cross();
+        deny_unknown_fields_applies_to_all_schemas();
+        v3_canonical_body_signs_teams_and_ordered_consent();
+        v3_cross_team_consent_rejections_are_typed();
+        // ── Story 13.6a — authenticated team identity (COHORT_SCHEMA_V4).
+        v3_canonical_body_matches_frozen_golden();
+        v4_canonical_body_matches_frozen_golden();
+        v4_is_additive_over_all_three_frozen_predecessors();
+        v4_member_team_is_signature_bound_and_fail_closed();
+        v4_member_team_rejections_are_typed();
     }
 }

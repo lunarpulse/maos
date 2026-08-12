@@ -55,6 +55,7 @@ fn empty_caps_required() -> CapabilitiesRequired {
     CapabilitiesRequired {
         provider: maos_kernel_core::security::ProviderCapabilities { complete: vec![] },
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
+        loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
     }
 }
 

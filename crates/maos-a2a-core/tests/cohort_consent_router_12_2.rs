@@ -51,6 +51,30 @@ impl CohortManifestGate for FixedGate {
             rejected_version: None,
         })
     }
+
+    /// Story 13.6a — this 12.2 fixture declares no V4 team, so it is
+    /// fail-closed: every crossing claim it is asked about is refused. The 12.2
+    /// legs below use a NON-crossing intent, so they are unaffected.
+    fn consent_and_team(
+        &self,
+        seam: CohortConsentSeam,
+        counterparty: &HostId,
+        _endpoint_fingerprint: Option<&PeerCertFingerprint>,
+        acting_role: Option<&str>,
+        intent: &str,
+        sender_manifest_version: Option<u64>,
+    ) -> (CohortConsentVerdict, Option<String>) {
+        (
+            self.consent_decision(
+                seam,
+                counterparty,
+                acting_role,
+                intent,
+                sender_manifest_version,
+            ),
+            None,
+        )
+    }
 }
 
 fn frame(intent: &str) -> IacFrame {

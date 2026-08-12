@@ -29,138 +29,148 @@
 //! # Live-oracle posture (D5 anti-canned)
 //!
 //! The live legs (1, 2, 4) are gated on `MAOS_TEST_POSTGRES_{A,B,C}`. An
-//! environment WITHOUT Postgres reports those legs as **Skipped** — never a
-//! silent pass. Absent/unmeasured → the oracle is RED (not green): at the
-//! advisory phases (v1.0/v1.5) a skipped leg emits a §A7.5 WOULD-HAVE-BLOCKED
-//! banner; at v2.0 a skipped leg BLOCKS ship. The gate never green-lights what
-//! it did not measure. A vacuous leg (attempted but ZERO tests) hard-fails at
-//! every phase (the J4 anti-canned guard).
+//! environment WITHOUT Postgres reports those legs as `ABSENT` — never a silent
+//! pass. A vacuous leg (attempted but ZERO tests) hard-fails at every phase
+//! (the J4 anti-canned guard).
 //!
-//! # Phase disposition
+//! # Story 13.6e — leg-level binding, and the ledger
 //!
-//! Advisory at v1.0/v1.5 (a RED/skipped oracle emits a WOULD-HAVE-BLOCKED
-//! banner but does not fail the aggregate); blocking at v2.0.
+//! This gate used to key its whole verdict off a private `CURRENT_PHASE =
+//! "v1_5"` const plus a registry `advisory` row, so a RED LIVE leg returned
+//! `Ok(())` — D-2's Family-B vacuity, and the `roundtrip-slo` floor breach sat
+//! behind it for a month. Those private phase copies are retired: every leg now
+//! carries a [`BindingClass`] (Option C, E12-B1), so a RED live leg with its
+//! substrate up hard-fails at HEAD. The GA ladder still lives in
+//! `gate-registry.toml` and still governs ONLY ship disposition.
+//!
+//! Every leg also carries a projected [`crate::gate_common::EvidenceState`] and
+//! the gate publishes a `product_claim` (Story 13.6e AC1/AC2/AC5).
 
-use crate::gate_common::emit_command;
-use std::collections::HashMap;
-use std::path::Path;
+use crate::evidence_ledger::{
+    finish_ledger_gate, harness_env, leg_signature, leg_signature_many, BuildBinding, EvidenceLeg,
+    EvidenceVerifier, LegObservation, SignatureCheck,
+};
+use crate::gate_common::{emit_command, read_disposition, BindingClass};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
-
-/// Phase graduation order — matches the `gate-registry.toml` `disposition` keys.
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
-
-/// Current release phase. The multi-region SLO binding graduates to blocking at
-/// v2.0; v1.0/v1.5 are the advisory WOULD-HAVE-BLOCKED window.
-const CURRENT_PHASE: &str = "v1_5";
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Canonical gate name (matches the registry `[[ship_gate]]` row and the
 /// `Commands` variant's `#[command(name = ...)]`).
-const GATE_NAME: &str = "check-multi-region-slo";
+pub(crate) const GATE_NAME: &str = "check-multi-region-slo";
 
-/// Read the full phase-disposition map for this gate from the registry.
-fn read_disposition() -> Result<HashMap<String, String>, String> {
-    let registry_path = Path::new("xtask/gate-registry.toml");
-    let registry: crate::corpus_types::ShipGateRegistry =
-        crate::corpus_types::load_toml(registry_path)
-            .map_err(|e| format!("cannot read gate-registry.toml: {e}"))?;
-    for entry in &registry.ship_gates {
-        if entry.name == GATE_NAME {
-            if entry.disposition.is_empty() {
-                return Err(format!("{GATE_NAME} has an empty disposition"));
-            }
-            return Ok(entry.disposition.clone());
-        }
-    }
-    Err(format!("{GATE_NAME} not found in gate-registry.toml"))
-}
+/// Raw labels are the single source for both gate construction and ledger
+/// membership validation.
+const RAW_LEG_LABELS: [&str; 5] = [
+    "three-region-convergence",
+    "roundtrip-slo",
+    "halt-presence",
+    "live-read-region-identity",
+    "kernel-abi-diff",
+];
 
-/// Resolve the disposition for `phase`, inheriting the nearest prior declared
-/// phase when `phase` itself is absent from the map.
-fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
-}
-
-/// True iff the gate BLOCKS ship at `phase` (the v2.0 cutover).
-fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> bool {
-    matches!(
-        phase_disposition(disposition, phase),
-        Some("blocking") | Some("blocking-when-present")
-    )
-}
-
-fn write_step_summary(text: &str) {
-    if let Ok(path) = std::env::var("GITHUB_STEP_SUMMARY") {
-        let _ = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut f| {
-                use std::io::Write;
-                write!(f, "{text}")
-            });
-    }
-}
-
-/// One oracle leg's parsed result.
-struct LegResult {
+/// One oracle leg's raw observation, before projection.
+struct RawLeg {
     label: &'static str,
+    class: BindingClass,
+    substrate_present: bool,
     passed: u32,
     failed: u32,
     ran: bool,
     attempted: bool,
     green: bool,
+    signature: SignatureCheck,
 }
 
-impl LegResult {
-    /// A live leg that was not attempted (Postgres unavailable) — unmeasured.
+impl RawLeg {
+    /// A live leg that was not attempted (Postgres unavailable) — unmeasured,
+    /// and therefore `ABSENT` once projected.
     fn skipped(label: &'static str) -> Self {
-        LegResult {
+        RawLeg {
             label,
+            class: BindingClass::AdvisorySubstrate,
+            substrate_present: false,
             passed: 0,
             failed: 0,
             ran: false,
             attempted: false,
             green: false,
+            signature: SignatureCheck::default(),
         }
     }
 
-    /// Human-readable verdict word for banners / summaries.
-    fn status_word(&self) -> &'static str {
-        if self.green {
-            "green"
-        } else if self.attempted {
-            "red"
-        } else {
-            "skipped"
-        }
+    fn into_leg(self, verifier: &EvidenceVerifier) -> EvidenceLeg {
+        let detail = format!(
+            "{} passed, {} failed (ran={})",
+            self.passed, self.failed, self.ran
+        );
+        EvidenceLeg::observe(
+            LegObservation {
+                name: self.label,
+                class: self.class,
+                attempted: self.attempted,
+                substrate_present: self.substrate_present,
+                green: self.green,
+                detail,
+                signature: self.signature,
+                passed: Some(self.passed),
+                failed: Some(self.failed),
+            },
+            verifier.binding(),
+            GATE_NAME,
+        )
     }
 }
 
-/// True iff all three region connection strings are set (F2 — three real
-/// Postgres DBs). The live legs are skipped unless ALL THREE are present.
+fn connection_present(name: &str) -> bool {
+    std::env::var(name).is_ok_and(|value| !value.trim().is_empty())
+}
+
+/// Two-region roundtrip needs A/B only; three-region convergence and identity
+/// need A/B/C. Keep the predicates separate so a missing C cannot suppress a
+/// valid A↔B measurement.
+fn two_region_postgres_available() -> bool {
+    connection_present("MAOS_TEST_POSTGRES_A") && connection_present("MAOS_TEST_POSTGRES_B")
+}
+
 fn three_region_postgres_available() -> bool {
-    std::env::var("MAOS_TEST_POSTGRES_A").is_ok()
-        && std::env::var("MAOS_TEST_POSTGRES_B").is_ok()
-        && std::env::var("MAOS_TEST_POSTGRES_C").is_ok()
+    two_region_postgres_available() && connection_present("MAOS_TEST_POSTGRES_C")
+}
+
+fn sink_path(leg: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir().join(format!(
+        "maos-evidence-{GATE_NAME}-{leg}-{}-{nanos:x}.jsonl",
+        std::process::id()
+    ))
+}
+
+/// One `cargo test` invocation plus the transcript it produced.
+struct CargoRun {
+    passed: u32,
+    failed: u32,
+    ran: bool,
+    green: bool,
+    transcript: String,
+    sink: PathBuf,
 }
 
 /// Invoke a `cargo test` filtered invocation and parse its `test result:`
-/// summary. Returns `(passed, failed, ran, green)`. PER-LEG INDEPENDENCE: each
-/// leg calls this with its OWN package/test/filter, so one break reds exactly
-/// one leg (no shared broadcast).
+/// summary. PER-LEG INDEPENDENCE: each leg calls this with its OWN
+/// package/test/filter, so one break reds exactly one leg (no shared broadcast).
 fn invoke_cargo_test(
+    leg: &str,
     package: &str,
     test_file: &str,
     name_filter: Option<&str>,
     features: Option<&str>,
     ignored: bool,
-) -> Result<(u32, u32, bool, bool), String> {
+    verifier: &EvidenceVerifier,
+) -> Result<CargoRun, String> {
+    let sink = sink_path(leg);
     let mut cmd = Command::new("cargo");
     cmd.args(["test", "--locked", "-p", package, "--test", test_file]);
     if let Some(f) = features {
@@ -177,6 +187,7 @@ fn invoke_cargo_test(
     }
     dashdash.push("--nocapture");
     cmd.args(&dashdash);
+    cmd.envs(harness_env(GATE_NAME, verifier.binding(), &sink));
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let output = cmd
         .output()
@@ -205,40 +216,75 @@ fn invoke_cargo_test(
             output.status
         );
     }
-    Ok((passed, failed, ran, green))
+    Ok(CargoRun {
+        passed,
+        failed,
+        ran,
+        green,
+        transcript: combined,
+        sink,
+    })
+}
+
+/// A leg whose oracle could not even be started.
+fn errored(label: &'static str, class: BindingClass, substrate_present: bool) -> RawLeg {
+    RawLeg {
+        label,
+        class,
+        substrate_present,
+        passed: 0,
+        failed: 1,
+        ran: true,
+        attempted: true,
+        green: false,
+        signature: SignatureCheck::default(),
+    }
 }
 
 /// Leg 1: three-region convergence (live, 3 PG).
-fn run_three_region_convergence_leg(pg: bool) -> LegResult {
-    let label = "three-region-convergence";
+fn run_three_region_convergence_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
+    let label = RAW_LEG_LABELS[0];
     if !pg {
-        return LegResult::skipped(label);
+        return RawLeg::skipped(label);
     }
     match invoke_cargo_test(
+        label,
         "maos-loom-lite",
         "cross_region_live",
         Some("three_region"),
         None,
         true,
+        verifier,
     ) {
-        Ok((passed, failed, ran, green)) => LegResult {
-            label,
-            passed,
-            failed,
-            ran,
-            attempted: true,
-            green,
-        },
+        Ok(run) => {
+            let signature = leg_signature(
+                verifier,
+                GATE_NAME,
+                &[
+                    "three_region_convergence_all_three_equal",
+                    "three_region_reorder_independence",
+                    "three_region_empty_set_is_na",
+                ],
+                &run.transcript,
+                &run.sink,
+                BindingClass::AdvisorySubstrate,
+                run.green,
+            );
+            RawLeg {
+                label,
+                class: BindingClass::AdvisorySubstrate,
+                substrate_present: true,
+                passed: run.passed,
+                failed: run.failed,
+                ran: run.ran,
+                attempted: true,
+                green: run.green,
+                signature,
+            }
+        }
         Err(e) => {
             eprintln!("{GATE_NAME}: {label} leg error: {e}");
-            LegResult {
-                label,
-                passed: 0,
-                failed: 1,
-                ran: true,
-                attempted: true,
-                green: false,
-            }
+            errored(label, BindingClass::AdvisorySubstrate, true)
         }
     }
 }
@@ -246,163 +292,247 @@ fn run_three_region_convergence_leg(pg: bool) -> LegResult {
 /// Leg 2: roundtrip-slo (live, 2 PG) + the `slo-fault-inject` mutation. GREEN
 /// requires BOTH the clean budget-met path AND the mutation that REDs the
 /// budget (the falsifier must move the number). Both are "pass" outcomes.
-fn run_roundtrip_slo_leg(pg: bool) -> LegResult {
-    let label = "roundtrip-slo";
+fn run_roundtrip_slo_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
+    let label = RAW_LEG_LABELS[1];
     if !pg {
-        return LegResult::skipped(label);
+        return RawLeg::skipped(label);
     }
-    let (p_live, f_live, ran_live, green_live) = match invoke_cargo_test(
+    let live = match invoke_cargo_test(
+        label,
         "maos-bench",
         "t_11_2b_cross_region_slo",
         Some("cross_region_roundtrip_live"),
         None,
         true,
+        verifier,
     ) {
-        Ok(t) => t,
+        Ok(run) => run,
         Err(e) => {
             eprintln!("{GATE_NAME}: {label} live error: {e}");
-            return LegResult {
-                label,
-                passed: 0,
-                failed: 1,
-                ran: true,
-                attempted: true,
-                green: false,
-            };
+            return errored(label, BindingClass::AdvisorySubstrate, true);
         }
     };
-    let (p_mut, f_mut, ran_mut, green_mut) = match invoke_cargo_test(
+    let mutation = match invoke_cargo_test(
+        label,
         "maos-bench",
         "t_11_2b_cross_region_slo",
         Some("cross_region_roundtrip_mutation"),
         Some("slo-fault-inject"),
         true,
+        verifier,
     ) {
-        Ok(t) => t,
+        Ok(run) => run,
         Err(e) => {
+            let _ = std::fs::remove_file(&live.sink);
             eprintln!("{GATE_NAME}: {label} mutation error: {e}");
-            return LegResult {
-                label,
-                passed: 0,
-                failed: 1,
-                ran: true,
-                attempted: true,
-                green: false,
-            };
+            return errored(label, BindingClass::AdvisorySubstrate, true);
         }
     };
-    let passed = p_live + p_mut;
-    let failed = f_live + f_mut;
-    let ran = ran_live && ran_mut;
-    LegResult {
+    let green = live.green && mutation.green;
+    // Both invocations determine this composite leg. A clean-run signature
+    // cannot prove the mutation falsifier, so verify and publish both harness
+    // records as one evidence block.
+    let signature = leg_signature_many(
+        verifier,
+        GATE_NAME,
+        &[
+            "cross_region_roundtrip_live",
+            "cross_region_roundtrip_mutation",
+        ],
+        &[
+            (live.transcript.as_str(), live.sink.as_path()),
+            (mutation.transcript.as_str(), mutation.sink.as_path()),
+        ],
+        BindingClass::AdvisorySubstrate,
+        green,
+    );
+    RawLeg {
         label,
-        passed,
-        failed,
-        ran,
+        class: BindingClass::AdvisorySubstrate,
+        substrate_present: true,
+        passed: live.passed + mutation.passed,
+        failed: live.failed + mutation.failed,
+        ran: live.ran && mutation.ran,
         attempted: true,
-        green: green_live && green_mut,
+        green,
+        signature,
     }
 }
 
 /// Leg 3: halt-presence observability (no PG — in-process termination corpus).
-fn run_halt_presence_leg() -> LegResult {
-    let label = "halt-presence";
-    match invoke_cargo_test("maos-bench", "t_11_2b_halt_presence", None, None, false) {
-        Ok((passed, failed, ran, green)) => LegResult {
-            label,
-            passed,
-            failed,
-            ran,
-            attempted: true,
-            green,
-        },
-        Err(e) => {
-            eprintln!("{GATE_NAME}: {label} leg error: {e}");
-            LegResult {
+/// Hermetic, therefore [`BindingClass::Blocking`]: a RED here has always been a
+/// real defect and now hard-fails at HEAD instead of hiding behind the phase.
+fn run_halt_presence_leg(verifier: &EvidenceVerifier) -> RawLeg {
+    let label = RAW_LEG_LABELS[2];
+    match invoke_cargo_test(
+        label,
+        "maos-bench",
+        "t_11_2b_halt_presence",
+        None,
+        None,
+        false,
+        verifier,
+    ) {
+        Ok(run) => {
+            let _ = std::fs::remove_file(&run.sink);
+            RawLeg {
                 label,
-                passed: 0,
-                failed: 1,
-                ran: true,
+                class: BindingClass::Blocking,
+                substrate_present: true,
+                passed: run.passed,
+                failed: run.failed,
+                ran: run.ran,
                 attempted: true,
-                green: false,
+                green: run.green,
+                signature: SignatureCheck::unverified(
+                    "hermetic leg — reproducible from source, no signature required".to_string(),
+                ),
             }
         }
+        Err(e) => {
+            eprintln!("{GATE_NAME}: {label} leg error: {e}");
+            errored(label, BindingClass::Blocking, true)
+        }
+    }
+}
+
+fn blocking_chokepoint_failure(run: CargoRun) -> RawLeg {
+    RawLeg {
+        label: RAW_LEG_LABELS[3],
+        class: BindingClass::Blocking,
+        substrate_present: true,
+        passed: run.passed,
+        failed: run.failed,
+        ran: run.ran,
+        attempted: true,
+        green: false,
+        signature: SignatureCheck::unverified(
+            "the always-on read-path chokepoint failed before the live half".to_string(),
+        ),
     }
 }
 
 /// Leg 4: live-read-region-identity (live, 3 PG) + the structural chokepoint
 /// (no PG, ALWAYS runs). The chokepoint is a structural precondition — if it
 /// fails, the leg is RED regardless of Postgres. The live read tests run only
-/// with Postgres; without it the live half is unmeasured (leg not green).
-fn run_live_read_region_identity_leg(pg: bool) -> LegResult {
-    let label = "live-read-region-identity";
+/// with Postgres; without it the live half is unmeasured (leg not green), and
+/// `substrate_present` stays FALSE so the dev lane is not blocked by an
+/// unmeasurable half.
+fn run_live_read_region_identity_leg(pg: bool, verifier: &EvidenceVerifier) -> RawLeg {
+    let label = RAW_LEG_LABELS[3];
     // The chokepoint ALWAYS runs (structural — no Postgres).
-    let (p_chk, f_chk, ran_chk, green_chk) =
-        match invoke_cargo_test("maos-loom-lite", "read_path_chokepoint", None, None, false) {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("{GATE_NAME}: {label} chokepoint error: {e}");
-                return LegResult {
-                    label,
-                    passed: 0,
-                    failed: 1,
-                    ran: true,
-                    attempted: true,
-                    green: false,
-                };
-            }
-        };
+    let chokepoint = match invoke_cargo_test(
+        label,
+        "maos-loom-lite",
+        "read_path_chokepoint",
+        None,
+        None,
+        false,
+        verifier,
+    ) {
+        Ok(run) => run,
+        Err(e) => {
+            eprintln!("{GATE_NAME}: {label} chokepoint error: {e}");
+            return errored(label, BindingClass::Blocking, true);
+        }
+    };
+    let _ = std::fs::remove_file(&chokepoint.sink);
+    if !chokepoint.green {
+        return blocking_chokepoint_failure(chokepoint);
+    }
     if !pg {
-        // Chokepoint ran (structural); live half unmeasured → not green.
-        return LegResult {
+        return RawLeg {
             label,
-            passed: p_chk,
-            failed: f_chk,
-            ran: ran_chk,
+            class: BindingClass::AdvisorySubstrate,
+            substrate_present: false,
+            passed: chokepoint.passed,
+            failed: chokepoint.failed,
+            ran: chokepoint.ran,
             attempted: true,
             green: false,
+            signature: SignatureCheck::unverified(
+                "live half unmeasured — non-empty MAOS_TEST_POSTGRES_{A,B,C} required".to_string(),
+            ),
         };
     }
-    let (p_live, f_live, ran_live, green_live) = match invoke_cargo_test(
+    let live_read = match invoke_cargo_test(
+        label,
         "maos-loom-lite",
         "cross_region_live",
         Some("live_read_region_identity"),
         None,
         true,
+        verifier,
     ) {
-        Ok(t) => t,
+        Ok(run) => run,
         Err(e) => {
-            eprintln!("{GATE_NAME}: {label} live error: {e}");
-            return LegResult {
-                label,
-                passed: p_chk,
-                failed: f_chk + 1,
-                ran: ran_chk,
-                attempted: true,
-                green: false,
-            };
+            eprintln!("{GATE_NAME}: {label} live-read error: {e}");
+            return errored(label, BindingClass::AdvisorySubstrate, true);
         }
     };
-    LegResult {
+    // `live_scan_region_identity_foreign_refused` does not match the
+    // `live_read_region_identity` filter. Run it explicitly; otherwise the leg
+    // can never verify the five records it publishes as its trusted set.
+    let live_scan = match invoke_cargo_test(
         label,
-        passed: p_chk + p_live,
-        failed: f_chk + f_live,
-        ran: ran_chk && ran_live,
+        "maos-loom-lite",
+        "cross_region_live",
+        Some("live_scan_region_identity_foreign_refused"),
+        None,
+        true,
+        verifier,
+    ) {
+        Ok(run) => run,
+        Err(e) => {
+            let _ = std::fs::remove_file(&live_read.sink);
+            eprintln!("{GATE_NAME}: {label} live-scan error: {e}");
+            return errored(label, BindingClass::AdvisorySubstrate, true);
+        }
+    };
+    let green = chokepoint.green && live_read.green && live_scan.green;
+    let signature = leg_signature_many(
+        verifier,
+        GATE_NAME,
+        &[
+            "live_read_region_identity_foreign_refused",
+            "live_read_region_identity_reattested_served",
+            "live_read_region_identity_home_served",
+            "live_scan_region_identity_foreign_refused",
+            "live_read_region_identity_forged_stamp_served",
+        ],
+        &[
+            (live_read.transcript.as_str(), live_read.sink.as_path()),
+            (live_scan.transcript.as_str(), live_scan.sink.as_path()),
+        ],
+        BindingClass::AdvisorySubstrate,
+        green,
+    );
+    RawLeg {
+        label,
+        class: BindingClass::AdvisorySubstrate,
+        substrate_present: true,
+        passed: chokepoint.passed + live_read.passed + live_scan.passed,
+        failed: chokepoint.failed + live_read.failed + live_scan.failed,
+        ran: chokepoint.ran && live_read.ran && live_scan.ran,
         attempted: true,
-        green: green_chk && green_live,
+        green,
+        signature,
     }
 }
 
-/// Leg 5: kernel-ABI baseline (no PG) — ZERO kernel-Δ at 23023.
-fn run_kernel_abi_leg() -> LegResult {
+/// Leg 5: kernel-ABI baseline (no PG) — ZERO kernel-Δ.
+fn run_kernel_abi_leg() -> RawLeg {
     let green = crate::check_kernel_baseline::run(false).is_ok();
-    LegResult {
-        label: "kernel-abi-diff",
-        passed: if green { 1 } else { 0 },
-        failed: if green { 0 } else { 1 },
+    RawLeg {
+        label: RAW_LEG_LABELS[4],
+        class: BindingClass::Blocking,
+        substrate_present: true,
+        passed: u32::from(green),
+        failed: u32::from(!green),
         ran: true,
         attempted: true,
         green,
+        signature: SignatureCheck::default(),
     }
 }
 
@@ -445,30 +575,13 @@ fn parse_count(s: &str, key: &str) -> u32 {
     total
 }
 
-/// Build the JSON array of per-leg verdicts for programmatic consumers.
-fn legs_json(legs: &[LegResult]) -> serde_json::Value {
-    serde_json::Value::Array(
-        legs.iter()
-            .map(|l| {
-                serde_json::json!({
-                    "label": l.label,
-                    "passed": l.passed,
-                    "failed": l.failed,
-                    "ran": l.ran,
-                    "attempted": l.attempted,
-                    "green": l.green,
-                    "status": l.status_word(),
-                })
-            })
-            .collect(),
-    )
-}
-
 pub fn run(json: bool) -> Result<(), String> {
-    // 1. Read + validate the phase disposition from the registry.
-    let disposition = read_disposition()?;
+    // 1. Read + validate the phase disposition from the registry. The GA ladder
+    //    is still the registry's job; it no longer decides dev-time enforcement
+    //    (Story 13.6e T5 — leg-level `BindingClass`).
+    let disposition = read_disposition(GATE_NAME)?;
     if !matches!(
-        disposition.get("v2_0").map(|s| s.as_str()),
+        disposition.get("v2_0").map(String::as_str),
         Some("blocking")
     ) {
         return Err(format!(
@@ -476,24 +589,27 @@ pub fn run(json: bool) -> Result<(), String> {
             disposition.get("v2_0")
         ));
     }
-    let blocking_now = is_blocking_at(&disposition, CURRENT_PHASE);
 
-    // 2. Per-leg oracles (each its OWN invocation — per-leg independence). The
-    //    live legs (1, 2, 4) are skipped without the three region DBs; halt-
-    //    presence (3) + kernel-abi-diff (5) always attempt.
-    let pg = three_region_postgres_available();
-    let mut legs: Vec<LegResult> = Vec::with_capacity(5);
-    legs.push(run_three_region_convergence_leg(pg));
-    legs.push(run_roundtrip_slo_leg(pg));
-    legs.push(run_halt_presence_leg());
-    legs.push(run_live_read_region_identity_leg(pg));
-    legs.push(run_kernel_abi_leg());
+    let verifier = EvidenceVerifier::load(BuildBinding::for_run(GATE_NAME)?)?;
 
-    // 3. Vacuous-green guard (J4 anti-canned): a live leg that was ATTEMPTED
-    //    but compiled to ZERO tests / never reported results is a re-stubbed
-    //    harness — hard-fail at EVERY phase. Skipped legs are NOT vacuous
+    // 2. Per-leg oracles (each its OWN invocation — per-leg independence).
+    // Roundtrip needs non-empty A/B; convergence and live identity need
+    // non-empty A/B/C. Hermetic halt + kernel legs always attempt.
+    let pg_ab = two_region_postgres_available();
+    let pg_abc = three_region_postgres_available();
+    let raw: Vec<RawLeg> = vec![
+        run_three_region_convergence_leg(pg_abc, &verifier),
+        run_roundtrip_slo_leg(pg_ab, &verifier),
+        run_halt_presence_leg(&verifier),
+        run_live_read_region_identity_leg(pg_abc, &verifier),
+        run_kernel_abi_leg(),
+    ];
+
+    // 3. Vacuous-green guard (J4 anti-canned): a leg that was ATTEMPTED but
+    //    compiled to ZERO tests / never reported results is a re-stubbed
+    //    harness — hard-fail at EVERY phase. ABSENT legs are NOT vacuous
     //    (unmeasured). The kernel-abi-diff leg is exempt (baseline, not a count).
-    for leg in &legs {
+    for leg in &raw {
         if leg.label != "kernel-abi-diff"
             && leg.attempted
             && (!leg.ran || (leg.passed == 0 && leg.failed == 0))
@@ -509,92 +625,136 @@ pub fn run(json: bool) -> Result<(), String> {
         }
     }
 
-    let oracle_green = legs.iter().all(|l| l.green);
+    let legs: Vec<EvidenceLeg> = raw.into_iter().map(|leg| leg.into_leg(&verifier)).collect();
 
-    // 4. Apply the phased disposition.
-    if oracle_green {
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "gate": GATE_NAME,
-                    "passed": true,
-                    "oracle_green": true,
-                    "blocking_now": blocking_now,
-                    "current_phase": CURRENT_PHASE,
-                    "disposition": disposition,
-                    "postgres_available": pg,
-                    "legs": legs_json(&legs),
-                })
-            );
-        } else {
-            eprintln!(
-                "{GATE_NAME}: PASSED — oracle green ({} legs); {} at {}",
-                legs.len(),
-                if blocking_now { "BLOCKING" } else { "advisory" },
-                CURRENT_PHASE,
-            );
-        }
-        return Ok(());
-    }
-
-    // Oracle RED (or skipped/unmeasured) — phased verdict.
-    let mut detail = String::new();
-    for leg in &legs {
-        detail.push_str(&format!(
-            "- {} leg: {} passed, {} failed (ran={}, attempted={}, green={})\n",
-            leg.label, leg.passed, leg.failed, leg.ran, leg.attempted, leg.green,
-        ));
-    }
-    if blocking_now {
-        let msg = format!(
-            "{GATE_NAME}: BLOCKING — oracle RED/unmeasured at {CURRENT_PHASE} (binding):\n{detail}"
-        );
-        emit_command(json, "error", &msg);
-        if !json {
-            eprintln!("{msg}");
-        }
-        return Err(format!(
-            "{GATE_NAME}: BLOCKING — oracle RED/unmeasured at {CURRENT_PHASE}"
-        ));
-    }
-
-    // v1.0/v1.5 advisory: WOULD-HAVE-BLOCKED banner, non-failing.
-    let banner = format!(
-        "## ⚠️ Multi-Region SLO Gate: WOULD HAVE BLOCKED SHIP (v2.0)\n\
-         {detail}\
-         - The multi-region SLO oracle is RED (live legs skipped — Postgres unavailable — or a leg failed). \
-           This gate is advisory at {CURRENT_PHASE}; it WILL block at v2.0.\n"
-    );
-    emit_command(
+    finish_ledger_gate(
+        GATE_NAME,
+        "Multi-Region SLO Gate",
         json,
-        "warning",
-        "Multi-region SLO oracle RED/unmeasured — would block ship at v2.0",
-    );
-    write_step_summary(&banner);
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "gate": GATE_NAME,
-                "passed": true,
-                "oracle_green": false,
-                "advisory": true,
-                "blocking_now": false,
-                "current_phase": CURRENT_PHASE,
-                "disposition": disposition,
-                "postgres_available": pg,
-                "legs": legs_json(&legs),
-            })
-        );
-    } else {
-        eprintln!(
-            "{GATE_NAME}: PASS (advisory — oracle RED/unmeasured, would block at v2.0); {}",
-            legs.iter()
-                .map(|l| format!("{}={}", l.label, l.status_word()))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        &disposition,
+        legs,
+        &verifier,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_count_sums_passed_and_failed() {
+        let s = "test result: ok. 19 passed; 0 failed; 0 ignored";
+        assert_eq!(parse_count(s, "passed"), 19);
+        assert_eq!(parse_count(s, "failed"), 0);
+        let s2 = "test result: FAILED. 3 passed; 2 failed; 1 ignored";
+        assert_eq!(parse_count(s2, "passed"), 3);
+        assert_eq!(parse_count(s2, "failed"), 2);
     }
-    Ok(())
+
+    /// T5/D-2 (Family B): `roundtrip-slo` is the leg whose real floor breach sat
+    /// behind `CURRENT_PHASE = "v1_5"` and exited 0 anyway. With leg-level
+    /// binding it blocks — and the ledger records why.
+    #[test]
+    fn a_red_roundtrip_slo_leg_blocks_and_is_indeterminate() {
+        let verifier = EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "c0ffee".to_string(),
+                nonce: "n".to_string(),
+            },
+            None,
+        );
+        let leg = RawLeg {
+            label: "roundtrip-slo",
+            class: BindingClass::AdvisorySubstrate,
+            substrate_present: true,
+            passed: 1,
+            failed: 1,
+            ran: true,
+            attempted: true,
+            green: false,
+            signature: SignatureCheck::default(),
+        }
+        .into_leg(&verifier);
+        assert_eq!(
+            leg.state(),
+            crate::gate_common::EvidenceState::Indeterminate
+        );
+        assert!(leg.blocks_dev_lane(), "a RED live leg must block at HEAD");
+        assert!(leg.blocks_product_claim(false));
+    }
+
+    /// The hermetic legs bind unconditionally — `halt-presence` is `Blocking`,
+    /// so a RED there hard-fails whether or not any substrate is present.
+    #[test]
+    fn halt_presence_is_hermetic_and_binds_without_substrate() {
+        let verifier = EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "c0ffee".to_string(),
+                nonce: "n".to_string(),
+            },
+            None,
+        );
+        let leg = RawLeg {
+            label: "halt-presence",
+            class: BindingClass::Blocking,
+            substrate_present: false,
+            passed: 0,
+            failed: 1,
+            ran: true,
+            attempted: true,
+            green: false,
+            signature: SignatureCheck::default(),
+        }
+        .into_leg(&verifier);
+        assert!(leg.blocks_dev_lane());
+    }
+
+    #[test]
+    fn structural_chokepoint_failure_blocks_without_postgres() {
+        let verifier = EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "c0ffee".to_string(),
+                nonce: "n".to_string(),
+            },
+            None,
+        );
+        let leg = blocking_chokepoint_failure(CargoRun {
+            passed: 5,
+            failed: 1,
+            ran: true,
+            green: false,
+            transcript: String::new(),
+            sink: PathBuf::new(),
+        })
+        .into_leg(&verifier);
+        assert_eq!(leg.binding, "blocking");
+        assert!(leg.blocks_dev_lane());
+    }
+
+    #[test]
+    fn skipped_live_leg_is_absent_and_unmeasured() {
+        let verifier = EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "c0ffee".to_string(),
+                nonce: "n".to_string(),
+            },
+            None,
+        );
+        let leg = RawLeg::skipped("three-region-convergence").into_leg(&verifier);
+        assert_eq!(leg.state(), crate::gate_common::EvidenceState::Absent);
+        assert!(!leg.green);
+        assert!(!leg.blocks_dev_lane());
+        assert!(!leg.blocks_product_claim(false));
+    }
+
+    #[test]
+    fn ledger_leg_names_are_derived_from_raw_labels() {
+        assert_eq!(ledger_leg_names(), RAW_LEG_LABELS.to_vec());
+    }
+}
+
+/// Complete ledger leg set, derived from the raw labels used to construct this
+/// gate's legs.
+pub fn ledger_leg_names() -> Vec<&'static str> {
+    RAW_LEG_LABELS.to_vec()
 }

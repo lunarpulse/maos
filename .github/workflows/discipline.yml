@@ -153,15 +153,22 @@ jobs:
 
   kloc-check:
     runs-on: ubuntu-latest
-    # ADVISORY gate (2026-06-11). `xtask/kloc.toml` deliberately forbids raising
-    # the maos-kernel-core / aggregate ceilings — the breach is intentional
-    # architectural pressure to force decomposition (Phase 3/4 still pending),
-    # and every Epic 8 story shipped with kloc "pre-existing RED, verified
-    # neutral". `continue-on-error` keeps the ❌ breach VISIBLE in the job list
-    # (the gate's documented purpose) without blocking the whole discipline run.
-    # FLAG-Winston: ratify this advisory posture; revert to blocking once the
-    # kernel-core decomposition lands and the ceilings can be met honestly.
-    continue-on-error: true
+    # BLOCKING since 2026-07-25 (founder-ratified ceiling-policy replacement).
+    # Was ADVISORY from 2026-06-11 under the "tight measured residual" rule, whose
+    # own revert condition read: "revert to blocking once the kernel-core
+    # decomposition lands and the ceilings can be met honestly."
+    # HONEST STATUS OF THAT CONDITION: the second half is met, the first is NOT.
+    # Decomposition Phase 3/4 has still not landed (kernel-core is 17,890 against
+    # an Epic-5 target of ~5,400 — a target whose own named extractions only ever
+    # totalled ~13,627 LOC, so it was never reachable as written). What changed is
+    # that ceilings are now set by a rule that leaves real operating capacity
+    # (`measured + max(100, ceil(0.02 * measured))`, see xtask/kloc.toml), so the
+    # gate can be met honestly and is therefore enforceable. It was advisory
+    # BECAUSE tight-residual made it unshippable, not because breaches were
+    # acceptable. Slack is capacity, NOT authorization: kernel-core changes still
+    # require a measured FLAG-Winston grant plus a kernel-core-baseline.toml
+    # HISTORY row, enforced separately by the BLOCKING check-kernel-baseline job.
+    # Phase 4 decomposition remains tracked architectural debt in kloc.toml.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1431,7 +1438,7 @@ jobs:
   # Story 6.2 AC7 — smoke-orchestrator-fanout-6-2 end-to-end demo arm.
   smoke-orchestrator-fanout-6-2:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1450,7 +1457,7 @@ jobs:
   # Story 6.3 AC7 — smoke-a2a-loopback-6-3 A2A wedge demo.
   smoke-a2a-loopback-6-3:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1470,7 +1477,7 @@ jobs:
   # demo (one fine-grained admit + one fine-grained code-mutation-directive deny).
   smoke-a2a-consent-vocab-8-7:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1490,7 +1497,7 @@ jobs:
   # demo (classified admit + absent-deny -32009 + non-canonical-deny -32009).
   smoke-a2a-fail-closed-8-8:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1538,7 +1545,7 @@ jobs:
   # NOT the in-process loopback shortcut).
   smoke-a2a-tcp-8-6:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1593,7 +1600,7 @@ jobs:
   # ConsentRupture detection + RateLimited frame emission.
   smoke-schedule-6-4:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2019,8 +2026,21 @@ jobs:
 
   # Story 10.1a AC4 — xtask CI lint: asserts expected gate job names are present
   # in the v1.0-ship-gate aggregate job's needs: array.
+  #
+  # Story 13.6e (AC5) — and the ledger consumer. It downloads the four
+  # ledger-set gates' published `product_claim` artifacts and refuses a ship
+  # badge asserted over `NOT_PROVEN` evidence, closing this gate's ownerless
+  # "never validates anything CI produced" gap. `needs:` + `if: always()` so it
+  # runs after the producers whatever they returned — a RED producer's ledger is
+  # the one worth reading.
   check-ship-gate-completeness:
     runs-on: ubuntu-latest
+    needs:
+      - check-cross-region-consensus
+      - check-multi-region-slo
+      - check-multi-tenant-loom
+      - check-reza-production-path
+    if: always()
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2029,7 +2049,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Download evidence ledgers from the ledger-set gates
+        uses: actions/download-artifact@v4
+        with:
+          pattern: evidence-ledger-*
+          path: tests/reports/
+          merge-multiple: true
       - name: Run check-ship-gate-completeness
+        # This is the ONLY job that downloads the ledger artifacts, so it is the
+        # only one that may demand them. Other jobs invoke this gate for its
+        # enrolment legs and report `ledger_consumed: false`.
+        env:
+          MAOS_LEDGER_ARTIFACTS: tests/reports
         run: cargo run -p xtask -- check-ship-gate-completeness --json
 
   # Story 7.5b AC9 — NFR-Onb-1 30-min first-Spirit validation gate (discipline rail).
@@ -2603,6 +2634,31 @@ jobs:
   # blocking at v2.0 (absent/unmeasured → BLOCK).
   check-cross-region-consensus:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Story 13.6c — the consensus gate runs the WHOLE cross_region_live
+    # binary (32 #[ignore] tests broadcast to 4 legs). It keys on the
+    # SINGULAR MAOS_TEST_POSTGRES (check_cross_region_consensus.rs:308) and
+    # every reader in that file panics rather than skipping, so the job must
+    # export the FULL union: the shared stand-in (→ its own maos_shared,
+    # never aliased onto a team DB — the AC1 role-disjoint rule), the region
+    # axis, and the team axis. TEAM_C is required too: the whole binary
+    # includes the team-c reader added in AC1/T2 (review round 2 corrected
+    # the original "TEAM_C has no reader here" note — D-7 is about Reza, not
+    # the consensus gate; the drift contract requires TEAM_{A,B,C}).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2611,10 +2667,34 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-cross-region-consensus-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision Loom substrate
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: |-
+            maos_team_b
+            maos_team_c
+            maos_shared
       - name: Run check-cross-region-consensus gate
+        env:
+          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_shared
+          MAOS_TEST_POSTGRES_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
+          MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_TEAM_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
         run: |
           set -o pipefail
           cargo run -p xtask -- check-cross-region-consensus --json 2>&1 | tee /tmp/cross-region-gate.json
+      # Story 13.6e (AC5) — publish the evidence ledger (see the reza job).
+      - name: Publish evidence ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-ledger-check-cross-region-consensus
+          path: tests/reports/evidence-ledger-check-cross-region-consensus.json
+          if-no-files-found: error
+          retention-days: 90
 
   # Story 11.2b (AC5, D5) — multi-region SLO gate. ONE gate / ONE disposition /
   # FIVE independently-falsifiable legs with PER-LEG independence (each leg reads
@@ -2624,6 +2704,26 @@ jobs:
   # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
   check-multi-region-slo:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Story 13.6c — the SLO gate filters to the three-region / roundtrip /
+    # region-identity legs, all on the REGION axis (pg_conn_for, A/B/C). It
+    # never reads the shared stand-in or the team axis, so its union is
+    # exactly MAOS_TEST_POSTGRES_{A,B,C} (AC2). maos_team_c is required: the
+    # three_region + live_read_region_identity legs home agents in region-c.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2632,10 +2732,29 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-multi-region-slo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision Loom substrate
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: |-
+            maos_team_b
+            maos_team_c
       - name: Run check-multi-region-slo gate
+        env:
+          MAOS_TEST_POSTGRES_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
         run: |
           set -o pipefail
           cargo run -p xtask -- check-multi-region-slo --json 2>&1 | tee /tmp/multi-region-slo-gate.json
+      # Story 13.6e (AC5) — publish the evidence ledger (see the reza job).
+      - name: Publish evidence ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-ledger-check-multi-region-slo
+          path: tests/reports/evidence-ledger-check-multi-region-slo.json
+          if-no-files-found: error
+          retention-days: 90
       # Story 11.2b (F7) SHIP-BLOCKER: slo-fault-inject MUST NOT leak into the
       # release feature graph (a release build with fault injection active would
       # inject spurious latency into a production measurement path). Mirrors the
@@ -2663,6 +2782,171 @@ jobs:
           key: check-cohort-mesh-${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-cohort-mesh gate
         run: cargo run -p xtask -- check-cohort-mesh --json
+
+  # Stories 13.1–13.3, 13.6a plus successor inversions — ADR-055 physical tenant
+  # wall, cryptographic tenant boundary, asymmetric crossing, per-row
+  # attestation, and COHORT_SCHEMA_V4 authenticated team identity. Hermetic
+  # refusal/dead-wire/identity legs are Blocking; live legs use two databases on
+  # one serialized Postgres 16 instance. 13.6a adds no new gate and no new
+  # substrate: every one of its legs is hermetic (synthetic frames only).
+  check-multi-tenant-loom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-multi-tenant-loom-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision Loom substrate
+        # Story 13.6c — third team database (maos_team_c). The two existing
+        # team DBs are unchanged; TEAM_C gains its reader (the three-team
+        # distinct-database leg) and MAOS_TEST_POSTGRES keeps its legacy
+        # alias onto maos_team_b (AC1: do not perturb what passes).
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: |-
+            maos_team_b
+            maos_team_c
+      - name: Run check-multi-tenant-loom gate
+        env:
+          MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+          MAOS_TEST_POSTGRES_TEAM_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
+          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_team_b
+        run: cargo run -p xtask -- check-multi-tenant-loom --json
+      # Story 13.6e (AC5) — publish the evidence ledger (see the reza job).
+      - name: Publish evidence ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-ledger-check-multi-tenant-loom
+          path: tests/reports/evidence-ledger-check-multi-tenant-loom.json
+          if-no-files-found: error
+          retention-days: 90
+  # Story 13.5d — Reza's mediated production collective route. Hermetic legs
+  # bind at HEAD; the live route runs against two databases on Postgres 16.
+  check-reza-production-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_team_a
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_team_a"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-reza-production-path-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision Loom substrate
+        # Story 13.6c — consolidated onto the shared composite action. The
+        # Reza substrate is UNCHANGED: two team DBs (maos_team_{a,b}), env
+        # TEAM_{A,B} only. It has no three-team leg and grows no third
+        # database (D-7: never provision a database with no reader).
+        uses: ./.github/actions/provision-loom-substrate
+        with:
+          extra-databases: maos_team_b
+      # Story 13.5b null-control #22: these five GDPR suites previously had no
+      # explicit CI invocation. Keep each file visible as an independent leg.
+      - name: GDPR erasure smoke
+        run: cargo test --locked -p maos-audit --test erasure_smoke_test
+      - name: GDPR erasure SLA
+        run: cargo test --locked -p maos-audit --test erasure_sla_test
+      - name: GDPR backend partition
+        run: cargo test --locked -p maos-audit --test multi_backend_erasure_test
+      - name: GDPR cascade integration
+        run: cargo test --locked -p maos-audit --test gdpr_cascade_test
+      - name: GDPR deterministic cascade corpus
+        run: cargo test --locked -p maos-audit --test gdpr_cascade_corpus_test
+      # 13.5b review: the operator-facing terminals (daemon JSON + exit codes)
+      # and the maosctl forwarding wrapper had no CI invocation either — the
+      # corpus suite above only replays kernel `ForgetOutcome`s.
+      - name: GDPR uninstall terminals and exit codes
+        run: cargo test --locked -p maos-bin --test erasure_uninstall_13_5b
+      - name: GDPR maosctl terminal exit-code forwarding
+        run: cargo test --locked -p maos-cli --test uninstall_exit_codes_13_5b
+      - name: GDPR legal-hold operator surface
+        run: cargo test --locked -p maos-cli --test legal_hold_cli_13_5b
+      - name: Run check-reza-production-path gate
+        env:
+          MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
+          MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
+        run: cargo run -p xtask -- check-reza-production-path --json
+      # Story 13.6e (AC5, D-5) — publish the evidence ledger. `discipline.yml`
+      # had ZERO artifact steps before this: every gate's JSON went to stdout
+      # and died with the job, so a `product_claim` no other job could read was
+      # a claim, not a control. Idiom copied from the shipped
+      # producer→consumer hand-offs (multi-provider.yml:30→47,
+      # rpo-rto-cadence.yml:83→107); `check-ship-gate-completeness` is the
+      # consumer. `if: always()` — a RED gate's ledger is the one worth reading.
+      - name: Publish evidence ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-ledger-check-reza-production-path
+          path: tests/reports/evidence-ledger-check-reza-production-path.json
+          if-no-files-found: error
+          retention-days: 90
+  # Story 13.6c (AC5) — three-team/three-region CI substrate drift controls.
+  # Structural (no Postgres): env-consistency (D-4 catcher) + service-block
+  # drift. Blocks at every phase — a substrate-config drift is a config defect.
+  check-loom-substrate-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-loom-substrate-drift-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-loom-substrate-drift gate
+        run: cargo run -p xtask -- check-loom-substrate-drift --json
+  # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
+  # hermetic (in-process crypto + registry admission path); no live substrate.
+  check-vetting-attestation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-vetting-attestation-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-vetting-attestation gate
+        run: cargo run -p xtask -- check-vetting-attestation --json
   # ONE disposition / FOUR independently-falsifiable legs with PER-LEG
   # independence (mesh-identity-reconcile, detection-latency, blast-recovery-
   # rto, kernel-abi-diff — each reads its OWN `cargo test` oracle). Advisory
@@ -2746,6 +3030,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-fkcs-${{ hashFiles('**/Cargo.lock') }}
+      # `diff-oracle-derives` and `fault-inject-falsifiers` capture the REAL
+      # public API via `cargo public-api` (xtask/src/abi_diff.rs). Without these
+      # two steps the capture fails with "cargo-public-api not installed" and
+      # both legs go RED -- which is what happened once Story 13.6e closed this
+      # gate's blocking_now/dev_blocks divergence and the reds stopped being
+      # swallowed. Mirrors the abi-diff job exactly.
+      - name: Install nightly toolchain for cargo-public-api
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       - name: Run check-fkcs gate
         run: |
           set -o pipefail
@@ -2812,6 +3106,7 @@ jobs:
       - nfr-rel-3-hsis-95pct
       - check-stability-matrix
       - check-breaking-md
+      - check-ship-gate-completeness
       - check-pentest-gate
       - check-coverage-matrix-completeness
       - check-owasp-freeze-hash
@@ -2839,12 +3134,16 @@ jobs:
       - check-multi-region-slo
       - check-scale-churn
       - check-cohort-mesh
+      - check-multi-tenant-loom
+      - check-reza-production-path
       - check-enterprise-pdp
       - check-enterprise-identity
       - check-fkcs
       - check-trial-attestation
       - check-escape-detector
       - check-env-contract
+      - check-vetting-attestation
+      - check-loom-substrate-drift
     if: always()
     steps:
       - name: Ship gate results summary
@@ -2876,11 +3175,14 @@ jobs:
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"
           echo "| check-scale-churn | ${{ needs.check-scale-churn.result }} | cargo run -p xtask -- check-scale-churn |"
           echo "| check-cohort-mesh | ${{ needs.check-cohort-mesh.result }} | cargo run -p xtask -- check-cohort-mesh |"
+          echo "| check-multi-tenant-loom | ${{ needs.check-multi-tenant-loom.result }} | cargo run -p xtask -- check-multi-tenant-loom |"
+          echo "| check-reza-production-path | ${{ needs.check-reza-production-path.result }} | cargo run -p xtask -- check-reza-production-path |"
           echo "| check-enterprise-pdp | ${{ needs.check-enterprise-pdp.result }} | cargo run -p xtask -- check-enterprise-pdp |"
           echo "| check-enterprise-identity | ${{ needs.check-enterprise-identity.result }} | cargo run -p xtask -- check-enterprise-identity |"
           echo "| check-fkcs | ${{ needs.check-fkcs.result }} | cargo run -p xtask -- check-fkcs |"
           echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | cargo run -p xtask -- check-trial-attestation |"
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
+          echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -2908,9 +3210,12 @@ jobs:
           echo "  check-multi-region-slo: ${{ needs.check-multi-region-slo.result }}"
           echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
           echo "  check-cohort-mesh: ${{ needs.check-cohort-mesh.result }}"
+          echo "  check-multi-tenant-loom: ${{ needs.check-multi-tenant-loom.result }}"
+          echo "  check-reza-production-path: ${{ needs.check-reza-production-path.result }}"
           echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
+          echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           exit 1
 

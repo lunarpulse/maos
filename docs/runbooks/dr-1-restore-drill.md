@@ -97,6 +97,61 @@ production-scale database is the only reliable RTO measurement. CI exercises
 the code path (backup → restore → Merkle verify → query) to catch regressions,
 but cannot validate wall-clock RTO at scale.
 
+## Legal holds in tenant mode
+
+Team-shard Transparency Log backups do **not** contain `legal_holds`. Holds are
+principal-global and remain in the Host-global artifact
+`$MAOS_HOME/audit/transparency.sqlite`; the daemon attaches that authority to a
+team shard at boot. Before a tenant-mode DR operation:
+
+Team-scoped holds are **ABSENT** in this release. Story 13.6 owns the
+authoritative semantic model and implementation; do not emulate them with
+principal-global rows.
+
+1. Run `maosctl legal-hold list` and retain the JSON with the drill evidence.
+2. Back up the Host-global artifact separately from every team-shard TL.
+3. Restore the Host-global artifact before starting a tenant daemon. An
+   unbound or missing hold authority fails closed; it must never be treated as
+   an empty hold set.
+4. Re-run `maosctl legal-hold list` after restore and reconcile it byte-for-byte
+   with the pre-drill inventory before permitting erasure operations.
+
+## Reading an erasure artifact
+
+A GDPR uninstall can emit two artifacts, and they answer different questions.
+Do not submit either one alone as a complete Article 17 response.
+
+| Artifact | What it attests |
+|---|---|
+| `<spirit>-<ns>-<root>.bundle` (erasure proof) | Per-category outcome for this run: `Removed { count }`, `VerifiedEmpty`, or `CoverageGap { reason }`. This is the authoritative record of what was and was not erased. |
+| `regional-teardown-<region>-<ns>.json` | Signed attestation that the cascade completed **over the stores named in `forget_cascade.stores_covered`** — currently `private`, `principal_index` and `shared`. It is scoped, not all-tier. |
+
+Rules:
+
+- Always read the receipt beside the proof bundle from the same run. A receipt
+  verifying `Ok` does **not** mean every backend was erased; stores listed in
+  `UNCOVERED_STORES` are excluded by construction and appear in the proof as a
+  `CoverageGap`. `UNCOVERED_STORES` is empty after the Shared-tier partition.
+- The Shared tier is no longer a gap. The principal partition excludes
+  `MemoryNamespace::Principal` at its write, read and scan entry
+  points, so it is principal-empty by construction and normally attests
+  `VerifiedEmpty`. That status is verified per run by counting
+  principal-namespaced rows, not assumed. **If you see the Shared tier as a
+  `CoverageGap` reporting a non-zero row count, the Host is carrying
+  pre-partition residue:** rows written before the guard existed. They are
+  unreachable but NOT erased, and there is no delete path. Every uninstall
+  exits non-zero after writing a partial proof; a region-pinned run also refuses
+  to sign a teardown receipt until the residue is removed out of band. Treat
+  that as an escalation, not a flake.
+- A `held` terminal (exit 3) may still carry a proof path. That proof is
+  **partial**: it records the principals this run erased and lists the held
+  principals as a legal-hold `CoverageGap`. It is never a complete-erasure
+  submission. Releasing a hold changes eligibility only — it does not erase.
+- A held run writes no regional teardown receipt. A held run is not a teardown.
+- Terminal exit codes: `0` erased, `3` held, `4` not-found, `5` failed. The
+  JSON terminal on stdout and the exit code are one contract; if they ever
+  disagree, treat the run as failed and escalate.
+
 ## Cleanup
 
 ```bash

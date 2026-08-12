@@ -9,7 +9,7 @@
 - [STABILITY.md](https://github.com/lunarpulse/maos/blob/main/STABILITY.md) — deprecation lifecycle tracking
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Story 7.1 v0.5 binding — deprecation warning channel surface.
 

@@ -30,7 +30,9 @@ use std::time::{Duration, Instant};
 use maos_domain::memory::{
     CollectiveErrorKind, MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue,
 };
-use maos_domain::ports::{CollectiveMemoryPort, CollectivePortError, MemoryManagerPort};
+use maos_domain::ports::{
+    CollectiveEraseReceipt, CollectiveMemoryPort, CollectivePortError, MemoryManagerPort,
+};
 use maos_kernel_core::api::{
     MemoryManagerAdapter, PrincipalNamespaceIndex, PrivateMemoryStore, SharedMemoryStore,
     TransparencyLogAdapter,
@@ -39,8 +41,10 @@ use maos_loom_lite::adapter::LoomLiteAdapter;
 use maos_loom_lite::store::{LoomLiteStore, StoreConfig};
 
 use maos_domain::invariants::i1::{IntentClass, Scope};
+use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoProvider;
+use maos_domain::ports::scheduler::SpiritSchedulerPort;
 use maos_kernel_core::capability::cap_policy::decision::TrustTier;
 use maos_kernel_core::capability::cap_policy::{
     ManifestCapabilityScope, PolicyTable, PolicyTableInner,
@@ -49,7 +53,11 @@ use maos_kernel_core::capability::cap_tokens::Ed25519SigningKey;
 use maos_kernel_core::capability::{
     cap_audit, cap_quota, CapabilityRegistryAdapter, WorkingMemoryStore,
 };
+use maos_kernel_core::security::manifest::{
+    CapabilitiesRequired, ClassSection, PostureSection, ResourceCaps, SandboxConfig,
+};
 use maos_kernel_core::security::RingCryptoProvider;
+use maos_kernel_core::security::SecurityManagerAdapter;
 use maos_kernel_core::telemetry::TelemetryStreamAdapter;
 use parking_lot::Mutex;
 
@@ -61,6 +69,34 @@ fn workspace_root() -> &'static std::path::Path {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("xtask sits directly under the workspace root")
+}
+
+fn live_researcher_collective_method_body<'a>(source: &'a str, method: &str) -> &'a str {
+    let implementation = source
+        .find("impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {")
+        .expect("LiveResearcherCollectivePort implementation exists");
+    let method_start = implementation
+        + source[implementation..]
+            .find(&format!("fn {method}("))
+            .expect("collective method exists");
+    let body_start = method_start
+        + source[method_start..]
+            .find('{')
+            .expect("collective method body opens");
+    let mut depth = 0;
+    for (offset, byte) in source.as_bytes()[body_start..].iter().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &source[body_start + 1..body_start + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("collective method body closes");
 }
 
 /// Run the xtask binary with the given args (built by `cargo test`).
@@ -292,6 +328,9 @@ fn story_10_4a_ac1_dependency_closure_green() {
 /// the data lives.  Uses `parking_lot::Mutex` per rule rs-parking-lot.
 struct RecordingPort {
     write_count: Mutex<usize>,
+    read_count: Mutex<usize>,
+    scan_count: Mutex<usize>,
+    erase_count: Mutex<usize>,
     kv: Mutex<Vec<(u32, MemoryNamespace, String, MemoryValue)>>,
 }
 
@@ -299,12 +338,27 @@ impl RecordingPort {
     fn new() -> Self {
         Self {
             write_count: Mutex::new(0),
+            read_count: Mutex::new(0),
+            scan_count: Mutex::new(0),
+            erase_count: Mutex::new(0),
             kv: Mutex::new(Vec::new()),
         }
     }
 
     fn writes(&self) -> usize {
         *self.write_count.lock()
+    }
+
+    fn reads(&self) -> usize {
+        *self.read_count.lock()
+    }
+
+    fn scans(&self) -> usize {
+        *self.scan_count.lock()
+    }
+
+    fn erases(&self) -> usize {
+        *self.erase_count.lock()
     }
 }
 
@@ -329,6 +383,7 @@ impl CollectiveMemoryPort for RecordingPort {
         namespace: &MemoryNamespace,
         key: &str,
     ) -> Result<Option<MemoryValue>, CollectivePortError> {
+        *self.read_count.lock() += 1;
         let guard = self.kv.lock();
         Ok(guard
             .iter()
@@ -344,6 +399,7 @@ impl CollectiveMemoryPort for RecordingPort {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>, CollectivePortError> {
+        *self.scan_count.lock() += 1;
         let guard = self.kv.lock();
         let mut out = Vec::new();
         for (pid, ns, k, v) in guard.iter().rev() {
@@ -358,6 +414,66 @@ impl CollectiveMemoryPort for RecordingPort {
         }
         Ok(out)
     }
+
+    fn erase(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<CollectiveEraseReceipt, CollectivePortError> {
+        let mut rows = self.kv.lock();
+        let before = rows.len();
+        rows.retain(|(pid, ns, row_key, _)| {
+            !(*pid == spirit_pid && ns == namespace && row_key == key)
+        });
+        let deleted_rows = (before - rows.len()) as u64;
+        *self.erase_count.lock() += 1;
+        Ok(CollectiveEraseReceipt {
+            deleted_rows,
+            tombstone_recorded: true,
+        })
+    }
+}
+
+fn reconcile_collective_erase(
+    store: Option<&CollectiveEraseReceipt>,
+    audit_intent_present: bool,
+) -> Result<(), &'static str> {
+    match (store.is_some(), audit_intent_present) {
+        (true, true) => Ok(()),
+        (true, false) => Err("store erase exists without audit intent"),
+        (false, true) => Err("audit intent exists without store erase"),
+        (false, false) => Err("no collective erase evidence"),
+    }
+}
+
+#[test]
+fn story_13_5b_one_sided_collective_erase_is_red() {
+    let port = RecordingPort::new();
+    let namespace = MemoryNamespace::Default;
+    port.write(
+        7,
+        &namespace,
+        "erase-me",
+        MemoryValue::Text("payload".into()),
+    )
+    .unwrap();
+    let store_receipt = port.erase(7, &namespace, "erase-me").unwrap();
+    assert_eq!(port.erases(), 1);
+    assert_eq!(store_receipt.deleted_rows, 1);
+
+    assert_eq!(
+        reconcile_collective_erase(Some(&store_receipt), false),
+        Err("store erase exists without audit intent")
+    );
+    assert_eq!(
+        reconcile_collective_erase(None, true),
+        Err("audit intent exists without store erase")
+    );
+    assert_eq!(
+        reconcile_collective_erase(Some(&store_receipt), true),
+        Ok(())
+    );
 }
 
 /// Build a real `MemoryManagerAdapter` against tempdir-backed stores, with the
@@ -563,6 +679,7 @@ fn story_10_4a_ac1_loom_down_typed_timeout() {
                 pool_size: 2,
                 timeout_ms: 800,
                 home_region: String::new(),
+                home_team: String::new(),
             })
             .await
         })
@@ -802,14 +919,19 @@ fn story_10_4a_ac1_weekly_backup_green() {
 /// three Loom scopes.  Mirrors `make_capability` in the kernel-core halt test.
 /// `init_monotonic_base` is idempotent and must run before any token
 /// issue/verify (the TTL clock's `debug_assert`).
-fn make_capability() -> Arc<CapabilityRegistryAdapter> {
+fn make_capability_for_with_audit(
+    spirit_pid: u32,
+) -> (
+    Arc<CapabilityRegistryAdapter>,
+    tokio::sync::mpsc::Receiver<cap_audit::CapAuditEvent>,
+) {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
     let signing_key = Ed25519SigningKey::new([0u8; 32]);
     let policy = Arc::new(PolicyTable::new());
     let mut inner = PolicyTableInner::default();
     inner.manifest_scopes.insert(
-        1,
+        spirit_pid,
         ManifestCapabilityScope {
             scopes: vec![Scope::LoomWrite, Scope::LoomRead, Scope::LoomScan],
             declared_tier: SandboxTier(0),
@@ -817,9 +939,9 @@ fn make_capability() -> Arc<CapabilityRegistryAdapter> {
         },
     );
     policy.update(inner);
-    let (audit_tx, _audit_rx) = cap_audit::channel();
+    let (audit_tx, audit_rx) = cap_audit::channel();
     let quota = cap_quota::CapQuotaTracker::new();
-    Arc::new(CapabilityRegistryAdapter::new(
+    let adapter = Arc::new(CapabilityRegistryAdapter::new(
         crypto,
         signing_key,
         0x10A4,
@@ -828,7 +950,104 @@ fn make_capability() -> Arc<CapabilityRegistryAdapter> {
         quota,
         Arc::new(WorkingMemoryStore::new()),
         Arc::new(TelemetryStreamAdapter::default()),
-    ))
+    ));
+    (adapter, audit_rx)
+}
+
+fn make_capability_for(spirit_pid: u32) -> Arc<CapabilityRegistryAdapter> {
+    make_capability_for_with_audit(spirit_pid).0
+}
+
+fn make_capability() -> Arc<CapabilityRegistryAdapter> {
+    make_capability_for(1)
+}
+
+struct NoopJournal;
+
+impl SpiritSchedulerPort for NoopJournal {
+    fn journal_lifecycle(&self, _entry: JournalEntry) {}
+
+    fn last_lifecycle_event(&self, _spirit_id: &str) -> Option<LifecycleEvent> {
+        None
+    }
+}
+
+fn make_manifest_admitted_capability(
+    spirit_pid: u32,
+) -> (
+    Arc<CapabilityRegistryAdapter>,
+    tokio::sync::mpsc::Receiver<cap_audit::CapAuditEvent>,
+) {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let required = CapabilitiesRequired::from_toml_str(
+        r#"provider.complete = ["anthropic.default"]
+loom.read = true
+loom.write = true
+loom.scan = true"#,
+    )
+    .expect("v4 Loom capability declaration parses");
+    let security = SecurityManagerAdapter::default();
+    let posture = PostureSection::from_toml_str(
+        r#"default = "cautious"
+allowed_max = "cautious""#,
+    )
+    .unwrap();
+    security
+        .admit_spirit(
+            spirit_pid,
+            "story-13-5d-researcher",
+            &SandboxConfig::default(),
+            &ResourceCaps::default(),
+            &required,
+            None,
+            &NoopJournal,
+            &posture,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&ClassSection {
+                name: "researcher".into(),
+                version: "0.5.0".into(),
+                abi: "1.0".into(),
+                manifest_schema_version: 4,
+                min_substrate_version: "0.0.1".into(),
+                forms: vec!["rust-inproc".into()],
+                trust_tier: "local".into(),
+                description: "Story 13.5d admission witness".into(),
+            }),
+        )
+        .expect("real manifest admission succeeds");
+
+    let policy = Arc::clone(security.policy());
+    let admitted = policy.inner().load_full();
+    let scopes = &admitted
+        .manifest_scopes
+        .get(&spirit_pid)
+        .expect("admission inserts manifest scopes")
+        .scopes;
+    for expected in [Scope::LoomRead, Scope::LoomWrite, Scope::LoomScan] {
+        assert!(
+            scopes.contains(&expected),
+            "admission must preserve declared {expected:?}"
+        );
+    }
+    drop(admitted);
+
+    let (audit_tx, audit_rx) = cap_audit::channel();
+    let adapter = Arc::new(CapabilityRegistryAdapter::new(
+        Arc::new(RingCryptoProvider),
+        Ed25519SigningKey::new([0u8; 32]),
+        0x135D,
+        policy,
+        audit_tx,
+        cap_quota::CapQuotaTracker::new(),
+        Arc::new(WorkingMemoryStore::new()),
+        Arc::new(TelemetryStreamAdapter::default()),
+    ));
+    (adapter, audit_rx)
 }
 
 /// Build a `MemoryManagerAdapter` with BOTH the collective port AND the
@@ -938,4 +1157,339 @@ fn story_10_4a_ac1_i1_valid_loomwrite_allows_green() {
         )
         .expect("a valid ≤60s LoomWrite token MUST allow the mediated write");
     assert_eq!(port.writes(), 1, "the write MUST reach the backing store");
+}
+
+/// RED (Story 13.5d P0): a token bound to pid 7 cannot be presented as pid 9.
+/// The typed denial must occur before the backing port is reached; presenting
+/// the same token as pid 7 remains the matching control.
+#[test]
+fn story_13_5d_forged_pid_is_denied_before_collective_write() {
+    let port = Arc::new(RecordingPort::new());
+    let (caps, mut audit_rx) = make_capability_for_with_audit(7);
+    let adapter = adapter_with_caps(port.clone(), caps.clone());
+    let posture = [0u8; 32];
+    let token = caps
+        .issue_with_mediation(7, Scope::LoomWrite, 30, posture, IntentClass::HighPrivilege)
+        .expect("LoomWrite token issues for pid 7");
+
+    let err = adapter
+        .collective_write(
+            9,
+            &MemoryNamespace::Default,
+            "forged-pid",
+            MemoryValue::Text("payload".into()),
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect_err("pid 9 MUST NOT spend a token issued for pid 7");
+    match err {
+        MemoryError::Collective { kind, reason } => {
+            assert_eq!(kind, CollectiveErrorKind::CapabilityDenied);
+            assert!(
+                reason.contains("SpiritIdMismatch"),
+                "expected SpiritIdMismatch reason, got {reason}"
+            );
+        }
+        other => panic!("expected Collective::CapabilityDenied, got {other:?}"),
+    }
+    assert_eq!(port.writes(), 0, "forged pid MUST make zero port writes");
+    let audits: Vec<_> = std::iter::from_fn(|| audit_rx.try_recv().ok())
+        .filter_map(|event| match event {
+            cap_audit::CapAuditEvent::Verify {
+                token_id,
+                spirit_pid,
+                outcome,
+            } if token_id == token.token_id => Some((spirit_pid, outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        audits,
+        vec![
+            (7, cap_audit::VerifyOutcome::Ok),
+            (7, cap_audit::VerifyOutcome::SpiritIdMismatch),
+        ],
+        "a valid token is verified before its caller/token pid refusal"
+    );
+
+    adapter
+        .collective_write(
+            7,
+            &MemoryNamespace::Default,
+            "matching-pid",
+            MemoryValue::Text("payload".into()),
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect("matching token and caller pid MUST succeed");
+    assert_eq!(port.writes(), 1, "matching pid MUST reach the backing port");
+}
+
+/// RED (D1): authentication wins over caller-pid attribution. A forged token
+/// presented with a mismatched pid must record its verification failure, never
+/// a caller/token `SpiritIdMismatch`.
+#[test]
+fn story_13_5d_forged_token_is_verified_before_pid_mismatch() {
+    let port = Arc::new(RecordingPort::new());
+    let (caps, mut audit_rx) = make_capability_for_with_audit(7);
+    let adapter = adapter_with_caps(port.clone(), caps.clone());
+    let posture = [0u8; 32];
+    let token = caps
+        .issue_with_mediation(7, Scope::LoomWrite, 30, posture, IntentClass::HighPrivilege)
+        .expect("LoomWrite token issues for pid 7");
+    let mut forged = token.clone();
+    forged.signature[0] ^= 0xFF;
+
+    let err = adapter
+        .collective_write(
+            9,
+            &MemoryNamespace::Default,
+            "forged-token",
+            MemoryValue::Text("payload".into()),
+            &forged,
+            posture,
+            SandboxTier(0),
+        )
+        .expect_err("a forged token MUST be rejected before pid attribution");
+    match err {
+        MemoryError::Collective { kind, reason } => {
+            assert_eq!(kind, CollectiveErrorKind::CapabilityDenied);
+            assert!(
+                reason.contains("signature integrity violation"),
+                "expected verification-class signature failure, got {reason}"
+            );
+            assert!(
+                !reason.contains("SpiritIdMismatch"),
+                "forged token must not reach caller/token attribution: {reason}"
+            );
+        }
+        other => panic!("expected Collective::CapabilityDenied, got {other:?}"),
+    }
+    assert_eq!(port.writes(), 0, "forged token MUST make zero port writes");
+
+    let audits: Vec<_> = std::iter::from_fn(|| audit_rx.try_recv().ok())
+        .filter_map(|event| match event {
+            cap_audit::CapAuditEvent::Verify {
+                token_id,
+                spirit_pid,
+                outcome,
+            } if token_id == token.token_id => Some((spirit_pid, outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        audits,
+        vec![(7, cap_audit::VerifyOutcome::SignatureMismatch)],
+        "forged token must emit only its verification failure"
+    );
+    assert!(
+        !audits
+            .iter()
+            .any(|(_, outcome)| *outcome == cap_audit::VerifyOutcome::SpiritIdMismatch),
+        "forged token must record zero SpiritIdMismatch audit events"
+    );
+}
+
+#[test]
+fn story_13_5d_forged_pid_is_denied_before_collective_read() {
+    let port = Arc::new(RecordingPort::new());
+    let (caps, mut audit_rx) = make_capability_for_with_audit(7);
+    let adapter = adapter_with_caps(port.clone(), caps.clone());
+    let posture = [0u8; 32];
+    let token = caps
+        .issue_with_mediation(7, Scope::LoomRead, 30, posture, IntentClass::Readonly)
+        .expect("LoomRead token issues for pid 7");
+
+    let err = adapter
+        .collective_read(
+            9,
+            &MemoryNamespace::Default,
+            "forged-pid",
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect_err("pid 9 MUST NOT spend a LoomRead token issued for pid 7");
+    match err {
+        MemoryError::Collective { kind, reason } => {
+            assert_eq!(kind, CollectiveErrorKind::CapabilityDenied);
+            assert!(reason.contains("SpiritIdMismatch"));
+        }
+        other => panic!("expected Collective::CapabilityDenied, got {other:?}"),
+    }
+    assert_eq!(port.reads(), 0, "forged pid MUST make zero port reads");
+    let audits: Vec<_> = std::iter::from_fn(|| audit_rx.try_recv().ok())
+        .filter_map(|event| match event {
+            cap_audit::CapAuditEvent::Verify {
+                token_id,
+                spirit_pid,
+                outcome,
+            } if token_id == token.token_id => Some((spirit_pid, outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        audits,
+        vec![
+            (7, cap_audit::VerifyOutcome::Ok),
+            (7, cap_audit::VerifyOutcome::SpiritIdMismatch),
+        ],
+        "read refusal must be audited under the token owner's pid"
+    );
+
+    assert_eq!(
+        adapter
+            .collective_read(
+                7,
+                &MemoryNamespace::Default,
+                "matching-pid",
+                &token,
+                posture,
+                SandboxTier(0),
+            )
+            .expect("matching token and caller pid MUST succeed"),
+        None
+    );
+    assert_eq!(port.reads(), 1, "matching pid MUST reach the backing port");
+}
+
+#[test]
+fn story_13_5d_forged_pid_is_denied_before_collective_scan() {
+    let port = Arc::new(RecordingPort::new());
+    let (caps, mut audit_rx) = make_capability_for_with_audit(7);
+    let adapter = adapter_with_caps(port.clone(), caps.clone());
+    let posture = [0u8; 32];
+    let token = caps
+        .issue_with_mediation(7, Scope::LoomScan, 30, posture, IntentClass::Readonly)
+        .expect("LoomScan token issues for pid 7");
+
+    let err = adapter
+        .collective_scan(
+            9,
+            &MemoryNamespace::Default,
+            "forged-pid",
+            10,
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect_err("pid 9 MUST NOT spend a LoomScan token issued for pid 7");
+    match err {
+        MemoryError::Collective { kind, reason } => {
+            assert_eq!(kind, CollectiveErrorKind::CapabilityDenied);
+            assert!(reason.contains("SpiritIdMismatch"));
+        }
+        other => panic!("expected Collective::CapabilityDenied, got {other:?}"),
+    }
+    assert_eq!(port.scans(), 0, "forged pid MUST make zero port scans");
+    let audits: Vec<_> = std::iter::from_fn(|| audit_rx.try_recv().ok())
+        .filter_map(|event| match event {
+            cap_audit::CapAuditEvent::Verify {
+                token_id,
+                spirit_pid,
+                outcome,
+            } if token_id == token.token_id => Some((spirit_pid, outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        audits,
+        vec![
+            (7, cap_audit::VerifyOutcome::Ok),
+            (7, cap_audit::VerifyOutcome::SpiritIdMismatch),
+        ],
+        "scan refusal must be audited under the token owner's pid"
+    );
+
+    assert!(adapter
+        .collective_scan(
+            7,
+            &MemoryNamespace::Default,
+            "matching-pid",
+            10,
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect("matching token and caller pid MUST succeed")
+        .is_empty());
+    assert_eq!(port.scans(), 1, "matching pid MUST reach the backing port");
+}
+
+#[test]
+fn story_13_5d_loom_scope_reaches_policy_table() {
+    let (caps, _audit_rx) = make_manifest_admitted_capability(7);
+    caps.issue_with_mediation(
+        7,
+        Scope::LoomWrite,
+        30,
+        [0u8; 32],
+        IntentClass::HighPrivilege,
+    )
+    .expect("manifest-declared LoomWrite must issue where the old policy denied");
+}
+
+#[test]
+fn story_13_5d_request_route_row_audit_correlation() {
+    let (caps, mut audit_rx) = make_manifest_admitted_capability(7);
+    let port = Arc::new(RecordingPort::new());
+    let adapter = adapter_with_caps(port.clone(), caps.clone());
+    let posture = [0u8; 32];
+    let token = caps
+        .issue_with_mediation(7, Scope::LoomWrite, 30, posture, IntentClass::HighPrivilege)
+        .expect("manifest-admitted token issues");
+    adapter
+        .collective_write(
+            7,
+            &MemoryNamespace::Default,
+            "correlated-row",
+            MemoryValue::Text("correlated payload".into()),
+            &token,
+            posture,
+            SandboxTier(0),
+        )
+        .expect("mediated correlated write");
+
+    let rows = port.kv.lock();
+    assert_eq!(rows.len(), 1, "exactly one backing row must land");
+    assert_eq!(rows[0].0, 7, "store row requester pid");
+    assert_eq!(rows[0].2, "correlated-row", "store row identity");
+    drop(rows);
+
+    let kernel_frames: Vec<_> = std::iter::from_fn(|| audit_rx.try_recv().ok())
+        .filter_map(|event| match event {
+            cap_audit::CapAuditEvent::Verify {
+                token_id,
+                spirit_pid,
+                outcome,
+            } if token_id == token.token_id => Some((spirit_pid, outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        kernel_frames,
+        vec![(7, cap_audit::VerifyOutcome::Ok)],
+        "the kernel's verify_and_audit frame must carry the store row token id"
+    );
+
+    let source = include_str!("../../crates/maos-bin/src/main.rs");
+    let write_body = live_researcher_collective_method_body(source, "collective_write");
+    let audit_call = write_body
+        .find("record_invocation(")
+        .expect("collective_write must record its invocation");
+    let memory_call = write_body
+        .find(".collective_write(")
+        .expect("collective_write must call the kernel memory route");
+    assert!(
+        audit_call < memory_call,
+        "composition root must audit collective_write before the store route"
+    );
+    for method in ["collective_read", "collective_scan"] {
+        assert!(
+            live_researcher_collective_method_body(source, method).contains("record_invocation("),
+            "{method} must record its invocation"
+        );
+    }
 }

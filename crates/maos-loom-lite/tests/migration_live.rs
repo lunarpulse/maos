@@ -9,9 +9,15 @@
 //! pass — Winston 10.2 verdict axis).  Run them with a live backend:
 //!
 //! ```text
-//! MAOS_TEST_POSTGRES="host=127.0.0.1 user=maos_test password=maos_test dbname=maos_test" \
+//! MAOS_TEST_POSTGRES="postgresql://postgres:postgres@127.0.0.1:5432/maos_shared" \
 //!   cargo test -p maos-loom-lite --test migration_live -- --ignored --nocapture
 //! ```
+//!
+//! ⚠ `MAOS_TEST_POSTGRES` is the SHARED stand-in database (`maos_shared`) of
+//! the 13.6c four-database substrate, NOT the singular `maos_test` this header
+//! named until Story 13.6: `maos_test` has not existed in CI since 13.6c, and
+//! aliasing the stand-in onto a team database breaks the AC1 role-disjoint
+//! rule. `docs/testing/local-loom-substrate.md` is the full runbook.
 //!
 //! Every vector exercises the actual `migrate_sqlite_to_postgres` /
 //! `verify_migration_integrity` / `rollback_migration` surface — no mocked

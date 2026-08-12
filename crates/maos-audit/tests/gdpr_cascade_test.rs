@@ -34,7 +34,10 @@ fn open_isolated_stores(
     let principal_index =
         Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_with_global_legal_holds(
+            &db_path, &db_path, 1,
+        )
+        .unwrap(),
     );
     (private, shared, principal_index, tl, db_path)
 }

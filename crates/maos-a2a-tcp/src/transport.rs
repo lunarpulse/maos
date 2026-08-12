@@ -221,12 +221,10 @@ impl TcpA2ATransport {
     }
 
     /// Story 12.4a — cohort-enabled construction path wiring the manifest gate,
-    /// the halt-receipt observer, AND the digest-read correlation port. All are
-    /// installed via the named `A2ARouterCore` builders (no adjacent-`Arc`
-    /// positional transposition footgun, P7b) BEFORE the core is wrapped and the
-    /// accept loop spawns, so no inbound connection observes a legacy
-    /// policy/observation/correlation window (P7c). In production all three are
-    /// the SAME `CohortManifestState` (`state.clone()`).
+    /// the halt-receipt observer, AND the digest-read correlation port.
+    /// Delegates to [`Self::bind_with_cohort_wiring_and_crossing`] with no
+    /// cross-team crossing applier — existing callers stay byte-for-byte
+    /// unchanged (Story 13.6b keeps 12.4a's P7a no-caller-churn discipline).
     #[allow(clippy::too_many_arguments)]
     pub async fn bind_with_cohort_wiring_and_digest(
         tcp_config: TcpA2AConfig,
@@ -240,6 +238,46 @@ impl TcpA2ATransport {
         halt_receipt_observer: Option<Arc<dyn HaltReceiptObserver>>,
         digest_read_port: Option<Arc<dyn DigestReadPort>>,
         rupture_sink: Option<Arc<dyn ConsentRuptureSink>>,
+    ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_cohort_wiring_and_crossing(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            cohort_manifest_gate,
+            halt_receipt_observer,
+            digest_read_port,
+            rupture_sink,
+            None,
+        )
+        .await
+    }
+
+    /// Story 13.6b — cohort-enabled construction path that ALSO wires the
+    /// cross-team crossing applier. Every port is installed via the named
+    /// `A2ARouterCore` builders (no adjacent-`Arc` positional transposition
+    /// footgun, P7b) BEFORE the core is wrapped and the accept loop spawns, so
+    /// no inbound connection observes a legacy policy / observation /
+    /// correlation / applier window (P7c). In production the gate, observer,
+    /// and digest port are the SAME `CohortManifestState` (`state.clone()`);
+    /// the crossing applier is the composition root's store-owning adapter.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn bind_with_cohort_wiring_and_crossing(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+        halt_receipt_observer: Option<Arc<dyn HaltReceiptObserver>>,
+        digest_read_port: Option<Arc<dyn DigestReadPort>>,
+        rupture_sink: Option<Arc<dyn ConsentRuptureSink>>,
+        crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
     ) -> Result<Self, TcpTransportError> {
         let pins = tcp_config.build_pin_store().await?;
         let posture = tcp_config.trust_posture()?;
@@ -255,6 +293,14 @@ impl TcpA2ATransport {
         let mut core_inner =
             A2ARouterCore::try_new(peer_configs, pins.clone() as Arc<dyn TofuPinStore>)
                 .map_err(|e| TcpTransportError::Config(e.to_string()))?;
+        // Story 13.6a (review P1) — this endpoint's own leaf fingerprint, from
+        // the SAME identity chain the server/client configs below present on
+        // the wire. The Send-seam team declaration is gated on it equalling the
+        // local host's signed `CohortMember.fingerprint`.
+        if let Some(own_leaf) = own_chain.first() {
+            core_inner = core_inner
+                .with_local_leaf_fingerprint(PeerCertFingerprint::from_cert_der(own_leaf.as_ref()));
+        }
         // Story 8.8 — the live wire is genuine cross-Host → fail-closed is
         // unconditional in `A2ARouterCore` (Option 2, no toggle). Unclassified
         // frames are denied with CODE_CONSENT_UNCLASSIFIED (-32009).
@@ -269,6 +315,9 @@ impl TcpA2ATransport {
         }
         if let Some(port) = digest_read_port {
             core_inner = core_inner.with_digest_read_port(port);
+        }
+        if let Some(port) = crossing_port {
+            core_inner = core_inner.with_cross_team_crossing_port(port);
         }
         let core = Arc::new(core_inner);
         if let Some(sink) = rupture_sink {
@@ -535,8 +584,11 @@ async fn serve_connection(
     // we resolve which peer that pinned leaf belongs to via the SAME oracle
     // `verifier.rs` used). intake binds to THIS, never to `frame.from.host_id`.
     // If no verified peer resolves, close without ever entering intake.
-    let verified_peer = match resolve_verified_peer(&tls, &pins) {
-        Some(p) => p,
+    // Story 13.6a (review P1) — the negotiated leaf fingerprint rides along:
+    // the gate returns the peer's team declaration only when this equals the
+    // signed `CohortMember.fingerprint`.
+    let (verified_peer, peer_leaf_fingerprint) = match resolve_verified_peer(&tls, &pins) {
+        Some(resolved) => resolved,
         None => {
             tracing::warn!("resolve_verified_peer: no active pin for negotiated client cert — closing connection without intake");
             return;
@@ -582,8 +634,13 @@ async fn serve_connection(
                         Ok(req) => {
                             let observed = (req.boot_nonce, req.params.logical_clock);
                             // AC1: bind to the TLS-verified peer in the shared core.
-                            let (resp, binding_passed) =
-                                core.handle_intake_verified(req, &verified_peer).await;
+                            let (resp, binding_passed) = core
+                                .handle_intake_verified(
+                                    req,
+                                    &verified_peer,
+                                    Some(&peer_leaf_fingerprint),
+                                )
+                                .await;
                             // AC1.2: count + observe ONLY a frame whose verified-peer
                             // binding passed (a forged `from` → `intake_entered`
                             // stays 0, `last_intake` is NOT recorded).
@@ -622,11 +679,12 @@ async fn serve_connection(
 fn resolve_verified_peer(
     tls: &tokio_rustls::server::TlsStream<TcpStream>,
     pins: &InMemoryTofuPinStore,
-) -> Option<PeerId> {
+) -> Option<(PeerId, PeerCertFingerprint)> {
     let (_io, conn) = tls.get_ref();
     let leaf = conn.peer_certificates()?.first()?;
     let fp = PeerCertFingerprint::from_cert_der(leaf.as_ref());
     pins.find_active_pin_by_fingerprint(&fp)
+        .map(|peer| (peer, fp))
 }
 
 async fn send_response<S>(

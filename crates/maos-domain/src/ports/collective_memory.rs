@@ -15,6 +15,47 @@
 //! no `async fn`, no tokio/sqlx types.  Only sync trait method signatures.
 
 use crate::memory::{MemoryEntry, MemoryError, MemoryNamespace, MemoryValue};
+use crate::team::TeamId;
+
+/// Structured causes carried inside the existing transport category so the
+/// kernel's tuple pattern stays byte-for-byte unchanged while callers can
+/// distinguish tenant and cross-team refusals without parsing strings.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum TransportCause {
+    #[error("{reason}")]
+    Other { reason: String },
+    #[error("collective namespace partition refused: {namespace}")]
+    PartitionRefused { namespace: String },
+    #[error(
+        "collective erasure tombstone dominates key {key}: erased at ({erased_at_source_ts}, {erased_at_source_region})"
+    )]
+    ErasureTombstoneDominates {
+        key: String,
+        erased_at_source_ts: i64,
+        erased_at_source_region: String,
+    },
+    #[error("cross-team consent denied: {from_team}->{to_team}, intent={intent}")]
+    ConsentDenied {
+        from_team: TeamId,
+        to_team: TeamId,
+        intent: String,
+    },
+    #[error("tenant map stale{team_suffix}: {reason}", team_suffix = team_id.as_ref().map(|team| format!(" for {team}")).unwrap_or_default())]
+    MapStale {
+        team_id: Option<TeamId>,
+        reason: String,
+    },
+    #[error("cross-team attestation invalid for {team_id}: {reason}")]
+    AttestationInvalid { team_id: TeamId, reason: String },
+    #[error("tenant spirit pid {spirit_pid} is not registered")]
+    UnmappedSpirit { spirit_pid: u32 },
+    #[error("tenant connection mismatch for store {configured_team}: {reason}")]
+    ConnectionMismatch {
+        configured_team: TeamId,
+        caller_team: Option<TeamId>,
+        reason: String,
+    },
+}
 
 /// Error returned when the collective port is unreachable or times out.
 ///
@@ -33,9 +74,18 @@ pub enum CollectivePortError {
     #[error(transparent)]
     Memory(#[from] MemoryError),
 
+    /// Structured transport refusal; the outer variant remains unchanged for
+    /// kernel compatibility.
     /// An internal transport or protocol error.
     #[error("collective tier transport error: {0}")]
-    Transport(String),
+    Transport(TransportCause),
+}
+
+/// Result of an operator-authority erase at the collective store.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CollectiveEraseReceipt {
+    pub deleted_rows: u64,
+    pub tombstone_recorded: bool,
 }
 
 /// Sync port trait for the collective memory tier (Postgres+pgvector Loom-lite).
@@ -57,6 +107,7 @@ pub enum CollectivePortError {
 ///
 /// All methods are `data-movement` — the port moves frames/values between
 /// the kernel mediation layer and the external Loom-lite backing store.
+
 pub trait CollectiveMemoryPort: Send + Sync {
     /// Class: data-movement
     ///
@@ -94,4 +145,14 @@ pub trait CollectiveMemoryPort: Send + Sync {
         prefix: &str,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>, CollectivePortError>;
+    /// Erase one store-addressed collective row under operator authority.
+    ///
+    /// This method is intentionally absent from `SpiritMemoryView` and the
+    /// kernel's `MemoryTier::Collective` arms.
+    fn erase(
+        &self,
+        spirit_pid: u32,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<CollectiveEraseReceipt, CollectivePortError>;
 }

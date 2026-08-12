@@ -55,3 +55,16 @@ covered_changes = [
   "GovernanceEventPayload",
 ]
 ratified_at = "2026-06-15"
+
+# Story 13.5d — declared collective capability surface and manifest schema 3→4.
+[[ratification]]
+proposal_id = "13.5d-AC1-loom-capabilities"
+summary = "MANIFEST_SCHEMA_VERSION 3→4 + [capabilities.required.loom] (read/write/scan) declaration surface"
+adr_ref = "ADR-045"
+status = "ratified"
+covered_changes = [
+  "MANIFEST_SCHEMA_VERSION",
+  "LoomCapabilities",
+  "RawLoomCapabilities",
+]
+ratified_at = "2026-07-19"

@@ -12,7 +12,7 @@ review_status: machine
 - [Constants](./constants) — `ABI_VERSION`과 `MANIFEST_SCHEMA_VERSION` 참조
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 `maos-spirit-abi` — 와이어 안정 타입 전용(`#![no_std]`).
 
@@ -39,7 +39,7 @@ Story 2.1이 추가합니다:
 | `compliance` | Story 1b.4 | 동결된 스키마, ABI_VERSION 범프 트리거 |
 | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 | `deprecation` | Story 7.1 | empty-present 지원 중단 채널 |
-| `MANIFEST_SCHEMA_VERSION = 3` | Story 9.4b | `[model_provenance]` 섹션 |
+| `MANIFEST_SCHEMA_VERSION = 4` | Story 13.5d | `[capabilities.required.loom]` 섹션 |
 
 ## Modules {#maos-spirit-abi-modules}
 | 모듈 | 설명 | 도입 |

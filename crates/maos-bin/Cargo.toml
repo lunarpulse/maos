@@ -38,6 +38,7 @@ maos-cli = { path = "../maos-cli" }
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
+maos-manifest = { path = "../maos-manifest" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
@@ -103,3 +104,4 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 [dev-dependencies]
 tempfile = "3"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test
+tokio-postgres = "0.7"   # Story 13.6c CI remediation — raw physical row oracle for live two-datname tests

@@ -141,7 +141,7 @@
     - [15.1 What v2.2 stands on](./15-full-spectrum-v2-2.md#151-what-v22-stands-on-already-shipped-by-epic-11)
     - [15.2 J3 cohort mesh — proposed ADR-052](./15-full-spectrum-v2-2.md#152-j3-cohort-mesh-proposed-adr-052)
     - [15.3 Multi-tenant Loom — proposed ADR-053](./15-full-spectrum-v2-2.md#153-multi-tenant-loom-proposed-adr-053)
-    - [15.4 FR37 vetting machinery — proposed ADR-054](./15-full-spectrum-v2-2.md#154-fr37-vetting-machinery-proposed-adr-054)
+    - [15.4 FR37 vetting machinery — proposed ADR-056](./15-full-spectrum-v2-2.md#154-fr37-vetting-machinery-proposed-adr-056)
     - [15.5 Post-v2.0 constitutional ceiling — proposed ADR-055](./15-full-spectrum-v2-2.md#155-post-v20-constitutional-ceiling-proposed-adr-055-constitutional-adr-037-gate-applies)
     - [15.6 v2.0 remainder sweep + scale closers — dispositions](./15-full-spectrum-v2-2.md#156-v20-remainder-sweep-scale-closers-dispositions)
     - [15.7 Operational envelope](./15-full-spectrum-v2-2.md#157-operational-envelope-rubric-high-previously-silent)

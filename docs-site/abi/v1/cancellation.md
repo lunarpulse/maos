@@ -9,7 +9,7 @@
 - [ctx Module](./ctx) — `Ctx::cancellation()`
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Cancellation signal trait — no_std abstraction for Spirit hook cancellation.
 

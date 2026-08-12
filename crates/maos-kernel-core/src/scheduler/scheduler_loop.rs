@@ -196,6 +196,7 @@ impl SpiritSchedulerAdapter {
             let caps_required = CapabilitiesRequired {
                 provider: ProviderCapabilities { complete: vec![] },
                 mcp: McpCapabilities { servers: vec![] },
+                loom: crate::security::manifest::LoomCapabilities::default(),
             };
             let posture = PostureSection {
                 default: Posture::Cautious,
@@ -237,7 +238,6 @@ impl SpiritSchedulerAdapter {
                 FrameOrigin::SpiritAuto,
             );
         }
-
         let spirit_obj = make_spirit_obj(spirit);
         let scb = Arc::new(SpiritControlBlock::new(
             pid,

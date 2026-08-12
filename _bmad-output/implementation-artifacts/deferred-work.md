@@ -2,16 +2,16 @@
 
 > Surfaced by the §A2/§A6 R4-only re-review (run `wcw24wqlm`, unanimous GO). All three are hardening items the synthesis lead explicitly **dismissed as 10.5 GO blockers** after independent re-confirmation — filed here so the gaps are owned, not assumed-closed. See `story-10-5-r4-rereview-2026-06-29.md`.
 
-- **cargo-deny is effectively NON-BLOCKING.** `cargo deny check` runs as a step **inside** the `reproducible-build` job, which is `continue-on-error: true` (the aggregate's `contains(needs.*.result,'failure')` check is neutralized for a continue-on-error job — proven in the Epic-10 5th-push iteration). So the "NON-NEGOTIABLE" supply-chain dependency-closure gate (10.4b) is currently advisory. Pre-existing (continue-on-error dated 2026-06-12, FLAG-Winston); masks nothing **at HEAD** because `cargo deny check` genuinely passes (exit 0). **Action:** move `cargo deny check` into its **own** `continue-on-error: false` job so a future supply-chain failure cannot be silently swallowed. Owner: Winston/John.
-- **windows-check sandbox step has no vacuous-green guard.** The step `cargo test -p maos-kernel-core --test sandbox_enforcement_windows ...` has no `>=1 test ran` assertion. On windows-latest `#![cfg(target_os="windows")]` is satisfied so all 6 tests run today; but a future cfg/target drift compiling the suite to **zero tests** would `exit 0` silently. **Action:** add a `test result: ok. [1-9]` grep guard, the idiom already used by `check-j4-latency`. Owner: test-infra.
-- **Epic 11 must carry REAL ja/zh-Hans + a language-identity gate.** AC5 i18n is honestly DESCOPED to v2.0/Epic 11 (Korean placeholders + DO-NOT-SHIP markers; coverage+glossary gates report-only because they tautologically pass on wrong-language content). Epic-11 Story 11.6 must add real translations **and** a language-identity gate that detects wrong-language content (Hangul-in-ja, etc.) — coverage/glossary-lock provably cannot. Owner: Epic 11 party-mode ratification.
+- **cargo-deny is effectively NON-BLOCKING.** `cargo deny check` runs as a step **inside** the `reproducible-build` job, which is `continue-on-error: true` (the aggregate's `contains(needs.*.result,'failure')` check is neutralized for a continue-on-error job — proven in the Epic-10 5th-push iteration). So the "NON-NEGOTIABLE" supply-chain dependency-closure gate (10.4b) is currently advisory. Pre-existing (continue-on-error dated 2026-06-12, FLAG-Winston); masks nothing **at HEAD** because `cargo deny check` genuinely passes (exit 0). **Action:** move `cargo deny check` into its **own** `continue-on-error: false` job so a future supply-chain failure cannot be silently swallowed. **Ownerless and open.** *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* `Winston/John` was a review-panel attribution, not a pageable sprint-status key. Re-measured at HEAD: still true — `.github/workflows/discipline.yml:38` keeps `continue-on-error: true` on the job that runs `cargo deny check`.
+- **windows-check sandbox step has no vacuous-green guard.** The step `cargo test -p maos-kernel-core --test sandbox_enforcement_windows ...` has no `>=1 test ran` assertion. On windows-latest `#![cfg(target_os="windows")]` is satisfied so all 6 tests run today; but a future cfg/target drift compiling the suite to **zero tests** would `exit 0` silently. **Action:** add a `test result: ok. [1-9]` grep guard, the idiom already used by `check-j4-latency`. **Ownerless and open.** *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* `test-infra` names no story in sprint-status.
+- **Epic 11 must carry REAL ja/zh-Hans + a language-identity gate.** AC5 i18n is honestly DESCOPED to v2.0/Epic 11 (Korean placeholders + DO-NOT-SHIP markers; coverage+glossary gates report-only because they tautologically pass on wrong-language content). Epic-11 Story 11.6 must add real translations **and** a language-identity gate that detects wrong-language content (Hangul-in-ja, etc.) — coverage/glossary-lock provably cannot. **Ownerless and open.** *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* Epic 11 and its retrospective are both `done`; the language-identity gate was never claimed by a successor.
 
 ## Deferred from: Story 9.5b preflight party-mode Round 2 (2026-06-16) — OTel spans are a new telemetry data-sink the GDPR erasure scope must acknowledge
 
 > Surfaced by Murat in the 9.5b OpenTelemetry-adapter preflight (Winston·Amelia·Murat·John, ratified Lunarpulse). Cross-story finding — out of 9.5b's own ACs by design, filed here so the gap is owned, not assumed-closed.
 
 - **OTel span attributes are a 4th telemetry surface the forget cascade cannot reach.** The GDPR Art.17 forget cascade reaches exactly `REGISTERED_ERASURE_BACKENDS = ["private","principal_index","shared"]` (`crates/maos-kernel-core/src/memory/mod.rs:35`). Span attributes emitted by the new `maos-telemetry` adapter are a NEW data sink outside that set. Story 9.5b mitigates this **by construction** via `gate:otel-attr-contract` (AC-5): spans carry **zero principal/subject nexus** → erasure-exempt by construction, mirroring `governance.rs:122` ("zero principal nexus → stays OUT of the forget cascade"). So spans are NOT wired into the cascade, and the attr-contract gate prevents a future contributor from silently adding a PII key.
-- **What's deferred / owned elsewhere:** the *existence* of this telemetry surface should be acknowledged in the **GDPR erasure scope documentation / data-sink inventory** owned by Stories 9.2 / 9.2b (forget cascade) — not just constrained inside 9.5b's test gate. Action: when the 9.5b adapter lands, add "OTel span attributes (erasure-exempt by zero-principal-nexus construction; enforced by `gate:otel-attr-contract`)" to the erasure-scope/data-sink inventory so the exemption is a documented invariant, not an implicit one. Flag to the 9.2 erasure owner (John/Winston). E1b ComplianceClaim schema is unchanged (no new claim field) — this is scope-documentation, not a claim amendment.
+- **What's deferred / owned elsewhere:** the *existence* of this telemetry surface should be acknowledged in the **GDPR erasure scope documentation / data-sink inventory** documented by Stories 9.2 / 9.2b (forget cascade, both `done`) — **Ownerless and open** for the acknowledgement itself, *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* and — not just constrained inside 9.5b's test gate. Action: when the 9.5b adapter lands, add "OTel span attributes (erasure-exempt by zero-principal-nexus construction; enforced by `gate:otel-attr-contract`)" to the erasure-scope/data-sink inventory so the exemption is a documented invariant, not an implicit one. Flag to the 9.2 erasure owner (John/Winston). E1b ComplianceClaim schema is unchanged (no new claim field) — this is scope-documentation, not a claim amendment.
 
 ## Epic-7 §A3 skill-queue closure — VERIFIED by Story 8.16 (2026-06-12, "verify don't assume"); 2 of 4 items still OPEN → Epic 9
 
@@ -58,7 +58,7 @@ dev_model_used: claude-opus-4-7
 
 ## Deferred from: party-mode implementation audit of Epic 8 (2026-06-06)
 
-> Two-round adversarial audit (party-mode: John / Winston / Murat / Amelia + Mary) of whether Epic 8 delivers the PRD user journeys. Surfaced **NEW security/invariant defects not previously logged**. Each is now owned by a completion-delivery story (8.9–8.15), registered via `sprint-change-proposal-2026-06-06.md`. Listed here for canonical defect tracking.
+> Two-round adversarial audit (party-mode: John / Winston / Murat / Amelia + Mary) of whether Epic 8 delivers the PRD user journeys. Surfaced **NEW security/invariant defects not previously logged**. Each was tracked to completion by the delivery stories 8.9–8.15 (all `done`), registered via `sprint-change-proposal-2026-06-06.md`. Listed here for canonical defect tracking.
 
 ### Security — A2A cross-Host (closed by Story 8.9)
 - **G8 — peer-identity bypass (CRITICAL).** The live mTLS verifier learns the true peer (`crates/maos-a2a-tcp/src/verifier.rs:177` — `find_active_pin_by_fingerprint → Some(_peer)`) then discards it; `serve_connection` hands `handle_intake` the *request*, which re-derives identity from attacker-supplied `frame.from.host_id` (fallback `"loopback"`) at `crates/maos-a2a-core/src/router.rs:438-441`, and the intake `verify_pinned` compares the config fingerprint against itself (`X==X`). A mesh peer with any one validly-pinned leaf can set `frame.from.host_id="nash"` and inherit Nash's accept-allowlist — the confused-deputy J4 exists to prevent. `fix: thread the verified PeerId into handle_intake; reject frame.from != tls_verified_peer`.
@@ -175,7 +175,7 @@ dev_model_used: claude-opus-4-7
 - **Sec-14b cross-Host adversarial runtime** — Story 4.5 ships Sec-14b structurally
   (kernel rejects cross-Host with `IacBusError::CrossHostUnsupported`). The transition
   to "kernel rejects forged peer attempt" (mTLS replay, certificate-pin attack, A2A
-  frame injection under load) is owned by Story 6.3 (A2A bilateral mTLS) at v0.5+.
+  frame injection under load) was assigned to Story 6.3 (A2A bilateral mTLS, `done`) at v0.5+, and is **Ownerless and open** today. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).*
   The corpus is structurally ready — Story 6.3 wires the runtime check WITHOUT corpus
   regeneration.
 
@@ -478,7 +478,7 @@ and `check-epic-close-green` (§A5) added. YAML re-validated.
 - **`from_stored` rewrites unknown `entry_path` labels to `PackageShipped`** — pre-existing enum limitation; `RevisionProposal` cannot be reconstructed from its string label, so the round-trip is lossy. `crates/maos-skill/src/admission.rs:286-287`
 - **`query_approvals` ordering semantic change** — changed from `timestamp_ns ASC` to `decision_id ASC`; intentional per Review #5/R8 to eliminate non-monotonic-clock LWW hazard, but it is a behavior change to a public read API. `crates/maos-iac/src/adapter/transparency_log.rs:1305-1307`
 - **Reconcile keys on raw target string, `parse_approval_target` removed** — intentional per Review #13; safe today because `SkillId` charset excludes `@`, but it abandons the bidirectional "cannot drift" guarantee R6 originally sought. `crates/maos-cli/src/subcommands.rs:334`
-- **`entry_path` provenance fidelity for CLI-discovered skills** — filesystem discovery (`discover_skills_detailed`) has no provenance signal, so 9.7 caches discovered skills as `package_shipped`. Faithful provenance (`AuthorSelf`/`RevisionProposal`) is an enqueue-time concept owned by the Epic-10 F6b/R8 daemon-enqueue seam. **Constraint:** any future daemon admission-enforcement logic must key on the TL decided-set (approve/reject capability rows), NEVER on the cached `entry_path` label. Add a pinning test that fails when discovery gains a provenance signal or the daemon starts writing enqueue rows, forcing the follow-up. `crates/maos-cli/src/subcommands.rs:425-430`
+- **`entry_path` provenance fidelity for CLI-discovered skills** — filesystem discovery (`discover_skills_detailed`) has no provenance signal, so 9.7 caches discovered skills as `package_shipped`. Faithful provenance (`AuthorSelf`/`RevisionProposal`) is an enqueue-time concept belonging to the Epic-10 F6b/R8 daemon-enqueue seam, and is **Ownerless and open**. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* **Constraint:** any future daemon admission-enforcement logic must key on the TL decided-set (approve/reject capability rows), NEVER on the cached `entry_path` label. Add a pinning test that fails when discovery gains a provenance signal or the daemon starts writing enqueue rows, forcing the follow-up. `crates/maos-cli/src/subcommands.rs:425-430`
 
 ## Deferred from: code review of story-10.2 (2026-06-21) — RESOLVED pre-completion
 
@@ -490,7 +490,7 @@ Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
 
 ## Deferred from: code review of 10-3-close-v1-0-compliance-gates-export-control-fuzz-hardening-korean-docs-cna-registration (2026-06-22)
 
-- **Unmaintained `serde_cbor` 0.11 (RUSTSEC-flagged) re-used as a new fuzz-crate dependency.** Story 10.3 wire-protocol fuzz crate `crates/maos-domain/fuzz/Cargo.toml` depends on `serde_cbor = "0.11"` per ratified preflight N6 (fuzz harness MUST use the same CBOR crate as production code; `maos-compliance`/`canonical_cbor.rs` already depends on `serde_cbor` 0.11). The crate is deprecated and carries a known amplification DoS (mitigated operationally via `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0` + `-rss_limit_mb=0`, documented in `docs/runbooks/fuzz-cadence.md`). Resolution = migrate `maos-compliance` canonical-CBOR off `serde_cbor` → `ciborium` (already used by `maos-kernel-core`) and update the fuzz harness to match — a supply-chain/modernization effort that spans production code, out of 10.3's docs/fuzz-i18n scope. Owner: future hardening story; flag to Winston/security.
+- **Unmaintained `serde_cbor` 0.11 (RUSTSEC-flagged) re-used as a new fuzz-crate dependency.** Story 10.3 wire-protocol fuzz crate `crates/maos-domain/fuzz/Cargo.toml` depends on `serde_cbor = "0.11"` per ratified preflight N6 (fuzz harness MUST use the same CBOR crate as production code; `maos-compliance`/`canonical_cbor.rs` already depends on `serde_cbor` 0.11). The crate is deprecated and carries a known amplification DoS (mitigated operationally via `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0` + `-rss_limit_mb=0`, documented in `docs/runbooks/fuzz-cadence.md`). Resolution = migrate `maos-compliance` canonical-CBOR off `serde_cbor` → `ciborium` (already used by `maos-kernel-core`) and update the fuzz harness to match — a supply-chain/modernization effort that spans production code, out of 10.3's docs/fuzz-i18n scope. **Ownerless and open.** *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* “future hardening story” named nothing pageable; no successor has claimed the `serde_cbor` → `ciborium` migration.
 
 ## Deferred from: Story 10.3 code review — export classification counsel confirmation (2026-06-22)
 
@@ -521,3 +521,277 @@ Extracted to `xtask/src/gate_common.rs` and applied to all 4 gate modules:
 
 - **FKCS diff-oracle leg self-compares live surfaces** [xtask/src/check_fkcs.rs:140-148,334-364] — `capture_from_baselines` captures the LIVE ABI/host surfaces and `run_diff_oracle_derives_leg` derives its verdict from that snapshot compared to itself. The leg's purpose is to prove the oracle DERIVES `kernel_unchanged` and IGNORES a forged self-report (not to guard live ABI drift), and `validate_live_triple` only checks the ABI/host baseline files exist and are non-empty. An ABI/host regression can therefore still derive green on this leg; the real additive-only ABI guard lives outside FKCS (`cargo public-api --diff` / abi baseline). Pre-existing; untouched by 12.6.
 - **FKCS frozen-tag leg uses CWD-relative kernel-baseline paths** [xtask/src/check_fkcs.rs:94-106] — `validate_live_triple` → `check_kernel_baseline::check()` opens `xtask/kernel-core-baseline.toml` and `crates/maos-kernel-core/src` relative to the CWD, so running the gate from a workspace subdirectory (e.g. `crates/maos-bin`) fails with `No such file or directory`. 12.6's new `workspace_root()` helper hardened only the `git()` invocation, not this path resolution. Not triggered in CI (jobs run from the workspace root). Pre-existing.
+## Deferred from: code review of 13-5d-production-spirit-collective-route (2026-07-19)
+
+- **Fallible `record_invocation` (audit-channel drop returns `Ok`)** [crates/maos-kernel-core/src/capability/mod.rs:332-351] — `CapabilityRegistryAdapter::record_invocation` treats a full-channel `try_send` failure as a dropped event and still returns `Ok(())`; a saturated audit channel silently loses the route-level `CapabilityInvocation` that AC5's correlation join reconciles against. The only real fix is a fallible invocation path, which is kernel-core work outside the L10 FLAG-Winston grant (fence item 2: do not spend the grant beyond the pid check). *Reason deferred:* requires a second FLAG-Winston escalation; Owner: `epic-14` — Epic-14 preflight, per the Epic-13 retrospective §4 disposition (2026-08-11). *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* “the next kernel-touching story” has been overtaken FOUR times (13.5h, 13.5i, 13.5j, 13.6c all shipped kernel deltas without taking it), so the phrase now names nobody; the retro decides who carries kernel-core debt. Party-mode consensus 2026-07-19. The story's interim mitigations: audit-first ordering at the composition root + a drop-counter assertion on the `mediated-operation-correlation` gate leg + a may/may-not-table honesty line.
+## Deferred from: code review of 13-3-cross-team-asymmetric-consent-multi-hop-distillation-provenance (2026-07-20)
+
+- **Consent adapter ignores local-host membership** [crates/maos-bin/src/cross_team_consent.rs:23-38] — a fresh signed reissue can remove `state.local_host()` from `manifest.members` while retaining the teams and a matching `[[cross_team_consent]]` grant; `CrossTeamConsentAdapter::is_granted` checks only lease freshness + the grant and returns true, and the deliberately unguarded replication apply path then lands rows on an evicted host. *Reason deferred:* party-mode consensus D2 (2026-07-20) — the consent port is team-axis by ratified design (H2/AC2); host-membership is the host axis and belongs to the daemon that ADR-055 §5 assigns verbatim to Story 13.5c. CLOSED at the Epic-13 retrospective §4 (2026-08-11): the successor identity and endpoint work shipped in 13.6a/13.6b, and the 13.5c successor is `done`, so no live Epic-13 assignment survives. The recorded gap — "an evicted host holding a fresh lease still consents" — stays as an audit trail, not an open item. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-ownership sweep).* Story 13.5c is `done` and closed WITHOUT a membership answer, so the reopen condition it named has fired.
+
+## Deferred from: code review of 13-3b-provenance-crosses-the-wall (2026-07-21)
+
+- **`deserialize_receipt` silently drops malformed nested refs** [crates/maos-iac/src/adapter/distillate.rs:163-170] — `source_log_ref` entries are parsed with `filter_map`, so an unparseable nested reference vanishes and a new digest can be written with an empty effective audit chain. *Reason deferred:* pre-existing — the `filter_map` predates this diff; 13.3b touched `flatten_source_log_ref` (diamond fix), not receipt deserialization.
+- **Receipt `distillation_depth` truncates via `as u32`** [crates/maos-iac/src/adapter/distillate.rs:154-161] — a nested receipt carrying a depth > u32::MAX wraps instead of erroring; no `u32::try_from`/`checked_add`. *Reason deferred:* pre-existing cast; no 13.3b code path can produce such a receipt (depths originate from `effective_depth = max_seen + 1` over local traversal).
+
+### Round 2 (post-rework review, 2026-07-21)
+
+- **Successful cross-wall recalls journaled as plain local `log.recall`** [crates/maos-iac/src/adapter/log_recall.rs:281-288,370-377] — `recall_cross_wall` delegates to `recall` after consent, so the `CapabilityInvocation` audit row carries only limit/cursor metadata: a cross-wall disclosure is indistinguishable from a local recall and does not record which directional grant was exercised. *Reason deferred:* ADR-058 Decision 2 explicitly scopes journaling out ("Per-team TL isolation and refusal journaling remain outside this decision"); the dead-wire negative named 13.5e for refusal journaling. **CLOSED by Story 13.6d** — verified 2026-08-08: `recall_cross_wall` no longer delegates to `recall`; it journals `disclosing` before movement and `disclosed`/`failed` after, under the distinct intent `log.recall.cross-wall` (`crates/maos-iac/src/adapter/log_recall.rs:52`, `:403`, `:421`, `:424`, `:428`), and `cross_wall_recall_refusals_and_disclosures_are_journaled` (`crates/maos-bin/tests/cross_team_consent_13_3.rs:444`) pins the outcome pair. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).*
+
+## Deferred from: code review of 13-5b-collective-tier-erasure-legal-hold-cascade (2026-07-25)
+
+> Six findings from the 13.5b three-layer review (Blind Hunter + Edge Case Hunter + Acceptance Auditor). All are pre-existing to this story's diff or explicitly ratified by its ACs/ADR, so they are owned here rather than treated as 13.5b blockers.
+
+- **Legal-hold check-then-act race with deletion** [crates/maos-kernel-core/src/memory/mod.rs:470-498,571-573] — `forget_with_reason` consults `is_under_legal_hold` and releases the authority lock before any mutation; the private/index deletes happen ~100 lines later with no spanning transaction or recheck. A `place_legal_hold` that lands in that window is ignored and the principal erases despite an active hold. Each hold operation takes its own SQLite lock (`crates/maos-iac/src/adapter/transparency_log.rs:1155-1187`). *Reason deferred:* the check/mutate ordering predates this diff; 13.5b changed the orchestrator's handling of `Suspended`, not the kernel's hold-then-delete sequence. Closing it needs a hold-scoped transaction or an optimistic recheck in kernel-core — kernel-core lines, outside the ratified ZERO fence. Owner: `epic-14` — Epic-14 preflight, per the Epic-13 retrospective §4 disposition (2026-08-11). *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* The `13-5h` candidacy lapsed: that story is `done` and did not take the hold-scoped transaction.
+- **`revoke_all_for_pid(...).unwrap_or(0)` feeds a signed `CategoryStatus::Removed` count** [crates/maos-bin/src/main.rs:8168-8169,8217-8221] — a failed revocation is indistinguishable from "zero tokens existed", and the difference is then signed into the proof bundle as `capability_tokens: Removed { count }`. Exactly the D-1/D-4 genre this story exists to close, on a line the diff did not touch. *Reason deferred:* pre-existing; the honest fix is a `CoverageGap` on revocation failure, which reopens the AC1 vocabulary decision now pending on the region-pinned terminal.
+- **`decommission_region_key` hardcodes `completed: true`** [crates/maos-audit/src/erasure/regional_teardown.rs:116-124] — it derives a public key from the still-supplied `base_seed` and asserts completion; no key material is revoked or destroyed. The signed regional receipt therefore attests a decommission that never happened. *Reason deferred:* pre-existing (Story 9.4b); currently unreachable in practice because phase (a) fails first on the `shared` coverage gap. Becomes live the moment the pending AC1 decision restores a `completed`-capable forget attestation — re-open then.
+- **Crash between durable mutation and audit append leaves no reconciliation record** [crates/maos-kernel-core/src/memory/mod.rs:571-589; crates/maos-loom-lite/src/store.rs:1772-1823 → crates/maos-bin/src/main.rs:4862-4877] — both the forget cascade and the operator collective erase commit destructive state before their audit frame, and `insert_kernel_event_returning_id` panics on write failure by design (I2 binding). No startup repair or persisted reconciliation job exists; the one-sided-erase plant in `xtask/tests/story_10_4a_ac1_proven_red.rs:438-447` is a pure boolean helper that never observes production stores. *Reason deferred:* 13.5b took an explicit position (Trap 4 fail-fast, ADR-059:58-62) and registered mutation-to-audit crash atomicity as ownerless and open. Recorded here so it does not disappear.
+- **Skipped `AdvisorySubstrate` legs still emit `passed: true`** [xtask/src/check_reza_production_path.rs:474-545] — when the two-datname Postgres environment is absent the live legs are not attempted, yet `passed` is `blockers.is_empty()` and the gate exits zero with a WOULD-HAVE-BLOCKED warning. The story's own testing standard says absent substrate must be UNMEASURED, never green. *Reason deferred:* this is the shared `gate_common` house pattern across every substrate-bound gate, not a 13.5b regression; CI provisions pgvector/pg16 for this job so the legs do run and do block there. Fixing it is a cross-gate change.
+- **`MAOS_ONE_SHOT` legal-hold-release and collective-erase carry no operator authorization boundary** [crates/maos-bin/src/main.rs:4799-4828,4831-4877] — both accept a principal id / pid+namespace+key from environment variables and act, with no operator identity, capability, or approval check; `team_guard` is tenant placement, not authority. *Reason deferred:* AC4(a) explicitly mandated reusing the `MAOS_ONE_SHOT` dispatch idiom, and every other one-shot verb has the same shape — exec rights on the host binary already imply operator authority. Revisit if operator-axis work (NFR-Ops-11) ever lands.
+
+### Round 2 (post-patch review, 2026-07-25) — raised BY the review's own proven-red work
+
+- **Private-tier filesystem residue survives the forget cascade** [crates/maos-kernel-core/src/memory/private.rs:319-337,183-188,30-36] — `forget_principal` derives its removal set exclusively from the in-memory map, but the private tier deliberately does not cache `MemoryValue::Markdown` (it is filesystem-canonical so operator hand-edits stay visible) and always spills it to disk. The Markdown record is invisible to the removal set, `fs::remove_dir_all` never runs, the file survives — and the signed proof records `memory_namespace` as `Removed { count: 0 }` while `subject_access_query` reports the principal gone: an Article 15/17 asymmetry that hides its own residue. The same hole swallows any value above the 4 KiB spill threshold once the writing process exits, because `PrivateMemoryStore::new` never hydrates from `fs_root` — which describes every real operator uninstall. This is D-4's defect surviving D-4's fix: 13.5b corrected the *count*, but the *enumeration source* upstream of it was already wrong. *Reason deferred:* the correction means walking `fs_root` inside `forget_principal` — kernel-core lines, outside 13.5b's ratified ZERO-Δ fence. Trap 1(ii) says escalate rather than absorb. **FLAG-Winston, ownerless and open**; recorded as ADR-059 Decision 10 / Residual 8. Pinned by `private_tier_markdown_survives_the_forget_cascade` and bound as the Blocking Reza leg `gdpr-private-markdown-residue-pinned`, so a successor's fix goes RED and forces the proof category to be corrected with it. **CLOSED by Story 13.5i** — verified 2026-08-08: `forget_principal` now walks the private spill tree instead of the in-memory map (`crates/maos-kernel-core/src/memory/private.rs:811`, `forget_principal_unix` `:827`, `forget_principal_nonunix` `:926`), and the pinning leg `gdpr-private-markdown-residue-pinned` no longer exists in `xtask/src` because the residue it pinned is gone. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).*
+
+## Deferred from: code review of 13-5i-private-tier-filesystem-residue (2026-07-27)
+
+- **TOCTOU: the checked pid directory can be swapped for a symlink before `read_dir`** [crates/maos-kernel-core/src/memory/private.rs:374-382] — `forget_principal` validates `pid_entry.file_type()?.is_dir()` and then reopens the path *by name* at `:382`; no directory handle is retained. A process that replaces `<fs_root>/<pid>` with a symlink between those two operations makes the subsequent `read_dir` and `remove_dir_all` resolve outside `fs_root`. *Reason deferred:* requires a concurrent local writer inside the operator-owned memory root during an uninstall, and a real fix needs descriptor-anchored `openat(O_NOFOLLOW)` traversal — a new dependency and a materially larger kernel delta than any bounded repair 13.5i could carry.
+- **A write concurrent with `forget_principal` can survive it** [crates/maos-kernel-core/src/memory/private.rs:326-355,368-410; :177-197] — there is no operation-wide exclusion between `write` and `forget_principal`. A target write landing after the `to_remove` snapshot stays in `in_mem`; a spill landing after `remove_dir_all` recreates the namespace directory. Either way the forget returns success and the store can still serve target data. *Reason deferred:* pre-existing — the lock discipline is unchanged in shape by 13.5i — and the production forget path is a one-shot CLI process with no Spirit running (story D-1).
+- **Directory entries are unlinked while their parent's `ReadDir` is still being iterated** [crates/maos-kernel-core/src/memory/private.rs:399-421] — `fs::remove_dir_all(&ns_dir)` runs inside `for ns_entry in fs::read_dir(&pid_dir)`, and `fs::remove_dir(&pid_dir)` inside `for pid_entry in read_dir(&fs_root)`. POSIX leaves subsequent `readdir` results unspecified once the directory is modified after `opendir`, so on some backing stores a sibling namespace directory can be skipped — silent under-deletion under a success receipt, this story's own defect class. *Reason deferred:* [INFERENCE] not reproduced; glibc's `readdir` buffering makes it safe on ext4/tmpfs, which is what MAOS runs on today. Fix if revisited: collect entries into a `Vec` before deleting.
+
+## Deferred from: code review of 13-5g-tl-stage2-datname-inversion-defense-in-depth (2026-07-27)
+
+> One finding. Resolved by party-mode consensus (Code Review Crew, 5/5, criterion: per spec + long-term correctness). The room split the originally-filed TOCTOU in two and deferred only the adversary-grade half; the benign concurrent-boot half was escalated to a blocking patch inside the story.
+
+- **TOCTOU: the Transparency Log artifact can be replaced between the Phase A verdict and the TL open** [crates/maos-bin/src/main.rs:2444,2649; crates/maos-audit/src/lib.rs:1056-1068] — nothing carries a file descriptor, inode identity, or SQLite snapshot from `phase_a_preflight` to `open_with_global_legal_holds` or to the subsequent `write_tenant_binding`. `read_tenant_artifact` itself does `symlink_metadata(path)` and then a *separate* `open_with_flags(path, ...)`. `SQLITE_OPEN_NOFOLLOW` rejects a symlink at each individual open but does not prevent a regular-file replacement between them, so an actor able to write the audit directory can have the process approve one artifact and open — or write a local binding into — another. *Reason deferred:* the exploit requires audit-directory write access plus arbitrary timing, which AC6's ratified honest limit already places outside the model ("detects misconfiguration, mis-restore and accidental substitution — not an adversary"). Closing it in-story would require carrying an fd/inode identity into the Transparency Log adapter, which lives in `maos-iac` — pinned at **zero delta** by this story's Budget table — and would stand up a second artifact-identity mechanism that residual #1 `v25-signed-shard` subsumes and deletes, since a signed genesis row travels inside the artifact and detects substitution regardless of timing. Recorded as **residual #6 in ADR-055 and explicitly assigned to `v25-signed-transparency-log-artifact-identity`** (the sprint-status key; `v25-signed-shard` was a nickname that resolved to nothing — *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).*), so it is owned rather than silently accepted. Structurally identical to the 13.5i private-tier TOCTOU deferred above, and deferred on the same reasoning. *Not deferred:* the benign sibling — two boots racing the `NeedsWrite` window, reachable through a config typo with no privilege — was split out and is a blocking patch on `write_tenant_binding` (`crates/maos-audit/src/lib.rs:1108-1121`).
+
+## Deferred from: code review of 13-6d-cross-wall-recall-production-initiator (2026-07-30)
+
+- **`consent_grant` audit field records the compile-time intent constant, not an actual grant id/version/lease** [crates/maos-iac/src/adapter/log_recall.rs:107] — `CrossWallRecallConsentDecision::Granted` is a unit variant carrying no metadata (`crates/maos-domain/src/ports/cross_wall_recall_consent.rs:17`), so the cross-wall disclosure row cannot name the specific manifest grant that authorized it; only the intent string (`log:recall`). The grant is reconstructable from (home_team [the artifact's own binding], remote_team, intent). *Reason deferred:* enriching the consent decision requires widening the consent port + adapter across crate boundaries; out of 13.6d's local scope. ACCEPTED RISK — ratified at the Epic-13 retrospective §4 (2026-08-11); no successor assignment, by decision. The authorization is reconstructable from the artifact's home team, remote team, and intent; widening the consent decision crosses crate boundaries and is not required to validate the published minimum-disclosure journey. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-ownership sweep).* The prior record was self-admitting: it cited 13.6a — already `done` — as the live assignee on the day it was written.
+
+## Deferred from: code review of 13-6c-three-team-three-region-substrate (2026-08-03) — RESOLVED
+
+All three items (TI-1 fsync-failure rollback, TI-2 io_lock serialization, TI-3 no-follow-open TOCTOU swap) were re-applied the same day via a kloc-excluded `cfg(test/debug_assertions)` fault module (`memory/spill_test_faults.rs`, excluded by `check_kloc.rs -e`). Ceiling 18248 unchanged. Kept here as an audit trail of the defer→resolve path.
+
+## Story 13.6e preflight — `roundtrip-slo` floor breach: MEASURED, DIAGNOSED and RESOLVED 2026-08-04
+
+> The tracking entry the RED-at-HEAD contingency (`13-6c…md:154`, from 10.4c D6 `10-4c…md:82`) required and that did not exist. **Operator chose option (B) — reduce the cost rather than re-base the floor. The floor was NOT touched and no control was removed.** Recorded with the full measurement chain, including a first hypothesis that measurement killed.
+
+### Outcome
+
+`check-multi-region-slo` is **`oracle_green: true`**, all five legs green, `roundtrip-slo` `passed: 2` (live + mutation). Clean p95 **17 802 µs / 17 866 µs** across two runs against the untouched **30 000 µs** floor. One test file changed; zero production lines.
+
+### What was actually wrong: the probe counted a verification step that had MOVED
+
+`verify_replication_bundle` is **7 137 µs** per call in this debug `cargo test` build. That single fact dominates everything — component attribution for one leg (p50 µs):
+
+| component | µs |
+|---|---|
+| `write_with_source` | 564 |
+| `read_all_rows_from` + `from_row` | 193 |
+| `build_replication_bundle` (Merkle + Ed25519 **sign**) | 230 |
+| **`verify_replication_bundle` (1 Ed25519 verify)** | **7 137** |
+| `apply_replication_bundle` (internal verify + 1 write) | 7 956 |
+| `apply` **minus** its internal verify | **819** |
+
+Four verifies per round trip × 7 137 = 28 548 µs of a 31 596 µs modelled round trip — **~90%**; modelled 31 596 vs measured 31 059, so the model closes. The 7 ms is the signature verification itself, not key derivation: `derive_region_pubkey` measures **102 µs** (HKDF alone 19 µs).
+
+**Root cause.** When this probe was written at 11.2b, `apply_replication_bundle` did **not** verify, so an explicit `verify_replication_bundle` before `apply` was genuinely part of the production path. **Story 13.2 moved verification INSIDE `apply`** (`bundle.rs:866` — before any store access, the Fork-4 payoff). The probe was never updated, so from 13.2 onward it performed **two verifies per leg where production performs one**. Production's sole caller of `apply_replication_bundle` — `crates/maos-bin/src/cross_team_crossing.rs:255` — calls it directly with no pre-verify.
+
+So the apparent **1.94×** regression was **~85% probe infidelity**. With the redundant verify removed, HEAD measures **17 802 µs against 11.2b's 16 535 µs = 1.08×** — ~8% genuine machinery growth over five stories, which is a healthy tripwire margin, not a regression. **Coverage is unchanged**: a bundle that fails verification makes `apply` return `SignatureVerificationFailed` and the `.expect` panics.
+
+### A hypothesis that measurement killed — recorded because the reasoning was persuasive and wrong
+
+The 5 → 17 SQL-statement expansion on the write path (`store.rs:619-708`: `BEGIN` + `pg_advisory_xact_lock` + erasure-tombstone `SELECT` + 18-column upsert + `COMMIT`) was the leading explanation, with arithmetic that appeared to fit. A probe harness measured it per-write (p50 µs, N=200):
+
+| variant | p50 | vs baseline |
+|---|---|---|
+| V0 autocommit, unprepared (11.2b shape) | 141 | 1.00× |
+| V1 full path, **unprepared** (HEAD shape) | 380 | **2.70×** |
+| V2 full path, **`prepare_cached`** | 178 | 1.26× |
+| V3 no advisory lock | 143 | 1.01× |
+| V4 no tombstone `SELECT` | 143 | 1.01× |
+
+**The controls are nearly free (~35 µs each); statement PARSING was the entire write-path cost.** But 3 writes × 239 µs = 0.7 ms against a 15.3 ms round-trip delta — it explained **under 5%** of the regression, which is what redirected the investigation to the verify count. *The arithmetic that "fit" fit because two wrong numbers were multiplied.*
+
+### Residuals — open, and none of them block
+
+- ~~**`cross_region_roundtrip_mutation`'s second assert is still non-discriminating**~~ — **CLOSED by Story 13.6e (T5) and the remaining evidence-producer review, 2026-08-04.** The old `p95 >= 14_000` passed below the clean baseline. The final oracle alternates adjacent clean/injected samples, computes each pair's saturating delta, and requires the paired-delta median to carry at least 14 ms of the fixed 15 ms injection. `paired_delta_oracle_requires_the_injection_on_a_majority_of_pairs` is the direct proven-red: an absent injection stays below 14 ms while the injected vector crosses it. The `roundtrip-slo` trusted mapping also requires both signed records — 29 ordinary gate proofs plus this mutation falsifier make 30 guards total.
+- **`prepare_cached` is an unclaimed, measured production win** — `deadpool_postgres::Client::prepare_cached` takes the write path from 2.70× to 1.26× with zero semantic change (`store.rs` currently passes `&str` to `query_one`/`query_opt`/`execute`, re-parsing every call). Worth ~200 µs/write. Not taken here: it is production code in `maos-loom-lite`, it is not needed to clear the floor, and it deserves its own story rather than a benchmark-driven drive-by. **Ownerless and open.** *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* `maos-loom-lite performance maintainers` is not a role that exists in sprint-status, and an owner nobody can page converts an honest ownerless row into an unfalsifiable one. **Close when a dedicated performance story either ships cached statements with the roundtrip tripwire unchanged or records a measured reason to decline the optimization.**
+- **This gate's absolute numbers are debug-build-dominated and always were** — ~7.1 ms per Ed25519 verify in `cargo test` debug versus roughly two orders of magnitude less in release. The floor is a *loopback regression tripwire, not a geo-SLO* (`ADR-049…md:125`), so a debug-build constant is legitimate as long as it stays a constant — but any future change to build mode invalidates the floor's provenance. `cross_region.rs:61-64` already demands rig + build mode be recorded with any change to the constant; **the constant did not change here.**
+
+### Also landed (required by the governing rule regardless of disposition)
+
+The diagnostic `eprintln!` in **both** `cross_region_roundtrip_live` and `..._mutation` moved **above** their asserts. Every assert panics, so emitting the distribution afterwards meant a RED run reported p95 and nothing else — the failure's shape was unmeasurable by construction, which is why "is this jitter?" stayed an opinion for two days. The distribution is what settled it: std_dev 499 µs and p95−p50 = 1 005 µs around a p50 that was *itself* over the floor — a uniform shift, not a tail. Both gate legs already pass `--nocapture`, so this surfaces in CI with no workflow change.
+
+---
+
+## Deferred from: Story 13.6e — evidence ledger, AC1's explicit non-goal (2026-08-04)
+
+> Recorded rather than silently skipped, per the story's AC1. The ledger covers the FOUR journey-relevant gates derived from `check_loom_substrate_drift`'s `CONTRACTS`. It does **not** cover the other eight Family-B gates, and it must not be read as "every gate emits an evidence state".
+
+- **Eight Family-B gates are outside the evidence ledger** [`xtask/src/check_scale_churn.rs`, `check_cohort_mesh.rs`, `check_enterprise_pdp.rs`, `check_enterprise_identity.rs`, `check_escape_detector.rs`, `check_trial_attestation.rs`, `check_vetting_attestation.rs`, `check_wasm_form_equiv.rs`] — each carries its own `{label, passed, failed, ran, [attempted,] green}` leg struct with no `binding`, no `substrate_present` and no evidence state, so none of them emits a `product_claim` and none of them publishes a ledger artifact. *Reason deferred:* 13.6e's ledger set is **derived** from the four `CONTRACTS` entries precisely so it cannot quietly grow; widening it is scope, not budget. **Owner: `epic-14` — Epic-14 preflight, per the Epic-13 retrospective §4 disposition (2026-08-11).** (alongside the `maos-a2a-core` third-consecutive-unratified grant and the `xtask` decomposition question) — the retro should decide whether the ledger is a four-gate journey instrument or a workspace-wide one before anyone extends it.
+- **Two of those eight cannot express `ABSENT` at all** [`xtask/src/check_vetting_attestation.rs:31`, `xtask/src/check_wasm_form_equiv.rs:104`] — their `LegResult` has **no `attempted` field**, so "the leg never ran" and "the leg ran and produced nothing" are the same value. A projection cannot distinguish `ABSENT` from `INDETERMINATE` there without a struct change. Both gates are hermetic today, which is why the hole has not bitten; it becomes real the moment either grows a substrate-bound leg. **Owner: `epic-14` — Epic-14 preflight, per the Epic-13 retrospective §4 disposition (2026-08-11).**, same decision.
+- **`check-kernel-baseline` prints its PASSED line to stdout** [`xtask/src/check_kernel_baseline.rs`] — every gate that reuses it as a leg (`check-cross-region-consensus`, `check-multi-region-slo`) therefore emits one non-JSON line before its `--json` payload. Pre-existing and harmless in CI (both jobs `tee` rather than parse), and 13.6e's ledger artifact is written to a file so it is unaffected. *Reason deferred:* fixing it changes a shared gate's output contract. **Ownerless and open.** *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* `xtask gate-infrastructure maintainers` is not a role that exists in sprint-status. **Close when `check-kernel-baseline --json` is machine-clean and both composite callers consume a quiet structured result without transcript parsing.**
+
+### The RED that closing `check_fkcs.rs:325` uncovered — HELD ADVISORY, not fixed, not re-pinned
+
+- **`check-fkcs`'s `admission-path-unmodified` leg has been RED since Story 13.4** [`xtask/fkcs-baseline.toml:22`, `crates/maos-registry/src/admission.rs`, `crates/maos-skill/src/admission.rs`] — 13.4 (FR37 vetting machinery, `148a33ee`) changed both admission sources and never re-pinned `admission_baseline.sha256`; the last re-pin was `5767cf0d` (Story 12.6). The gate's exit tested `blocking_now` while its JSON `passed` field tested `dev_blocks`, so it printed `"passed": false` and exited **0** — the one-identifier defect Story 13.6e's AC2 named. **Measured both ways at 13.6e:** with the original identifier the gate exits 0 over the same RED leg; with the fix it exits 1.
+  - **The harness is correct.** The admission path genuinely is not unmodified. Re-pinning here would re-can a fixture over another story's unreviewed admission-path change, which the governing rule (`13-6c…md:154`) forbids: *"Never re-can a fixture, never silently relax a floor."*
+  - **Disposition:** held advisory with a loud banner, a named owner and this entry. The hold is bound to the exact recorded baseline SHA-256 and current Story-13.4 worktree SHA-256; malformed baseline data, unreadable sources, or any later admission drift blocks instead of inheriting the hold. `check-fkcs` emits a `WOULD HAVE BLOCKED` banner and reports `held_advisory_legs` in JSON. The gate-level `advisory` field now matches its actual verdict.
+  - **Owner: `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger`** — handed by the Epic-13 retrospective §4 (2026-08-11): 14.3 owns FKCS infrastructure readiness and must decide the conformant re-pin or retain the exact bounded hold. *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).* The original record read “with Story 11.5 (FKCS infrastructure)”; Story 11.5 is `done`, so this residual was STALE AT BIRTH — authored inside the story that built the judge, naming a completed owner on the day it was written. The FKCS infrastructure it depends on is 11.5's shipped output, not a live owner. The decision is whether 13.4's admission-path change is frozen-kernel-conformant; if it is, re-pin `admission_baseline.sha256` and delete the hold entry — the gate then blocks on the leg again with no code change.
+
+## Fixed, not deferred: `check-service-boundary` counted cfg(test) modules as kernel ABI (2026-08-07)
+
+> Recorded because the RED was live on `main`'s last CI run and was filed nowhere, and because the fix corrected a mis-captured ABI baseline.
+
+- **The gate's two walks disagreed about the same module.** `walk_p4_mod` / `walk_p4_inline_item` have always skipped a `mod` whose `#[cfg(...)]` predicate mentions `test`; the SURFACE walk (`walk_mod`, `walk_inline_mod_item`) never received that rule. It went unnoticed until Story 13.6c added `maos_kernel_core::memory::spill_test_faults` — the first `pub mod` under `#[cfg(any(test, debug_assertions))]` to reach the surface walk — whose five functions were then reported as unclassified public kernel API. `check-service-boundary` is `BindingClass::Blocking` and sits in `aggregate`'s needs, so CI run `30881082656` at `b568a052` failed on it (154 jobs, one real failure). Story 13.6c's own change log claims *"All gates green (baseline/kloc/drift/ship-gate/service-boundary/fmt)"* at that same commit — a claim standing in for a control.
+- **Why the rejected fix was rejected.** Adding the five symbols to `xtask/kernel-api-classes.toml` would have blessed test fault-injection as permanent public kernel API under a real class (`universal-arithmetic` / `data-movement` / `supervision`) via invariant-lock review, asserting something false: the symbols do not exist in a release build. `kloc_check` already excludes the same module for exactly that reason. **Fixed** by porting the existing 8-line predicate into a shared `is_test_cfg_mod` used by both walks.
+- **The baseline had one mis-captured entry.** With the walks agreed, `maos_kernel_core::security::crypto::tests::MockCryptoProvider` (`crypto.rs:100-101`, `#[cfg(test)] pub mod tests`) became a *removed* symbol. It was captured by the buggy walk and was never real ABI — a release build has never exported it — so it was deleted from `docs/ci-baselines/kernel-surface-v0.1-beta.json` (371 → 370 items). It was the **only** `::tests::` entry in the baseline. This is a correction of a mis-capture, not an ABI break, and the file is not invariant-lock guarded.
+- **Proven a real control, not a null one.** A planted non-cfg-gated `pub fn planted_unclassified_probe` in `security/crypto.rs` still reds the gate with the ordinary unclassified-symbol message; restored byte-identically (SHA-256 verified). Only cfg(test)-gated modules are now skipped.
+- **Related, still open:** the older *"`check-service-boundary` baseline staleness"* entry above (Stories 3.x–4.x drift) is untouched by this fix and remains a cross-cutting maintenance task.
+
+## Story 13.6 — findings the journey closer RULED but did not build (2026-08-08)
+
+Story 13.6 judges; it never invents a missing mechanism (`epic-13:57`). Everything
+below was MEASURED against the working tree during the composed three-team journey
+run and is filed with a live owner rather than patched here.
+
+### The kernel collapses EIGHT collective causes into ONE — the ruling
+
+- **`CollectivePortError::Transport(_) => CollectiveErrorKind::Transport`**
+  [`crates/maos-kernel-core/src/memory/mod.rs:206`] maps **all eight**
+  `TransportCause` variants
+  (`crates/maos-domain/src/ports/collective_memory.rs:24-58`: `Other`,
+  `PartitionRefused`, `ErasureTombstoneDominates`, `ConsentDenied`, `MapStale`,
+  `AttestationInvalid`, `UnmappedSpirit`, `ConnectionMismatch`) onto **one**
+  kind. The erasure is **8 → 1**, not 8 → 5.
+  **THE RULING (Story 13.6, the named owner of the inherited question):** the
+  claim *"the operator can see why the wall refused"* is **ALLOWED on the
+  host-initiated crossing path** — `emit_cross_team_share` journals a typed
+  `status` per outcome (`crates/maos-bin/src/main.rs:9876-9893`, labels at
+  `:9910-9922`), and Story 13.6 proved the label survives into the tenant
+  Transparency Log for a REFUSED crossing
+  (`refused_crossing_is_operator_visible_and_retry_needs_a_consent_repair`).
+  It is **NOT ALLOWED on the Spirit path**: of the eight variants, `ConsentDenied`
+  has no production constructor (documented in-code at
+  `crates/maos-loom-lite/src/adapter.rs:196-200`) and `Other` is a free-text
+  fallback, so the **six** causes that path can actually produce — `MapStale`,
+  `ConnectionMismatch`, `UnmappedSpirit`, `AttestationInvalid`,
+  `PartitionRefused`, `ErasureTombstoneDominates` — all reach the caller as the
+  single word `Transport`.
+  Successor: the machine-readable leg `kernel-collective-cause-distinguishable`
+  (`xtask/src/check_multi_tenant_loom.rs:114`), whose owner string the Epic-13
+  closer re-assigned away from itself when it ruled the collapse.
+  **ACCEPTED RISK with an explicit claim boundary — ratified at the Epic-13
+  retrospective §4 (2026-08-11); no successor assignment, by decision.** The
+  host-initiated crossing publishes a typed status, so that path may claim
+  explainability. The Spirit path may not, and no artifact may imply otherwise.
+  Widening the kernel remains a future FLAG-Winston decision, not hidden
+  Epic-13 debt: it is a kernel-core edit outside the closer's ZERO-Δ fence.
+
+### `CrossWallRecallRefusal` collapses SIX variants into the token `refused`
+
+- **A second, independent cause collapse on a SHIPPED operator surface.**
+  `CrossWallRecallRefusal` (`crates/maos-domain/src/log_recall.rs:290-304`) has
+  **six** distinguishable variants — `NoConsentProvider`, `NoGrant`,
+  **`WrongDirection`**, `ConsentStateStale`, `ConsentStateUnavailable`,
+  `ReadPortUnavailable` — and the production `cross_wall_traceback` one-shot
+  collapses all six into the single token `"refused"`
+  (`crates/maos-bin/src/main.rs:3075-3080`), preserving the cause only inside a
+  free-text `"error"` string. `WrongDirection` in particular tells an operator
+  something completely different from `NoGrant`, and the machine-readable
+  outcome cannot tell them apart. Distinct from the kernel collapse above: this
+  one is in the CLI, not the kernel. **Owner: `epic-14` — Epic-14 preflight, per the Epic-13 retrospective §4 disposition (2026-08-11).**
+
+### Two operator one-shots are UNREACHABLE on a tenant host
+
+- **`MAOS_ONE_SHOT=collective-erase` has no reachable configuration in tenant
+  mode.** `MAOS_LOOM_POSTGRES` makes `MAOS_LOOM_HOME_TEAM` mandatory
+  (`crates/maos-bin/src/main.rs:2784`), which makes a tenant-map source
+  mandatory (`crates/maos-bin/src/tenant_map.rs::tenant_map_for_store` →
+  `SourceUnavailable`); the only source is the cohort bootstrap, and
+  `TenantMapAdapter::new` refuses every mode that is neither
+  `cohort-a2a-daemon` nor `run --once`
+  (`crates/maos-bin/src/main.rs:2804-2807`,
+  `crates/maos-bin/src/tenant_map.rs:65-67` → `SourceUnrefreshable`). Both arms
+  are now PINNED by the composed journey leg, so a repair reds the leg instead
+  of passing silently. The GDPR operator erase control 13.5b shipped therefore
+  cannot be executed on the Reza substrate at all.
+  **CLOSED at the Epic-13 retrospective §4 (2026-08-11).** The final operator
+  evidence records this one-shot reaching its production dispatch after the
+  tenant-mode reachability repairs — bounded-refreshable classification for the
+  cohort-backed `collective-erase` arm, measured live in
+  `reza_three_team_three_region_production_journey` (PROCESS 5).
+- **`maos traceback --team <T>` is unreachable for the same reason, and the
+  consequence is sharper:** a CONSENTED, SERVED cross-wall read is impossible in
+  production. The consent provider is attached only when a cohort bootstrap
+  exists (`crates/maos-bin/src/main.rs:3033-3044`) and the read port only when
+  `MAOS_LOOM_POSTGRES` is set (`:3050-3054`) — but that same combination builds
+  the tenant map and dies at `SourceUnrefreshable` before the dispatch at
+  `:3057`. Every reachable configuration ends in a refusal. Story 13.6 exercised
+  the SHIPPED `CrossWallLogReadAdapter` in-process against a tenant
+  Transparency Log a real daemon wrote (the first producer/consumer meeting on
+  that surface) and pinned the CLI's measured refusal beside it.
+  **CLOSED at the Epic-13 retrospective §4 (2026-08-11).** The final operator
+  evidence records this one-shot reaching its production dispatch after the
+  tenant-mode reachability repairs — measured live in
+  `reza_three_team_three_region_production_journey` (PROCESS 6), which asserts
+  `outcome: ok` and the exact six-field minimum-disclosure DTO.
+
+### AC4 (c) — a vetting lapse cannot refuse a crossing: NOT BUILDABLE
+
+- **There is no code path from a vetting lapse to a refused crossing.**
+  Re-confirmed 3/3 and stronger: `grep -rn "TrustTier|trust_tier|Vetted"`
+  returns **zero** in `crates/maos-loom-lite/src`, `crates/maos-a2a-core/src`,
+  `crates/maos-cohort/src`, and `crates/maos-bin/src/main.rs:9300-10000`. The
+  13.4 vetting machinery is orthogonal to the crossing: it gates the *upgrade*
+  surface (`spirit-upgrade` / `hot-swap-precheck` →
+  `enforce_vetted_upgrade_precondition`), and that is the ONLY surface on which
+  a vetting lapse is demonstrable. Building the crossing-side refusal would be
+  inventing a mechanism, which this story is forbidden to do.
+  **Owner: `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger`** —
+  the v2.2 story that already owns FKCS/trial vetting infrastructure.
+
+### AC4 (d) — an unauthorized legal-hold bypass is NOT CONSTRUCTIBLE
+
+- **There is no join key, so the control cannot be built without breaking
+  Decision D.** `grep -rni "legal.hold" crates/maos-loom-lite/` → **zero,
+  including tests**. This is deeper than "no code": a hold is keyed by
+  `principal_id`, and the collective tier is principal-namespace-free BY
+  CONSTRUCTION (Decision D,
+  `crates/maos-kernel-core/src/memory/mod.rs:180-193`). `CollectiveEraseReceipt`
+  (`crates/maos-domain/src/ports/collective_memory.rs:86-89`) is
+  `{deleted_rows, tombstone_recorded}` — **`held` is not representable**. So
+  "erased vs failed" IS judgeable (Story 13.6 exercised exactly that
+  reconciliation live: team B's row erased with a tombstone while team A's
+  origin row survives — a one-sided erase) and **`held` is not**. "Unauthorized
+  hold bypass is RED" would first require giving collective rows a principal
+  nexus that Decision D forbids.
+  **ACCEPTED RISK — Decision D preserved, ratified at the Epic-13 retrospective
+  §4 (2026-08-11); no successor assignment, by decision.** Collective rows are
+  principal-namespace-free and `CollectiveEraseReceipt` cannot represent
+  `held`. Introducing a principal nexus merely to make the negative
+  constructible would violate the governing partition-by-construction decision,
+  so the control stays unbuildable and the boundary stays stated.
+
+### `MAOS_REGION_HOME` is never reconciled against the signed `TeamEntry.region`
+
+- Nothing in production compares the environment's `MAOS_REGION_HOME` with the
+  region the SIGNED manifest carries for that host's team
+  (`TeamEntry.region`). A misconfigured host stamps rows with a region its own
+  cohort manifest contradicts. Story 13.6's composed journey now DERIVES each
+  daemon's region from the signed entry
+  (`crates/maos-bin/tests/cross_team_crossing_13_6b.rs::journey_region`), so the
+  scene is honest — but the harness deriving it is not production enforcing it.
+  **Owner: `epic-14` — Epic-14 preflight, per the Epic-13 retrospective §4 disposition (2026-08-11).**
+
+### AC5's ownerless register, re-measured 2026-08-08 and dispositioned
+
+- **No gate reconciles the kernel pin with its own HISTORY.** `grep -rn "HISTORY" xtask/src/` → **0**. `xtask/kernel-core-baseline.toml:438` reads *"23596 → 23517"* while its own prose two lines down says *"+116 physical lines from the 23401 pin"* (23401 + 116 = 23517). The `from` value could be arbitrary and nothing would red. Fixing it needs a NEW gate, which Story 13.6 is forbidden to add, so the gap is recorded rather than closed.
+  **Owner: `14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition`** — handed by the Epic-13 retrospective §4 (2026-08-11): 14.6 owns the ceiling instrument and retro-residual discipline.
+- **In-`src` kernel test modules are budget-charged but CI-unexecuted.** Re-measured: **41** files under `crates/maos-kernel-core/src` declare a `mod tests`, every one of them counted by `kloc-check` (only `spill_test_faults` is excluded, `xtask/src/kloc_check.rs:189`), and all 58 `--test` invocations in `.github/workflows/discipline.yml` name an integration target, so **zero** CI invocations run the kernel lib target. The counting rule matters: "files declaring `mod tests`" = 41, which is why the earlier "42 in 42" and "44 in 43" numbers disagreed — they counted different things.
+  **Owner: `14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition`** — handed by the Epic-13 retrospective §4 (2026-08-11): 14.6 owns the ceiling instrument and retro-residual discipline.
+- **`maos-bench --bench audit_query_latency` has been broken since 9.1.** `crates/maos-bench/benches/audit_query_latency.rs:24` and `:235` use the kind `"capability.invoke"`; the accepted spelling is `"capability.invocation"` (`crates/maos-audit/src/lib.rs:675`). The bench has run **zero** times.
+  **Owner: `14-4-v2-0-sweep-operational-surfaces`.**
+- **`EXPECTED_GATES` is hand-maintained and nothing derives it from the workflow.** Re-framed rather than re-filed: 13.6e added a genuine reverse check (`ledger_ship_badge_problems`, `xtask/src/check_ship_gate_completeness.rs:137-166`), so *"never validates anything CI produced"* is now FALSE. The surviving defect is the forward direction — 36 `EXPECTED_GATES` entries against the workflow's `check-*` jobs, with no derivation between them.
+  **Owner: `14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition`** — handed by the Epic-13 retrospective §4 (2026-08-11): 14.6 owns the ceiling instrument and retro-residual discipline.

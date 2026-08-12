@@ -62,6 +62,10 @@ maos-eval = { path = "../maos-eval" }
 # Story 4.3 — optional cross-Spirit isolation framework (spirit_test feature).
 maos-spirit-sdk = { path = "../maos-spirit-sdk", optional = true, features = ["spirit_test"] }
 
+[target.'cfg(unix)'.dependencies]
+# Private spill containment uses descriptor-relative no-follow filesystem I/O.
+rustix = { version = "1.1", features = ["fs"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.4"
 seccompiler = "0.4"

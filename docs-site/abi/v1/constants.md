@@ -9,7 +9,7 @@
 - [v2 → v3 Migration](/migrate/v2-to-v3) — what changed at manifest schema version 3
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 
 ## Constants {#maos-spirit-abi-constants}
@@ -76,12 +76,12 @@ constant directly.
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
-assert_eq!(MANIFEST_SCHEMA_VERSION, 3);
+assert_eq!(MANIFEST_SCHEMA_VERSION, 4);
 ```
 
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 3u32;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 4u32;
 ```
 
 ### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
@@ -135,11 +135,11 @@ fn is_version_supported(v: u32) -> bool {
 assert!(is_version_supported(1));  // N-1 — supported
 assert!(is_version_supported(2));  // N-1 — supported
 assert!(is_version_supported(3));  // Current — supported
-assert!(!is_version_supported(4)); // Future — EAbiTooNew
+assert!(is_version_supported(4)); // Current — supported
 assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 ```
 
 
 ```rust
-pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 3u32;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 4u32;
 ```

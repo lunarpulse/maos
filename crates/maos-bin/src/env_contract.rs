@@ -77,6 +77,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        name: "MAOS_TEST_BOOT_NONCE",
+        purpose: "Debug-build-only deterministic process boot nonce for real multi-daemon integration tests",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_SPIRIT_ID",
         purpose: "Spirit identifier for one-shot lifecycle verbs",
         stability: EnvStability::UserFacing,
@@ -282,6 +287,71 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_LOOM_HOME_TEAM",
+        purpose: "Canonical tenant team id for the Loom-lite store; requires a refreshable verified schema-v2-or-newer cohort source, and in cohort-a2a-daemon mode MUST equal the signed CohortMember.team for this host or the boot fails (Stories 13.1/13.3/13.6b AC4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_VETTER_KEYRING",
+        purpose: "Path to the CBOR vetter-key lifecycle keyring required to verify a public-vetted target against the operator audit root (Story 13.4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_LEGAL_HOLD_PRINCIPAL",
+        purpose: "Principal identifier whose legal hold the operator one-shot control lists or releases; empty values are refused (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COLLECTIVE_ERASE_PID",
+        purpose: "Spirit PID whose collective-tier row is erased by the operator one-shot control; must be a u32 (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COLLECTIVE_ERASE_NAMESPACE",
+        purpose: "Collective namespace for the operator one-shot erase: default, coordination, or forgotten (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_COLLECTIVE_ERASE_KEY",
+        purpose: "Collective row key required by the operator one-shot erase control (Story 13.5b)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_BASE_SEED",
+        purpose: "Hex-encoded 32-byte root for cross-team key derivation. Story 13.3 read it only to derive PUBLIC row-verification keys; Story 13.6b widened it to the SIGN side for the crossing emitter, so a host holding it can produce a validly-signed bundle under ANY team's key — the applier's envelope/payload weld, not this seed, is what binds a crossing to its team (Stories 13.3/13.6b D-7)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_PEER",
+        purpose: "Destination cohort host_id for a boot-time cross-team share emitted by the cohort-a2a-daemon; presence is the emit trigger, absence leaves the daemon byte-for-byte unchanged (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_TO_TEAM",
+        purpose: "Canonical destination team id requested for a boot-time cross-team share; the applier rejects any request that does not name its own home team (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_PID",
+        purpose: "Spirit pid attributed to a boot-time cross-team share row and its Transparency Log event (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_NAMESPACE",
+        purpose: "Collective namespace for a boot-time cross-team share (default|coordination|forgotten); principal is refused at both ends (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_KEY",
+        purpose: "Collective key for a boot-time cross-team share (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_CROSS_TEAM_SHARE_VALUE",
+        purpose: "Text value for a boot-time cross-team share (Story 13.6b AC1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_SIEM_FILE",
         purpose: "Path to the local SIEM file sink; when set and non-empty, enables enterprise SIEM export (Story 11.4c)",
         stability: EnvStability::UserFacing,
@@ -344,6 +414,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_COHORT_DAEMON_CONFIG",
         purpose: "Path to the cohort A2A daemon TOML config (manifest path + digest summary) (Story 12.1)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_WORKER_TASK",
+        purpose: "The bounded task text routed to the CliWrapper Worker's argv (trailing arg after the hashed argv_prefix); operator-supplied for the J1 Tier-2 live run (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_LIVE_AGENT",
+        purpose: "Opt in to spawning a REAL agent-CLI Worker subprocess (codex/claude) instead of the hermetic fixture; local-only, never CI. Distinct from --live (which selects the real reasoning provider for class Spirits) (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_HOST_GRANTS",
+        purpose: "Path to an operator TOML file of host-managed CliWrapper grants ([[grant]] attested_image/signing_key_id/permitted_tier/permitted_egress_destinations); replaces the v0.9 self-grant. Absent → built-in fixture grant only, real agent CLIs fail closed (j1-tier2-live-agent-signed-bridge)",
         stability: EnvStability::UserFacing,
     },
 ];

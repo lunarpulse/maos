@@ -139,65 +139,152 @@ fn is_hex_byte(b: u8) -> bool {
 /// Minimum length of a hex-encoded token to be considered a secret.
 const TOKEN_HEX_MIN_LEN: usize = 32;
 
-impl RedactionPolicy for CorpusBackedRedactionPolicy {
-    fn redact<'a>(&self, bytes: &'a [u8]) -> Cow<'a, [u8]> {
-        let mut has_match = false;
-        // First pass: check if any rule matches
+fn redact_unscoped<'a>(bytes: &'a [u8]) -> Cow<'a, [u8]> {
+    let has_match = RULES.iter().any(|rule| contains_prefix(bytes, rule.prefix));
+    if !has_match && !contains_hex_token(bytes) {
+        return Cow::Borrowed(bytes);
+    }
+
+    let mut result = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let mut matched = false;
         for rule in RULES {
-            if contains_prefix(bytes, rule.prefix) {
-                has_match = true;
+            let prefix_len = rule.prefix.len();
+            if i + prefix_len <= bytes.len() && &bytes[i..i + prefix_len] == rule.prefix {
+                let end = find_secret_end(bytes, i + prefix_len);
+                let secret_len = end - i;
+                let hash_prefix = simple_hash(&bytes[i..end]);
+                let marker = format!(
+                    "<REDACTED:type={},len={},hash={:04x}>",
+                    rule.class, secret_len, hash_prefix
+                );
+                result.extend_from_slice(marker.as_bytes());
+                i = end;
+                matched = true;
                 break;
             }
         }
-        if !has_match && !contains_hex_token(bytes) {
-            return Cow::Borrowed(bytes);
-        }
-
-        // Second pass: build redacted output
-        let mut result = Vec::with_capacity(bytes.len());
-        let mut i = 0;
-        while i < bytes.len() {
-            let mut matched = false;
-            for rule in RULES {
-                let prefix_len = rule.prefix.len();
-                if i + prefix_len <= bytes.len() && &bytes[i..i + prefix_len] == rule.prefix {
-                    // Find the end of the secret (whitespace, newline, or end)
-                    let end = find_secret_end(bytes, i + prefix_len);
-                    let secret_len = end - i;
-                    let hash_prefix = simple_hash(&bytes[i..end]);
+        if !matched {
+            if i + TOKEN_HEX_MIN_LEN <= bytes.len() {
+                let hex_run = count_hex_run(bytes, i);
+                if hex_run >= TOKEN_HEX_MIN_LEN {
+                    let secret_len = hex_run;
+                    let hash_prefix = simple_hash(&bytes[i..i + secret_len]);
                     let marker = format!(
-                        "<REDACTED:type={},len={},hash={:04x}>",
-                        rule.class, secret_len, hash_prefix
+                        "<REDACTED:type=capability_token,len={},hash={:04x}>",
+                        secret_len, hash_prefix
                     );
                     result.extend_from_slice(marker.as_bytes());
-                    i = end;
+                    i += secret_len;
                     matched = true;
-                    break;
                 }
             }
             if !matched {
-                // Check for hex-encoded token pattern
-                if i + TOKEN_HEX_MIN_LEN <= bytes.len() {
-                    let hex_run = count_hex_run(bytes, i);
-                    if hex_run >= TOKEN_HEX_MIN_LEN {
-                        let secret_len = hex_run;
-                        let hash_prefix = simple_hash(&bytes[i..i + secret_len]);
-                        let marker = format!(
-                            "<REDACTED:type=capability_token,len={},hash={:04x}>",
-                            secret_len, hash_prefix
-                        );
-                        result.extend_from_slice(marker.as_bytes());
-                        i += secret_len;
-                        matched = true;
+                result.push(bytes[i]);
+                i += 1;
+            }
+        }
+    }
+    Cow::Owned(result)
+}
+
+fn is_compact_frame_ref(value: &str) -> bool {
+    value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn redact_json_value(value: &mut serde_json::Value, under_clause_sources: bool) -> bool {
+    match value {
+        serde_json::Value::Object(fields) => {
+            let mut saw_clause_sources = false;
+            for (key, value) in fields.iter_mut() {
+                let protected = under_clause_sources || key == "clause_sources";
+                saw_clause_sources |= key == "clause_sources";
+                saw_clause_sources |= redact_json_value(value, protected);
+            }
+
+            let mut redacted_keys: Vec<_> = fields
+                .keys()
+                .filter_map(|key| {
+                    if key == "clause_sources" {
+                        return None;
                     }
+                    match redact_unscoped(key.as_bytes()) {
+                        Cow::Owned(redacted) => Some((
+                            key.clone(),
+                            String::from_utf8(redacted)
+                                .expect("redaction preserves valid UTF-8 JSON object keys"),
+                        )),
+                        Cow::Borrowed(_) => None,
+                    }
+                })
+                .collect();
+            if !redacted_keys.is_empty() {
+                let original_fields = std::mem::take(fields);
+                let mut redacted_fields = serde_json::Map::with_capacity(original_fields.len());
+                for (key, value) in original_fields {
+                    let key = redacted_keys
+                        .iter()
+                        .position(|(original, _)| original == &key)
+                        .map_or(key, |index| redacted_keys.swap_remove(index).1);
+                    // Two keys can redact to the same marker, and a redacted
+                    // marker can equal a pre-existing literal key — a plain
+                    // `insert` would silently delete a member. Disambiguate
+                    // deterministically so every member survives.
+                    let mut key = key;
+                    if redacted_fields.contains_key(&key) {
+                        let mut n = 2u32;
+                        loop {
+                            let candidate = format!("{key}#{n}");
+                            if !redacted_fields.contains_key(&candidate) {
+                                key = candidate;
+                                break;
+                            }
+                            n += 1;
+                        }
+                    }
+                    redacted_fields.insert(key, value);
                 }
-                if !matched {
-                    result.push(bytes[i]);
-                    i += 1;
+                *fields = redacted_fields;
+            }
+
+            saw_clause_sources
+        }
+        serde_json::Value::Array(values) => values.iter_mut().fold(false, |seen, value| {
+            redact_json_value(value, under_clause_sources) || seen
+        }),
+        serde_json::Value::String(value) => {
+            if !(under_clause_sources && is_compact_frame_ref(value)) {
+                if let Cow::Owned(redacted) = redact_unscoped(value.as_bytes()) {
+                    *value = String::from_utf8(redacted)
+                        .expect("redaction preserves valid UTF-8 JSON strings");
+                }
+            }
+            false
+        }
+        _ => false,
+    }
+}
+
+impl RedactionPolicy for CorpusBackedRedactionPolicy {
+    fn redact<'a>(&self, bytes: &'a [u8]) -> Cow<'a, [u8]> {
+        // Digest payloads need one narrow exception: exact 16-byte frame refs
+        // under `clause_sources` are audit identifiers, not credentials. An
+        // exact-32-hex secret there is retained as the accepted residual because
+        // it is shape-indistinguishable from a frame ref; shorter/longer hex,
+        // prefix-rule secrets, and object keys are still scrubbed. Parse only
+        // payloads that name the key; all other payloads retain the
+        // allocation-free fast path.
+        if contains_prefix(bytes, b"\"clause_sources\"") {
+            if let Ok(mut value) = serde_json::from_slice::<serde_json::Value>(bytes) {
+                if redact_json_value(&mut value, false) {
+                    if let Ok(encoded) = serde_json::to_vec(&value) {
+                        return Cow::Owned(encoded);
+                    }
                 }
             }
         }
-        Cow::Owned(result)
+        redact_unscoped(bytes)
     }
 }
 
@@ -207,6 +294,23 @@ fn contains_prefix(haystack: &[u8], needle: &[u8]) -> bool {
         return false;
     }
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// Scan for a CREDENTIAL-shaped value (API key, private key, cloud credential)
+/// by the same prefix [`RULES`] the redaction filter uses, returning the class
+/// of the first match.
+///
+/// Unlike [`RedactionPolicy::redact`], this deliberately does NOT flag the
+/// 32+-hex token heuristic: Transparency-Log references (frame IDs, digest refs)
+/// are legitimately hex and are NOT secrets. This is the pre-write TRIPWIRE for
+/// human-authored artifacts — e.g. a J1 Tier-2 signed-run capture — that must
+/// carry NO credential yet DO carry hex TL references. `redact()` (which scrubs
+/// tokens too) remains the boundary filter for machine-generated frames.
+pub fn detect_credential(bytes: &[u8]) -> Option<&'static str> {
+    RULES
+        .iter()
+        .find(|rule| contains_prefix(bytes, rule.prefix))
+        .map(|rule| rule.class)
 }
 
 /// Check if `haystack` contains a hex-encoded token of sufficient length.
@@ -276,6 +380,74 @@ mod tests {
             matches!(result, Cow::Borrowed(_)),
             "clean payload triggered allocation"
         );
+    }
+
+    #[test]
+    fn detect_credential_flags_prefix_secrets_but_not_hex_refs() {
+        // Prefix-shaped credentials are flagged with their class...
+        assert_eq!(
+            detect_credential(b"OPENAI_API_KEY=sk-proj-abcdef0123456789"),
+            Some("api_key_openai")
+        );
+        assert_eq!(
+            detect_credential(b"token: ghp_ABCDEFGHIJKLMNOPqrstuvwx"),
+            Some("api_key_github")
+        );
+        // ...but a 32-hex Transparency-Log reference is NOT a secret: `redact`
+        // would scrub it as a token, yet `detect_credential` (prefix-only) lets
+        // it through, which is exactly what a signed-run capture needs.
+        assert_eq!(
+            detect_credential(b"audit_ref: aabbccddeeff00112233445566778899"),
+            None
+        );
+        assert_eq!(detect_credential(b"plain non-secret metadata"), None);
+    }
+
+    #[test]
+    fn clause_source_frame_refs_survive_without_exempting_other_hex_or_secrets() {
+        let policy = CorpusBackedRedactionPolicy::new();
+        let frame_ref = "aabbccddeeff00112233445566778899";
+        let long_hex = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+        let key_secret = "ffeeddccbbaa99887766554433221100";
+        let mut payload = serde_json::json!({
+            "digest_payload": {
+                "clause_sources": {
+                    "agents_ran": [frame_ref],
+                    "long_hex": long_hex,
+                    "narrative": ["sk-proj-secret-value"]
+                },
+                "unrelated_hex": frame_ref
+            }
+        });
+        payload
+            .as_object_mut()
+            .unwrap()
+            .insert(key_secret.to_owned(), serde_json::json!(1));
+        let encoded = serde_json::to_vec(&payload).unwrap();
+        let redacted = policy.redact(&encoded);
+        let text = std::str::from_utf8(&redacted).unwrap();
+
+        // This is the documented accepted tradeoff, not a credential-safety
+        // guarantee: exact 32-hex values here are indistinguishable from refs.
+        assert!(
+            text.contains(frame_ref),
+            "exact frame refs under clause_sources must survive"
+        );
+        assert_eq!(
+            text.matches(frame_ref).count(),
+            1,
+            "the same hex outside clause_sources must still be redacted"
+        );
+        assert!(
+            !text.contains(long_hex),
+            "longer hex under clause_sources must still be redacted"
+        );
+        assert!(
+            !text.contains(key_secret),
+            "object keys must be redacted even when clause_sources is present"
+        );
+        assert!(!text.contains("sk-proj-secret-value"));
+        assert!(text.contains("<REDACTED:type="));
     }
 
     #[test]

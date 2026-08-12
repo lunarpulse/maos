@@ -1,0 +1,2243 @@
+{
+  "schema_version": "maos.audit-bundle.v1",
+  "entries": [
+    {
+      "frame_id": "019f67be33e851d6d2daa92be9dd6052",
+      "timestamp_ns": 1784151946216695370,
+      "spirit_pid": 0,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67be33f1ba366c9cd915c32fddae",
+      "timestamp_ns": 1784151946225408156,
+      "spirit_pid": 0,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67be33fb779864a9e5e614e3ecd7",
+      "timestamp_ns": 1784151946235122042,
+      "spirit_pid": 0,
+      "boot_nonce": 5981516360124873655,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784151946235032745,\"effective_at_ns\":1784151946235032745,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67be340bf4e94f8d9c3bdce4c062",
+      "timestamp_ns": 1784151946251090736,
+      "spirit_pid": 0,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67be34156898928849235543a003",
+      "timestamp_ns": 1784151946261581882,
+      "spirit_pid": 1,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67be341d45231cafeaffd598af58",
+      "timestamp_ns": 1784151946269654664,
+      "spirit_pid": 1,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67be3425b4525686bdebed2f57a7",
+      "timestamp_ns": 1784151946277690637,
+      "spirit_pid": 0,
+      "boot_nonce": 5981516360124873655,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784151946277601811,\"effective_at_ns\":1784151946277601811,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67be342d17cad0df65b5227e2c71",
+      "timestamp_ns": 1784151946285513913,
+      "spirit_pid": 1,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67be34366b89b094004eba5291e5",
+      "timestamp_ns": 1784151946294625755,
+      "spirit_pid": 2,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67be343eabcc981a4ffff952809b",
+      "timestamp_ns": 1784151946302262092,
+      "spirit_pid": 2,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67be3446007422de99352ff33751",
+      "timestamp_ns": 1784151946310682142,
+      "spirit_pid": 0,
+      "boot_nonce": 5981516360124873655,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784151946310592715,\"effective_at_ns\":1784151946310592715,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67be344eaf20e0f68defd54f81fd",
+      "timestamp_ns": 1784151946318080094,
+      "spirit_pid": 2,
+      "boot_nonce": 5981516360124873655,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c3dd16e63807f5f26b3a33221c",
+      "timestamp_ns": 1784152317206371403,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67c3dd26ad8e61fcb2cf74b2d0f3",
+      "timestamp_ns": 1784152317222385334,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c3dd2e49e3792cba8dddbcfc75",
+      "timestamp_ns": 1784152317230634337,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152317230545531,\"effective_at_ns\":1784152317230545531,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c3dd36d3ebb6bb28b0fab255c0",
+      "timestamp_ns": 1784152317238451734,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c3dd3f93cffa0b297c4d32d0cb",
+      "timestamp_ns": 1784152317247193586,
+      "spirit_pid": 1,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67c3dd468678e40cd9d42f5bbab6",
+      "timestamp_ns": 1784152317254781364,
+      "spirit_pid": 1,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c3dd4e02a43e42da5f55d76d6b",
+      "timestamp_ns": 1784152317262863896,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152317262772896,\"effective_at_ns\":1784152317262772896,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c3dd562386a9fad1b0248980d2",
+      "timestamp_ns": 1784152317270419384,
+      "spirit_pid": 1,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c3dd5f7b54c165f09b65a818a7",
+      "timestamp_ns": 1784152317279004033,
+      "spirit_pid": 2,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67c3dd66084b2e6e180440bc9a01",
+      "timestamp_ns": 1784152317286504679,
+      "spirit_pid": 2,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c3dd6e6145ef3a3794f08fc961",
+      "timestamp_ns": 1784152317294649587,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152317294560561,\"effective_at_ns\":1784152317294560561,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c3dd76d8326430ffa64cc67ee5",
+      "timestamp_ns": 1784152317302012866,
+      "spirit_pid": 2,
+      "boot_nonce": 2272509835081677993,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c3de477cce88d556ce7b218d08",
+      "timestamp_ns": 1784152317511332150,
+      "spirit_pid": 0,
+      "boot_nonce": 2272509835081677993,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Reading additional input from stdin...\",\"line_no\":1,\"child_pid\":497494,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67c5b3964a4912a42ca3f5a29dc0",
+      "timestamp_ns": 1784152437654319223,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67c5b3a3f7896f57a2a08c5082b0",
+      "timestamp_ns": 1784152437667167214,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c5b3a91905d6ac61774a41604b",
+      "timestamp_ns": 1784152437673120490,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152437673024331,\"effective_at_ns\":1784152437673024331,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c5b3aeada21cd9c94c304cad40",
+      "timestamp_ns": 1784152437678647200,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c5b3b4a662d47c7bd7090624bc",
+      "timestamp_ns": 1784152437684931635,
+      "spirit_pid": 1,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67c5b3ba41dc1658c0b2d1905214",
+      "timestamp_ns": 1784152437690499331,
+      "spirit_pid": 1,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c5b3c0c04a859279df73b3c6b5",
+      "timestamp_ns": 1784152437696427551,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152437696326412,\"effective_at_ns\":1784152437696326412,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c5b3c5ce695538a72eb9e49495",
+      "timestamp_ns": 1784152437701843624,
+      "spirit_pid": 1,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c5b3ccd0fb8e9e8af52430e085",
+      "timestamp_ns": 1784152437708034644,
+      "spirit_pid": 2,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67c5b3d11b577a5b2cc16491f7ff",
+      "timestamp_ns": 1784152437713665338,
+      "spirit_pid": 2,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c5b3d76be125b06c64e242f00c",
+      "timestamp_ns": 1784152437719674298,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152437719541440,\"effective_at_ns\":1784152437719541440,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c5b3dccf09208b23a839498327",
+      "timestamp_ns": 1784152437724892422,
+      "spirit_pid": 2,
+      "boot_nonce": 7034586767798928637,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c5b4589ec7fef728c539c616da",
+      "timestamp_ns": 1784152437848052685,
+      "spirit_pid": 0,
+      "boot_nonce": 7034586767798928637,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Reading additional input from stdin...\",\"line_no\":1,\"child_pid\":501088,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67c767ecccfadf2fabb5f27d0dd4",
+      "timestamp_ns": 1784152549356196820,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67c767fcee6a44bd2015e76630e0",
+      "timestamp_ns": 1784152549372452735,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c76804488100857acedf6bfa5e",
+      "timestamp_ns": 1784152549380581594,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152549380469615,\"effective_at_ns\":1784152549380469615,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c7680c023261f9412994c0e18f",
+      "timestamp_ns": 1784152549388205239,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c768141f0efaddf72b03ca142b",
+      "timestamp_ns": 1784152549396605375,
+      "spirit_pid": 1,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67c7681c22b6f1174001e9b02c03",
+      "timestamp_ns": 1784152549404498574,
+      "spirit_pid": 1,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c76824b51fdfc01c564b08f276",
+      "timestamp_ns": 1784152549412676955,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152549412530341,\"effective_at_ns\":1784152549412530341,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c7682c0151028224692a5dc101",
+      "timestamp_ns": 1784152549420146804,
+      "spirit_pid": 1,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c7683487bb3d2f354b8e8cccf2",
+      "timestamp_ns": 1784152549428442625,
+      "spirit_pid": 2,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67c7683c5560f231dee3d7f704ca",
+      "timestamp_ns": 1784152549436462300,
+      "spirit_pid": 2,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c768445a0e58b1d45dedae3803",
+      "timestamp_ns": 1784152549444598582,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152549444509346,\"effective_at_ns\":1784152549444509346,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c7684c03806ee9c670e1bbdc3c",
+      "timestamp_ns": 1784152549452137530,
+      "spirit_pid": 2,
+      "boot_nonce": 4767527968421540561,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c768da6098447981ebe3b0ec23",
+      "timestamp_ns": 1784152549594632831,
+      "spirit_pid": 0,
+      "boot_nonce": 4767527968421540561,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Reading additional input from stdin...\",\"line_no\":1,\"child_pid\":504856,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67c94a6755f120bb87ef170bb90c",
+      "timestamp_ns": 1784152672871273378,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67c94a7278837d5dc059a464f177",
+      "timestamp_ns": 1784152672882100936,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c94a81680e4d5bed3af857e8e1",
+      "timestamp_ns": 1784152672897152252,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152672897044050,\"effective_at_ns\":1784152672897044050,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c94a8b1baa3c55b4452ac04be6",
+      "timestamp_ns": 1784152672907070483,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67c94a93d222bb5ebbcae0f10f3b",
+      "timestamp_ns": 1784152672915358329,
+      "spirit_pid": 1,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67c94a9db5a8953dab98235b624a",
+      "timestamp_ns": 1784152672925078058,
+      "spirit_pid": 1,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c94aa5c846aab7f73bc1bdc8fd",
+      "timestamp_ns": 1784152672933312104,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152672933228348,\"effective_at_ns\":1784152672933228348,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c94aac9565c4885c30faefcc78",
+      "timestamp_ns": 1784152672940690372,
+      "spirit_pid": 1,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67c94ab5a28e3c3dc90b72eb31c4",
+      "timestamp_ns": 1784152672949142675,
+      "spirit_pid": 2,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67c94abcab6a39d31ab65a30dadd",
+      "timestamp_ns": 1784152672956855688,
+      "spirit_pid": 2,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c94ac5fe0a2bafece947fe5682",
+      "timestamp_ns": 1784152672965019883,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784152672964901822,\"effective_at_ns\":1784152672964901822,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67c94accfdd094cdab1c8f67b32d",
+      "timestamp_ns": 1784152672972463172,
+      "spirit_pid": 2,
+      "boot_nonce": 5058391938871126666,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67c94b5642eaa8be5c0959ded838",
+      "timestamp_ns": 1784152673110205652,
+      "spirit_pid": 0,
+      "boot_nonce": 5058391938871126666,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Reading additional input from stdin...\",\"line_no\":1,\"child_pid\":508297,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5867daeb2f4e24a72a5629d62",
+      "timestamp_ns": 1784154523261982426,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67e586855493d0e1a392c15facad",
+      "timestamp_ns": 1784154523269801112,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67e5868d5bc584721b38378f138c",
+      "timestamp_ns": 1784154523277710388,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784154523277582208,\"effective_at_ns\":1784154523277582208,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67e58695445a0f166ae5186c1d20",
+      "timestamp_ns": 1784154523285187086,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67e5869efb774a63119710735fb0",
+      "timestamp_ns": 1784154523294195522,
+      "spirit_pid": 1,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67e586a5dbd6542dfc4e6fa593fd",
+      "timestamp_ns": 1784154523301522211,
+      "spirit_pid": 1,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67e586ad7b9ff386742ffd6f1c78",
+      "timestamp_ns": 1784154523309460149,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784154523309340606,\"effective_at_ns\":1784154523309340606,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67e586b4da3b6091d2531a716cd8",
+      "timestamp_ns": 1784154523316635666,
+      "spirit_pid": 1,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67e586bc17b98e3e473cfb8af3dc",
+      "timestamp_ns": 1784154523324988629,
+      "spirit_pid": 2,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67e586c4c3ccc9d7cd6b088da7eb",
+      "timestamp_ns": 1784154523332423199,
+      "spirit_pid": 2,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67e586cc1b0fa2c32f52fad511b4",
+      "timestamp_ns": 1784154523340561902,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784154523340443061,\"effective_at_ns\":1784154523340443061,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67e586d31d6eb599d8e73e4ac74f",
+      "timestamp_ns": 1784154523347926241,
+      "spirit_pid": 2,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67e587612a2e3b81a6ba922835ed",
+      "timestamp_ns": 1784154523489175072,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Reading additional input from stdin...\",\"line_no\":1,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587981e4236988dc05247809d",
+      "timestamp_ns": 1784154523544337783,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"OpenAI Codex v0.144.4\",\"line_no\":2,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587a093593a659ec1ace3297d",
+      "timestamp_ns": 1784154523552188138,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--------\",\"line_no\":3,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587a8f3f8e2fc36fe054a5d6c",
+      "timestamp_ns": 1784154523560346158,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"workdir: /tmp/maos-j1-demo.hK3AO5\",\"line_no\":4,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587b0e3ec959ab206fbdec4cf",
+      "timestamp_ns": 1784154523568926956,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"model: gpt-5.6-sol\",\"line_no\":5,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587b89b69621fe2ed541bc428",
+      "timestamp_ns": 1784154523576934044,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"provider: openai\",\"line_no\":6,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587c04bd8a0f27d97fc1b698a",
+      "timestamp_ns": 1784154523584938417,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"approval: never\",\"line_no\":7,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587c877e8e09e7943dc2cdfa8",
+      "timestamp_ns": 1784154523592869102,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"sandbox: workspace-write [workdir, /tmp, $TMPDIR]\",\"line_no\":8,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587d0421d6f61bf8782234a0f",
+      "timestamp_ns": 1784154523600720770,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"reasoning effort: none\",\"line_no\":9,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587d84cf44dd6fc57f6c92233",
+      "timestamp_ns": 1784154523608684336,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"reasoning summaries: none\",\"line_no\":10,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587e02b02b3f0dd21da284b27",
+      "timestamp_ns": 1784154523616614010,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"session id: 019f67e5-8776-7882-9f84-91fff4a4bb60\",\"line_no\":11,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587e8db92fe254bbfe84a7c83",
+      "timestamp_ns": 1784154523624622841,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--------\",\"line_no\":12,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587f0dbdf5b8c02cb402f17c9",
+      "timestamp_ns": 1784154523632616855,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"user\",\"line_no\":13,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e587f8a428fb1f7b68a9d8c6e7",
+      "timestamp_ns": 1784154523640560354,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"create ./main.rs with a hello-world main() and a #[test] fn that asserts 2+2==4; create ./NOTES.md summarizing what you did. Do NOT run cargo or fetch any crate.\",\"line_no\":14,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e58d547cad8d12a009451c5bc2",
+      "timestamp_ns": 1784154525012335313,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:45.012053Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":15,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e590a33dcbc9ae05f7437c835a",
+      "timestamp_ns": 1784154525859429678,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:45.859218Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":16,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5946d3465e64a5bf3a62708cd",
+      "timestamp_ns": 1784154526829322886,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:46.829127Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":17,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e594752482442aa5103b296127",
+      "timestamp_ns": 1784154526837306520,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 2/5\",\"line_no\":18,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5995736b4c8054ee3107f9730",
+      "timestamp_ns": 1784154528087994726,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:48.087768Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":19,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5995f65aa2c30c18b08782d91",
+      "timestamp_ns": 1784154528095989390,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 3/5\",\"line_no\":20,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5a0654f8afd324291b0d45004",
+      "timestamp_ns": 1784154529893834316,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:49.893547Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":21,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5a06d12ff1b67adaaa351f190",
+      "timestamp_ns": 1784154529901757317,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 4/5\",\"line_no\":22,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5ab58a1add6e5f5333ecf26f0",
+      "timestamp_ns": 1784154532696139576,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:52.695864Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":23,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5ab603ed46be83c6d7094a98e",
+      "timestamp_ns": 1784154532704272820,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 5/5\",\"line_no\":24,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5bbc373d9cb365a6241b86de7",
+      "timestamp_ns": 1784154536899258403,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"2026-07-15T22:28:56.899039Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses\",\"line_no\":25,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5bbd113ec823272a5c840ebf7",
+      "timestamp_ns": 1784154536913087182,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"warning: Falling back from WebSockets to HTTPS transport. unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: wss://api.openai.com/v1/responses, cf-ray: a1bc33fb9f41d5e4-SYD\",\"line_no\":26,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5bd0443300102abf156b75fa1",
+      "timestamp_ns": 1784154537220335152,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 1/5\",\"line_no\":27,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5bf1e70d6cbcb90a38bbaabf3",
+      "timestamp_ns": 1784154537758005326,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 2/5\",\"line_no\":28,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5c1bd9f799e110fb3064a63c6",
+      "timestamp_ns": 1784154538429336248,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 3/5\",\"line_no\":29,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5c5f0ddfefd6056fb59820ea7",
+      "timestamp_ns": 1784154539504431672,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 4/5\",\"line_no\":30,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5cdf4afe7fd8c7ec6a9d2c110",
+      "timestamp_ns": 1784154541556190499,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: Reconnecting... 5/5\",\"line_no\":31,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5db655cb5301d96c5f3a74da8",
+      "timestamp_ns": 1784154544997275097,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses, cf-ray: a1bc3430ce46e7c4-SYD, request id: req_<REDACTED:type=capability_token,len=32,hash=0251>\",\"line_no\":32,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5db6d0705906f4d6a2a131852",
+      "timestamp_ns": 1784154545005618162,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"ERROR: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses, cf-ray: a1bc3430ce46e7c4-SYD, request id: req_<REDACTED:type=capability_token,len=32,hash=0251>\",\"line_no\":33,\"child_pid\":597966,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67e5db751c6222ff840e6de6a022",
+      "timestamp_ns": 1784154545013381746,
+      "spirit_pid": 0,
+      "boot_nonce": 6000888578460668643,
+      "kind": "capability.invocation",
+      "intent": "cli.subprocess.exit",
+      "payload": "{\"event\":\"cli_subprocess_exit\",\"cli_child_pid\":597966,\"exit_cause\":\"exited(code=1)\",\"is_crash\":true}"
+    },
+    {
+      "frame_id": "019f67ef6713adbfd2d9d0314fe43417",
+      "timestamp_ns": 1784155170579932347,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "019f67ef672594832b94e75046b1fa62",
+      "timestamp_ns": 1784155170597978540,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67ef672ea02c4ff4d0577467ea57",
+      "timestamp_ns": 1784155170606407888,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784155170606286492,\"effective_at_ns\":1784155170606286492,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67ef673dfd6be16b734a1340ddf4",
+      "timestamp_ns": 1784155170621225868,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":0}"
+    },
+    {
+      "frame_id": "019f67ef67465ab0bfdb7dc913c0e398",
+      "timestamp_ns": 1784155170630243654,
+      "spirit_pid": 1,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "019f67ef674d15ff43cc232f7f1cd190",
+      "timestamp_ns": 1784155170637733510,
+      "spirit_pid": 1,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67ef67556d880d43218ed23b5fa6",
+      "timestamp_ns": 1784155170645871094,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784155170645781176,\"effective_at_ns\":1784155170645781176,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67ef675d45f8936876fb77eb75a5",
+      "timestamp_ns": 1784155170653408648,
+      "spirit_pid": 1,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "019f67ef6766b1bdfa5b576d5ab10824",
+      "timestamp_ns": 1784155170662215301,
+      "spirit_pid": 2,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "019f67ef676d10a64f41b57c6947da7d",
+      "timestamp_ns": 1784155170669648311,
+      "spirit_pid": 2,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67ef6775ab0274dcd707c7735674",
+      "timestamp_ns": 1784155170677696217,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1784155170677561115,\"effective_at_ns\":1784155170677561115,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "019f67ef677d0120a8b80bf3f1386790",
+      "timestamp_ns": 1784155170685106895,
+      "spirit_pid": 2,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "019f67ef6875004826ecd12136ff810c",
+      "timestamp_ns": 1784155170933149657,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Reading additional input from stdin...\",\"line_no\":1,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68bddfbced723e3bccaa02b3",
+      "timestamp_ns": 1784155171005209365,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"OpenAI Codex v0.144.4\",\"line_no\":2,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68c45b5879bd598940d6c448",
+      "timestamp_ns": 1784155171012897862,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--------\",\"line_no\":3,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68ccdd9e1fbaa4e037ae933c",
+      "timestamp_ns": 1784155171020476282,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"workdir: /tmp/maos-j1-demo.hK3AO5\",\"line_no\":4,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68d4de11a026f8e5e94f334c",
+      "timestamp_ns": 1784155171028191508,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"model: gpt-5.6-sol\",\"line_no\":5,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68dbd67c8385e7fdbdfd3ce4",
+      "timestamp_ns": 1784155171035979941,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"provider: openai\",\"line_no\":6,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68e3ce05e8e7406ba9f3c8ea",
+      "timestamp_ns": 1784155171043555847,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"approval: never\",\"line_no\":7,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68ebbd7659b35b590b28476b",
+      "timestamp_ns": 1784155171051453193,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"sandbox: workspace-write [workdir, /tmp, $TMPDIR]\",\"line_no\":8,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68f3694fe0c6e23ce1ee9d16",
+      "timestamp_ns": 1784155171059079143,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"reasoning effort: none\",\"line_no\":9,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef68faf09110954688e3122eae",
+      "timestamp_ns": 1784155171066911127,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"reasoning summaries: none\",\"line_no\":10,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef6902554f1dee1c3a40a05e9a",
+      "timestamp_ns": 1784155171074765552,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"session id: 019f67ef-6893-7591-a1cd-5817ceaf4247\",\"line_no\":11,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef690acc69e5ca8c46af4e290c",
+      "timestamp_ns": 1784155171082542283,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--------\",\"line_no\":12,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef6912a579d22635cb70c9e273",
+      "timestamp_ns": 1784155171090167722,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"user\",\"line_no\":13,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef69199c538fb20bf06f6370ad",
+      "timestamp_ns": 1784155171097975350,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"create ./main.rs with a hello-world main() and a #[test] fn that asserts 2+2==4; create ./NOTES.md summarizing what you did. Do NOT run cargo or fetch any crate.\",\"line_no\":14,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef7af35b1f55f661b24c4ce7f3",
+      "timestamp_ns": 1784155175667868572,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"codex\",\"line_no\":15,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef7afb5772543c6f75d7e1b170",
+      "timestamp_ns": 1784155175675861806,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"I’ll add the two requested files directly and won’t run Cargo or access any crates.\",\"line_no\":16,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8595342507cb342f4be917d0",
+      "timestamp_ns": 1784155178389515779,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"apply patch\",\"line_no\":17,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef868329dc2a709ae93b0db4b3",
+      "timestamp_ns": 1784155178627098423,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"patch: completed\",\"line_no\":18,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef868a12f1d69c97f7e843fe75",
+      "timestamp_ns": 1784155178634791879,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"/tmp/maos-j1-demo.hK3AO5/NOTES.md\",\"line_no\":19,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8692390238b5e4303bcfe01c",
+      "timestamp_ns": 1784155178642569702,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"/tmp/maos-j1-demo.hK3AO5/main.rs\",\"line_no\":20,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef869abe892b0490a28f13da08",
+      "timestamp_ns": 1784155178650284938,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"diff --git a/NOTES.md b/NOTES.md\",\"line_no\":21,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86a1964525745cc95d4a9dd2",
+      "timestamp_ns": 1784155178657981058,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"new file mode 100644\",\"line_no\":22,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86a96dcdb80268659d1bf944",
+      "timestamp_ns": 1784155178665593874,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"index <REDACTED:type=capability_token,len=40,hash=0d1c>..<REDACTED:type=capability_token,len=40,hash=f94c>\",\"line_no\":23,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86b1f4f63996baaf30470a78",
+      "timestamp_ns": 1784155178673248416,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--- /dev/null\",\"line_no\":24,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86b86ae7bc5c8fc79e0d51e1",
+      "timestamp_ns": 1784155178680873805,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+++ b/NOTES.md\",\"line_no\":25,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86c02bd89a8a9ecd2520cbad",
+      "timestamp_ns": 1784155178688437739,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"@@ -0,0 +1,5 @@\",\"line_no\":26,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86c8a0df85ea9767f29fc7f0",
+      "timestamp_ns": 1784155178696158595,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+# Notes\",\"line_no\":27,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86cf036173097c438c7dc66c",
+      "timestamp_ns": 1784155178703944844,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+\",\"line_no\":28,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86d7a8d4c834547acab09133",
+      "timestamp_ns": 1784155178711695005,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Added `main.rs` with a hello-world `main()` function.\",\"line_no\":29,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86dfbd970d5c61415082569e",
+      "timestamp_ns": 1784155178719485702,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Added a unit test asserting that `2 + 2 == 4`.\",\"line_no\":30,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86e7beed37c5d38d173c4849",
+      "timestamp_ns": 1784155178727179108,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Did not run Cargo or fetch any crates.\",\"line_no\":31,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86eee5f63601d9f0e9e5c09f",
+      "timestamp_ns": 1784155178734842357,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"diff --git a/main.rs b/main.rs\",\"line_no\":32,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86f645e6646e371825a18ae9",
+      "timestamp_ns": 1784155178742582129,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"new file mode 100644\",\"line_no\":33,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef86fe1dd81ee6b746244e926d",
+      "timestamp_ns": 1784155178750335917,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"index <REDACTED:type=capability_token,len=40,hash=0d1c>..<REDACTED:type=capability_token,len=40,hash=c50a>\",\"line_no\":34,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8706a3153045ab2c9a688e6d",
+      "timestamp_ns": 1784155178758084786,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--- /dev/null\",\"line_no\":35,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef870da5a3be2330d6d1b2ddb7",
+      "timestamp_ns": 1784155178765775887,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+++ b/main.rs\",\"line_no\":36,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8715433eab6ca7691751d88e",
+      "timestamp_ns": 1784155178773438875,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"@@ -0,0 +1,11 @@\",\"line_no\":37,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef871d608d3e8e9804f3458b8f",
+      "timestamp_ns": 1784155178781065276,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+fn main() {\",\"line_no\":38,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87245bc73e80a537195fede1",
+      "timestamp_ns": 1784155178788658184,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    println!(\\\"Hello, world!\\\");\",\"line_no\":39,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef872c0d3f51e36db403f4918a",
+      "timestamp_ns": 1784155178796268604,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+}\",\"line_no\":40,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef873384e24e1650b8c9f765ff",
+      "timestamp_ns": 1784155178803950749,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+\",\"line_no\":41,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef873be4c1ccce735f94e52fbc",
+      "timestamp_ns": 1784155178811552914,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+#[cfg(test)]\",\"line_no\":42,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87430e258ee1aaf716379499",
+      "timestamp_ns": 1784155178819250136,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+mod tests {\",\"line_no\":43,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef874b00578640f6b69e8ddfac",
+      "timestamp_ns": 1784155178827067383,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    #[test]\",\"line_no\":44,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87528a7bcbbecbfa376572fc",
+      "timestamp_ns": 1784155178834884068,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    fn two_plus_two_equals_four() {\",\"line_no\":45,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef875aa5f7915a297c378373a3",
+      "timestamp_ns": 1784155178842675627,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+        assert_eq!(2 + 2, 4);\",\"line_no\":46,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87627cf7e254e2d8a4c6e661",
+      "timestamp_ns": 1784155178850456786,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    }\",\"line_no\":47,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef876a6a0895e18da8aba91341",
+      "timestamp_ns": 1784155178858172733,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+}\",\"line_no\":48,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87718ce3d6a7975d2440954f",
+      "timestamp_ns": 1784155178865852974,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":49,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87791232f6aac03584740db7",
+      "timestamp_ns": 1784155178873550748,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"diff --git a/NOTES.md b/NOTES.md\",\"line_no\":50,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87810b118423355be4a8ab32",
+      "timestamp_ns": 1784155178881244103,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"new file mode 100644\",\"line_no\":51,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87895e81a4a639b249ed8f89",
+      "timestamp_ns": 1784155178889019692,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"index <REDACTED:type=capability_token,len=40,hash=0d1c>..<REDACTED:type=capability_token,len=40,hash=f94c>\",\"line_no\":52,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8790cf57631b2c5961001090",
+      "timestamp_ns": 1784155178896663054,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--- /dev/null\",\"line_no\":53,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8798fb2fbcc24d540982129e",
+      "timestamp_ns": 1784155178904279185,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+++ b/NOTES.md\",\"line_no\":54,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef879fe4eb8f7cd8dbf6ac69c4",
+      "timestamp_ns": 1784155178911971649,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"@@ -0,0 +1,5 @@\",\"line_no\":55,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87a7a7a62c5d3440c77be935",
+      "timestamp_ns": 1784155178919546773,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+# Notes\",\"line_no\":56,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87afc8469f0fa557d1edd667",
+      "timestamp_ns": 1784155178927138008,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+\",\"line_no\":57,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87b6acafefa37a985ce0fff7",
+      "timestamp_ns": 1784155178934783013,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Added `main.rs` with a hello-world `main()` function.\",\"line_no\":58,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87bec16b11a9eada5b48cbb1",
+      "timestamp_ns": 1784155178942561277,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Added a unit test asserting that `2 + 2 == 4`.\",\"line_no\":59,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87c652f40ce4d2d0b0591bca",
+      "timestamp_ns": 1784155178950283957,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Did not run Cargo or fetch any crates.\",\"line_no\":60,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87cdc5d4103c0a8531cddab6",
+      "timestamp_ns": 1784155178957961603,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"diff --git a/main.rs b/main.rs\",\"line_no\":61,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87d5347f3dd011fe238ee2cc",
+      "timestamp_ns": 1784155178965780152,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"new file mode 100644\",\"line_no\":62,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87dd168063737b35939710f2",
+      "timestamp_ns": 1784155178973598551,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"index <REDACTED:type=capability_token,len=40,hash=0d1c>..<REDACTED:type=capability_token,len=40,hash=c50a>\",\"line_no\":63,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87e5479c569ae7194d0b07d6",
+      "timestamp_ns": 1784155178981176691,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--- /dev/null\",\"line_no\":64,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87ec7ad045b6328ae53c1944",
+      "timestamp_ns": 1784155178988894712,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+++ b/main.rs\",\"line_no\":65,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87f43ea1ee203012494ab067",
+      "timestamp_ns": 1784155178996654592,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"@@ -0,0 +1,11 @@\",\"line_no\":66,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef87fc0a8f385380573ac3b5ba",
+      "timestamp_ns": 1784155179004226480,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+fn main() {\",\"line_no\":67,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef88036b455c56def93320ebd3",
+      "timestamp_ns": 1784155179011788280,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    println!(\\\"Hello, world!\\\");\",\"line_no\":68,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef880b04554f82bdee1212c3fc",
+      "timestamp_ns": 1784155179019452571,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+}\",\"line_no\":69,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8813e14f619baae867b35687",
+      "timestamp_ns": 1784155179027051530,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+\",\"line_no\":70,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef881a6d21f1666346f55c921a",
+      "timestamp_ns": 1784155179034775914,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+#[cfg(test)]\",\"line_no\":71,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef88228b881f87082294d18add",
+      "timestamp_ns": 1784155179042482413,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+mod tests {\",\"line_no\":72,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef882ada997ead47e4f304cca8",
+      "timestamp_ns": 1784155179050113112,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    #[test]\",\"line_no\":73,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef883145ab8874f5026f249722",
+      "timestamp_ns": 1784155179057686954,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    fn two_plus_two_equals_four() {\",\"line_no\":74,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8839a0b1bf90de887e4811d8",
+      "timestamp_ns": 1784155179065417419,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+        assert_eq!(2 + 2, 4);\",\"line_no\":75,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8841b19c019e5d3b51a2ae0e",
+      "timestamp_ns": 1784155179073160156,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    }\",\"line_no\":76,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef88492f5421e864fe4f14a331",
+      "timestamp_ns": 1784155179081020974,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+}\",\"line_no\":77,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef885045c17ad5ef85fbf77cd0",
+      "timestamp_ns": 1784155179088783378,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":78,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c03d01694dc6f1e3c497b75",
+      "timestamp_ns": 1784155180035461809,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"codex\",\"line_no\":79,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c22359c8423eeb4ffbb3953",
+      "timestamp_ns": 1784155180066403595,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Created:\",\"line_no\":80,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c4bef583aa850ec94d8dccd",
+      "timestamp_ns": 1784155180107341021,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":81,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c5251145a455360d0ab566e",
+      "timestamp_ns": 1784155180114988361,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"- [main.rs](/tmp/maos-j1-demo.hK3AO5/main.rs)\",\"line_no\":82,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c5bc9117b704aee75ea8e9b",
+      "timestamp_ns": 1784155180123265025,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"- [NOTES.md](/tmp/maos-j1-demo.hK3AO5/NOTES.md)\",\"line_no\":83,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c6a016dd8f35a1670c6c309",
+      "timestamp_ns": 1784155180138023804,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":84,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c78a0e9ee8caeaa88b4f5d8",
+      "timestamp_ns": 1784155180152997564,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"Cargo was not run, and no crates were fetched.\",\"line_no\":85,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c802175e4473ba905b7b3e5",
+      "timestamp_ns": 1784155180160458014,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"diff --git a/NOTES.md b/NOTES.md\",\"line_no\":86,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c88131362e35628fff41e29",
+      "timestamp_ns": 1784155180168087120,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"new file mode 100644\",\"line_no\":87,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c8ff26138f6e5c6077f91f6",
+      "timestamp_ns": 1784155180175617611,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"index <REDACTED:type=capability_token,len=40,hash=0d1c>..<REDACTED:type=capability_token,len=40,hash=f94c>\",\"line_no\":88,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c96666e25f85501528b2f78",
+      "timestamp_ns": 1784155180182957617,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--- /dev/null\",\"line_no\":89,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8c9e120f9b2e1b340effb092",
+      "timestamp_ns": 1784155180190552198,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+++ b/NOTES.md\",\"line_no\":90,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8ca5e0678bd54269ab5325ad",
+      "timestamp_ns": 1784155180197971142,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"@@ -0,0 +1,5 @@\",\"line_no\":91,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cad698027f32264e2a66305",
+      "timestamp_ns": 1784155180205594546,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+# Notes\",\"line_no\":92,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cb55c5e3c74afa95bd3c6b8",
+      "timestamp_ns": 1784155180213277011,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+\",\"line_no\":93,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cbc353714d0d61cfdfcc895",
+      "timestamp_ns": 1784155180220738925,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Added `main.rs` with a hello-world `main()` function.\",\"line_no\":94,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cc4629ea25362da78696289",
+      "timestamp_ns": 1784155180228411551,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Added a unit test asserting that `2 + 2 == 4`.\",\"line_no\":95,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8ccbdc2a7df8a909d8e85066",
+      "timestamp_ns": 1784155180235754513,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+- Did not run Cargo or fetch any crates.\",\"line_no\":96,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cd30f6380c8e812874bff93",
+      "timestamp_ns": 1784155180243240431,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"diff --git a/main.rs b/main.rs\",\"line_no\":97,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cdad914e9431da6ca76b886",
+      "timestamp_ns": 1784155180250611665,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"new file mode 100644\",\"line_no\":98,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8ce24580f4394360af002bb8",
+      "timestamp_ns": 1784155180258062438,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"index <REDACTED:type=capability_token,len=40,hash=0d1c>..<REDACTED:type=capability_token,len=40,hash=c50a>\",\"line_no\":99,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8ce97d7bf5b825aa4e7c44a4",
+      "timestamp_ns": 1784155180265531775,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"--- /dev/null\",\"line_no\":100,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cf13a66993ca2ab19273c4e",
+      "timestamp_ns": 1784155180273115005,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+++ b/main.rs\",\"line_no\":101,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8cf8af73989a7b59123a480d",
+      "timestamp_ns": 1784155180280562392,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"@@ -0,0 +1,11 @@\",\"line_no\":102,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d00c9f48565357c07489117",
+      "timestamp_ns": 1784155180288131475,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+fn main() {\",\"line_no\":103,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d0795fa2060e9ec1c29be5a",
+      "timestamp_ns": 1784155180295547272,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    println!(\\\"Hello, world!\\\");\",\"line_no\":104,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d0f7e32095cbd748c5326a8",
+      "timestamp_ns": 1784155180303036988,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+}\",\"line_no\":105,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d16dbb0b1d5017c0565cf3c",
+      "timestamp_ns": 1784155180310425664,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+\",\"line_no\":106,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d1df45a7594db91da348f1a",
+      "timestamp_ns": 1784155180317839809,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+#[cfg(test)]\",\"line_no\":107,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d25834f2029d9675ca50549",
+      "timestamp_ns": 1784155180325526552,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+mod tests {\",\"line_no\":108,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d2c684e1e45fda9bc273708",
+      "timestamp_ns": 1784155180332931158,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    #[test]\",\"line_no\":109,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d3476bdccfb85a40bb99535",
+      "timestamp_ns": 1784155180340416395,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    fn two_plus_two_equals_four() {\",\"line_no\":110,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d3c1440907a387d07c15eef",
+      "timestamp_ns": 1784155180348039730,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+        assert_eq!(2 + 2, 4);\",\"line_no\":111,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d436f1bf2540e27a06e1cac",
+      "timestamp_ns": 1784155180355931145,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+    }\",\"line_no\":112,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d4b6dd6ed3ed70415e6b383",
+      "timestamp_ns": 1784155180363460684,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"+}\",\"line_no\":113,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d52cc57767d35e5e34b489a",
+      "timestamp_ns": 1784155180370938257,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":114,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d5ad0d6e409f8bc104efdcd",
+      "timestamp_ns": 1784155180378530474,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"tokens used\",\"line_no\":115,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d625d8e08e0192ebe72c840",
+      "timestamp_ns": 1784155180386037562,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stderr\",\"line\":\"11,890\",\"line_no\":116,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d69d072999d0cd4d54016bf",
+      "timestamp_ns": 1784155180393556471,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stdout\",\"line\":\"Created:\",\"line_no\":1,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d7120848bf5429947156b50",
+      "timestamp_ns": 1784155180401088385,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stdout\",\"line\":\"\",\"line_no\":2,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d788144400e579a03f286dc",
+      "timestamp_ns": 1784155180408621382,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stdout\",\"line\":\"- [main.rs](/tmp/maos-j1-demo.hK3AO5/main.rs)\",\"line_no\":3,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d800b12fbf115d9c557491b",
+      "timestamp_ns": 1784155180416154027,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stdout\",\"line\":\"- [NOTES.md](/tmp/maos-j1-demo.hK3AO5/NOTES.md)\",\"line_no\":4,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d873e6318ee07b75ea0a738",
+      "timestamp_ns": 1784155180423527535,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stdout\",\"line\":\"\",\"line_no\":5,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d8f548f32e4a0cb94308968",
+      "timestamp_ns": 1784155180431075940,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "unknown",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/codex\",\"stream\":\"stdout\",\"line\":\"Cargo was not run, and no crates were fetched.\",\"line_no\":6,\"child_pid\":626140,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "019f67ef8d96138603cb89e27aff3893",
+      "timestamp_ns": 1784155180438723119,
+      "spirit_pid": 0,
+      "boot_nonce": 3849058460798526732,
+      "kind": "capability.invocation",
+      "intent": "cli.subprocess.exit",
+      "payload": "{\"event\":\"cli_subprocess_exit\",\"cli_child_pid\":626140,\"exit_cause\":\"exited(code=0)\",\"is_crash\":false}"
+    },
+    {
+      "frame_id": "242d5c96a48fd457523881736b27dda1",
+      "timestamp_ns": 1784161102219586185,
+      "spirit_pid": 0,
+      "boot_nonce": 0,
+      "kind": "run.capture",
+      "intent": "run.capture",
+      "payload": "{\"audit_refs\":[\"019f67ef8d8f548f32e4a0cb94308968\"],\"command_metadata\":\"codex exec --sandbox workspace-write \\\"<c2 task>\\\"; CODEX_API_KEY injected host-side (value redacted)\",\"egress\":\"declared-not-enforced\",\"egress_followup\":\"FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT\",\"host_grant_disposition\":\"exact-match host grant admitted (attested_image=codex, signing_key_id=OpenAI, tier T3); a mismatch would have refused\",\"live_agent_identity\":\"OpenAI Codex v0.144.4 (model gpt-5.6-sol, provider openai)\",\"outcome\":\"codex worker completed the delegated task (exit 0, adapter-parsed completion); main.rs + NOTES.md written to $DEMO; no secret persisted to the TL\",\"redaction_result\":\"verified\",\"signer\":\"Myoungki Jung (Lunarpulse) — named human signer\"}"
+    },
+    {
+      "frame_id": "d301a233b34c70738d1624dd3f486303",
+      "timestamp_ns": 1784161260136172819,
+      "spirit_pid": 0,
+      "boot_nonce": 0,
+      "kind": "run.capture",
+      "intent": "run.capture",
+      "payload": "{\"audit_refs\":[\"019f67ef8d8f548f32e4a0cb94308968\"],\"command_metadata\":\"codex exec --sandbox workspace-write \\\"<c2 task>\\\"; CODEX_API_KEY injected host-side (value redacted)\",\"egress\":\"declared-not-enforced\",\"egress_followup\":\"FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT\",\"host_grant_disposition\":\"exact-match host grant admitted (attested_image=codex, signing_key_id=OpenAI, tier T3); a mismatch would have refused\",\"live_agent_identity\":\"OpenAI Codex v0.144.4 (model gpt-5.6-sol, provider openai)\",\"outcome\":\"codex worker completed the delegated task (exit 0, adapter-parsed completion); main.rs + NOTES.md written to $DEMO; no secret persisted to the TL\",\"redaction_result\":\"verified\",\"signer\":\"Myoungki Jung (Lunarpulse) — named human signer\"}"
+    }
+  ],
+  "i12_digest_refs": [],
+  "i11_distilled_content": [],
+  "freshness": {
+    "export_timestamp_ns": 1784161270937636202,
+    "covered_window": {
+      "since_ns": 1784151946216695370,
+      "until_ns": 1784161260136172819
+    },
+    "export_seq": 1784161270937636202
+  },
+  "signature_block": {
+    "algorithm": "Ed25519",
+    "attester_pubkey": "61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766",
+    "signature": "bf7c9b410b8a41be154c913013187907ba16b1803b90f0a09e2b6d8c704e7d9f2f97353e3758b0a3cafde17d555529d4a63a465b3bb22a18a4d1708047f4ca03"
+  }
+}

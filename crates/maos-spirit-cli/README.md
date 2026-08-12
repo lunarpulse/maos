@@ -29,7 +29,7 @@ maos-spirit publish \
 | `local` | Personal / development Spirits |
 | `org_internal` | Organization-internal sharing |
 | `public_untrusted` | Public sharing (self-attested) |
-| `public_vetted` | **Deferred to v2.5** (FR37) |
+| `public_vetted` | Vetted promotion via a signed **vetting attestation** (FR37/ADR-056); the tier is a declared aspiration until an attestation promotes it at admission |
 
 ## Subcommands
 

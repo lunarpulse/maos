@@ -111,28 +111,47 @@ pub fn ranged_recall(
 
     // 1. Transparency Log frames
     {
-        let filter = crate::AuditFilter {
-            since_ns: Some(range.since_ns),
-            until_ns: Some(range.until_ns),
-            ..Default::default()
+        // A Spirit name resolves to many (boot_nonce, spirit_pid) pairs across
+        // boots — the PAIR is the identity key. A pid is reused by different
+        // Spirits across boots, so scoping by `spirit_pid` alone leaks another
+        // Spirit's reused-pid rows into this recall. Bind BOTH columns.
+        const PER_INCARNATION_LIMIT: usize = 100_000;
+        let incarnations: Vec<(Option<u64>, Option<u32>)> = match spirit_filter {
+            Some(name) => {
+                let mut pairs =
+                    crate::resolve_spirit_name(audit_db, name, true).map_err(|error| {
+                        AuditError::Row(format!("spirit resolution failed: {error}"))
+                    })?;
+                pairs.sort_unstable();
+                pairs.dedup();
+                pairs
+                    .into_iter()
+                    .map(|(boot, pid)| (Some(boot), Some(pid)))
+                    .collect()
+            }
+            None => vec![(None, None)],
         };
-        let audit_entries = crate::query(audit_db, filter)?;
-        for e in audit_entries {
-            // Transparency Log entries do not carry a spirit_id column
-            // (v0.3-β schema limitation). When a spirit_filter is
-            // requested, TL entries are included regardless — they
-            // represent system-wide IAC frames visible to the director.
-            let _ = spirit_filter;
-            entries.push(ComposedLogEntry {
-                timestamp_ns: e.timestamp_ns,
-                spirit_id: None,
-                source: LogSource::TransparencyLog,
-                payload: ComposedPayload::Frame {
-                    frame_kind: e.kind,
-                    intent: e.intent,
-                    payload_redacted: vec![],
-                },
-            });
+        for (boot_nonce, spirit_pid) in incarnations {
+            let filter = crate::AuditFilter {
+                spirit_pid,
+                boot_nonce,
+                since_ns: Some(range.since_ns),
+                until_ns: Some(range.until_ns),
+                limit: Some(PER_INCARNATION_LIMIT),
+                ..Default::default()
+            };
+            for e in crate::query(audit_db, filter)? {
+                entries.push(ComposedLogEntry {
+                    timestamp_ns: e.timestamp_ns,
+                    spirit_id: spirit_filter.map(str::to_owned),
+                    source: LogSource::TransparencyLog,
+                    payload: ComposedPayload::Frame {
+                        frame_kind: e.kind,
+                        intent: e.intent,
+                        payload_redacted: vec![],
+                    },
+                });
+            }
         }
     }
 
@@ -141,7 +160,9 @@ pub fn ranged_recall(
         use rusqlite::OpenFlags;
         let conn = rusqlite::Connection::open_with_flags(
             audit_db,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(AuditError::Open)?;
 
@@ -364,9 +385,9 @@ pub fn posture_delta(
     let entries = ranged_recall(audit_db, journal_path, range, spirit_filter)?;
 
     // Collect approval events keyed by capability for authoritative join.
-    // AC3.2: join on capability (Approval) ↔ intent (Frame) rather than
-    // timestamp proximity. TL Frame entries do not carry spirit_id, so the
-    // join key is capability alone.
+    // AC3.2: scoped requests first constrain both TL and Approval rows to the
+    // resolved Spirit. The capability key then attributes an approval within
+    // that scope; unscoped TL rows still have no single Spirit name to join on.
     let approvals_by_capability: HashMap<String, ApprovalAttribution> = entries
         .iter()
         .filter_map(|e| match &e.payload {
@@ -681,7 +702,7 @@ mod tests {
     }
 
     #[test]
-    fn spirit_filter_includes_transparency_log_regardless() {
+    fn spirit_filter_scopes_transparency_log_across_boots() {
         let tmp = tempfile::TempDir::new().unwrap();
         let db_path = tmp.path().join("test.sqlite");
         let journal_path = tmp.path().join("test.ndjson");
@@ -692,6 +713,8 @@ mod tests {
                 frame_id BLOB NOT NULL PRIMARY KEY,
                 timestamp_ns INTEGER NOT NULL,
                 spirit_pid INTEGER NOT NULL,
+                from_spirit_id TEXT NOT NULL DEFAULT '',
+                to_spirit_id TEXT NOT NULL DEFAULT '',
                 boot_nonce INTEGER NOT NULL,
                 capability_token BLOB,
                 kind INTEGER NOT NULL,
@@ -711,13 +734,34 @@ mod tests {
             );",
         )
         .unwrap();
-        conn.execute(
-            "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            rusqlite::params![
-                &[1u8; 16] as &[u8], 100i64, 0i64, 1i64, 0i64, "delegate", b"x" as &[u8], 0i64,
-            ],
-        ).unwrap();
+        let insert = "INSERT INTO transparency_log (
+                frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
+                boot_nonce, kind, intent, payload_redacted, origin
+            ) VALUES (?1, ?2, ?3, '', '', ?4, ?5, ?6, ?7, ?8)";
+        for (id, timestamp, pid, boot, kind, intent) in [
+            (1u8, 10i64, 7i64, 1i64, 19i64, "target-spirit"),
+            (2, 20, 8, 2, 19, "target-spirit"),
+            (3, 100, 7, 1, 7, "target-action"),
+            (4, 110, 8, 2, 7, "target-action"),
+            (5, 120, 9, 2, 7, "other-action"),
+            (6, 30, 7, 3, 19, "other-spirit"),
+            (7, 140, 7, 3, 7, "reused-pid-action"),
+        ] {
+            conn.execute(
+                insert,
+                rusqlite::params![
+                    &[id; 16] as &[u8],
+                    timestamp,
+                    pid,
+                    boot,
+                    kind,
+                    intent,
+                    b"x" as &[u8],
+                    0i64,
+                ],
+            )
+            .unwrap();
+        }
         conn.execute(
             "INSERT INTO approval_decision_log (timestamp_ns, actor, target, capability, intent)
              VALUES (100, 'director', 'other-spirit', 'cap', 'test')",
@@ -734,26 +778,65 @@ mod tests {
             since_ns: 0,
             until_ns: i64::MAX as u64,
         };
-        let result = ranged_recall(&db_path, &journal_path, range, Some("hello-spirit")).unwrap();
+        let result = ranged_recall(&db_path, &journal_path, range, Some("target-spirit")).unwrap();
+        let target_actions = result
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    &entry.payload,
+                    ComposedPayload::Frame { intent, .. } if intent == "target-action"
+                )
+            })
+            .count();
 
+        assert_eq!(
+            target_actions, 2,
+            "all incarnations of the named Spirit must be included"
+        );
         assert!(
-            result
-                .iter()
-                .any(|e| e.source == LogSource::TransparencyLog),
-            "spirit_filter should not exclude TransparencyLog entries"
+            !result.iter().any(|entry| {
+                matches!(
+                    &entry.payload,
+                    ComposedPayload::Frame { intent, .. } if intent == "other-action"
+                )
+            }),
+            "spirit_filter must exclude another Spirit's Transparency Log entries"
+        );
+        assert!(
+            !result.iter().any(|entry| {
+                matches!(
+                    &entry.payload,
+                    ComposedPayload::Frame { intent, .. } if intent == "reused-pid-action"
+                )
+            }),
+            "a pid reused by another Spirit in a later boot must not leak into this recall"
         );
         assert!(
             !result
                 .iter()
-                .any(|e| matches!(e.source, LogSource::ApprovalDecisionLog)),
+                .any(|entry| matches!(entry.source, LogSource::ApprovalDecisionLog)),
             "spirit_filter should exclude non-matching ADL entries"
         );
         assert!(
             !result
                 .iter()
-                .any(|e| matches!(e.source, LogSource::LifecycleJournal)),
+                .any(|entry| matches!(entry.source, LogSource::LifecycleJournal)),
             "spirit_filter should exclude non-matching journal entries"
         );
+        assert_eq!(
+            ranged_count(&db_path, &journal_path, range, Some("target-spirit")).unwrap(),
+            result.len(),
+            "ranged_count must inherit the same Spirit scope"
+        );
+        let report = posture_delta(&db_path, &journal_path, range, Some("target-spirit")).unwrap();
+        assert_eq!(
+            report.summary.total_events, 2,
+            "posture_delta must classify only the named Spirit's events"
+        );
+        assert!(report
+            .events
+            .iter()
+            .all(|entry| entry.spirit_id.as_deref() == Some("target-spirit")));
     }
 
     #[test]

@@ -39,10 +39,52 @@
 # inference + telemetry + revocation + journal + lifecycle + orchestrator +
 # small glue modules + composition-root forwarders). Under the 6,000 ceiling.
 #
-# **Interim posture (Epics 6/7 in flight before Phase 4 completes):**
-# the kloc gate stays strict. Stories that ADD to `maos-kernel-core` MUST first
-# extract a candidate module netting to ≤0 added LOC. The gate's continuing
-# failure on every CI run keeps the breach visible until decomposition lands.
+# **[SUPERSEDED 2026-07-25 — see "Ceiling rule" below.]** The Epics-6/7 interim
+# posture required any story ADDING to `maos-kernel-core` to first extract a
+# candidate module netting to ≤0 added LOC, justified by "the gate's continuing
+# failure on every CI run keeps the breach visible until decomposition lands".
+# That premise is dead: the gate is GREEN (the Epic-10/12 retros re-based ceilings
+# to measured residuals), and Phase 4 never ran. Retained here as history only.
+# -----------------------------------------------------------------------------
+# CEILING RULE (founder-ratified 2026-07-25; replaces "tight measured residual")
+# -----------------------------------------------------------------------------
+# Lunarpulse: "as the founder I am okay with incrementing the kernel size."
+# Team discussion (Winston · Murat · John · Amelia · Mary) — UNANIMOUS that this
+# licenses re-basing the CEILINGS and replacing this policy, and does NOT license
+# relaxing the `kernel-core-baseline.toml` PIN or pre-approving any story's delta.
+# The two are different mechanisms: the PIN is anti-DRIFT (it never forbade
+# growth, only UNRECORDED growth); the CEILINGS are anti-GROWTH.
+#
+#   ceiling(crate) = measured_tokei_code + max(100, ceil(0.02 * measured))
+#   _aggregate_hardfail = measured_aggregate + max(100, ceil(0.02 * measured))
+#
+# Recalculated ONLY at an epic retrospective, or under an explicitly authorized
+# measured grant. NOT per story. Slack is operating capacity, NOT authorization:
+# every kernel-core change still needs its measured FLAG-Winston grant and a
+# HISTORY row. A crate that breaches before the next review needs a named grant
+# or a decomposition — the formula is never silently re-run to fit.
+#
+# MIGRATION RULE (2026-07-25): this pass only ever RAISES. 13 of 29 governed
+# crates moved; the other 16 already carry forward-declared budgets larger than
+# the formula (e.g. maos-cap-registry 3000 at 0 measured) and were left alone.
+# Lowering a ceiling is an architectural decision for a retrospective, never a
+# side effect of a migration whose purpose was to RELIEVE constraint.
+#
+# WHY THIS REPLACED "tight measured residual, NOT round headroom":
+#   • It left crates with 2–10 lines of unusable capacity (notify-push 2,
+#     loom-lite 3, kernel-core 10), so ordinary work required a governance event.
+#   • Story 13.5b alone triggered EIGHT ceiling re-base events.
+#   • Those re-bases were bookkeeping for an ADVISORY gate: `kloc-check` ran
+#     `continue-on-error: true` from 2026-06-11, so it could not fail a build.
+#     The tight-residual rule is WHY it had to be advisory — nobody can ship
+#     against a 2-line budget. With real reserve the gate becomes enforceable,
+#     and it is flipped to BLOCKING in the same change.
+#   • The Epic-5 decomposition plan this posture served was never arithmetically
+#     sound: its named extractions total ~13,627 LOC against a crate then at
+#     ~21,370, so the stated ~5,400 residual was unreachable by its own moves.
+#     Phase 4 remains real architectural debt, tracked below — but it is NOT a
+#     release gate disguised as a budget rule, and it must never block a
+#     correctness or compliance repair.
 # -----------------------------------------------------------------------------
 # Epic 10 retrospective ceiling review (2026-06-26)
 # -----------------------------------------------------------------------------
@@ -122,7 +164,35 @@
 # 12.5 delta) in the Epic-12 retro — the rest is composition-root/tooling growth.
 # -----------------------------------------------------------------------------
 
-maos-kernel-core = 17900   # Epic-12 retro 2026-07-14: 17750→17900 (Story 12.5 PostSwapMonitor +59; measured 17,832)
+# Story 13.5b ceiling review (2026-07-25) — tight measured residuals.
+#   maos-bin       14000 → 14150 (measured 14_111): four uninstall terminals,
+#                               legal-hold and operator collective-erase one-shots.
+#   maos-iac        6450 → 6500  (measured 6_476): explicit Host-global legal-hold
+#                               authority binding plus list/release.
+#   xtask          30750 → 30850 (measured 30_799): Reza GDPR legs and one-sided
+#                               erase reconciliation plant.
+#   maos-audit       none → 6100 (measured 6_088): first explicit ceiling; the
+#                               six-stratum GDPR generator is production src.
+#   maos-loom-lite   none → 4750 (measured 4_708): first explicit ceiling; typed
+#                               partition, operator erase, advisory-lock tombstones.
+#   aggregate      133100 → 134000 (measured 133_770): sum of named drivers.
+#   maos-domain moved within ceiling 8450 (measured 8_421): collective-memory port erase method.
+#   maos-cli moved within ceiling 4550 (measured 4_526): maosctl legal-hold list/release.
+#
+# Story 13.5b CODE REVIEW re-base (2026-07-25) — measured after the review
+# patches. Named drivers, measured residuals, no waivers:
+#   maos-audit      6100 → 6150 (measured 6_117): teardown scope contract,
+#                               UNCOVERED_STORES, store-set partition invariant.
+#   xtask          30850 → 30950 (measured 30_911): seven new Blocking Reza legs
+#                               for the operator terminals, regional coverage
+#                               gap, mixed-held proof, and residue pin.
+#   maos-bin       14150 → 14200 (measured 14_150 — sat exactly at ceiling):
+#                               lifecycle-journal helper and the widened Held
+#                               terminal carrying its erased set and proof path.
+#   aggregate     134000 → 134150 (measured 133_989): sum of the above.
+# Tests and fixtures are excluded by the gate, so they are not cited as drivers.
+
+maos-kernel-core = 18248   # 2026-07-25 founder policy re-base (Winston 2%): 17900->18248 (measured 17890, reserve 358) | prior: Epic-12 retro 2026-07-14: 17750→17900 (Story 12.5 PostSwapMonitor +59; measured 17,832)
 maos-capability = 2000
 maos-cap-registry = 3000
 maos-corpus-gen = 3000
@@ -130,13 +200,15 @@ maos-wire = 2000
 maos-journal = 2000
 maos-spirit-abi = 3000
 maos-spirit-sdk = 3000
-xtask = 29000          # Epic-12 retro 2026-07-14: 22500→29000 (+6,291 LOC v2.0/v2.2 gate infra + Option-C binding + dev-model-tier; measured 28,791; tooling, not kernel)
+xtask = 36839   # Story 13.6 closure measured grant (FLAG-Winston, Lunarpulse 2026-08-11, authorized AFTER the code existed and was measured — never on an estimate): 35931->36839 (formatted measured 36116 + ceil(2%)=723). Driver: the 13.6e reopened published-ledger omission fixed at the root (per-gate `ledger_leg_names()` accessors derived from each gate's own declarations + exact-set `validate_against`), the topology value-distinctness controls, and the ownerless dev-record sweep. Correctness repairs from four adversarial review rounds; deleting any of it re-opens a HIGH finding. ZERO kernel-core Δ @23679. NOTE: this is the SIXTH consecutive xtask re-base — the Epic-13 retrospective owns the question of whether the gate machinery's growth rate is itself the defect. | prior: Story 13.6e remaining-review measured grant (FLAG-Winston authorization already granted at the formula, 2026-08-04): 34736->35931 (formatted measured 35226 + ceil(2%)=705). Driver: correctness repairs from the five-chunk adversarial review — fingerprint-bound FKCS hold, trusted run/leg evidence bindings, composite live-test verification, exact Family-B isolation, observational successor legs, and their non-vacuity controls. ZERO kernel-core Δ @23679; ZERO maos-audit Δ. | prior: Story 13.6e implementation grant 33270->34736 (measured 34054 + ceil(2%)=682): evidence ledger, sealed projection, four gate migrations, published-claim consumer. | prior: Story 13.6c 32517->33270; Story 13.6d 31856->32517.
 # Story 6.5 — Phase 1 extraction
-maos-iac = 5800        # Epic-10 retro 2026-06-26: 5500→5800 (TL + bus growth; measured 5,736)
-maos-manifest = 4050   # Epic-10 retro 2026-06-26: 4000→4050 (schema-version surface; measured 4,012)
+maos-iac = 6888   # Story 13.6d final policy grant: 6606->6888 (measured 6753 + ceil(2%)=135). Driver: dependency-inverted cross-wall read routing, typed fail-closed refusal, pre-movement refusal/disclosure audit rows, and their mutation-capable controls. | prior: 2026-07-25 founder policy re-base 6500->6606 (measured 6476 + reserve 130).
+maos-audit = 6665   # Story 13.5g named grant: 6240->6665 (measured 6534, reserve 131 per 2% formula). Driver: in-artifact `tenant_binding` DDL + read/write/verify helpers + Phase A/B pure verdict + Display + AC1-AC4 unit tests — the story budget's "maos-audit: + helpers & DDL". Per kloc.toml CEILING RULE §"must never block a correctness or compliance repair"; ZERO kernel-core Δ @23401. | prior: 2026-07-25 founder policy re-base (Winston 2%): 6150->6240 (measured 6117, reserve 123); Story 13.5b review: 6100->6150 (measured 6_117 — teardown scope contract + UNCOVERED_STORES partition invariant)
+maos-loom-lite = 5383   # Story 13.6 closure measured grant (FLAG-Winston, Lunarpulse 2026-08-11, measured not estimated): 4847->5383 (formatted measured 5277 + max(100, ceil(2%)=106)=106). Driver: the two-sided collective erase hardened over four adversarial review rounds — additive nullable `cross_*` operation-metadata columns that keep the physical/tombstone address stable, atomic generation-conditional `erase_at_generation` under one advisory-locked transaction, `write_native_with_source_attested` home-row transition, and the crossed-row origin lookup. Every line closes a named HIGH finding (tombstone dominance, non-atomic compare-and-delete, cross-row misresolution). ZERO kernel-core Δ @23679. | prior: 2026-07-25 founder policy re-base (Winston 2%): 4750->4847 (measured 4747, reserve 100) | prior: Story 13.5b first explicit ceiling (measured 4_708 — operator erase + tombstones)
+maos-manifest = 4314   # 2026-07-25 founder policy re-base (Winston 2%): 4250->4314 (measured 4214, reserve 100) | prior: Epic-13 retro 2026-07-22: 4150→4250 (measured 4_157)
 
 # Story 1a.1 — 13 new crate stubs
-maos-domain = 8300     # Epic-12 retro 2026-07-14: 8100→8300 (v2.2 cohort/tenant ports; measured 8,231)
+maos-domain = 8590   # 2026-07-25 founder policy re-base (Winston 2%): 8450->8590 (measured 8421, reserve 169) | prior: Epic-13 retro 2026-07-22: 8300→8450 (measured 8_392); Story 13.5b: unchanged ceiling, measured 8_421 (collective-memory port erase method)
 maos-spirit-hello = 1000
 maos-providers = 2000
 maos-mcp = 1100
@@ -170,23 +242,162 @@ maos-a2a = 1500
 # over a per-crate ceiling, that is a scope signal — surface it, do not bump
 # silently"). Per the 8.8 precedent: set to the tight measured residual (3144),
 # NOT round headroom. FLAG-Winston: ratify this surfaced bump in 8.13.1 review.
-maos-a2a-core = 4050   # Epic-12 retro 2026-07-14: 3200→4050 (cohort mesh transport + halt receipt-presence; measured 3,999)
+maos-a2a-core = 4654   # Story 13.6d policy grant: 4450->4654 (branch-point measured 4554 + max(100, ceil(2%))=100). Named owner for the committed +104 overage remains Story 13.6b; 13.6d adds no maos-a2a-core work. | prior: Story 13.6b named grant 4271->4450 (measured 4350 +100) for the authenticated crossing port, applier, refusal taxonomy, and wire errors.
 # Story 8.6 — maos-a2a-tcp: live cross-Host TCP/mTLS transport (the second
 # A2ATransport impl). Socket + rustls + codec wiring + verifier.
 maos-a2a-tcp = 1500
 # Story 8.13 — generic HTTP mobile-push adapter, intentionally small and
 # dependency-light (maos-director-surface + maos-domain + ureq only).
-maos-notify-push = 250
+maos-notify-push = 348   # 2026-07-25 founder policy re-base (Winston 2%): 250->348 (measured 248, reserve 100)
 maos-persistence = 2000
 maos-secrets = 1000
-maos-compliance = 2000
+maos-compliance = 2117   # 2026-07-25 founder policy re-base (Winston 2%): 2050->2117 (measured 2017, reserve 100) | prior: Story 13.4 re-baseline 2026-07-23: 2000→2050 (measured 2_017 — NEW vetting module: mod+attestation+keyring+terminal, FR37 4 verbs)
 maos-control = 1500
-maos-cli = 3750        # Epic-10 retro 2026-06-26: 2000→3750 (skill-queue + audit subcommands; measured 3,689)
-maos-bin = 11100       # Epic-12 retro 2026-07-14: 9000→11100 (enterprise SSO/KMS/SIEM + cohort A2A daemon + identity.asserted write moved from maos-audit; measured 11,003)
-maos-bench = 1550      # Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
+maos-cli = 4626   # 2026-07-25 founder policy re-base (Winston 2%): 4550->4626 (measured 4526, reserve 100) | prior: Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200; Story 13.5b: unchanged ceiling, measured 4_526 (maosctl legal-hold list/release subcommands)
+maos-bin = 16178   # Story 13.6 closure measured grant (FLAG-Winston, Lunarpulse 2026-08-11, measured not estimated): 15104->16178 (formatted measured 15860 + ceil(2%)=318). Driver: the production dispatch the closer existed to prove — bounded-refreshable tenant-mode classification for the `traceback` and cohort-backed `collective-erase` one-shots (both previously failed before production dispatch), `CrossTeamCrossingControl::Erase` provenance-gated two-sided reconciliation over the authenticated intake path, `emit_collective_erase_reconciliation`, and the erase-intent wire class plus daemon route allowlists. Four adversarial review rounds; 11 findings fixed across this crate and maos-loom-lite. ZERO kernel-core Δ @23679. | prior: Story 13.6d design-time grant: 14835->15104 (branch-point measured 14807 + ceil(2%)=297). Driver: dependency-inverted read-only remote Transparency Log adapter plus the production cross-wall traceback initiator; surfaced before code under AC6. | prior: Story 13.6b named grant 14433->14835 for the write-side crossing initiator and applier.
+maos-bench = 1631   # 2026-07-25 founder policy re-base (Winston 2%): 1550->1631 (measured 1531, reserve 100) | prior: Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
+
+# -----------------------------------------------------------------------------
+# Epic 13 retrospective ceiling review (2026-07-22) — first full-branch CI run
+# -----------------------------------------------------------------------------
+# `origin/epic-13` was pushed for the first time (~20 commits, the whole Epic 13
+# multi-tenant Loom line), so this is the FIRST time the blocking `kloc-check`
+# ran over the v2.2 tenant surface. Six crates + the aggregate breached the
+# Epic-12 ceilings. Per the established process (tight measured residual, NOT
+# round headroom — cf. the Epic-10 and Epic-12 blocks above):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-bin         11100    12298     12400        13.5c single composition
+#                                                     root + 13.5d collective
+#                                                     route wiring + tenant map.
+#   maos-cli         3750     4119      4200         v2.2 tenant/audit surface.
+#   maos-domain      8300     8392      8450         cross-team consent + team
+#                                                     ports (13.2/13.3).
+#   maos-iac         5800     6118      6200         cross-wall log.recall +
+#                                                     consent port (13.3b).
+#   maos-manifest    4150     4157      4250         13.5d raised 4050→4150 for
+#                                                     the v4 Loom block; the v4
+#                                                     surface landed 7 lines over
+#                                                     that estimate. Re-based on
+#                                                     the MEASURED value, not a
+#                                                     second estimate.
+#   xtask            29000    29962     30050        Epic-13 gate infra:
+#                                                     multi-tenant-loom legs,
+#                                                     cross-region-consensus,
+#                                                     reza-production-path, plus the
+#                                                     dev-model-tier pre-dev filter.
+#   _aggregate       122000   127530    128000       sum of the above.
+#
+# NOTE — kernel-core is NOT in this list. It sat at 17832/17900 through Epic 13
+# and consumed only the +26 lines authorized by the 13.5d FLAG-Winston grant
+# (kernel-baseline gate green @23228). Phase-4 decomposition debt REMAINS.
+# -----------------------------------------------------------------------------
+# Story 13.4 FR37 vetting machinery re-baseline (2026-07-23) — ADR-056
+# -----------------------------------------------------------------------------
+# Story 13.4 (commit 148a33ee) landed the vetter-key + attestation lifecycle
+# (issue/verify/journal/revoke). Four LISTED crates + the aggregate breached the
+# ceilings set in the Epic-13 retro block above. Per the established process
+# (tight measured residual, NOT round headroom — cf. every retro block above):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-compliance  2000     2017      2050         NEW `vetting` module (F4
+#                                                     EXTEND, not create): mod +
+#                                                     attestation + keyring +
+#                                                     terminal. FR37's 4 verbs.
+#   maos-bin         12400    12422     12500        `maosctl vet` composition-
+#                                                     root wiring (+129 main.rs).
+#   maos-cli         4200     4228      4300         `vet` subcommand + flags.
+#   xtask            30350    30520     30600        check-vetting-attestation
+#                                                     gate (AC6, 7 anti-null legs
+#                                                     incl. forged-vetter-key).
+#   _aggregate       128500   130276    131000       sum of the above PLUS the
+#                                                     F2 lattice-collision fix in
+#                                                     maos-registry/admission.rs
+#                                                     (+560: promotion ABOVE
+#                                                     strictest_of). See NOTE.
+#
+# NOTE — the aggregate grew ~2.3k but the four LISTED crates account for only
+# ~240 of it. The data gap is now closed: this file carries 49 keys and 0
+# unbudgeted measured roots after Story 13.6d's policy migration below. The
+# surviving defect is the CONTROL: `xtask/src/kloc_check.rs:229-235` silently
+# skips a measured root with no budget key, so a crate added tomorrow escapes
+# its per-crate ceiling exactly as before — live and unowned. (Corrected by
+# Story 13.6, 2026-08-08.)
+# -----------------------------------------------------------------------------
+# Story 13.5e tenant-audit-isolation re-baseline (2026-07-24) — NFR-Ops-11
+# -----------------------------------------------------------------------------
+# Story 13.5e (commit 2e0244fa) landed tenant-isolated audit (per-team TL recall +
+# 2-stage datname sharding + tenant_map + tenant-scoped backup/export). Four LISTED
+# crates + the aggregate breached again — the THIRD consecutive story (CI-repair,
+# 13.4, 13.5e) to breach kloc-at-"done". PROCESS FLAG for the Epic-13 retro: the
+# dev "gates green" task is not running/re-basing kloc-check before marking done.
+# Per the established process (tight measured residual, documented driver):
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-bin         12500    12604     12700        tenant_map.rs + audit-route wiring
+#   maos-cli         4300     4489      4550         tenant-scoped backup/export subcommands
+#   maos-iac         6200     6375      6450         transparency_log tenant-isolated recall
+#   xtask            30600    30652     30750        check-reza-production-path tenant legs
+#   _aggregate       131000   131502    132000       + unlisted maos-audit (+260) & maos-cohort (+107)
+#
+# The former unlisted-crate data gap was superseded by Story 13.6d's policy
+# migration below, which assigned founder-formula ceilings to each discovered
+# source root. The surviving skip control is recorded in the corrected 13.4
+# note above. (Corrected by Story 13.6, 2026-08-08.)
+
+# -----------------------------------------------------------------------------
+# Story 13.5a enterprise-daemon-posture re-baseline (2026-07-25)
+# -----------------------------------------------------------------------------
+# Story 13.5a closed the `cohort-a2a-daemon` enterprise dead-wire: the
+# `EnterpriseRuntime` was constructed at the composition root and never threaded
+# into the daemon, so collective reads served in that mode ran with no SSO
+# principal, no PDP mediation, no at-rest seal and no SIEM forward. Closing it is
+# composition-root work by construction (the enterprise crates are `maos-bin`-only
+# — see ADR-057), so the delta lands entirely in `maos-bin`.
+#
+#   crate            prev     measured  new ceiling  driver
+#   maos-bin         13700    13927     14000        review corrections: real two-endpoint mTLS
+#                                                    daemon round-trip; PDP-only + KMS-down +
+#                                                    unwired fail-closed controls; shared journal;
+#                                                    live-WAL SIEM snapshot/projection proof
+#   maos-a2a-core     4050     4009      4050        guarded digest-admission contract fits the
+#                                                    existing ceiling
+#   _aggregate       132600   132988    133100       maos-bin review delta plus guarded cohort
+#                                                    test and injected maos-siem projection seam;
+#                                                    xtask remains 30_700 ≤ 30_750
+#
+# This is a MEASURED re-base with a named driver, NOT an "advisory/pre-existing"
+# waiver (the 13.4 / 13.5e anti-pattern the Epic-13 retro flagged). It is the
+# fifth consecutive story to breach kloc-at-"done"; three re-bases occurred
+# inside Story 13.6e alone. The PROCESS FLAG above stands. (Corrected by Story
+# 13.6, 2026-08-08.)
+
+# Story 13.6d policy migration (FLAG-Winston authorized 2026-07-30): every
+# previously discovered-but-ungoverned Rust source root receives the founder
+# formula ceiling measured + max(100, ceil(2%)). This only raises ceilings.
+"(unknown:spikes)" = 244
+"(unknown:templates)" = 111
+maos-attrs = 120
+maos-cohort = 4900
+maos-director-surface = 826
+maos-escape-detector = 376
+maos-eval = 3696
+maos-fkcs = 591
+maos-host = 139
+maos-journey-test = 593
+maos-pdp = 536
+maos-registry = 3615
+maos-shell = 405
+maos-siem = 547
+maos-skill = 900
+maos-spirit-cli = 853
+maos-spirit-derive = 450
+maos-sso = 491
+maos-telemetry = 612
+maos-wasm-host = 1129
 
 _aggregate_alarm = 16000
-_aggregate_hardfail = 122000  # Epic-12 retro 2026-07-14: 103000→122000 (measured aggregate 121,198)
+_aggregate_hardfail = 144224   # Story 13.6e remaining-review measured grant (authorized formula applies because aggregate actually breached): 140707->144224 (formatted measured 141396 + ceil(2%)=2828). Review correctness repairs only; ZERO kernel-core/maos-audit delta. | prior: Story 13.6d 139902->140707 (measured 137948 + ceil(2%)=2759).
 
 # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
 # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a

@@ -2,17 +2,24 @@
 
 //! Gate — `check-dev-model-used-populated`.
 //!
-//! Walks all `_bmad-output/implementation-artifacts/[0-9]*.md` files, parses YAML
-//! frontmatter, and asserts:
-//! 1. Every story file has a `dev_model_used:` field
+//! Walks developed `_bmad-output/implementation-artifacts/[0-9]*.md` files,
+//! using the sibling `sprint-status.yaml` as the authoritative development
+//! state, and asserts:
+//! 1. Every developed story file has a `dev_model_used:` field
 //! 2. The field value is NON-EMPTY
 //! 3. The field value is NOT `TBD-set-at-story-start`
 //! 4. Optionally: warns if value not in known set (allows future model adoption)
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::path::Path;
 
 const DEFAULT_STORIES_DIR: &str = "_bmad-output/implementation-artifacts";
+/// The authoritative statuses that prove a story has not yet been developed.
+///
+/// This list is deliberately narrow: unknown, missing, or later lifecycle
+/// statuses stay in scope so provenance gates fail closed.
+pub const PRE_DEVELOPMENT_STATUSES: &[&str] = &["backlog", "drafted", "ready-for-dev", "blocked"];
 const KNOWN_MODELS: &[&str] = &[
     "claude-opus-4-5",
     "claude-opus-4-6",
@@ -23,13 +30,66 @@ const KNOWN_MODELS: &[&str] = &[
     "deepseek-v4-pro",
     "k2p6",
     "glm-5.1",
+    // glm-5.2 — frontier-class member of the Epic-11/E12 allowlist
+    // {opus-4-8/gpt-5.5/glm-5.2/equiv}; used by Stories 10.4a, 11.2b,
+    // 13.5g, 13.5i, 13.5j, 13.6c. Allowlist lagged (the Story 7.5a pattern).
+    "glm-5.2",
     // Epic 8 actual dev attributions (per each story's `### Agent Model Used`):
     // 8.13 shipped on openai/gpt-5.5; 8.14c on kimi-code/kimi-for-coding.
     "openai/gpt-5.5",
     "kimi-code/kimi-for-coding",
     // Epic 9 actual dev attribution (9.5d shipped on openai-codex/gpt-5.4).
     "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.6-sol",
 ];
+
+/// Loads the authoritative development state from the sibling sprint record.
+///
+/// Story filenames and `development_status` keys use the same full slug. A
+/// missing or unreadable status file produces no exemptions, preserving the
+/// fail-closed default in both dev-model gates.
+pub fn load_sibling_sprint_status(stories_dir: &str) -> HashMap<String, String> {
+    let path = Path::new(stories_dir).join("sprint-status.yaml");
+    let Ok(content) = fs::read_to_string(path) else {
+        return HashMap::new();
+    };
+
+    let mut statuses = HashMap::new();
+    let mut in_development_status = false;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("development_status:") {
+            in_development_status = true;
+            continue;
+        }
+        if !in_development_status {
+            continue;
+        }
+        if !line.starts_with(' ') && !line.starts_with('\t') && !line.is_empty() {
+            if !trimmed.starts_with('#') {
+                break;
+            }
+            continue;
+        }
+        if let Some((key, value)) = trimmed.split_once(':') {
+            let value = value
+                .split('#')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .trim_matches(|c| c == '\'' || c == '"');
+            if !key.trim().is_empty() && !value.is_empty() {
+                statuses.insert(key.trim().to_string(), value.to_string());
+            }
+        }
+    }
+    statuses
+}
+
+/// True only for an explicit authoritative pre-development status.
+pub fn is_pre_development_status(status: Option<&str>) -> bool {
+    status.is_some_and(|value| PRE_DEVELOPMENT_STATUSES.contains(&value))
+}
 
 #[derive(Debug)]
 struct DmuViolation {
@@ -51,14 +111,23 @@ pub fn run(json: bool) -> Result<(), String> {
 }
 
 fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
+    let sprint_status = load_sibling_sprint_status(stories_dir);
+    run_with_dir_and_status(json, stories_dir, &sprint_status)
+}
+
+fn run_with_dir_and_status(
+    json: bool,
+    stories_dir: &str,
+    sprint_status: &HashMap<String, String>,
+) -> Result<(), String> {
     let mut violations: Vec<DmuViolation> = Vec::new();
-    let known_set: HashSet<&str> = KNOWN_MODELS.iter().cloned().collect();
+    let known_set: HashSet<&str> = KNOWN_MODELS.iter().copied().collect();
 
     let entries = match fs::read_dir(stories_dir) {
         Ok(e) => e,
         Err(e) => return Err(format!("Cannot read {}: {}", stories_dir, e)),
     };
-
+    let mut skipped_pre_development = 0usize;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         if !name.ends_with(".md") {
@@ -68,6 +137,11 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
             continue;
         }
 
+        let story_key = name.trim_end_matches(".md");
+        if is_pre_development_status(sprint_status.get(story_key).map(String::as_str)) {
+            skipped_pre_development += 1;
+            continue;
+        }
         let path = entry.path();
         let content = match fs::read_to_string(&path) {
             Ok(c) => c,
@@ -141,6 +215,7 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
                     "value": v.value,
                 })
             }).collect::<Vec<_>>(),
+            "stories_skipped_pre_development": skipped_pre_development,
         });
         println!("{}", payload);
     } else {
@@ -357,5 +432,32 @@ mod tests {
         let (value, has_fm) = parse_dev_model_used(content);
         assert!(!has_fm);
         assert_eq!(value, None);
+    }
+
+    fn sprint_status(dir: &TempDir, body: &str) -> HashMap<String, String> {
+        write_story(
+            dir,
+            "sprint-status.yaml",
+            &format!("development_status:\n{body}"),
+        );
+        load_sibling_sprint_status(dir.path().to_str().unwrap())
+    }
+
+    #[test]
+    fn blocked_story_is_skipped_not_failed() {
+        let dir = TempDir::new().unwrap();
+        write_story(&dir, "13-6-blocked.md", "---\nepic: 13\n---\n# Story");
+        sprint_status(&dir, "  13-6-blocked: blocked\n");
+
+        assert!(run_with_dir(false, dir.path().to_str().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn done_story_is_checked_and_fails_without_a_model() {
+        let dir = TempDir::new().unwrap();
+        write_story(&dir, "13-6-done.md", "---\nepic: 13\n---\n# Story");
+        sprint_status(&dir, "  13-6-done: done\n");
+
+        assert!(run_with_dir(false, dir.path().to_str().unwrap()).is_err());
     }
 }

@@ -244,6 +244,8 @@ Recommended `claude-opus-4-8`. This story is the exact shape `[[feedback_deepsee
 - **AC-5 (smoke retirement):** the three `smoke-*` arms + impls deleted; mode list updated; `check-literal-reappearance` xtask gate + `gate-registry.toml` entry fail CI on `smoke-founder-loop`/`smoke-mira-nash` reappearance in non-test crates; `#[test]`-reachable drain-complete seam (`{"event":"drain","topology":true}`) is the production graceful-drain.
 - **AC-6 (green-at-HEAD):** kernel baseline re-pinned 21894 → 22227 with FLAG-Winston history entry (+1 line is the `#[i9_exempt]` on `ProviderHistory` added during review closure to resolve a pre-existing Story 9.4b I9/P3 violation; no functional kernel-core delta for Story 9.6's implementation). `cargo test --workspace --locked` = 2600 passed / 0 failed; `check-kernel-baseline`, `check-literal-reappearance`, `check-empty-kernel`, and `check-service-boundary` gates pass; pre-existing DRR backpressure workspace-only race fixed; `graphify update .` run.
 
+### File List
+
 New:
 - `spirits/topologies/j1-founder-loop.toml` — J1 founder-trio topology manifest (orchestrator/architect/reviewer).
 - `spirits/topologies/j4-mira-nash.toml` — J4 mira-nash topology manifest.

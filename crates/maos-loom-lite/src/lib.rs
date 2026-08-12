@@ -22,8 +22,10 @@
 
 pub mod adapter;
 pub mod canonical;
+pub mod cross_team_consent;
 pub mod migration;
 pub mod replication;
 pub mod schema;
 pub mod seal;
 pub mod store;
+pub mod tenant;

@@ -1,0 +1,1189 @@
+{
+  "absent_successors": [
+    "audit-escape-anomaly-detector-wiring: 11.4b audit escape-anomaly detector consumer is not called from the production composition root (crates/maos-bin/src/main.rs); no harness evidence record"
+  ],
+  "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+  "gate": "check-reza-production-path",
+  "legs": [
+    {
+      "artifact_ref": "check-reza-production-path/loom-scope-reaches-policy-table@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "story_13_5d_loom_scope_reaches_policy_table"
+      ],
+      "green": true,
+      "name": "loom-scope-reaches-policy-table",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/route-not-spirit-reachable@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "unit_tests::collective_route_is_fail_closed_until_wired_then_reaches_port"
+      ],
+      "green": true,
+      "name": "route-not-spirit-reachable",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/production-collective-single-source@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "production_collective_calls_share_one_atomic_pid_binding"
+      ],
+      "green": true,
+      "name": "production-collective-single-source",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/composition-root-does-not-seed-manifest-scopes@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "composition_root_does_not_seed_manifest_scopes"
+      ],
+      "green": true,
+      "name": "composition-root-does-not-seed-manifest-scopes",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/mediated-operation-correlation@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "story_13_5d_request_route_row_audit_correlation"
+      ],
+      "green": true,
+      "name": "mediated-operation-correlation",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-physical-team-paths@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::team_transparency_log_paths_are_physically_distinct"
+      ],
+      "green": true,
+      "name": "tenant-audit-physical-team-paths",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-backup-restore-boundary@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "backup::tests::tenant_backup_round_trip_rejects_wrong_team"
+      ],
+      "green": true,
+      "name": "tenant-audit-backup-restore-boundary",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-two-log-correlation@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "adapter::transparency_log::tests::cross_team_correlation_requires_both_physical_logs"
+      ],
+      "green": true,
+      "name": "tenant-audit-two-log-correlation",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-correlation-producer-wired@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "audit::tests::digest_cross_team_action_correlates_via_request_id"
+      ],
+      "green": true,
+      "name": "tenant-audit-correlation-producer-wired",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-cross-wall-historical-recall@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "adapter::log_recall::tests::cross_wall_recall_has_five_distinguishable_outcomes"
+      ],
+      "green": true,
+      "name": "tenant-audit-cross-wall-historical-recall",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-adversarial-paths@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tenant_transparency_log_adversarial_paths_fail_closed"
+      ],
+      "green": true,
+      "name": "tenant-audit-adversarial-paths",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-integrity-residual@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tenant_audit_tamper_residual_is_not_misreported_as_integrity"
+      ],
+      "green": true,
+      "name": "tenant-audit-integrity-residual",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-ranged-recall-spirit-filter@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "log_composition::tests::spirit_filter_scopes_transparency_log_across_boots"
+      ],
+      "green": true,
+      "name": "tenant-audit-ranged-recall-spirit-filter",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-identity-writer-no-shard-mint@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "enterprise_identity::available_arm_tests::identity_asserted_does_not_mint_an_unvalidated_audit_shard"
+      ],
+      "green": true,
+      "name": "tenant-audit-identity-writer-no-shard-mint",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-run-capture-writer-fails-closed@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "subcommands::tests::journal_run_capture_row_fails_closed_without_a_tl"
+      ],
+      "green": true,
+      "name": "tenant-audit-run-capture-writer-fails-closed",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tenant-audit-restore-refuses-cross-team@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "backup::tests::validate_restore_target_team_refuses_cross_team_planting"
+      ],
+      "green": true,
+      "name": "tenant-audit-restore-refuses-cross-team",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-round-trip@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_tenant_binding_round_trip"
+      ],
+      "green": true,
+      "name": "tl-tenant-binding-round-trip",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-read-only-missing-none@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_tenant_binding_read_is_read_only_and_missing_reads_none"
+      ],
+      "green": true,
+      "name": "tl-tenant-binding-read-only-missing-none",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-bound-match-proceeds@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_bound_match_proceeds"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-bound-match-proceeds",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-bound-foreign-refuses@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_bound_foreign_refuses"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-bound-foreign-refuses",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-corrupt-binding-refuses@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_corrupt_binding_refuses"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-corrupt-binding-refuses",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-fresh-needs-write@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_fresh_artifact_needs_write"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-fresh-needs-write",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-legacy-sidecar-migrates@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_legacy_sidecar_migrates"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-legacy-sidecar-migrates",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-foreign-history-refuses@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_foreign_history_without_sidecar_refuses"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-foreign-history-refuses",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-none-records@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_b_datname_none_records"
+      ],
+      "green": true,
+      "name": "tl-phase-b-datname-none-records",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-match-proceeds@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_b_datname_match_proceeds"
+      ],
+      "green": true,
+      "name": "tl-phase-b-datname-match-proceeds",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-b-datname-drift-refuses@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_b_datname_drift_refuses"
+      ],
+      "green": true,
+      "name": "tl-phase-b-datname-drift-refuses",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-refuses-foreign-shard-before-append@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "phase_a_refuses_foreign_shard_with_history_before_append"
+      ],
+      "green": true,
+      "name": "tl-phase-a-refuses-foreign-shard-before-append",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-refuses-artifact-bound-to-foreign-team@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "phase_a_refuses_artifact_bound_to_foreign_team"
+      ],
+      "green": true,
+      "name": "tl-phase-a-refuses-artifact-bound-to-foreign-team",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-legacy-sidecar-migrates-wiring@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "phase_a_legacy_artifact_with_matching_sidecar_migrates"
+      ],
+      "green": true,
+      "name": "tl-phase-a-legacy-sidecar-migrates-wiring",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-needs-write-then-proceeds-wiring@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "phase_a_needs_write_then_proceeds_after_binding_written"
+      ],
+      "green": true,
+      "name": "tl-phase-a-needs-write-then-proceeds-wiring",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-b-persisted-datname-vs-live-current-database@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [phase_b_persisted_datname_vs_live_current_database] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "phase_b_persisted_datname_vs_live_current_database"
+      ],
+      "green": true,
+      "name": "tl-phase-b-persisted-datname-vs-live-current-database",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-reza-production-path",
+          "nonce": "check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+          "outcome": "PASSED",
+          "signature": "4b9794f23727ef064aa3a30c654e11d867f91d30c47975478d32d57d84208437c6022e6cbeb16d42d9c605660979bfdff60c71531982570a91f9fd4972014e05",
+          "test": "phase_b_persisted_datname_vs_live_current_database"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-phase-a-verdict-whitespace-binding-refuses@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_phase_a_verdict_whitespace_binding_refuses"
+      ],
+      "green": true,
+      "name": "tl-phase-a-verdict-whitespace-binding-refuses",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-read-fails-closed@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_tenant_binding_read_fails_closed_on_unreadable_artifact"
+      ],
+      "green": true,
+      "name": "tl-tenant-binding-read-fails-closed",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-write-refuses-foreign-overwrite@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_tenant_binding_write_refuses_foreign_binding_overwrite"
+      ],
+      "green": true,
+      "name": "tl-tenant-binding-write-refuses-foreign-overwrite",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-tenant-binding-refuses-symlinked-artifact@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "tests::tl_tenant_binding_refuses_symlinked_artifact"
+      ],
+      "green": true,
+      "name": "tl-tenant-binding-refuses-symlinked-artifact",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-boot-refuses-foreign-shard-before-open@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "boot_refuses_foreign_shard_before_opening_the_transparency_log"
+      ],
+      "green": true,
+      "name": "tl-boot-refuses-foreign-shard-before-open",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/tl-boot-writes-binding-after-open@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "boot_writes_binding_after_open_for_a_legacy_shard"
+      ],
+      "green": true,
+      "name": "tl-boot-writes-binding-after-open",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-backend-partition@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "multi_backend_erasure_partition_invariant"
+      ],
+      "green": true,
+      "name": "gdpr-backend-partition",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-kernel-forget-outcome-corpus@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "gdpr_cascade_v0_corpus_replay"
+      ],
+      "green": true,
+      "name": "gdpr-kernel-forget-outcome-corpus",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-erased@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "erased_uninstall_is_success_with_machine_receipt"
+      ],
+      "green": true,
+      "name": "gdpr-uninstall-terminal-erased",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-held@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "held_uninstall_is_non_success_and_writes_no_complete_proof"
+      ],
+      "green": true,
+      "name": "gdpr-uninstall-terminal-held",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-not-found@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "not_found_uninstall_has_distinct_terminal_code"
+      ],
+      "green": true,
+      "name": "gdpr-uninstall-terminal-not-found",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-uninstall-terminal-failed@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "proof_write_failure_has_failed_terminal_code"
+      ],
+      "green": true,
+      "name": "gdpr-uninstall-terminal-failed",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-regional-shared-verified-empty@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "regional_uninstall_attests_shared_tier_verified_empty"
+      ],
+      "green": true,
+      "name": "gdpr-regional-shared-verified-empty",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-shared-pre-partition-residue-fail-closed@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "regional_uninstall_refuses_to_attest_pre_partition_shared_residue"
+      ],
+      "green": true,
+      "name": "gdpr-shared-pre-partition-residue-fail-closed",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-mixed-held-partial-proof@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "mixed_held_uninstall_writes_partial_proof"
+      ],
+      "green": true,
+      "name": "gdpr-mixed-held-partial-proof",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-filesystem-erasure-subprocess@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "private_tier_markdown_is_erased_by_the_forget_cascade"
+      ],
+      "green": true,
+      "name": "gdpr-private-filesystem-erasure-subprocess",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-restart-markdown-erasure@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "restart_forget_erases_markdown_content"
+      ],
+      "green": true,
+      "name": "gdpr-private-restart-markdown-erasure",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-restart-spill-erasure@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "restart_forget_erases_non_markdown_spill_content"
+      ],
+      "green": true,
+      "name": "gdpr-private-restart-spill-erasure",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-proof-count@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "restart_forget_reports_distinct_persisted_entry_count"
+      ],
+      "green": true,
+      "name": "gdpr-private-proof-count",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-exact-once-count@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_counts_cached_and_spilled_value_exactly_once"
+      ],
+      "green": true,
+      "name": "gdpr-private-exact-once-count",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-bystander-retention@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_preserves_bystander_and_default_namespace_content"
+      ],
+      "green": true,
+      "name": "gdpr-private-bystander-retention",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-symlink-containment@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_does_not_follow_pid_directory_symlink"
+      ],
+      "green": true,
+      "name": "gdpr-private-symlink-containment",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-fail-closed-io@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_fails_closed_when_pid_directory_is_unreadable"
+      ],
+      "green": true,
+      "name": "gdpr-private-fail-closed-io",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-inline-only-count@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_counts_inline_only_entries_that_never_spill"
+      ],
+      "green": true,
+      "name": "gdpr-private-inline-only-count",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-namespace-symlink-containment@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_does_not_follow_namespace_directory_symlink"
+      ],
+      "green": true,
+      "name": "gdpr-private-namespace-symlink-containment",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-private-logical-key-identity@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_counts_logical_keys_not_filesystem_nodes"
+      ],
+      "green": true,
+      "name": "gdpr-private-logical-key-identity",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-spill-supersession-kind-change@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "write_unlinks_the_superseded_spill_when_the_kind_changes"
+      ],
+      "green": true,
+      "name": "private-spill-supersession-kind-change",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-spill-supersession-shrink@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "write_unlinks_the_spill_when_the_value_shrinks_below_the_threshold"
+      ],
+      "green": true,
+      "name": "private-spill-supersession-shrink",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-scan-logical-key-merge@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "scan_returns_one_entry_for_a_key_held_in_cache_and_on_disk"
+      ],
+      "green": true,
+      "name": "private-scan-logical-key-merge",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-scan-read-cardinality@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "a_read_does_not_change_scan_cardinality"
+      ],
+      "green": true,
+      "name": "private-scan-read-cardinality",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-scan-empty-key-recovery@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "scan_recovers_the_empty_key_from_its_spill_name"
+      ],
+      "green": true,
+      "name": "private-scan-empty-key-recovery",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-scan-junk-node-skip@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "scan_skips_a_directory_that_looks_like_a_spill"
+      ],
+      "green": true,
+      "name": "private-scan-junk-node-skip",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-scan-namespace-symlink-containment@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "scan_does_not_follow_a_namespace_directory_symlink"
+      ],
+      "green": true,
+      "name": "private-scan-namespace-symlink-containment",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-read-spill-symlink-containment@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "read_does_not_follow_a_spill_symlink"
+      ],
+      "green": true,
+      "name": "private-read-spill-symlink-containment",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-forget-legacy-residue-count@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "forget_counts_a_pre_existing_superseded_spill_once"
+      ],
+      "green": true,
+      "name": "private-forget-legacy-residue-count",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/private-signed-frame-digest-dedup@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "digest_refs_are_not_duplicated_by_a_spilled_working_memory_entry"
+      ],
+      "green": true,
+      "name": "private-signed-frame-digest-dedup",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-maosctl-forwards-terminal-exit-codes@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "uninstall_forwards_erased_held_not_found_and_failed_codes"
+      ],
+      "green": true,
+      "name": "gdpr-maosctl-forwards-terminal-exit-codes",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-legal-hold-fail-closed@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "independently_opened_team_shard_cannot_answer_hold_absent"
+      ],
+      "green": true,
+      "name": "gdpr-legal-hold-fail-closed",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-operator-erase-zero-spirit-reach@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "collective_erase_has_one_operator_route_and_zero_spirit_reach"
+      ],
+      "green": true,
+      "name": "gdpr-operator-erase-zero-spirit-reach",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-one-sided-erase-reconciliation@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "blocking",
+      "detail": "running 1 test; 1 passed; hermetic leg \u2014 reproducible from source, no signature required",
+      "evidence_state": "PROVEN_BLOCKING",
+      "evidence_tests": [
+        "story_13_5b_one_sided_collective_erase_is_red"
+      ],
+      "green": true,
+      "name": "gdpr-one-sided-erase-reconciliation",
+      "required": true,
+      "signature_block": [],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-collective-partition-live@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [collective_principal_partition_refuses_write_and_replication_apply] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "collective_principal_partition_refuses_write_and_replication_apply"
+      ],
+      "green": true,
+      "name": "gdpr-collective-partition-live",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-reza-production-path",
+          "nonce": "check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+          "outcome": "PASSED",
+          "signature": "c7cf75ffed817b06fdd2ea66374c6dcfae74efe2d8d056a4dee6d7e3824d5a0732086e94d2be86d54a9041b50a7bab9a2a812d186930deb4b0b6544abb8fa101",
+          "test": "collective_principal_partition_refuses_write_and_replication_apply"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/gdpr-collective-erase-live@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [collective_erase_moves_merkle_triple_and_blocks_stale_replication] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "collective_erase_moves_merkle_triple_and_blocks_stale_replication"
+      ],
+      "green": true,
+      "name": "gdpr-collective-erase-live",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-reza-production-path",
+          "nonce": "check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+          "outcome": "PASSED",
+          "signature": "f11a6df7fd921a6df0b1aa221662df5799bb63e8e5228bfad9eaab2d5a86bcf001cde9e946a6092e58d78296a8d91057bdceeed996c9128c7d46b5c60fb48a06",
+          "test": "collective_erase_moves_merkle_triple_and_blocks_stale_replication"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": "check-reza-production-path/spirit-route-and-tenant-audit-stage2-refusal-live@c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "attempted": true,
+      "binding": "advisory-substrate",
+      "detail": "running 1 test; 1 passed; harness tests [tenant_mode_boots_on_live_substrate] signed PASSED outcomes; verified against the operator-pinned key and bound to c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb#check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+      "evidence_state": "PROVEN_LIVE_SIGNED",
+      "evidence_tests": [
+        "tenant_mode_boots_on_live_substrate"
+      ],
+      "green": true,
+      "name": "spirit-route-and-tenant-audit-stage2-refusal-live",
+      "required": true,
+      "signature_block": [
+        {
+          "commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06+worktree:4750a3cced4b00e0bf80c58583fc8c15b2b0fb4d87b1a40c573a53966e4a2dbb",
+          "gate": "check-reza-production-path",
+          "nonce": "check-reza-production-path.15e9d6.18c9d7a600cec7c2",
+          "outcome": "PASSED",
+          "signature": "e8787b2fd652def3f080883899d5130e2b7e4fbab61eca210519ae34d9cbd2ea50f758a21b5240bda446ac63aa92cb4fa2560c80ad2c8b7918420f9d3a170202",
+          "test": "tenant_mode_boots_on_live_substrate"
+        }
+      ],
+      "substrate_present": true
+    },
+    {
+      "artifact_ref": null,
+      "attempted": false,
+      "binding": "advisory-substrate",
+      "detail": "11.4b audit escape-anomaly detector consumer is not called from the production composition root (crates/maos-bin/src/main.rs); no harness evidence record",
+      "evidence_state": "ABSENT",
+      "evidence_tests": [],
+      "green": false,
+      "name": "audit-escape-anomaly-detector-wiring",
+      "required": false,
+      "signature_block": [],
+      "substrate_present": false
+    }
+  ],
+  "operator_key_available": true,
+  "operator_key_reason": "operator audit key loaded (MAOS_AUDIT_KEY precedence)",
+  "product_claim": "PROVEN",
+  "publication_note": "Historical operator artifact from the rejected pre-review Story 13.6 worktree. It is not current evidence for the corrected story. This checked-in historical copy sanitizes operator-local paths; signed transcript payloads are unchanged.",
+  "publication_status": "SUPERSEDED_PRE_REVIEW",
+  "substrate_nonce": "check-reza-production-path.15e9d6.18c9d7a600cec7c2"
+}

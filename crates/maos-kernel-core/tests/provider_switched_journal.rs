@@ -39,6 +39,7 @@ fn default_caps_required() -> CapabilitiesRequired {
         // Story 5.5c added the `mcp` field; default to an empty MCP capability
         // set so this 5.5b regression test stays unchanged in spirit.
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
+        loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
     }
 }
 

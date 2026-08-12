@@ -1,0 +1,43 @@
+{
+  "absent_required_legs": [
+    "asymmetric-consent-reverse-share-refused",
+    "collective-store-tenant-wall-live",
+    "cross-team-clobber-refused",
+    "cross-team-crossing-lands-with-bound-source-team",
+    "d1-forged-stamp-served-boundary",
+    "foreign-team-row-without-attestation-refused-at-read",
+    "live-crossing-runs-through-two-daemons",
+    "per-row-inclusion-verified-at-read-time",
+    "per-team-merkle-independence",
+    "provenance-carries-across-two-stores",
+    "refused-crossing-operator-tail-and-repair",
+    "reza-three-team-three-region-journey",
+    "tenant-mode-boots-live",
+    "three-team-databases-physically-distinct",
+    "two-datname-physical-absence"
+  ],
+  "binding_note": "The gate hashes tracked and untracked worktree bytes before writing its report. Publishing that report changes the hashed set, so no dirty-worktree digest is presented as current. Use an immutable clean commit for a bound publication.",
+  "binding_status": "UNBOUND_DIRTY_WORKTREE",
+  "command_exit": 0,
+  "gate": "check-multi-tenant-loom",
+  "leg_counts": {
+    "ABSENT": 16,
+    "PROVEN_BLOCKING": 87
+  },
+  "live_substrate_available": false,
+  "observed_on": "2026-08-08",
+  "operator_key_available": false,
+  "product_claim": "NOT_PROVEN(two-datname-physical-absence=ABSENT, d1-forged-stamp-served-boundary=ABSENT, per-team-merkle-independence=ABSENT, three-team-databases-physically-distinct=ABSENT, refused-crossing-operator-tail-and-repair=ABSENT, cross-team-crossing-lands-with-bound-source-team=ABSENT, asymmetric-consent-reverse-share-refused=ABSENT, cross-team-clobber-refused=ABSENT, per-row-inclusion-verified-at-read-time=ABSENT, foreign-team-row-without-attestation-refused-at-read=ABSENT, live-crossing-runs-through-two-daemons=ABSENT, provenance-carries-across-two-stores=ABSENT, tenant-mode-boots-live=ABSENT, collective-store-tenant-wall-live=ABSENT, reza-three-team-three-region-journey=ABSENT)",
+  "publication_status": "CURRENT_REVIEW_OBSERVATION_UNBOUND",
+  "required_journey": {
+    "attempted": false,
+    "detail": "Story 13.6 has no signed journey declaration after review; no harness evidence record.",
+    "evidence_state": "ABSENT",
+    "green": false,
+    "name": "reza-three-team-three-region-journey",
+    "required": true
+  },
+  "schema": "maos.review-observation.v1",
+  "source_commit": "c6977b359fc289fecdb39d2fbedd36476b90fd06",
+  "source_report": "tests/reports/evidence-ledger-check-multi-tenant-loom.json (local ignored output; not published)"
+}

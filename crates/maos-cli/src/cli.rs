@@ -111,6 +111,8 @@ pub enum Subcommand {
     Skills(SkillsArgs),
     /// GDPR Article 17 — forget a principal and emit a receipt.
     Forget(ForgetArgs),
+    /// Operate the Host-global GDPR legal-hold registry (Story 13.5b).
+    LegalHold(LegalHoldArgs),
     /// Story 9.3b — governance operations on the schema-lifecycle registry.
     Governance(GovernanceArgs),
     /// Story 9.4 AC-3 — Transparency Log backup/DR (region-scoped).
@@ -222,6 +224,23 @@ pub struct ForgetArgs {
     /// Optional legal-hold reason, e.g. `legal-hold` or `legal-hold:<case-ref>`.
     #[arg(long, value_name = "REASON")]
     pub reason: Option<String>,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct LegalHoldArgs {
+    #[command(subcommand)]
+    pub op: LegalHoldOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum LegalHoldOp {
+    /// List every Host-global principal legal hold.
+    List,
+    /// Release one principal legal hold. Release never auto-erases data.
+    Release {
+        #[arg(long, value_name = "PRINCIPAL")]
+        principal: String,
+    },
 }
 
 /// Story 7.4 — `maosctl skills <list|approve|reject>`.
@@ -394,6 +413,28 @@ pub enum AuditQuery {
         /// Output file path for the signing key.
         #[arg(long)]
         output: Option<std::path::PathBuf>,
+    },
+    /// J1 Tier-2 — journal a signed-run **capture doc** as an audit entry so a
+    /// subsequent `sealed-export` signature covers it.
+    ///
+    /// `sealed-export` signs the covered-window audit ROWS (not an arbitrary
+    /// file set), so a human-readable capture is only under the signature if it
+    /// is first written to the Transparency Log. This records the capture as a
+    /// `run.capture` row (kind 31, `HumanAuthored` origin) after validating the
+    /// required non-secret fields and refusing any capture that carries a
+    /// secret-shaped value. Run this BEFORE `sealed-export --spirit <same>`.
+    RecordCapture {
+        /// Path to the capture-doc JSON file (non-secret run metadata).
+        #[arg(long)]
+        capture: std::path::PathBuf,
+        /// Spirit the capture attests. Its `(boot_nonce, pid)` stamp the row so
+        /// `sealed-export --spirit <same>` includes it. Omit to stamp a
+        /// host-level attestation (pid/boot = 0), covered by `--range` export.
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Disambiguate when the spirit name resolves to multiple boots.
+        #[arg(long)]
+        boot: Option<u64>,
     },
     /// Verify a sealed-export bundle.
     VerifyBundle {
@@ -643,6 +684,15 @@ pub enum SpiritOp {
         /// Path to the successor's manifest TOML file.
         #[arg(long)]
         to: String,
+        /// Story 13.4 (FR37/ADR-056) — optional path to the target version's
+        /// vetting attestation (CBOR). Required for a public-vetted target to
+        /// pass the precondition; absent ⇒ the exact-hash flap refuses.
+        #[arg(long)]
+        attestation: Option<String>,
+        /// Story 13.4 — optional path to the operator vetter keyring (CBOR)
+        /// used to walk the attestation → enrollment → operator-root chain.
+        #[arg(long)]
+        keyring: Option<String>,
     },
     /// Upgrade a Spirit to a successor version with a declared policy (Story 5.4, FR49).
     Upgrade {
@@ -662,6 +712,12 @@ pub enum SpiritOp {
         /// without starting a swap.
         #[arg(long)]
         plan: bool,
+        /// Target version's vetting attestation (CBOR).
+        #[arg(long, requires = "keyring")]
+        attestation: Option<String>,
+        /// Operator vetter-key journal (CBOR).
+        #[arg(long, requires = "attestation")]
+        keyring: Option<String>,
         /// Upgrade policy. Default: hot-swap.
         #[arg(long, value_enum, default_value_t = UpgradePolicyArg::HotSwap)]
         policy: UpgradePolicyArg,
@@ -702,6 +758,14 @@ pub struct ImportArgs {
     /// (default false).
     #[arg(long)]
     pub force_tier: Option<String>,
+
+    /// Public-vetted promotion artifact (canonical CBOR).
+    #[arg(long, requires = "vetter_keyring")]
+    pub vetting_attestation: Option<std::path::PathBuf>,
+
+    /// Operator vetter-key journal (canonical CBOR).
+    #[arg(long, requires = "vetting_attestation")]
+    pub vetter_keyring: Option<std::path::PathBuf>,
 
     /// Verify-only mode: print the would-be admission decision and exit.
     #[arg(long, default_value_t = false)]

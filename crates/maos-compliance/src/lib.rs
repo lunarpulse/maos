@@ -37,6 +37,15 @@ pub mod builder;
 pub mod canonical_cbor;
 pub mod evaluator;
 pub mod runtime_context;
+pub mod vetting;
 
 pub use evaluator::{evaluate_envelope, ComplianceVerdict, DriftField, EComplianceRejection};
 pub use runtime_context::RuntimeExecutionContext;
+pub use vetting::{
+    classify_terminal_cause, evaluate_upgrade_precondition, issue_attestation,
+    observe_running_spirit, verify_attestation, verify_attestation_signature, RevocationSemantics,
+    RunningSpiritObservation, SuccessorPolicy, TerminalDisposition, TerminalInputs,
+    TerminalObservationSink, VerifiedAttestation, VetterKeyEvent, VetterKeyEventClaim,
+    VetterKeyEventKind, VetterKeyring, VettingAttestation, VettingClaim, VettingRejection,
+    VettingTerminalCause,
+};

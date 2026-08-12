@@ -13,7 +13,7 @@ review_status: machine
 - [ADR-004](https://github.com/lunarpulse/maos/blob/main/docs/adr/ADR-004-sandbox-tier-taxonomy.md) — `SandboxTier` 근거
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Binding-v0.1 ComplianceClaim 스키마 타입 — **동결(FROZEN)**.
 

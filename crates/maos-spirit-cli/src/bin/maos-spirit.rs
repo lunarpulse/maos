@@ -30,8 +30,10 @@ enum Command {
 
 #[derive(Parser, Debug)]
 struct PublishArgsCli {
-    /// Trust tier: local | org_internal | public_untrusted (public_vetted deferred per FR37 v2.5).
-    #[arg(long, value_parser = ["local", "org_internal", "public_untrusted"])]
+    /// Trust tier: local | org_internal | public_untrusted | public_vetted.
+    /// `public_vetted` is a declared aspiration (FR37/ADR-056) — inert until a
+    /// vetting attestation promotes it at admission.
+    #[arg(long, value_parser = ["local", "org_internal", "public_untrusted", "public_vetted"])]
     tier: String,
 
     /// Path to the Spirit manifest TOML.

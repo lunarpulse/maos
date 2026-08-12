@@ -35,6 +35,7 @@ pub enum CohortManifestForkReason {
     NonAuthoritySigner,
     VersionRegression,
     ConcurrentFork,
+    SchemaDowngrade,
 }
 
 impl std::fmt::Display for CohortManifestForkReason {
@@ -43,6 +44,7 @@ impl std::fmt::Display for CohortManifestForkReason {
             Self::NonAuthoritySigner => "non_authority_signer",
             Self::VersionRegression => "version_regression",
             Self::ConcurrentFork => "concurrent_fork",
+            Self::SchemaDowngrade => "schema_downgrade",
         };
         formatter.write_str(value)
     }
@@ -76,10 +78,9 @@ pub enum CohortError {
     #[error("cohort manifest TOML parse error: {0}")]
     ParseError(String),
 
-    /// `schema_version` is not the frozen v1 (`SCHEMA_VERSION`). A bump is a
-    /// wire-format change gated by an ADR.
-    #[error("unsupported cohort manifest schema_version: got {got}, expected {expected}")]
-    EUnsupportedSchemaVersion { got: u64, expected: u64 },
+    /// `schema_version` is outside the explicitly supported reader set.
+    #[error("unsupported cohort manifest schema_version: got {got}, supported {supported:?}")]
+    EUnsupportedSchemaVersion { got: u64, supported: Vec<u64> },
 
     /// `version` is not a strictly-positive integer (≤ 0). Strict monotonicity
     /// across re-issues is enforced by the re-issue discipline (Task 3); at
@@ -127,6 +128,77 @@ pub enum CohortError {
     /// A `host_id` appears more than once across `members`.
     #[error("duplicate cohort member host_id: {host_id}")]
     EDuplicateHostId { host_id: String },
+
+    #[error(
+        "cohort schema/team-map mismatch: schema_version={schema_version}, teams={teams_state}"
+    )]
+    ECohortSchemaTeamsMismatch {
+        schema_version: u64,
+        teams_state: &'static str,
+    },
+
+    #[error(
+        "cross-team consent is only valid in schema v3 or newer, got schema v{schema_version}"
+    )]
+    ECohortSchemaCrossTeamConsentMismatch { schema_version: u64 },
+
+    /// Story 13.6a — a pre-v4 manifest carried a per-member `team` declaration.
+    /// Refused rather than ignored: an ignored declaration is an UNSIGNED
+    /// declaration on the shared canonical pre-image.
+    #[error(
+        "per-member team declaration is only valid in schema v4, got schema \
+         v{schema_version} for member {host_id}"
+    )]
+    ECohortSchemaMemberTeamMismatch {
+        schema_version: u64,
+        host_id: String,
+    },
+
+    /// Story 13.6a — a member declares a team the same signed body never
+    /// declares as a [`crate::manifest::TeamEntry`].
+    #[error("member {host_id} declares undeclared team {team_id}")]
+    ECohortMemberTeamUnknown { host_id: String, team_id: String },
+
+    #[error("cross-team consent references undeclared source team {team_id}")]
+    ECrossTeamConsentFromTeamUnknown { team_id: String },
+
+    #[error("cross-team consent references undeclared destination team {team_id}")]
+    ECrossTeamConsentToTeamUnknown { team_id: String },
+
+    #[error("cross-team consent cannot grant a self-crossing for team {team_id}")]
+    ECrossTeamConsentSelfGrant { team_id: String },
+
+    #[error("cross-team consent intent is not canonical: {intent}")]
+    ECrossTeamConsentIntentNotCanonical { intent: String },
+
+    #[error("duplicate cross-team consent grant: {from_team}->{to_team}, intent={intent}")]
+    EDuplicateCrossTeamConsent {
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+
+    #[error("duplicate team id in cohort manifest: {team_id}")]
+    EDuplicateTeamId { team_id: String },
+
+    #[error("duplicate team datname in cohort manifest: {datname}")]
+    EDuplicateTeamDatname { datname: String },
+
+    #[error("team {team_id} has no Spirit members")]
+    EEmptyTeamMembers { team_id: String },
+
+    #[error("team {team_id} region is not canonical: {region}")]
+    ETeamRegionNotCanonical { team_id: String, region: String },
+
+    #[error("team {team_id} Postgres datname is invalid: {datname}")]
+    ETeamDatnameInvalid { team_id: String, datname: String },
+
+    #[error("Spirit {spirit_id} belongs to multiple teams: {first_team} and {second_team}")]
+    ESpiritInMultipleTeams {
+        spirit_id: String,
+        first_team: String,
+        second_team: String,
+    },
 
     /// (Task 2) [`CohortManifest::peer_configs_for`] was asked for the peer
     /// edges of a `self_host` that is not a declared cohort member. The mesh is

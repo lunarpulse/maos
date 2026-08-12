@@ -13,7 +13,7 @@ review_status: machine
 - [deprecation Module](./deprecation) — `Ctx::deprecation_warnings()`가 반환하는 `DeprecationWarning`
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Spirit 작성자용 컨텍스트 타입.
 

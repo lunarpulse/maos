@@ -13,7 +13,7 @@ review_status: machine
 - [STABILITY.md](https://github.com/lunarpulse/maos/blob/main/STABILITY.md) — 지원 중단 라이프사이클 추적
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 Story 7.1 v0.5 바인딩 — 지원 중단 경고 채널 표면.
 

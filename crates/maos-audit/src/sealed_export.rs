@@ -6,6 +6,7 @@
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use hkdf::Hkdf;
 use maos_domain::region::Region;
+use maos_domain::team::TeamId;
 use sha2::{Digest, Sha256};
 
 // ─── Story 9.4b AC-5 — region-bound TL signing-key derivation ────────────────
@@ -39,6 +40,53 @@ pub fn derive_region_signing_seed(base_seed: &[u8; 32], region: &Region) -> [u8;
 /// [`derive_region_signing_seed`]).
 pub fn derive_region_pubkey(base_seed: &[u8; 32], region: &Region) -> [u8; 32] {
     derive_pubkey(&derive_region_signing_seed(base_seed, region))
+}
+
+// ─── Story 13.2 AC-1 — per-team TL signing-key weld (2nd HKDF stage) ──────────
+
+/// HKDF-SHA256 salt domain-separator for the per-team TL signing-key weld.
+///
+/// Pinned — never change without an ADR; changing it irreversibly re-keys every
+/// in-flight team bundle.
+const TEAM_TL_SIGNING_SALT: &[u8] = b"maos.team.tl-signing.v1";
+/// HKDF `info` prefix binding the frozen team `ascii-v1` encoding into the
+/// derivation context. Unlike [`Region`], [`TeamId`] REJECTS non-canonical
+/// input and never normalizes, so two spellings of one team can never reach a
+/// single key — the "one key per team" property (AC-12 analogue) is enforced by
+/// rejection at the `TeamId` boundary, NOT by folding inside this derivation.
+///
+/// Pinned — never change without an ADR; changing it irreversibly re-keys every
+/// in-flight team bundle.
+const TEAM_INFO_PREFIX: &[u8] = b"maos.team.ascii-v1:";
+
+/// Derive a per-team Ed25519 signing seed as a SECOND HKDF-SHA256 stage whose
+/// IKM is the region-bound signing seed (Story 13.2 / Fork-4 / ADV-055-1). The
+/// team weld welds directly over [`derive_region_signing_seed`]'s output, so a
+/// bundle signed under one `(region, team)` cannot verify under another team's
+/// derived key — the cryptographic tenant boundary.
+///
+/// ⚠ Blast radius: welding over the region seed means region-seed compromise is
+/// **team-wide** — an attacker who recovers the region signing seed can derive
+/// every team key in that region. Acceptable (region compromise is already
+/// region-wide) but documented (`loom-threat-model.md` T1 blast-radius note).
+pub fn derive_team_signing_seed(base_seed: &[u8; 32], region: &Region, team: &TeamId) -> [u8; 32] {
+    let region_seed = derive_region_signing_seed(base_seed, region);
+    let hk = Hkdf::<Sha256>::new(Some(TEAM_TL_SIGNING_SALT), &region_seed);
+    let mut info = Vec::with_capacity(TEAM_INFO_PREFIX.len() + team.as_str().len());
+    info.extend_from_slice(TEAM_INFO_PREFIX);
+    info.extend_from_slice(team.as_str().as_bytes());
+    let mut okm = [0u8; 32];
+    hk.expand(&info, &mut okm)
+        .expect("32 bytes is a valid HKDF-SHA256 output length");
+    okm
+}
+
+/// Derive the per-team Ed25519 *public* key — the expected attester key for
+/// verifying a cross-team bundle claiming `(region, team)` (the verify-side
+/// companion of [`derive_team_signing_seed`]). The verifier derives this from
+/// the bundle's *claimed* identity, never from a key the bundle carries (R-RG1).
+pub fn derive_team_pubkey(base_seed: &[u8; 32], region: &Region, team: &TeamId) -> [u8; 32] {
+    derive_pubkey(&derive_team_signing_seed(base_seed, region, team))
 }
 
 // ─── Bundle types ──────────────────────────────────────────────────────────
@@ -330,6 +378,76 @@ mod tests {
     use super::*;
     use crate::AuditEntry;
 
+    // ─── Story 13.2 AC-1 — per-team weld ─────────────────────────────────────
+
+    #[test]
+    fn team_encoding_ids_are_frozen() {
+        // Tripwire (mirrors region.rs::encoding_id_is_frozen): changing either
+        // constant is an intentional irreversible re-key of every in-flight team
+        // bundle. Editing this assert mandates an ADR (AC-1 frozen grammar).
+        assert_eq!(TEAM_TL_SIGNING_SALT, b"maos.team.tl-signing.v1");
+        assert_eq!(TEAM_INFO_PREFIX, b"maos.team.ascii-v1:");
+    }
+
+    #[test]
+    fn team_weld_is_deterministic_and_second_stage() {
+        let base = [0x42u8; 32];
+        let region = Region::canonicalize("us-east-1").unwrap();
+        let team = TeamId::new("security").unwrap();
+        // Deterministic.
+        assert_eq!(
+            derive_team_signing_seed(&base, &region, &team),
+            derive_team_signing_seed(&base, &region, &team)
+        );
+        // The team seed is a SECOND stage over the region seed — it must differ
+        // from the region seed it is welded over (not a passthrough).
+        assert_ne!(
+            derive_team_signing_seed(&base, &region, &team),
+            derive_region_signing_seed(&base, &region)
+        );
+        // The team pubkey differs from the region pubkey (distinct keys).
+        assert_ne!(
+            derive_team_pubkey(&base, &region, &team),
+            derive_region_pubkey(&base, &region)
+        );
+    }
+
+    #[test]
+    fn team_weld_separates_teams_and_regions() {
+        let base = [0x42u8; 32];
+        let region_a = Region::canonicalize("us-east-1").unwrap();
+        let region_b = Region::canonicalize("eu-west-1").unwrap();
+        let team_x = TeamId::new("security").unwrap();
+        let team_y = TeamId::new("support").unwrap();
+        let kxa = derive_team_pubkey(&base, &region_a, &team_x);
+        // Different team, same region → different key (the tenant boundary).
+        assert_ne!(kxa, derive_team_pubkey(&base, &region_a, &team_y));
+        // Same team, different region → different key.
+        assert_ne!(kxa, derive_team_pubkey(&base, &region_b, &team_x));
+        // Different base seed → different key.
+        assert_ne!(kxa, derive_team_pubkey(&[0x43u8; 32], &region_a, &team_x));
+    }
+
+    #[test]
+    fn team_weld_signs_and_verifies_ed25519() {
+        // Positive control: a signature under the derived team seed verifies
+        // under the independently-derived team pubkey (real crypto, no stub).
+        let base = [0x42u8; 32];
+        let region = Region::canonicalize("us-east-1").unwrap();
+        let team = TeamId::new("security").unwrap();
+        let seed = derive_team_signing_seed(&base, &region, &team);
+        let signing_key = SigningKey::from_bytes(&seed);
+        let msg = b"team-bound attestation payload";
+        let sig = signing_key.sign(msg);
+        let pk = VerifyingKey::from_bytes(&derive_team_pubkey(&base, &region, &team)).unwrap();
+        assert!(pk.verify(msg, &sig).is_ok());
+        // Negative: another team's pubkey must reject the signature.
+        let other = TeamId::new("support").unwrap();
+        let pk_other =
+            VerifyingKey::from_bytes(&derive_team_pubkey(&base, &region, &other)).unwrap();
+        assert!(pk_other.verify(msg, &sig).is_err());
+    }
+
     fn make_test_entries() -> Vec<AuditEntry> {
         vec![AuditEntry {
             frame_id_hex: "deadbeef".to_string(),
@@ -609,10 +727,7 @@ mod tests {
         // covered_window has since/until
         let _since = signed.freshness.covered_window.since_ns;
         let _until = signed.freshness.covered_window.until_ns;
-        assert!(
-            signed.freshness.export_seq >= 0, // u64 is always >= 0 but check explicitly
-            "export_seq must be present"
-        );
+        let _export_seq = signed.freshness.export_seq;
         // Also verify the bundle passes verification
         let pubkey = derive_pubkey(&seed);
         verify_bundle(&signed, &pubkey).expect("signed bundle must verify");

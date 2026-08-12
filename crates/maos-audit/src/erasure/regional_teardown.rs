@@ -45,22 +45,57 @@ pub const REGIONAL_TEARDOWN_SCHEMA_VERSION: &str = "maos.regional-teardown.v1";
 /// Honest phase-(b) method label under Option A (signed, not encrypted).
 pub const KEY_DECOMMISSION_METHOD: &str = "signing-key-decommission";
 
-/// The three plaintext working-memory backends the forget cascade must cover.
+/// The plaintext working-memory backends the forget cascade must cover for a
+/// regional teardown to attest `completed`.
+///
+/// Story 13.5b REMOVED `"shared"` from this set: `SharedMemoryStore` has no
+/// delete method at any visibility, so the cascade could never cover it and
+/// `completed` was structurally unable to be `true`.
+///
+/// Story 13.5h RESTORED it, on a different footing. The Shared tier is now
+/// principal-empty **by construction** — `reject_principal_outside_private`
+/// refuses `MemoryNamespace::Principal` at the Shared write/read/scan entry
+/// points — so the erasure obligation over it is dischargeable. Coverage here
+/// means "this store holds no subject-scoped PII", which the producer
+/// VERIFIES per run by counting principal-namespaced rows. It does NOT mean
+/// rows were deleted: there is still no DELETE path, and the partition makes
+/// any pre-existing row unreachable rather than erased. A Host carrying
+/// pre-partition rows therefore fails that count, omits `"shared"` from
+/// `stores_covered`, and keeps `completed == false` — fail-closed.
 pub const REQUIRED_STORES: &[&str] = &["private", "principal_index", "shared"];
 
-/// All known store names. Used to reject typos / unknown stores in attestation
-/// construction. Currently identical to [`REQUIRED_STORES`]; kept separate so
-/// future optional stores can be added without weakening the required set.
+/// Backends that exist and hold principal-shaped data but have **no erase
+/// path**, so no attestation may ever claim coverage of them.
+///
+/// EMPTY since Story 13.5h closed the Shared-tier hole. The constant is
+/// retained deliberately: it is the single grep-able place a future
+/// no-erase-path backend is declared, and `store_sets_partition_known_stores`
+/// keeps it partitioned against [`REQUIRED_STORES`].
+pub const UNCOVERED_STORES: &[&str] = &[];
+
+/// All known store names. Used to reject typos / fabricated stores in
+/// attestation construction. Always the disjoint union of [`REQUIRED_STORES`]
+/// and [`UNCOVERED_STORES`] — asserted by `store_sets_partition_known_stores`.
 pub const KNOWN_STORES: &[&str] = &["private", "principal_index", "shared"];
 
 /// Phase (a) — forget-cascade completion attestation (the REAL erasure).
+///
+/// **Scope contract (Story 13.5b).** This attestation covers exactly the stores
+/// named in `stores_covered` and nothing else. `completed == true` means every
+/// [`REQUIRED_STORES`] entry was covered — it does **not** mean every backend on
+/// the Host was erased. A store in [`UNCOVERED_STORES`] is never covered here;
+/// it is reported per-run in the companion erasure-proof bundle as
+/// [`crate::erasure::proof::CategoryStatus::CoverageGap`]. A receipt is therefore
+/// **not** a standalone all-tier Article 17 artifact: read it beside its proof.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ForgetCascadeAttestation {
     /// The stores the cascade covered — must include all of [`REQUIRED_STORES`].
+    /// This list, not the `completed` flag, is the authoritative scope.
     pub stores_covered: Vec<String>,
     /// Count of region-scoped principals whose rows were erased/redacted.
     pub erased_principal_count: u64,
-    /// Whether the cascade completed across ALL required stores.
+    /// Whether the cascade completed across all [`REQUIRED_STORES`]. Never a
+    /// claim about [`UNCOVERED_STORES`].
     pub completed: bool,
 }
 
@@ -239,6 +274,15 @@ pub fn build_regional_teardown_receipt(
 /// Re-checks both phases completed and recomputes + verifies the home-key
 /// signature over the canonical payload (so tampering `region` or either
 /// attestation breaks verification).
+///
+/// **What a successful verification does and does not say (Story 13.5b).**
+/// `Ok(())` means the receipt is authentic and both phases completed **over the
+/// stores named in `forget_cascade.stores_covered`**. It is not a claim that
+/// every backend on the Host was erased: [`UNCOVERED_STORES`] are excluded by
+/// construction. A consumer treating this receipt as an all-tier Article 17
+/// artifact MUST also read the companion erasure-proof bundle for the same run
+/// and honour its [`crate::erasure::proof::CategoryStatus::CoverageGap`]
+/// entries. Receipt alone: scoped attestation. Receipt + proof: full picture.
 pub fn verify_regional_teardown_receipt(
     receipt: &RegionalTeardownReceipt,
     home_pubkey: &[u8; 32],
@@ -276,6 +320,7 @@ pub fn verify_regional_teardown_receipt(
 mod tests {
     use super::*;
     use crate::sealed_export::derive_pubkey;
+    use std::collections::BTreeSet;
 
     fn region(s: &str) -> Region {
         Region::canonicalize(s).unwrap()
@@ -289,16 +334,60 @@ mod tests {
         .unwrap()
     }
 
+    /// Story 13.5b invariant: the required and uncovered sets partition the
+    /// known set. Moving a store between `REQUIRED_STORES` and
+    /// `UNCOVERED_STORES` without removing it from the other reds here, so the
+    /// two constants cannot drift apart. Story 13.5h moved `"shared"` across.
+    #[test]
+    fn store_sets_partition_known_stores() {
+        let required: BTreeSet<&str> = REQUIRED_STORES.iter().copied().collect();
+        let uncovered: BTreeSet<&str> = UNCOVERED_STORES.iter().copied().collect();
+        let known: BTreeSet<&str> = KNOWN_STORES.iter().copied().collect();
+        assert!(
+            required.is_disjoint(&uncovered),
+            "a store cannot be both required and uncovered: {:?}",
+            required.intersection(&uncovered).collect::<Vec<_>>()
+        );
+        let union: BTreeSet<&str> = required.union(&uncovered).copied().collect();
+        assert_eq!(
+            union, known,
+            "REQUIRED_STORES + UNCOVERED_STORES must equal KNOWN_STORES exactly"
+        );
+    }
+
+    /// Story 13.5h: `"shared"` is required and no longer uncovered. It became
+    /// nameable as required only because the tier is principal-empty by
+    /// construction (the partition), not because a DELETE path appeared.
+    #[test]
+    fn shared_is_required_not_uncovered() {
+        assert!(REQUIRED_STORES.contains(&"shared"));
+        assert!(!UNCOVERED_STORES.contains(&"shared"));
+        assert!(KNOWN_STORES.contains(&"shared"));
+    }
+
     #[test]
     fn cascade_completed_only_when_all_required_stores_covered() {
         assert!(complete_cascade().completed);
-        // Missing `shared` → not complete.
-        let partial = ForgetCascadeAttestation::from_outcome(
+        // Story 13.5h: `shared` is now required and dischargeable, so a run
+        // that verified all three stores completes.
+        let real = ForgetCascadeAttestation::from_outcome(
+            vec!["private".into(), "principal_index".into(), "shared".into()],
+            3,
+        )
+        .unwrap();
+        assert!(real.completed);
+        // Missing `principal_index` → not complete. `completed` stays falsifiable.
+        let partial = ForgetCascadeAttestation::from_outcome(vec!["private".into()], 3).unwrap();
+        assert!(!partial.completed);
+        // Story 13.5h fail-closed: a Host whose shared tier still holds
+        // pre-partition principal rows omits `shared` from the covered set, and
+        // `completed` must go FALSE rather than quietly attest success.
+        let pre_partition_residue = ForgetCascadeAttestation::from_outcome(
             vec!["private".into(), "principal_index".into()],
             3,
         )
         .unwrap();
-        assert!(!partial.completed);
+        assert!(!pre_partition_residue.completed);
     }
 
     #[test]

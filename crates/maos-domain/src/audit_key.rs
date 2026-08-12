@@ -42,6 +42,15 @@ pub fn load_audit_key_seed(explicit_path: &Option<PathBuf>) -> Result<Ed25519See
     parse_seed_bytes(&raw)
 }
 
+/// Derive the operator audit root public key from its configured seed.
+pub fn derive_audit_public_key(seed: &Ed25519Seed) -> [u8; 32] {
+    use ed25519_dalek::{SigningKey, VerifyingKey};
+
+    let signing_key = SigningKey::from(seed);
+    let verifying_key: VerifyingKey = signing_key.verifying_key();
+    verifying_key.to_bytes()
+}
+
 /// Default audit signing key path: `~/.config/maos/audit-signing.key`
 pub fn default_audit_key_path() -> PathBuf {
     dirs_config_home().join("audit-signing.key")

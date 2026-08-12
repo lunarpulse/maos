@@ -55,6 +55,167 @@ coverage:
       IdentityAssertionPort / KeyManagementPort / SiemProjectionPort; OIDC
       reference verifier, dev/CI local-master-key KMS, and SIEM TL projection
       are additive leaves. Fault-inject features are blocked from release builds.
+  ADR-055:
+    gates:
+    - check-multi-tenant-loom
+    - check-reza-production-path
+    - check-dependency-closure
+    - check-kernel-baseline
+    corpora: []
+    phase: v2.0+
+    valid_until: '2027-07-28'
+    notes: |
+      Story 13.1 physical tenant-wall anchor + Story 13.2 cryptographic tenant
+      boundary (Fork-4 / ADV-055-1). 13.1: database-per-team, manifest-authoritative
+      team placement, the three-site pre-query guard, construction-time datname
+      self-check, physical-absence witness, and the staged D1 forged-stamp-served
+      boundary. 13.2 (Option A, closed at ENTRY): per-team HKDF signing-key weld
+      (2nd stage over the region seed), canonical_kv_leaf v2 (source_team in the
+      pre-image, v1 leaves byte-identical), and verify_replication_bundle deriving
+      the pubkey from the CLAIMED (region, team) so a forged same-region cross-team
+      bundle is refused at verify and never lands (apply-only-after-verify). Proven
+      by the check-multi-tenant-loom crypto legs: forged-team-stamp-refused-at-verify,
+      apply-refuses-forged-bundle, team-identity-source-reflex (hermetic Blocking) +
+      per-team-merkle-independence incl. mixed v1/v2 (advisory-substrate).
+      Story 13.3 keeps team_guard presence-only and adds a separate two-site
+      post-query attestation_guard: schema-v3 ordered A→B consent, verified
+      source-team persistence, cross-team namespace isolation, per-row
+      leaf/root/signature/proof persistence, plaintext row binding, and
+      structured caller-visible refusal causes inside TransportCause. Its
+      check-multi-tenant-loom legs cover crossing landing, asymmetric reverse
+      refusal (composition-level: the production manifest-backed adapter over
+      a signed V3 manifest on two physical databases), clobber prevention
+      (namespace isolation + a planted physical collision exercising the LWW
+      source-team predicate), read-time inclusion/signature verification, the
+      unattested-foreign-row read refusal, taxonomy distinguishability, the
+      claimed-pair verifying-key refusal at apply (party-mode D1), and the
+      remaining no-production-initiator dead wire (scanned across every
+      production source, not just main). Apply stamps the envelope identity
+      onto every leaf at build and refuses leaf/envelope mismatches, so an
+      honestly built bundle can never land a permanently unreadable row. The
+      region source_log_ref presence residual remains OPEN with no named
+      successor; the region-migration key-stranding residual is named and
+      owned by the initiator era (party-mode D1).
+      Story 13.5c (single composition root + bootable tenant
+      mode) closed refresh wiring: one Transparency Log, one per-boot nonce
+      (single-sourced, NFR-Rel-6), and TenantMapAdapter's first production
+      construction so MAOS_LOOM_HOME_TEAM boots. Story 13.5d makes the route
+      serve: manifest-v4 loom scopes reach admission policy, Researcher exposes
+      a fail-closed synchronous collective port, one AtomicU32 single-sources
+      token issuance, kernel calls, and tenant registration, and the live
+      two-datname witness proves a registered pid writes only its mapped team
+      while an unregistered pid writes nowhere. 13.5c legs:
+      cohort-daemon-boots-and-serves, cohort-daemon-per-boot-nonce-single-sourced,
+      non-daemon-does-not-enable-tenant-map (hermetic Blocking) +
+      tenant-mode-boots-live (advisory-substrate). `check-reza-production-path`
+      owns the 13.5d route legs: loom-scope-reaches-policy-table,
+      route-not-spirit-reachable, production-collective-single-source,
+      composition-root-does-not-seed-manifest-scopes, and
+      mediated-operation-correlation (hermetic Blocking) +
+      spirit-collective-route-live (advisory-substrate).
+      Story 13.3b adds frozen predecessor leaf goldens plus signed v3
+      distillation_depth/intent_lineage origin metadata, a two-datname
+      apply/rebundle continuation witness, a manifest-backed directional
+      cross-wall recall seam with typed refusal taxonomy, and the
+      diamond-not-cycle traversal oracle. The leaf and bundle establish
+      origin provenance only, never authorization provenance.
+      Story 13.6a adds authenticated team identity: COHORT_SCHEMA_V4 +
+      SIG_DOMAIN_V4 carry an operator-signed CohortMember.team (the first
+      host->team edge in the signed manifest), appended after every predecessor
+      section so v1/v2/v3 canonical bodies stay byte-identical by construction
+      and are pinned by three goldens. Both A2A seams enforce it: the send seam
+      stamps cohort_source_team from the LOCAL host's signed declaration, and
+      handle_intake_verified refuses a claim the TLS-verified peer does not
+      speak for under CODE_TEAM_IDENTITY_MISMATCH (-32010), distinct from the
+      host-axis CODE_PEER_IDENTITY_MISMATCH (-32007). Absence is fail-closed.
+      Defer becomes a refusal on collective:share only, with a bilateral
+      regression control proving Story 12.1's mixed-deployment fallback
+      survives for every other intent. 13.6a legs (all hermetic Blocking):
+      manifest-v4-additive-over-three-predecessors, manifest-v4-golden,
+      manifest-v4-member-team-signature-bound,
+      manifest-v4-member-team-negatives-typed,
+      cohort-v4-to-v3-downgrade-refused-and-audited,
+      team-identity-impersonation-refused, team-identity-absence-refuses,
+      team-identity-emitter-self-check,
+      crossing-intent-not-reserved-both-seams,
+      crossing-gate-wired-at-composition-root,
+      eviction-enforced-on-both-endpoints, stale-cache-refuses-crossing,
+      crossing-defer-refused-on-both-seams, and
+      bilateral-fallback-preserved-for-non-crossing-intents. 13.6a corrects
+      loom-threat-model T1: 13.2's close is scoped to a SEED-LESS forger, and
+      the surviving limit is that isolation is enforced against a peer, not
+      against the operator (per-team key provisioning = v25-signed-shard).
+      No artifact may claim "Fork-4 proven" of the crossing path.
+      Story 13.6b wires the production crossing and welds the two team fields.
+      Topology: TWO cohort-a2a-daemon processes, one store each (D-5 — exactly
+      one production LoomLiteStore::new, now a Blocking control), joined by the
+      cohort A2A mesh. The emitter lives INSIDE the daemon runtime because
+      prepare_outbound is the only production outbound A2A path and its
+      transport exists only there (D-14); it uses the 13.3b originate_team_row
+      seam so the row is born attested and the bytes on the wire are the bytes
+      that were signed. The applier hangs off handle_intake_verified (D-8, 12.3
+      P5r) through a dependency-inverted CrossTeamCrossingPort, and is the FIRST
+      production caller of apply_replication_bundle -> is_granted.
+      THE HEADLINE (D-13): 13.6a authenticates the ENVELOPE
+      (request.cohort_source_team) while consent is decided from the PAYLOAD
+      (bundle.source_team); nothing bound them, so a truthful envelope plus a
+      correctly-signed lying payload landed an impersonated row with every
+      shipped check green. The applier now refuses that before any apply, under
+      CODE_CROSSING_SOURCE_TEAM_UNBOUND (-32011), distinct from -32010 (a lying
+      envelope) and -32012 (an honest but ungranted crossing). 13.6a's
+      impersonation leg is NOT evidence for it: different site, different
+      assertion, and the forger here HOLDS the seed so its signature verifies.
+      AC2 gives the refusal a wire: -32012 carries reason/from_team/to_team/
+      intent and interpret_response re-materialises it, so denial, staleness,
+      and unavailability stay three distinct EMITTER-side outcomes (D-15
+      measured zero TransportCause occurrences in either A2A crate);
+      TransportCause stays applier-local where the five-cause matrix already
+      holds. AC4 extends reconcile_transport_identity_with_manifest to the team
+      axis: MAOS_LOOM_HOME_TEAM must equal the signed CohortMember.team or the
+      process does not start — the correctness control against misconfiguration,
+      explicitly NOT a substitute for the AC3 weld.
+      13.6b legs: crossing-has-production-initiator-both-endpoints (a call-chain
+      REACHABILITY walk, not a text scan — the first draft stayed green when the
+      emitter call was deleted, 13.5g's exact finding reproduced inside this
+      story's own gate), crossing-scan-closes-originate-team-row-hole (D-6b: the
+      retired negative skipped replication/bundle.rs and never named
+      originate_team_row, so routing the call one file over kept it green; at
+      cutover the retired needle set was measured BLIND to the emitter),
+      exactly-one-production-loom-lite-store,
+      crossing-payload-team-must-equal-authenticated-envelope,
+      crossing-weld-is-a-binding-not-a-refuse-all-stub,
+      crossing-applier-ignores-non-crossing-frames,
+      crossing-control-rides-the-telemetry-idiom (golden wire constant — no
+      FramePayload/FrameKind variant is added, because abi-diff is a null
+      control that cannot see an enum addition),
+      boot-refuses-home-team-manifest-disagreement,
+      boot-refuses-uncorroborated-home-team,
+      crossing-weld-refusal-has-its-own-wire-code,
+      crossing-consent-denial-reaches-the-emitter,
+      crossing-causes-stay-distinguishable-on-the-wire (all hermetic Blocking) +
+      live-crossing-lands-at-destination-datname (advisory-substrate: physical
+      presence in maos_team_b, physical ABSENCE from maos_team_a, reverse
+      refused at the applier with the ordered pair, seed-holding forger
+      refused). Dead-wire clause (f-i) no-production-crossing-initiator is
+      INVERTED and replaced in the same commit (11.3 D2 / 10.4c atomic
+      cutover); (f-ii) was inverted by 13.5c.
+      Story 13.6b claims NOTHING about the kernel's cause erasure
+      (kernel-core memory/mod.rs maps Transport(_) to one word, so no Spirit has
+      ever distinguished ConsentDenied from MapStale) and nothing about
+      per-team key provisioning. The operator-trust limit is unchanged:
+      isolation is enforced against a peer, not against the operator.
+      Story 13.6d closes the read-side successor. `CrossWallRecallRequest`
+      keeps the team dimension out of the LLM-built six-field filter;
+      `CrossWallLogReadPort` routes a granted recall to the named team's
+      read-only/NOFOLLOW artifact after path and in-artifact binding checks.
+      The two-artifact negative proves remote rows are returned and caller-local
+      rows are absent, while ordinary boot still refuses a foreign binding.
+      Six refusal limbs stay typed and independently proven-red. Refusals and
+      allowed disclosures journal under `log.recall.cross-wall` before remote
+      data movement. The `maos traceback` composition-root initiator is wired
+      only with verified cohort state plus `MAOS_LOOM_HOME_TEAM`; its deletion
+      reds the positive caller leg. Absent successors now remain the 13.6
+      three-team journey closer and kernel cause erasure (13.6 to judge).
   ADR-024:
     gates:
     - check-escape-detector
@@ -1027,12 +1188,21 @@ coverage:
       advisory pass); blocking at v1.5. The 10⁶-row corpus spans 100 batch
       boundaries at BATCH_SIZE=10_000, exercising multi-batch proven-red vectors.
   NFR-Ops-11:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-reza-production-path
+    enforcement: blocking-at-v2.2-team-axis
     corpora: []
-    phase: v1.0
-    valid_until: '2027-05-12'
-    notes: primitive-reservation at v1.0; full implementation v1.5+
+    phase: v2.0+
+    valid_until: '2027-07-23'
+    notes: |
+      Story 13.5e serves the team axis: per-team physical Transparency Log
+      artifacts, post-assignment path/sidecar reconciliation, scoped recall,
+      wrong-team backup refusal, and two-log correlation. The live Postgres
+      Stage-2 leg is AdvisorySubstrate and reports WOULD-HAVE-BLOCKED when absent.
+      Full NFR-Ops-11 remains open for per-operator namespace, capability-token
+      signing keys, and GDPR-erasure scope. SQLite cryptographic integrity is
+      explicitly absent; inverters are 11.4b (escape anomaly) and 13.5b
+      (collective erase/legal-hold fan-out).
   NFR-Ops-12:
     gates: []
     enforcement: advisory-until-engagement
@@ -1089,11 +1259,18 @@ coverage:
     phase: v0.3
     valid_until: '2027-05-12'
   NFR-Ops-9:
-    gates: []
-    enforcement: advisory-until-engagement
+    gates:
+    - check-reza-production-path
+    enforcement: advisory-rpo-rto-with-blocking-team-boundary
     corpora: []
     phase: v1.0
-    valid_until: '2027-05-12'
+    valid_until: '2027-07-23'
+    notes: |
+      Story 13.5e fans backup operations from one Host artifact to N team
+      artifacts. The blocking leg proves team provenance, one-team round-trip,
+      no cross-team row leakage, and wrong-team restore refusal. Fleet-wide
+      manifest-team enumeration plus the RPO ≤1h / RTO ≤4h schedule remains an
+      operator obligation and is not claimed by this hermetic leg.
   NFR-Perf-1:
     gates: [check-j4-latency]
     corpora: []

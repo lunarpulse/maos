@@ -18,6 +18,8 @@ pub mod private;
 pub mod read_entry_point;
 pub mod self_telemetry;
 pub mod shared;
+#[cfg(any(test, debug_assertions))]
+pub mod spill_test_faults;
 pub mod write_entry_point; // Story 9.4b AC-5/AC-9 — region-enforcement chokepoint // Story 9.4b R1-COND / AC-9 — region-enforcement chokepoint (read side)
 
 pub use maos_domain::ports::MemoryManagerPort;
@@ -32,7 +34,7 @@ pub use shared::SharedMemoryStore;
 /// multi-backend erasure test: adding a backend here WITHOUT partitioning it
 /// (proved-erased / proved-principal-empty) in that test FAILS the test, so a
 /// new backend can never slip through unaudited.
-pub const REGISTERED_ERASURE_BACKENDS: &[&str] = &["private", "principal_index", "shared"];
+pub const REGISTERED_ERASURE_BACKENDS: &[&str] = &["private", "principal_index", "shared", "loom"];
 
 /// AC6 / R12 — the full set of erasure-class lineage ids the forget cascade
 /// must stamp in the `ForgetReceipt`.  Mirrors the governance test
@@ -52,9 +54,12 @@ use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, Observatio
 #[cfg(feature = "spirit_test")]
 use parking_lot::Mutex;
 
+use crate::capability::cap_audit::VerifyOutcome;
+use crate::capability::CapabilityRegistryAdapter;
 use crate::iac::transparency_log::TransparencyLogAdapter;
 use maos_domain::cost::{CostAttributionPayload, PrincipalRef};
 use maos_domain::governance::GovernanceEventPayload;
+use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::memory::{
     CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
     MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
@@ -165,18 +170,24 @@ impl MemoryManagerAdapter {
         self
     }
 
-    /// Reject `Principal` namespace at the collective edge (Decision D).
-    /// The collective tier holds cross-Spirit patterns, NOT subject-scoped
-    /// PII; extending the principal_index / forget cascade into it would open
-    /// a GDPR Art.15/17 hole.  Partitioned by construction.
-    fn reject_principal_collective(namespace: &MemoryNamespace) -> Result<(), MemoryError> {
-        if matches!(namespace, MemoryNamespace::Principal { .. }) {
-            return Err(MemoryError::NamespaceViolation(
-                "Principal namespace is partitioned out of the Collective tier \
-                 (GDPR Art.15/17 — the collective tier holds cross-Spirit patterns, \
-                 not subject-scoped PII)"
-                    .into(),
-            ));
+    /// Reject `Principal` namespace outside the private tier (Decision D).
+    /// ONLY the private tier has a forget cascade and a `principal_index`; the
+    /// shared and collective tiers hold cross-Spirit data with no erase path,
+    /// so admitting subject-scoped PII there opens a GDPR Art.15/17 hole.
+    /// Stated as a negation of the allowlist so a FUTURE tier is
+    /// principal-rejecting by default.  Partitioned by construction.
+    fn reject_principal_outside_private(
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+    ) -> Result<(), MemoryError> {
+        if !matches!(tier, MemoryTier::Private)
+            && matches!(namespace, MemoryNamespace::Principal { .. })
+        {
+            return Err(MemoryError::NamespaceViolation(format!(
+                "Principal namespace is partitioned out of the {tier:?} tier \
+                 (GDPR Art.15/17 — non-private tiers hold cross-Spirit data, not \
+                 subject-scoped PII, and have no erase path)"
+            )));
         }
         Ok(())
     }
@@ -201,6 +212,25 @@ impl MemoryManagerAdapter {
         }
     }
 
+    /// Refuse and audit a caller/token pid mismatch before the port.
+    /// The refusal is audited under the token owner's pid and reaches no port.
+    /// This guard must precede tenant registration's first production caller.
+    fn reject_spirit_pid(
+        caps: &CapabilityRegistryAdapter,
+        spirit_pid: u32,
+        token: &CapabilityToken,
+    ) -> Result<(), MemoryError> {
+        let token_pid = token.spirit_pid;
+        if spirit_pid == token_pid {
+            return Ok(());
+        }
+        caps.record_verification(token, VerifyOutcome::SpiritIdMismatch);
+        Err(MemoryError::Collective {
+            kind: CollectiveErrorKind::CapabilityDenied,
+            reason: format!("SpiritIdMismatch: caller={spirit_pid} token={token_pid}"),
+        })
+    }
+
     /// Story 10.4a — Spirit-facing collective-tier WRITE, I1/I2 mediated.
     ///
     /// I1: `verify_and_audit` checks the token (and I2: journals the
@@ -217,7 +247,7 @@ impl MemoryManagerAdapter {
         posture_hash: [u8; 32],
         sandbox: maos_domain::invariants::i9::SandboxTier,
     ) -> Result<(), MemoryError> {
-        Self::reject_principal_collective(namespace)?;
+        Self::reject_principal_outside_private(MemoryTier::Collective, namespace)?;
         let caps =
             self.capabilities
                 .as_ref()
@@ -236,6 +266,7 @@ impl MemoryManagerAdapter {
                 kind: CollectiveErrorKind::CapabilityDenied,
                 reason: format!("capability denied: {e}"),
             })?;
+        Self::reject_spirit_pid(caps, spirit_pid, token)?;
         match caps.get_token_scope(&token.token_id) {
             Some(maos_domain::invariants::i1::Scope::LoomWrite) => {}
             other => {
@@ -280,7 +311,7 @@ impl MemoryManagerAdapter {
         posture_hash: [u8; 32],
         sandbox: maos_domain::invariants::i9::SandboxTier,
     ) -> Result<Option<MemoryValue>, MemoryError> {
-        Self::reject_principal_collective(namespace)?;
+        Self::reject_principal_outside_private(MemoryTier::Collective, namespace)?;
         let caps =
             self.capabilities
                 .as_ref()
@@ -299,6 +330,7 @@ impl MemoryManagerAdapter {
                 kind: CollectiveErrorKind::CapabilityDenied,
                 reason: format!("capability denied: {e}"),
             })?;
+        Self::reject_spirit_pid(caps, spirit_pid, token)?;
         match caps.get_token_scope(&token.token_id) {
             Some(maos_domain::invariants::i1::Scope::LoomRead) => {}
             other => {
@@ -324,7 +356,7 @@ impl MemoryManagerAdapter {
         posture_hash: [u8; 32],
         sandbox: maos_domain::invariants::i9::SandboxTier,
     ) -> Result<Vec<MemoryEntry>, MemoryError> {
-        Self::reject_principal_collective(namespace)?;
+        Self::reject_principal_outside_private(MemoryTier::Collective, namespace)?;
         let caps =
             self.capabilities
                 .as_ref()
@@ -343,6 +375,7 @@ impl MemoryManagerAdapter {
                 kind: CollectiveErrorKind::CapabilityDenied,
                 reason: format!("capability denied: {e}"),
             })?;
+        Self::reject_spirit_pid(caps, spirit_pid, token)?;
         match caps.get_token_scope(&token.token_id) {
             Some(maos_domain::invariants::i1::Scope::LoomScan) => {}
             other => {
@@ -481,8 +514,8 @@ impl MemoryManagerAdapter {
         //    scrubbed — not every distillate by any writer Spirit (which would
         //    destroy unrelated principals' data).
         //    P5: a query error is propagated, not silently dropped.
-        //    P4: a scrub/marker failure is propagated and the frame is NOT
-        //    attested as redacted.
+        //    P4: scrub failure is propagated; the append-only redaction marker
+        //    is best-effort and does not determine whether the scrubbed frame is attested.
         let mut redacted_distillate_frame_ids: Vec<String> = Vec::new();
         if !writer_pids.is_empty() {
             let distillates = self
@@ -699,6 +732,7 @@ impl MemoryManagerPort for MemoryManagerAdapter {
             }
         }
 
+        Self::reject_principal_outside_private(tier, namespace)?;
         match tier {
             MemoryTier::Private => {
                 self.private
@@ -717,7 +751,6 @@ impl MemoryManagerPort for MemoryManagerAdapter {
             }
             MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
             MemoryTier::Collective => {
-                Self::reject_principal_collective(namespace)?;
                 // P1 — I1/I2 fail-closed.  The trait path carries NO token /
                 // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
                 // change), so it CANNOT perform capability mediation.  When
@@ -773,11 +806,11 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         )
         .map_err(|e| MemoryError::Storage(e.to_string()))?;
 
+        Self::reject_principal_outside_private(tier, namespace)?;
         match tier {
             MemoryTier::Private => self.private.read(spirit_pid, namespace, key),
             MemoryTier::Shared => self.shared.read(spirit_pid, namespace, key),
             MemoryTier::Collective => {
-                Self::reject_principal_collective(namespace)?;
                 // P1 — I1/I2 fail-closed (see the write arm for the rationale):
                 // the trait path cannot carry the LoomRead token, so when
                 // capability mediation is wired the unmediated read is DENIED.
@@ -827,11 +860,11 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         )
         .map_err(|e| MemoryError::Storage(e.to_string()))?;
 
+        Self::reject_principal_outside_private(tier, namespace)?;
         match tier {
             MemoryTier::Private => self.private.scan(spirit_pid, namespace, prefix, limit),
             MemoryTier::Shared => self.shared.scan(spirit_pid, namespace, prefix, limit),
             MemoryTier::Collective => {
-                Self::reject_principal_collective(namespace)?;
                 // P1 — I1/I2 fail-closed (see the write arm for the rationale):
                 // the trait path cannot carry the LoomScan token, so when
                 // capability mediation is wired the unmediated scan is DENIED.
@@ -872,8 +905,8 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         match self.forget_with_reason(principal_id, None)? {
             ForgetOutcome::Erased { receipt, .. } => Ok(receipt),
             ForgetOutcome::Suspended { .. } => {
-                // The trait-level `forget` is the legacy no-reason path;
-                // a legal-hold is impossible without an explicit reason.
+                // Trait-level `forget` is legacy no-reason path; a durable hold can suspend it,
+                // so callers must use `forget_with_reason` to observe the `held` distinction.
                 Err(MemoryError::Storage(
                     "forget unexpectedly returned legal-hold without reason".to_string(),
                 ))

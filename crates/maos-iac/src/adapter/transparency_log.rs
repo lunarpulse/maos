@@ -11,11 +11,11 @@
 //!
 //! # I9 status
 //!
-//! This file is the I9-sanctioned holder for two pieces of persistent
-//! state: the SQLite connection itself and the in-memory frame_id
-//! monotonic counter. The `#[i9_exempt]` attribute on `TransparencyLogAdapter`
-//! is documented at `docs/invariants/i9-exemptions.md` per the
-//! `xtask check-empty-kernel` exemption discipline.
+//! This file is the historical holder for the SQLite connection and in-memory
+//! frame_id counter. The previously documented `#[i9_exempt]` attribute is not
+//! present, the old whitelist path is stale, and `check-empty-kernel` does not
+//! scan this crate. Story 13.5e records that enforcement gap rather than
+//! treating prose as an active control; lint repair remains separately filed.
 //!
 //! # Shared multi-writer contract (Story 9.7 AC-7)
 //!
@@ -201,6 +201,7 @@ pub struct TransparencyLogEntry {
     pub capability_token: Option<[u8; 32]>,
     pub kind: FrameKind,
     pub intent: String,
+    pub correlation_id: Option<String>,
     pub payload_redacted: Vec<u8>,
     pub origin: FrameOrigin,
 }
@@ -212,6 +213,7 @@ pub struct TransparencyLogEntry {
 pub struct FrameFilter {
     pub spirit_pid: Option<u32>,
     pub kind: Option<FrameKind>,
+    pub correlation_id: Option<String>,
     pub since_ns: Option<u64>,
     pub until_ns: Option<u64>,
     pub limit: Option<usize>,
@@ -221,6 +223,14 @@ pub struct FrameFilter {
     /// When both are `Some`, the query adds `WHERE (timestamp_ns, frame_id) > (?cursor_ts, ?cursor_id)`.
     pub cursor_timestamp_ns: Option<u64>,
     pub cursor_frame_id: Option<[u8; 16]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PersistedLegalHold {
+    pub principal_id: String,
+    pub reason: String,
+    pub case_ref: Option<String>,
+    pub requested_at_ns: u64,
 }
 
 /// Typed audit-spine error. Coarse-grained at v0.1-β per the dep-introduction
@@ -239,6 +249,8 @@ pub enum AuditError {
     MalformedFrameId(usize),
     #[error("serialization failed: {0}")]
     Serialization(String),
+    #[error("legal-hold authority is not bound")]
+    LegalHoldAuthorityUnbound,
 }
 
 /// SQL schema for both tables.
@@ -253,6 +265,7 @@ CREATE TABLE IF NOT EXISTS transparency_log (
     capability_token    BLOB,
     kind                INTEGER NOT NULL,
     intent              TEXT    NOT NULL,
+    correlation_id      TEXT,
     payload_redacted    BLOB    NOT NULL,
     origin              INTEGER NOT NULL
 );
@@ -283,17 +296,6 @@ CREATE TABLE IF NOT EXISTS approval_decision_log (
     reasoning           TEXT
 );
 
--- Story 9.2 (P29) — durable per-principal-global legal holds.  Consulted by
--- every forget/uninstall so a held principal cannot be erased by a later
--- command until explicitly released (Decision E: release re-queues, never
--- auto-fires).  Lives in the I9-sanctioned Transparency Log holder (same
--- Connection) — no new state-bearing struct.
-CREATE TABLE IF NOT EXISTS legal_holds (
-    principal_id        TEXT    NOT NULL PRIMARY KEY,
-    reason              TEXT    NOT NULL,
-    case_ref            TEXT,
-    requested_at_ns     INTEGER NOT NULL
-);
 
 CREATE INDEX IF NOT EXISTS idx_approval_actor
     ON approval_decision_log(actor, timestamp_ns);
@@ -317,6 +319,14 @@ CREATE INDEX IF NOT EXISTS idx_slr_version
 CREATE INDEX IF NOT EXISTS idx_slr_recorded_at
     ON schema_lifecycle_registry(recorded_at_ns);
 ";
+
+const LEGAL_HOLDS_TABLE_SQL: &str = "\
+CREATE TABLE IF NOT EXISTS legal_holds (
+    principal_id        TEXT    NOT NULL PRIMARY KEY,
+    reason              TEXT    NOT NULL,
+    case_ref            TEXT,
+    requested_at_ns     INTEGER NOT NULL
+);";
 /// The Transparency Log + Approval Decision Log adapter.
 ///
 /// One per Host; constructed in the composition root (`maos-bin/main.rs`)
@@ -332,11 +342,18 @@ pub struct TransparencyLogAdapter {
     mailbox: MailboxStub,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LegalHoldAuthority {
+    Main,
+    Attached,
+}
+
 struct TransparencyLogInner {
     conn: Connection,
     next_frame_id_counter: u64,
     boot_nonce: u64,
     last_frame_id: [u8; 16],
+    legal_hold_authority: Option<LegalHoldAuthority>,
 }
 
 impl std::fmt::Debug for TransparencyLogInner {
@@ -368,6 +385,74 @@ impl TransparencyLogAdapter {
         )
     }
 
+    /// Open an existing Transparency Log for query-only cross-wall disclosure.
+    ///
+    /// SQLite enforces read-only mode and `NOFOLLOW`; no schema migration,
+    /// journal-mode change, or file creation is attempted.
+    pub fn open_read_only(path: &Path) -> Result<Self, AuditError> {
+        let conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
+        Ok(Self::from_read_only_connection(conn))
+    }
+
+    /// Wrap an externally-opened **read-only** SQLite connection for query-only
+    /// cross-wall disclosure (Story 13.6d P2 — single-connection foreign read).
+    ///
+    /// The connection MUST already be read-only with `NOFOLLOW` (open it via
+    /// `maos_audit::open_tenant_artifact_readonly`); this constructor performs no
+    /// schema work and assumes a query-only handle. No counters or nonce are
+    /// seeded — query paths never write, so the zeroed frame-id state is inert.
+    /// Redaction is the same stateless `CorpusBackedRedactionPolicy` the local
+    /// read uses, so a foreign shard is redacted identically.
+    pub fn from_read_only_connection(conn: Connection) -> Self {
+        Self {
+            inner: Mutex::new(TransparencyLogInner {
+                conn,
+                next_frame_id_counter: 0,
+                boot_nonce: 0,
+                last_frame_id: [0; 16],
+                legal_hold_authority: None,
+            }),
+            redaction: Box::new(CorpusBackedRedactionPolicy::new()),
+            mailbox: MailboxStub::new(),
+        }
+    }
+
+    /// Open a Transparency Log with an explicit Host-global legal-hold
+    /// authority. Team shards attach `global_path`; the global artifact binds
+    /// its own `main` schema. Callers using [`Self::open`] remain unbound and
+    /// legal-hold reads fail closed.
+    pub fn open_with_global_legal_holds(
+        path: &Path,
+        global_path: &Path,
+        boot_nonce: u64,
+    ) -> Result<Self, AuditError> {
+        let adapter = Self::open(path, boot_nonce)?;
+        if path == global_path {
+            adapter.bind_main_legal_holds()?;
+        } else {
+            adapter.attach_global_legal_holds(global_path)?;
+        }
+        Ok(adapter)
+    }
+
+    fn bind_main_legal_holds(&self) -> Result<(), AuditError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        inner
+            .conn
+            .execute_batch(LEGAL_HOLDS_TABLE_SQL)
+            .map_err(AuditError::SqliteWriteFatal)?;
+        inner.legal_hold_authority = Some(LegalHoldAuthority::Main);
+        Ok(())
+    }
+
     /// Open with a custom redaction policy (for tests and future composition).
     #[doc(hidden)]
     pub fn open_with_policy(
@@ -390,7 +475,10 @@ impl TransparencyLogAdapter {
         redaction: Box<dyn RedactionPolicy + Send + Sync>,
         busy_timeout_ms: u64,
     ) -> Result<Self, AuditError> {
-        let conn = Connection::open(path)?;
+        let conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::default() | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )?;
         // Story 9.7 R3 — multi-writer SQLite contract: the CLI may write to
         // the TL concurrently with the daemon. busy_timeout lets the second
         // writer BLOCK-then-succeed instead of failing immediately with
@@ -406,12 +494,18 @@ impl TransparencyLogAdapter {
         let _ = conn.execute_batch(
             "ALTER TABLE transparency_log ADD COLUMN from_spirit_id TEXT NOT NULL DEFAULT '';",
         );
+        let _ = conn.execute_batch("ALTER TABLE transparency_log ADD COLUMN correlation_id TEXT;");
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_tlog_correlation
+             ON transparency_log(correlation_id, timestamp_ns);",
+        )?;
         Ok(Self {
             inner: Mutex::new(TransparencyLogInner {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
                 last_frame_id: [0u8; 16],
+                legal_hold_authority: None,
             }),
             redaction,
             mailbox: MailboxStub::new(),
@@ -449,12 +543,15 @@ impl TransparencyLogAdapter {
         let conn = Connection::open_in_memory().expect("in-memory SQLite must succeed");
         conn.execute_batch(SCHEMA_SQL)
             .expect("schema init must succeed");
+        conn.execute_batch(LEGAL_HOLDS_TABLE_SQL)
+            .expect("in-memory legal-hold schema init must succeed");
         Self {
             inner: Mutex::new(TransparencyLogInner {
                 conn,
                 next_frame_id_counter: 0,
                 boot_nonce,
                 last_frame_id: [0u8; 16],
+                legal_hold_authority: Some(LegalHoldAuthority::Main),
             }),
             redaction,
             mailbox: MailboxStub::new(),
@@ -493,6 +590,42 @@ impl TransparencyLogAdapter {
             "",
             "",
             capability_token,
+            intent,
+            payload,
+            origin,
+        )
+    }
+
+    /// Insert a frame event that participates in a cross-team audit action.
+    ///
+    /// Existing kernel callers remain on [`Self::insert_frame_event`]; only
+    /// out-of-kernel composition paths that already own a correlation token use
+    /// this additive writer.
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_frame_event_with_correlation(
+        &self,
+        kind: FrameKind,
+        spirit_pid: u32,
+        capability_token: Option<&[u8; 32]>,
+        correlation_id: &str,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+    ) -> LogBeforeDeliver<()> {
+        if kind == FrameKind::Distillate {
+            panic!(
+                "MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows \
+                 may only be inserted via DistillateWriter"
+            );
+        }
+        self.insert_frame_row_with_correlation(
+            None,
+            kind,
+            spirit_pid,
+            "",
+            "",
+            capability_token,
+            Some(correlation_id),
             intent,
             payload,
             origin,
@@ -622,6 +755,34 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
+        self.insert_frame_row_with_correlation(
+            frame_id,
+            kind,
+            spirit_pid,
+            from_spirit_id,
+            to_spirit_id,
+            capability_token,
+            None,
+            intent,
+            payload,
+            origin,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn insert_frame_row_with_correlation(
+        &self,
+        frame_id: Option<[u8; 16]>,
+        kind: FrameKind,
+        spirit_pid: u32,
+        from_spirit_id: &str,
+        to_spirit_id: &str,
+        capability_token: Option<&[u8; 32]>,
+        correlation_id: Option<&str>,
+        intent: &str,
+        payload: &[u8],
+        origin: FrameOrigin,
+    ) -> LogBeforeDeliver<()> {
         let redacted = self.redaction.redact(payload);
         let mut inner = self
             .inner
@@ -634,9 +795,9 @@ impl TransparencyLogAdapter {
 
         let result = inner.conn.execute(
             "INSERT INTO transparency_log
-                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce, capability_token,
-                 kind, intent, payload_redacted, origin)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                (frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
+                 capability_token, kind, intent, correlation_id, payload_redacted, origin)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             rusqlite::params![
                 &frame_id[..],
                 timestamp_ns as i64,
@@ -647,6 +808,7 @@ impl TransparencyLogAdapter {
                 capability_token.map(|t| &t[..]),
                 kind as i64,
                 intent,
+                correlation_id,
                 &redacted[..],
                 origin as i64,
             ],
@@ -655,9 +817,6 @@ impl TransparencyLogAdapter {
         match result {
             Ok(_) => LogBeforeDeliver::new(()),
             Err(e) => {
-                // I2 binding: log write failure must halt the kernel rather than
-                // silently dropping the frame. This is the ONLY `panic!` outside
-                // `unreachable!()` paths in kernel-core.
                 panic!(
                     "MAOS kernel panic — Transparency Log write failed: {e}. \
                      Architecture §7.3 I2: log-before-deliver guarantee broken; \
@@ -957,6 +1116,38 @@ impl TransparencyLogAdapter {
         Ok(())
     }
 
+    /// Keep the principal-global legal-hold table on the Host-global artifact
+    /// while this adapter writes frame/approval rows to a team shard.
+    ///
+    /// Legal-hold methods select the attached schema explicitly; an adapter
+    /// without this binding returns `LegalHoldAuthorityUnbound`.
+    pub fn attach_global_legal_holds(&self, global_path: &Path) -> Result<(), AuditError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        inner
+            .conn
+            .execute(
+                "ATTACH DATABASE ?1 AS maos_host_global",
+                rusqlite::params![global_path.to_string_lossy().as_ref()],
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        inner
+            .conn
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS maos_host_global.legal_holds (
+                    principal_id TEXT NOT NULL PRIMARY KEY,
+                    reason TEXT NOT NULL,
+                    case_ref TEXT,
+                    requested_at_ns INTEGER NOT NULL
+                 );",
+            )
+            .map_err(AuditError::SqliteWriteFatal)?;
+        inner.legal_hold_authority = Some(LegalHoldAuthority::Attached);
+        Ok(())
+    }
+
     /// Story 9.2 (P29) — place a durable per-principal-global legal hold.
     /// Idempotent: re-placing replaces the reason/case_ref/timestamp.
     pub fn place_legal_hold(
@@ -970,12 +1161,25 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => {
+                "INSERT OR REPLACE INTO main.legal_holds
+                 (principal_id, reason, case_ref, requested_at_ns)
+                 VALUES (?1, ?2, ?3, ?4)"
+            }
+            LegalHoldAuthority::Attached => {
+                "INSERT OR REPLACE INTO maos_host_global.legal_holds
+                 (principal_id, reason, case_ref, requested_at_ns)
+                 VALUES (?1, ?2, ?3, ?4)"
+            }
+        };
         inner
             .conn
             .execute(
-                "INSERT OR REPLACE INTO legal_holds \
-                 (principal_id, reason, case_ref, requested_at_ns) \
-                 VALUES (?1, ?2, ?3, ?4)",
+                sql,
                 rusqlite::params![principal_id, reason, case_ref, requested_at_ns as i64,],
             )
             .map_err(AuditError::SqliteWriteFatal)?;
@@ -988,13 +1192,20 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => {
+                "SELECT COUNT(*) FROM main.legal_holds WHERE principal_id = ?1"
+            }
+            LegalHoldAuthority::Attached => {
+                "SELECT COUNT(*) FROM maos_host_global.legal_holds WHERE principal_id = ?1"
+            }
+        };
         let exists: i64 = inner
             .conn
-            .query_row(
-                "SELECT COUNT(*) FROM legal_holds WHERE principal_id = ?1",
-                rusqlite::params![principal_id],
-                |row| row.get(0),
-            )
+            .query_row(sql, rusqlite::params![principal_id], |row| row.get(0))
             .map_err(AuditError::SqliteRead)?;
         Ok(exists > 0)
     }
@@ -1006,14 +1217,54 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => "DELETE FROM main.legal_holds WHERE principal_id = ?1",
+            LegalHoldAuthority::Attached => {
+                "DELETE FROM maos_host_global.legal_holds WHERE principal_id = ?1"
+            }
+        };
         let removed = inner
             .conn
-            .execute(
-                "DELETE FROM legal_holds WHERE principal_id = ?1",
-                rusqlite::params![principal_id],
-            )
+            .execute(sql, rusqlite::params![principal_id])
             .map_err(AuditError::SqliteWriteFatal)?;
         Ok(removed > 0)
+    }
+
+    pub fn list_legal_holds(&self) -> Result<Vec<PersistedLegalHold>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let sql = match inner
+            .legal_hold_authority
+            .ok_or(AuditError::LegalHoldAuthorityUnbound)?
+        {
+            LegalHoldAuthority::Main => {
+                "SELECT principal_id, reason, case_ref, requested_at_ns
+                 FROM main.legal_holds ORDER BY requested_at_ns, principal_id"
+            }
+            LegalHoldAuthority::Attached => {
+                "SELECT principal_id, reason, case_ref, requested_at_ns
+                 FROM maos_host_global.legal_holds ORDER BY requested_at_ns, principal_id"
+            }
+        };
+        let mut statement = inner.conn.prepare(sql).map_err(AuditError::SqliteRead)?;
+        let rows = statement
+            .query_map([], |row| {
+                let requested_at_ns: i64 = row.get(3)?;
+                Ok(PersistedLegalHold {
+                    principal_id: row.get(0)?,
+                    reason: row.get(1)?,
+                    case_ref: row.get(2)?,
+                    requested_at_ns: requested_at_ns.max(0) as u64,
+                })
+            })
+            .map_err(AuditError::SqliteRead)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(AuditError::SqliteRead)
     }
 
     /// Story 9.2 (P7) — journal a kernel `TaskComplete` frame and return its
@@ -1115,7 +1366,7 @@ impl TransparencyLogAdapter {
             .expect("TransparencyLogAdapter inner poisoned");
         let mut sql = String::from(
             "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
-                    capability_token, kind, intent, payload_redacted, origin
+                    capability_token, kind, intent, correlation_id, payload_redacted, origin
              FROM transparency_log",
         );
         let mut where_clauses: Vec<String> = Vec::new();
@@ -1132,6 +1383,10 @@ impl TransparencyLogAdapter {
         if let Some(kind) = filter.kind {
             where_clauses.push("kind = ?".to_string());
             params.push(Box::new(kind as i64));
+        }
+        if let Some(correlation_id) = filter.correlation_id {
+            where_clauses.push("correlation_id = ?".to_string());
+            params.push(Box::new(correlation_id));
         }
         if let Some(since) = filter.since_ns {
             where_clauses.push("timestamp_ns >= ?".to_string());
@@ -1195,8 +1450,9 @@ impl TransparencyLogAdapter {
                         FrameKind::TaskAssign
                     }),
                     intent: row.get(8)?,
-                    payload_redacted: row.get(9)?,
-                    origin: match row.get::<_, i64>(10)? {
+                    correlation_id: row.get(9)?,
+                    payload_redacted: row.get(10)?,
+                    origin: match row.get::<_, i64>(11)? {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
@@ -1228,7 +1484,7 @@ impl TransparencyLogAdapter {
             .conn
             .prepare(
                 "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
-                        capability_token, kind, intent, payload_redacted, origin
+                        capability_token, kind, intent, correlation_id, payload_redacted, origin
                  FROM transparency_log
                  WHERE frame_id = ?1
                  LIMIT 1",
@@ -1269,8 +1525,9 @@ impl TransparencyLogAdapter {
                         FrameKind::TaskAssign
                     }),
                     intent: row.get(8)?,
-                    payload_redacted: row.get(9)?,
-                    origin: match row.get::<_, i64>(10)? {
+                    correlation_id: row.get(9)?,
+                    payload_redacted: row.get(10)?,
+                    origin: match row.get::<_, i64>(11)? {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
@@ -1616,6 +1873,48 @@ impl TransparencyLogAdapter {
     }
 }
 
+/// One side of a correlation query, retaining the physical team provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TeamTransparencyLogEntry {
+    pub team_id: maos_domain::team::TeamId,
+    pub entry: TransparencyLogEntry,
+}
+
+/// Reconcile a correlation token across explicitly supplied team artifacts.
+///
+/// A single adapter can only return its local half. Callers must enumerate
+/// every team path participating in the action; this function preserves each
+/// row's physical-team provenance and returns one deterministic timeline.
+pub fn reconcile_correlated_frames(
+    sources: &[(&maos_domain::team::TeamId, &TransparencyLogAdapter)],
+    correlation_id: &str,
+) -> Result<Vec<TeamTransparencyLogEntry>, AuditError> {
+    let mut reconciled = Vec::new();
+    for (team_id, log) in sources {
+        let entries = log.query_frames(FrameFilter {
+            correlation_id: Some(correlation_id.to_owned()),
+            ..Default::default()
+        })?;
+        reconciled.extend(entries.into_iter().map(|entry| TeamTransparencyLogEntry {
+            team_id: (*team_id).clone(),
+            entry,
+        }));
+    }
+    reconciled.sort_by(|left, right| {
+        (
+            left.entry.timestamp_ns,
+            left.entry.frame_id,
+            left.team_id.as_str(),
+        )
+            .cmp(&(
+                right.entry.timestamp_ns,
+                right.entry.frame_id,
+                right.team_id.as_str(),
+            ))
+    });
+    Ok(reconciled)
+}
+
 /// Format a frame_id as colon-separated hex pairs.
 fn format_frame_id_hex(frame_id: &[u8; 16]) -> String {
     frame_id
@@ -1766,6 +2065,137 @@ mod tests {
         assert_eq!(entries[0].spirit_pid, 7);
         assert_eq!(entries[0].kind, FrameKind::TaskAssign);
         assert_eq!(entries[0].intent, "delegate");
+    }
+
+    #[test]
+    fn cross_team_correlation_requires_both_physical_logs() {
+        let security = maos_domain::team::TeamId::new("security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+        let security_log = TransparencyLogAdapter::open_in_memory(1);
+        let support_log = TransparencyLogAdapter::open_in_memory(2);
+        let correlation_id = "cross-team-action-01";
+
+        for (log, pid, intent) in [
+            (&security_log, 7, "cross-team-send"),
+            (&support_log, 8, "cross-team-receive"),
+        ] {
+            let _ = log.insert_frame_event_with_correlation(
+                FrameKind::CapabilityInvocation,
+                pid,
+                None,
+                correlation_id,
+                intent,
+                b"redacted",
+                FrameOrigin::Kernel,
+            );
+        }
+
+        let one_path = security_log
+            .query_frames(FrameFilter {
+                correlation_id: Some(correlation_id.to_owned()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            one_path.len(),
+            1,
+            "a one-path reader cannot reconcile both team records"
+        );
+
+        let reconciled = reconcile_correlated_frames(
+            &[(&security, &security_log), (&support, &support_log)],
+            correlation_id,
+        )
+        .unwrap();
+        assert_eq!(reconciled.len(), 2);
+        assert_eq!(
+            reconciled[0].entry.correlation_id.as_deref(),
+            Some(correlation_id)
+        );
+        assert_eq!(
+            reconciled[1].entry.correlation_id.as_deref(),
+            Some(correlation_id)
+        );
+        assert_ne!(reconciled[0].team_id, reconciled[1].team_id);
+    }
+
+    #[test]
+    fn correlation_column_migrates_an_existing_transparency_log() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("legacy.sqlite");
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                from_spirit_id TEXT NOT NULL DEFAULT '',
+                to_spirit_id TEXT NOT NULL DEFAULT '',
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        drop(conn);
+
+        let log = TransparencyLogAdapter::open(&path, 3).unwrap();
+        let _ = log.insert_frame_event_with_correlation(
+            FrameKind::CapabilityInvocation,
+            9,
+            None,
+            "migrated-correlation",
+            "migrated-action",
+            b"redacted",
+            FrameOrigin::Kernel,
+        );
+        let entries = log
+            .query_frames(FrameFilter {
+                correlation_id: Some("migrated-correlation".to_owned()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].correlation_id.as_deref(),
+            Some("migrated-correlation")
+        );
+    }
+
+    #[test]
+    fn team_shard_keeps_legal_holds_in_global_database() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let team_path = dir.path().join("teams/security/transparency.sqlite");
+        let global_path = dir.path().join("transparency.sqlite");
+        std::fs::create_dir_all(team_path.parent().unwrap()).unwrap();
+
+        let log = TransparencyLogAdapter::open(&team_path, 4).unwrap();
+        log.attach_global_legal_holds(&global_path).unwrap();
+        log.place_legal_hold("principal-1", "legal-hold", Some("case-1"), 10)
+            .unwrap();
+
+        let team = rusqlite::Connection::open(&team_path).unwrap();
+        let team_tables: i64 = team
+            .query_row(
+                "SELECT count(*) FROM sqlite_master
+                 WHERE type = 'table' AND name = 'legal_holds'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            team_tables, 0,
+            "legal_holds must not move into the team shard"
+        );
+
+        let global = rusqlite::Connection::open(&global_path).unwrap();
+        let global_holds: i64 = global
+            .query_row("SELECT count(*) FROM legal_holds", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(global_holds, 1);
     }
 
     #[test]

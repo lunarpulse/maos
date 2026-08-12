@@ -20,8 +20,8 @@ use maos_a2a_core::{A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, HaltReceipt
 use maos_cohort::{
     CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, HaltReceiptControl, HaltReceiptDistributor, InMemoryCohortAuditSink,
-    ManifestSignature, PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
-    SCHEMA_VERSION,
+    ManifestSignature, PinnedAuthorityKeys, COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE,
 };
 use maos_domain::frame::{EpistemicHaltPayload, FrameAddress, IacFrame};
 use maos_kernel_core::halt::{invoke_halt, HaltRegistry};
@@ -79,7 +79,7 @@ fn fingerprint(byte: u8) -> String {
 /// for `host_a` (the shipping member). Reserved intents include halt-receipt.
 fn shipping_state(authority: &SigningKey) -> Arc<CohortManifestState> {
     let manifest = CohortManifest {
-        schema_version: SCHEMA_VERSION,
+        schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-12-3-provenance".into(),
         version: 1,
         authority: CohortAuthority {
@@ -91,11 +91,13 @@ fn shipping_state(authority: &SigningKey) -> Arc<CohortManifestState> {
                 host_id: "host_a".into(),
                 fingerprint: fingerprint(0xaa),
                 roles: vec!["worker".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: fingerprint(0xbb),
                 roles: vec!["worker".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {
@@ -115,7 +117,9 @@ fn shipping_state(authority: &SigningKey) -> Arc<CohortManifestState> {
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
         t_stale_secs: 120,
+        teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(authority);
     let toml = toml::to_string(&manifest).expect("signed manifest serializes");

@@ -13,7 +13,7 @@ review_status: machine
 - [ctx Module](./ctx) — `Ctx::cancellation()`
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 3*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
 
 취소 신호 트레이트 — Spirit 훅 취소를 위한 no_std 추상화.
 

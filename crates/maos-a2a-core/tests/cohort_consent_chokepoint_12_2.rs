@@ -20,7 +20,19 @@ fn cohort_consent_has_one_port_call_and_two_route_uses() {
     );
     assert_eq!(
         router.matches("cohort_consent_decision(").count(),
-        3,
-        "one definition plus the outbound and inbound enforcement calls"
+        2,
+        "one definition plus the UNVERIFIED intake fallback — the verified \
+         accept path consumes the precomputed verdict instead (Story 13.6a \
+         review P2)"
+    );
+    // Story 13.6a review P1/P2 — the single-snapshot consent+team port has
+    // exactly two route uses: the Send seam (verdict + source-team stamp) and
+    // the verified Accept seam (team-identity check + precomputed verdict).
+    assert_eq!(
+        router
+            .matches("cohort_manifest_gate.consent_and_team(")
+            .count(),
+        2,
+        "the combined consent+team port is called at the two seams only"
     );
 }

@@ -27,6 +27,47 @@ pub enum ManifestError {
     Toml(String),
 }
 
+/// Parse the manifest-declared registry trust tier from TOML structure.
+///
+/// Both the current `[class]` schema and the legacy `[spirit]` package shape
+/// are supported. `public-vetted` has one canonical manifest spelling; CLI
+/// flags may still use their established snake_case spelling.
+pub fn parse_manifest_trust_tier(
+    manifest_toml: &[u8],
+) -> Result<maos_spirit_abi::compliance::TrustTier, ManifestError> {
+    use maos_spirit_abi::compliance::TrustTier;
+
+    let text = std::str::from_utf8(manifest_toml)
+        .map_err(|error| ManifestError::Toml(format!("manifest is not UTF-8: {error}")))?;
+    let root: toml::Value =
+        toml::from_str(text).map_err(|error| ManifestError::Toml(error.to_string()))?;
+    let tier = root
+        .get("class")
+        .and_then(|section| section.get("trust_tier"))
+        .or_else(|| {
+            root.get("spirit")
+                .and_then(|section| section.get("trust_tier"))
+        })
+        .or_else(|| root.get("trust_tier"));
+
+    let Some(tier) = tier else {
+        return Ok(TrustTier::Local);
+    };
+    let tier = tier
+        .as_str()
+        .ok_or_else(|| ManifestError::Toml(validation_msg("trust_tier", "must be a string")))?;
+    match tier {
+        "local" => Ok(TrustTier::Local),
+        "org-internal" | "org_internal" => Ok(TrustTier::OrgInternal),
+        "public-untrusted" | "public_untrusted" => Ok(TrustTier::PublicUntrusted),
+        "public-vetted" => Ok(TrustTier::PublicVetted),
+        other => Err(ManifestError::Toml(validation_msg(
+            "trust_tier",
+            &format!("unknown trust_tier: {other}"),
+        ))),
+    }
+}
+
 // Story 1b.5c — post-parse validation errors are surfaced via
 // `ManifestError::Toml` with a stable `validation failed for {field}: {reason}`
 // prefix so the public ABI of `ManifestError` remains exactly what Story 1b.3
@@ -209,7 +250,7 @@ impl ClassSection {
 /// gate reports the constant as missing. Keep the declaration on one physical
 /// line and out of doc comments above it.
 #[rustfmt::skip]
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -356,10 +397,13 @@ impl RawClassSection {
                 )));
             }
         }
-        // trust_tier ∈ {local, org-internal, public-untrusted}.
+        // trust_tier ∈ {local, org-internal, public-untrusted, public-vetted}.
+        // Story 13.4 (FR37 / ADR-056): `public-vetted` is accepted as a declared
+        // aspiration on Axis A; the promotion is the signed vetting attestation
+        // verified at admission, never this manifest field.
         if !matches!(
             self.trust_tier.as_str(),
-            "local" | "org-internal" | "public-untrusted"
+            "local" | "org-internal" | "public-untrusted" | "public-vetted"
         ) {
             return Err(ManifestError::Toml(validation_msg(
                 "class.trust_tier",
@@ -404,6 +448,7 @@ impl RawClassSection {
 pub struct CapabilitiesRequired {
     pub provider: ProviderCapabilities,
     pub mcp: McpCapabilities,
+    pub loom: LoomCapabilities,
 }
 
 #[maos_attrs::i9_exempt(
@@ -412,6 +457,16 @@ pub struct CapabilitiesRequired {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCapabilities {
     pub complete: Vec<String>,
+}
+
+/// Story 13.5d — declared collective capabilities. Scopes are unit variants,
+/// so this is intentionally three explicit booleans rather than a false
+/// namespace-qualified promise.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LoomCapabilities {
+    pub read: bool,
+    pub write: bool,
+    pub scan: bool,
 }
 
 /// Story 5.5c — MCP server/tool capability declarations.
@@ -436,6 +491,17 @@ impl CapabilitiesRequired {
             toml::from_str(s).map_err(|e| ManifestError::Toml(e.to_string()))?;
         raw.validate()
     }
+    /// Drops capability declarations introduced after the manifest's schema.
+    ///
+    /// Schema v4 introduced `[capabilities.required.loom]`; older manifests
+    /// degrade it rather than gaining a capability their declared schema cannot
+    /// express.
+    pub fn degrade_for_schema_version(mut self, declared_schema: u32) -> Self {
+        if declared_schema < 4 {
+            self.loom = LoomCapabilities::default();
+        }
+        self
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -444,6 +510,8 @@ struct RawCapabilitiesRequired {
     provider: RawProviderCapabilities,
     #[serde(default)]
     mcp: RawMcpCapabilities,
+    #[serde(default)]
+    loom: RawLoomCapabilities,
 }
 
 #[maos_attrs::i9_exempt(
@@ -461,6 +529,17 @@ struct RawProviderCapabilities {
 struct RawMcpCapabilities {
     #[serde(default)]
     servers: Vec<RawMcpCapabilityServerEntry>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawLoomCapabilities {
+    #[serde(default)]
+    read: bool,
+    #[serde(default)]
+    write: bool,
+    #[serde(default)]
+    scan: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -501,6 +580,11 @@ impl RawCapabilitiesRequired {
                     })
                     .collect(),
             },
+            loom: LoomCapabilities {
+                read: self.loom.read,
+                write: self.loom.write,
+                scan: self.loom.scan,
+            },
         })
     }
 }
@@ -535,6 +619,15 @@ pub fn capabilities_required_to_scopes(
                 tool: tool.clone(),
             });
         }
+    }
+    if caps.loom.read {
+        scopes.push(maos_domain::invariants::i1::Scope::LoomRead);
+    }
+    if caps.loom.write {
+        scopes.push(maos_domain::invariants::i1::Scope::LoomWrite);
+    }
+    if caps.loom.scan {
+        scopes.push(maos_domain::invariants::i1::Scope::LoomScan);
     }
     scopes
 }
@@ -1176,7 +1269,7 @@ fn default_idle_window_ms() -> u32 {
 
 impl RawSchedulingSection {
     fn validate(self) -> Result<SchedulingSection, ManifestError> {
-        if self.priority_weight < 1 || self.priority_weight > 255 {
+        if self.priority_weight == 0 {
             return Err(ManifestError::Toml(validation_msg(
                 "scheduling.priority_weight",
                 &format!("must be in [1, 255], got {}", self.priority_weight),
@@ -2255,6 +2348,25 @@ impl RawMcpSection {
 mod tests {
     use super::*;
 
+    #[test]
+    fn trust_tier_parser_handles_valid_toml_syntax() {
+        let manifest = br#"[class]
+"trust_tier" = 'public-vetted' # reviewed
+"#;
+        assert_eq!(
+            parse_manifest_trust_tier(manifest).unwrap(),
+            maos_spirit_abi::compliance::TrustTier::PublicVetted
+        );
+    }
+
+    #[test]
+    fn trust_tier_parser_rejects_unknown_values() {
+        let manifest = br#"[spirit]
+trust_tier = "public_vetted"
+"#;
+        assert!(parse_manifest_trust_tier(manifest).is_err());
+    }
+
     // ---- SandboxConfig ----
 
     #[test]
@@ -2464,9 +2576,9 @@ description = "MAOS reference Spirit"
     fn class_section_rejects_above_max_schema_version() {
         // Anything beyond MAX_SUPPORTED is hard-rejected — the kernel does not
         // gamble on future schemas it has not been compiled against.
-        // (Story 9.4b bumped MAX_SUPPORTED 2→3, so the above-max probe is now 4.)
+        // (Story 13.5d bumped MAX_SUPPORTED 3→4, so the above-max probe is 5.)
         let s =
-            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 4");
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 5");
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(
             matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))
@@ -2488,6 +2600,16 @@ description = "MAOS reference Spirit"
     }
 
     #[test]
+    fn class_section_accepts_public_vetted_tier() {
+        // Story 13.4 (FR37 / ADR-056) — a vetted Spirit's [class] parses; the
+        // promotion is the attestation at admission, not this manifest field.
+        let s =
+            class_toml_full().replace(r#"trust_tier = "local""#, r#"trust_tier = "public-vetted""#);
+        let c = ClassSection::from_toml_str(&s).unwrap();
+        assert_eq!(c.trust_tier, "public-vetted");
+    }
+
+    #[test]
     fn class_section_rejects_typo_field() {
         // deny_unknown_fields discipline — a typo'd field is a TOML error.
         let s = class_toml_full().replace("trust_tier =", "trust_teir =");
@@ -2502,6 +2624,117 @@ description = "MAOS reference Spirit"
         let s = r#"provider.complete = ["anthropic.claude-3-haiku-20240307"]"#;
         let c = CapabilitiesRequired::from_toml_str(s).unwrap();
         assert_eq!(c.provider.complete.len(), 1);
+    }
+
+    #[test]
+    fn capabilities_required_loom_defaults_false_and_rejects_unknown_fields() {
+        let defaults =
+            CapabilitiesRequired::from_toml_str(r#"provider.complete = ["anthropic.default"]"#)
+                .unwrap();
+        assert_eq!(
+            defaults.loom,
+            LoomCapabilities {
+                read: false,
+                write: false,
+                scan: false,
+            }
+        );
+        let error = CapabilitiesRequired::from_toml_str(
+            r#"provider.complete = ["anthropic.default"]
+loom.wirte = true"#,
+        )
+        .unwrap_err();
+        assert!(matches!(error, ManifestError::Toml(_)));
+    }
+
+    fn loom_scopes(caps: &CapabilitiesRequired) -> Vec<maos_domain::invariants::i1::Scope> {
+        capabilities_required_to_scopes(caps)
+            .into_iter()
+            .filter(|scope| {
+                matches!(
+                    scope,
+                    maos_domain::invariants::i1::Scope::LoomRead
+                        | maos_domain::invariants::i1::Scope::LoomWrite
+                        | maos_domain::invariants::i1::Scope::LoomScan
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn capabilities_required_loom_degrades_before_schema_v4() {
+        let caps = CapabilitiesRequired::from_toml_str(
+            "provider.complete = [\"anthropic.default\"]\nloom.write = true",
+        )
+        .unwrap();
+        let v3 = ClassSection::from_toml_str(
+            &class_toml_full()
+                .replace("manifest_schema_version = 1", "manifest_schema_version = 3"),
+        )
+        .unwrap();
+        let v4 = ClassSection::from_toml_str(
+            &class_toml_full()
+                .replace("manifest_schema_version = 1", "manifest_schema_version = 4"),
+        )
+        .unwrap();
+        assert_eq!(
+            loom_scopes(
+                &caps
+                    .clone()
+                    .degrade_for_schema_version(v3.manifest_schema_version)
+            ),
+            Vec::new()
+        );
+        assert_eq!(
+            loom_scopes(&caps.degrade_for_schema_version(v4.manifest_schema_version)),
+            vec![maos_domain::invariants::i1::Scope::LoomWrite]
+        );
+    }
+
+    #[test]
+    fn capabilities_required_loom_maps_each_field_exactly() {
+        use maos_domain::invariants::i1::Scope;
+        for (declaration, expected) in [
+            ("loom.read = true", vec![Scope::LoomRead]),
+            ("loom.write = true", vec![Scope::LoomWrite]),
+            ("loom.scan = true", vec![Scope::LoomScan]),
+        ] {
+            let caps = CapabilitiesRequired::from_toml_str(&format!(
+                "provider.complete = [\"anthropic.default\"]\n{declaration}"
+            ))
+            .unwrap();
+            assert_eq!(loom_scopes(&caps), expected);
+        }
+    }
+
+    #[test]
+    fn capabilities_required_loom_false_fields_emit_no_loom_scopes() {
+        for declaration in [
+            "loom.read = false",
+            "loom.write = false",
+            "loom.scan = false",
+            "loom.read = false\nloom.write = false\nloom.scan = false",
+        ] {
+            let caps = CapabilitiesRequired::from_toml_str(&format!(
+                "provider.complete = [\"anthropic.default\"]\n{declaration}"
+            ))
+            .unwrap();
+            assert_eq!(loom_scopes(&caps), Vec::new());
+        }
+    }
+
+    #[test]
+    fn capabilities_required_loom_rejects_malformed_fields() {
+        for declaration in [
+            "loom.read = \"yes\"",
+            "loom.write = \"yes\"",
+            "loom.scan = \"yes\"",
+        ] {
+            assert!(CapabilitiesRequired::from_toml_str(&format!(
+                "provider.complete = [\"anthropic.default\"]\n{declaration}"
+            ))
+            .is_err());
+        }
     }
 
     #[test]

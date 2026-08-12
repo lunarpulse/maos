@@ -1,6 +1,6 @@
 {
   "$schema": "./route-manifest.schema.json",
-  "_comment": "Shared route manifest \u2014 single source of truth for gate:routes, gate:links, gate:a11y (D7). Every canonical route and redirect target must be listed; axe coverage gates distinct rendered pages.",
+  "_comment": "Shared route manifest — single source of truth for gate:routes, gate:links, gate:a11y (D7). Every canonical route and redirect target must be listed; axe coverage gates distinct rendered pages.",
   "version": "1.0.0",
   "routes": [
     {
@@ -27,6 +27,10 @@
       "path": "/manifest/latest",
       "label": "Manifest Schema (index)",
       "content_floor": "link list"
+    },
+    {
+      "path": "/manifest/v4",
+      "label": "Manifest v4 Reference"
     },
     {
       "path": "/manifest/v3",
@@ -112,6 +116,10 @@
       "path": "/migrate/",
       "label": "Migration (index)",
       "content_floor": "link list"
+    },
+    {
+      "path": "/migrate/v3-to-v4",
+      "label": "v3 to v4 Migration"
     },
     {
       "path": "/migrate/v2-to-v3",
@@ -235,7 +243,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 113,
+  "expected_distinct_pages": 118,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",

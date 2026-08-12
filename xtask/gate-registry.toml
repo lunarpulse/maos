@@ -107,6 +107,12 @@ gates = [
     "check-scale-churn",
     # Story 12.1 — signed cohort manifest and blocking N=3/N=8 pairwise mesh.
     "check-cohort-mesh",
+    # Story 13.1 — ADR-055 physical tenant wall; hermetic legs bind at HEAD,
+    # live two-datname legs are advisory-substrate-gated.
+    "check-multi-tenant-loom",
+    # Story 13.5d — Reza's mediated production collective route; hermetic legs
+    # bind at HEAD and the live route is advisory-substrate-gated.
+    "check-reza-production-path",
     # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
     # in-process; real per-commit tripwire). Per-leg independence. Advisory at
     # v1.0/v1.5; blocking at v2.0.
@@ -128,6 +134,11 @@ gates = [
     "check-trial-attestation",
     # Story 12.6 — maos-bin/src environment-contract registry; workspace coverage is Story 12.7.
     "check-env-contract",
+    # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate; 7 hermetic blocking legs.
+    "check-vetting-attestation",
+    # Story 13.6c — three-team/three-region CI substrate drift controls
+    # (env-consistency + service-block). Structural; blocks at every phase.
+    "check-loom-substrate-drift",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -290,6 +301,18 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-cohort-mesh"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+# Story 13.1 — physical tenant wall. Hermetic legs hard-fail at HEAD; live
+# two-datname legs block when the Postgres substrate is present and emit a
+# WOULD-HAVE-BLOCKED advisory when absent.
+[[ship_gate]]
+name = "check-multi-tenant-loom"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+# Story 13.5d — Reza's mediated production collective route. Hermetic legs
+# hard-fail at HEAD; the live route blocks when Postgres is present and emits a
+# WOULD-HAVE-BLOCKED advisory when absent.
+[[ship_gate]]
+name = "check-reza-production-path"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
 # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
 # in-process). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
@@ -323,7 +346,18 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-env-contract"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+# Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
+# hermetic (in-process crypto + registry admission, no live substrate) and
+# hard-fail per-commit at HEAD; this disposition governs the ship-gate ladder.
+[[ship_gate]]
+name = "check-vetting-attestation"
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
 
+# Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
+# Structural (no Postgres); a substrate-config drift blocks at every phase.
+[[ship_gate]]
+name = "check-loom-substrate-drift"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 
 

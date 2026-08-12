@@ -166,8 +166,28 @@ fn kloc_check(config_path: &str) -> Result<Report, String> {
 
     let output = Command::new(tokei_path)
         .args([
-            "--output", "json", "--types", "Rust", "-e", "target", "-e", "tests", "-e", "benches",
-            "-e", "examples", "-e", "fuzz", "-e", "spirits", ".",
+            "--output",
+            "json",
+            "--types",
+            "Rust",
+            "-e",
+            "target",
+            "-e",
+            "tests",
+            "-e",
+            "benches",
+            "-e",
+            "examples",
+            "-e",
+            "fuzz",
+            "-e",
+            "spirits",
+            // cfg(test/debug_assertions) fault-injection scaffolding for the private spill
+            // transaction; excluded per the production Rust code only intent (ratified
+            // 2026-08-03), not a ceiling increase.
+            "-e",
+            "crates/maos-kernel-core/src/memory/spill_test_faults.rs",
+            ".",
         ])
         .current_dir(workspace_root)
         .output()

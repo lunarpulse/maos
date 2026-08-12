@@ -32,6 +32,7 @@
 pub mod a2a; // NEW — Story 6.3 A2ARouter port per ADR-003 + ADR-012
 pub mod capability;
 pub mod collective_memory; // NEW — Story 10.4a CollectiveMemoryPort per ADR-006
+pub mod cross_wall_recall_consent; // Story 13.3b cross-wall log-recall consent
 pub mod distillation; // NEW — Story 4.4 DistillationPort per AC2
 pub mod epistemic_scalar; // NEW — Story 8.10 AC1 cognitive-Spirit scalar-write port
 pub mod hot_swap; // NEW — ADR-041 (Epic 6 retro §A3 2026-05-28) Phase-4 extraction prep
@@ -57,7 +58,12 @@ pub mod crypto; // NEW — Story 1a.3 CryptoProvider port per FR48 / NFR-Sec-15 
 
 pub use a2a::A2ARouter; // NEW — Story 6.3
 pub use capability::CapabilityRegistryPort;
-pub use collective_memory::{CollectiveMemoryPort, CollectivePortError}; // NEW — Story 10.4a
+pub use collective_memory::{
+    CollectiveEraseReceipt, CollectiveMemoryPort, CollectivePortError, TransportCause,
+}; // Story 10.4a / 13.3 / 13.5b
+pub use cross_wall_recall_consent::{
+    CrossWallRecallConsentDecision, CrossWallRecallConsentError, CrossWallRecallConsentPort,
+};
 pub use crypto::{CryptoError, CryptoProvider};
 pub use distillation::DistillationPort; // NEW — Story 4.4
 pub use epistemic_scalar::{EpistemicScalarPort, ScalarPortError}; // NEW — Story 8.10 AC1
@@ -67,7 +73,7 @@ pub use identity_assertion::{AuthenticatedPrincipal, IdentityAssertionPort, Iden
 pub use inference::InferencePort;
 pub use io_subsystem::IoSubsystemPort;
 pub use key_management::{KeyManagementPort, KmsError}; // NEW — Story 11.4c
-pub use log_recall::LogRecallPort; // NEW — Story 4.4
+pub use log_recall::{CrossWallLogReadPort, LogRecallPort}; // Story 4.4 / 13.6d
 pub use mcp::{McpAttribution, McpClientPort, McpError, McpRequest, McpResponse, McpTransportId}; // NEW — Story 5.5c
 pub use memory::MemoryManagerPort;
 pub use policy_decision::{

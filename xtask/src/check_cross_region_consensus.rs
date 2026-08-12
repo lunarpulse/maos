@@ -24,274 +24,161 @@
 //!
 //! Legs 1–4 run as `cargo test -p maos-loom-lite --test cross_region_live
 //! -- --ignored --nocapture`, gated on the `MAOS_TEST_POSTGRES` connection
-//! string. An environment WITHOUT Postgres reports those legs as **Skipped** —
-//! never a silent pass. Absent/unmeasured → the oracle is RED (not green), so
-//! at the advisory phases (v1.0/v1.5) a skipped leg emits a §A7.5
-//! WOULD-HAVE-BLOCKED banner; at v2.0 a skipped leg BLOCKS ship. The gate
-//! never green-lights what it did not measure.
+//! string. An environment WITHOUT Postgres reports those legs as `ABSENT` —
+//! never a silent pass.
 //!
-//! # Phase disposition
+//! # Story 13.6e — leg-level binding, and the ledger
 //!
-//! Advisory at v1.0/v1.5 (a RED/skipped oracle emits a WOULD-HAVE-BLOCKED
-//! banner but does not fail the aggregate); blocking at v2.0. The current
-//! phase is read from `gate-registry.toml`, not hardcoded.
+//! This gate used to key its whole verdict off a private `CURRENT_PHASE =
+//! "v1_5"` const plus a registry `advisory` row, so a RED LIVE leg returned
+//! `Ok(())` — D-2's Family-B vacuity. Those private phase copies are retired:
+//! every leg now carries a [`BindingClass`] (Option C, E12-B1), so a RED live
+//! leg with its substrate up hard-fails at HEAD, exactly as the two Family-A
+//! gates already did. The GA ladder still lives in `gate-registry.toml` and
+//! still governs ONLY ship disposition, never dev-time enforcement.
+//!
+//! Every leg also carries a projected [`crate::gate_common::EvidenceState`] and
+//! the gate publishes a `product_claim` (Story 13.6e AC1/AC2/AC5).
 
-use crate::gate_common::emit_command;
-use std::collections::HashMap;
-use std::path::Path;
-use std::process::{Command, Stdio};
-
-/// Phase graduation order — matches the `gate-registry.toml` `disposition` keys.
-/// Absent phases inherit the nearest prior declared phase (corpus_types.rs:82).
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
-
-/// Current release phase. The cross-region binding graduates to blocking at
-/// v2.0; v1.0/v1.5 are the advisory WOULD-HAVE-BLOCKED window.
-const CURRENT_PHASE: &str = "v1_5";
+use crate::evidence_ledger::{
+    finish_ledger_gate, run_exact_test_leg, BuildBinding, EvidenceLeg, EvidenceVerifier,
+    LegObservation, SignatureCheck, TestLeg,
+};
+use crate::gate_common::{read_disposition, BindingClass};
 
 /// Canonical gate name (matches the registry `[[ship_gate]]` row and the
 /// `Commands` variant's `#[command(name = ...)]`).
-const GATE_NAME: &str = "check-cross-region-consensus";
+pub(crate) const GATE_NAME: &str = "check-cross-region-consensus";
 
-/// Read the full phase-disposition map for this gate from the registry.
-fn read_disposition() -> Result<HashMap<String, String>, String> {
-    let registry_path = Path::new("xtask/gate-registry.toml");
-    let registry: crate::corpus_types::ShipGateRegistry =
-        crate::corpus_types::load_toml(registry_path)
-            .map_err(|e| format!("cannot read gate-registry.toml: {e}"))?;
-    for entry in &registry.ship_gates {
-        if entry.name == GATE_NAME {
-            if entry.disposition.is_empty() {
-                return Err(format!("{GATE_NAME} has an empty disposition"));
-            }
-            return Ok(entry.disposition.clone());
-        }
-    }
-    Err(format!("{GATE_NAME} not found in gate-registry.toml"))
-}
+const KERNEL_ABI_LEG: &str = "kernel-abi-diff";
 
-/// Resolve the disposition for `phase`, inheriting the nearest prior declared
-/// phase when `phase` itself is absent from the map.
-fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
-}
-
-/// True iff the gate BLOCKS ship at `phase` (the v2.0 cutover). At v1.0/v1.5 a
-/// RED/skipped oracle is advisory (WOULD-HAVE-BLOCKED banner, non-failing).
-fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> bool {
-    matches!(
-        phase_disposition(disposition, phase),
-        Some("blocking") | Some("blocking-when-present")
-    )
-}
-
-fn write_step_summary(text: &str) {
-    if let Ok(path) = std::env::var("GITHUB_STEP_SUMMARY") {
-        let _ = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut f| {
-                use std::io::Write;
-                write!(f, "{text}")
-            });
-    }
-}
-
-/// The four live oracle legs. They name distinct aspects proven by the SAME
-/// `cross_region_live` test file, so the gate invokes that binary ONCE and
-/// broadcasts the parsed result to each leg (running `cargo test` 4× would be a
-/// real CI-time defect). `kernel-abi-diff` is a separate, always-attempted leg.
-const LIVE_LEGS: &[&str] = &[
-    "reattestation-mediated",
-    "convergence-oracle",
-    "region-identity",
-    "ap-degrade",
+/// The four consensus oracles. Each runs by exact identity: the shared
+/// `cross_region_live` binary also contains three-region and multi-tenant tests
+/// with different substrate contracts, so broadcasting one unfiltered result
+/// would turn their absence or failure into four unrelated consensus REDs.
+const LIVE_LEGS: &[TestLeg] = &[
+    TestLeg {
+        name: "reattestation-mediated",
+        class: BindingClass::AdvisorySubstrate,
+        args: &[
+            "test",
+            "--locked",
+            "-p",
+            "maos-loom-lite",
+            "--test",
+            "cross_region_live",
+            "reattest_copy_fails_then_reattest_succeeds",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture",
+        ],
+    },
+    TestLeg {
+        name: "convergence-oracle",
+        class: BindingClass::AdvisorySubstrate,
+        args: &[
+            "test",
+            "--locked",
+            "-p",
+            "maos-loom-lite",
+            "--test",
+            "cross_region_live",
+            "crdt_reorder_independence_oracle_converges",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture",
+        ],
+    },
+    TestLeg {
+        name: "region-identity",
+        class: BindingClass::AdvisorySubstrate,
+        args: &[
+            "test",
+            "--locked",
+            "-p",
+            "maos-loom-lite",
+            "--test",
+            "cross_region_live",
+            "region_identity_forge_rejected_count_moves",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture",
+        ],
+    },
+    TestLeg {
+        name: "ap-degrade",
+        class: BindingClass::AdvisorySubstrate,
+        args: &[
+            "test",
+            "--locked",
+            "-p",
+            "maos-loom-lite",
+            "--test",
+            "cross_region_live",
+            "ap_degrade_real_partition",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture",
+        ],
+    },
 ];
 
-/// One oracle leg's parsed result.
-struct LegResult {
-    label: &'static str,
-    passed: u32,
-    failed: u32,
-    /// Did the test binary report a `test result:` line at all (live legs) /
-    /// did the baseline check execute (kernel-abi-diff leg)?
-    ran: bool,
-    /// Did we attempt to run this leg? `false` for live legs skipped because
-    /// `MAOS_TEST_POSTGRES` is unset. A skipped leg is *unmeasured* (not green),
-    /// distinct from a *vacuous* leg that ran but produced no tests.
-    attempted: bool,
-    green: bool,
-}
-
-impl LegResult {
-    /// A live leg that was not attempted (Postgres unavailable) — unmeasured.
-    fn skipped(label: &'static str) -> Self {
-        LegResult {
-            label,
-            passed: 0,
-            failed: 0,
-            ran: false,
-            attempted: false,
-            green: false,
-        }
-    }
-
-    /// Human-readable verdict word for banners / summaries.
-    fn status_word(&self) -> &'static str {
-        if self.green {
-            "green"
-        } else if self.attempted {
-            "red"
-        } else {
-            "skipped"
-        }
-    }
-}
-
-/// Invoke the live `cross_region_live` test binary once and parse its `test
-/// result:` summary. Returns `(passed, failed, ran, green)`.
-fn run_live_oracle() -> Result<(u32, u32, bool, bool), String> {
-    let mut cmd = Command::new("cargo");
-    cmd.args([
-        "test",
-        "--locked",
-        "-p",
-        "maos-loom-lite",
-        "--test",
-        "cross_region_live",
-        "--",
-        "--ignored",
-        "--nocapture",
-    ]);
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-    let output = cmd
-        .output()
-        .map_err(|e| format!("cannot invoke `cargo test` (cross_region_live): {e}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = format!("{stdout}{stderr}");
-    let (passed, failed) = parse_test_summary(&combined);
-    let ran = combined
-        .lines()
-        .any(|l| l.trim().starts_with("test result:"));
-    // GREEN requires: cargo exited 0, the binary reported results, ≥1 passed,
-    // and 0 failed. A non-zero exit (compile error, test panic) or a 0-test run
-    // is not green (the 0-test vacuous case is escalated in `run()`).
-    let green = output.status.success() && ran && passed >= 1 && failed == 0;
-    if !green {
-        // Surface the tail of the captured output so a failure is attributable.
-        let tail: String = combined
-            .lines()
-            .rev()
-            .take(40)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join("\n");
-        eprintln!(
-            "{GATE_NAME}: live oracle NOT green (passed={passed}, failed={failed}, ran={ran}, exit={}):\n{tail}",
-            output.status
-        );
-    }
-    Ok((passed, failed, ran, green))
+fn live_substrate_present() -> bool {
+    [
+        "MAOS_TEST_POSTGRES",
+        "MAOS_TEST_POSTGRES_A",
+        "MAOS_TEST_POSTGRES_B",
+        "MAOS_TEST_POSTGRES_C",
+        "MAOS_TEST_POSTGRES_TEAM_A",
+        "MAOS_TEST_POSTGRES_TEAM_B",
+        "MAOS_TEST_POSTGRES_TEAM_C",
+    ]
+    .iter()
+    .all(|name| std::env::var(name).is_ok_and(|value| !value.trim().is_empty()))
 }
 
 /// Run the kernel-ABI baseline leg by reusing the existing `check-kernel-baseline`
 /// logic directly (no Postgres dependency). The re-pin must be GREEN — the
 /// `WriteEntryPoint::CrossRegionReadmit` addition must not drift the kernel.
-fn run_kernel_abi_leg() -> LegResult {
+fn run_kernel_abi_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
     // Reuse the real baseline check rather than duplicating the line counter.
     // `run(false)` keeps its output on stderr (diagnostic) and returns Ok/Err;
     // it never emits JSON to stdout, so this gate's JSON output stays clean.
     let green = crate::check_kernel_baseline::run(false).is_ok();
-    LegResult {
-        label: "kernel-abi-diff",
-        passed: if green { 1 } else { 0 },
-        failed: if green { 0 } else { 1 },
-        ran: true,
-        attempted: true,
-        green,
-    }
-}
-
-/// Sum `passed`/`failed` counts across every `test result:` line in `output`.
-/// `cargo test` emits one such line per test binary; summing is robust to extra
-/// binaries.
-fn parse_test_summary(output: &str) -> (u32, u32) {
-    let mut passed = 0u32;
-    let mut failed = 0u32;
-    for line in output.lines() {
-        let l = line.trim();
-        if let Some(rest) = l.strip_prefix("test result:") {
-            passed += parse_count(rest, "passed");
-            failed += parse_count(rest, "failed");
-        }
-    }
-    (passed, failed)
-}
-
-/// Parse the total of `"<n> <key>"` occurrences in `s` (e.g. `19 passed`).
-/// Cargo emits the count and the key space-separated, so we skip whitespace
-/// between them before walking back over the digits.
-fn parse_count(s: &str, key: &str) -> u32 {
-    let bytes = s.as_bytes();
-    let mut total = 0u32;
-    let mut from = 0usize;
-    while let Some(rel) = s[from..].find(key) {
-        let abs = from + rel;
-        // Skip the whitespace separating the count from the key, then the digits.
-        let mut end = abs;
-        while end > 0 && bytes[end - 1] == b' ' {
-            end -= 1;
-        }
-        let mut start = end;
-        while start > 0 && bytes[start - 1].is_ascii_digit() {
-            start -= 1;
-        }
-        if start < end {
-            if let Ok(n) = s[start..end].parse::<u32>() {
-                total += n;
-            }
-        }
-        from = abs + key.len();
-    }
-    total
-}
-
-/// Build the JSON array of per-leg verdicts for programmatic consumers.
-fn legs_json(legs: &[LegResult]) -> serde_json::Value {
-    serde_json::Value::Array(
-        legs.iter()
-            .map(|l| {
-                serde_json::json!({
-                    "label": l.label,
-                    "passed": l.passed,
-                    "failed": l.failed,
-                    "ran": l.ran,
-                    "attempted": l.attempted,
-                    "green": l.green,
-                    "status": l.status_word(),
-                })
-            })
-            .collect(),
+    EvidenceLeg::observe(
+        LegObservation {
+            name: KERNEL_ABI_LEG,
+            class: BindingClass::Blocking,
+            attempted: true,
+            substrate_present: true,
+            green,
+            detail: if green {
+                "kernel baseline re-pin GREEN".to_string()
+            } else {
+                "kernel baseline re-pin FAILED".to_string()
+            },
+            signature: SignatureCheck::default(),
+            passed: Some(u32::from(green)),
+            failed: Some(u32::from(!green)),
+        },
+        verifier.binding(),
+        GATE_NAME,
     )
 }
 
 pub fn run(json: bool) -> Result<(), String> {
-    // 1. Read + validate the phase disposition from the registry.
-    let disposition = read_disposition()?;
+    // 1. Read + validate the phase disposition from the registry. The GA ladder
+    //    is still the registry's job; it no longer decides dev-time
+    //    enforcement, which is now leg-level `BindingClass` (Story 13.6e T5).
+    let disposition = read_disposition(GATE_NAME)?;
     // The v2.0 binding promise MUST be present — its absence is a registry
     // defect (the gate would silently stay advisory forever).
     if !matches!(
-        disposition.get("v2_0").map(|s| s.as_str()),
+        disposition.get("v2_0").map(String::as_str),
         Some("blocking")
     ) {
         return Err(format!(
@@ -299,199 +186,141 @@ pub fn run(json: bool) -> Result<(), String> {
             disposition.get("v2_0")
         ));
     }
-    let blocking_now = is_blocking_at(&disposition, CURRENT_PHASE);
 
-    // 2. Live-oracle legs. They share one `cross_region_live` invocation; if
-    //    Postgres is unavailable every live leg is Skipped (unmeasured, never a
-    //    silent pass). The current phase is advisory, so Skipped → WOULD-HAVE-
-    //    BLOCKED banner; at v2.0 Skipped → BLOCK (absent/unmeasured fails ship).
-    let postgres_available = std::env::var("MAOS_TEST_POSTGRES").is_ok();
-    let mut legs: Vec<LegResult> = Vec::with_capacity(LIVE_LEGS.len() + 1);
-    if postgres_available {
-        let (passed, failed, ran, green) = run_live_oracle()?;
-        for &label in LIVE_LEGS {
-            legs.push(LegResult {
-                label,
-                passed,
-                failed,
-                ran,
-                attempted: true,
-                green,
-            });
-        }
-    } else {
-        for &label in LIVE_LEGS {
-            legs.push(LegResult::skipped(label));
-        }
-    }
+    let verifier = EvidenceVerifier::load(BuildBinding::for_run(GATE_NAME)?)?;
+
+    // 2. Each conceptual leg runs only its exact oracle. The shared file holds
+    // tests with unrelated A/B/C and TEAM_A/B/C contracts; those cannot affect
+    // this gate. An absent or whitespace-only base connection makes all four
+    // legs ABSENT and remains advisory on the local lane.
+    let live_present = live_substrate_present();
+    let mut legs: Vec<EvidenceLeg> = LIVE_LEGS
+        .iter()
+        .map(|spec| run_exact_test_leg(spec, live_present, GATE_NAME, &verifier))
+        .collect();
 
     // 3. Kernel-ABI baseline leg (always attempted; no Postgres dependency).
-    legs.push(run_kernel_abi_leg());
+    legs.push(run_kernel_abi_leg(&verifier));
 
-    // 4. Axis-1 structural guard: a live leg that was ATTEMPTED (Postgres was
-    //    set) but compiled to ZERO tests / never reported results is a vacuous
-    //    green — a re-stubbed harness cannot pass this gate (J4 anti-canned
-    //    guard). Hard-fail at every phase. The kernel-abi-diff leg is exempt
-    //    (it is a baseline check, not a test count). Skipped legs are NOT
-    //    vacuous — they are unmeasured (handled by the phased disposition).
-    for leg in &legs {
-        if leg.label != "kernel-abi-diff"
-            && leg.attempted
-            && (!leg.ran || (leg.passed == 0 && leg.failed == 0))
-        {
-            let msg = format!(
-                "{GATE_NAME}: FAIL — {} leg is vacuous (ran={}, passed={}, failed={}). \
-                 The live oracle produced no tests — a re-stubbed harness cannot pass this \
-                 gate (J4 anti-canned guard).",
-                leg.label, leg.ran, leg.passed, leg.failed
-            );
-            emit_command(json, "error", &msg);
-            return Err(msg);
-        }
-    }
-
-    let oracle_green = legs.iter().all(|l| l.green);
-
-    // 5. Apply the phased disposition.
-    if oracle_green {
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "gate": GATE_NAME,
-                    "passed": true,
-                    "oracle_green": true,
-                    "blocking_now": blocking_now,
-                    "current_phase": CURRENT_PHASE,
-                    "disposition": disposition,
-                    "postgres_available": postgres_available,
-                    "legs": legs_json(&legs),
-                })
-            );
-        } else {
-            eprintln!(
-                "{GATE_NAME}: PASSED — oracle green ({} legs); {} at {}",
-                legs.len(),
-                if blocking_now { "BLOCKING" } else { "advisory" },
-                CURRENT_PHASE,
-            );
-        }
-        return Ok(());
-    }
-
-    // Oracle RED (or skipped/unmeasured) — an axis-2 verdict, phased.
-    let mut detail = String::new();
-    for leg in &legs {
-        detail.push_str(&format!(
-            "- {} leg: {} passed, {} failed (ran={}, attempted={}, green={})\n",
-            leg.label, leg.passed, leg.failed, leg.ran, leg.attempted, leg.green,
-        ));
-    }
-    if blocking_now {
-        // v2.0: BLOCK ship.
-        let msg = format!(
-            "{GATE_NAME}: BLOCKING — oracle RED/unmeasured at {CURRENT_PHASE} (binding):\n{detail}"
-        );
-        emit_command(json, "error", &msg);
-        if !json {
-            eprintln!("{msg}");
-        }
-        return Err(format!(
-            "{GATE_NAME}: BLOCKING — oracle RED/unmeasured at {CURRENT_PHASE}"
-        ));
-    }
-
-    // v1.0/v1.5 advisory: surface loudly but do not fail the aggregate.
-    let banner = format!(
-        "## ⚠️ Cross-Region Consensus Gate: WOULD HAVE BLOCKED SHIP (v2.0)\n\
-         {detail}\
-         - The cross-region oracle is RED (live legs skipped — Postgres unavailable — or a leg failed). \
-           This gate is advisory at {CURRENT_PHASE}; it WILL block at v2.0.\n"
-    );
-    emit_command(
+    finish_ledger_gate(
+        GATE_NAME,
+        "Cross-Region Consensus Gate",
         json,
-        "warning",
-        "Cross-region consensus oracle RED/unmeasured — would block ship at v2.0",
-    );
-    write_step_summary(&banner);
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "gate": GATE_NAME,
-                "passed": true,
-                "oracle_green": false,
-                "advisory": true,
-                "blocking_now": false,
-                "current_phase": CURRENT_PHASE,
-                "disposition": disposition,
-                "postgres_available": postgres_available,
-                "legs": legs_json(&legs),
-            })
-        );
-    } else {
-        eprintln!(
-            "{GATE_NAME}: PASS (advisory — oracle RED/unmeasured, would block at v2.0); {}",
-            legs.iter()
-                .map(|l| format!("{}={}", l.label, l.status_word()))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-    }
-    Ok(())
+        &disposition,
+        legs,
+        &verifier,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// T5/D-2 (Family B): a live leg that was ATTEMPTED and came back RED with
+    /// its substrate up now hard-fails at HEAD. Before Story 13.6e this gate's
+    /// private `CURRENT_PHASE = "v1_5"` turned it into `Ok(())`.
     #[test]
-    fn parse_count_sums_passed_and_failed() {
-        let s = "test result: ok. 19 passed; 0 failed; 0 ignored";
-        assert_eq!(parse_count(s, "passed"), 19);
-        assert_eq!(parse_count(s, "failed"), 0);
-        let s2 = "test result: FAILED. 3 passed; 2 failed; 1 ignored";
-        assert_eq!(parse_count(s2, "passed"), 3);
-        assert_eq!(parse_count(s2, "failed"), 2);
+    fn a_red_live_leg_blocks_now_that_binding_is_leg_level() {
+        let verifier = EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "c0ffee".to_string(),
+                nonce: "n".to_string(),
+            },
+            None,
+        );
+        let red = EvidenceLeg::observe(
+            LegObservation {
+                name: "convergence-oracle",
+                class: BindingClass::AdvisorySubstrate,
+                attempted: true,
+                substrate_present: true,
+                green: false,
+                detail: "0 passed, 1 failed".to_string(),
+                signature: SignatureCheck::default(),
+                passed: Some(0),
+                failed: Some(1),
+            },
+            verifier.binding(),
+            GATE_NAME,
+        );
+        assert!(red.blocks_dev_lane(), "a RED live leg must block at HEAD");
+        assert!(red.blocks_product_claim(false));
     }
 
+    /// An unmeasured live leg is `ABSENT`, never green, and — with its
+    /// substrate genuinely absent — advisory to the dev lane while still
+    /// making the product claim NOT_PROVEN.
     #[test]
-    fn parse_test_summary_sums_across_binaries() {
-        let out = "test result: ok. 5 passed; 0 failed\nrandom line\ntest result: ok. 2 passed; 1 failed\n";
-        let (p, f) = parse_test_summary(out);
-        assert_eq!(p, 7);
-        assert_eq!(f, 1);
-    }
-
-    #[test]
-    fn parse_count_returns_zero_when_absent() {
-        assert_eq!(parse_count("nothing here", "passed"), 0);
-    }
-
-    #[test]
-    fn phase_disposition_inherits_nearest_prior() {
-        let mut d = HashMap::new();
-        d.insert("v1_0".to_string(), "advisory".to_string());
-        d.insert("v2_0".to_string(), "blocking".to_string());
-        // v1_5 absent → inherits v1_0 (advisory).
-        assert_eq!(phase_disposition(&d, "v1_5"), Some("advisory"));
-        assert_eq!(phase_disposition(&d, "v2_0"), Some("blocking"));
-        assert!(!is_blocking_at(&d, "v1_5"));
-        assert!(is_blocking_at(&d, "v2_0"));
-    }
-
-    #[test]
-    fn phase_disposition_unknown_phase_is_none() {
-        let mut d = HashMap::new();
-        d.insert("v1_0".to_string(), "advisory".to_string());
-        assert_eq!(phase_disposition(&d, "v9_9"), None);
-    }
-
-    #[test]
-    fn skipped_leg_is_not_green_not_attempted() {
-        let leg = LegResult::skipped("convergence-oracle");
+    fn skipped_leg_is_absent_not_green() {
+        let verifier = EvidenceVerifier::with_pubkey(
+            BuildBinding {
+                commit: "c0ffee".to_string(),
+                nonce: "n".to_string(),
+            },
+            None,
+        );
+        let leg = EvidenceLeg::observe(
+            LegObservation {
+                name: "convergence-oracle",
+                class: BindingClass::AdvisorySubstrate,
+                attempted: false,
+                substrate_present: false,
+                green: false,
+                detail: "MAOS_TEST_POSTGRES unset — live oracle unmeasured".to_string(),
+                signature: SignatureCheck::default(),
+                passed: None,
+                failed: None,
+            },
+            verifier.binding(),
+            GATE_NAME,
+        );
         assert!(!leg.green);
         assert!(!leg.attempted);
-        assert_eq!(leg.status_word(), "skipped");
+        assert_eq!(
+            leg.state(),
+            crate::gate_common::EvidenceState::Absent,
+            "an unmeasured live leg is ABSENT"
+        );
+        assert!(!leg.blocks_dev_lane());
+        assert!(!leg.blocks_product_claim(false));
+        assert!(crate::evidence_ledger::product_claim(&[leg]).starts_with("NOT_PROVEN("));
     }
+    #[test]
+    fn every_consensus_leg_runs_one_exact_trusted_test() {
+        for spec in LIVE_LEGS {
+            let separator = spec
+                .args
+                .iter()
+                .position(|arg| *arg == "--")
+                .expect("libtest separator");
+            let expected_test = spec.args[separator - 1];
+            assert!(
+                spec.args[separator + 1..].contains(&"--exact"),
+                "{} must use libtest --exact",
+                spec.name
+            );
+            assert_eq!(
+                crate::evidence_ledger::trusted_evidence_tests(GATE_NAME, spec.name)
+                    .expect("trusted mapping"),
+                &[expected_test],
+                "{} gate runner and published consumer mapping drifted",
+                spec.name
+            );
+        }
+    }
+
+    #[test]
+    fn ledger_leg_names_are_derived_from_live_legs() {
+        assert_eq!(ledger_leg_names().len(), LIVE_LEGS.len() + 1);
+        assert_eq!(ledger_leg_names().last(), Some(&KERNEL_ABI_LEG));
+    }
+}
+
+/// Complete ledger leg set, derived from the gate's own live-leg declarations.
+pub fn ledger_leg_names() -> Vec<&'static str> {
+    LIVE_LEGS
+        .iter()
+        .map(|leg| leg.name)
+        .chain(std::iter::once(KERNEL_ABI_LEG))
+        .collect()
 }

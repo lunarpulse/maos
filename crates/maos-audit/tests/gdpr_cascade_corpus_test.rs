@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+use std::collections::BTreeSet;
 use std::io::BufRead;
 use std::path::Path;
 use std::sync::Arc;
@@ -82,7 +83,10 @@ fn open_isolated_stores(
     let principal_index =
         Arc::new(maos_kernel_core::memory::PrincipalNamespaceIndex::open(&db_path).unwrap());
     let tl = Arc::new(
-        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open(&db_path, 1).unwrap(),
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_with_global_legal_holds(
+            &db_path, &db_path, 1,
+        )
+        .unwrap(),
     );
     (private, shared, principal_index, tl, db_path)
 }
@@ -215,26 +219,77 @@ fn gdpr_cascade_v0_corpus_replay() {
         .map(|line| serde_json::from_str(&line.unwrap()).unwrap())
         .collect();
     assert_eq!(scenarios.len(), 50, "corpus must contain 50 scenarios");
+    let scenario_ids: BTreeSet<_> = scenarios
+        .iter()
+        .map(|scenario| scenario.scenario_id.as_str())
+        .collect();
+    let duplicate_ids: BTreeSet<_> = scenarios
+        .iter()
+        .filter(|scenario| {
+            scenarios
+                .iter()
+                .filter(|candidate| candidate.scenario_id == scenario.scenario_id)
+                .count()
+                > 1
+        })
+        .map(|scenario| scenario.scenario_id.as_str())
+        .collect();
+    assert_eq!(
+        scenario_ids.len(),
+        scenarios.len(),
+        "corpus scenario_id values must be unique; duplicate(s): {duplicate_ids:?}"
+    );
 
     for scenario in &scenarios {
-        // Cross-Spirit cascade: data written by two Spirits for the same principal.
-        write_principal_data(
-            &memory,
-            scenario.spirit_pid,
-            &scenario.principal,
-            &scenario.schema,
-            &scenario.key,
-            &scenario.value,
-        );
-        if let Some(secondary) = scenario.secondary_spirit_pid {
+        // The terminal corpus includes a true empty subject and a deterministic
+        // filesystem failure in addition to the ordinary/held paths.
+        if scenario.expected_outcome == "failed" {
+            let namespace = MemoryNamespace::Principal {
+                principal_id: scenario.principal.clone(),
+                schema: scenario.schema.clone(),
+            };
+            memory
+                .write(
+                    scenario.spirit_pid,
+                    MemoryTier::Private,
+                    &namespace,
+                    &scenario.key,
+                    MemoryValue::Blob(vec![0x5b; 8 * 1024]),
+                )
+                .unwrap();
+        } else if scenario.expected_outcome != "not_found" {
             write_principal_data(
                 &memory,
-                secondary,
+                scenario.spirit_pid,
                 &scenario.principal,
                 &scenario.schema,
-                &format!("{}-secondary", scenario.key),
-                &format!("{}-secondary", scenario.value),
+                &scenario.key,
+                &scenario.value,
             );
+            if let Some(secondary) = scenario.secondary_spirit_pid {
+                write_principal_data(
+                    &memory,
+                    secondary,
+                    &scenario.principal,
+                    &scenario.schema,
+                    &format!("{}-secondary", scenario.key),
+                    &format!("{}-secondary", scenario.value),
+                );
+            }
+        }
+        if scenario.expected_outcome == "failed" {
+            let pid_dir = dir
+                .path()
+                .join("memory")
+                .join(scenario.spirit_pid.to_string());
+            let namespace_dir = std::fs::read_dir(&pid_dir)
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .path();
+            std::fs::remove_dir_all(&namespace_dir).unwrap();
+            std::fs::write(&namespace_dir, b"simulated removal failure").unwrap();
         }
 
         // Distillate-embedded canary: plant a canary in a source frame and embed
@@ -252,12 +307,10 @@ fn gdpr_cascade_v0_corpus_replay() {
         }
 
         let reason = scenario.legal_hold_reason.as_deref();
-        let outcome = memory
-            .forget_with_reason(&scenario.principal, reason)
-            .unwrap();
+        let outcome = memory.forget_with_reason(&scenario.principal, reason);
 
         match scenario.expected_outcome.as_str() {
-            "erased" => match outcome {
+            "erased" => match outcome.unwrap() {
                 ForgetOutcome::Erased { receipt, .. } => {
                     if scenario.reused_pid {
                         assert_eq!(
@@ -267,36 +320,40 @@ fn gdpr_cascade_v0_corpus_replay() {
                         );
                     }
                 }
-                _ => panic!(
-                    "{}: expected Erased, got {:?}",
-                    scenario.scenario_id, outcome
-                ),
+                other => panic!("{}: expected Erased, got {:?}", scenario.scenario_id, other),
             },
-            "suspended" => match outcome {
+            "held" => match outcome.unwrap() {
                 ForgetOutcome::Suspended { hold } => {
-                    assert!(
-                        hold.reason.starts_with("legal-hold"),
-                        "{}: hold reason must start with legal-hold",
-                        scenario.scenario_id
-                    );
-                    assert!(
-                        hold.status.contains("SUSPENDED"),
-                        "{}: hold status must contain SUSPENDED",
-                        scenario.scenario_id
-                    );
+                    assert!(hold.reason.starts_with("legal-hold"));
+                    assert!(hold.status.contains("SUSPENDED"));
                 }
-                _ => panic!(
-                    "{}: expected Suspended, got {:?}",
-                    scenario.scenario_id, outcome
+                other => panic!("{}: expected Held, got {:?}", scenario.scenario_id, other),
+            },
+            "not_found" => match outcome.unwrap() {
+                ForgetOutcome::Erased { receipt, .. } => {
+                    assert_eq!(receipt.deleted_entries, 0);
+                    assert_eq!(receipt.deleted_index_rows, 0);
+                }
+                other => panic!(
+                    "{}: expected NotFound, got {:?}",
+                    scenario.scenario_id, other
                 ),
             },
+            "failed" => {
+                let error = outcome.expect_err("forced filesystem failure must propagate");
+                assert!(
+                    error.to_string().contains("directory")
+                        || error.to_string().contains("Directory"),
+                    "unexpected filesystem failure: {error}"
+                );
+            }
             other => panic!(
                 "{}: unknown expected_outcome {}",
                 scenario.scenario_id, other
             ),
         }
 
-        if scenario.expected_outcome == "erased" {
+        if matches!(scenario.expected_outcome.as_str(), "erased" | "not_found") {
             let rows = maos_audit::subject_access_query(&db_path, &scenario.principal).unwrap();
             assert!(
                 rows.is_empty(),

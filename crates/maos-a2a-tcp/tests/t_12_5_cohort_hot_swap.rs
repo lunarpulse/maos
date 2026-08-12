@@ -15,7 +15,7 @@ use maos_a2a_core::identity::PeerId;
 use maos_cohort::{
     CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys,
-    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
+    COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_spirit_abi::identity::HostId;
@@ -45,6 +45,7 @@ fn reissued_manifest(names: &[String], leaves: &[Leaf], authority: &SigningKey) 
             host_id: host_id.clone(),
             fingerprint: leaf.fingerprint.wire(),
             roles: vec!["worker".into()],
+            team: None,
         })
         .collect();
     let tuples: Vec<ConsentTuple> = names
@@ -56,7 +57,7 @@ fn reissued_manifest(names: &[String], leaves: &[Leaf], authority: &SigningKey) 
         })
         .collect();
     CohortManifest {
-        schema_version: SCHEMA_VERSION,
+        schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-12-5-n8".into(),
         version: 2,
         authority: CohortAuthority {
@@ -73,7 +74,9 @@ fn reissued_manifest(names: &[String], leaves: &[Leaf], authority: &SigningKey) 
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
         t_stale_secs: 30,
+        teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(authority)
 }

@@ -16,7 +16,9 @@
 //! committed story files), so a violation reds CI at HEAD regardless of
 //! `CURRENT_PHASE`.
 
-use crate::check_dev_model_used_populated::agent_model_section_model;
+use crate::check_dev_model_used_populated::{
+    agent_model_section_model, is_pre_development_status, load_sibling_sprint_status,
+};
 use crate::gate_common::{dev_enforced_red_blocks, BindingClass};
 use std::fs;
 
@@ -29,8 +31,13 @@ const ENFORCE_FROM_EPIC: u32 = 12;
 /// Frontier-class family tokens — E11 retro A1 allowlist {opus-4-8, gpt-5.5,
 /// glm-5.2, equiv} plus the frontier successors actually used in v2.2 dev.
 /// A recorded model is allowlisted iff its lowercased form contains one of these.
+///
+/// `opus-5` added 2026-07-25 (Story 13.5a): a strict frontier successor to
+/// `opus-4-8`, which is already allowlisted. Extending this list for a newer
+/// frontier model is the documented maintenance of the A1 policy, not a waiver
+/// — a NON-frontier model still fails.
 const FRONTIER_FAMILIES: &[&str] = &[
-    "opus-4-6", "opus-4-7", "opus-4-8", "gpt-5.5", "gpt-5.6", "glm-5.1", "glm-5.2",
+    "opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "gpt-5.5", "gpt-5.6", "glm-5.1", "glm-5.2",
 ];
 /// §A6 review-net markers — a story that ran the multi-layer adversarial review
 /// names at least one of these somewhere in its record.
@@ -41,6 +48,11 @@ const REVIEW_MARKERS: &[&str] = &[
     "Acceptance Auditor",
     "REVIEW COMPLETE",
 ];
+
+/// The authoritative pre-development policy is shared with
+/// `check-dev-model-used-populated`, so the two provenance gates cannot exempt
+/// different stories. The sibling sprint record, not a story's stale body
+/// status, determines whether a model/review record is required.
 
 #[derive(Debug)]
 struct TierViolation {
@@ -70,11 +82,21 @@ pub fn run(json: bool) -> Result<(), String> {
 }
 
 fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
+    let sprint_status = load_sibling_sprint_status(stories_dir);
+    run_with_dir_and_status(json, stories_dir, &sprint_status)
+}
+
+fn run_with_dir_and_status(
+    json: bool,
+    stories_dir: &str,
+    sprint_status: &std::collections::HashMap<String, String>,
+) -> Result<(), String> {
     let entries = fs::read_dir(stories_dir)
         .map_err(|e| format!("check-dev-model-tier: cannot read {stories_dir}: {e}"))?;
 
     let mut violations: Vec<TierViolation> = Vec::new();
     let mut checked = 0u32;
+    let mut skipped_pre_dev = 0u32;
 
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -84,6 +106,15 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
         match epic_of(&name) {
             Some(e) if e >= ENFORCE_FROM_EPIC => {}
             _ => continue,
+        }
+        // A story that has not been developed yet has no dev model to record.
+        // Demanding one would force a fabricated provenance entry into the gate
+        // whose whole purpose is to verify provenance. Skip ONLY on positive
+        // evidence (an explicit pre-dev status); unknown/missing stays checked.
+        let story_key = name.trim_end_matches(".md").to_string();
+        if is_pre_development_status(sprint_status.get(&story_key).map(String::as_str)) {
+            skipped_pre_dev += 1;
+            continue;
         }
         let content = match fs::read_to_string(entry.path()) {
             Ok(c) => c,
@@ -132,6 +163,7 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
                 "binding": "Blocking",
                 "enforce_from_epic": ENFORCE_FROM_EPIC,
                 "stories_checked": checked,
+                "stories_skipped_pre_dev": skipped_pre_dev,
                 "violations": violations.iter().map(|v| serde_json::json!({
                     "file": v.file, "reason": v.reason,
                 })).collect::<Vec<_>>(),
@@ -139,7 +171,7 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
         );
     } else if oracle_green {
         eprintln!(
-            "check-dev-model-tier: PASS — {checked} frontier-era stories, all on allowlisted models with a §A6 artifact"
+            "check-dev-model-tier: PASS — {checked} frontier-era stories, all on allowlisted models with a §A6 artifact ({skipped_pre_dev} pre-dev stories skipped)"
         );
     } else {
         eprintln!(
@@ -226,5 +258,79 @@ mod tests {
             "---\nepic: 11\n---\n### Agent Model Used\n\nModel: legacy-gpt-4o\n",
         );
         assert!(run_with_dir(false, d.path().to_str().unwrap()).is_ok());
+    }
+
+    fn sprint_status(dir: &TempDir, body: &str) -> std::collections::HashMap<String, String> {
+        let p = dir.path().join("sprint-status.yaml");
+        let mut f = std::fs::File::create(&p).unwrap();
+        write!(f, "development_status:\n{body}").unwrap();
+        load_sibling_sprint_status(dir.path().to_str().unwrap())
+    }
+
+    /// The reason this filter exists: a story that has not been developed has
+    /// no dev model, and demanding one would force fabricated provenance into
+    /// the gate that verifies provenance.
+    #[test]
+    fn pre_dev_story_is_skipped_not_failed() {
+        let d = TempDir::new().unwrap();
+        story(
+            &d,
+            "13-9-undeveloped.md",
+            "---\nepic: 13\n---\n### Agent Model Used\n\n_(record at dev start)_\n",
+        );
+        let ss = sprint_status(
+            &d,
+            "  13-9-undeveloped: ready-for-dev  # long provenance comment\n",
+        );
+        assert!(run_with_dir_and_status(false, d.path().to_str().unwrap(), &ss).is_ok());
+    }
+
+    #[test]
+    fn blocked_story_is_skipped_not_failed() {
+        let d = TempDir::new().unwrap();
+        story(
+            &d,
+            "13-9-blocked.md",
+            "---\nepic: 13\n---\n### Agent Model Used\n\n_(record at dev start)_\n",
+        );
+        sprint_status(&d, "  13-9-blocked: blocked\n");
+        assert!(run_with_dir(false, d.path().to_str().unwrap()).is_ok());
+    }
+
+    /// The skip must be driven by STATUS, not by the story being unfinished-looking.
+    #[test]
+    fn same_story_marked_done_is_checked_and_reds() {
+        let d = TempDir::new().unwrap();
+        story(
+            &d,
+            "13-9-undeveloped.md",
+            "---\nepic: 13\n---\n### Agent Model Used\n\n_(record at dev start)_\n",
+        );
+        sprint_status(&d, "  13-9-undeveloped: done  # shipped\n");
+        assert!(run_with_dir(false, d.path().to_str().unwrap()).is_err());
+    }
+
+    /// Regression: the status value carries a trailing `# …` comment in this
+    /// repo. A parser that keeps the comment matches no known status, which
+    /// silently turns the whole gate into a no-op.
+    #[test]
+    fn status_parser_strips_trailing_comment() {
+        let d = TempDir::new().unwrap();
+        let m = sprint_status(&d, "  13-1-x: done  # F4 OPTION A+ RATIFIED 2026-07-17\n  13-5e-y: ready-for-dev  # PREFLIGHT CLOSED\n");
+        assert_eq!(m.get("13-1-x").map(String::as_str), Some("done"));
+        assert_eq!(m.get("13-5e-y").map(String::as_str), Some("ready-for-dev"));
+    }
+
+    /// Fail-closed is preserved: an unknown or missing status is still checked.
+    #[test]
+    fn unknown_status_is_still_checked() {
+        let d = TempDir::new().unwrap();
+        story(
+            &d,
+            "13-9-orphan.md",
+            "---\nepic: 13\n---\n### Agent Model Used\n\nModel: legacy-gpt-4o\n\n§A6\n",
+        );
+        let ss = sprint_status(&d, "  13-other: done\n");
+        assert!(run_with_dir_and_status(false, d.path().to_str().unwrap(), &ss).is_err());
     }
 }

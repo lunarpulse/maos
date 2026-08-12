@@ -26,8 +26,8 @@ use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
 use maos_cohort::{
     AbsenceKind, CohortAuthority, CohortManifest, CohortManifestState, CohortMember, ConsentMatrix,
     ConsentTuple, HaltPresence, HaltReceiptControl, HaltReceiptDistributor,
-    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, RESERVED_INTENT_HALT_RECEIPT,
-    RESERVED_INTENT_REISSUE, SCHEMA_VERSION,
+    InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys, COHORT_SCHEMA_V1,
+    RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
 };
 use maos_domain::frame::{FrameAddress, IacFrame};
 use maos_domain::halt::{HaltId, HaltReceipt};
@@ -131,7 +131,7 @@ fn signed_manifest(
     fp_b: &PeerCertFingerprint,
 ) -> String {
     let manifest = CohortManifest {
-        schema_version: SCHEMA_VERSION,
+        schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-12-3-halt-receipt".into(),
         version: 1,
         authority: CohortAuthority {
@@ -143,11 +143,13 @@ fn signed_manifest(
                 host_id: "host_a".into(),
                 fingerprint: fp_a.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
             CohortMember {
                 host_id: "host_b".into(),
                 fingerprint: fp_b.wire(),
                 roles: vec!["worker".into()],
+                team: None,
             },
         ],
         consent: ConsentMatrix {
@@ -167,7 +169,9 @@ fn signed_manifest(
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
         t_stale_secs: 120,
+        teams: None,
         signature: ManifestSignature { sig: String::new() },
+        cross_team_consent: Vec::new(),
     }
     .signed_with(authority);
     toml::to_string(&manifest).expect("signed manifest serializes")
@@ -251,6 +255,7 @@ async fn broadcast_attempts_members_after_a_middle_peer_failure() {
         host_id: "host_c".into(),
         fingerprint: fingerprint_of(0xc3).wire(),
         roles: vec!["worker".into()],
+        team: None,
     });
     let toml = toml::to_string(&manifest.signed_with(&authority)).expect("fixture serializes");
     let state = load_state("host_a", &toml, &authority);
@@ -587,7 +592,7 @@ async fn t_12_3_source_identity_over_core() {
     // (2) Verified path but `from` (host_a) ≠ TLS-verified peer (host_z) → refused
     //     BEFORE observe.
     let (_resp, passed) = core
-        .handle_intake_verified(request.clone(), &PeerId::new("host_z"))
+        .handle_intake_verified(request.clone(), &PeerId::new("host_z"), None)
         .await;
     assert!(!passed, "identity mismatch fails the binding");
     assert_eq!(
@@ -598,7 +603,7 @@ async fn t_12_3_source_identity_over_core() {
 
     // (3) A valid, verified receipt reaches an ACK and is then counted.
     assert!(matches!(
-        core.handle_intake_verified(request.clone(), &PeerId::new("host_a"))
+        core.handle_intake_verified(request.clone(), &PeerId::new("host_a"), None)
             .await
             .0,
         A2AJsonRpcResponse::Ack(_)
@@ -620,7 +625,7 @@ async fn t_12_3_source_identity_over_core() {
         .expect("courier supplies a consent envelope")
         .valid_until_ns = Some(0);
     assert!(matches!(
-        core.handle_intake_verified(expired, &PeerId::new("host_a"))
+        core.handle_intake_verified(expired, &PeerId::new("host_a"), None)
             .await
             .0,
         A2AJsonRpcResponse::Nack(_)

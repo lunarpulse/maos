@@ -242,4 +242,221 @@
 #          source lines. No behavior, public API, or dependency change.
 #          FLAG-Winston: Lunarpulse authorized the formatter run and this
 #          baseline reconciliation on 2026-07-13.
-src_lines = 23147
+#   23202  J1 Tier-2 live-agent bridge — real-CLI stdin deadlock fix (+55,
+#          AUTHORIZED kernel-core delta). FLAG-Winston: Lunarpulse authorized
+#          2026-07-15 ("approving proper fix"). The J1 Tier-2 signed-live-run
+#          bridge spawns a REAL worker CLI (`codex exec`) that reads
+#          stdin-until-EOF for its prompt; `spawn_and_bridge` held the child's
+#          stdin open as a control channel, so the worker BLOCKED reading stdin
+#          while the bridge BLOCKED reading the worker's output — a mutual
+#          deadlock. The hermetic fixture never read stdin, so this stayed
+#          invisible through T1–T5 (the "PROVEN" runs were fixture-only). Fix
+#          (lifecycle/cli_wrapper/runtime.rs, spawn_and_bridge): when
+#          `control_channel` is `Signals` (worker is NOT driven via stdin), drop
+#          the `ChildStdin` right after spawn so the child receives EOF and
+#          proceeds on its argv prompt. `StdinCommands` (the J1 bench's
+#          `write_stdin_line` path) keeps stdin open — unaffected. Net +55 = ~9
+#          functional (the match arm) + ~46 the in-src #[cfg(test)] regression
+#          (signals_control_closes_worker_stdin_so_a_stdin_reader_proceeds — a
+#          real `cat`-then-`echo` that can only complete if it received EOF; the
+#          private spawn path cannot be exercised from tests/). All additive; no
+#          public symbols removed.
+#   23228  Story 13.5d — production Spirit collective route (+26, AUTHORIZED
+#          kernel-core delta). FLAG-Winston: authorized on the epic-13 lineage.
+#          ROW ADDED RETROACTIVELY 2026-07-25 by the Story 13.5h grant review:
+#          the 23202 → 23228 re-pin landed with the code but its HISTORY row was
+#          never written, leaving the pin one entry ahead of its own audit trail.
+#          The number below was already correct; only this record was missing.
+#   23234  Story 13.5h — Shared-tier principal partition (+6, AUTHORIZED
+#          kernel-core delta). FLAG-Winston: Lunarpulse authorized 2026-07-25 on
+#          a UNANIMOUS 4/4 panel (Winston · Murat · John · Amelia,
+#          `variant=B grant=approve extraction=waive headroom=accept`).
+#          Closed a PROVEN GDPR Art.15/17 hole: `MemoryTier::Shared` accepted
+#          `MemoryNamespace::Principal` at all three trait arms (memory/mod.rs
+#          :743/:803/:857) while `SharedMemoryStore` has NO delete at any
+#          visibility and `subject_access_query` reads only `principal_index` —
+#          so subject-scoped PII written there was neither erasable nor visible.
+#          The control that claimed otherwise was measured to be a NULL CONTROL:
+#          it planted its canary under `Coordination`, so it passed identically
+#          with and without principal PII in the tier.
+#          SHAPE (Variant B, measured — Variant A's separate mirror cost +26
+#          physical / +20 tokei and BREACHED the then-17900 kloc ceiling, and
+#          was rejected 4/4 on ARCHITECTURE not cost): generalized
+#          `reject_principal_collective` into
+#          `reject_principal_outside_private(tier, namespace)`, stated as a
+#          negation of the allowlist so a FUTURE MemoryTier is
+#          principal-rejecting by default; hoisted ONE call above each of the
+#          three `match tier` blocks; deleted the three in-arm collective calls;
+#          updated the three cap-gated call sites so they cannot become an
+#          alternate bypass. Additive; no public symbols removed; no enum
+#          widened.
+#          LANDED AND RE-MEASURED 2026-07-25 on the FORMATTED tree (13.5d :475 —
+#          the estimate is not the authorization): +6 physical, 23228 → 23234,
+#          exactly as authorized; +4 tokei, 17890 → 17894.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: the rewritten
+#          discriminating control was falsified PER LEG, not once. Deleting the
+#          hoisted predicate above the write / read / scan `match tier` block
+#          each made `multi_backend_erasure_partition_invariant` RED at its OWN
+#          assertion (write / read / scan respectively), proving all three legs
+#          independently load-bearing; restoring all three returned the suite to
+#          `running 1 test` / `1 passed`. The PRE-13.5h control would NOT have
+#          redded on guard deletion — it never wrote a principal namespace at
+#          Shared. `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag
+#          and is NOT touched. Authorization detail:
+#          the Shared-tier principal-partition implementation artifact
+#   23280  Story 13.5i — private-tier filesystem residue (+46, AUTHORIZED
+#          kernel-core delta). FLAG-Winston: Lunarpulse authorized 2026-07-26
+#          on the operator-ratified Shape A4 measured at preflight.
+#          Closed the production Art.17 defect in memory/private.rs:
+#          one-shot uninstall constructs an empty cache, so map-only
+#          `forget_principal` never enumerated any filesystem value and signed
+#          Removed { count: 0 } while persistent principal bytes survived.
+#          The prior `"private"` backend discharge was measured as NULL
+#          CONTROL #24: it wrote sub-threshold Text that never reached disk, so
+#          its filesystem scan passed whether private erasure worked or not.
+#          SHAPE (A4, measured): authoritative namespace decode walk,
+#          fail-closed read_dir handling, pid-level symlink containment, and a
+#          distinct (pid/namespace, key) set for exact-once counting. Shape B
+#          was rejected because serde field reordering would silently stop
+#          prefix matching; the +12 A1/B1 variants were rejected as fail-open
+#          and fs_root-escaping; out-of-kernel Shape C violated the port
+#          contract and sealed a false zero; index-driven Shape D treated the
+#          index claim as more authoritative than filesystem reality.
+#          LANDED AND RE-MEASURED 2026-07-26 on the FORMATTED tree: +46
+#          physical, 23234 → 23280; +30 tokei, 17894 → 17924. The estimate is
+#          not the authorization. The 18248 ceiling is unchanged (324 spare);
+#          no hot_swap extraction is owed for this compliance repair.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: serialized
+#          per-limb falsification produced M1 restart residue RED (3/3) while
+#          13 pre-existing private tests stayed GREEN; M2 spill RED/Markdown
+#          GREEN; M3 Markdown RED/spill GREEN; M4 proof-count RED/file-absence
+#          GREEN; M5 symlink-containment RED/ordinary-erasure GREEN; M6
+#          unreadable-directory RED/happy-path GREEN; M7 bystander-retention
+#          RED/target-erasure GREEN; M8 exact-once RED/absence GREEN. Restoring
+#          every limb returned the seven restart controls GREEN.
+#          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
+#          is NOT touched. All additive; no public symbols removed.
+#   23318  Story 13.5i code review — private-tier erasure hardening (+38
+#          physical / +17 tokei on top of the A4 landing; 23280 → 23318,
+#          17924 → 17941). FLAG-Winston: Lunarpulse authorized 2026-07-27 on
+#          the review's three decision findings, as a bounded correctness
+#          repair to an already-authorized surface.
+#          Closed three residue/attestation holes the A4 landing left open in
+#          memory/private.rs: (1) a symlink at the NAMESPACE level was
+#          followed by read_dir, its external files counted into `erased`,
+#          and then only the link unlinked by remove_dir_all — a signed
+#          Removed { count: n } over bytes still on disk, this story's own
+#          defect one level down (pid-level containment did not cover it;
+#          measured on rustc 1.96.0: read_dir(symlink)=Ok, remove_dir_all
+#          (symlink)=Ok, target survives); (2) `file_stem()` as the key
+#          identity double-counted the empty key, whose spill is named
+#          `.bin` and stems to ".bin" while the cache side holds ""; (3)
+#          every namespace child was attested as a logical key, so a
+#          hand-created sub-directory counted as one entry while its
+#          recursively-deleted contents counted as none, and an editor
+#          backup inflated the receipt. The private tier's Markdown area is
+#          deliberately operator-editable, so all three are reachable.
+#          SHAPE: fail closed on a namespace entry that decodes to the
+#          target principal but is not a real directory (Trap 4 preserved —
+#          the two Err-expecting tests stay green); count only regular files
+#          whose name carries a `file_ext_for_kind` extension, recovering
+#          the key by stripping that extension rather than `file_stem()`;
+#          propagate a late `read_dir` iterator error in the pid reap
+#          instead of reading Some(Err(_)) as "not empty". The decoder
+#          round-trips through `file_ext_for_kind` rather than a literal
+#          extension array — 11 of the 17 tokei lines — because a duplicated
+#          literal is Shape B's rejected drift failure mode on the file-name
+#          axis. The measured cost is 3.8x the estimate quoted when the
+#          repair was authorized; the estimate is not the authorization.
+#          The 18248 ceiling is unchanged (307 spare) and no hot_swap
+#          extraction is owed for this compliance repair.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: serialized
+#          per-limb falsification, every mutant run showing `Compiling
+#          maos-kernel-core`, source restored after each — M8 AS SPECIFIED
+#          (count per file, which the A4 landing had no CI-executed detector
+#          for) RED on forget_counts_inline_only_entries_that_never_spill,
+#          9 others GREEN; M9 (drop the namespace type check) RED on
+#          forget_does_not_follow_namespace_directory_symlink, 9 GREEN;
+#          M10 (identity back to a non-stripping shape) RED on the logical-key,
+#          exact-once and inline-only limbs, 7 GREEN; M11 (drop the
+#          regular-file guard) RED on forget_counts_logical_keys_not_
+#          filesystem_nodes, 9 GREEN. Restored: 10/10 GREEN, and
+#          maos-bin erasure_uninstall_13_5b 13/13 GREEN including the
+#          Trap-4 leg private_forget_reports_filesystem_removal_failure.
+#          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
+#          is NOT touched. All additive; no public symbols removed.
+#   23401  Story 13.5j — the private tier's READ surface is made consistent
+#          with its durable state and contained to its own directory
+#          (+83 physical / +34 tokei; 23318 → 23401). AUTHORIZED 2026-07-27,
+#          FLAG-Winston, at the MEASURED number after six shapes were probed
+#          and proven defective at HEAD. Story 13.5i made `forget_principal`
+#          authoritative about the filesystem; `write`, `read` and `scan` were
+#          left behind and disagreed with it in six ways, all confirmed by
+#          running code before a line was written: (D1) `write` never unlinked
+#          a superseded spill, so `k.json` and `k.bin` coexisted and a cold
+#          read returned the value the Spirit had already overwritten
+#          (measured warm=Blob / cold=Json); (D2) `scan` unioned the in-memory
+#          cache with the filesystem without a shared logical-key identity and
+#          returned `["digest:aaa", "digest:aaa"]` for one key, which reaches
+#          `working_memory_digest_refs` in a SIGNED `decision.*` frame and
+#          halves the effective scan cap; (D3) `scan` recovered keys with
+#          `file_stem()`, so the empty key was invisible to it while
+#          `forget_principal` counted it — the two disagreed about what a
+#          logical key IS; (D4) one hand-made directory in the deliberately
+#          operator-editable Markdown area failed the WHOLE namespace scan
+#          with `IsADirectory`, which the production digest provider swallows
+#          into empty refs; (D5) `scan`'s `is_dir()` and (D6) `read`'s
+#          `exists()` both traverse symlinks, so a link planted in a Spirit's
+#          own area read entries from outside it (I5) — the containment
+#          13.5i closed on the erase path, still open on the read path.
+#          SEVERITY CORRECTED, NOT INFLATED: the 13.5i residual filed this as
+#          a "live data-integrity and data-exposure bug". It is LATENT at
+#          HEAD — no shipped writer produces the trigger (the sole production
+#          private writer, `halt/resolver.rs:170`, writes unique
+#          `halt_context::` keys, and nothing writes the `digest:` keys the
+#          sole production scanner reads). The surface is nonetheless fully
+#          wired: `KernelCtx::memory()` hands the adapter to Spirit-hosting
+#          code, so both halves are one Spirit write away.
+#          The 18248 ceiling is unchanged (measured 17975, 273 spare); no
+#          hot_swap extraction is owed for this correctness repair.
+#          BINDING CONDITION DISCHARGED BEFORE THIS NUMBER MOVED: serialized
+#          per-limb falsification, source restored byte-identical after each —
+#          M1 (write does not unlink) RED on both `write_unlinks_*`, 8 GREEN;
+#          M2 (scan drops the cache-identity skip) RED on the one-entry, the
+#          read-cardinality and the signed-frame limbs, 7 GREEN; M3 (`scan`
+#          back to `file_stem()`) RED on the empty-key limb, 9 GREEN; M4 (drop
+#          the regular-file guard) RED on the junk-directory limb, 9 GREEN;
+#          M5 (`scan` back to `is_dir()`) RED on the namespace-symlink limb,
+#          9 GREEN; M6 (`read` back to `exists()`) RED on the spill-symlink
+#          limb, 9 GREEN. Restored: 10/10 GREEN.
+#          NO CONTROL IS CLAIMED for the in-memory loop's `break` → `continue`
+#          change: `limit` caps the filesystem pass first, so a complete
+#          versus truncated `cached` set is not observable today. It is kept
+#          because the comment above it would otherwise be false.
+#          `xtask/fkcs-baseline.toml` src_lines = 23081 is the FROZEN tag and
+#          is NOT touched. All additive; no public symbols removed.
+# HISTORY: Post-review hardening (2026-08-02): 23596 -> 23517 physical lines
+#          (+116 physical lines from the 23401 Story 13.5j pin). The approved
+#          spec-13-6c-ci-blockers-2 design now uses Unix directory-relative
+#          O_NOFOLLOW traversal, parent/file/directory fsync, serialized
+#          hard-link-backed rollback transactions, exclusive temporary files,
+#          fail-closed equal-mtime dedupe and hostile PID handling, and
+#          prefix/limit-isolated scans. Behavioral contracts moved from private
+#          source-unit tests to public-adapter integration tests: 15 Story
+#          13.5j, 10 Story 13.5i, and the full 558-test kernel suite pass. The
+#          logical count is 18171, 77 below the unchanged 18248 ceiling; no
+#          public symbols removed.
+# HISTORY: Story 13.6c code review round 2 (2026-08-03): 23517 -> 23679
+#          physical lines (+162). (1) Private-store security hardening: BH-1
+#          hard-link containment (fstat nlink==1 on the spill read path),
+#          EH-1 crash durability (fsync the root's parent on first creation),
+#          BH-4 containment (require an absolute spill root). (2) TI-1/2/3
+#          test-depth fault injection: a cfg(test/debug_assertions) module
+#          (spill_test_faults.rs) + thin consultation points prove the
+#          temp-fsync rollback, io_lock serialization, and no-follow open.
+#          The fault module is kloc-excluded (check_kloc.rs `-e`) per the
+#          gate's 'production code only' intent — a measurement-scope
+#          refinement ratified by party-mode (Winston 2026-08-03), NOT a
+#          ceiling increase. Logical count 18210, 38 below the unchanged
+#          18248 ceiling; the pub mod is cfg-gated and absent from release.
+src_lines = 23679

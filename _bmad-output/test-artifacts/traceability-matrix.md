@@ -1,7 +1,7 @@
 ---
 stepsCompleted: ['step-01-load-context', 'step-02-discover-tests', 'step-03-map-criteria', 'step-04-analyze-gaps', 'step-05-gate-decision']
 lastStep: 'step-05-gate-decision'
-lastSaved: '2026-07-01'
+lastSaved: '2026-08-11'
 coverageBasis: 'acceptance_criteria'
 oracleResolutionMode: 'formal_requirements'
 oracleConfidence: 'high'
@@ -11,6 +11,7 @@ externalPointerStatus: 'not_used'
 story: '11-1a-wasm-component-model-spirit-form-host-wit'
 gate_decision: 'PASS'
 gate_decision_after_ta: true
+epic_13_coverage: 'added @ HEAD ea9939d3'
 ---
 
 # Traceability Matrix — Story 11.1a (WASM Component-Model Spirit Form — Host + WIT)
@@ -65,3 +66,19 @@ $$\boxed{\text{PASS}}$$
 - ✅ DONE — Add `frame_bridge` unit tests for all FrameKinds (was HIGH/P1).
 - LOW — Run `bmad-testarch-test-review` for a test-quality pass on the new suite (isolation, determinism, explicit-assertion checks).
 - LOW — When a privileged CI runner is available, promote the T2 column from self-skip to asserted-kill for both this suite and the kernel's `sandbox_enforcement_linux.rs`.
+
+## Epic 13 — Reza journey coverage
+
+**Scope:** Reza cross-team Cortex capabilities, mapped from [`user-journeys.md:227-253`](../planning-artifacts/prd/user-journeys.md) to the published Epic 13 operator evidence at `ea9939d3` (added @ HEAD `ea9939d3`).
+
+| Journey capability / requirement | Stories | Evidence | Level | Coverage |
+|---|---|---|---|---|
+| Cross-team A2A with asymmetric consent envelopes | 13.3, 13.6b | `check-multi-tenant-loom` gate ledger (`product_claim: PROVEN`) | Gate | ✅ PROVEN |
+| Multi-hop distillation provenance to original raw decisions | 13.3b | `check-multi-tenant-loom` gate ledger (`product_claim: PROVEN`) | Gate | ✅ PROVEN |
+| Multi-tenant Loom physical + cryptographic wall; team data residency | 13.1, 13.2 | `check-multi-tenant-loom` gate ledger (`product_claim: PROVEN`) | Gate | ✅ PROVEN |
+| Tenant audit isolation | 13.5e | `check-multi-tenant-loom` gate ledger (`product_claim: PROVEN`) | Gate | ✅ PROVEN |
+| FR37 vetting machinery | 13.4 | `check-reza-production-path` gate ledger (`product_claim: PROVEN`) | Gate | ✅ PROVEN |
+| Three-team / three-region substrate and Reza journey | 13.6c, 13.6 | `reza-three-team-three-region-journey` required leg — `PROVEN_LIVE_SIGNED` | Operator gate | ✅ PROVEN |
+| Fourteen-institution isolation | 13.6 | `cortex-fourteen-institution-isolation` required leg — `PROVEN_LIVE_SIGNED` | Operator gate | ✅ PROVEN |
+| NFR-Scale-5 capacity envelope | 13.6 | `check-multi-region-slo` and `check-cross-region-consensus` gate ledgers (`product_claim: PROVEN`) | Gate | ✅ PROVEN |
+| **GAP — J3 Marcus peer-mesh journey** ([`user-journeys.md:203-225`](../planning-artifacts/prd/user-journeys.md)) | — | No Epic 13 verification evidence | N/A | ⚠ GAP |

@@ -90,3 +90,113 @@ E10 v1.0 Ship Gate + v1.5 Collective Tier
    - **Per-journey "presentable" gate:** J0 = 8.14a + 9.1 · J-Butler = 8.10·AC1 + 8.11 + 8.14a + 8.14b · J-Researcher = 8.11 + 8.14a + 8.14c · J1 = 8.11 + 8.12 · J4 = 8.9 + 8.11 + 8.13. (J3/Reza/Diego remain out of Epic 8 scope.)
    - **Shortest "watch-it-work" path (Butler):** 8.10·AC1 → 8.11 → 8.14a → 8.14b (Story 8.15 harness asserts it). Researcher: 8.11 → 8.14a → 8.14c.
    - **Test track:** Story 8.15 (journey-acceptance harness + red-phase suites, ATDD-authored) DEPENDS ON 8.11 + 8.14a; authored RED early, each journey story flips its slice green. Owns the harness relocated out of 8.11·AC5. Last in Epic 8, before Epic 9.
+
+---
+
+## Epic 13 — Reza Cortex (v2.2) — intra-epic DAG
+
+Added 2026-07-18 after the epic was rescoped 8 → 11 stories (`sprint-change-proposal-2026-07-18.md`). Epic 13 warrants an explicit intra-epic graph because two of its edges were **stale or wrong** until this pass: the old 13.5c dependency row predated the H1 split and never listed 13.3b, and `13.5a → 13.5d` turned out to be a **hard** precondition rather than the advisory ordering the epic implied.
+
+```mermaid
+flowchart TD
+    S131["13.1 physical tenant wall<br/>DONE but INERT"]
+    S132["13.2 cryptographic tenant boundary<br/>DONE but INERT"]
+    S133["13.3 governed cross-team row<br/>READY-FOR-DEV"]
+    S133B["13.3b provenance crosses the wall<br/>ADR-058 ports and amends ADR-013<br/>BLOCKED at preflight"]
+    S134["13.4 FR37 vetting machinery<br/>DONE, fully independent"]
+    S135A["13.5a Enterprise reference Spirit<br/>backlog"]
+    S135B["13.5b collective erasure and legal hold<br/>backlog, FLAG-Winston kernel arm"]
+    S135C["13.5c single composition root<br/>THE UNBLOCKER: tenant mode boots<br/>READY-FOR-DEV, ZERO kernel delta"]
+    S135D["13.5d production Spirit to collective route<br/>READY-FOR-DEV, 7 ACs by ratified exception<br/>FLAG-Winston pid-binding re-pin, schema bump 3 to 4"]
+    S135E["13.5e tenant audit isolation<br/>NFR-Ops-11 team axis only<br/>READY-FOR-DEV, NOT zero delta"]
+    S136["13.6 Reza journey closer<br/>backlog, judges only"]
+
+    S131 --> S132
+    S132 --> S133
+    S133 --> S133B
+    S131 ==> S135C
+    S135C ==> S133B
+    S135C ==> S135D
+    S135C ==> S135E
+    S133 --> S135D
+    S135A -.-> S135D
+    S132 --> S135B
+    S133B -.-> S135E
+    S133B --> S136
+    S134 --> S136
+    S135B --> S136
+    S135D --> S136
+    S135E --> S136
+
+    classDef done fill:#1b5e20,stroke:#66bb6a,stroke-width:2px,color:#ffffff
+    classDef ready fill:#0d47a1,stroke:#64b5f6,stroke-width:2px,color:#ffffff
+    classDef draft fill:#4a148c,stroke:#ba68c8,stroke-width:2px,color:#ffffff
+    classDef backlog fill:#37474f,stroke:#90a4ae,stroke-width:2px,color:#ffffff
+    classDef unblocker fill:#e65100,stroke:#ffb74d,stroke-width:4px,color:#ffffff
+    classDef blocked fill:#b71c1c,stroke:#ef9a9a,stroke-width:3px,color:#ffffff
+
+    class S131,S132 done
+    class S133,S135D,S135E ready
+    class S133B blocked
+    class S134,S135A,S135B,S136 backlog
+    class S135C unblocker
+```
+
+**Reading it** *(legend refreshed 2026-07-19 — the three preflights changed both edges and colours)*: **thick arrows** are the critical path through 13.5c, which now feeds **three** stories (13.3b, 13.5d, 13.5e). **Dotted arrows are soft, and the two are soft for different reasons** — `13.5a ⇢ 13.5d` is an **advisory** dependency (reversed from HARD: researcher hosts the port, so 13.5d is not gated on an unwritten story), while `13.3b ⇢ 13.5e` is an **ABSENT-leg constraint** (13.5e's *label-only team identity* leg stays ABSENT until 13.3b lands). **Colours are preflight verdicts:** green = shipped-but-inert, **orange = the unblocker**, blue = `ready-for-dev`, **red = blocked at preflight**, grey = backlog. 13.1 and 13.2 are INERT because `MAOS_LOOM_HOME_TEAM` is a hard boot failure until 13.5c — both walls exist in code and run in no bootable configuration. **13.3b is the epic's only blocked story:** its AC1 and AC5 contradict each other (AC1 demands a live two-region proof; `check-cross-region-consensus` provisions no Postgres). 13.1 and 13.2 are marked INERT because `MAOS_LOOM_HOME_TEAM` is a hard boot failure until 13.5c — both walls exist in code and run in no bootable configuration.
+
+
+**The three edges this pass corrected or discovered:**
+
+1. **`13.1 → 13.5c` is the epic's real critical path, not `13.2 → 13.3`.** 13.5c depends only on 13.1, and until it lands `MAOS_LOOM_HOME_TEAM` is a hard boot failure (`main.rs:2286`) — so 13.1's and 13.2's walls are **inert in every bootable configuration**. Two shipped stories currently do nothing at runtime.
+   - ⚠ **CORRECTED by the 13.5c preflight (2026-07-19): "13.5c makes the walls live" is TOO STRONG.** Two findings bound it. **D17:** `TenantMapAdapter::register_spirit` has **zero production callers**, so after 13.5c tenant mode *boots* and then every collective read/write/scan fails `TenantSpiritUnmapped` — fail-closed and correct scope, but **"boots" ≠ "serves"**; **13.5d owns `register_spirit`**. **D18:** `tenant_map_for_store` sits inside the `MAOS_LOOM_POSTGRES` arm, so `TenantMapAdapter` is **never constructed hermetically** — the first production construction is reachable **only on the live Postgres leg**, and with the substrate absent the claim is **UNMEASURED, not green**. The honest statement: **13.5c makes the tenant map constructible and boot-reachable in production for the first time; the wall does not SERVE until 13.5d.**
+2. ~~**`13.5a → 13.5d` is HARD, not advisory.**~~ ⚠ **REVERSED 2026-07-19 by the 13.5d preflight (D26). The edge is ADVISORY.** The premise ("no reference Spirit touches memory") is **true**, and its conclusion is a **non-sequitur**: 13.5a's own AC sketch never mentions memory either, so 13.5a has no memory surface to hang a port on. The decisive test is which Spirit is **constructed at the composition root** — `researcher` is (`main.rs:3815`); 13.5a's Enterprise Spirit is constructed nowhere and sits at `backlog` with no story file. `researcher` also supplies the trait shape, the enterprise runtimes, and a `provider.complete` block that **discharges fork L2 outright**. `sprint-change-proposal:117` and `epic-13:52` were already right; this DAG line was the outlier. **Consequence: the epic's critical path is shorter than drawn, and 13.5d is not gated on an unwritten story.**
+3. **`13.3b → 13.6` and `13.3b ⇢ 13.5e`.** The old 13.5c AC5 restated 13.3b's deliverable list verbatim; it moved to 13.3b, and 13.5e's *label-only team identity* leg emits **ABSENT** until 13.3b lands. The pre-split dependency row never recorded either edge.
+
+### Three more edges, from the 2026-07-19 preflights of 13.3b / 13.5d / 13.5e
+
+4. **NEW HARD EDGE: `13.5c → 13.3b`.** Found by the 13.3b preflight. 13.3b's AC3 injects consent into `log.recall`, but `LogRecallAdapter::new` is at `main.rs:2417` and `CohortManifestState::load` at `main.rs:8031` — **5 614 lines apart**; 13.5c closes that to `:2268`. **No cycle**: 13.5c depends only on 13.1 and is already `ready-for-dev`. Note the edge is **consent-layer-only** — 13.3b's leaf/store layer needs nothing from 13.5c, because 13.1's live legs construct `LoomLiteStore` directly (`tenant_wall_live.rs:144`). That asymmetry is why three artifacts missed it.
+5. **NEW INVERTER EDGE: `11.4b ⇢ 13.5e`.** 13.5e's dead-wire negative names 11.4b as an inverter alongside 13.5d and 13.5b — `Detector::detect` is a dead-wired fifth read surface with zero production callers, owned by 11.4b. Not previously drawn.
+6. **MERGE-ORDER CONSTRAINT (not a dependency, but it bites the same way).** **Three** stories now rewrite the same 4-element array `ABSENT_SUCCESSORS` in `xtask/src/check_multi_tenant_loom.rs`: 13.5c (mandated by its closed preflight), 13.3b, and 13.5e. **Whichever lands second must rebase, not merge.** ⚠ Citation correction: 13.5c's story file cites the array at `:21`; it is at **`:22`** — 13.5e's citation is the correct one.
+
+**Also corrected on the diagram:** node labels now carry real preflight verdicts (13.3b **BLOCKED**, 13.5d **NEEDS-REWORK**, 13.5c/13.5e **READY-FOR-DEV**) instead of the uniform `drafted` they were generated with.
+
+## Epic 14 — v2.2 Hardening + Closers — cross-epic DAG
+
+```mermaid
+flowchart TD
+    S141["14.1 100-host churn scale envelope<br/>backlog — draft-ready-for-preflight"]
+    S142["14.2 10-host mTLS rotation chaos<br/>backlog — draft-ready-for-preflight"]
+    S143["14.3 ecosystem-readiness + v2.5 ledger<br/>backlog — draft-ready-for-preflight"]
+    S144["14.4 operational-surface sweep<br/>backlog — draft-ready-for-preflight"]
+    S145["14.5 backend + multi-provider sweep<br/>backlog — draft-ready-for-preflight"]
+    S146["14.6 ADR-057 ceiling instrument<br/>backlog — draft-ready-for-preflight"]
+    S147["14.7 shared env-contract registry<br/>backlog — draft-ready-for-preflight"]
+    S148["14.8 workspace env classification<br/>backlog — draft-ready-for-preflight"]
+    S149["14.9 secret-var governance<br/>backlog — draft-ready-for-preflight"]
+
+    S113["11.3"]
+    S104B["10.4b"]
+    S105["10.5"]
+    S115["11.5"]
+    S117["11.7"]
+    S134["13.4"]
+    S114C["11.4c<br/>ADR-005"]
+    A155["§15.5 successor instrument"]
+    S126["12.6"]
+
+    S141 --> S113
+    S142 --> S104B
+    S142 --> S105
+    S143 --> S115
+    S143 --> S117
+    S143 --> S134
+    S144 --> S117
+    S145 --> S114C
+    S146 --> A155
+    S147 --> S126
+    S148 --> S126
+    S149 --> S126
+
+    classDef backlog fill:#37474f,stroke:#90a4ae,stroke-width:2px,color:#ffffff
+    class S141,S142,S143,S144,S145,S146,S147,S148,S149 backlog
+```

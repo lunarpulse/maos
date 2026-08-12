@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     kind            TEXT NOT NULL DEFAULT 'entry',
     source_log_ref  TEXT NOT NULL DEFAULT '',
     distillation_depth INTEGER NOT NULL DEFAULT 0,
+    -- Story 13.3b: canonical JSON for I13 intent lineage. NULL preserves v1/v2.
+    intent_lineage  BYTEA,
     timestamp_ns    BIGINT NOT NULL,
     -- Story 11.2a (AC1, F3): CRDT LWW-register total-order tiebreak columns.
     -- source_region: canonical ascii-v1 region tag of the originating write.
@@ -55,6 +57,17 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     -- These columns are NOT in the UNIQUE key (region-free convergence).
     source_region   TEXT NOT NULL DEFAULT '',
     source_ts       BIGINT NOT NULL DEFAULT 0,
+    -- Story 13.2 (AC2): nullable source-team provenance. NULL = v1 first-party
+    -- local row (byte-identical leaf); a value = re-attested cross-team copy.
+    -- NOT in the UNIQUE key. Additive/nullable = the 9.2b idiom.
+    source_team     TEXT,
+    -- Story 13.6: share-operation binding for crossed rows.  These nullable
+    -- columns preserve the stable xteam physical key and remain NULL for
+    -- native rows.
+    cross_emitter_host TEXT,
+    cross_op_id        TEXT,
+    cross_source_ts    BIGINT,
+    cross_source_region TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (spirit_pid, namespace_kind, namespace_detail, key),
     -- I11 (enforced-by-construction at the store layer): a pattern record
@@ -67,8 +80,24 @@ CREATE TABLE IF NOT EXISTS collective_memory (
     )
 );
 
--- Story 11.2a: additive migration — add source_region and source_ts if absent.
+-- Operator-authority erasure tombstones share the row's physical key tuple.
+-- Writers consult this table under the same transaction-scoped advisory lock,
+-- so stale CRDT replication cannot resurrect a deleted row.
+CREATE TABLE IF NOT EXISTS collective_erasure_tombstones (
+    spirit_pid              BIGINT NOT NULL,
+    namespace_kind          TEXT NOT NULL,
+    namespace_detail        TEXT NOT NULL DEFAULT '',
+    key                     TEXT NOT NULL,
+    erased_at_source_ts     BIGINT NOT NULL,
+    erased_at_source_region TEXT NOT NULL,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (spirit_pid, namespace_kind, namespace_detail, key)
+);
+
+-- Additive migrations for a table created by an older or reduced fixture.
 -- Idempotent (IF NOT EXISTS / DO NOTHING on re-run).
+ALTER TABLE collective_memory
+    ADD COLUMN IF NOT EXISTS embedding vector({vector_dim});
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -82,6 +111,72 @@ BEGIN
         WHERE table_name = 'collective_memory' AND column_name = 'source_ts'
     ) THEN
         ALTER TABLE collective_memory ADD COLUMN source_ts BIGINT NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'source_team'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN source_team TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'intent_lineage'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN intent_lineage BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'leaf_canonical_hash'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN leaf_canonical_hash BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'merkle_root'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN merkle_root BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'region_sig'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN region_sig BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'bundle_schema_version'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN bundle_schema_version SMALLINT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'inclusion_path'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN inclusion_path BYTEA;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_emitter_host'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_emitter_host TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_op_id'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_op_id TEXT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_source_ts'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_source_ts BIGINT;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'collective_memory' AND column_name = 'cross_source_region'
+    ) THEN
+        ALTER TABLE collective_memory ADD COLUMN cross_source_region TEXT;
     END IF;
 END
 $$;
@@ -121,14 +216,12 @@ pub fn namespace_to_parts(ns: &maos_domain::memory::MemoryNamespace) -> (&'stati
 
 /// Deserialize (kind, detail) back into a `MemoryNamespace`.
 ///
-/// The `principal` detail uses `principal_id:schema`.  The `:` delimiter is
-/// GUARANTEED absent from validated keys because `PrincipalKey::new` rejects
-/// `:` (and control chars), so `split_once(':')` round-trips losslessly for
-/// any namespace constructed through the validated path.  (The collective tier
-/// rejects `Principal` by construction per Decision D regardless.)
+/// Decision D partitions `MemoryNamespace::Principal` out of collective
+/// storage. Legacy or hostile `principal` rows are refused instead of being
+/// reconstructed into a namespace that has no collective erasure path.
 pub fn parts_to_namespace(
     kind: &str,
-    detail: &str,
+    _detail: &str,
 ) -> Result<maos_domain::memory::MemoryNamespace, String> {
     use maos_domain::memory::MemoryNamespace;
     match kind {
@@ -136,13 +229,7 @@ pub fn parts_to_namespace(
         "coordination" => Ok(MemoryNamespace::Coordination),
         "forgotten" => Ok(MemoryNamespace::Forgotten),
         "principal" => {
-            let (pid, schema) = detail
-                .split_once(':')
-                .ok_or_else(|| format!("invalid principal detail: {detail}"))?;
-            Ok(MemoryNamespace::Principal {
-                principal_id: pid.to_string(),
-                schema: schema.to_string(),
-            })
+            Err("principal namespace is forbidden in collective storage by Decision D".to_string())
         }
         _ => Err(format!("unknown namespace kind: {kind}")),
     }
@@ -200,14 +287,10 @@ mod tests {
     }
 
     #[test]
-    fn namespace_round_trip_principal() {
-        let ns = MemoryNamespace::Principal {
-            principal_id: "user-42".into(),
-            schema: "profile.v1".into(),
-        };
-        let (kind, detail) = namespace_to_parts(&ns);
-        let recovered = parts_to_namespace(kind, &detail).unwrap();
-        assert_eq!(ns, recovered);
+    fn principal_namespace_is_not_decodable_by_collective_store() {
+        let error = parts_to_namespace("principal", "user-42:profile.v1")
+            .expect_err("Decision D forbids principal namespaces in collective storage");
+        assert!(error.contains("principal namespace"));
     }
 
     #[test]
@@ -216,6 +299,13 @@ mod tests {
         let (kind, detail) = namespace_to_parts(&ns);
         let recovered = parts_to_namespace(kind, &detail).unwrap();
         assert_eq!(ns, recovered);
+    }
+
+    #[test]
+    fn schema_installs_collective_erasure_tombstones() {
+        let sql = create_schema_sql(DEFAULT_VECTOR_DIM);
+        assert!(sql.contains("CREATE TABLE IF NOT EXISTS collective_erasure_tombstones"));
+        assert!(sql.contains("PRIMARY KEY (spirit_pid, namespace_kind, namespace_detail, key)"));
     }
 
     #[test]
@@ -247,6 +337,7 @@ mod tests {
         let sql = create_schema_sql(1536);
         assert!(sql.contains("CREATE EXTENSION IF NOT EXISTS vector"));
         assert!(sql.contains("vector(1536)"));
+        assert!(sql.contains("ADD COLUMN IF NOT EXISTS embedding vector(1536)"));
         assert!(sql.contains("hnsw"));
     }
 }

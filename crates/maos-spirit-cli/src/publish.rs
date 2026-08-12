@@ -109,7 +109,8 @@ pub fn build_signed_package(args: &PublishArgs) -> Result<SignedPackage, CliErro
     let spirit_id = SpiritId(spirit_id_str.clone());
 
     // 4. Verify --tier matches manifest-declared trust_tier.
-    let manifest_tier = admission::extract_manifest_tier(&manifest_toml);
+    let manifest_tier = admission::extract_manifest_tier(&manifest_toml)
+        .map_err(|error| CliError::InvalidTier(error.to_string()))?;
     let arg_tier = parse_tier_arg(&args.tier)?;
     if manifest_tier != arg_tier {
         return Err(CliError::TierMismatch {
@@ -176,19 +177,21 @@ fn tier_to_cli_string(tier: TrustTier) -> String {
     }
 }
 
-/// Parse the `--tier` string into a `TrustTier`. Rejects `public_vetted`
-/// per FR37 v2.5 deferral.
+/// Parse the `--tier` string into a `TrustTier`.
+///
+/// Story 13.4 (FR37 / ADR-056) un-defers `public_vetted`: an author MAY declare
+/// the vetted aspiration at publish, but the declaration is inert — promotion is
+/// the **attestation artifact** (never this flag). A `public_vetted` package is
+/// admitted only when a valid `VettingAttestation` walks the verify chain at
+/// admission; absent one it defers with `PublicVettedDeferred`.
 pub fn parse_tier_arg(tier_str: &str) -> Result<TrustTier, CliError> {
     match tier_str {
         "local" => Ok(TrustTier::Local),
         "org_internal" => Ok(TrustTier::OrgInternal),
         "public_untrusted" => Ok(TrustTier::PublicUntrusted),
-        "public_vetted" => Err(CliError::InvalidTier(
-            "public_vetted: deferred per FR37 to v2.5; use one of: local, org_internal, public_untrusted"
-                .into(),
-        )),
+        "public_vetted" => Ok(TrustTier::PublicVetted),
         other => Err(CliError::InvalidTier(format!(
-            "{other}: expected one of: local, org_internal, public_untrusted (public_vetted deferred per FR37 v2.5)"
+            "{other}: expected one of: local, org_internal, public_untrusted, public_vetted"
         ))),
     }
 }
@@ -290,9 +293,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_tier_rejects_public_vetted() {
-        let err = parse_tier_arg("public_vetted").unwrap_err();
-        assert!(err.to_string().contains("public_vetted"));
+    fn parse_tier_accepts_public_vetted() {
+        // Story 13.4 (ADR-056) — un-deferred; the aspiration is inert until an
+        // attestation promotes it at admission.
+        assert!(matches!(
+            parse_tier_arg("public_vetted"),
+            Ok(TrustTier::PublicVetted)
+        ));
     }
 
     #[test]

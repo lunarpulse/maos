@@ -7,10 +7,17 @@
 
 #![cfg(feature = "fixture_replay")]
 
+use maos_compliance::vetting::keyring::issue_event;
+use maos_compliance::{
+    issue_attestation, RevocationSemantics, VetterKeyEventClaim, VetterKeyEventKind, VetterKeyring,
+    VettingClaim,
+};
 use maos_domain::ports::registry::{
     PublishReceipt, SearchQuery, SignedPackage, SpiritId, SpiritRegistryClient, YankReason,
 };
-use maos_registry::admission::{admit_spirit, AdmissionConfig, AdmissionDecision};
+use maos_registry::admission::{
+    admit_spirit, admit_spirit_with_attestation, AdmissionConfig, AdmissionDecision, AdmissionError,
+};
 use maos_registry::compliance_verify;
 use maos_registry::fixture_replay::FixtureReplaySpiritRegistryClient;
 use maos_registry::storage::{LocalFsRegistryStorage, RegistryStorage};
@@ -41,8 +48,12 @@ fn make_signed_package(
 ) -> SignedPackage {
     use sha2::Digest;
 
+    // Domain-separated to match `admission::verify_publisher_sig`
+    // (sha256(manifest_len_u64 || manifest || artifact_len_u64 || artifact)).
     let mut hasher = sha2::Sha256::new();
+    hasher.update((manifest.len() as u64).to_le_bytes());
     hasher.update(manifest);
+    hasher.update((artifact.len() as u64).to_le_bytes());
     hasher.update(artifact);
     let msg = hasher.finalize();
     let signature = keypair.sign(&msg);
@@ -163,9 +174,12 @@ fn e2e_public_untrusted_admit_with_valid_compliance() {
     assert_eq!(decision.effective_tier, TrustTier::PublicUntrusted);
 }
 
+/// Story 13.4 (FR37 / ADR-056) leg 6 — the pre-existing "always rejected"
+/// negative is REPURPOSED as the anti-null control for the un-defer: rejected
+/// WITHOUT a valid attestation, admitted WITH one.
 #[test]
 fn e2e_public_vetted_always_rejected() {
-    let manifest = b"[spirit]\nname = \"vetted-spirit\"\nversion = \"0.1.0\"\ntrust_tier = \"public_vetted\"\n";
+    let manifest = b"[spirit]\nname = \"vetted-spirit\"\nversion = \"0.1.0\"\ntrust_tier = \"public-vetted\"\nsandbox_tier = \"t3\"\n";
     let artifact = b"vetted-binary".to_vec();
 
     let (kp, pubkey) = make_keypair();
@@ -174,15 +188,86 @@ fn e2e_public_vetted_always_rejected() {
         "0.1.0",
         manifest,
         &artifact,
-        TrustTier::PublicVetted,
+        TrustTier::PublicUntrusted,
         &kp,
         &pubkey,
     );
 
-    let result = admit_spirit(&pkg, &local_config());
-    assert!(result.is_err());
-    let err_str = format!("{:?}", result.unwrap_err());
-    assert!(err_str.contains("PublicVettedDeferred"));
+    // Operator vetter keyring: an operator-root-signed enrollment predating issuance.
+    let op_seed = [0x44u8; 32];
+    let vetter_seed = [0x33u8; 32];
+    let ed_pub = |seed: &[u8; 32]| -> [u8; 32] {
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+        Ed25519KeyPair::from_seed_unchecked(seed)
+            .unwrap()
+            .public_key()
+            .as_ref()
+            .try_into()
+            .unwrap()
+    };
+    let mut keyring = VetterKeyring::new(ed_pub(&op_seed));
+    keyring.push(issue_event(
+        &op_seed,
+        &VetterKeyEventClaim {
+            kind: VetterKeyEventKind::Enroll,
+            vetter_key_id: "vetter-01".into(),
+            vetter_pubkey: ed_pub(&vetter_seed),
+            predecessor_pubkey: None,
+            effective_at_unix_ms: 100,
+            journal_sequence: 1,
+            journaled_at_unix_ms: 100,
+            note: "enrolled".into(),
+        },
+    ));
+
+    let manifest_hash: [u8; 32] = {
+        use sha2::Digest;
+        let mut h = sha2::Sha256::new();
+        h.update(manifest);
+        h.finalize().into()
+    };
+    let att = issue_attestation(
+        &vetter_seed,
+        &VettingClaim {
+            manifest_hash,
+            spirit_id: "vetted-spirit".into(),
+            spirit_version: "0.1.0".into(),
+            from_tier: TrustTier::PublicUntrusted,
+            to_tier: TrustTier::PublicVetted,
+            vetter_key_id: "vetter-01".into(),
+            issued_at_unix_ms: 500,
+            expires_at_unix_ms: 2_000,
+            revocation_semantics: RevocationSemantics::RefuseAtNextLoad,
+            successor_policy: None,
+        },
+    );
+
+    // WITHOUT a valid attestation → deferred (rejected).
+    let deferred = admit_spirit_with_attestation(
+        &pkg,
+        &local_config(),
+        None,
+        &keyring,
+        &ed_pub(&op_seed),
+        1_000,
+    );
+    assert!(matches!(
+        deferred,
+        Err(AdmissionError::PublicVettedDeferred)
+    ));
+
+    // WITH a valid attestation → admitted as public-vetted.
+    let decision = admit_spirit_with_attestation(
+        &pkg,
+        &local_config(),
+        Some(&att),
+        &keyring,
+        &ed_pub(&op_seed),
+        1_000,
+    )
+    .unwrap();
+    assert!(decision.admit);
+    assert_eq!(decision.effective_tier, TrustTier::PublicVetted);
 }
 
 #[test]
@@ -287,9 +372,11 @@ fn e2e_compliance_fingerprint_mismatch_rejected() {
 
     let (kp, pubkey) = make_keypair();
 
-    let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update((manifest.len() as u64).to_le_bytes());
     hasher.update(manifest);
+    hasher.update((artifact.len() as u64).to_le_bytes());
     hasher.update(&artifact);
     let msg = hasher.finalize();
     let signature = kp.sign(&msg);

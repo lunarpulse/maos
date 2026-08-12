@@ -12,6 +12,9 @@ mod check_adr_040_accepted;
 mod check_air_gap;
 mod check_bare_review_findings;
 mod gate_common;
+// Story 13.6e — the evidence ledger (judge machinery for the four
+// journey-relevant gates). Depends on gate_common's projection.
+mod evidence_ledger;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
 mod check_dependency_closure;
 // Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port).
@@ -36,6 +39,12 @@ mod check_multi_region_slo;
 mod check_scale_churn;
 // Story 12.1 — signed cohort manifest and full-pairwise mesh gate.
 mod check_cohort_mesh;
+// Story 13.1 — physical multi-tenant Loom wall (ADR-055).
+mod check_multi_tenant_loom;
+// Story 13.5d — Reza's mediated production collective route.
+mod check_reza_production_path;
+// Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
+mod check_loom_substrate_drift;
 // Story 11.4a — enterprise PDP integration gate (per-leg independence, ADR-050).
 mod check_enterprise_pdp;
 // Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence, ADR-051).
@@ -89,12 +98,16 @@ mod check_skill_schema;
 // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
 mod check_skill_conformance;
 mod check_unsafe;
+mod check_vetting_attestation;
 mod check_workspace_count;
 mod corpus_staleness;
 mod corpus_types;
 mod coverage_matrix;
 mod coverage_matrix_nfr_test_3;
 mod example_spirit_regen;
+// Story 13.6 closure follow-on — the one-command Reza scene. Orchestration
+// only: it runs the journey test and the four gates, and narrates them.
+mod demo_reza;
 mod fs_walk;
 mod gen_abi_docs;
 mod gen_isolation_corpus;
@@ -104,6 +117,7 @@ mod kloc_check;
 mod nfr_onb_1_gate;
 mod rebaseline_check;
 mod release_verify;
+mod sprint_status;
 mod stability_matrix;
 mod templates_regen;
 
@@ -791,6 +805,24 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 13.1 — physical multi-tenant Loom wall (ADR-055).
+    #[command(name = "check-multi-tenant-loom")]
+    CheckMultiTenantLoom {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 13.5d — Reza's mediated production collective route gate.
+    #[command(name = "check-reza-production-path")]
+    CheckRezaProductionPath {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
+    #[command(name = "check-loom-substrate-drift")]
+    CheckLoomSubstrateDrift {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.4a — enterprise PDP integration gate (per-leg independence).
     #[command(name = "check-enterprise-pdp")]
     CheckEnterprisePdp {
@@ -800,6 +832,12 @@ enum Commands {
     /// Story 11.4c — enterprise identity + at-rest + SIEM gate (per-leg independence).
     #[command(name = "check-enterprise-identity")]
     CheckEnterpriseIdentity {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 13.4 (AC6) — FR37 vetting-attestation gate (7 hermetic blocking legs).
+    #[command(name = "check-vetting-attestation")]
+    CheckVettingAttestation {
         #[arg(long)]
         json: bool,
     },
@@ -879,6 +917,19 @@ enum Commands {
     CheckSkillConformance {
         #[arg(long)]
         json: bool,
+    },
+    /// Run the Reza Cortex scene end to end: substrate, journey, gates, verdict.
+    #[command(name = "demo-reza")]
+    DemoReza {
+        /// Create any missing substrate databases before running.
+        #[arg(long)]
+        provision: bool,
+        /// Run the journey but not the four gates.
+        #[arg(long)]
+        skip_gates: bool,
+        /// Run only the journey — no database observation, no gates, no ledger.
+        #[arg(long)]
+        journey_only: bool,
     },
 }
 
@@ -1222,11 +1273,20 @@ fn main() {
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
+        Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),
+        Commands::CheckRezaProductionPath { json } => check_reza_production_path::run(json),
+        Commands::CheckLoomSubstrateDrift { json } => check_loom_substrate_drift::run(json),
         Commands::CheckEnterprisePdp { json } => check_enterprise_pdp::run(json),
         Commands::CheckEnterpriseIdentity { json } => check_enterprise_identity::run(json),
+        Commands::CheckVettingAttestation { json } => check_vetting_attestation::run(json),
         Commands::CheckFkcs { json } => check_fkcs::run(json),
         Commands::CheckTrialAttestation { json } => check_trial_attestation::run(json),
         Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),
+        Commands::DemoReza {
+            provision,
+            skip_gates,
+            journey_only,
+        } => demo_reza::run(provision, skip_gates, journey_only),
     };
     if let Err(e) = result {
         eprintln!("{e}");

@@ -184,7 +184,9 @@ fn resolve_kind_filter(kind_str: &str) -> Option<Vec<i64>> {
 pub fn query(db_path: &Path, filter: AuditFilter) -> Result<Vec<AuditEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -356,7 +358,9 @@ pub fn query_with_redaction(
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
     let mut sql = String::from(
@@ -528,7 +532,9 @@ pub fn load_ratification_frames(db_path: &Path) -> Result<Vec<RatificationFrame>
 
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -677,6 +683,12 @@ fn kind_to_string(kind: i64) -> String {
         28 => "governance.event",
         29 => "cost.attribution",
         30 => "identity.asserted",
+        // J1 Tier-2 — a human-authored signed-run capture attestation, written
+        // at the bin/CLI boundary as a raw kind int (like `identity.asserted`
+        // above) so it renders here on read WITHOUT a kernel `FrameKind` variant
+        // (ZERO kernel delta). Journaled by `maosctl audit record-capture` so a
+        // subsequent `sealed-export` signature covers the capture as an audit row.
+        31 => "run.capture",
         _ => "unknown",
     }
     .to_string()
@@ -704,6 +716,7 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "governance.event" | "GovernanceEvent" => Some(28),
         "cost.attribution" | "CostAttribution" => Some(29),
         "identity.asserted" | "IdentityAsserted" => Some(30),
+        "run.capture" | "RunCapture" => Some(31),
         _ => None,
     }
 }
@@ -874,6 +887,496 @@ pub fn default_transparency_log_path() -> std::path::PathBuf {
         .join("maos")
         .join("audit")
         .join("transparency.sqlite")
+}
+
+/// Resolve the physical Transparency Log artifact for one canonical team.
+///
+/// The default path remains the untenanted/global artifact. Tenant logs retain
+/// its file name but live under `teams/<team>/`, so an explicit
+/// `MAOS_AUDIT_DB` override still controls the storage root without collapsing
+/// multiple teams into one SQLite file.
+pub fn transparency_log_path_for_team(team: &maos_domain::team::TeamId) -> std::path::PathBuf {
+    let default = default_transparency_log_path();
+    let file_name = default
+        .file_name()
+        .unwrap_or_else(|| std::ffi::OsStr::new("transparency.sqlite"));
+    default
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("teams")
+        .join(team.as_str())
+        .join(file_name)
+}
+
+/// Resolve the runtime Transparency Log path from explicit tenancy inputs.
+///
+/// A team becomes a routing operand only when the collective tier is active.
+/// Missing or empty team input preserves the byte-identical global path; a
+/// present but non-canonical team fails closed.
+pub fn transparency_log_path_for_tenant_mode(
+    collective_configured: bool,
+    home_team: Option<&str>,
+) -> Result<std::path::PathBuf, maos_domain::team::TeamIdError> {
+    let Some(home_team) = home_team.filter(|value| !value.trim().is_empty()) else {
+        return Ok(default_transparency_log_path());
+    };
+    if !collective_configured {
+        return Ok(default_transparency_log_path());
+    }
+    let team = maos_domain::team::TeamId::new(home_team)?;
+    Ok(transparency_log_path_for_team(&team))
+}
+
+/// Reject a Transparency Log path whose file or any existing ancestor is a
+/// symbolic link.
+///
+/// Physical file-per-team isolation is not preserved if `teams/<team>` aliases
+/// another team's directory. Missing components are valid before first boot;
+/// callers may create them only after this check succeeds.
+pub fn validate_transparency_log_path(path: &std::path::Path) -> std::io::Result<()> {
+    for candidate in path.ancestors() {
+        match std::fs::symlink_metadata(candidate) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!(
+                        "Transparency Log path contains symbolic link: {}",
+                        candidate.display()
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+/// Sidecar carrying the manifest-validated team bound to one physical TL.
+pub fn transparency_log_team_binding_path(path: &std::path::Path) -> std::path::PathBuf {
+    let mut binding = path.as_os_str().to_os_string();
+    binding.push(".team");
+    binding.into()
+}
+
+/// Validate a previously bound team artifact without mutating it.
+pub fn validate_transparency_log_team_binding(
+    path: &std::path::Path,
+    expected_team: &maos_domain::team::TeamId,
+) -> std::io::Result<()> {
+    let binding_path = transparency_log_team_binding_path(path);
+    validate_transparency_log_path(&binding_path)?;
+    let raw = std::fs::read_to_string(&binding_path)?;
+    let actual = maos_domain::team::TeamId::new(raw.trim()).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "Transparency Log team binding {} is invalid: {error}",
+                binding_path.display()
+            ),
+        )
+    })?;
+    if &actual != expected_team {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "Transparency Log artifact team mismatch: expected {}, found {}",
+                expected_team, actual
+            ),
+        ));
+    }
+    Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Story 13.5g — in-artifact tenant binding (defense-in-depth Stage-2).
+//
+// The `.team` sidecar is a label *beside* the artifact: it is separable from
+// the file and detects nothing (13.5e D2/D4). This section moves the binding
+// to a single row *inside* the artifact and factors the verdict logic into
+// pure, hermetic functions so the control leg stays blocking while only the
+// live-Postgres wiring (`current_database()`) is substrate-bound. An adversary
+// who can write to the audit directory can rewrite this row exactly as they
+// can rewrite the sidecar — this detects misconfiguration, mis-restore and
+// accidental substitution, not an adversary (ADR-055 §13.5e).
+// ─────────────────────────────────────────────────────────────────────────
+
+/// DDL for the in-artifact tenant binding row (Story 13.5g AC1).
+///
+/// A single-row table (`CHECK (id = 1)`) carrying the canonical team the
+/// artifact is bound to, the persisted `datname` recorded on the first tenant
+/// boot, and the bind timestamp. Created lazily by [`write_tenant_binding`];
+/// read by [`read_tenant_artifact`] through a read-only NOFOLLOW connection.
+/// It lives in `maos-audit`, not `maos-iac`: the read side cannot depend on
+/// `maos-iac` (see `backup.rs`), and keeping it here leaves `maos-iac` at zero
+/// delta.
+const TENANT_BINDING_SCHEMA: &str = "\
+CREATE TABLE IF NOT EXISTS tenant_binding (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    team_id     TEXT    NOT NULL,
+    datname     TEXT,
+    bound_at_ns INTEGER NOT NULL
+);";
+
+/// Typed error for the in-artifact tenant binding read/write helpers.
+#[derive(Debug, thiserror::Error)]
+pub enum TenantBindingError {
+    #[error("tenant binding io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("tenant binding sqlite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+    /// The artifact already carries a binding for a *different* team. Raised by
+    /// [`write_tenant_binding`]'s compare-and-set when a second boot races the
+    /// Phase A `NeedsWrite` window (two daemons pointed at one team directory —
+    /// a config typo, not an adversary). Fail closed rather than overwrite.
+    #[error(
+        "tenant binding conflict: artifact is already bound to team {existing}, \
+         refusing to overwrite with {attempted}"
+    )]
+    BindingConflict {
+        /// `tenant_binding.team_id` already persisted in the artifact.
+        existing: String,
+        /// The team this boot attempted to bind.
+        attempted: String,
+    },
+}
+
+/// Read-only snapshot of a Transparency Log artifact used by the Phase A
+/// verdict ([`decide_phase_a`]) and the Phase B datname check
+/// ([`verify_datname_binding`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TenantArtifactRead {
+    /// `tenant_binding.team_id`, raw and unparsed. `None` when the table or the
+    /// single row is absent — the pure verdict parses it so a non-canonical
+    /// value is refused rather than silently normalized (Trap 5).
+    pub binding_team: Option<String>,
+    /// `tenant_binding.datname`. `None` on the first tenant boot; `Some(d)` on
+    /// every boot after Phase B recorded the live datname.
+    pub binding_datname: Option<String>,
+    /// Row count of `transparency_log` (0 when the table is absent). Distinguishes
+    /// a fresh artifact from one carrying foreign history (AC3 rows 3–5).
+    pub transparency_log_rows: u64,
+}
+
+/// Read the in-artifact tenant binding + transparency_log row count through a
+/// **read-only** NOFOLLOW connection (Story 13.5g AC2).
+///
+/// A missing file, or a file without a `tenant_binding` table, reads as
+/// `None`/0 rather than an error, so a refused boot never mutates the other
+/// team's artifact (D-4). The `team_id` is returned raw — canonicality is
+/// enforced by the pure verdict, not here.
+/// Open a **read-only** NOFOLLOW connection to a tenant Transparency Log artifact
+/// (Story 13.6d P2 — single-connection foreign read).
+///
+/// Returns `Ok(None)` when the file is absent, mirroring [`read_tenant_artifact`]'s
+/// "absent reads as default" contract so a refused boot never mutates another
+/// team's artifact (D-4). The returned connection is the *sole* handle a
+/// cross-wall reader holds: the binding is verified AND the rows are served
+/// through it, so a file replacement between the two can no longer attest one
+/// artifact while disclosing another (the binding-vs-rows TOCTOU).
+pub fn open_tenant_artifact_readonly(
+    path: &Path,
+) -> Result<Option<rusqlite::Connection>, TenantBindingError> {
+    match std::fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(TenantBindingError::Io(error)),
+        Ok(_) => {}
+    }
+    let conn = rusqlite::Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    Ok(Some(conn))
+}
+
+/// Read the in-artifact tenant binding + `transparency_log` row count through a
+/// caller-supplied connection (Story 13.6d P2).
+///
+/// Pair with [`open_tenant_artifact_readonly`] so the cross-wall reader verifies
+/// the binding and serves rows on the **same** connection. The `team_id` is
+/// returned raw; canonicality is enforced by the caller (the pure verdict, not
+/// here).
+pub fn read_tenant_artifact_on(
+    conn: &rusqlite::Connection,
+) -> Result<TenantArtifactRead, TenantBindingError> {
+    let binding_team;
+    let binding_datname;
+    match read_binding_row(conn)? {
+        Some((team, datname)) => {
+            binding_team = Some(team);
+            binding_datname = datname;
+        }
+        None => {
+            binding_team = None;
+            binding_datname = None;
+        }
+    }
+    let transparency_log_rows = count_transparency_log_rows(conn)?;
+    Ok(TenantArtifactRead {
+        binding_team,
+        binding_datname,
+        transparency_log_rows,
+    })
+}
+
+/// Read the in-artifact tenant binding + transparency_log row count through a
+/// **read-only** NOFOLLOW connection (Story 13.5g AC2).
+///
+/// A missing file, or a file without a `tenant_binding` table, reads as
+/// `None`/0 rather than an error, so a refused boot never mutates the other
+/// team's artifact (D-4). The `team_id` is returned raw — canonicality is
+/// enforced by the pure verdict, not here.
+///
+/// Thin wrapper over [`open_tenant_artifact_readonly`] + [`read_tenant_artifact_on`];
+/// kept for the Phase A verdict and Phase B datname check, which read the binding
+/// and then discard the connection.
+pub fn read_tenant_artifact(path: &Path) -> Result<TenantArtifactRead, TenantBindingError> {
+    match open_tenant_artifact_readonly(path)? {
+        None => Ok(TenantArtifactRead::default()),
+        Some(conn) => read_tenant_artifact_on(&conn),
+    }
+}
+
+/// Persist the single tenant binding row, or update the `datname` of an
+/// existing binding **for the same team** (Story 13.5g AC1).
+///
+/// Opens read-write with NOFOLLOW and runs `CREATE TABLE IF NOT EXISTS`, so the
+/// first call after a successful TL open materializes the row. `datname = None`
+/// is the first-boot state Phase B later fills with the live database name.
+///
+/// **Compare-and-set.** The upsert updates only when the persisted `team_id`
+/// equals the one being written; a binding belonging to another team yields
+/// [`TenantBindingError::BindingConflict`] instead of being overwritten. Phase A
+/// only returns `NeedsWrite` for an artifact that had no binding *at read time*,
+/// so this closes the window in which a second concurrent boot binds the same
+/// artifact first and would otherwise be silently clobbered. The whole
+/// create-and-upsert runs in one transaction so a competing writer observes
+/// either both statements or neither.
+pub fn write_tenant_binding(
+    path: &Path,
+    team_id: &maos_domain::team::TeamId,
+    datname: Option<&str>,
+) -> Result<(), TenantBindingError> {
+    validate_transparency_log_path(path)?;
+    let mut conn = rusqlite::Connection::open_with_flags(
+        path,
+        OpenFlags::default() | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )?;
+    // The Transparency Log adapter holds its own WAL connection; this writer is
+    // a second connection, so honour the multi-writer busy_timeout contract
+    // (Story 9.7 R3) rather than failing immediately under a transient lock.
+    conn.busy_timeout(std::time::Duration::from_millis(5000))?;
+    let tx = conn.transaction()?;
+    tx.execute_batch(TENANT_BINDING_SCHEMA)?;
+    let bound_at_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as i64)
+        .unwrap_or(0);
+    let updated = tx.execute(
+        "INSERT INTO tenant_binding (id, team_id, datname, bound_at_ns) \
+         VALUES (1, ?1, ?2, ?3) \
+         ON CONFLICT(id) DO UPDATE SET \
+            datname = excluded.datname, \
+            bound_at_ns = excluded.bound_at_ns \
+         WHERE tenant_binding.team_id = excluded.team_id",
+        rusqlite::params![team_id.as_str(), datname, bound_at_ns],
+    )?;
+    if updated == 0 {
+        // The conflict arm's predicate rejected the update: a row exists and it
+        // names another team. Report it rather than adopting the artifact.
+        let existing: String = tx.query_row(
+            "SELECT team_id FROM tenant_binding WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        return Err(TenantBindingError::BindingConflict {
+            existing,
+            attempted: team_id.as_str().to_string(),
+        });
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Whether `name` is a table in this database.
+///
+/// Errors propagate: a locked, corrupt or otherwise unreadable artifact MUST
+/// NOT be reported as "table absent", because every caller reads absence as
+/// "no binding / no history" and Phase A maps that to `NeedsWrite` — i.e. the
+/// boot would adopt and bind an artifact whose identity it could not establish.
+fn table_exists(conn: &rusqlite::Connection, name: &str) -> Result<bool, TenantBindingError> {
+    let exists = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+        rusqlite::params![name],
+        |row| row.get::<_, bool>(0),
+    )?;
+    Ok(exists)
+}
+
+fn read_binding_row(
+    conn: &rusqlite::Connection,
+) -> Result<Option<(String, Option<String>)>, TenantBindingError> {
+    if !table_exists(conn, "tenant_binding")? {
+        return Ok(None);
+    }
+    match conn.query_row(
+        "SELECT team_id, datname FROM tenant_binding WHERE id = 1",
+        [],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+    ) {
+        Ok(pair) => Ok(Some(pair)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(error) => Err(TenantBindingError::Sqlite(error)),
+    }
+}
+
+/// Row count of `transparency_log`, or 0 when the table is genuinely absent.
+///
+/// Like [`table_exists`], a failed count is an error rather than 0: reading a
+/// busy or corrupt foreign shard as "empty" would re-open D-3 by routing it to
+/// the `NeedsWrite` (fresh) row of the AC3 table.
+fn count_transparency_log_rows(conn: &rusqlite::Connection) -> Result<u64, TenantBindingError> {
+    if !table_exists(conn, "transparency_log")? {
+        return Ok(0);
+    }
+    let rows = conn.query_row("SELECT COUNT(*) FROM transparency_log", [], |row| {
+        row.get::<_, i64>(0)
+    })?;
+    Ok(rows.max(0) as u64)
+}
+
+// ── Phase A verdict (AC3) ────────────────────────────────────────────────
+
+/// Phase A verdict for an in-artifact tenant binding (Story 13.5g AC3). Pure:
+/// no DB access, no env. Each variant is one row of the AC3 table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TenantBindingPhaseADecision {
+    /// In-artifact binding present and `== env` (AC3 row 1).
+    Proceed,
+    /// No in-artifact binding; a fresh or legacy-migrate artifact should have
+    /// its binding written after a successful open (AC3 rows 3 & 4).
+    NeedsWrite,
+    /// Refuse to serve the artifact under this env team (AC3 rows 2 & 5).
+    Refuse(TenantBindingPhaseARefusal),
+}
+
+/// Why Phase A refuses an artifact. Each variant is independently falsifiable
+/// (AC6), so each carries its own gate leg.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TenantBindingPhaseARefusal {
+    /// `tenant_binding.team_id` is bound to a different canonical team (AC3 row 2).
+    BoundToForeignTeam {
+        bound: String,
+        env: maos_domain::team::TeamId,
+    },
+    /// No binding, but the artifact carries `transparency_log` history with no
+    /// matching `.team` sidecar — a file-copied foreign shard (AC3 row 5, D-3).
+    UnboundHistoryWithoutSidecar { env: maos_domain::team::TeamId },
+    /// `tenant_binding.team_id` is not a canonical `TeamId` (Trap 5): read it,
+    /// parse it, refuse it — never normalize it into validity.
+    CorruptBinding {
+        raw: String,
+        env: maos_domain::team::TeamId,
+    },
+}
+
+impl std::fmt::Display for TenantBindingPhaseARefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BoundToForeignTeam { bound, env } => write!(
+                f,
+                "artifact tenant_binding is bound to {bound}, but env team is {env}"
+            ),
+            Self::UnboundHistoryWithoutSidecar { env } => write!(
+                f,
+                "artifact has transparency_log history but no tenant_binding and no matching \
+                 .team sidecar for env team {env} (foreign shard, D-3)"
+            ),
+            Self::CorruptBinding { raw, env } => write!(
+                f,
+                "artifact tenant_binding team_id {raw:?} is not canonical for env team {env}"
+            ),
+        }
+    }
+}
+
+/// Decide Phase A from the read-only artifact snapshot + sidecar (AC3). Pure.
+///
+/// `binding_team` / `sidecar_team` are raw strings; canonicality is enforced
+/// here so a tampered persisted value is refused rather than trimmed into shape.
+pub fn decide_phase_a(
+    binding_team: Option<&str>,
+    env: &maos_domain::team::TeamId,
+    transparency_log_rows: u64,
+    sidecar_team: Option<&str>,
+) -> TenantBindingPhaseADecision {
+    use TenantBindingPhaseADecision as D;
+    use TenantBindingPhaseARefusal as R;
+    match binding_team {
+        // Trap 5: parse the persisted value exactly as stored. `TeamId::new`
+        // rejects rather than normalizes, and a binding written by
+        // `write_tenant_binding` never carries surrounding whitespace, so any
+        // that is present means the row was not written by this code path.
+        Some(raw) => match maos_domain::team::TeamId::new(raw) {
+            Ok(bound) if &bound == env => D::Proceed,
+            Ok(bound) => D::Refuse(R::BoundToForeignTeam {
+                bound: bound.as_str().to_string(),
+                env: env.clone(),
+            }),
+            Err(_) => D::Refuse(R::CorruptBinding {
+                raw: raw.to_string(),
+                env: env.clone(),
+            }),
+        },
+        None => {
+            if transparency_log_rows == 0 {
+                D::NeedsWrite
+            } else {
+                // The `.team` sidecar is trimmed because its on-disk format is
+                // team + "\n" (see `bind_tenant_audit_artifact` and the reader
+                // at `validate_transparency_log_team_binding`). That is a legacy
+                // file format, not a persisted identity, so trimming it here is
+                // format handling rather than the Trap 5 normalization above.
+                match sidecar_team.and_then(|s| maos_domain::team::TeamId::new(s.trim()).ok()) {
+                    Some(side) if &side == env => D::NeedsWrite,
+                    _ => D::Refuse(R::UnboundHistoryWithoutSidecar { env: env.clone() }),
+                }
+            }
+        }
+    }
+}
+
+// ── Phase B verdict (AC4) ────────────────────────────────────────────────
+
+/// Phase B verdict for the persisted datname vs the live `current_database()`
+/// (Story 13.5g AC4). Pure. This is the real Stage-2: the persisted value
+/// comes from a *previous* boot, so it is NOT entailed by the same-boot
+/// `connection_assignment_guard`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DatnameBindingDecision {
+    /// Persisted `Some(d)`, `d == live` — proceed (second+ boot, no drift).
+    Proceed,
+    /// Persisted `None` — record the live datname on this (first) tenant boot.
+    RecordFirstDatname,
+    /// Persisted `Some(d)`, `d != live` — the team was re-pointed at a
+    /// different database; refuse to break audit continuity silently.
+    RefuseDatnameDrift { persisted: String, live: String },
+}
+
+/// Compare a persisted datname against the live database name (AC4). Pure.
+pub fn verify_datname_binding(persisted: Option<&str>, live: &str) -> DatnameBindingDecision {
+    use DatnameBindingDecision as D;
+    match persisted {
+        None => D::RecordFirstDatname,
+        Some(d) if d == live => D::Proceed,
+        Some(d) => D::RefuseDatnameDrift {
+            persisted: d.to_string(),
+            live: live.to_string(),
+        },
+    }
 }
 
 /// Resolve the default Lifecycle Journal NDJSON path.
@@ -1111,7 +1614,9 @@ pub fn resolve_spirit_name(
         }
         let conn = rusqlite::Connection::open_with_flags(
             db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(|e| format!("failed to open TL: {e}"))?;
         let mut stmt = conn
@@ -1154,7 +1659,9 @@ pub fn resolve_spirit_name(
 
         let conn = rusqlite::Connection::open_with_flags(
             db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(|e| format!("failed to open TL: {e}"))?;
 
@@ -1230,7 +1737,9 @@ pub fn subject_access_query(
 ) -> Result<Vec<PrincipalIndexEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -1256,6 +1765,56 @@ pub fn subject_access_query(
         entries.push(row.map_err(AuditError::Read)?);
     }
     Ok(entries)
+}
+
+/// Count `shared_memory` rows whose NAMESPACE COLUMN is a `Principal` variant.
+///
+/// Story 13.5h. The Shared tier has no DELETE path at any visibility; it is
+/// discharged by the `reject_principal_outside_private` partition, which stops
+/// new principal rows from entering. A Host upgraded from a pre-partition
+/// build may still hold rows written before that guard existed — those are
+/// unreachable, NOT erased (13.5h Trap 4). This is the per-run check that
+/// tells the two apart, so a `VerifiedEmpty` attestation is EARNED rather than
+/// asserted. Asserting it unchecked would rebuild the null control that
+/// Story 13.5h exists to remove.
+///
+/// Filters on the namespace COLUMN, never the value blob: `MemoryNamespace` is
+/// serde externally tagged, so every `Principal` variant serialises with the
+/// anchored prefix `{"Principal":`. A missing `shared_memory` table means the
+/// Shared store was never opened on this artifact — zero rows, and `Ok(0)` is
+/// the honest answer.
+///
+/// Note this reads the MEMORY artifact, not the audit shard: `SharedMemoryStore`
+/// is opened on the Host-wide `memory_db_path`, which under active tenancy is a
+/// different file from the team-sharded transparency log.
+pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, AuditError> {
+    let conn = rusqlite::Connection::open_with_flags(
+        memory_db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(AuditError::Open)?;
+
+    let table_present: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'shared_memory'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(AuditError::Read)?;
+    if table_present == 0 {
+        return Ok(0);
+    }
+
+    let count: i64 = conn
+        .query_row(
+            r#"SELECT COUNT(*) FROM shared_memory WHERE namespace LIKE '{"Principal":%'"#,
+            [],
+            |row| row.get(0),
+        )
+        .map_err(AuditError::Read)?;
+    Ok(u64::try_from(count).unwrap_or(0))
 }
 
 /// Provenance type for subject-access enrichment (Decision D: Direct/Distilled).
@@ -1295,7 +1854,9 @@ pub fn enrich_subject_access(
 ) -> Result<Vec<SubjectAccessEntry>, AuditError> {
     let conn = rusqlite::Connection::open_with_flags(
         db_path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(AuditError::Open)?;
 
@@ -1524,6 +2085,479 @@ fn resolve_isolation_corpus_root_from_env_internal(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn team_transparency_log_paths_are_physically_distinct() {
+        let security = maos_domain::team::TeamId::new("security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+        let default = default_transparency_log_path();
+        let security_path = transparency_log_path_for_team(&security);
+        let support_path = transparency_log_path_for_team(&support);
+
+        assert_ne!(security_path, support_path);
+        assert_ne!(security_path, default);
+        assert_eq!(security_path.file_name(), default.file_name());
+        assert!(security_path
+            .components()
+            .any(|component| component.as_os_str() == "security"));
+        assert!(support_path
+            .components()
+            .any(|component| component.as_os_str() == "support"));
+    }
+
+    #[test]
+    fn tenant_mode_path_shards_only_when_both_inputs_are_present() {
+        let default = default_transparency_log_path();
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(false, Some("security")).unwrap(),
+            default
+        );
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(true, None).unwrap(),
+            default
+        );
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(true, Some("")).unwrap(),
+            default
+        );
+        assert_ne!(
+            transparency_log_path_for_tenant_mode(true, Some("security")).unwrap(),
+            default
+        );
+        assert!(transparency_log_path_for_tenant_mode(true, Some("SECURITY")).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tenant_transparency_log_adversarial_paths_fail_closed() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let teams = dir.path().join("teams");
+        let outside = dir.path().join("outside");
+        std::fs::create_dir_all(&teams).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, teams.join("security")).unwrap();
+        let aliased = teams.join("security/transparency.sqlite");
+
+        let error = validate_transparency_log_path(&aliased).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(error.to_string().contains("symbolic link"));
+        assert!(validate_transparency_log_path(&teams.join("support/transparency.sqlite")).is_ok());
+        for invalid in ["../support", "Security", "sécurité", "security/../support"] {
+            assert!(
+                maos_domain::team::TeamId::new(invalid).is_err(),
+                "non-canonical team {invalid:?} must not become a path component"
+            );
+        }
+        assert_eq!(
+            transparency_log_path_for_tenant_mode(false, Some("security")).unwrap(),
+            default_transparency_log_path(),
+            "a partial tenancy environment must not silently select a shard"
+        );
+
+        let renamed = teams.join("support/transparency.sqlite");
+        std::fs::create_dir_all(renamed.parent().unwrap()).unwrap();
+        std::fs::write(&renamed, b"sqlite-placeholder").unwrap();
+        std::fs::write(transparency_log_team_binding_path(&renamed), "security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+        assert!(
+            validate_transparency_log_team_binding(&renamed, &support).is_err(),
+            "renaming a foreign shard into the expected path must refuse"
+        );
+    }
+
+    #[test]
+    fn tenant_binding_refuses_missing_or_foreign_artifacts() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        std::fs::write(&path, b"sqlite-placeholder").unwrap();
+        let security = maos_domain::team::TeamId::new("security").unwrap();
+        let support = maos_domain::team::TeamId::new("support").unwrap();
+
+        assert!(validate_transparency_log_team_binding(&path, &security).is_err());
+        std::fs::write(transparency_log_team_binding_path(&path), security.as_str()).unwrap();
+        validate_transparency_log_team_binding(&path, &security).unwrap();
+        assert!(validate_transparency_log_team_binding(&path, &support).is_err());
+    }
+
+    // ── Story 13.5g — in-artifact tenant binding (AC1/AC2/AC3/AC4) ────────
+
+    /// Create a TL artifact with `rows` transparency_log rows and an optional
+    /// in-artifact `tenant_binding` row + `.team` sidecar. Forces a checkpoint
+    /// + drop so the rows are durable before the read-only open (Trap 6: WAL).
+    fn make_13_5g_artifact(
+        path: &std::path::Path,
+        rows: usize,
+        binding_team: Option<&str>,
+        binding_datname: Option<&str>,
+        sidecar_team: Option<&str>,
+    ) {
+        // AC1: every open this story adds carries NOFOLLOW, fixtures included.
+        let conn = rusqlite::Connection::open_with_flags(
+            path,
+            OpenFlags::default() | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .unwrap();
+        conn.execute_batch("PRAGMA journal_mode=WAL;").unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                from_spirit_id TEXT NOT NULL DEFAULT '',
+                to_spirit_id TEXT NOT NULL DEFAULT '',
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                correlation_id TEXT,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );",
+        )
+        .unwrap();
+        for i in 0..rows {
+            let mut fid = [0u8; 16];
+            fid[0..8].copy_from_slice(&((i as u64).to_be_bytes()));
+            conn.execute(
+                "INSERT INTO transparency_log \
+                 (frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, payload_redacted, origin) \
+                 VALUES (?1, ?2, 1, 1, 1, 'seed', X'00', 0)",
+                rusqlite::params![&fid[..], (i as i64) + 1],
+            )
+            .unwrap();
+        }
+        if let Some(team) = binding_team {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS tenant_binding (\
+                    id INTEGER PRIMARY KEY CHECK (id = 1),\
+                    team_id TEXT NOT NULL,\
+                    datname TEXT,\
+                    bound_at_ns INTEGER NOT NULL\
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO tenant_binding (id, team_id, datname, bound_at_ns) \
+                 VALUES (1, ?1, ?2, 1)",
+                rusqlite::params![team, binding_datname],
+            )
+            .unwrap();
+        }
+        conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .unwrap();
+        drop(conn);
+        if let Some(team) = sidecar_team {
+            std::fs::write(transparency_log_team_binding_path(path), team).unwrap();
+        }
+    }
+
+    #[test]
+    fn tl_tenant_binding_round_trip() {
+        // AC1 — the helpers persist + read the single-row binding, and a datname
+        // update (Phase B's first-boot record) replaces the row in place.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        let team = maos_domain::team::TeamId::new("security").unwrap();
+
+        write_tenant_binding(&path, &team, None).unwrap();
+        let read = read_tenant_artifact(&path).unwrap();
+        assert_eq!(read.binding_team.as_deref(), Some("security"));
+        assert_eq!(read.binding_datname, None);
+
+        write_tenant_binding(&path, &team, Some("maos_security")).unwrap();
+        let read = read_tenant_artifact(&path).unwrap();
+        assert_eq!(read.binding_team.as_deref(), Some("security"));
+        assert_eq!(read.binding_datname.as_deref(), Some("maos_security"));
+    }
+
+    #[test]
+    fn tl_tenant_binding_read_is_read_only_and_missing_reads_none() {
+        // AC2 — a missing file reads as None/0, and a read of an artifact
+        // WITHOUT a tenant_binding table does not create one (read-only: D-4).
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("absent.sqlite");
+        let read = read_tenant_artifact(&path).unwrap();
+        assert_eq!(read.binding_team, None);
+        assert_eq!(read.binding_datname, None);
+        assert_eq!(read.transparency_log_rows, 0);
+
+        let path = dir.path().join("transparency.sqlite");
+        make_13_5g_artifact(&path, 3, None, None, None);
+        let read = read_tenant_artifact(&path).unwrap();
+        assert_eq!(
+            read.binding_team, None,
+            "no tenant_binding table reads as None"
+        );
+        assert_eq!(read.transparency_log_rows, 3);
+
+        // Reading must NOT have materialized the tenant_binding table.
+        let probe = rusqlite::Connection::open_with_flags(
+            &path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .unwrap();
+        let has_table: bool = probe
+            .query_row(
+                "SELECT EXISTS (SELECT 1 FROM sqlite_master \
+                 WHERE type = 'table' AND name = 'tenant_binding')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!has_table, "read_tenant_artifact must be read-only (D-4)");
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_bound_match_proceeds() {
+        // AC3 row 1 — in-artifact binding == env → Proceed.
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        assert_eq!(
+            decide_phase_a(Some("security"), &env, 9, None),
+            TenantBindingPhaseADecision::Proceed
+        );
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_bound_foreign_refuses() {
+        // AC3 row 2 — in-artifact binding != env → Refuse(BoundToForeignTeam).
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        assert_eq!(
+            decide_phase_a(Some("support"), &env, 0, None),
+            TenantBindingPhaseADecision::Refuse(TenantBindingPhaseARefusal::BoundToForeignTeam {
+                bound: "support".to_string(),
+                env: env.clone(),
+            })
+        );
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_corrupt_binding_refuses() {
+        // Trap 5 — a non-canonical persisted team_id is refused, not normalized.
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        assert_eq!(
+            decide_phase_a(Some("Security!"), &env, 0, None),
+            TenantBindingPhaseADecision::Refuse(TenantBindingPhaseARefusal::CorruptBinding {
+                raw: "Security!".to_string(),
+                env: env.clone(),
+            })
+        );
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_fresh_artifact_needs_write() {
+        // AC3 row 3 — no binding, 0 rows → NeedsWrite (fresh → write after open).
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        assert_eq!(
+            decide_phase_a(None, &env, 0, None),
+            TenantBindingPhaseADecision::NeedsWrite
+        );
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_legacy_sidecar_migrates() {
+        // AC3 row 4 — no binding, >0 rows, sidecar == env → NeedsWrite (migrate).
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        assert_eq!(
+            decide_phase_a(None, &env, 5, Some("security")),
+            TenantBindingPhaseADecision::NeedsWrite
+        );
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_foreign_history_without_sidecar_refuses() {
+        // AC3 row 5 — no binding, >0 rows, sidecar absent or != env → Refuse
+        // (closes D-3: a file-copied foreign shard with history and no sidecar).
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        assert_eq!(
+            decide_phase_a(None, &env, 5, None),
+            TenantBindingPhaseADecision::Refuse(
+                TenantBindingPhaseARefusal::UnboundHistoryWithoutSidecar { env: env.clone() }
+            )
+        );
+        assert_eq!(
+            decide_phase_a(None, &env, 5, Some("support")),
+            TenantBindingPhaseADecision::Refuse(
+                TenantBindingPhaseARefusal::UnboundHistoryWithoutSidecar { env: env.clone() }
+            )
+        );
+    }
+
+    #[test]
+    fn tl_phase_b_datname_none_records() {
+        // AC4 — persisted None → RecordFirstDatname (first tenant boot).
+        assert_eq!(
+            verify_datname_binding(None, "maos_security"),
+            DatnameBindingDecision::RecordFirstDatname
+        );
+    }
+
+    #[test]
+    fn tl_phase_b_datname_match_proceeds() {
+        // AC4 — persisted Some(d), d == live → Proceed.
+        assert_eq!(
+            verify_datname_binding(Some("maos_security"), "maos_security"),
+            DatnameBindingDecision::Proceed
+        );
+    }
+
+    #[test]
+    fn tl_phase_b_datname_drift_refuses() {
+        // AC4 — persisted Some(d), d != live → RefuseDatnameDrift (re-pointed DB).
+        assert_eq!(
+            verify_datname_binding(Some("maos_security"), "maos_support"),
+            DatnameBindingDecision::RefuseDatnameDrift {
+                persisted: "maos_security".to_string(),
+                live: "maos_support".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn tl_phase_a_verdict_whitespace_binding_refuses() {
+        // Trap 5 — a persisted team_id that would only become canonical after
+        // trimming is REFUSED, not normalized into validity. `write_tenant_binding`
+        // never persists surrounding whitespace, so its presence means the row did
+        // not come from this code path.
+        let env = maos_domain::team::TeamId::new("security").unwrap();
+        for raw in [" security", "security\n", " security ", "\tsecurity"] {
+            assert_eq!(
+                decide_phase_a(Some(raw), &env, 0, None),
+                TenantBindingPhaseADecision::Refuse(TenantBindingPhaseARefusal::CorruptBinding {
+                    raw: raw.to_string(),
+                    env: env.clone(),
+                }),
+                "a persisted team_id needing a trim to parse must be refused: {raw:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn tl_tenant_binding_write_refuses_foreign_binding_overwrite() {
+        // A second boot that races the Phase A NeedsWrite window must NOT clobber
+        // a binding another team already wrote. Reachable through a config typo
+        // (two daemons pointed at one team directory) — no privilege required.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        let first = maos_domain::team::TeamId::new("security").unwrap();
+        let second = maos_domain::team::TeamId::new("support").unwrap();
+
+        write_tenant_binding(&path, &first, None).unwrap();
+        let error = write_tenant_binding(&path, &second, None)
+            .expect_err("a foreign binding must not be overwritten");
+        assert!(
+            matches!(
+                &error,
+                TenantBindingError::BindingConflict { existing, attempted }
+                    if existing == "security" && attempted == "support"
+            ),
+            "expected BindingConflict, got {error:?}"
+        );
+
+        // The persisted binding is untouched by the refused write.
+        let read = read_tenant_artifact(&path).unwrap();
+        assert_eq!(read.binding_team.as_deref(), Some("security"));
+
+        // The owning team can still record its datname (same-team update).
+        write_tenant_binding(&path, &first, Some("maos_security")).unwrap();
+        let read = read_tenant_artifact(&path).unwrap();
+        assert_eq!(read.binding_datname.as_deref(), Some("maos_security"));
+    }
+
+    #[test]
+    fn tl_tenant_binding_refuses_symlinked_artifact() {
+        // AC1/AC2 — the NOFOLLOW policy is a security property, so it gets a
+        // negative control: deleting SQLITE_OPEN_NOFOLLOW must red a leg. A
+        // symlink pointing at another team's shard is refused on both the read
+        // and the write side.
+        let dir = tempfile::TempDir::new().unwrap();
+        let real = dir.path().join("foreign.sqlite");
+        make_13_5g_artifact(&real, 3, Some("support"), None, None);
+        let link = dir.path().join("transparency.sqlite");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        let team = maos_domain::team::TeamId::new("security").unwrap();
+
+        assert!(
+            read_tenant_artifact(&link).is_err(),
+            "a symlinked artifact must not be read through (NOFOLLOW)"
+        );
+        assert!(
+            write_tenant_binding(&link, &team, None).is_err(),
+            "a symlinked artifact must not be written through (NOFOLLOW)"
+        );
+
+        // The symlink target was neither read as ours nor rebound.
+        let read = read_tenant_artifact(&real).unwrap();
+        assert_eq!(read.binding_team.as_deref(), Some("support"));
+    }
+
+    #[test]
+    fn tl_tenant_binding_read_fails_closed_on_unreadable_artifact() {
+        // A file that exists but is not a SQLite database must surface an error,
+        // NOT read as (no binding, 0 rows) — that verdict is `NeedsWrite`, i.e.
+        // the boot would adopt and bind an artifact it could not identify.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        std::fs::write(&path, b"this is not a sqlite database, it is 40 bytes").unwrap();
+        let error = read_tenant_artifact(&path)
+            .expect_err("an unreadable artifact must fail closed, not read as fresh");
+        assert!(
+            matches!(error, TenantBindingError::Sqlite(_)),
+            "expected a propagated sqlite error, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn tenant_audit_tamper_residual_is_not_misreported_as_integrity() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("transparency.sqlite");
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE transparency_log (
+                frame_id BLOB NOT NULL PRIMARY KEY,
+                timestamp_ns INTEGER NOT NULL,
+                spirit_pid INTEGER NOT NULL,
+                from_spirit_id TEXT NOT NULL DEFAULT '',
+                to_spirit_id TEXT NOT NULL DEFAULT '',
+                boot_nonce INTEGER NOT NULL,
+                capability_token BLOB,
+                kind INTEGER NOT NULL,
+                intent TEXT NOT NULL,
+                correlation_id TEXT,
+                payload_redacted BLOB NOT NULL,
+                origin INTEGER NOT NULL
+            );
+            INSERT INTO transparency_log VALUES (
+                X'01010101010101010101010101010101',
+                1, 7, '', '', 1, NULL, 0, 'original', NULL, X'00', 0
+            );
+            UPDATE transparency_log SET intent = 'tampered';",
+        )
+        .unwrap();
+        drop(conn);
+
+        let rows = query(&path, AuditFilter::default()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].intent, "tampered",
+            "Story 13.5e must report the open cryptographic integrity residual honestly"
+        );
+    }
+
+    #[test]
+    fn run_capture_kind_round_trips() {
+        // J1 Tier-2 — the human-authored `run.capture` attestation is written at
+        // the bin/CLI boundary as a raw kind int (31) so no kernel `FrameKind`
+        // variant is needed (ZERO kernel delta). It must render on read and be
+        // resolvable by name, exactly like `identity.asserted` (30).
+        assert_eq!(kind_to_string(31), "run.capture");
+        assert_eq!(kind_from_string("run.capture"), Some(31));
+        assert_eq!(kind_from_string("RunCapture"), Some(31));
+        // Kind ints are NOT part of the kernel FrameKind enum surface here; an
+        // unmapped int must still degrade gracefully, never panic.
+        assert_eq!(kind_to_string(9999), "unknown");
+    }
 
     #[test]
     fn query_empty_db_returns_empty() {

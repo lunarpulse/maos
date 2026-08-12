@@ -44,6 +44,30 @@ fn count_code_occurrences(src: &str, needle: &str) -> usize {
         .count()
 }
 
+fn function_body<'a>(src: &'a str, signature: &str) -> &'a str {
+    let start = src
+        .find(signature)
+        .unwrap_or_else(|| panic!("missing function signature: {signature}"));
+    let open = src[start..]
+        .find('{')
+        .map(|offset| start + offset)
+        .unwrap_or_else(|| panic!("missing function body: {signature}"));
+    let mut depth = 0usize;
+    for (offset, byte) in src.as_bytes()[open..].iter().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return &src[open..=open + offset];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("unterminated function body: {signature}");
+}
+
 #[test]
 fn region_guard_wired_into_both_spirit_reads() {
     // The guard is invoked in BOTH read and scan. Two real call sites
@@ -55,6 +79,76 @@ fn region_guard_wired_into_both_spirit_reads() {
          (read + scan); found {guard_calls}. A missing guard on either read, or \
          a third unguarded Spirit read, is a fail-closed bypass (AC4)."
     );
+}
+
+#[test]
+fn attestation_guard_wired_into_both_spirit_reads() {
+    let guard_calls = count_code_occurrences(STORE_SRC, "self.attestation_guard(");
+    assert_eq!(
+        guard_calls, 2,
+        "attestation_guard MUST be invoked exactly in read + scan; found {guard_calls}"
+    );
+}
+
+fn public_store_method_name(signature: &str) -> &str {
+    signature
+        .strip_prefix("pub async fn ")
+        .or_else(|| signature.strip_prefix("pub fn "))
+        .expect("public method signature")
+        .split(['(', '<'])
+        .next()
+        .expect("method name")
+}
+
+#[test]
+fn team_guard_covers_all_public_store_entry_points() {
+    let store_impl = function_body(STORE_SRC, "impl LoomLiteStore {");
+    // These public seams are construction, composition, schema/provenance, or
+    // operator-only plumbing—not Spirit-addressed data access. Each exception
+    // is named so adding a new public method cannot silently bypass the guard.
+    let exemptions = [
+        ("new", "constructs a store before a Spirit exists"),
+        ("with_at_rest_seal", "composition-time builder"),
+        ("with_tenant_map", "composition-time builder"),
+        ("with_cross_team_consent", "composition-time builder"),
+        ("with_team_verifying_keys", "composition-time builder"),
+        ("at_rest_sealer", "seal posture accessor"),
+        ("init_schema", "operator schema initialization"),
+        ("current_database", "operator connection diagnostic"),
+        ("write_with_source", "verified replication apply seam"),
+        ("annotate_crossed_row", "verified apply's operation binding"),
+        ("read_all_rows_from", "internal provenance/readback helper"),
+        ("pool", "migration and physical-verification access"),
+        ("config", "configuration accessor"),
+    ];
+
+    let public_methods: Vec<_> = store_impl
+        .lines()
+        .map(str::trim_start)
+        .filter(|line| line.starts_with("pub async fn ") || line.starts_with("pub fn "))
+        .collect();
+    assert!(
+        !public_methods.is_empty(),
+        "must discover public store methods"
+    );
+
+    for signature in public_methods {
+        let name = public_store_method_name(signature);
+        let body = function_body(store_impl, signature);
+        if let Some((_, reason)) = exemptions.iter().find(|(candidate, _)| *candidate == name) {
+            assert_eq!(
+                count_code_occurrences(body, "self.team_guard("),
+                0,
+                "{signature} is deliberately unguarded: {reason}"
+            );
+        } else {
+            assert_eq!(
+                count_code_occurrences(body, "self.team_guard("),
+                1,
+                "{signature} must invoke team_guard exactly once before querying"
+            );
+        }
+    }
 }
 
 #[test]
