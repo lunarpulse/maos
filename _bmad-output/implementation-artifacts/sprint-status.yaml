@@ -38,10 +38,10 @@ development_status:
   epic-3: done
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: done
-  3-3-directors-halt-resolution-ux-decision-audit-i12: in-review
+  3-3-directors-halt-resolution-ux-decision-audit-i12: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): the story file has read `**Status:** done` with a complete dev record (Agent Model Used + Completion Notes + a 30-row File List table) since Epic 3 closed. sprint-status was never advanced past `in-review`, so epic-3 was marked `done` OVER an unfinished-looking story. Re-derived from the artifact, not assumed.
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: done
   epic-3-retrospective: done
-  epic-4: in-progress
+  epic-4: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): all 5 Epic-4 stories are `done` and `epic-4-retrospective` is `done`. The epic key was never advanced. No work was found outstanding — this is tracker drift in the direction that HIDES completed work, the same class the retro caught in E12-B1..B6.
   4-1-halt-protocol-mechanism-three-resolution-kinds-halt-receipt-99-9-single-halt-owner: done
   4-2-implement-the-tagged-scalar-slot-with-four-universal-arithmetic-predicates: done
   4-3-provide-three-memory-tiers-with-principal-namespace-and-spirit-self-telemetry: done
@@ -49,24 +49,24 @@ development_status:
   4-5-author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap: done
   epic-4-retrospective: done
   epic-5: done
-  5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: in-review
-  5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: in-review
+  5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (46-entry File List). sprint-status never advanced past `in-review`.
+  5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (43-entry File List). sprint-status never advanced past `in-review`.
   5-3-detect-spirit-crashes-hangs-and-silent-failures-with-halt-receipt-99-9: done
-  5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: in-review
-  5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: in-review
+  5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (49-entry File List). sprint-status never advanced past `in-review`.
+  5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (30-entry File List). sprint-status never advanced past `in-review`. epic-5 had been marked `done` over this and the three rows above.
   5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: done
   5-5c-mcp-client-acp-server-tool-servers-and-editor-hosts: done
   5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: done
   5-5e-section-13-1-rust-inproc-measurement-gate-subprocess-vs-in-process-latency-decision: done
   epic-5-retrospective: done
-  epic-6: in-progress
+  epic-6: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): all 5 Epic-6 stories are `done` and `epic-6-retrospective` is `done`. The epic key was never advanced; no outstanding work found.
   6-1-ship-the-full-iac-bus-with-retract-primitive-and-drr-fairness-scheduler: done
   6-2-dispatch-orchestrator-distillates-with-intent-lineage-and-cliwrapperspirit-worker-pattern: done
   6-3-build-the-a2a-peer-mesh-from-loopback-to-cross-host-with-mtls-rotation-chaos: done
   6-4-wire-scheduled-invocations-with-consentrupture-and-provider-rate-limit-isolation: done
   6-5-gateway-sub-modules-adr-029-telegram-slack-discord-signal-email: done
   epic-6-retrospective: done
-  epic-7: in-progress
+  epic-7: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): all 9 Epic-7 stories are `done` and `epic-7-retrospective` is `done`. The epic key was never advanced; no outstanding work found.
   7-1-full-cargo-generate-per-language-full-spirit-test-sdk-with-assertion-macros: done
   7-1-5-section-a2-step-3-closure-17-review-findings-25-dev-model-backfills-hard-fail-flip: done
   7-2-ship-end-to-end-registry-publish-install-yank-and-air-gapped-import: done
@@ -78,7 +78,7 @@ development_status:
   7-1-6-section-a2-full-flip-clear-9-review-findings-and-44-dev-record-violations-hard-fail-both-gates: done
   7-1-7-baseline-reset-service-boundary-101-stale-plus-72-boundary-and-serde-300-green-at-head: done
   epic-7-retrospective: done
-  epic-8: in-progress
+  epic-8: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): all 19 Epic-8 stories are `done` and `epic-8-retrospective` is `done`. The epic key was never advanced; no outstanding work found.
   8-1-butler-v0-3-on-idle-anticipatory-reasoning-morning-digest-spirit-side: done
   8-2-ship-the-researcher-reference-spirit-with-distillation-pattern-and-log-recall-walker: done
   8-3-observer-v0-5-telemetry-stream-subscriber-pre-halt-scalar-drift-watchdog: done
