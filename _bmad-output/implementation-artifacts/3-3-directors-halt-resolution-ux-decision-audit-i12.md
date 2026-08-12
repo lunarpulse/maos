@@ -4,7 +4,7 @@ dev_model_used: deepseek-v4-pro
 
 # Story 3.3: Director's Halt Resolution UX + Decision Audit (I12)
 
-**Status:** done
+**Status:** in-review
 
 **Type:** Epic 3 third story — operationalizes the "director's surface"
 metaphor as a real UX path for halt resolution AND closes the I12
@@ -1713,20 +1713,22 @@ _No debug log references for this session._
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|
-| Missing CLI integration tests (AC6) | Critical | open | decision needed |
-| Missing e2e smoke test (AC7) | Critical | open | decision needed |
-| HaltFlow design deviation — no internal journaling (AC3/AC4) | High | open | decision needed |
-| I12 test at wrong file path (AC5) | Medium | open | decision needed |
-| digest_provider not in composition root (AC5/AC7) | Medium | open | decision needed |
-| NotificationEvent::Halt duplicated halt_id | Medium | open | decision needed |
-| Empty text/operator_policy_ref accepted | Medium | open | decision needed |
-| `required_if_eq` kebab vs snake_case | High | open | patch queued |
-| `halt_id` discarded from audit trail | High | open | patch queued |
-| halt-list ignores unknown spirit filter | High | open | patch queued |
-| `frame_carries_i12_refs` tautological | Medium | open | patch queued |
-| halt-list NDJSON `unwrap_or_default` silently drops | Low | open | patch queued |
-| halt-list renders bytes vs chars inconsistency | Low | open | patch queued |
-| maos-audit unused dev-deps | Low | open | patch queued |
+| Missing CLI integration tests (AC6) | Medium | open | Patch required — 2026-08-12 HEAD audit: `crates/maos-cli/tests/halt_resolve_test.rs:39-207` now has six process tests, but the positive cases do not inspect Approval Decision Log capability/intent/reasoning, the `NO_COLOR` case exercises `halt resolve` instead of `halt list`, and the unknown-Spirit case does not pin exit code 2. |
+| Missing e2e smoke test (AC7) | Medium | open | Patch required — 2026-08-12 HEAD audit: `tests/integration/halt_resolve_smoke.sh:15-59` exists, but never runs `maosctl audit query` and exits green without proving the approval row when `sqlite3` is absent. |
+| HaltFlow design deviation — no internal journaling (AC3/AC4) | — | closed | Fixed at HEAD: `crates/maos-director-surface/src/halt_ui.rs:35-80` owns `HaltJournal`, resolves first, journals internally, and propagates audit failures; `crates/maos-kernel-core/tests/halt_resolution_journaled.rs:96-118` covers the fail-closed path. |
+| I12 test at wrong file path (AC5) | — | closed | Fixed at HEAD: `crates/maos-audit/tests/i12_decision_audit_test.rs:1-106` is the exact AC5 artifact and exercises the public audit read path plus digest-ref deserialization. |
+| digest_provider not in composition root (AC5/AC7) | — | closed | Fixed at HEAD: `crates/maos-bin/src/main.rs:3110-3137` injects the Memory Manager-backed provider through `IacBusAdapter::with_digest_provider`. |
+| NotificationEvent::Halt duplicated halt_id | — | closed | Fixed at HEAD: `crates/maos-domain/src/notification.rs:41-45` carries only `payload`; rendering reads the single `payload.halt_id` source at `crates/maos-director-surface/src/notification.rs:178-197`. |
+| Empty text/operator_policy_ref accepted | High | open | Patch required — 2026-08-12 HEAD audit: validated constructors exist, but public enum variants and serde still permit empty strings; `crates/maos-kernel-core/src/halt/resolver.rs:132-216` mutates halt state before validating either payload. Enforce non-empty values before any transition. |
+| `required_if_eq` kebab vs snake_case | — | closed | Fixed at HEAD: `crates/maos-cli/src/cli.rs:593-611` uses matching `provided-context` and `authorized-override` spellings; the missing-text case is covered at `crates/maos-cli/tests/halt_resolve_test.rs:149-177`. |
+| `halt_id` discarded from audit trail | — | closed | Fixed at HEAD: `crates/maos-kernel-core/src/halt/mod.rs:51-79` persists `halt=<id>` in reasoning, asserted by `crates/maos-kernel-core/tests/halt_resolution_journaled.rs:39-45`. |
+| halt-list ignores unknown spirit filter | — | closed | Fixed at HEAD: both `crates/maos-cli/src/subcommands.rs:1321-1327` and `crates/maos-bin/src/main.rs:5551-5560` reject unknown Spirit filters before querying. |
+| `frame_carries_i12_refs` tautological | — | closed | Fixed at HEAD: `crates/maos-iac/src/adapter/decision_logger.rs:58-69,217-239` distinguishes empty decision refs, populated refs, and non-decision frames. |
+| halt-list NDJSON `unwrap_or_default` silently drops | — | closed | Fixed at HEAD: `crates/maos-bin/src/main.rs:5575-5585` explicitly diagnoses serialization errors before skipping a row. |
+| halt-list renders bytes vs chars inconsistency | — | closed | Fixed at HEAD: list and terminal paths both use `.chars().take(8)` at `crates/maos-bin/src/main.rs:5567-5575` and `crates/maos-director-surface/src/notification.rs:178-195`. |
+| maos-audit unused dev-deps | — | dismissed | Obsolete at HEAD — `maos-spirit-abi` is absent; current audit integration tests use the remaining `maos-kernel-core` and `tempfile` dev dependencies. |
+
+**2026-08-12 current-HEAD disposition:** 14 rows audited — 10 closed, 1 dismissed, 3 open.
 | HaltResolver trait at wrong source file (AC2) | Medium | deferred | documented circular-dep design decision |
 | Re-export set differs from spec | Low | deferred | follows from trait relocation |
 | Tests fork mock/capture infrastructure | Medium | deferred | forced by circular dep |
