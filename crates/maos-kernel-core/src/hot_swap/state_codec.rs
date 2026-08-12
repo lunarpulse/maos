@@ -128,8 +128,8 @@ pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope
         envelope_version,
     };
 
-    // Reject schema_version == 0 symmetrically with encode.
-    if expected_schema_version == 0 {
+    // Reject zero on either side symmetrically with encode.
+    if expected_schema_version == 0 || envelope.schema_version == 0 {
         return Err(StateCodecError::SchemaVersionMismatch {
             expected: expected_schema_version,
             actual: envelope.schema_version,
@@ -150,7 +150,7 @@ pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope
         }
     } else {
         // Cross-major: the coordinator will invoke the migrator path.
-        if pred_major.wrapping_sub(succ_major) >= 2 {
+        if pred_major.abs_diff(succ_major) >= 2 {
             return Err(StateCodecError::SchemaVersionMismatch {
                 expected: expected_schema_version,
                 actual: envelope.schema_version,
@@ -236,11 +236,63 @@ mod tests {
     }
 
     #[test]
-    fn decode_schema_mismatch_gt_two_majors() {
-        let encoded = encode(b"state", 1).unwrap();
-        // expect version 3 (differs by ≥2 in major)
+    fn decode_rejects_zero_envelope_schema_version() {
+        let envelope = serde_json::json!({
+            "schema_version": 0u32,
+            "payload": hex::encode(b"state"),
+            "envelope_version": 1u32,
+        });
+        let mut encoded = Vec::new();
+        ciborium::into_writer(&envelope, &mut encoded).unwrap();
+
+        let result = decode(&encoded, 0x0001_0001);
+        assert!(matches!(
+            result,
+            Err(StateCodecError::SchemaVersionMismatch {
+                expected: 0x0001_0001,
+                actual: 0,
+            })
+        ));
+    }
+
+    #[test]
+    fn decode_accepts_adjacent_upward_major() {
+        let encoded = encode(b"state", 0x0001_0001).unwrap();
+        let envelope = decode(&encoded, 0x0002_0001).unwrap();
+        assert_eq!(envelope.schema_version, 0x0001_0001);
+    }
+
+    #[test]
+    fn decode_accepts_adjacent_downward_major() {
+        let encoded = encode(b"state", 0x0002_0001).unwrap();
+        let envelope = decode(&encoded, 0x0001_0001).unwrap();
+        assert_eq!(envelope.schema_version, 0x0002_0001);
+    }
+
+    #[test]
+    fn decode_rejects_upward_gap_of_two_majors() {
+        let encoded = encode(b"state", 0x0001_0001).unwrap();
         let result = decode(&encoded, 0x0003_0001);
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(StateCodecError::SchemaVersionMismatch {
+                expected: 0x0003_0001,
+                actual: 0x0001_0001,
+            })
+        ));
+    }
+
+    #[test]
+    fn decode_rejects_downward_gap_of_two_majors() {
+        let encoded = encode(b"state", 0x0003_0001).unwrap();
+        let result = decode(&encoded, 0x0001_0001);
+        assert!(matches!(
+            result,
+            Err(StateCodecError::SchemaVersionMismatch {
+                expected: 0x0001_0001,
+                actual: 0x0003_0001,
+            })
+        ));
     }
 
     #[test]
