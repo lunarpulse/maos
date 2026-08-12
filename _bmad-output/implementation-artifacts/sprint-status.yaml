@@ -35,10 +35,10 @@ development_status:
   2-4-seed-the-spirit-test-sdk-with-lcas-framework-and-cross-spirit-isolation-hooks: done
   epic-2-retrospective: done
   2-5-epic-3-prep-iac-addendum-d11-drain: done
-  epic-3: done
+  epic-3: in-progress  # 2026-08-11 REOPENED by check-epic-close-coherence (Epic-13 retro C1). Marked `done` over story 3-3, which carries 14 OPEN review findings — closure by implication. Reopening is the response Epic 6 retro §A1 already prescribed for this exact pattern; the mechanical floor held while the process floor did not.
   3-1-route-task-assign-frames-over-the-iac-bus-with-notification-surface-dispatch: done
   3-2-manage-director-posture-with-a-halt-policy-schema-and-bounded-shift-propagation: done
-  3-3-directors-halt-resolution-ux-decision-audit-i12: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): the story file has read `**Status:** done` with a complete dev record (Agent Model Used + Completion Notes + a 30-row File List table) since Epic 3 closed. sprint-status was never advanced past `in-review`, so epic-3 was marked `done` OVER an unfinished-looking story. Re-derived from the artifact, not assumed.
+  3-3-directors-halt-resolution-ux-decision-audit-i12: in-review  # 2026-08-11 REVERTED. An earlier sweep this session read the story file's `**Status:** done` header plus a complete dev record and flipped this to `done`; `check-review-findings-resolved` then RED with 14 OPEN rows in its Review Findings table. `in-review` was never drift — it is the honest guard, and the file header is the inconsistent field. Epic 5 retro §A2 / Epic 6 retro §A1 already ruled that a story with open findings must sit `in-review`, never `done`.
   3-4-buffer-orchestrator-instructions-and-honor-director-pause-resume-revoke-p99-2s: done
   epic-3-retrospective: done
   epic-4: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): all 5 Epic-4 stories are `done` and `epic-4-retrospective` is `done`. The epic key was never advanced. No work was found outstanding — this is tracker drift in the direction that HIDES completed work, the same class the retro caught in E12-B1..B6.
@@ -48,12 +48,12 @@ development_status:
   4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate: done
   4-5-author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap: done
   epic-4-retrospective: done
-  epic-5: done
-  5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (46-entry File List). sprint-status never advanced past `in-review`.
-  5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (43-entry File List). sprint-status never advanced past `in-review`.
+  epic-5: in-progress  # 2026-08-11 REOPENED by check-epic-close-coherence (Epic-13 retro C1). Marked `done` over four stories carrying 43 OPEN review findings (5-1:7, 5-2:8, 5-4:21, 5-5a:7). The Epic 5 retro §A2 backfill review DID run and DID produce findings; nobody closed them and nobody re-derived the epic roll-up, so the epic closed by implication. Epic 6 retro §A1 named this exact anti-pattern for 5.5d: "the mechanical floor holds; the process floor (reopen) did not."
+  5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: in-review  # 2026-08-11 REVERTED — 7 OPEN rows in the §A2 backfill Review Findings table (backfilled 2026-05-28 per Epic 6 retro §A2). `in-review` is correct until they close.
+  5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: in-review  # 2026-08-11 REVERTED — 8 OPEN rows in its Review Findings table. `in-review` is correct until they close.
   5-3-detect-spirit-crashes-hangs-and-silent-failures-with-halt-receipt-99-9: done
-  5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (49-entry File List). sprint-status never advanced past `in-review`.
-  5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: done  # 2026-08-11 status correction (Epic-13 retro C1 sweep): story file reads `Status: done` with a complete dev record (30-entry File List). sprint-status never advanced past `in-review`. epic-5 had been marked `done` over this and the three rows above.
+  5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: in-review  # 2026-08-11 REVERTED — 21 OPEN rows in its Review Findings table, the largest open set in the repo. `in-review` is correct until they close.
+  5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: in-review  # 2026-08-11 REVERTED — 7 OPEN rows in its Review Findings table. `in-review` is correct until they close.
   5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: done
   5-5c-mcp-client-acp-server-tool-servers-and-editor-hosts: done
   5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: done

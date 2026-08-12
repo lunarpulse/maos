@@ -1815,6 +1815,21 @@ jobs:
       - name: Run check-epic-close-green
         run: cargo run -p xtask -- check-epic-close-green --json
 
+  # Epic-13 retro C1. `check-epic-close-green` proves no gate was PARKED; this
+  # proves the close-out sources AGREE. Different failure, same close-out family.
+  check-epic-close-coherence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-epic-close-coherence
+        run: cargo run -p xtask -- check-epic-close-coherence --json
+
   # Pre-merge coverage for the HERMETIC journey suite. The full
   # `maos-journey-test` crate runs only in journey-nightly.yml (scheduled),
   # never here — so push/PR CI was green while a Story-8.15 self-contradiction
@@ -3320,6 +3335,7 @@ jobs:
       - check-dev-model-tier
       - check-kernel-baseline
       - check-epic-close-green
+      - check-epic-close-coherence
       - journey-hermetic-tier-1
       - smoke-discipline-7-1-5
       - smoke-registry-7-2
@@ -3398,6 +3414,7 @@ jobs:
           echo "safc=${{ needs.smoke-a2a-fail-closed-8-8.result }}" >> $GITHUB_OUTPUT
           echo "ckb=${{ needs.check-kernel-baseline.result }}" >> $GITHUB_OUTPUT
           echo "ecg=${{ needs.check-epic-close-green.result }}" >> $GITHUB_OUTPUT
+          echo "ecc=${{ needs.check-epic-close-coherence.result }}" >> $GITHUB_OUTPUT
           echo "jht1=${{ needs.journey-hermetic-tier-1.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
@@ -3459,6 +3476,7 @@ jobs:
             const safc = '${{ needs.smoke-a2a-fail-closed-8-8.result }}';
             const ckb = '${{ needs.check-kernel-baseline.result }}';
             const ecg = '${{ needs.check-epic-close-green.result }}';
+            const ecc = '${{ needs.check-epic-close-coherence.result }}';
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
             // Pre-existing latent bug fixed by Story 8.16 (surfaced on the FIRST PR, run 27397275823):
             // `dt` is used in the advisory determinism-tests table row but was never declared, so the
@@ -3519,6 +3537,7 @@ jobs:
             | check-dev-model-used-populated | ${icon(cdmu)} ${cdmu} |
             | check-kernel-baseline | ${icon(ckb)} ${ckb} |
             | check-epic-close-green | ${icon(ecg)} ${ecg} |
+            | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 

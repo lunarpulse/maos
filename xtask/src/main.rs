@@ -65,6 +65,7 @@ mod check_dev_record_completeness;
 mod check_empty_kernel;
 mod check_env_contract;
 mod check_epic_6_bridge;
+mod check_epic_close_coherence;
 mod check_epic_close_green;
 mod check_equiv_fixture_provenance;
 mod check_error_catalog;
@@ -378,6 +379,14 @@ enum Commands {
     /// "mark an epic retrospective done while gates are parked red" impossible.
     #[command(name = "check-epic-close-green")]
     CheckEpicCloseGreen {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Epic-13 retro C1 — re-derive every epic's roll-up. REDs when an epic is
+    /// closed over an open story, when a key never advanced, when planning prose
+    /// disagrees, or when an OPEN epic cites a kernel pin that is not the baseline.
+    #[command(name = "check-epic-close-coherence")]
+    CheckEpicCloseCoherence {
         #[arg(long)]
         json: bool,
     },
@@ -1192,6 +1201,7 @@ fn main() {
             json,
         ),
         Commands::CheckEpicCloseGreen { json } => check_epic_close_green::run(json),
+        Commands::CheckEpicCloseCoherence { json } => check_epic_close_coherence::run(json),
         Commands::StabilityMatrix { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             stability_matrix::run(&workspace_root, check, json)

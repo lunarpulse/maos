@@ -70,8 +70,13 @@ pub fn check() -> Result<Report, String> {
 }
 
 /// Parse the single `src_lines = N` key from the baseline toml without pulling a
-/// toml dependency (the file is intentionally trivial).
-fn read_pinned(path: &Path) -> Result<usize, String> {
+/// toml dependency. The file is NOT valid TOML — its HISTORY block carries
+/// unindented prose outside comment markers, so `toml::from_str` fails at the
+/// first entry. Comment-skipping line parsing is therefore the only correct
+/// reader, and it is deliberately single-sourced here: `check-epic-close-coherence`
+/// (Epic-13 retro C1) resolves doc pins against this same function, because two
+/// readers of the authoritative pin would be the very drift C1 exists to stop.
+pub fn read_pinned(path: &Path) -> Result<usize, String> {
     let text = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     for line in text.lines() {
         let line = line.trim();
