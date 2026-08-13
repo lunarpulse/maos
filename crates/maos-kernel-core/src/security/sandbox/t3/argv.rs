@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use maos_domain::sandbox::T3ImageAttestation;
+use super::image_lock::VerifiedImageAttestation;
 
 use crate::security::sandbox::SandboxSpec;
 
@@ -26,14 +26,14 @@ use super::runtime_detect::ContainerRuntime;
 /// the SHA at pull/use time (TOCTOU mitigation).
 pub fn build_runtime_argv(
     runtime: &ContainerRuntime,
-    image: &T3ImageAttestation,
+    image: &VerifiedImageAttestation,
     spec: &SandboxSpec,
     spirit_binary_path: &Path,
     command: &[String],
     spirit_id: &str,
     boot_nonce: u64,
     container_name: &str,
-) -> Vec<String> {
+) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
     let cpu_str = spec
         .resolved_caps
         .cpu_max_pct
@@ -56,17 +56,12 @@ pub fn build_runtime_argv(
         .map(|v| format!("{v}"))
         .unwrap_or_else(|| "64".to_string());
 
-    // Use the first entry's image_uri + sha256 hex for the image reference.
-    let image_ref = if let Some(entry) = image.entries.first() {
-        format!(
-            "{}@sha256:{}",
-            entry.image_uri,
-            hex::encode(entry.image_sha256)
-        )
-    } else {
-        // Fallback — should not happen; empty entries are rejected upstream.
-        "gcr.io/distroless/cc-debian12@sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()
-    };
+    // The verified attestation is a precondition, not a source of fallback
+    // defaults. Strip any existing tag/digest before adding exactly one manifest
+    // digest.
+    let entry = image.entry();
+    let repository = super::image_verify::normalize_repository(&entry.image_uri)?;
+    let image_ref = format!("{}@sha256:{}", repository, hex::encode(entry.image_sha256));
 
     let mut argv = vec![
         runtime.path.to_string_lossy().to_string(),
@@ -90,7 +85,7 @@ pub fn build_runtime_argv(
         "--".to_string(),
     ];
     argv.extend(command.iter().cloned());
-    argv
+    Ok(argv)
 }
 
 #[cfg(test)]
@@ -117,19 +112,27 @@ mod tests {
             spirit_id: "test-spirit".into(),
             output_shape_predicate: None,
         };
-        let image = maos_domain::sandbox::T3ImageAttestation {
-            id: maos_domain::sandbox::ImageAttestationId([1u8; 32]),
-            schema_version: 1,
-            signed_at_ns: 0,
-            entries: vec![maos_domain::sandbox::T3ImageEntry {
+        let image = VerifiedImageAttestation::for_test(
+            maos_domain::sandbox::T3ImageAttestation {
+                id: maos_domain::sandbox::ImageAttestationId([1u8; 32]),
+                schema_version: 1,
+                signed_at_ns: 1,
+                entries: vec![maos_domain::sandbox::T3ImageEntry {
+                    image_uri: "gcr.io/distroless/cc-debian12".into(),
+                    image_sha256: [0xAB; 32],
+                    description: "test".into(),
+                    default_for_v05: true,
+                }],
+                signature: [1u8; 64],
+                signer_pub_key: [1u8; 32],
+            },
+            maos_domain::sandbox::T3ImageEntry {
                 image_uri: "gcr.io/distroless/cc-debian12".into(),
                 image_sha256: [0xAB; 32],
                 description: "test".into(),
                 default_for_v05: true,
-            }],
-            signature: [1u8; 64],
-            signer_pub_key: [1u8; 32],
-        };
+            },
+        );
         let argv = build_runtime_argv(
             &runtime,
             &image,
@@ -139,7 +142,8 @@ mod tests {
             "test-spirit",
             12345,
             "maos-test-spirit-00003039-3039",
-        );
+        )
+        .expect("valid attestation produces argv");
 
         assert_eq!(argv[0], "/usr/bin/podman");
         assert_eq!(argv[1], "run");

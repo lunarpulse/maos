@@ -11,6 +11,7 @@
 //! reflex under test is the detector's source-identity + dedup behavior.
 
 #![cfg(target_os = "linux")]
+#![cfg(not(feature = "escape-fault-inject"))]
 
 mod common;
 use common::*;

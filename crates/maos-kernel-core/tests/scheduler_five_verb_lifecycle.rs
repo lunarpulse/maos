@@ -6,14 +6,16 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use maos_domain::lifecycle::LifecycleError;
+use maos_domain::lifecycle::{LifecycleError, LifecycleResolver, LifecycleVerb};
 use maos_kernel_core::scheduler::{
     control_block::SpiritManifestBundle, scheduler_loop::SpiritSchedulerAdapter,
+    KernelLifecycleResolver,
 };
 use maos_kernel_core::security::manifest::{LifecycleSection, SchedulingSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 
-struct TestSpirit {
+#[derive(Default)]
+struct HookCounts {
     on_load: AtomicU32,
     on_start: AtomicU32,
     on_pause: AtomicU32,
@@ -21,33 +23,26 @@ struct TestSpirit {
     on_unload: AtomicU32,
 }
 
-impl Default for TestSpirit {
-    fn default() -> Self {
-        Self {
-            on_load: AtomicU32::new(0),
-            on_start: AtomicU32::new(0),
-            on_pause: AtomicU32::new(0),
-            on_resume: AtomicU32::new(0),
-            on_unload: AtomicU32::new(0),
-        }
-    }
+#[derive(Default)]
+struct TestSpirit {
+    counts: Arc<HookCounts>,
 }
 
 impl maos_spirit_abi::lifecycle::Spirit for TestSpirit {
     fn on_load(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
-        self.on_load.fetch_add(1, Ordering::Relaxed);
+        self.counts.on_load.fetch_add(1, Ordering::Relaxed);
     }
     fn on_start(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
-        self.on_start.fetch_add(1, Ordering::Relaxed);
+        self.counts.on_start.fetch_add(1, Ordering::Relaxed);
     }
     fn on_pause(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
-        self.on_pause.fetch_add(1, Ordering::Relaxed);
+        self.counts.on_pause.fetch_add(1, Ordering::Relaxed);
     }
     fn on_resume(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
-        self.on_resume.fetch_add(1, Ordering::Relaxed);
+        self.counts.on_resume.fetch_add(1, Ordering::Relaxed);
     }
     fn on_unload(&self, _ctx: &mut maos_spirit_abi::ctx::Ctx) {
-        self.on_unload.fetch_add(1, Ordering::Relaxed);
+        self.counts.on_unload.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -112,7 +107,7 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
 async fn five_verb_lifecycle_routes_through_scheduler() {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let scheduler = make_scheduler();
-    let spirit = TestSpirit::default();
+    let counts = Arc::new(HookCounts::default());
     let manifest = SpiritManifestBundle {
         scheduling: SchedulingSection::default(),
         lifecycle: LifecycleSection {
@@ -127,9 +122,15 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
         ..Default::default()
     };
 
-    // 1. Load
     let pid = scheduler
-        .load("test-spirit", manifest, spirit, 0xBEEF)
+        .load(
+            "test-spirit",
+            manifest,
+            TestSpirit {
+                counts: Arc::clone(&counts),
+            },
+            0xBEEF,
+        )
         .await
         .expect("load");
     assert_eq!(
@@ -156,6 +157,15 @@ async fn five_verb_lifecycle_routes_through_scheduler() {
         None,
         "SCB must be removed after unload"
     );
+    for (hook, observed) in [
+        ("on_load", counts.on_load.load(Ordering::Relaxed)),
+        ("on_start", counts.on_start.load(Ordering::Relaxed)),
+        ("on_pause", counts.on_pause.load(Ordering::Relaxed)),
+        ("on_resume", counts.on_resume.load(Ordering::Relaxed)),
+        ("on_unload", counts.on_unload.load(Ordering::Relaxed)),
+    ] {
+        assert_eq!(observed, 1, "{hook} must fire exactly once");
+    }
 }
 
 #[tokio::test]
@@ -196,4 +206,41 @@ async fn invalid_state_transition_rejected() {
         matches!(err, LifecycleError::InvalidStateTransition { .. }),
         "pause on Loaded must fail: {err}"
     );
+}
+
+fn make_resolver(identity: &str) -> Result<KernelLifecycleResolver, LifecycleError> {
+    KernelLifecycleResolver::new(
+        make_scheduler(),
+        Arc::new(
+            maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0xBEEF),
+        ),
+        identity.to_owned(),
+    )
+}
+
+#[test]
+fn lifecycle_resolver_without_tokio_runtime_returns_typed_error() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let resolver = make_resolver("director").expect("valid resolver");
+    let error = resolver
+        .resolve_verb("not-loaded", LifecycleVerb::Start)
+        .expect_err("missing Spirit must return a typed error");
+    assert!(matches!(error, LifecycleError::NotLoaded { .. }));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn lifecycle_resolver_inside_current_thread_runtime_does_not_unwind() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let resolver = make_resolver("director").expect("valid resolver");
+    let error = resolver
+        .resolve_verb("not-loaded", LifecycleVerb::Start)
+        .expect_err("missing Spirit must return a typed error");
+    assert!(matches!(error, LifecycleError::NotLoaded { .. }));
+}
+
+#[test]
+fn lifecycle_resolver_rejects_blank_director_identity() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let error = make_resolver("  ").err().expect("blank identity must fail");
+    assert!(matches!(error, LifecycleError::Admission(_)));
 }

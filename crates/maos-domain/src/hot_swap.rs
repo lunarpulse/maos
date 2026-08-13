@@ -83,7 +83,8 @@ impl std::fmt::Display for SchemaCompat {
     }
 }
 
-/// Seven typed-error variants for hot-swap operations.
+/// Typed errors for hot-swap operations. Snapshot, expected-schema, and
+/// migrator-default failures remain distinct for operators and callers.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum HotSwapError {
@@ -111,12 +112,18 @@ pub enum HotSwapError {
 
     #[error("swap-out failed for spirit {spirit_id}: {error}")]
     SwapOutFailed { spirit_id: String, error: String },
+    #[error("snapshot failed for spirit {spirit_id}: {error}")]
+    SnapshotFailed { spirit_id: String, error: String },
+    #[error("expected schema version must be greater than zero: {expected}")]
+    InvalidExpectedSchemaVersion { expected: u32 },
 
     #[error("swap-in failed for spirit {spirit_id}: {error}")]
     SwapInFailed { spirit_id: String, error: String },
 
     #[error("migrator failed: {error}")]
     MigratorFailed { error: String },
+    #[error("migrator declared but not implemented: {error}")]
+    MigratorNotImplemented { error: String },
 
     #[error("post-swap invariant violation: {0:?}")]
     PostSwapInvariantViolation(PostSwapInvariantViolation),
@@ -303,6 +310,20 @@ mod tests {
             }
             _ => panic!("unexpected variant"),
         }
+    }
+
+    #[test]
+    fn invalid_expected_schema_version_is_distinct_from_snapshot_and_migrator_errors() {
+        let error = HotSwapError::InvalidExpectedSchemaVersion { expected: 0 };
+        assert_eq!(
+            error.to_string(),
+            "expected schema version must be greater than zero: 0"
+        );
+        assert!(!matches!(&error, HotSwapError::SnapshotFailed { .. }));
+        assert!(!matches!(
+            &error,
+            HotSwapError::MigratorNotImplemented { .. }
+        ));
     }
 
     #[test]

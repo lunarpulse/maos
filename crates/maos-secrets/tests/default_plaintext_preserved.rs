@@ -78,6 +78,7 @@ fn no_kms_default_returns_byte_identical_plaintext() {
     );
 }
 
+#[cfg(not(feature = "kms-fault-inject"))]
 #[test]
 fn configured_kms_seals_to_ciphertext_not_passthrough() {
     // A configured, healthy KMS -> the posture is "encrypted", opt-in.

@@ -663,11 +663,11 @@ mod chain_tests {
         let mut keyring = keyring_with_enrollment(100);
         let entries =
             vec![RevocationEntry::new("vetted", "0.1.0", "vetting withdrawn", None).unwrap()];
-        let entries_bytes = serde_json::to_vec(&entries).unwrap();
+        let entries_bytes = maos_domain::revocation::canonical_entries_bytes(&entries).unwrap();
         let signature = ed25519_sign(&op_seed(), &entries_bytes);
         keyring.push_attestation_revocation(
             SignedRevocationList::new(
-                CrlId([0xAA; 32]),
+                CrlId::from_entries(&entries).unwrap(),
                 1,
                 900_000_000,
                 RevocationOrigin::Operator,

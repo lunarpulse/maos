@@ -1,3 +1,5 @@
+#![cfg(not(feature = "sso-fault-inject"))]
+
 //! Story 11.4c AC1 (Task 1) - CLAIMS fail-closed: expired, wrong-audience,
 //! untrusted-issuer, unknown-kid, and malformed assertions are each rejected
 //! with their named error. A verified principal is produced ONLY when every

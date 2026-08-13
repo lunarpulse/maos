@@ -1,5 +1,7 @@
 //! Test helpers shared across kernel-core integration tests.
 
+pub mod upgrade;
+
 use maos_kernel_core::security::sandbox::t3::runtime_detect;
 
 /// Returns `true` if no container runtime (Podman/Docker) is available,

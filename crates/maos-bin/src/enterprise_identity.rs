@@ -744,6 +744,7 @@ mod available_arm_tests {
         }
     }
 
+    #[cfg(not(feature = "kms-fault-inject"))]
     #[test]
     fn kms_available_seals_to_real_ciphertext() {
         let kms = LocalMasterKeyKms::from_master_key(&[0x42u8; 32]).expect("master key");
@@ -774,6 +775,7 @@ mod available_arm_tests {
         );
     }
 
+    #[cfg(not(feature = "sso-fault-inject"))]
     #[test]
     fn sso_available_denies_forged_assertions() {
         let rt = build_runtime(

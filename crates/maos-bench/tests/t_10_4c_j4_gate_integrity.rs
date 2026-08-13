@@ -120,7 +120,7 @@ fn t_10_4c_sample_count_matches_invocations() {
 }
 
 /// AC2: the measurement is GREEN without fault injection — within the 10ms budget.
-#[cfg(feature = "kernel_measurement")]
+#[cfg(all(feature = "kernel_measurement", not(feature = "bench-fault-inject")))]
 #[test]
 fn t_10_4c_no_injection_green() {
     let (result, _stderr) = run_j4_in_subprocess();

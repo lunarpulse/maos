@@ -2445,6 +2445,7 @@ dependencies = [
  "maos-cli",
  "maos-cohort",
  "maos-compliance",
+ "maos-control",
  "maos-corpus-gen",
  "maos-digest",
  "maos-director-surface",
@@ -2573,6 +2574,12 @@ dependencies = [
 [[package]]
 name = "maos-control"
 version = "0.1.0-alpha"
+dependencies = [
+ "maos-domain",
+ "maos-kernel-core",
+ "ring",
+ "serde_json",
+]
 
 [[package]]
 name = "maos-corpus-gen"
@@ -2631,6 +2638,7 @@ dependencies = [
  "maos-spirit-abi",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "smallvec",
  "thiserror 2.0.18",
 ]
@@ -2664,6 +2672,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
+ "toml 0.8.23",
  "walkdir",
 ]
 

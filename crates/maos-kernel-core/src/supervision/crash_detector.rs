@@ -171,8 +171,9 @@ impl CrashDetector {
         }
 
         // Step 6: Apply FR50 disposition
+        let runtime = scb.runtime_snapshot();
         let disposition_outcome = crate::supervision::disposition::enforce_disposition(
-            scb.on_crash_action.clone(),
+            runtime.on_crash_action.clone(),
             &drained_tasks,
             &self.iac,
             self.replica.as_deref(),
@@ -186,7 +187,7 @@ impl CrashDetector {
                 lifecycle_event: LifecycleEvent::Crash,
                 spirit_id: scb.spirit_id.clone(),
                 payload: None,
-                effective_sandbox_tier: Some(scb.sandbox_tier),
+                effective_sandbox_tier: Some(runtime.sandbox_tier),
             }));
 
         {

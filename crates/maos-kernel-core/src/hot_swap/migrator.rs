@@ -26,12 +26,9 @@ pub async fn run_migrator(
     successor_manifest: &SpiritManifestBundle,
     predecessor_version: &str,
 ) -> Result<Vec<u8>, HotSwapError> {
-    // Derive predecessor + successor class names from the SCBs/manifests.
-    // Story 5.2 review backfill: predecessor_class must come from predecessor SCB,
-    // not from successor manifest (they may differ for a class-rename swap; today
-    // same-class-only is enforced upstream but the error variant carries both
-    // sides for diagnostic accuracy).
-    let predecessor_class = scb
+    // Derive predecessor + successor class names from the manifests.
+    let predecessor_runtime = scb.runtime_snapshot();
+    let predecessor_class = predecessor_runtime
         .manifest
         .class
         .as_ref()
@@ -84,11 +81,10 @@ pub async fn run_migrator(
     match result {
         Ok(migrated_bytes) => Ok(migrated_bytes),
         Err(e) => match e {
-            MigratorError::NotImplemented => Err(HotSwapError::EMigratorMissing {
-                predecessor_class,
-                predecessor_version: predecessor_version.to_string(),
-                successor_class,
-                successor_version,
+            MigratorError::NotImplemented => Err(HotSwapError::MigratorNotImplemented {
+                error: format!(
+                    "successor class={successor_class} version={successor_version} declares migration from {predecessor_class} {predecessor_version} but its migrate hook is not implemented"
+                ),
             }),
             other => Err(HotSwapError::MigratorFailed {
                 error: other.to_string(),

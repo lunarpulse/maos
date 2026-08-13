@@ -21,6 +21,3 @@ fn halt_continuity_corpus_loads() {
         "AC4 requires ≥10 halt-continuity scenarios"
     );
 }
-
-// TODO: full e2e test that boots TestKernel and exercises each scenario.
-// Deferred to Task 8.6 completion.

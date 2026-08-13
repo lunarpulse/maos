@@ -177,6 +177,8 @@ fn well_formed_fixtures_admit_or_error_as_expected() {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let result = admit_spirit(&pkg, &cfg);
@@ -244,6 +246,8 @@ fn malformed_fixtures_rejected_with_typed_error() {
             t3_for_public_untrusted: false,
             allow_unsigned_local: true,
             org_signing_pubkey: None,
+            runtime_provider_endpoint: None,
+            runtime_crypto_provider: None,
         };
 
         let result = admit_spirit(&pkg, &cfg);

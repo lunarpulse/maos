@@ -264,20 +264,24 @@ pub enum T3Error {
         "no container runtime found (tried podman, docker); install one or set MAOS_T3_RUNTIME=none to disable T3"
     )]
     RuntimeUnavailable,
+    #[error("no container runtime found: podman: {podman}; docker: {docker}")]
+    RuntimeUnavailableDiagnostics { podman: String, docker: String },
     #[error("image SHA mismatch: expected {expected}, observed {observed}")]
     ImageMismatch { expected: String, observed: String },
     #[error("image attestation signature invalid")]
     SignatureInvalid,
     #[error("image attestation trust anchor mismatch")]
     TrustAnchorMismatch,
+    #[error("T3 image pin '{name}' is not present in the verified image lock")]
+    ImagePinMissing { name: String },
+    #[error("T3 image trust anchor unavailable: {0}")]
+    TrustAnchorMissing(String),
     #[error("image attestation unsupported schema version {version}")]
     UnsupportedSchemaVersion { version: u32 },
-    #[error("image pin '{name}' not found in t3-image.lock")]
-    ImagePinMissing { name: String },
+    #[error("T3 image lock is a shipped placeholder and cannot be used for admission")]
+    PlaceholderImageLock,
     #[error("no default T3 image in t3-image.lock")]
     NoDefaultImage,
-    #[error("image trust anchor not configured (set MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX)")]
-    TrustAnchorMissing(String),
     #[error("container spawn failed: {0}")]
     Spawn(String),
     #[error("container runtime inspect failed: {0}")]

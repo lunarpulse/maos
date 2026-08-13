@@ -21,6 +21,8 @@
 //! The reference `LocalMasterKeyKms` is dev/CI-ONLY (ADR-051 / NFR-Sec-19);
 //! production = OS keyring / cloud-KMS, additive-per-port, deferred (F3).
 
+#![cfg(not(feature = "kms-fault-inject"))]
+
 use maos_domain::ports::{CryptoProvider, KeyManagementPort};
 use maos_kernel_core::security::RingCryptoProvider;
 use maos_secrets::{open_at_rest, seal_at_rest, LocalMasterKeyKms};

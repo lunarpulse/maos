@@ -82,3 +82,64 @@ fn revocation_corpus_category_distribution_is_uniform() {
         assert_eq!(count, 5, "each category must have exactly 5 scenarios");
     }
 }
+
+/// Opens every referenced anchor/CRL and executes the production parser with
+/// ring Ed25519 verification. This makes descriptor expectations executable,
+/// including the negative cryptographic and structural cases.
+#[test]
+fn revocation_corpus_executes_real_signature_parser_for_every_asset() {
+    let corpus = RevocationCorpus::load_from(Path::new("fixtures/revocation-corpus-v0/"))
+        .expect("revocation corpus");
+    let assets = corpus
+        .read_assets()
+        .expect("all descriptor assets must exist");
+
+    for (scenario, crl_bytes, anchor) in assets {
+        let result = maos_kernel_core::revocation::parse_signed_crl(
+            &crl_bytes,
+            &anchor,
+            &maos_kernel_core::security::RingCryptoProvider,
+        );
+        match (scenario.expected_outcome.accepted, result) {
+            (true, Ok(crl)) => {
+                assert_eq!(
+                    crl.entries.len(),
+                    scenario.expected_outcome.revoked_spirit_count,
+                    "{} accepted CRL entry count",
+                    scenario.scenario_id
+                );
+            }
+            (false, Err(error)) => {
+                let observed = match error {
+                    maos_domain::revocation::RevocationError::SignatureInvalid => {
+                        "SignatureInvalid"
+                    }
+                    maos_domain::revocation::RevocationError::TrustAnchorMismatch { .. } => {
+                        "TrustAnchorMismatch"
+                    }
+                    maos_domain::revocation::RevocationError::MalformedVersionRange { .. } => {
+                        "MalformedVersionRange"
+                    }
+                    other => panic!(
+                        "{} rejected with unexpected error variant: {other}",
+                        scenario.scenario_id
+                    ),
+                };
+                assert_eq!(
+                    scenario.expected_outcome.error_variant.as_deref(),
+                    Some(observed),
+                    "{} rejection outcome",
+                    scenario.scenario_id
+                );
+            }
+            (true, Err(error)) => panic!(
+                "{} was expected to parse but failed: {error}",
+                scenario.scenario_id
+            ),
+            (false, Ok(_)) => panic!(
+                "{} was expected to reject but parsed successfully",
+                scenario.scenario_id
+            ),
+        }
+    }
+}

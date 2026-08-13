@@ -14,5 +14,6 @@ pub mod cli_wrapper; // Story 6.2 AC5 — CliWrapperSpirit class
 pub mod upgrade;
 
 pub use upgrade::{
-    UpgradeError, UpgradeOrchestrator, UpgradeOutcome, UpgradePolicy, UpgradeReport,
+    SuccessorSpiritFactory, UpgradeError, UpgradeOrchestrator, UpgradeOutcome, UpgradePolicy,
+    UpgradeReport,
 };

@@ -10,7 +10,6 @@ use maos_domain::ports::crypto::CryptoProvider;
 use maos_domain::revocation::{RegistryClient, RevocationError};
 
 use crate::revocation::applier::RevocationApplier;
-use crate::supervision::watchdog_common;
 use crate::telemetry::iac_rt::{ErrorKind, IacRtMetrics, Service};
 
 /// Periodic CRL fetch + apply task.
@@ -68,14 +67,50 @@ impl RevocationPoller {
     }
 }
 
-/// Poll cadence: uses the shared watchdog_common baseline, but allows
-/// `MAOS_REVOCATION_FAST` to collapse to 100ms independently of
-/// `MAOS_SUPERVISION_FAST`.
+/// Poll cadence has explicit precedence: its own test override wins; otherwise
+/// it follows the supervision test override; production default is one second.
 fn pick_poll_cadence() -> std::time::Duration {
-    let base = watchdog_common::pick_poll_cadence();
-    if std::env::var_os("MAOS_REVOCATION_FAST").is_some() {
+    pick_poll_cadence_from_flags(
+        std::env::var_os("MAOS_REVOCATION_FAST").is_some(),
+        std::env::var_os("MAOS_SUPERVISION_FAST").is_some(),
+    )
+}
+
+fn pick_poll_cadence_from_flags(
+    revocation_fast: bool,
+    supervision_fast: bool,
+) -> std::time::Duration {
+    if revocation_fast {
+        std::time::Duration::from_millis(100)
+    } else if supervision_fast {
         std::time::Duration::from_millis(100)
     } else {
-        base
+        std::time::Duration::from_secs(1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_poll_cadence_from_flags;
+    use std::time::Duration;
+
+    #[test]
+    fn cadence_precedence_is_revocation_then_supervision_then_default() {
+        assert_eq!(
+            pick_poll_cadence_from_flags(true, true),
+            Duration::from_millis(100)
+        );
+        assert_eq!(
+            pick_poll_cadence_from_flags(true, false),
+            Duration::from_millis(100)
+        );
+        assert_eq!(
+            pick_poll_cadence_from_flags(false, true),
+            Duration::from_millis(100)
+        );
+        assert_eq!(
+            pick_poll_cadence_from_flags(false, false),
+            Duration::from_secs(1)
+        );
     }
 }

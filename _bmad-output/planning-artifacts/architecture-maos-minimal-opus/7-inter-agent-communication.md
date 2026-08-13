@@ -35,6 +35,8 @@ Each `kind` selects a Tokio channel class, cardinality, and backpressure policy.
 | `telemetry.event` | `broadcast` | 1:N (Spirit → subscribers) | 256 | **Drop oldest** (broadcast lag tolerated; not audit-critical) |
 | `consent.request` | `mpsc` | 1:1 (Spirit → Director) | 32 | Backpressure |
 | `retract` | `mpsc` | 1:1 (sender → recipient) | 32 | Backpressure |
+| `budget.warning` | `mpsc` | 1:1 (kernel → invoking Spirit) | 32 | Backpressure; typed 80%-budget signal |
+| `budget.exceeded` | `mpsc` | 1:1 (kernel → invoking Spirit) | 32 | Backpressure; typed terminal-budget signal |
 
 ### 7.1.2 Backpressure hook points (Spirit Scheduler integration)
 

@@ -114,8 +114,8 @@ fn corpus_covers_all_frame_kinds() {
     let kinds = wit_ast::frame_kinds();
     assert_eq!(
         kinds.len(),
-        15,
-        "must cover all 15 FrameKind discriminants from the parsed .wit AST, got {kinds:?}"
+        17,
+        "must cover all 17 FrameKind discriminants from the parsed .wit AST, got {kinds:?}"
     );
 }
 
@@ -145,8 +145,8 @@ fn corpus_covers_all_payload_variants() {
     let variants = wit_ast::payload_variants();
     assert_eq!(
         variants.len(),
-        9,
-        "must cover all 9 FramePayload variant arms from the parsed .wit AST, got {variants:?}"
+        11,
+        "must cover all 11 FramePayload variant arms from the parsed .wit AST, got {variants:?}"
     );
 }
 
@@ -155,8 +155,8 @@ fn corpus_covers_all_record_types() {
     let records = wit_ast::record_names();
     assert_eq!(
         records.len(),
-        15,
-        "must cover all 15 record types from the parsed .wit AST, got {records:?}"
+        16,
+        "must cover all 16 record types from the parsed .wit AST, got {records:?}"
     );
     // Every field is also mechanically counted — adding a field to any
     // record without updating this list of expectations trips a test.
@@ -175,6 +175,7 @@ fn corpus_covers_all_record_types() {
         ("rupture-rejection", 2),
         ("consent-rupture-body", 6),
         ("rate-limited-body", 7),
+        ("budget-envelope", 4),
         ("iac-frame", 8),
     ];
     for (name, expected) in expected_field_counts {

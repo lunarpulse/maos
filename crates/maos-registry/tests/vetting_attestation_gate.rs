@@ -143,12 +143,12 @@ fn revoke_attestation_in(kr: &mut VetterKeyring, pkg: &SignedPackage, effective_
         None,
     )
     .unwrap()];
-    let entries_bytes = serde_json::to_vec(&entries).unwrap();
+    let entries_bytes = maos_domain::revocation::canonical_entries_bytes(&entries).unwrap();
     let operator = Ed25519KeyPair::from_seed_unchecked(&OP_SEED).unwrap();
     let signature = operator.sign(&entries_bytes).as_ref().try_into().unwrap();
     kr.push_attestation_revocation(
         SignedRevocationList::new(
-            CrlId([0xA5; 32]),
+            CrlId::from_entries(&entries).unwrap(),
             1,
             effective_at * 1_000_000,
             RevocationOrigin::Operator,

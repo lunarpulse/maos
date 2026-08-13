@@ -50,6 +50,13 @@ pub enum FrameKind {
     /// Kernel-internal audit kind: inference call.
     InferenceCall = 9,
 
+    /// Lifecycle hook crossed 80% of its declared execution budget.  This is
+    /// a targeted kernel-to-invoking-Spirit MPSC event, not merely an audit row.
+    BudgetWarning = 12,
+    /// Lifecycle hook exceeded its declared execution budget.  Like the
+    /// warning, this is delivered to the invoking Spirit and logged first.
+    BudgetExceeded = 13,
+
     /// Story 6.2 AC6 — FR52: a line of stdout/stderr captured from a
     /// CliWrapperSpirit's invoked CLI subprocess. Payload shape:
     /// `{ cli_binary_path, invoking_spirit_id, output_stream: "stdout"|"stderr",
@@ -101,7 +108,8 @@ impl FrameKind {
             6 => Some(Self::Retract),
             7 => Some(Self::CapabilityInvocation),
             8 => Some(Self::SandboxBlock),
-            9 => Some(Self::InferenceCall),
+            12 => Some(Self::BudgetWarning),
+            13 => Some(Self::BudgetExceeded),
             21 => Some(Self::CliSubprocessOutput),
             22 => Some(Self::ConsentRupture),
             23 => Some(Self::RateLimited),

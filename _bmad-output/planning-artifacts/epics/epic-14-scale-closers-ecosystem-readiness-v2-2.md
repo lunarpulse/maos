@@ -57,7 +57,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 3. Floors **UNCHANGED** from 11.3, all **derived per-event** not asserted: detection ≤1h median, blast-radius ≤5 peers, recovery ≤24h, RTO 4h-breach. **The teeth are the falsifiers, not the clean pass** (11.3 L5).
 4. Real planted adversarial hosts (per-class: pin-spoof, cert-rotation-race, consent-bypass) at N=100; the 10–20% turnover/wk × 4wk churn profile driven from real evictions/re-dials.
 5. `check-scale-churn` gains a **new N=100 leg/param** (not a rewrite): blind-one-detector proven-red on **REAL** events (the 11.3 rework lesson — derived-but-loopback-trivial is still vacuous; falsifiers must bite on real evictions/reconvergence at scale); per-leg independence; live at N=100.
-6. ZERO kernel-Δ @23679 (resolves to `xtask/kernel-core-baseline.toml`; machine-checked by `check-epic-close-coherence`) (bench/test-infra); `churn-fault-inject` compiled-**OUT** of the release tree (11.3 discipline); the N=100 live leg is **advisory-substrate-gated** where CI cannot host 100 instances (E11 retro A2), never silent-green; NFR-Scale-1 30-day soak + geo hosts remain **release-gate artifacts, evicted from the AC set**.
+6. ZERO kernel-Δ @24472 (resolves to `xtask/kernel-core-baseline.toml`; machine-checked by `check-epic-close-coherence`) (bench/test-infra); `churn-fault-inject` compiled-**OUT** of the release tree (11.3 discipline); the N=100 live leg is **advisory-substrate-gated** where CI cannot host 100 instances (E11 retro A2), never silent-green; NFR-Scale-1 30-day soak + geo hosts remain **release-gate artifacts, evicted from the AC set**.
 
 **14.2 — 10-host mTLS rotation chaos** (NFR-Sec-13 v2.0 half)
 1. Scale the ratified `rotation.rs` floors (10.4b/10.5 3-host drill) to **10 hosts** with real timestamps — floors stay **as strict as the ratified `rotation.rs`**, never relaxed to looser story numbers (the 10.5 AC6 regression-trap lesson).
@@ -108,7 +108,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 3. **Generalize the gate to scan ALL workspace crates** (rename so the name is workspace-true — the churn 12.6 deliberately deferred), preserving 12.6's **read-shape detection** (`env::var`/`var_os` literal + helper-indirected literal + `any_env_with_prefix` prefix-guard); NOT a blanket "any `MAOS_` literal" rule (the 12.6 false-positive lesson: writes/`.env()` child-env/prefix literals must stay invisible).
 4. **Per-crate proven-red** — an unregistered read in ANY crate reds its crate's leg (the workspace-scale guard against greening 47 at once — the vacuous-green 12.6 killed); per-crate independence.
 5. Enroll **advisory-first** (WOULD-HAVE-BLOCKED banner) — blocking is flipped in 14.8 once the surface is registered, so the generalized gate never lands red-by-construction.
-6. ZERO kernel-Δ @23679 — the gate is a **static scan** and a `maos-domain` registry needs **no `maos-kernel-core` source edit**; FLAG-Winston only if placement genuinely surfaces a kernel-crate-set seam.
+6. ZERO kernel-Δ @24472 — the gate is a **static scan** and a `maos-domain` registry needs **no `maos-kernel-core` source edit**; FLAG-Winston only if placement genuinely surfaces a kernel-crate-set seam.
 
 **14.8 — Register + classify the full workspace env surface**
 1. Register the **~43 non-secret `MAOS_*` reads across the 15 crates** (preflight-scanned: maos-audit, maos-cli, maos-domain, maos-eval, **maos-kernel-core** ~18, maos-registry, maos-siem, maos-shell, maos-bench, maos-providers, maos-a2a-tcp, maos-loom-lite, maos-spirit-cli, …) — kernel-core entries land in the shared registry with **NO kernel source edit**.
@@ -116,7 +116,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 3. **Flag the `HarnessOnly`-in-production smell** (e.g. `MAOS_AUTO_REVERT_FAST` read in `hot_swap/post_swap_monitor.rs` production `src/`, `IDLE_FAST`/`SCHEDULE_FAST`/`REVOCATION_FAST` in watchdogs) as a documented finding — not a silent pass, not a kernel edit in this story.
 4. **Flip the workspace gate to BLOCKING**; wire into the ship aggregate (`gate-registry.toml` + `discipline.yml` + `check-ship-gate-completeness`), scope-honest message now genuinely workspace-wide.
 5. Per-crate proven-red still bites after the flip (a fresh unregistered read in any crate reds).
-6. ZERO kernel-Δ @23679 (registry metadata + xtask only).
+6. ZERO kernel-Δ @24472 (registry metadata + xtask only).
 
 **14.9 — Secret-var governance + provider keys** (§A6 security-sensitive)
 1. Add a third **`EnvStability::Secret`** variant to the shared enum.
@@ -124,7 +124,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 3. The registry stores **name + purpose + `Secret` stability, NEVER the value** (declaring the name is safe; storing the value is the leak).
 4. Gate: `Secret`-classified vars are **never logged, echoed, or serialized** (a proven-red asserting a planted secret-echo reds); provider keys governed under the same rule.
 5. Demo/verification-anchored: the gate reds on a planted `Secret`-value leak and greens when it is redacted.
-6. ZERO kernel-Δ @23679 (enum variant + registry + xtask).
+6. ZERO kernel-Δ @24472 (enum variant + registry + xtask).
 
 ---
 
@@ -137,7 +137,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 - **`check-env-contract` (workspace leg, 14.7→14.9)** — read-shape detection not blanket-literal (12.6 false-positive lesson); **per-crate proven-red** (never green 47 at once — the workspace-scale vacuous-green guard); advisory at 14.7 → **blocking** at 14.8; **`Secret`-vars never logged/echoed/serialized** (14.9); static-scan ⇒ ZERO kernel-Δ even for kernel-core reads.
 
 ## Kernel-delta budget
-Baseline **23679** — resolved from `xtask/kernel-core-baseline.toml` (`src_lines`), the single source of truth, and machine-checked by `check-epic-close-coherence` (Epic-13 retro C1): an OPEN epic citing any other value REDS. The previous header carried **23141** with a 2026-07-16 note saying "repin to 23202 at preflight" — *both* were stale, which is why this line is now derived rather than restated. **ZERO expected across all 10** — 14.1 bench/test-infra; 14.2 `rotation.rs` out-of-kernel (`maos-a2a-tcp`); 14.3 xtask + `maos-fkcs` + `maos-eval` infra; 14.4 orchestration + channel adapter + packaging (out-of-kernel); 14.5 secret backends + inference drivers behind traits (FR47/ADR-005 keep vendor SDKs out of the kernel); 14.6 the ceiling **instrument** measures the kernel, it does not change it; **14.7–14.9 the env contract is a STATIC SCAN + a shared registry in `maos-domain` (a kernel-core dependency), so kernel-core's env-var names register with NO `maos-kernel-core` source edit** (FLAG-Winston only if a leaf-crate placement surfaces a kernel-crate-set seam — the 14.6 interaction). **Note (14.6):** ADR-041 Phase-3/4 extraction (kernel-core → port-trait crates) *reduces* kernel-core toward the measured-honest ~11.2K target — a **downward** move under the retro-residual discipline, recorded per-extraction in HISTORY. No upward FLAG-Winston seam anticipated; churn outside a named surface is RED.
+Baseline **24472** — resolved from `xtask/kernel-core-baseline.toml` (`src_lines`), the single source of truth, and machine-checked by `check-epic-close-coherence` (Epic-13 retro C1): an OPEN epic citing any other value REDS. The previous header carried **23141** with a 2026-07-16 note saying "repin to 23202 at preflight" — *both* were stale, which is why this line is now derived rather than restated. **ZERO expected across all 10** — 14.1 bench/test-infra; 14.2 `rotation.rs` out-of-kernel (`maos-a2a-tcp`); 14.3 xtask + `maos-fkcs` + `maos-eval` infra; 14.4 orchestration + channel adapter + packaging (out-of-kernel); 14.5 secret backends + inference drivers behind traits (FR47/ADR-005 keep vendor SDKs out of the kernel); 14.6 the ceiling **instrument** measures kernel change but does not add kernel source; 14.7–14.9 registry + static-scan/governance live out-of-kernel.
 
 ## Cut / deferred (not Epic 14)
 - **Genuine external actors** — 3 external-authored FKCS Spirits, external N=12 trial cohort, accredited external vetters (NFR-Comp-2) → **v2.5, non-gating** (14.3 reserves the structure + ledgers them).

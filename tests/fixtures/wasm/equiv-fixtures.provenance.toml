@@ -1,6 +1,6 @@
-# Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
+# WASM component fixture provenance / drift guard.
 #
-# Each committed equiv-*.wasm fixture is pinned to BOTH its binary hash and the
+# Each committed component fixture below is pinned to BOTH its binary hash and the
 # hash of the source inputs that produced it. `cargo run -p xtask --
 # check-equiv-fixture-provenance` recomputes both from the live tree and FAILS
 # on any mismatch:
@@ -16,34 +16,47 @@
 # sync guard that runs in the check-wasm-form-equiv CI job.
 
 [[fixture]]
+component = "echo_spirit_component.wasm"
+wasm_sha256 = "1ab9c5b8e019ff64988152c3b7b9fddd2408d2e3c2300919931ad3a407f00c2f"
+source_sha256 = "9ab91c1f15b73a73fc7ab9a232220cfeaed685a8b2d2588f54eb21a2e55ec8df"
+source = [
+    "crates/maos-wasm-host/guests/echo-spirit/Cargo.toml",
+    "crates/maos-wasm-host/guests/echo-spirit/src/lib.rs",
+    "wit/spirit.wit",
+]
+
+[[fixture]]
 component = "equiv_identity_spirit_component.wasm"
-wasm_sha256 = "4f6789a0860a07d1833026b1a497b40ae68b115678d03ffd2b5340f7d34741fa"
-source_sha256 = "ade9e0093ca6ddd4f7e9695768f734690ec66de7a5b0617ee3a7352722d62af4"
+wasm_sha256 = "7a5a46d895689e99094d1b59c16223ae4252cc4325472bf67b85b72af88fae5f"
+source_sha256 = "c358af8481abe23721a4f7860d28fd3de355338853d22fb03803af9490c104c1"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
     "crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/src/lib.rs",
+    "wit/spirit.wit",
 ]
 
 [[fixture]]
 component = "equiv_divergent_spirit_component.wasm"
-wasm_sha256 = "659ed858f321675ccce8dd4c0e2fb614e7281b2836046d2a6461505c4d3703fc"
-source_sha256 = "0622d463446ca0e6a777af4b4beba11e496a6fead0eb10e32bf875cb41d85fd4"
+wasm_sha256 = "eafcc329d8961f0a9627d9ecde4ba206f15984f7a356409974234ec8b1de5c11"
+source_sha256 = "7d8792dc776d48164404547b660db7b4e49d91e0b5e6baf6898136ab948050c0"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/src/lib.rs",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
+    "wit/spirit.wit",
 ]
 
 [[fixture]]
 component = "equiv_cosmetic_spirit_component.wasm"
-wasm_sha256 = "405463de3a1fe17e6f0cf78f41cd1ee3d5ef7449a099cac605ae9267dd98da11"
-source_sha256 = "6ca8eee478850c7d6fe81e45bf84ec1168a2e04d75661ca88e7ee6615662d099"
+wasm_sha256 = "6eba896d5a5df3824d64fcbd1658442b9aec639fb56d1606378858846e2a4ac7"
+source_sha256 = "685ae4a38dde3171d9122127bae70bfb527b9a4a48f218f1db7c5408f947616a"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/src/lib.rs",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
+    "wit/spirit.wit",
 ]

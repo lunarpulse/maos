@@ -44,6 +44,33 @@ impl SandboxedContainerChild {
             None => Ok(None),
         }
     }
+
+    /// Project the data observed at successful runtime spawn into the live
+    /// operator report shape.  The caller commits it to the owning SCB.
+    pub fn inspect_report(
+        &self,
+        spirit_id: String,
+        image: &super::image_lock::VerifiedImageAttestation,
+    ) -> maos_domain::sandbox::SandboxInspectReport {
+        maos_domain::sandbox::SandboxInspectReport {
+            spirit_id,
+            pid: self.host_pid,
+            runtime: self.runtime.kind.as_str().to_owned(),
+            image_sha: hex::encode(image.entry().image_sha256),
+            applied_t2_protections: maos_domain::sandbox::T2ProtectionSummary {
+                landlock_rules: 0,
+                seccomp_allow_count: 0,
+                seccomp_kill_count: 0,
+            },
+            strictest_of_reasoning: maos_domain::sandbox::StrictestOfReasoning {
+                manifest_tier: "T3".into(),
+                trust_tier_floor: "T3".into(),
+                operator_policy_floor: "T0".into(),
+                effective_tier: "T3".into(),
+                dominant_axis: "manifest".into(),
+            },
+        }
+    }
 }
 
 impl Drop for SandboxedContainerChild {

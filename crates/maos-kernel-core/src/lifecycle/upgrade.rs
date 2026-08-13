@@ -17,11 +17,32 @@ use crate::halt::terminate_spirit;
 use crate::hot_swap::HotSwapCoordinator;
 use crate::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use crate::journal::JournalAdapter;
-use crate::scheduler::control_block::SpiritManifestBundle;
+use crate::scheduler::control_block::{AnySpiritObj, SpiritManifestBundle};
 use crate::scheduler::SpiritSchedulerAdapter;
 use crate::security::manifest::{ClassSection, GatewaysSection};
 use crate::telemetry::iac_rt::{IacRtMetrics, Outcome, Service};
 use maos_domain::invariants::i3::FrameOrigin;
+
+/// Creates a new executable successor for a parsed manifest. Upgrade policy
+/// code never receives or reuses the predecessor's object.
+pub trait SuccessorSpiritFactory: Send + Sync {
+    fn create(
+        &self,
+        manifest: &SpiritManifestBundle,
+    ) -> Result<Arc<dyn AnySpiritObj>, UpgradeError>;
+}
+
+impl<F> SuccessorSpiritFactory for F
+where
+    F: Fn(&SpiritManifestBundle) -> Result<Arc<dyn AnySpiritObj>, UpgradeError> + Send + Sync,
+{
+    fn create(
+        &self,
+        manifest: &SpiritManifestBundle,
+    ) -> Result<Arc<dyn AnySpiritObj>, UpgradeError> {
+        self(manifest)
+    }
+}
 
 #[maos_attrs::i9_exempt(reason = "upgrade orchestrator composite; holds exempt adapter Arcs")]
 pub struct UpgradeOrchestrator {
@@ -30,6 +51,7 @@ pub struct UpgradeOrchestrator {
     tl: Arc<TransparencyLogAdapter>,
     journal: Arc<JournalAdapter>,
     telemetry: Arc<IacRtMetrics>,
+    successor_factory: Arc<dyn SuccessorSpiritFactory>,
 }
 
 impl UpgradeOrchestrator {
@@ -39,6 +61,7 @@ impl UpgradeOrchestrator {
         tl: Arc<TransparencyLogAdapter>,
         journal: Arc<JournalAdapter>,
         telemetry: Arc<IacRtMetrics>,
+        successor_factory: Arc<dyn SuccessorSpiritFactory>,
     ) -> Self {
         Self {
             scheduler,
@@ -46,6 +69,7 @@ impl UpgradeOrchestrator {
             tl,
             journal,
             telemetry,
+            successor_factory,
         }
     }
 
@@ -83,24 +107,27 @@ impl UpgradeOrchestrator {
                     spirit_id: spirit_id.into(),
                 })?;
 
-        // 3. Capture predecessor version + spirit_obj under a single read lock
-        let (predecessor_version, successor_spirit_obj) = {
-            let scbs = self.scheduler.scbs();
-            let map = scbs.read().expect("spirits lock poisoned");
-            let scb = map
-                .get(&predecessor_pid)
-                .ok_or_else(|| UpgradeError::NotLoaded {
-                    spirit_id: spirit_id.into(),
-                })?;
-            let version = scb
-                .manifest
-                .class
-                .as_ref()
-                .map(|c| c.version.clone())
-                .unwrap_or_else(|| "unknown".into());
-            let obj = Arc::clone(&scb.spirit_obj);
-            (version, obj)
-        };
+        // 3. Resolve predecessor metadata and construct a fresh successor
+        // before any policy mutates the predecessor.
+        let (predecessor_version, predecessor_scb, predecessor_state) =
+            {
+                let scbs = self.scheduler.scbs();
+                let map = scbs.read().expect("spirits lock poisoned");
+                let scb = Arc::clone(map.get(&predecessor_pid).ok_or_else(|| {
+                    UpgradeError::NotLoaded {
+                        spirit_id: spirit_id.into(),
+                    }
+                })?);
+                let runtime = scb.runtime_snapshot();
+                let version = runtime
+                    .manifest
+                    .class
+                    .as_ref()
+                    .map(|c| c.version.clone())
+                    .unwrap_or_else(|| "unknown".into());
+                (version, scb.clone(), scb.current_state())
+            };
+        let successor_spirit_obj = self.successor_factory.create(&successor_manifest)?;
 
         let successor_version = successor_manifest
             .class
@@ -134,12 +161,17 @@ impl UpgradeOrchestrator {
             }
             UpgradePolicy::ColdSwap => {
                 let unload_start_ns = monotonic_now_ns();
-                self.scheduler
-                    .unload(predecessor_pid)
-                    .await
-                    .map_err(|e| UpgradeError::Lifecycle(e))?;
+                if let Err(error) = self.scheduler.unload(predecessor_pid).await {
+                    // Unload can transition before a hook fails. Restore the
+                    // predecessor's lifecycle state on its still-stable Arc.
+                    predecessor_scb.state.store(
+                        predecessor_state as u8,
+                        std::sync::atomic::Ordering::Release,
+                    );
+                    return Err(UpgradeError::Lifecycle(error));
+                }
 
-                // Count receipts in the unload window
+                // Count receipts in the unload window.
                 let entries = self
                     .tl
                     .query_frames(FrameFilter {
@@ -151,26 +183,30 @@ impl UpgradeOrchestrator {
                     .unwrap_or_default();
                 halt_receipts_produced = entries.len();
 
-                // v0.3-β: manual SCB insertion. scheduler.load() requires T: Spirit
-                // (concrete type), but we only have Arc<dyn AnySpiritObj> from the
-                // predecessor's SCB. The scheduler's load path (security admission,
-                // on_load hooks, Load journaling) is bypassed — the successor is
-                // admitted via the predecessor's prior admission. Production
-                // cold-swap admission arrives at Story 5.5x with subprocess wire
-                // protocol.
                 let boot_nonce = 0u64;
                 let new_pid = crate::scheduler::scheduler_loop::allocate_pid();
                 let new_scb = Arc::new(crate::scheduler::control_block::SpiritControlBlock::new(
                     new_pid,
                     spirit_id.into(),
                     successor_manifest,
-                    Arc::clone(&successor_spirit_obj),
+                    successor_spirit_obj,
                     boot_nonce,
                 ));
                 {
                     let scbs = self.scheduler.scbs();
                     let mut map = scbs.write().expect("spirits lock poisoned");
                     map.insert(new_pid, new_scb);
+                }
+                if let Err(error) = self.scheduler.start(new_pid).await {
+                    let scbs = self.scheduler.scbs();
+                    let mut map = scbs.write().expect("spirits lock poisoned");
+                    map.remove(&new_pid);
+                    predecessor_scb.state.store(
+                        predecessor_state as u8,
+                        std::sync::atomic::Ordering::Release,
+                    );
+                    map.insert(predecessor_pid, Arc::clone(&predecessor_scb));
+                    return Err(UpgradeError::Lifecycle(error));
                 }
             }
             UpgradePolicy::Migrator => {
@@ -328,6 +364,8 @@ pub enum UpgradeError {
     ManifestNotFound { path: String },
     #[error("manifest at '{path}' parse failed: {reason}")]
     ManifestParse { path: String, reason: String },
+    #[error("successor factory failed: {reason}")]
+    SuccessorFactory { reason: String },
     #[error("--policy migrator requested but successor manifest does not declare [migrates_from]")]
     MigratorNotDeclared,
     #[error("hot-swap coordinator error: {0}")]
@@ -337,8 +375,7 @@ pub enum UpgradeError {
 }
 
 /// Load a `SpiritManifestBundle` from a TOML file path.
-/// v0.3-β minimal implementation — reads file, extracts known sections.
-fn load_bundle_from_file(
+pub(crate) fn load_bundle_from_file(
     path: &Path,
 ) -> Result<SpiritManifestBundle, crate::security::manifest::ManifestError> {
     use crate::security::manifest::*;

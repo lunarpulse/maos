@@ -80,6 +80,7 @@ impl ProgressWatchdog {
             }
 
             let progress_threshold_ms = scb
+                .runtime_snapshot()
                 .manifest
                 .supervision
                 .as_ref()
@@ -119,18 +120,18 @@ impl ProgressWatchdog {
                         "first_in_flight_task_id": first_task.as_ref().map(|t| t.task_id.clone()).unwrap_or_default(),
                         "originator_spirit_id": first_task.as_ref().map(|t| t.originator_spirit_id.clone()).unwrap_or_default(),
                     });
-
-                    self.tl.insert_frame_event(
-                        FrameKind::TaskStalled,
-                        scb.pid,
-                        None,
-                        "task.stalled",
-                        &serde_json::to_vec(&payload).unwrap_or_default(),
-                        maos_domain::invariants::i3::FrameOrigin::Kernel,
-                    );
-
-                    self.telemetry
-                        .record_iac_rt(Service::SpiritScheduler, Outcome::Ok, 0);
+                    if let Ok(payload_bytes) = serde_json::to_vec(&payload) {
+                        self.tl.insert_frame_event(
+                            FrameKind::TaskStalled,
+                            scb.pid,
+                            None,
+                            "task.stalled",
+                            &payload_bytes,
+                            maos_domain::invariants::i3::FrameOrigin::Kernel,
+                        );
+                        self.telemetry
+                            .record_iac_rt(Service::SpiritScheduler, Outcome::Ok, 0);
+                    }
                 }
             }
         }

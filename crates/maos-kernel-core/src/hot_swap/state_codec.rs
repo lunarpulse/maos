@@ -33,6 +33,7 @@ pub enum StateCodecError {
     CborDecode(String),
     CborEncode(String),
     SchemaVersionMismatch { expected: u32, actual: u32 },
+    InvalidExpectedSchemaVersion { expected: u32 },
 }
 
 impl std::fmt::Display for StateCodecError {
@@ -41,6 +42,9 @@ impl std::fmt::Display for StateCodecError {
             Self::EmptyBlob => write!(f, "empty CBOR blob"),
             Self::CborDecode(msg) => write!(f, "CBOR decode error: {msg}"),
             Self::CborEncode(msg) => write!(f, "CBOR encode error: {msg}"),
+            Self::InvalidExpectedSchemaVersion { expected } => {
+                write!(f, "expected schema version must be > 0, got {expected}")
+            }
             Self::SchemaVersionMismatch { expected, actual } => {
                 write!(
                     f,
@@ -56,9 +60,9 @@ impl std::error::Error for StateCodecError {}
 /// Encodes a Spirit's `snapshot()` output into a CBOR envelope.
 pub fn encode(predecessor_state: &[u8], schema_version: u32) -> Result<Vec<u8>, StateCodecError> {
     if schema_version == 0 {
-        return Err(StateCodecError::CborEncode(
-            "schema_version must be > 0".into(),
-        ));
+        return Err(StateCodecError::InvalidExpectedSchemaVersion {
+            expected: schema_version,
+        });
     }
 
     // Encode payload as hex string to avoid serde_json array-of-integers
@@ -84,6 +88,12 @@ pub fn encode(predecessor_state: &[u8], schema_version: u32) -> Result<Vec<u8>, 
 /// - If the major version differs, this is a cross-major swap and the
 ///   caller must invoke the migrator path.
 pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope, StateCodecError> {
+    if expected_schema_version == 0 {
+        return Err(StateCodecError::InvalidExpectedSchemaVersion {
+            expected: expected_schema_version,
+        });
+    }
+
     if blob.is_empty() {
         return Err(StateCodecError::EmptyBlob);
     }
@@ -128,36 +138,41 @@ pub fn decode(blob: &[u8], expected_schema_version: u32) -> Result<StateEnvelope
         envelope_version,
     };
 
-    // Reject zero on either side symmetrically with encode.
-    if expected_schema_version == 0 || envelope.schema_version == 0 {
+    validate_logical_envelope(envelope, expected_schema_version)
+}
+
+/// Validate an in-process logical envelope. Serialization remains at archive
+/// and subprocess boundaries; hot-swap carries this logical value directly.
+pub fn validate_logical_envelope(
+    envelope: StateEnvelope,
+    expected_schema_version: u32,
+) -> Result<StateEnvelope, StateCodecError> {
+    if expected_schema_version == 0 {
+        return Err(StateCodecError::InvalidExpectedSchemaVersion {
+            expected: expected_schema_version,
+        });
+    }
+    if envelope.schema_version == 0 {
         return Err(StateCodecError::SchemaVersionMismatch {
             expected: expected_schema_version,
             actual: envelope.schema_version,
         });
     }
-
-    // Forward-compat: envelope schema_version must be >= predecessor declared version.
-    // (Only enforced for same-major; cross-major always goes through migrator.)
-    let pred_major = envelope.schema_version >> 16;
-    let succ_major = expected_schema_version >> 16;
-
-    if pred_major == succ_major {
+    let predecessor_major = envelope.schema_version >> 16;
+    let successor_major = expected_schema_version >> 16;
+    if predecessor_major == successor_major {
         if envelope.schema_version < expected_schema_version {
             return Err(StateCodecError::SchemaVersionMismatch {
                 expected: expected_schema_version,
                 actual: envelope.schema_version,
             });
         }
-    } else {
-        // Cross-major: the coordinator will invoke the migrator path.
-        if pred_major.abs_diff(succ_major) >= 2 {
-            return Err(StateCodecError::SchemaVersionMismatch {
-                expected: expected_schema_version,
-                actual: envelope.schema_version,
-            });
-        }
+    } else if predecessor_major.abs_diff(successor_major) >= 2 {
+        return Err(StateCodecError::SchemaVersionMismatch {
+            expected: expected_schema_version,
+            actual: envelope.schema_version,
+        });
     }
-
     Ok(envelope)
 }
 
@@ -214,6 +229,28 @@ mod tests {
     fn decode_rejects_empty_blob() {
         let result = decode(&[], 1);
         assert!(matches!(result, Err(StateCodecError::EmptyBlob)));
+    }
+
+    #[test]
+    fn decode_rejects_invalid_expected_schema_version_distinctly() {
+        let encoded = encode(b"state", 1).unwrap();
+        assert_eq!(
+            decode(&encoded, 0),
+            Err(StateCodecError::InvalidExpectedSchemaVersion { expected: 0 })
+        );
+    }
+
+    #[test]
+    fn logical_envelope_preserves_the_spirit_payload_without_a_codec_roundtrip() {
+        let payload = vec![0x00, 0xff, 0x81, 0x42];
+        let envelope = StateEnvelope {
+            schema_version: 0x0001_0002,
+            payload: payload.clone(),
+            envelope_version: 1,
+        };
+
+        let validated = validate_logical_envelope(envelope, 0x0001_0001).unwrap();
+        assert_eq!(validated.payload, payload);
     }
 
     #[test]

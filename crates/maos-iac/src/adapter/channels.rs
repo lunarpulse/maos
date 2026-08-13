@@ -28,6 +28,10 @@ pub const CHANNEL_CLASSES: &[(FrameKind, ChannelClass, usize)] = &[
     (FrameKind::TelemetryEvent, ChannelClass::Broadcast, 256),
     (FrameKind::ConsentRequest, ChannelClass::Mpsc, 32),
     (FrameKind::Retract, ChannelClass::Mpsc, 32),
+    // Story 5.1 — lifecycle budget signals are targeted to the invoking
+    // Spirit; warning and terminal events share a bounded MPSC-32 mailbox.
+    (FrameKind::BudgetWarning, ChannelClass::Mpsc, 32),
+    (FrameKind::BudgetExceeded, ChannelClass::Mpsc, 32),
     // Story 6.4 — ADR-034 binding-v0.9: partial-consent failure event.
     // §7.1.1 cardinality matches `consent.request` (1:1 sender ← bus).
     (FrameKind::ConsentRupture, ChannelClass::Mpsc, 32),
@@ -73,6 +77,8 @@ mod tests {
             (FrameKind::TelemetryEvent, ChannelClass::Broadcast, 256),
             (FrameKind::ConsentRequest, ChannelClass::Mpsc, 32),
             (FrameKind::Retract, ChannelClass::Mpsc, 32),
+            (FrameKind::BudgetWarning, ChannelClass::Mpsc, 32),
+            (FrameKind::BudgetExceeded, ChannelClass::Mpsc, 32),
             (FrameKind::ConsentRupture, ChannelClass::Mpsc, 32),
             (FrameKind::RateLimited, ChannelClass::Mpsc, 32),
             (FrameKind::GatewayInbound, ChannelClass::Mpsc, 64),

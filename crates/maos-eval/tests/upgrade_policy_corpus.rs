@@ -84,3 +84,39 @@ fn upgrade_policy_corpus_category_distribution_is_uniform() {
         assert_eq!(count, 5, "each category must have exactly 5 scenarios");
     }
 }
+
+fn parse_class(
+    manifest: &str,
+) -> Result<maos_kernel_core::security::manifest::ClassSection, String> {
+    let root: toml::Value = toml::from_str(manifest).map_err(|error| error.to_string())?;
+    let class = root
+        .get("class")
+        .ok_or_else(|| "manifest is missing [class]".to_string())?;
+    maos_kernel_core::security::manifest::ClassSection::from_toml_str(
+        &toml::to_string(class).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())
+}
+
+/// Every scenario supplies parsable predecessor/successor manifests. The
+/// kernel integration suite executes policy transitions; this corpus gate
+/// proves those paths have real, readable inputs rather than dangling names.
+#[test]
+fn upgrade_policy_corpus_opens_and_parses_every_manifest_pair() {
+    let corpus = UpgradePolicyCorpus::load_from(Path::new("fixtures/upgrade-policy-corpus-v0/"))
+        .expect("upgrade policy corpus");
+    for (scenario, predecessor, successor) in corpus.read_assets().expect("corpus assets") {
+        let predecessor = parse_class(&predecessor);
+        let successor = parse_class(&successor);
+        assert!(
+            predecessor.is_ok(),
+            "{} predecessor manifest must parse",
+            scenario.scenario_id
+        );
+        assert!(
+            successor.is_ok(),
+            "{} successor manifest must parse",
+            scenario.scenario_id
+        );
+    }
+}

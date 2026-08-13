@@ -1653,23 +1653,99 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
                 eprintln!("maos: spirit inspect requires --sandbox at v0.3-β; full inspect surface arrives at Story 9.x");
                 return ExitCode::SUCCESS;
             }
-            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
-                eprintln!("maos: {diag}");
-                return ExitCode::from(2);
+            match fetch_live_sandbox_report(spirit) {
+                Ok(report) => {
+                    println!("{report}");
+                    ExitCode::SUCCESS
+                }
+                Err(SandboxInspectHttpError::Unauthorized) => {
+                    eprintln!("maosctl: sandbox inspect unauthorized (operator bearer rejected)");
+                    ExitCode::from(4)
+                }
+                Err(SandboxInspectHttpError::NotFound) => {
+                    eprintln!("maosctl: sandbox report not found for Spirit '{spirit}'");
+                    ExitCode::from(5)
+                }
+                Err(error) => {
+                    eprintln!("maosctl: sandbox inspect failed: {error}");
+                    ExitCode::from(1)
+                }
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "spirit-inspect");
-            cmd.env("MAOS_SPIRIT_ID", spirit);
-            cmd.env("MAOS_INSPECT_SANDBOX", "1");
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-
-            exec_and_forward(&mut cmd, &bin)
         }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum SandboxInspectHttpError {
+    #[error("MAOS_OPERATOR_HTTP_ENDPOINT is required for --sandbox")]
+    EndpointMissing,
+    #[error("MAOS_OPERATOR_BEARER_TOKEN is required for --sandbox")]
+    TokenMissing,
+    #[error("operator endpoint must be http://<loopback-host>:<port>")]
+    InvalidEndpoint,
+    #[error("operator HTTP I/O: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("malformed HTTP response")]
+    MalformedResponse,
+    #[error("operator returned HTTP {0}")]
+    UnexpectedStatus(u16),
+    #[error("unauthorized")]
+    Unauthorized,
+    #[error("not found")]
+    NotFound,
+}
+
+/// Fetch a sandbox report from the already-running daemon.  This intentionally
+/// has no one-shot process fallback: a fresh process has no live SCB state.
+fn fetch_live_sandbox_report(spirit_id: &str) -> Result<String, SandboxInspectHttpError> {
+    if spirit_id.is_empty()
+        || !spirit_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err(SandboxInspectHttpError::InvalidEndpoint);
+    }
+    let endpoint = std::env::var("MAOS_OPERATOR_HTTP_ENDPOINT")
+        .map_err(|_| SandboxInspectHttpError::EndpointMissing)?;
+    let token = std::env::var("MAOS_OPERATOR_BEARER_TOKEN")
+        .map_err(|_| SandboxInspectHttpError::TokenMissing)?;
+    if token.is_empty() {
+        return Err(SandboxInspectHttpError::TokenMissing);
+    }
+    let address = endpoint
+        .strip_prefix("http://")
+        .unwrap_or(&endpoint)
+        .parse::<std::net::SocketAddr>()
+        .map_err(|_| SandboxInspectHttpError::InvalidEndpoint)?;
+    if !address.ip().is_loopback() {
+        return Err(SandboxInspectHttpError::InvalidEndpoint);
+    }
+    let mut stream =
+        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(2))?;
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
+    use std::io::{Read, Write};
+    write!(
+        stream,
+        "GET /v1/spirits/{spirit_id}/sandbox HTTP/1.1\r\nHost: {address}\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
+    )?;
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response)?;
+    let response =
+        String::from_utf8(response).map_err(|_| SandboxInspectHttpError::MalformedResponse)?;
+    let (head, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or(SandboxInspectHttpError::MalformedResponse)?;
+    let status = head
+        .split_whitespace()
+        .nth(1)
+        .ok_or(SandboxInspectHttpError::MalformedResponse)?
+        .parse::<u16>()
+        .map_err(|_| SandboxInspectHttpError::MalformedResponse)?;
+    match status {
+        200 => Ok(body.to_owned()),
+        401 => Err(SandboxInspectHttpError::Unauthorized),
+        404 => Err(SandboxInspectHttpError::NotFound),
+        other => Err(SandboxInspectHttpError::UnexpectedStatus(other)),
     }
 }
 

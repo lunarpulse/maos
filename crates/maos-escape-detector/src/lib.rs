@@ -394,6 +394,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "escape-fault-inject"))]
     #[test]
     fn unanticipated_real_kill_is_anomaly() {
         let f = frame("sandbox.block.unknown", "tier=2", FRAME_ORIGIN_KERNEL);
@@ -407,6 +408,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "escape-fault-inject"))]
     #[test]
     fn anticipated_real_kill_is_no_anomaly() {
         // The SAME real seccomp kill, correlated against an anticipated manifest,
@@ -417,6 +419,7 @@ mod tests {
         assert_eq!(outcome, CorrelationOutcome::NoAnomaly);
     }
 
+    #[cfg(not(feature = "escape-fault-inject"))]
     #[test]
     fn synthesized_non_kernel_frame_is_no_anomaly() {
         let f = frame("sandbox.block.unknown", "tier=2", 0);

@@ -29,6 +29,7 @@ fn req(pid: u32, key: &str) -> PolicyDecisionRequest {
 
 const POLICY_FORBID_FSREAD: &str = r#"forbid(principal, action == Action::"FsRead", resource);"#;
 
+#[cfg(not(feature = "pdp-fault-inject"))]
 #[test]
 fn deny_forbid_returns_deny_through_port() {
     // AC3 (real engine) — a `forbid` rule produces `Deny` via the real Cedar
@@ -45,6 +46,7 @@ fn deny_forbid_returns_deny_through_port() {
     );
 }
 
+#[cfg(not(feature = "pdp-fault-inject"))]
 #[test]
 fn permit_returns_allow_contrast_with_forbid() {
     // Contrast leg — under a PERMIT policy the SAME request returns Allow.

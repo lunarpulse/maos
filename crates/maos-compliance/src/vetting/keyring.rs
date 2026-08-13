@@ -300,8 +300,15 @@ impl VetterKeyring {
             {
                 return Err(VettingRejection::AttestationRevocationListInvalid);
             }
-            let entries_bytes = serde_json::to_vec(&revocation.entries)
-                .map_err(|_| VettingRejection::AttestationRevocationListInvalid)?;
+            let entries_bytes =
+                maos_domain::revocation::canonical_entries_bytes(&revocation.entries)
+                    .map_err(|_| VettingRejection::AttestationRevocationListInvalid)?;
+            if maos_domain::revocation::CrlId::from_entries(&revocation.entries)
+                .map_err(|_| VettingRejection::AttestationRevocationListInvalid)?
+                != revocation.id
+            {
+                return Err(VettingRejection::AttestationRevocationListInvalid);
+            }
             if !ed25519_verify(
                 expected_operator_root,
                 &entries_bytes,

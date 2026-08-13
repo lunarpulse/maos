@@ -80,11 +80,12 @@ impl SilentFailureDetector {
             }
 
             let silent_failure_threshold_ms = scb
+                .runtime_snapshot()
                 .manifest
                 .supervision
                 .as_ref()
                 .map(|s| s.silent_failure_threshold_ms)
-                .unwrap_or(30000);
+                .unwrap_or(30_000);
             let last_heartbeat_ns = scb.last_heartbeat_ns.load(Ordering::Relaxed);
             let last_progress_iac_ns = scb.last_progress_iac_ns.load(Ordering::Relaxed);
             let last_silent_failure_emit_ns =
@@ -116,18 +117,18 @@ impl SilentFailureDetector {
                         "heartbeat_progress_gap_ms": heartbeat_progress_gap / 1_000_000,
                         "in_flight_task_count": in_flight_count,
                     });
-
-                    self.tl.insert_frame_event(
-                        FrameKind::SilentFailureSuspect,
-                        scb.pid,
-                        None,
-                        "silent_failure.suspect",
-                        &serde_json::to_vec(&payload).unwrap_or_default(),
-                        maos_domain::invariants::i3::FrameOrigin::Kernel,
-                    );
-
-                    self.telemetry
-                        .record_iac_rt(Service::SpiritScheduler, Outcome::Ok, 0);
+                    if let Ok(payload_bytes) = serde_json::to_vec(&payload) {
+                        self.tl.insert_frame_event(
+                            FrameKind::SilentFailureSuspect,
+                            scb.pid,
+                            None,
+                            "silent_failure.suspect",
+                            &payload_bytes,
+                            maos_domain::invariants::i3::FrameOrigin::Kernel,
+                        );
+                        self.telemetry
+                            .record_iac_rt(Service::SpiritScheduler, Outcome::Ok, 0);
+                    }
                 }
             }
         }

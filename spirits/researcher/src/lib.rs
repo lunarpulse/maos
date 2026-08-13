@@ -35,7 +35,7 @@
 //! class is declared in the manifest (`provider.complete`, ≥Sonnet-tier).
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -329,26 +329,22 @@ impl std::error::Error for ResearcherError {}
 // The Researcher Spirit.
 // ───────────────────────────────────────────────────────────────────────────
 
-/// Story 8.11 / AC2 — the optional live-inference seam. When present, the
-/// finding-synthesis step calls the frozen Inference Port (ADR-010 sync) instead
-/// of the deterministic [`summarize`]. The token + pid are **daemon-issued**
-/// (`maos run` issues a `Scope::ProviderInfer` token and threads it here); the
-/// kernel never appears in this crate's API surface — only the pure domain port.
+/// Story 8.11 / AC2 — the optional live-inference seam. The daemon installs
+/// the port before load, then binds the token and real scheduler pid before
+/// the first hook can run.
 #[derive(Clone)]
 struct LiveInference {
-    /// The frozen Inference Port adapter (real provider under `--live`, a
-    /// deterministic replay/stub otherwise — selected daemon-side).
     port: Arc<dyn InferencePort + Send + Sync>,
-    /// The daemon-issued `Scope::ProviderInfer` capability token.
-    token: CapabilityToken,
-    /// The loaded Spirit's real pid (NOT a `Some(0)` placeholder).
-    spirit_pid: u32,
+    binding: Arc<Mutex<Option<(CapabilityToken, u32)>>>,
 }
 
 impl std::fmt::Debug for LiveInference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LiveInference")
-            .field("spirit_pid", &self.spirit_pid)
+            .field(
+                "bound",
+                &self.binding.lock().is_ok_and(|binding| binding.is_some()),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -378,10 +374,8 @@ pub struct Researcher {
     /// Story 8.14c — the participant-scoped `LogRecallPort` used to recall
     /// McpInvocation frames after the fan-out. Required when `mcp_port` is `Some`.
     log_recall_port: Option<Arc<dyn LogRecallPort>>,
-    /// Story 8.14c — the REAL spirit pid (NOT a placeholder). Used for
-    /// participant-scoped `walk()` and token issuance so McpInvocation frames
-    /// journal under the same pid the walker queries.
-    spirit_pid: u32,
+    /// Story 8.14c — the REAL spirit pid, backfilled after scheduler load.
+    spirit_pid: Arc<AtomicU32>,
     /// Story 13.5d — mediated collective tier, wired by the composition root.
     collective_port: Option<Arc<dyn ResearcherCollectivePort>>,
     /// Set only after the production `on_idle` hook writes and reads back the
@@ -449,7 +443,8 @@ impl Researcher {
                     None,
                     None,
                 );
-                match self.walk(log_port.as_ref(), self.spirit_pid, filter) {
+                let spirit_pid = self.spirit_pid.load(Ordering::Acquire);
+                match self.walk(log_port.as_ref(), spirit_pid, filter) {
                     Ok(frames) => {
                         let joined = self.join_claims_to_frames(&fetched, &frames);
                         let output = self.survey(&joined);
@@ -480,7 +475,7 @@ impl Default for Researcher {
             inference: None,
             mcp_port: None,
             log_recall_port: None,
-            spirit_pid: 0,
+            spirit_pid: Arc::new(AtomicU32::new(0)),
             collective_port: None,
             collective_probe_completed: Arc::new(AtomicBool::new(false)),
             collective_probe_failed: Arc::new(AtomicBool::new(false)),
@@ -502,24 +497,25 @@ impl Researcher {
         }
     }
 
-    /// Story 8.11 / AC2 — wire the live finding-synthesis seam. `maos run`
-    /// supplies the frozen Inference Port, a daemon-issued `Scope::ProviderInfer`
-    /// token, and the loaded Spirit's real pid. With this set, the
-    /// finding-synthesis step calls `inference.complete(...)` instead of the
-    /// deterministic [`summarize`] — every cite, hedge, and the I11 chain are
-    /// unchanged. Without it, the survey is byte-identical to v0.5.
-    pub fn with_inference_port(
+    /// Wire live inference before scheduler load. The capability token and real
+    /// pid are backfilled into the shared binding after admission.
+    pub fn with_deferred_inference_port(
         mut self,
+        port: Arc<dyn InferencePort + Send + Sync>,
+        binding: Arc<Mutex<Option<(CapabilityToken, u32)>>>,
+    ) -> Self {
+        self.inference = Some(LiveInference { port, binding });
+        self
+    }
+
+    /// Convenience builder for callers that already own an admitted pid.
+    pub fn with_inference_port(
+        self,
         port: Arc<dyn InferencePort + Send + Sync>,
         token: CapabilityToken,
         spirit_pid: u32,
     ) -> Self {
-        self.inference = Some(LiveInference {
-            port,
-            token,
-            spirit_pid,
-        });
-        self
+        self.with_deferred_inference_port(port, Arc::new(Mutex::new(Some((token, spirit_pid)))))
     }
 
     /// Story 8.14c — wire the MCP domain port. `maos run` supplies the
@@ -620,10 +616,13 @@ impl Researcher {
             .ok_or(ResearcherCollectiveError::Unavailable)?
             .collective_scan(namespace, prefix, limit)
     }
-    /// Story 8.14c — wire the participant-scoped `LogRecallPort` used to recall
-    /// McpInvocation frames after the MCP fan-out. Required when `mcp_port` is
-    /// `Some` so the source-key join can locate the journaled fetch frames.
-    pub fn with_log_recall_port(mut self, port: Arc<dyn LogRecallPort>, spirit_pid: u32) -> Self {
+    /// Wire participant-scoped recall. The scheduler pid is atomically
+    /// backfilled after load, before the first hook fires.
+    pub fn with_log_recall_port(
+        mut self,
+        port: Arc<dyn LogRecallPort>,
+        spirit_pid: Arc<AtomicU32>,
+    ) -> Self {
         self.log_recall_port = Some(port);
         self.spirit_pid = spirit_pid;
         self
@@ -890,9 +889,17 @@ impl Researcher {
         let Some(live) = &self.inference else {
             return summarize(statement);
         };
+        let binding = live
+            .binding
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some((token, spirit_pid)) = binding.as_ref() else {
+            eprintln!("researcher: live inference binding is not ready");
+            return summarize(statement);
+        };
         let req = InferenceRequest::new(
-            live.spirit_pid,
-            live.token.clone(),
+            *spirit_pid,
+            token.clone(),
             format!(
                 "Summarize this research claim in one sentence for a digest. \
                  Preserve any hedges; add no facts.\n\nClaim: {statement}"
@@ -1392,7 +1399,7 @@ mod unit_tests {
         };
         let researcher = Researcher::new()
             .with_mcp_port(Arc::new(mcp_port))
-            .with_log_recall_port(Arc::new(log_port), 42);
+            .with_log_recall_port(Arc::new(log_port), Arc::new(AtomicU32::new(42)));
         let mut ctx = Ctx::mock();
         researcher.on_idle(&mut ctx);
         let output = researcher.last_output().unwrap();

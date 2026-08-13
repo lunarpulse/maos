@@ -49,6 +49,7 @@ mod tests {
     /// SandboxBlock row whose manifest did not anticipate the kill, and zero for
     /// an anticipated one — the correlation decision, wired at the composition
     /// root (out of `api.rs`).
+    #[cfg(not(feature = "escape-fault-inject"))]
     #[test]
     fn consumer_reports_anomaly_for_unanticipated_kill_only() {
         let dir = tempfile::tempdir().expect("tempdir");

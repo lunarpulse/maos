@@ -1,3 +1,5 @@
+#![cfg(not(feature = "sso-fault-inject"))]
+
 //! Story 11.4c Task 2 — IDENTITY-ASSERTED PROVENANCE + reconciliation.
 //!
 //! # The contract defended

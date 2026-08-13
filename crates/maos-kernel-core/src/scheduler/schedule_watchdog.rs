@@ -166,14 +166,15 @@ impl ScheduleWatchdog {
                 if scb.current_state() != ScbLifecycleState::Running {
                     continue;
                 }
-                if scb.manifest.schedules.entries.is_empty() {
+                let runtime = scb.runtime_snapshot();
+                if runtime.manifest.schedules.entries.is_empty() {
                     continue;
                 }
                 // Step 1 — lifecycle gate.
-                if !Self::on_schedule_allowed(scb) {
+                if !Self::on_schedule_allowed(&runtime) {
                     continue;
                 }
-                for entry in &scb.manifest.schedules.entries {
+                for entry in &runtime.manifest.schedules.entries {
                     let last = self
                         .last_fire_ns
                         .get(&(scb.pid, entry.id.clone()))
@@ -266,8 +267,8 @@ impl ScheduleWatchdog {
         }
     }
 
-    fn on_schedule_allowed(scb: &SpiritControlBlock) -> bool {
-        let enabled: Vec<&str> = scb
+    fn on_schedule_allowed(runtime: &crate::scheduler::control_block::ScbRuntimeSnapshot) -> bool {
+        let enabled: Vec<&str> = runtime
             .manifest
             .lifecycle
             .enabled_hooks

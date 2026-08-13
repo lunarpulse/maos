@@ -2388,7 +2388,7 @@ trust_tier = "public_vetted"
     }
 
     #[test]
-    fn sandbox_config_t3_parseable_but_rejected_at_admission() {
+    fn sandbox_config_t3_parseable() {
         let cfg = SandboxConfig::from_toml_str(r#"tier = "T3""#).unwrap();
         assert_eq!(cfg.tier, SandboxTier::T3);
     }

@@ -228,7 +228,7 @@ impl Mailbox {
         {
             return Err(IacBusError::AlreadyRegistered(spirit_id.to_string()));
         }
-        let mut receivers = Vec::with_capacity(8);
+        let mut receivers = Vec::with_capacity(10);
         let kinds: &[FrameKind] = &[
             FrameKind::TaskAssign,
             FrameKind::TaskComplete,
@@ -236,6 +236,10 @@ impl Mailbox {
             FrameKind::EpistemicHalt,
             FrameKind::ConsentRequest,
             FrameKind::Retract,
+            // Story 5.1 — per-invocation lifecycle budget frames are direct
+            // MPSC-32 deliveries, never broadcast telemetry.
+            FrameKind::BudgetWarning,
+            FrameKind::BudgetExceeded,
             // Story 6.4 — ConsentRupture + RateLimited delivered to sender
             // via 1:1 mpsc with capacity 32 (§7.1.1 cardinality).
             FrameKind::ConsentRupture,
@@ -699,8 +703,9 @@ mod tests {
         let mailbox = Mailbox::new(metrics);
         let handle = mailbox.register_spirit("test-spirit").unwrap();
         assert_eq!(handle.spirit_id, "test-spirit");
-        // Story 6.4 — 8 channels: 6 base + ConsentRupture + RateLimited.
-        assert_eq!(handle.receivers.len(), 8);
+        // Ten direct channels: six base, two lifecycle-budget, and the
+        // ConsentRupture/RateLimited sender channels.
+        assert_eq!(handle.receivers.len(), 10);
     }
 
     #[tokio::test]

@@ -9,6 +9,7 @@
 //! `maos-kernel-core`.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------
@@ -95,11 +96,69 @@ mod serde_pubkey32 {
     }
 }
 
+/// Compact JSON encoding with recursively sorted object keys.
+///
+/// This is the sole CRL byte representation: signatures and `CrlId`s both
+/// derive from it. Arrays retain their declared order; object keys are sorted
+/// at every depth, so producer struct-field order cannot affect verification.
+pub fn canonical_entries_bytes(entries: &[RevocationEntry]) -> Result<Vec<u8>, RevocationError> {
+    fn write(value: &serde_json::Value, output: &mut Vec<u8>) -> Result<(), RevocationError> {
+        match value {
+            serde_json::Value::Null => output.extend_from_slice(b"null"),
+            serde_json::Value::Bool(value) => {
+                output.extend_from_slice(if *value { b"true" } else { b"false" })
+            }
+            serde_json::Value::Number(value) => {
+                output.extend_from_slice(value.to_string().as_bytes())
+            }
+            serde_json::Value::String(value) => {
+                serde_json::to_writer(&mut *output, value).map_err(|error| {
+                    RevocationError::Deserialize(format!("JSON string serialize: {error}"))
+                })?;
+            }
+            serde_json::Value::Array(values) => {
+                output.push(b'[');
+                for (index, value) in values.iter().enumerate() {
+                    if index != 0 {
+                        output.push(b',');
+                    }
+                    write(value, output)?;
+                }
+                output.push(b']');
+            }
+            serde_json::Value::Object(values) => {
+                output.push(b'{');
+                let mut keys: Vec<_> = values.keys().collect();
+                keys.sort_unstable();
+                for (index, key) in keys.iter().enumerate() {
+                    if index != 0 {
+                        output.push(b',');
+                    }
+                    serde_json::to_writer(&mut *output, *key).map_err(|error| {
+                        RevocationError::Deserialize(format!("JSON object key serialize: {error}"))
+                    })?;
+                    output.push(b':');
+                    write(&values[*key], output)?;
+                }
+                output.push(b'}');
+            }
+        }
+        Ok(())
+    }
+
+    let value = serde_json::to_value(entries)
+        .map_err(|error| RevocationError::Deserialize(format!("entries serialize: {error}")))?;
+    let mut output = Vec::new();
+    write(&value, &mut output)?;
+    Ok(output)
+}
+
 impl SignedRevocationList {
     /// Construct a `SignedRevocationList` with validation.
     ///
     /// Enforces:
-    /// - `entries` is non-empty.
+    /// - every entry satisfies `RevocationEntry::new` validation.
+    /// - `id` is SHA-256 of the canonical entries bytes.
     /// - `schema_version` is 1 (v0.3-β only accepts 1).
     /// - `signature` and `signer_pub_key` are non-zero (basic sanity).
     pub fn new(
@@ -126,6 +185,25 @@ impl SignedRevocationList {
         }
         if signer_pub_key == [0u8; 32] {
             return Err(RevocationError::SignatureInvalid);
+        }
+        let entries = entries
+            .into_iter()
+            .map(|entry| {
+                RevocationEntry::new(
+                    entry.spirit_class,
+                    entry.version_range,
+                    entry.reason,
+                    entry.recommended_action,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let expected_id = CrlId::from_entries(&entries)?;
+        if id != expected_id {
+            return Err(RevocationError::CrlIdMismatch {
+                expected: expected_id.to_string(),
+                actual: id.to_string(),
+            });
         }
         Ok(Self {
             id,
@@ -262,6 +340,15 @@ impl RevocationAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct CrlId(pub [u8; 32]);
 
+impl CrlId {
+    /// Derive the CRL identity from the same canonical bytes that are signed.
+    pub fn from_entries(entries: &[RevocationEntry]) -> Result<Self, RevocationError> {
+        let bytes = canonical_entries_bytes(entries)?;
+        let digest: [u8; 32] = Sha256::digest(bytes).into();
+        Ok(Self(digest))
+    }
+}
+
 impl std::fmt::Display for CrlId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(self.0))
@@ -323,6 +410,10 @@ pub enum RevocationError {
     Io(String),
     #[error("quarantine failed: {0}")]
     QuarantineFailed(String),
+    #[error("unsupported revocation action: {0}")]
+    UnsupportedAction(String),
+    #[error("CRL id does not match canonical entries digest (expected {expected}, got {actual})")]
+    CrlIdMismatch { expected: String, actual: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -336,9 +427,7 @@ pub trait RegistryClient: Send + Sync + 'static {
     /// `~/.local/share/maos/crl/latest.signed.json`.
     fn fetch_signed_crl(&self) -> Result<Vec<u8>, RevocationError>;
 
-    /// Optional: fetch the trust anchor for verification. v0.3-β
-    /// reads from `MAOS_CRL_TRUST_ANCHOR_PUB_HEX` env-var; Story 5.5d
-    /// wires registry per-trust-tier signing keys.
+    /// Return the trust anchor injected into this registry instance.
     fn trust_anchor_pub(&self) -> Result<Vec<u8>, RevocationError>;
 }
 
@@ -347,16 +436,18 @@ pub trait RegistryClient: Send + Sync + 'static {
 // ---------------------------------------------------------------------------
 
 /// v0.3-β default `RegistryClient` that reads CRL from local filesystem.
-/// Production `McpRegistryClient` lands at Story 5.5d.
-#[derive(Debug, Clone)]
 pub struct LocalFileRegistryClient {
     crl_dir: PathBuf,
+    trust_anchor_pub: Option<Vec<u8>>,
 }
 
 impl LocalFileRegistryClient {
-    pub fn new(crl_dir: impl Into<PathBuf>) -> Self {
+    /// Construct a local registry with the trust anchor supplied by the
+    /// composition root.  The client never reads mutable process environment.
+    pub fn new(crl_dir: impl Into<PathBuf>, trust_anchor_pub: Option<Vec<u8>>) -> Self {
         Self {
             crl_dir: crl_dir.into(),
+            trust_anchor_pub,
         }
     }
 }
@@ -364,18 +455,15 @@ impl LocalFileRegistryClient {
 impl RegistryClient for LocalFileRegistryClient {
     fn fetch_signed_crl(&self) -> Result<Vec<u8>, RevocationError> {
         let path = self.crl_dir.join("latest.signed.json");
-        std::fs::read(&path)
-            .map_err(|e| RevocationError::Io(format!("read CRL file {}: {}", path.display(), e)))
+        std::fs::read(&path).map_err(|error| {
+            RevocationError::Io(format!("read CRL file {}: {error}", path.display()))
+        })
     }
 
     fn trust_anchor_pub(&self) -> Result<Vec<u8>, RevocationError> {
-        let hex_str = std::env::var("MAOS_CRL_TRUST_ANCHOR_PUB_HEX")
-            .map_err(|_| RevocationError::TrustAnchorMissing)?;
-        hex::decode(&hex_str).map_err(|e| {
-            RevocationError::Io(format!(
-                "invalid hex encoding in MAOS_CRL_TRUST_ANCHOR_PUB_HEX: {e}"
-            ))
-        })
+        self.trust_anchor_pub
+            .clone()
+            .ok_or(RevocationError::TrustAnchorMissing)
     }
 }
 
@@ -682,7 +770,7 @@ mod tests {
     fn registry_client_trait_object_safe() {
         fn _accepts_dyn(_: &dyn RegistryClient) {}
         let _: std::sync::Arc<dyn RegistryClient> =
-            std::sync::Arc::new(LocalFileRegistryClient::new("/tmp"));
+            std::sync::Arc::new(LocalFileRegistryClient::new("/tmp", None));
     }
 
     #[test]
@@ -691,6 +779,16 @@ mod tests {
         let s = id.to_string();
         assert_eq!(s.len(), 64);
         assert!(s.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn crl_id_is_the_sha256_of_recursively_key_sorted_entries() {
+        let entry = RevocationEntry::new("worker", "1.0.0", "test", None).unwrap();
+        let id = CrlId::from_entries(&[entry]).unwrap();
+        assert_eq!(
+            id.to_string(),
+            "420b7542a679d0d85503662c43980f5313ac55528e42032a19461058f17f4063"
+        );
     }
 
     #[test]

@@ -61,6 +61,7 @@ fn emit_real_kill(
 
 /// AC4: TP-rate ≥ floor AND FP-rate ≤ ceiling, measured LIVE over real seccomp
 /// enforcement on the detector's correlation decision.
+#[cfg(not(feature = "escape-fault-inject"))]
 #[test]
 fn detection_quality_meets_floor_and_ceiling_on_real_seccomp() {
     let (_dir, db_path, tl) = fresh_temp_tl();
@@ -210,6 +211,7 @@ fn fault_inject_stubs_detector_to_canned_tp() {
 /// mock" enforcement tripwire on seccomp-capable runners. Together they make the
 /// metric non-vacuous: the correlation logic is proven here, the real-enforcement
 /// signal on capable hosts.
+#[cfg(not(feature = "escape-fault-inject"))]
 #[test]
 fn correlation_quality_on_structural_rows() {
     use maos_domain::invariants::i3::FrameOrigin;

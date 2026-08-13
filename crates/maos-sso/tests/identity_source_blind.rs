@@ -1,3 +1,5 @@
+#![cfg(not(feature = "sso-fault-inject"))]
+
 //! Story 11.4c Task 2 — BLIND-SOURCE reconciliation reflex.
 //!
 //! # The contract defended

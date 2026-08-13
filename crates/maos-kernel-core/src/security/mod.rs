@@ -121,8 +121,15 @@ pub enum SecurityError {
     reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9"
 )]
 #[derive(Debug, Clone)]
+struct T3ImageVerificationConfig {
+    lock_path: std::path::PathBuf,
+    trust_anchor_pub: [u8; 32],
+}
+
+#[derive(Debug, Clone)]
 pub struct SecurityManagerAdapter {
     policy: Arc<PolicyTable>,
+    t3_image_verification: Option<T3ImageVerificationConfig>,
     /// Drift-event channel sender (Story 2.1 AC4).
     /// The runtime detector that emits events ships in Story 9.x.
     drift_sender: Option<mpsc::Sender<DriftEvent>>,
@@ -194,6 +201,7 @@ impl SecurityManagerAdapter {
     pub fn new(policy: Arc<PolicyTable>) -> Self {
         Self {
             policy,
+            t3_image_verification: None,
             drift_sender: None,
             provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
         }
@@ -204,6 +212,23 @@ impl SecurityManagerAdapter {
     /// The sender is consumed by the runtime drift detector at Story 9.x.
     pub fn with_drift_sender(mut self, sender: mpsc::Sender<DriftEvent>) -> Self {
         self.drift_sender = Some(sender);
+        self
+    }
+
+    /// Inject an explicit verified-image lock boundary.
+    ///
+    /// Daemon defaults continue to read the operator-provided path and trust
+    /// anchor from environment variables. Embedded composition roots and tests
+    /// use this builder to avoid process-global state.
+    pub fn with_t3_image_verification(
+        mut self,
+        lock_path: impl Into<std::path::PathBuf>,
+        trust_anchor_pub: [u8; 32],
+    ) -> Self {
+        self.t3_image_verification = Some(T3ImageVerificationConfig {
+            lock_path: lock_path.into(),
+            trust_anchor_pub,
+        });
         self
     }
 
@@ -221,7 +246,7 @@ impl SecurityManagerAdapter {
         &self,
         spirit_pid: u32,
         spirit_id: &str,
-        _manifest: &SandboxConfig,
+        manifest: &SandboxConfig,
         caps: &ResourceCaps,
         caps_required: &CapabilitiesRequired,
         output_shape: Option<&OutputShape>,
@@ -357,18 +382,30 @@ impl SecurityManagerAdapter {
         // Story 5.5a: T3 is now admissible on Linux with container isolation.
         // T4 remains rejected (WASM tier scheduled for v2.0).
         if effective == SandboxTier::T3 {
-            let lock = crate::security::sandbox::t3::image_lock::T3ImageLock::load_default()
-                .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
-            if let Some(ref image_pin) = _manifest.image_pin {
-                lock.resolve_pin(image_pin).ok_or_else(|| {
-                    SecurityError::T3AdmissionFailed(format!(
-                        "sandbox.image_pin '{}' not present in t3-image.lock",
-                        image_pin
-                    ))
-                })?;
+            let crypto = crate::security::crypto::RingCryptoProvider;
+            let lock = match &self.t3_image_verification {
+                Some(config) => crate::security::sandbox::t3::image_lock::load_and_verify_lock_at(
+                    &config.lock_path,
+                    &config.trust_anchor_pub,
+                    &crypto,
+                ),
+                None => {
+                    let trust_anchor =
+                        crate::security::sandbox::t3::image_verify::read_trust_anchor_pub()
+                            .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
+                    crate::security::sandbox::t3::image_lock::load_and_verify_lock(
+                        &trust_anchor,
+                        &crypto,
+                    )
+                }
+            }
+            .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
+            if let Some(image_pin) = &manifest.image_pin {
+                lock.resolve_pin(image_pin)
+                    .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
             } else {
-                lock.default_attestation()
-                    .map_err(|e| SecurityError::T3AdmissionFailed(e.to_string()))?;
+                lock.default_entry()
+                    .map_err(|error| SecurityError::T3AdmissionFailed(error.to_string()))?;
             }
         } else if effective.0 > SandboxTier::T3.0 {
             return Err(SecurityError::SandboxTierUnsupported(effective));
@@ -406,18 +443,6 @@ impl SecurityManagerAdapter {
             effective_sandbox_tier: Some(effective),
         }));
 
-        if effective == SandboxTier::T3 {
-            journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
-                timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
-                lifecycle_event: LifecycleEvent::SandboxApplied,
-                spirit_id: spirit_id.into(),
-                payload: None,
-                effective_sandbox_tier: Some(effective),
-            }));
-        }
-
-        // Story 5.5b — ProviderSwitched emission.
-        //
         // Backfill review (2026-05-25): scope the mutex narrowly. The earlier
         // shape held the lock across `serde_json::to_vec` AND
         // `journal.journal_lifecycle` — the journal call can perform I/O
@@ -490,6 +515,7 @@ impl Default for SecurityManagerAdapter {
     fn default() -> Self {
         Self {
             policy: Arc::new(PolicyTable::new()),
+            t3_image_verification: None,
             drift_sender: None,
             provider_history: Arc::new(std::sync::Mutex::new(ProviderHistory::default())),
         }

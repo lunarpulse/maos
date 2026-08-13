@@ -459,4 +459,14 @@
 #          refinement ratified by party-mode (Winston 2026-08-03), NOT a
 #          ceiling increase. Logical count 18210, 38 below the unchanged
 #          18248 ceiling; the pub mod is cfg-gated and absent from release.
-src_lines = 23679
+# HISTORY: Epic 5 review-finding closure (2026-08-13): 23679 -> 24472
+#          physical lines (+793). The closure baseline commit already carried
+#          52 unpinned lines; the user-directed "apply every patch" closure
+#          added the remaining net +741 across scheduler, hot-swap, lifecycle,
+#          revocation, supervision, and T3 sandbox production surfaces.
+#          FLAG-Winston: authorized as the bounded repair of the reopened
+#          Stories 5.1/5.2/5.4/5.5a findings. The delta removes placeholders
+#          and false proofs, preserves ABI discriminants and the single-SCB
+#          ownership invariant, adds typed fail-closed errors and executable
+#          negative controls, and removes no public symbols.
+src_lines = 24472

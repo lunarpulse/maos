@@ -1,3 +1,5 @@
+#![cfg(not(feature = "sso-fault-inject"))]
+
 //! Story 11.4c AC1 (Task 1) - the ALGORITHM ALLOWLIST gate negatives: `alg:none`
 //! and the HS256 alg-confusion CVE class are REJECTED, while RS256 (in the
 //! allowlist) is accepted. This is Vex's binding threat-model requirement (F4):

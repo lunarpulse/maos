@@ -1,4 +1,4 @@
-last_updated: '2026-08-11+epic-13-CLOSED+C1-C2-C4-C5-C6-done+C3-open+epic-3-and-5-REOPENED-57-open-findings'
+last_updated: '2026-08-13+epic-5-CLOSED+43-formerly-open-rows-disposed'
 project: maos
 project_key: NOKEY
 tracking_system: file-system
@@ -48,12 +48,12 @@ development_status:
   4-4-enforce-the-i11-audit-chain-on-distillates-with-log-recall-and-the-five-metric-gate: done
   4-5-author-the-cross-spirit-isolation-200-corpus-and-enforce-i14-halt-continuity-in-hot-swap: done
   epic-4-retrospective: done
-  epic-5: in-progress  # 2026-08-12 current-HEAD audit: the 43 formerly open rows in Stories 5.1/5.2/5.4/5.5a are now 34 open, 7 closed, 2 dismissed. Keep open until the 28 patch findings and 6 decisions close.
-  5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: in-review  # 2026-08-12 audited all 7 formerly open rows; all 7 remain open and require patches.
-  5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: in-review  # 2026-08-12 audited all 8 formerly open rows: 6 open (5 patch, 1 decision), 2 closed.
+  epic-5: done  # 2026-08-13 closure: all four reopened stories have zero current open/decision rows; focused and workspace validation passed.
+  5-1-ship-full-lifecycle-verbs-and-11-triggers-with-priority-weighted-scheduling: done  # 2026-08-13: all 7 formerly open rows closed with production behavior and focused regressions.
+  5-2-implement-hot-swap-state-transfer-and-cross-major-migration-against-hsis-95: done  # 2026-08-13: all 6 remaining open rows closed; typed errors, logical-envelope ownership, and stable SCB identity verified.
   5-3-detect-spirit-crashes-hangs-and-silent-failures-with-halt-receipt-99-9: done
-  5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: in-review  # 2026-08-12 audited all 21 formerly open rows: 15 open (10 patch, 5 decision), 4 closed, 2 dismissed.
-  5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: in-review  # 2026-08-12 audited all 7 formerly open rows: 6 open (5 patch, 1 decision), 1 closed.
+  5-4-run-spirit-upgrades-and-propagate-signed-revocations-in-5s: done  # 2026-08-13: all current open/decision rows closed; real corpus, smoke, revocation, upgrade, p99, and workspace evidence passed.
+  5-5a-sandbox-tier-t3-container-isolation-via-docker-podman: done  # 2026-08-13: all 6 remaining open rows closed; live inspect, signed lock, digest, and runtime diagnostic paths verified.
   5-5b-run-the-multi-provider-ci-matrix-across-anthropic-openai-and-ollama: done
   5-5c-mcp-client-acp-server-tool-servers-and-editor-hosts: done
   5-5d-spirit-registry-over-mcp-streamable-http-with-three-trust-tiers: done

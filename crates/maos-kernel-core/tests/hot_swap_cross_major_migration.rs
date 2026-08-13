@@ -35,6 +35,14 @@ impl Spirit for MajorOnePredecessor {
     }
 }
 
+struct PanickingSnapshot;
+
+impl Spirit for PanickingSnapshot {
+    fn snapshot(&self, _ctx: &mut Ctx) -> Vec<u8> {
+        panic!("snapshot panic sentinel");
+    }
+}
+
 struct MajorTwoSuccessor {
     migrate_calls: Arc<AtomicU32>,
     migrate_input: Arc<Mutex<Vec<u8>>>,
@@ -72,11 +80,18 @@ fn class_section(version: &str) -> ClassSection {
     }
 }
 
-#[tokio::test]
-async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
-    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-    let tmp = tempfile::TempDir::new().expect("tempdir");
+fn make_coordinator<S>(
+    tmp: &tempfile::TempDir,
+    predecessor_manifest: SpiritManifestBundle,
+    predecessor: S,
+) -> (
+    HotSwapCoordinator,
+    Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    Arc<SpiritControlBlock>,
+)
+where
+    S: Spirit + Send + Sync + 'static,
+{
     let tl = Arc::new(
         maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0xC0DE),
     );
@@ -97,12 +112,44 @@ async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
         Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&telemetry))),
         Arc::clone(&tl),
     ));
-    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
     let dispatcher = Arc::new(HookDispatcher::new(Arc::clone(&tl), Arc::clone(&telemetry)));
     let journal = Arc::new(
         maos_kernel_core::journal::JournalAdapter::open(&tmp.path().join("journal.ndjson"))
             .expect("journal open"),
     );
+    let predecessor_scb = Arc::new(SpiritControlBlock::new(
+        7,
+        "migration-spirit".into(),
+        predecessor_manifest,
+        make_spirit_obj(predecessor),
+        0xC0DE,
+    ));
+    predecessor_scb
+        .state
+        .store(ScbLifecycleState::Running as u8, Ordering::Release);
+    let spirits = Arc::new(RwLock::new(BTreeMap::from([(
+        7,
+        Arc::clone(&predecessor_scb),
+    )])));
+    let coordinator = HotSwapCoordinator::new(
+        Arc::clone(&spirits),
+        journal,
+        tl,
+        Arc::new(maos_kernel_core::halt::HaltRegistry::new()),
+        capability,
+        iac,
+        dispatcher,
+        telemetry,
+        tmp.path().join("archives"),
+    );
+    (coordinator, spirits, predecessor_scb)
+}
+
+#[tokio::test]
+async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+    let tmp = tempfile::TempDir::new().expect("tempdir");
 
     let predecessor_manifest = SpiritManifestBundle {
         scheduling: SchedulingSection::default(),
@@ -116,33 +163,8 @@ async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
         }),
         ..Default::default()
     };
-    let predecessor_pid = 7;
-    let predecessor_scb = Arc::new(SpiritControlBlock::new(
-        predecessor_pid,
-        "migration-spirit".into(),
-        predecessor_manifest,
-        make_spirit_obj(MajorOnePredecessor),
-        0xC0DE,
-    ));
-    predecessor_scb
-        .state
-        .store(ScbLifecycleState::Running as u8, Ordering::Release);
-    let spirits = Arc::new(RwLock::new(BTreeMap::from([(
-        predecessor_pid,
-        predecessor_scb,
-    )])));
-
-    let coordinator = HotSwapCoordinator::new(
-        Arc::clone(&spirits),
-        journal,
-        tl,
-        halt_registry,
-        capability,
-        iac,
-        dispatcher,
-        telemetry,
-        tmp.path().join("archives"),
-    );
+    let (coordinator, spirits, predecessor_scb) =
+        make_coordinator(&tmp, predecessor_manifest, MajorOnePredecessor);
 
     let migrate_calls = Arc::new(AtomicU32::new(0));
     let migrate_input = Arc::new(Mutex::new(Vec::new()));
@@ -192,6 +214,93 @@ async fn adjacent_upward_major_reaches_migrator_and_delivers_migrated_state() {
             .expect("swap-in payload lock poisoned")
             .as_slice(),
         b"major-two-state"
+    );
+    let map = spirits.read().expect("spirits lock");
+    let active = map.get(&7).expect("active SCB");
+    assert!(
+        Arc::ptr_eq(active, &predecessor_scb),
+        "hot-swap must preserve the original SCB Arc"
+    );
+}
+
+#[tokio::test]
+async fn snapshot_panic_returns_snapshot_specific_error() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let tmp = tempfile::TempDir::new().expect("tempdir");
+    let predecessor_manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["snapshot".into()],
+        },
+        class: Some(class_section("1.0.0")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v1".into(),
+            state_schema_version: 0x0001_0001,
+        }),
+        ..Default::default()
+    };
+    let (coordinator, _, _) = make_coordinator(&tmp, predecessor_manifest, PanickingSnapshot);
+    let successor_manifest = SpiritManifestBundle {
+        class: Some(class_section("1.0.1")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v1".into(),
+            state_schema_version: 0x0001_0001,
+        }),
+        ..Default::default()
+    };
+
+    let error = coordinator
+        .initiate_swap(
+            "migration-spirit",
+            &successor_manifest,
+            make_spirit_obj(MajorOnePredecessor),
+        )
+        .await
+        .expect_err("panicking snapshot must abort the swap");
+    assert!(matches!(
+        error,
+        maos_domain::hot_swap::HotSwapError::SnapshotFailed {
+            ref spirit_id,
+            ref error,
+        } if spirit_id == "migration-spirit" && error.contains("snapshot panic sentinel")
+    ));
+}
+
+#[tokio::test]
+async fn zero_successor_schema_returns_distinct_expected_version_error() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let tmp = tempfile::TempDir::new().expect("tempdir");
+    let predecessor_manifest = SpiritManifestBundle {
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["snapshot".into()],
+        },
+        class: Some(class_section("1.0.0")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v1".into(),
+            state_schema_version: 0x0001_0001,
+        }),
+        ..Default::default()
+    };
+    let (coordinator, _, _) = make_coordinator(&tmp, predecessor_manifest, MajorOnePredecessor);
+    let successor_manifest = SpiritManifestBundle {
+        class: Some(class_section("1.0.1")),
+        hot_swap: Some(HotSwapManifestSection {
+            state_schema_uri: "urn:maos:test:state:v0".into(),
+            state_schema_version: 0,
+        }),
+        ..Default::default()
+    };
+
+    let error = coordinator
+        .initiate_swap(
+            "migration-spirit",
+            &successor_manifest,
+            make_spirit_obj(MajorOnePredecessor),
+        )
+        .await
+        .expect_err("zero expected schema version must fail");
+    assert_eq!(
+        error,
+        maos_domain::hot_swap::HotSwapError::InvalidExpectedSchemaVersion { expected: 0 }
     );
 }
 
@@ -309,4 +418,48 @@ async fn run_migrator_names_the_specific_absent_hop_at_run_time() {
         }
         other => panic!("expected EMigratorMissing naming the 2.0 -> 3.0 hop, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn declared_default_migrator_returns_migrator_not_implemented() {
+    use maos_domain::hot_swap::HotSwapError;
+
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let tl = Arc::new(
+        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0xD00D),
+    );
+    let dispatcher = HookDispatcher::new(tl, Arc::new(IacRtMetrics::new()));
+    let predecessor = SpiritControlBlock::new(
+        8,
+        "migration-spirit".into(),
+        SpiritManifestBundle {
+            class: Some(class_section("1.0.0")),
+            ..Default::default()
+        },
+        make_spirit_obj(MajorOnePredecessor),
+        0xD00D,
+    );
+    let successor_manifest = SpiritManifestBundle {
+        class: Some(class_section("2.0.0")),
+        lifecycle: LifecycleSection {
+            enabled_hooks: vec!["migrate".into()],
+        },
+        migrates_from: Some(MigratesFromSection {
+            versions: vec!["1.0.0".into()],
+        }),
+        ..Default::default()
+    };
+
+    let error = migrator::run_migrator(
+        &dispatcher,
+        &predecessor,
+        &make_spirit_obj(MajorOnePredecessor),
+        b"state",
+        &successor_manifest,
+        "1.0.0",
+    )
+    .await
+    .expect_err("the ABI default migrator must remain distinguishable");
+
+    assert!(matches!(error, HotSwapError::MigratorNotImplemented { .. }));
 }

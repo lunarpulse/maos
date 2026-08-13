@@ -68,10 +68,24 @@ pub enum FramePayload {
     TelemetryEvent(TelemetryEventPayload),
     ConsentRequest(ConsentRequestPayload),
     Retract(RetractPayload),
+    /// Lifecycle hook budget signal.  Emitted by the kernel to the one Spirit
+    /// whose hook consumed the budget; the IAC channel stays bounded at 32.
+    BudgetWarning(BudgetEnvelope),
+    /// Lifecycle hook terminal budget signal, with the same typed envelope.
+    BudgetExceeded(BudgetEnvelope),
     /// Story 6.4 — ADR-034 binding-v0.9: partial-consent rupture event.
     ConsentRupture(ConsentRupturePayload),
     /// Story 6.4 — NFR-Scale-4: per-(provider, credential) bucket-exhaustion event.
     RateLimited(RateLimitedPayload),
+}
+
+/// Typed budget event shared by the warning and exceeded ABI frames.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BudgetEnvelope {
+    pub spirit_pid: u32,
+    pub hook_name: String,
+    pub wall_ns: u64,
+    pub cap_seconds: u64,
 }
 
 /// FR14: natural-language task assignment payload.

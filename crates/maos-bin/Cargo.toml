@@ -31,6 +31,11 @@ wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a — OFF by default. Gates the 
 spirit_test = ["network", "maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
 fixture_replay = ["network", "maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay", "maos-bench/fixture_replay"]
 smoke_schedule = ["tokio/test-util"]
+# Dev/CI-only forwarding flags. They make dependency fault-injection state
+# visible to this crate's positive-path tests under `--workspace --all-features`.
+kms-fault-inject = ["network", "maos-secrets/kms-fault-inject"]
+sso-fault-inject = ["network", "maos-sso/sso-fault-inject"]
+escape-fault-inject = ["maos-escape-detector/escape-fault-inject"]
 
 [dependencies]
 maos-shell = { path = "../maos-shell" }
@@ -40,6 +45,7 @@ maos-director-surface = { path = "../maos-director-surface" }
 maos-domain = { path = "../maos-domain" }
 maos-manifest = { path = "../maos-manifest" }
 maos-kernel-core = { path = "../maos-kernel-core" }
+maos-control = { path = "../maos-control" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
 maos-escape-detector = { path = "../maos-escape-detector" }   # Story 11.4b — out-of-kernel sandbox-escape detector (ADR-024); read-only TL consumer wired at the composition root (NOT a kernel-core adapter; stays out of api.rs)

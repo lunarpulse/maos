@@ -74,10 +74,12 @@ impl IdleWatchdog {
                         return false;
                     }
                     let last_inbound = scb.last_inbound_frame_ns.load(Ordering::Relaxed);
+                    let idle_window_ms =
+                        scb.runtime_snapshot().manifest.scheduling.idle_window_ms as u64;
                     let idle_window_ms = if fast_mode {
-                        scb.manifest.scheduling.idle_window_ms as u64 / 100
+                        idle_window_ms / 100
                     } else {
-                        scb.manifest.scheduling.idle_window_ms as u64
+                        idle_window_ms
                     };
                     let idle_window_ns = idle_window_ms * 1_000_000;
                     // Story 5.1 review backfill — removed `last_inbound == 0`

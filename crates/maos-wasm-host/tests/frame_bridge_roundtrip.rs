@@ -137,13 +137,15 @@ fn all_15_frame_kinds_round_trip_through_lower_lift() {
         FrameKind::CapabilityInvocation,
         FrameKind::SandboxBlock,
         FrameKind::InferenceCall,
+        FrameKind::BudgetWarning,
+        FrameKind::BudgetExceeded,
         FrameKind::CliSubprocessOutput,
         FrameKind::ConsentRupture,
         FrameKind::RateLimited,
         FrameKind::GatewayInbound,
         FrameKind::GatewayOutbound,
     ];
-    assert_eq!(all.len(), 15, "sanity: the 11.1a frame set has 15 kinds");
+    assert_eq!(all.len(), 17, "sanity: the frame set has 17 kinds");
 
     for kind in all {
         let frame = envelope(kind, dummy.clone());

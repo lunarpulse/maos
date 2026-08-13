@@ -35,7 +35,10 @@ pub fn quarantine_spirit(
             timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
             lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::SandboxApplied,
             spirit_id: spirit_id.clone(),
-            payload: None,
+            payload: Some(
+                br#"{"action":"quarantine_requested","target_tier":"T3","status":"deferred","reason":"in_process_spirit_form_cannot_be_quarantined"}"#
+                    .to_vec(),
+            ),
             effective_sandbox_tier: Some(target_tier),
         },
     ));

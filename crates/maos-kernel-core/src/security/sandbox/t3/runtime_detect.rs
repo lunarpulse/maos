@@ -42,13 +42,28 @@ fn detect_container_runtime_uncached() -> Result<ContainerRuntime, T3Error> {
         "podman" => probe_runtime("/usr/bin/podman", ContainerRuntimeKind::Podman),
         "docker" => probe_runtime("/usr/bin/docker", ContainerRuntimeKind::Docker),
         "none" => Err(T3Error::RuntimeUnavailable),
-        "auto" | _ => {
-            // Probe Podman first (rootless, preferred), fall back to Docker.
-            match probe_runtime("/usr/bin/podman", ContainerRuntimeKind::Podman) {
-                Ok(rt) => Ok(rt),
-                Err(_) => probe_runtime("/usr/bin/docker", ContainerRuntimeKind::Docker),
-            }
-        }
+        "auto" | _ => select_auto_runtime(
+            probe_runtime("/usr/bin/podman", ContainerRuntimeKind::Podman),
+            probe_runtime("/usr/bin/docker", ContainerRuntimeKind::Docker),
+        ),
+    }
+}
+
+/// Select the automatic fallback result without erasing the preferred-runtime
+/// diagnostic. Forced modes deliberately bypass this aggregate.
+fn select_auto_runtime(
+    podman: Result<ContainerRuntime, T3Error>,
+    docker: Result<ContainerRuntime, T3Error>,
+) -> Result<ContainerRuntime, T3Error> {
+    match podman {
+        Ok(runtime) => Ok(runtime),
+        Err(podman) => match docker {
+            Ok(runtime) => Ok(runtime),
+            Err(docker) => Err(T3Error::RuntimeUnavailableDiagnostics {
+                podman: podman.to_string(),
+                docker: docker.to_string(),
+            }),
+        },
     }
 }
 
@@ -94,6 +109,21 @@ mod tests {
                 // Both failed, cached error — expected on systems without runtime.
             }
             _ => panic!("cached and non-cached results must match"),
+        }
+    }
+
+    #[test]
+    fn auto_mode_retains_both_runtime_probe_diagnostics() {
+        let result = select_auto_runtime(
+            Err(T3Error::Io("podman probe failed".into())),
+            Err(T3Error::Io("docker probe failed".into())),
+        );
+        match result {
+            Err(T3Error::RuntimeUnavailableDiagnostics { podman, docker }) => {
+                assert!(podman.contains("podman probe failed"));
+                assert!(docker.contains("docker probe failed"));
+            }
+            other => panic!("expected dual probe diagnostics, got {other:?}"),
         }
     }
 }

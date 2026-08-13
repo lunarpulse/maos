@@ -23,16 +23,22 @@ pub struct KernelLifecycleResolver {
 }
 
 impl KernelLifecycleResolver {
+    /// Construct a resolver for an authenticated, nonblank director identity.
     pub fn new(
         scheduler: Arc<SpiritSchedulerAdapter>,
         transparency_log: Arc<TransparencyLogAdapter>,
         director_identity: String,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, LifecycleError> {
+        if director_identity.trim().is_empty() {
+            return Err(LifecycleError::Admission(
+                "director identity must not be blank".into(),
+            ));
+        }
+        Ok(Self {
             scheduler,
             transparency_log,
             director_identity,
-        }
+        })
     }
 }
 
@@ -47,84 +53,102 @@ impl LifecycleResolver for KernelLifecycleResolver {
         let tl = Arc::clone(&self.transparency_log);
         let director = self.director_identity.clone();
         let sid = spirit_id.to_string();
+        let (result_tx, result_rx) = std::sync::mpsc::sync_channel(1);
 
-        // Use block_in_place to run async from sync context without panic.
-        let result = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async move {
-                let receipt = match verb {
-                    LifecycleVerb::Load => {
-                        // Load requires a manifest + Spirit object, which the
-                        // LifecycleResolver trait (by design per architecture §4.0.9)
-                        // does not carry.  The operator loads a Spirit via
-                        // `scheduler.load(spirit_id, manifest, spirit, boot_nonce)`
-                        // directly; LifecycleResolver handles start/pause/resume/unload
-                        // only.  v0.3-β: return a clear error directing the caller.
-                        return Err(LifecycleError::Admission(
-                            format!("load for '{sid}' must be called through SpiritSchedulerAdapter::load() directly — LifecycleResolver does not carry manifest/Spirit object")
-                        ));
-                    }
-                    LifecycleVerb::Start => {
-                        let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
-                            LifecycleError::NotLoaded {
-                                spirit_id: sid.clone(),
-                            }
-                        })?;
-                        scheduler.start(pid).await?;
-                        LifecycleReceipt::new(pid, verb, now_ns, None)?
-                    }
-                    LifecycleVerb::Pause => {
-                        let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
-                            LifecycleError::NotLoaded {
-                                spirit_id: sid.clone(),
-                            }
-                        })?;
-                        scheduler.pause(pid).await?;
-                        LifecycleReceipt::new(pid, verb, now_ns, None)?
-                    }
-                    LifecycleVerb::Resume => {
-                        let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
-                            LifecycleError::NotLoaded {
-                                spirit_id: sid.clone(),
-                            }
-                        })?;
-                        scheduler.resume(pid).await?;
-                        LifecycleReceipt::new(pid, verb, now_ns, None)?
-                    }
-                    LifecycleVerb::Unload => {
-                        let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
-                            LifecycleError::NotLoaded {
-                                spirit_id: sid.clone(),
-                            }
-                        })?;
-                        scheduler.unload(pid).await?;
-                        LifecycleReceipt::new(pid, verb, now_ns, None)?
-                    }
-                    _ => {
-                        return Err(LifecycleError::Internal(format!(
-                            "verb {verb:?} not yet implemented at v0.3-β"
-                        )));
-                    }
-                };
+        // The public resolver is synchronous, but it must be callable both
+        // without Tokio and from a current-thread Tokio runtime.  Own the
+        // async bridge on a dedicated thread instead of nesting/blocking the
+        // caller's runtime, which would panic in either unsupported context.
+        std::thread::Builder::new()
+            .name("maos-lifecycle-resolver".into())
+            .spawn(move || {
+                let result = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|err| {
+                        LifecycleError::Internal(format!(
+                            "unable to build lifecycle runtime: {err}"
+                        ))
+                    })
+                    .and_then(|runtime| {
+                        runtime.block_on(async move {
+                            let receipt = match verb {
+                                LifecycleVerb::Load => {
+                                    return Err(LifecycleError::Admission(
+                                        format!("load for '{sid}' must be called through SpiritSchedulerAdapter::load() directly — LifecycleResolver does not carry manifest/Spirit object")
+                                    ));
+                                }
+                                LifecycleVerb::Start => {
+                                    let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
+                                        LifecycleError::NotLoaded {
+                                            spirit_id: sid.clone(),
+                                        }
+                                    })?;
+                                    scheduler.start(pid).await?;
+                                    LifecycleReceipt::new(pid, verb, now_ns, None)?
+                                }
+                                LifecycleVerb::Pause => {
+                                    let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
+                                        LifecycleError::NotLoaded {
+                                            spirit_id: sid.clone(),
+                                        }
+                                    })?;
+                                    scheduler.pause(pid).await?;
+                                    LifecycleReceipt::new(pid, verb, now_ns, None)?
+                                }
+                                LifecycleVerb::Resume => {
+                                    let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
+                                        LifecycleError::NotLoaded {
+                                            spirit_id: sid.clone(),
+                                        }
+                                    })?;
+                                    scheduler.resume(pid).await?;
+                                    LifecycleReceipt::new(pid, verb, now_ns, None)?
+                                }
+                                LifecycleVerb::Unload => {
+                                    let pid = scheduler.resolve_pid(&sid).ok_or_else(|| {
+                                        LifecycleError::NotLoaded {
+                                            spirit_id: sid.clone(),
+                                        }
+                                    })?;
+                                    scheduler.unload(pid).await?;
+                                    LifecycleReceipt::new(pid, verb, now_ns, None)?
+                                }
+                                _ => {
+                                    return Err(LifecycleError::Internal(format!(
+                                        "verb {verb:?} not yet implemented at v0.3-β"
+                                    )));
+                                }
+                            };
 
-                // FR42 director-action audit row.
-                let _ = tl.insert_frame_event(
-                    crate::iac::transparency_log::FrameKind::DecisionDispatch,
-                    receipt.spirit_pid,
-                    None,
-                    &format!("lifecycle.{:?}", verb),
-                    serde_json::json!({
-                        "director": director,
-                        "spirit_id": sid,
-                        "verb": format!("{:?}", verb),
-                    }).to_string().as_bytes(),
-                    maos_domain::invariants::i3::FrameOrigin::HumanAuthored,
-                );
-
-                Ok(receipt)
+                            let _ = tl.insert_frame_event(
+                                crate::iac::transparency_log::FrameKind::DecisionDispatch,
+                                receipt.spirit_pid,
+                                None,
+                                &format!("lifecycle.{:?}", verb),
+                                serde_json::json!({
+                                    "director": director,
+                                    "spirit_id": sid,
+                                    "verb": format!("{:?}", verb),
+                                })
+                                .to_string()
+                                .as_bytes(),
+                                maos_domain::invariants::i3::FrameOrigin::HumanAuthored,
+                            );
+                            Ok(receipt)
+                        })
+                    });
+                let _ = result_tx.send(result);
             })
-        })?;
+            .map_err(|err| {
+                LifecycleError::Internal(format!("unable to start lifecycle bridge: {err}"))
+            })?;
 
-        Ok(result)
+        result_rx.recv().map_err(|err| {
+            LifecycleError::Internal(format!(
+                "lifecycle bridge terminated before returning: {err}"
+            ))
+        })?
     }
 }
 

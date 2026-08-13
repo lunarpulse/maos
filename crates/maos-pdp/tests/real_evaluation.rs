@@ -1,3 +1,5 @@
+#![cfg(not(feature = "pdp-fault-inject"))]
+
 //! Story 11.4a AC2 — decisions come from REAL policy evaluation, not a
 //! hardcoded map (the anti-canned thesis).
 //!

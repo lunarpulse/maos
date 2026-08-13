@@ -6,14 +6,13 @@
 //! emits `SpiritRevoked` frames, applies `[on_revocation].action`,
 //! and routes through `terminate_spirit(RevocationTerminated)`.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
 
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::revocation::{
     ApplyEntry, ApplyReport, CrlId, RevocationAction, RevocationError, SignedRevocationList,
 };
-use maos_domain::sandbox::T3Error;
 
 use crate::capability::cap_tokens::monotonic_now_ns;
 use crate::halt::{terminate_spirit, HaltRegistry};
@@ -30,13 +29,14 @@ pub struct RevocationApplier {
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     capability: Arc<crate::capability::CapabilityRegistryAdapter>,
     scheduler: Arc<SpiritSchedulerAdapter>,
-    iac: Arc<crate::iac::IacBusAdapter>,
+    _iac: Arc<crate::iac::IacBusAdapter>,
     halt_registry: Arc<HaltRegistry>,
     tl: Arc<TransparencyLogAdapter>,
     journal: Arc<JournalAdapter>,
     telemetry: Arc<IacRtMetrics>,
-    /// Idempotency: track applied CRL IDs to reject re-imports.
-    applied_crls: Arc<RwLock<BTreeSet<CrlId>>>,
+    /// Validated rules shared with scheduler admission. Its gate atomically
+    /// reserves CRLs, installs rules, and snapshots existing SCBs.
+    rules: Arc<crate::revocation::rules::ValidatedRevocationRules>,
     /// Story 5.4 — active drain handles for `DrainThenTerminate` policy.
     active_drains: Arc<Mutex<BTreeMap<u32, tokio::task::JoinHandle<()>>>>,
 }
@@ -52,358 +52,205 @@ impl RevocationApplier {
         journal: Arc<JournalAdapter>,
         telemetry: Arc<IacRtMetrics>,
     ) -> Self {
+        let rules = Arc::new(crate::revocation::rules::ValidatedRevocationRules::new());
+        scheduler.set_revocation_rules(Arc::clone(&rules));
         Self {
             spirits,
             capability,
             scheduler,
-            iac,
+            _iac: iac,
             halt_registry,
             tl,
             journal,
             telemetry,
-            applied_crls: Arc::new(RwLock::new(BTreeSet::new())),
+            rules,
             active_drains: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
-
-    /// Apply a parsed + signature-verified CRL. Returns one `ApplyEntry` per
-    /// matched Spirit. Idempotent: re-applying the same CRL returns
-    /// `Err(RevocationError::AlreadyApplied { id })`.
+    /// Apply a parsed + signature-verified CRL. The shared asynchronous rule
+    /// store reserves the ID and blocks admissions until the existing-SCB
+    /// propagation pass commits or rolls back.
     pub async fn apply_crl(
         &self,
         crl: SignedRevocationList,
     ) -> Result<ApplyReport, RevocationError> {
         let start_ns = monotonic_now_ns();
-
-        // 1. Idempotency check (read-only)
-        {
-            let read_set = self
-                .applied_crls
-                .read()
-                .expect("applied_crls lock poisoned");
-            if read_set.contains(&crl.id) {
-                return Err(RevocationError::AlreadyApplied {
-                    id: crl.id.to_string(),
-                });
-            }
+        let _admission_gate = self.rules.admission_guard().await;
+        if self.rules.contains_locked(crl.id) {
+            return Err(RevocationError::AlreadyApplied {
+                id: crl.id.to_string(),
+            });
         }
+        self.rules.install_locked(crl.id, crl.entries.clone());
 
-        let mut matched_count = 0usize;
-        let mut revoked_count = 0usize;
-        let mut halt_receipts_produced = 0usize;
-        let mut tokens_revoked_total = 0usize;
-        let mut per_spirit = Vec::new();
+        let result = async {
+            let mut matched_count = 0usize;
+            let mut revoked_count = 0usize;
+            let mut halt_receipts_produced = 0usize;
+            let mut tokens_revoked_total = 0usize;
+            let mut per_spirit = Vec::new();
+            let spirits_snapshot = {
+                let spirits = self.spirits.read().expect("spirits lock poisoned");
+                spirits.values().cloned().collect::<Vec<_>>()
+            };
 
-        // 2. Iterate spirits and match against CRL entries
-        let spirits_snapshot = {
-            let spirits = self.spirits.read().expect("spirits lock poisoned");
-            spirits.values().cloned().collect::<Vec<_>>()
-        };
-
-        for scb in spirits_snapshot {
-            let class_name = scb
-                .manifest
-                .class
-                .as_ref()
-                .map(|c| c.name.clone())
-                .unwrap_or_default();
-            let version = scb
-                .manifest
-                .class
-                .as_ref()
-                .map(|c| c.version.clone())
-                .unwrap_or_default();
-
-            for entry in &crl.entries {
-                if class_name != entry.spirit_class {
+            for scb in spirits_snapshot {
+                let runtime = scb.runtime_snapshot();
+                let Some(class) = &runtime.manifest.class else {
                     continue;
-                }
-                let matches = crate::revocation::version_match::semver_range_contains(
+                };
+                let class_name = class.name.clone();
+                let version = class.version.clone();
+                let entry = crl
+                    .entries
+                    .iter()
+                    .find(|entry| entry.spirit_class == class_name)
+                    .cloned();
+                let Some(entry) = entry else {
+                    continue;
+                };
+                if !crate::revocation::version_match::semver_range_contains(
                     &version,
                     &entry.version_range,
                 )
-                .unwrap_or(false);
-                if !matches {
+                .map_err(|error| RevocationError::MalformedVersionRange {
+                    range: entry.version_range.clone(),
+                    reason: error.to_string(),
+                })? {
                     continue;
                 }
-
                 matched_count += 1;
                 revoked_count += 1;
-
-                // Revoke capability tokens
-                let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid).map_err(|_e| {
-                    RevocationError::Io(format!(
-                        "capability revocation failed for spirit pid={}",
-                        scb.pid
-                    ))
+                let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid).map_err(|_| {
+                    RevocationError::Io(format!("capability revocation failed for spirit pid={}", scb.pid))
                 })?;
                 tokens_revoked_total += tokens_revoked;
-
                 let in_flight_token_count = scb
                     .task_assignments_in_flight
                     .lock()
-                    .map(|v| v.len())
-                    .unwrap_or(0);
+                    .map(|assignments| assignments.len())
+                    .map_err(|_| RevocationError::Io("in-flight task lock poisoned".into()))?;
 
-                // Emit SpiritRevoked frame
-                let payload = serde_json::json!({
+                let payload_bytes = serde_json::to_vec(&serde_json::json!({
                     "spirit_id": scb.spirit_id,
                     "spirit_pid": scb.pid,
-                    "spirit_class": class_name,
-                    "spirit_version": version,
+                    "spirit_class": &class_name,
+                    "spirit_version": &version,
                     "revocation_origin": crl.origin.as_str(),
-                    "revocation_reason": entry.reason,
+                    "revocation_reason": &entry.reason,
                     "applied_at_ns": monotonic_now_ns(),
                     "in_flight_token_count": in_flight_token_count,
-                    "action": scb.on_revocation_action.as_str(),
-                });
-                let payload_bytes = serde_json::to_vec(&payload)
-                    .map_err(|e| RevocationError::Deserialize(format!("payload serialize: {e}")))?;
+                    "action": runtime.on_revocation_action.as_str(),
+                }))
+                .map_err(|error| RevocationError::Deserialize(format!("payload serialize: {error}")))?;
                 self.tl.insert_frame_event(
-                    FrameKind::SpiritRevoked,
-                    scb.pid,
-                    None,
-                    "spirit.revoked",
-                    &payload_bytes,
-                    FrameOrigin::Kernel,
+                    FrameKind::SpiritRevoked, scb.pid, None, "spirit.revoked", &payload_bytes, FrameOrigin::Kernel,
                 );
 
-                // Apply declared action
-                let receipts = match scb.on_revocation_action {
+                let receipts = match runtime.on_revocation_action {
                     RevocationAction::TerminateImmediately => {
                         let receipts = terminate_spirit(
-                            &self.tl,
-                            &self.halt_registry,
-                            scb.pid,
-                            &scb.spirit_id,
-                            maos_domain::halt::TerminationKind::RevocationTerminated,
-                            scb.boot_nonce,
+                            &self.tl, &self.halt_registry, scb.pid, &scb.spirit_id,
+                            maos_domain::halt::TerminationKind::RevocationTerminated, scb.boot_nonce,
                         );
-                        let receipt_count = receipts.len();
-                        // Fire-and-forget unload
-                        let scheduler = Arc::clone(&self.scheduler);
-                        let pid = scb.pid;
-                        tokio::spawn(async move {
-                            if let Err(e) = scheduler.unload(pid).await {
-                                eprintln!(
-                                    "revocation: unload failed for pid={pid} after RevocationTerminated: {e}"
-                                );
-                            }
-                        });
-                        receipt_count
+                        self.scheduler.unload(scb.pid).await.map_err(|error| {
+                            RevocationError::Io(format!("unload revoked spirit pid={}: {error}", scb.pid))
+                        })?;
+                        receipts.len()
                     }
-                    RevocationAction::DrainThenTerminate => {
-                        let deadline_ms = scb
-                            .manifest
-                            .supervision
-                            .as_ref()
-                            .map(|s| s.progress_threshold_ms * 2)
+                    RevocationAction::DrainThenTerminate | RevocationAction::Quarantine => {
+                        if runtime.on_revocation_action == RevocationAction::Quarantine {
+                            let marker_bytes = serde_json::to_vec(&serde_json::json!({
+                                "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantine_requested": true,
+                            })).map_err(|error| RevocationError::Deserialize(format!("marker serialize: {error}")))?;
+                            self.tl.insert_frame_event(
+                                FrameKind::CapabilityInvocation, scb.pid, None, "spirit.quarantine_requested",
+                                &marker_bytes, FrameOrigin::Kernel,
+                            );
+                        }
+                        let deadline_ms = runtime.manifest.supervision.as_ref()
+                            .map(|supervision| u64::from(supervision.progress_threshold_ms).saturating_mul(2))
                             .unwrap_or(60_000);
                         let tl = Arc::clone(&self.tl);
-                        let halt = Arc::clone(&self.halt_registry);
+                        let halt_registry = Arc::clone(&self.halt_registry);
                         let scheduler = Arc::clone(&self.scheduler);
-                        let pid = scb.pid;
+                        let active_drains = Arc::clone(&self.active_drains);
                         let spirit_id = scb.spirit_id.clone();
+                        let pid = scb.pid;
                         let boot_nonce = scb.boot_nonce;
-                        let drains = Arc::clone(&self.active_drains);
                         let handle = tokio::spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_millis(
-                                deadline_ms as u64,
-                            ))
-                            .await;
-                            let _receipts = terminate_spirit(
-                                &tl,
-                                &halt,
-                                pid,
-                                &spirit_id,
-                                maos_domain::halt::TerminationKind::RevocationTerminated,
-                                boot_nonce,
+                            tokio::time::sleep(std::time::Duration::from_millis(deadline_ms)).await;
+                            let _ = terminate_spirit(
+                                &tl, &halt_registry, pid, &spirit_id,
+                                maos_domain::halt::TerminationKind::RevocationTerminated, boot_nonce,
                             );
-                            if let Err(e) = scheduler.unload(pid).await {
-                                eprintln!(
-                                    "revocation: drain-then-terminate unload failed for pid={pid}: {e}"
-                                );
+                            if let Err(error) = scheduler.unload(pid).await {
+                                eprintln!("revocation: deferred unload failed for pid={pid}: {error}");
                             }
-                            // Prune self from active_drains on completion
-                            if let Ok(mut m) = drains.lock() {
-                                m.remove(&pid);
+                            if let Ok(mut drains) = active_drains.lock() {
+                                drains.remove(&pid);
                             }
                         });
-                        {
-                            let mut drains =
-                                self.active_drains.lock().expect("active_drains poisoned");
-                            drains.insert(scb.pid, handle);
-                        }
-                        0 // receipts produced asynchronously
-                    }
-                    RevocationAction::Quarantine => {
-                        // Story 5.5a: wire the T3 quarantine structural seam.
-                        // v0.5-α: in-process Spirits cannot be re-spawned into a
-                        // container; quarantine_spirit returns
-                        // Err(QuarantineRequiresSubprocessForm). Fall back to
-                        // drain-then-terminate with the deferred rationale.
-                        let quarantine_result =
-                            crate::security::sandbox::t3::quarantine::quarantine_spirit(
-                                self.scheduler.as_ref(),
-                                scb.pid,
-                                maos_domain::invariants::i9::SandboxTier::T3,
-                                None,
-                            );
-                        match quarantine_result {
-                            Ok(_report) => 0,
-                            Err(T3Error::QuarantineRequiresSubprocessForm) => {
-                                eprintln!(
-                                    "maos: quarantine deferred for spirit_pid={} (in-process form; T3 re-spawn requires subprocess form at Epic 6)",
-                                    scb.pid
-                                );
-                                // Fall back to drain-then-terminate.
-                                let deadline_ms = scb
-                                    .manifest
-                                    .supervision
-                                    .as_ref()
-                                    .map(|s| s.progress_threshold_ms * 2)
-                                    .unwrap_or(60_000);
-                                let tl = Arc::clone(&self.tl);
-                                let halt = Arc::clone(&self.halt_registry);
-                                let scheduler = Arc::clone(&self.scheduler);
-                                let pid = scb.pid;
-                                let spirit_id = scb.spirit_id.clone();
-                                let boot_nonce = scb.boot_nonce;
-                                let drains = Arc::clone(&self.active_drains);
-                                let handle = tokio::spawn(async move {
-                                    tokio::time::sleep(std::time::Duration::from_millis(
-                                        deadline_ms as u64,
-                                    ))
-                                    .await;
-                                    let _receipts = terminate_spirit(
-                                        &tl,
-                                        &halt,
-                                        pid,
-                                        &spirit_id,
-                                        maos_domain::halt::TerminationKind::RevocationTerminated,
-                                        boot_nonce,
-                                    );
-                                    if let Err(e) = scheduler.unload(pid).await {
-                                        eprintln!(
-                                            "revocation: drain-then-terminate (quarantine fallback) unload failed for pid={pid}: {e}"
-                                        );
-                                    }
-                                    if let Ok(mut m) = drains.lock() {
-                                        m.remove(&pid);
-                                    }
-                                });
-                                {
-                                    let mut drains =
-                                        self.active_drains.lock().expect("active_drains poisoned");
-                                    drains.insert(scb.pid, handle);
-                                }
-                                0
-                            }
-                            Err(e) => {
-                                return Err(RevocationError::QuarantineFailed(e.to_string()));
-                            }
-                        }
+                        self.active_drains
+                            .lock()
+                            .expect("active revocation drains lock poisoned")
+                            .insert(scb.pid, handle);
+                        0
                     }
                     _ => {
-                        eprintln!(
-                            "revocation: unknown on_revocation_action={:?} for spirit pid={}, skipping termination",
-                            scb.on_revocation_action, scb.pid
-                        );
-                        0
+                        return Err(RevocationError::UnsupportedAction(format!(
+                            "{:?}", runtime.on_revocation_action
+                        )));
                     }
                 };
 
-                if scb.on_revocation_action == RevocationAction::Quarantine {
-                    let marker = serde_json::json!({
-                        "spirit_id": scb.spirit_id,
-                        "spirit_pid": scb.pid,
-                        "quarantine_requested": true,
-                    });
-                    let marker_bytes = serde_json::to_vec(&marker).map_err(|e| {
-                        RevocationError::Deserialize(format!("marker serialize: {e}"))
-                    })?;
-                    self.tl.insert_frame_event(
-                        FrameKind::CapabilityInvocation,
-                        scb.pid,
-                        None,
-                        "spirit.quarantine_requested",
-                        &marker_bytes,
-                        FrameOrigin::Kernel,
-                    );
-                }
-
                 halt_receipts_produced += receipts;
-
-                // Journal LifecycleEvent::Revoked
-                let now_ns = monotonic_now_ns();
-                self.journal
-                    .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
-                        timestamp: now_ns / 1_000_000_000,
-                        lifecycle_event: LifecycleEvent::Revoked,
-                        spirit_id: scb.spirit_id.clone(),
-                        payload: None,
-                        effective_sandbox_tier: None,
-                    }));
-
+                self.journal.append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+                    timestamp: monotonic_now_ns() / 1_000_000_000,
+                    lifecycle_event: LifecycleEvent::Revoked,
+                    spirit_id: scb.spirit_id.clone(),
+                    payload: None,
+                    effective_sandbox_tier: None,
+                }));
                 per_spirit.push(ApplyEntry {
                     spirit_id: scb.spirit_id.clone(),
                     spirit_pid: scb.pid,
-                    spirit_class: class_name.clone(),
-                    spirit_version: version.clone(),
-                    action: scb.on_revocation_action,
+                    spirit_class: class_name,
+                    spirit_version: version,
+                    action: runtime.on_revocation_action,
                     tokens_revoked,
                     halt_receipts_produced: receipts,
                     in_flight_token_count,
                 });
-
-                // Break after first matching entry for this SCB — avoid duplicate
-                // journal entries, frames, and terminate calls.
-                break;
             }
+
+            let latency_ns = monotonic_now_ns().saturating_sub(start_ns);
+            self.telemetry.record_iac_rt(Service::RevocationApplier, Outcome::Ok, latency_ns / 1000);
+            Ok(ApplyReport {
+                crl_id: crl.id,
+                origin: crl.origin,
+                matched_count,
+                revoked_count,
+                halt_receipts_produced,
+                tokens_revoked_total,
+                apply_latency_ns: latency_ns,
+                per_spirit,
+            })
+        }.await;
+
+        if result.is_err() {
+            self.rules.remove_locked(crl.id);
         }
-
-        let latency_ns = monotonic_now_ns().saturating_sub(start_ns);
-        self.telemetry
-            .record_iac_rt(Service::RevocationApplier, Outcome::Ok, latency_ns / 1000);
-
-        // Insert applied CRL id only after successful processing.
-        // If two concurrent callers race, the second will see AlreadyApplied
-        // on its next attempt.
-        {
-            let mut write_set = self
-                .applied_crls
-                .write()
-                .expect("applied_crls lock poisoned");
-            write_set.insert(crl.id);
-        }
-
-        Ok(ApplyReport {
-            crl_id: crl.id,
-            origin: crl.origin,
-            matched_count,
-            revoked_count,
-            halt_receipts_produced,
-            tokens_revoked_total,
-            apply_latency_ns: latency_ns,
-            per_spirit,
-        })
+        result
     }
 
-    /// Remove a CRL ID from the applied set (for `--force` re-apply).
-    pub fn forget(&self, id: CrlId) {
-        let mut set = self
-            .applied_crls
-            .write()
-            .expect("applied_crls lock poisoned");
-        set.remove(&id);
+    /// Remove a CRL ID and its validated admission rule (for `--force` re-apply).
+    pub async fn forget(&self, id: CrlId) {
+        self.rules.forget(id).await;
     }
 
-    /// List already-applied CRLs (for `maosctl revocations list`).
+    /// List committed or in-flight CRL IDs (for `maosctl revocations list`).
     pub fn list_applied(&self) -> Vec<CrlId> {
-        let set = self
-            .applied_crls
-            .read()
-            .expect("applied_crls lock poisoned");
-        set.iter().cloned().collect()
+        self.rules.list()
     }
 }

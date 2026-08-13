@@ -80,6 +80,11 @@ use maos_kernel_core::security::approval::ApprovalManager;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 #[cfg(feature = "network")]
 use maos_providers::AnthropicProvider;
+#[cfg(feature = "network")]
+struct UpgradeSmokeSpirit;
+
+#[cfg(feature = "network")]
+impl maos_spirit_abi::lifecycle::Spirit for UpgradeSmokeSpirit {}
 
 fn worker_thread_count() -> usize {
     available_parallelism().map(usize::from).unwrap_or(1)
@@ -3162,6 +3167,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
 
+    // Story 5.5a — the operator endpoint is an adapter over this exact
+    // scheduler Arc. It binds loopback by default when an operator bearer is
+    // configured and never manufactures a one-shot report fallback.
+    let _operator_http_server = match (
+        std::env::var("MAOS_OPERATOR_BEARER_TOKEN"),
+        std::env::var("MAOS_OPERATOR_HTTP_BIND"),
+    ) {
+        (Ok(token), bind) => {
+            let bind = bind.unwrap_or_else(|_| "127.0.0.1:8787".to_owned());
+            let bind = if bind.is_empty() {
+                "127.0.0.1:8787".parse()
+            } else {
+                bind.parse()
+            }
+            .map_err(|error| format!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}"))?;
+            Some(
+                maos_control::OperatorHttpServer::bind(
+                    maos_control::OperatorHttpConfig {
+                        bind,
+                        bearer_token: token,
+                    },
+                    Arc::clone(&scheduler),
+                )
+                .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?,
+            )
+        }
+        (Err(_), Ok(_)) => {
+            return Err(
+                "maos: MAOS_OPERATOR_BEARER_TOKEN is required when MAOS_OPERATOR_HTTP_BIND is configured"
+                    .into(),
+            )
+        }
+        (Err(_), Err(_)) => None,
+    };
+
     // Story 5.2 — Shared journal opened at default path.
     // Created before CrashDetector so the detector can append lifecycle events.
     let journal_path = maos_audit::default_journal_path();
@@ -3208,11 +3248,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     mailbox.set_tracker(tracker);
 
     // Story 5.1 — KernelLifecycleResolver assembled for CLI / ACP / HTTP API consumers.
-    let lifecycle_resolver = Arc::new(maos_kernel_core::scheduler::KernelLifecycleResolver::new(
-        Arc::clone(&scheduler),
-        Arc::clone(&transparency_log),
-        "director".into(),
-    ));
+    let lifecycle_resolver = Arc::new(
+        maos_kernel_core::scheduler::KernelLifecycleResolver::new(
+            Arc::clone(&scheduler),
+            Arc::clone(&transparency_log),
+            "director".into(),
+        )
+        .map_err(|error| format!("maos: invalid lifecycle resolver configuration: {error}"))?,
+    );
     eprintln!("maos: KernelLifecycleResolver wired (Story 5.1)");
 
     // Story 5.2 — HotSwapCoordinator constructed exactly once at composition root.
@@ -3243,8 +3286,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&shared_journal),
         Arc::clone(&telemetry),
     ));
+    let revocation_trust_anchor = std::env::var("MAOS_CRL_TRUST_ANCHOR_PUB_HEX")
+        .ok()
+        .map(|encoded| {
+            hex::decode(encoded)
+                .map_err(|error| format!("maos: invalid MAOS_CRL_TRUST_ANCHOR_PUB_HEX: {error}"))
+        })
+        .transpose()?;
     let local_file_registry = Arc::new(maos_domain::revocation::LocalFileRegistryClient::new(
         std::path::PathBuf::from("/tmp").join("maos").join("crl"),
+        revocation_trust_anchor,
     ));
     let crypto_provider: Arc<dyn maos_domain::ports::crypto::CryptoProvider> =
         Arc::new(maos_kernel_core::security::crypto::RingCryptoProvider);
@@ -3254,8 +3305,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&crypto_provider),
         Arc::clone(&telemetry),
     ));
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let _poller_handle = revocation_poller.spawn(cancel_token.child_token());
     eprintln!("maos: RevocationApplier + RevocationPoller wired (Story 5.4)");
 
     // Story 5.5d — Registry client + yank poller wiring (Finding #4 closed).
@@ -3390,13 +3439,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         registry_cfg.require_server_tier_signature
     );
 
-    // Story 5.4 — UpgradeOrchestrator constructed at composition root.
+    // Story 5.4 — UpgradeOrchestrator constructed at composition root. The
+    // factory creates a new concrete Spirit for every successor manifest;
+    // upgrade code is never given the predecessor object.
+    let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
+        |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
+            let class = manifest.class.as_ref().ok_or_else(|| {
+                maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                    reason: "successor manifest lacks [class]".into(),
+                }
+            })?;
+            let object = match class.name.as_str() {
+                "orchestrator" => maos_kernel_core::scheduler::make_spirit_obj(
+                    ::orchestrator::Orchestrator::new(&class.name),
+                ),
+                "architect" => maos_kernel_core::scheduler::make_spirit_obj(
+                    ::architect::Architect::new(&class.name).with_pending_spec("upgrade successor"),
+                ),
+                "reviewer" => maos_kernel_core::scheduler::make_spirit_obj(
+                    ::reviewer::Reviewer::new(&class.name)
+                        .with_pending_design(::reviewer::DesignUnderReview::default()),
+                ),
+                "mira" => maos_kernel_core::scheduler::make_spirit_obj(
+                    ::mira::Mira::default().with_id(&class.name),
+                ),
+                "nash" => maos_kernel_core::scheduler::make_spirit_obj(
+                    ::nash::Nash::default().with_id(&class.name),
+                ),
+                "digest" => maos_kernel_core::scheduler::make_spirit_obj(
+                    maos_digest::DigestSpirit::default(),
+                ),
+                "smoke-spirit" => maos_kernel_core::scheduler::make_spirit_obj(UpgradeSmokeSpirit),
+                unsupported => {
+                    return Err(
+                        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                            reason: format!(
+                                "no successor loader registered for class '{unsupported}'"
+                            ),
+                        },
+                    );
+                }
+            };
+            Ok(object)
+        },
+    );
     let upgrade_orchestrator = Arc::new(maos_kernel_core::lifecycle::UpgradeOrchestrator::new(
         Arc::clone(&scheduler),
         Arc::clone(&hot_swap_coordinator),
         Arc::clone(&transparency_log),
         Arc::clone(&shared_journal),
         Arc::clone(&telemetry),
+        successor_factory,
     ));
     eprintln!("maos: UpgradeOrchestrator wired (Story 5.4)");
 
@@ -4176,49 +4269,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .transpose()?;
 
-            // 2. Admit through the canonical SecurityManagerAdapter path.
-            // Reuse the composition root's shared journal (Story 8.11 review patch:
-            // opening a second JournalAdapter at the same SQLite path risks
-            // concurrent-write corruption).
             let journal = Arc::clone(&shared_journal);
             let spirit_id = class_section.name.clone();
-            let _run_spec = security
-                .admit_spirit(
-                    0,
-                    &spirit_id,
-                    &sandbox_cfg,
-                    &resource_caps,
-                    &caps_required,
-                    Some(&output_shape),
-                    journal.as_ref(),
-                    &posture_section,
-                    epistemic_policy.as_ref(),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(&class_section),
-                )
-                .map_err(|e| {
-                    emit_vetter_key_event(
-                        &transparency_log,
-                        &spirit_id,
-                        &class_section.version,
-                        false,
-                        "N/A",
-                        &format!("maos run: admission rejected: {e}"),
-                    );
-                    format!("maos run: admission failed: {e}")
-                })?;
-            emit_vetter_key_event(
-                &transparency_log,
-                &spirit_id,
-                &class_section.version,
-                true,
-                &format!("{:?}", _run_spec.tier),
-                "maos run: admission granted",
-            );
 
             // Story 9.4b AC-6 (D6/D7) — model-provenance admission gate + FR62
             // journaling. Fail-closed: a required/stale/malformed [model_provenance]
@@ -4243,7 +4295,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..Default::default()
             };
 
-            // 3. Construct the Spirit with its injected ports, then load + start.
+            // 3. Construct and load the Spirit; admission and start follow once the
+            //    scheduler has assigned the real pid.
             //    `--once` test seam: `MAOS_TEST_ONLY_STRIP_SCALAR_PORT` forces the
             //    port to `None` so the boot-loud guard can be proven RED (the
             //    negative-boot test). It is NEVER set in production; if it is, a
@@ -4260,6 +4313,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             > = None;
             let mut researcher_collective_failure: Option<Arc<std::sync::atomic::AtomicBool>> =
                 None;
+            let researcher_pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            let mut researcher_inference_binding: Option<
+                Arc<std::sync::Mutex<Option<(CapabilityToken, u32)>>>,
+            > = None;
+            let mut researcher_inference_provider: Option<String> = None;
 
             // JB-5 — shared output channel for output_shape validation (only
             // populated for Butler-class Spirits).
@@ -4659,36 +4717,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 )
                                 .with_log_recall_port(
                                     Arc::clone(&log_recall_adapter) as Arc<dyn LogRecallPort>,
-                                    // FIXME(Patch 4): spirit_pid is 0 because the real pid
-                                    // is not allocated until scheduler.load() below. Fixing
-                                    // requires making allocate_pid() pub or restructuring
-                                    // the Researcher to accept deferred pid.
-                                    0,
+                                    Arc::clone(&researcher_pid_binding),
                                 );
                             researcher_mcp_ref = Some(live_mcp);
                             eprintln!("maos run: researcher live MCP port wired (--live)");
                         }
 
-                        // --live also wires the inference seam (pre-existing, unchanged).
+                        // --live also wires the inference seam. Token issuance is
+                        // deferred until scheduler load and canonical admission
+                        // have bound the real pid.
                         let provider = router
                             .default_id()
                             .ok_or_else(|| {
                                 "maos run: --live requested but no inference provider is configured"
                             })?
                             .to_string();
-                        let token = issue_enterprise_governed_capability(
-                            capability.as_ref(),
-                            enterprise_runtime.as_deref(),
-                            enterprise_pdp_runtime.as_ref(),
-                            // FIXME(Patch 4): spirit_pid is 0 because pid is not yet
-                            // allocated; requires pre-alloc or deferred binding.
-                            0,
-                            Scope::ProviderInfer { provider },
-                            60,
-                            [0u8; 32],
-                            IntentClass::Standard,
-                        )
-                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                        researcher_inference_provider = Some(provider);
+                        let binding = Arc::new(std::sync::Mutex::new(None));
+                        researcher_inference_binding = Some(Arc::clone(&binding));
                         let researcher_inference = InferencePortAdapter::new(
                             Arc::clone(&router),
                             Arc::clone(&capability),
@@ -4711,8 +4757,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             } else {
                                 Arc::new(researcher_inference)
                             };
-                        // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                        researcher = researcher.with_inference_port(port, token, 0);
+                        researcher = researcher.with_deferred_inference_port(port, binding);
                         eprintln!("maos run: researcher live-inference seam wired (--live)");
                     } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
                         let strict = std::env::var("MAOS_REPLAY_STRICT")
@@ -4723,24 +4768,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             strict,
                         )
                         .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
-                        let token = issue_enterprise_governed_capability(
-                            capability.as_ref(),
-                            enterprise_runtime.as_deref(),
-                            enterprise_pdp_runtime.as_ref(),
-                            // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                            0,
-                            Scope::ProviderInfer {
-                                provider: "replay".into(),
-                            },
-                            60,
-                            [0u8; 32],
-                            IntentClass::Standard,
-                        )
-                        .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                        let binding = Arc::new(std::sync::Mutex::new(None));
+                        researcher_inference_binding = Some(Arc::clone(&binding));
+                        researcher_inference_provider = Some("replay".into());
                         let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
                             Arc::new(replay);
-                        // FIXME(Patch 4): spirit_pid is 0; same structural blocker.
-                        researcher = researcher.with_inference_port(port, token, 0);
+                        researcher = researcher.with_deferred_inference_port(port, binding);
                         eprintln!(
                             "maos run: researcher cassette-replay inference wired ({})",
                             cassette_path
@@ -4754,9 +4787,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .load(&spirit_id, bundle, researcher, boot_nonce)
                         .await
                         .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
-                    // Patch 4 — update the MCP port's spirit_pid to the real
-                    // scheduler-allocated value (was hardcoded 0 at construction time).
-                    if let Some(ref mcp) = researcher_mcp_ref {
+                    researcher_pid_binding.store(pid, std::sync::atomic::Ordering::SeqCst);
+                    if let Some(mcp) = &researcher_mcp_ref {
                         mcp.spirit_pid
                             .store(pid, std::sync::atomic::Ordering::SeqCst);
                     }
@@ -4859,6 +4891,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?,
             };
+            // 4. Admit through the canonical SecurityManagerAdapter path using the
+            // scheduler-assigned pid. Capability mediation is keyed by pid, so
+            // admitting a placeholder pid would make every live port fail closed.
+            let _run_spec = security
+                .admit_spirit(
+                    pid,
+                    &spirit_id,
+                    &sandbox_cfg,
+                    &resource_caps,
+                    &caps_required,
+                    Some(&output_shape),
+                    journal.as_ref(),
+                    &posture_section,
+                    epistemic_policy.as_ref(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&class_section),
+                )
+                .map_err(|e| {
+                    emit_vetter_key_event(
+                        &transparency_log,
+                        &spirit_id,
+                        &class_section.version,
+                        false,
+                        "N/A",
+                        &format!("maos run: admission rejected: {e}"),
+                    );
+                    format!("maos run: admission failed: {e}")
+                })?;
+            emit_vetter_key_event(
+                &transparency_log,
+                &spirit_id,
+                &class_section.version,
+                true,
+                &format!("{:?}", _run_spec.tier),
+                "maos run: admission granted",
+            );
+            if let (Some(binding), Some(provider)) = (
+                researcher_inference_binding.as_ref(),
+                researcher_inference_provider.as_ref(),
+            ) {
+                let token = issue_enterprise_governed_capability(
+                    capability.as_ref(),
+                    enterprise_runtime.as_deref(),
+                    enterprise_pdp_runtime.as_ref(),
+                    pid,
+                    Scope::ProviderInfer {
+                        provider: provider.clone(),
+                    },
+                    60,
+                    [0u8; 32],
+                    IntentClass::Standard,
+                )
+                .map_err(|e| format!("maos run: token issue failed: {e}"))?;
+                *binding.lock().unwrap_or_else(|error| error.into_inner()) = Some((token, pid));
+            }
             pid_by_spirit_id
                 .write()
                 .unwrap_or_else(|e| {
@@ -6670,7 +6761,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|e| format!("CRL parse/verify failed: {e}"))?;
 
             if std::env::var("MAOS_CRL_FORCE_REAPPLY").is_ok() {
-                revocation_applier.forget(crl.id);
+                revocation_applier.forget(crl.id).await;
             }
 
             let report = revocation_applier
@@ -6710,6 +6801,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if mode == "smoke-upgrade-revoke-5" {
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+            let revocation_poller_cancel = tokio_util::sync::CancellationToken::new();
+            let revocation_poller_handle =
+                Arc::clone(&revocation_poller).spawn(revocation_poller_cancel.child_token());
             // Inline smoke spirit — minimal Spirit impl for testing.
             struct SmokeSpirit;
             impl maos_spirit_abi::lifecycle::Spirit for SmokeSpirit {
@@ -6842,23 +6937,115 @@ description = "smoke test spirit successor"
             println!("{{\"step\":2,\"surface\":\"upgrade_orchestrator\",\"policy\":\"cold-swap\",\"outcome\":\"{}\",\"halt_receipts_produced\":{}}}",
                 cold_report.outcome.as_str(), cold_report.halt_receipts_produced);
 
-            // Step 4: Apply synthetic CRL
-            let crl = maos_domain::revocation::SignedRevocationList::new(
-                maos_domain::revocation::CrlId([1u8; 32]),
+            // Step 4: Admit the upgraded Spirit through the canonical security
+            // path, then issue a real token before applying a real signed CRL.
+            let revoked_pid = scheduler
+                .resolve_pid("smoke-spirit")
+                .ok_or("smoke: upgraded spirit is not loaded")?;
+            let smoke_caps = maos_kernel_core::security::manifest::CapabilitiesRequired {
+                provider: maos_kernel_core::security::manifest::ProviderCapabilities {
+                    complete: vec!["smoke-revocation".into()],
+                },
+                mcp: maos_kernel_core::security::manifest::McpCapabilities {
+                    servers: Vec::new(),
+                },
+                loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
+            };
+            let smoke_class = maos_kernel_core::security::manifest::ClassSection {
+                name: "smoke-spirit".into(),
+                version: "0.1.1".into(),
+                abi: "1.0".into(),
+                manifest_schema_version: 1,
+                min_substrate_version: env!("CARGO_PKG_VERSION").into(),
+                forms: vec!["rust-inproc".into()],
+                trust_tier: "local".into(),
+                description: "smoke test spirit successor".into(),
+            };
+            let smoke_posture = maos_kernel_core::security::manifest::PostureSection {
+                default: maos_kernel_core::security::manifest::Posture::Cautious,
+                allowed_max: maos_kernel_core::security::manifest::Posture::Cautious,
+            };
+            security
+                .admit_spirit(
+                    revoked_pid,
+                    "smoke-spirit",
+                    &maos_kernel_core::security::manifest::SandboxConfig::default(),
+                    &maos_kernel_core::security::manifest::ResourceCaps::default(),
+                    &smoke_caps,
+                    None,
+                    shared_journal.as_ref(),
+                    &smoke_posture,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&smoke_class),
+                )
+                .map_err(|error| format!("smoke: security admission failed: {error}"))?;
+            let token = issue_enterprise_governed_capability(
+                capability.as_ref(),
+                enterprise_runtime.as_deref(),
+                enterprise_pdp_runtime.as_ref(),
+                revoked_pid,
+                maos_domain::invariants::i1::Scope::ProviderInfer {
+                    provider: "smoke-revocation".into(),
+                },
+                60,
+                [0u8; 32],
+                maos_domain::invariants::i1::IntentClass::Standard,
+            )
+            .map_err(|error| format!("smoke: token issue failed: {error}"))?;
+            capability
+                .verify_and_audit(
+                    &token,
+                    [0u8; 32],
+                    maos_domain::invariants::i9::SandboxTier::T2,
+                )
+                .map_err(|error| format!("smoke: issued token did not verify: {error}"))?;
+
+            let entries = vec![maos_domain::revocation::RevocationEntry::new(
+                "smoke-spirit",
+                "*",
+                "smoke-test",
+                None,
+            )
+            .map_err(|error| format!("smoke: invalid CRL entry: {error}"))?];
+            let signing_seed = [0x5Au8; 32];
+            let signing_key = ring::signature::Ed25519KeyPair::from_seed_unchecked(&signing_seed)
+                .map_err(|_| "smoke: synthetic CRL signing key rejected")?;
+            use ring::signature::KeyPair;
+            let signer_pub_key: [u8; 32] = signing_key
+                .public_key()
+                .as_ref()
+                .try_into()
+                .map_err(|_| "smoke: synthetic CRL public key has wrong length")?;
+            let entries_bytes = maos_domain::revocation::canonical_entries_bytes(&entries)
+                .map_err(|error| format!("smoke: canonical CRL payload failed: {error}"))?;
+            let signature: [u8; 64] = crypto_provider
+                .sign_capability_token(&signing_seed, &entries_bytes)
+                .map_err(|error| format!("smoke: CRL signing failed: {error}"))?
+                .try_into()
+                .map_err(|_| "smoke: synthetic CRL signature has wrong length")?;
+            let unsigned = maos_domain::revocation::SignedRevocationList::new(
+                maos_domain::revocation::CrlId::from_entries(&entries)
+                    .map_err(|error| format!("smoke: CRL identity failed: {error}"))?,
                 1,
                 0,
                 maos_domain::revocation::RevocationOrigin::Operator,
-                vec![maos_domain::revocation::RevocationEntry::new(
-                    "smoke-spirit",
-                    "*",
-                    "smoke-test",
-                    None,
-                )
-                .unwrap()],
-                [1u8; 64],
-                [1u8; 32],
+                entries,
+                signature,
+                signer_pub_key,
             )
-            .unwrap();
+            .map_err(|error| format!("smoke: CRL construction failed: {error}"))?;
+            let crl = maos_kernel_core::revocation::parse_signed_crl(
+                &serde_json::to_vec(&unsigned)
+                    .map_err(|error| format!("smoke: CRL encoding failed: {error}"))?,
+                &signer_pub_key,
+                crypto_provider.as_ref(),
+            )
+            .map_err(|error| format!("smoke: CRL verification failed: {error}"))?;
             let report = revocation_applier
                 .apply_crl(crl)
                 .await
@@ -6867,9 +7054,29 @@ description = "smoke test spirit successor"
             println!("{{\"step\":3,\"surface\":\"revocation_applier\",\"outcome\":\"completed\",\"revoked_count\":{},\"halt_receipts_produced\":{}}}",
                 report.revoked_count, report.halt_receipts_produced);
 
-            // Step 5: Verify capability denial
-            println!("{{\"step\":4,\"surface\":\"capability_registry\",\"outcome\":\"denied_after_revocation\"}}");
+            // Step 5: The already-issued token must now be denied by the real
+            // verification path; the output is derived from that observation.
+            match capability.verify_and_audit(
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier::T2,
+            ) {
+                Err(maos_domain::ports::capability::CapError::Revoked) => {
+                    println!("{{\"step\":4,\"surface\":\"capability_registry\",\"outcome\":\"denied_after_revocation\"}}");
+                }
+                Ok(()) => return Err("smoke: revoked token remained valid".into()),
+                Err(error) => {
+                    return Err(format!("smoke: expected CapError::Revoked, got {error}").into())
+                }
+            }
 
+            revocation_poller_cancel.cancel();
+            match revocation_poller_handle.await {
+                Ok(()) => {}
+                Err(error) => {
+                    eprintln!("maos: RevocationPoller task failed during smoke drain: {error}")
+                }
+            }
             drop(audit_tx);
             drop(inference);
             drop(capability);
@@ -6881,19 +7088,6 @@ description = "smoke test spirit successor"
                 _ => {}
             }
             eprintln!("maos: smoke-upgrade-revoke-5 complete — 3 surfaces exercised");
-            return Ok(());
-        }
-
-        if mode == "spirit-inspect" {
-            // Story 5.5a AC5: JSON report to stdout (operator-facing diagnostic
-            // surface; consumers pipe to `jq`). Story 5.5a review finding
-            // §inspect-on-stderr corrected the original `eprintln!` here.
-            let spirit_id =
-                std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "unknown".to_string());
-            println!(
-                r#"{{"spirit_id":"{}","pid":0,"runtime":"none","image_sha":"","applied_t2_protections":{{"landlock_rules":0,"seccomp_allow_count":0,"seccomp_kill_count":0}},"strictest_of_reasoning":{{"manifest_tier":"T0","trust_tier_floor":"T0","operator_policy_floor":"T0","effective_tier":"T0","dominant_axis":"manifest"}}}}"#,
-                spirit_id
-            );
             return Ok(());
         }
 
@@ -6915,139 +7109,92 @@ description = "smoke test spirit successor"
                         r#"{{"step":1,"surface":"runtime_detect","outcome":"available","runtime":"{:?}","version":"{}"}}"#,
                         runtime.kind, runtime.version,
                     );
-                    // Step 2: verify pinned image lock can be loaded
-                    let lock = maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default();
-                    match lock {
-                        Err(e) => {
-                            println!(
-                                r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_load_failed","reason":"{}"}}"#,
-                                e
-                            );
+                    // Step 2: a lock is useful only after a configured trust
+                    // anchor, signature verification, and placeholder rejection.
+                    // Do not pretend that the shipped development placeholder is
+                    // a runnable production image.
+                    let trust_anchor = match maos_kernel_core::security::sandbox::t3::image_verify::read_trust_anchor_pub() {
+                        Ok(anchor) => anchor,
+                        Err(error) => {
+                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"unavailable","reason":"{}"}}"#, error);
+                            return Ok(());
                         }
-                        Ok(_lock) => {
-                            println!(
-                                r#"{{"step":2,"surface":"t3_image_verify","outcome":"lock_loaded"}}"#
-                            );
+                    };
+                    let crypto = maos_kernel_core::security::crypto::RingCryptoProvider;
+                    let lock = match maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock(&trust_anchor, &crypto) {
+                        Ok(lock) => {
+                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"verified"}}"#);
+                            lock
                         }
-                    }
+                        Err(error) => {
+                            println!(r#"{{"step":2,"surface":"t3_image_verify","outcome":"unavailable","reason":"{}"}}"#, error);
+                            return Ok(());
+                        }
+                    };
 
-                    // Step 3: smoke spawn (if busybox available)
+                    // Step 3: smoke spawn (if busybox available).
                     let busybox_path = std::path::Path::new("/usr/bin/busybox");
-                    if busybox_path.exists() {
-                        use maos_domain::invariants::i9::SandboxTier;
-                        use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
-                        use maos_kernel_core::security::sandbox::SandboxSpec;
-
-                        let spec = SandboxSpec::new_for_test(SandboxTier::T3);
-                        let ctx = T3SpawnContext {
-                            spirit_binary_path: busybox_path.to_path_buf(),
-                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(
-                            ),
-                            container_name: format!(
-                                "maos-smoke-t3-{}",
-                                maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
-                            ),
-                        };
-
-                        match maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default() {
-                            Ok(lock) => {
-                                match lock.default_attestation() {
-                                    Ok(image) => {
-                                        match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
-                                            &spec,
-                                            image,
-                                            &["echo".into(), "hello-from-t3".into()],
-                                            ctx,
-                                        ) {
-                                            Ok(mut child) => {
-                                                match child.wait_with_output() {
-                                                    Ok(output) => {
-                                                        let rc = output.status.code().unwrap_or(-1);
-                                                        let stdout = String::from_utf8_lossy(&output.stdout);
-                                                        if rc == 0 && stdout.contains("hello-from-t3") {
-                                                            println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"completed","container_exit_rc":{},"host_pid":{}}}"#, rc, child.host_pid);
-                                                        } else {
-                                                            println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"unexpected","container_exit_rc":{},"stdout":"{}"}}"#, rc, stdout.trim());
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"wait_failed","error":"{}"}}"#, e);
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"spawn_failed","error":"{}"}}"#, e);
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"no_default_image","error":"{}"}}"#, e);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                println!(r#"{{"step":3,"surface":"t3_spawn","outcome":"lock_load_failed","error":"{}"}}"#, e);
-                            }
-                        }
-                    } else {
+                    if !busybox_path.exists() {
                         println!(
                             r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"busybox not at /usr/bin/busybox"}}"#
                         );
+                        return Ok(());
                     }
+                    use maos_domain::invariants::i9::SandboxTier;
+                    use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
+                    use maos_kernel_core::security::sandbox::SandboxSpec;
 
-                    // Step 4: adversarial subcommand — assert escape blocked.
-                    let busybox_attack = std::path::Path::new("/usr/bin/busybox");
-                    if busybox_attack.exists() {
-                        use maos_domain::invariants::i9::SandboxTier;
-                        use maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext;
-                        use maos_kernel_core::security::sandbox::SandboxSpec;
-
-                        let attack_spec = SandboxSpec::new_for_test(SandboxTier::T3);
-                        let attack_ctx = T3SpawnContext {
-                            spirit_binary_path: busybox_attack.to_path_buf(),
-                            boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(
-                            ) + 1,
-                            container_name: format!(
-                                "maos-smoke-t3-attack-{}",
-                                maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
-                            ),
-                        };
-
-                        match maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock::load_default() {
-                            Ok(lock) => {
-                                match lock.default_attestation() {
-                                    Ok(image) => {
-                                        match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
-                                            &attack_spec,
-                                            image,
-                                            &["sh".into(), "-c".into(), "cat /etc/host_secret".into()],
-                                            attack_ctx,
-                                        ) {
-                                            Ok(mut child) => {
-                                                let _ = child.wait_with_output();
-                                                maos_kernel_core::security::sandbox::t3::cap_audit_bridge::emit_t3_escape_block_probe(
-                                                    child.host_pid, "filesystem_escape", "etc_host_secret",
-                                                );
-                                                println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"blocked","host_pid":{}}}"#, child.host_pid);
-                                            }
-                                            Err(e) => {
-                                                println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"spawn_failed","error":"{}"}}"#, e);
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"no_default_image","error":"{}"}}"#, e);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                println!(r#"{{"step":4,"surface":"t3_escape_block","outcome":"lock_load_failed","error":"{}"}}"#, e);
-                            }
+                    let image = match lock.default_entry() {
+                        Ok(image) => image,
+                        Err(error) => {
+                            println!(
+                                r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"{}"}}"#,
+                                error
+                            );
+                            return Ok(());
                         }
-                    } else {
-                        println!(
-                            r#"{{"step":4,"surface":"t3_escape_block","outcome":"unavailable","reason":"busybox not available"}}"#
-                        );
+                    };
+                    let spec = SandboxSpec::new_for_test(SandboxTier::T3);
+                    let ctx = T3SpawnContext {
+                        spirit_binary_path: busybox_path.to_path_buf(),
+                        boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                        container_name: format!(
+                            "maos-smoke-t3-{}",
+                            maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
+                        ),
+                    };
+                    match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
+                        &spec,
+                        &image,
+                        &["echo".into(), "hello-from-t3".into()],
+                        ctx,
+                    ) {
+                        Ok(mut child) => match child.wait_with_output() {
+                            Ok(output)
+                                if output.status.success()
+                                    && String::from_utf8_lossy(&output.stdout)
+                                        .contains("hello-from-t3") =>
+                            {
+                                println!(
+                                    r#"{{"step":3,"surface":"t3_spawn","outcome":"completed","host_pid":{}}}"#,
+                                    child.host_pid
+                                );
+                            }
+                            Ok(output) => {
+                                println!(
+                                    r#"{{"step":3,"surface":"t3_spawn","outcome":"unexpected","container_exit_rc":{}}}"#,
+                                    output.status.code().unwrap_or(-1)
+                                );
+                            }
+                            Err(error) => println!(
+                                r#"{{"step":3,"surface":"t3_spawn","outcome":"wait_failed","reason":"{}"}}"#,
+                                error
+                            ),
+                        },
+                        Err(error) => println!(
+                            r#"{{"step":3,"surface":"t3_spawn","outcome":"spawn_failed","reason":"{}"}}"#,
+                            error
+                        ),
                     }
                 }
             }
@@ -7530,7 +7677,9 @@ description = "smoke test spirit successor"
                 let fp_hex = hex::encode(fp_hash);
 
                 let mut pkg_hasher = sha2::Sha256::new();
+                pkg_hasher.update(&(manifest.len() as u64).to_le_bytes());
                 pkg_hasher.update(manifest);
+                pkg_hasher.update(&(artifact.len() as u64).to_le_bytes());
                 pkg_hasher.update(&artifact);
                 let pkg_msg = pkg_hasher.finalize();
                 let pkg_signature = keypair.sign(&pkg_msg);
@@ -7597,7 +7746,9 @@ description = "smoke test spirit successor"
 
                 let mut hasher = sha2::Sha256::new();
                 use sha2::Digest;
+                hasher.update(&(manifest.len() as u64).to_le_bytes());
                 hasher.update(manifest);
+                hasher.update(&(artifact.len() as u64).to_le_bytes());
                 hasher.update(&artifact);
                 let msg = hasher.finalize();
                 let signature = keypair.sign(&msg);
@@ -7952,7 +8103,7 @@ description = "smoke test spirit successor"
 
         if mode != "hello-spirit" {
             eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, spirit-inspect, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, bench-section-13-1, smoke-orchestrator-fanout-6-2, smoke-a2a-loopback-6-3, smoke-schedule-6-4, smoke-spirit-author-7-1, smoke-discipline-7-1-5, smoke-registry-7-2, smoke-import-7-2, smoke-compliance-7-3, smoke-skill-7-4, smoke-abi-7-5a, smoke-a2a-tcp-8-6, smoke-a2a-consent-vocab-8-7, smoke-a2a-fail-closed-8-8"
+                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, smoke-abi-7-5a",
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
@@ -8147,6 +8298,9 @@ description = "smoke test spirit successor"
         handle
     });
 
+    let revocation_poller_handle = Arc::clone(&revocation_poller).spawn(cancel.child_token());
+    eprintln!("maos: RevocationPoller spawned (Story 5.4)");
+
     // Story 11.4c — SIEM export consumer (see `spawn_siem_export_consumer`).
     let _siem_forward_handle = enterprise_runtime.as_ref().map(|rt| {
         spawn_siem_export_consumer(
@@ -8209,6 +8363,13 @@ description = "smoke test spirit successor"
     // Signal yank poller to exit gracefully.
     yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
     cancel.cancel();
+
+    // Story 5.4 — do not abandon the CRL poller. Its select loop observes
+    // root cancellation before the rest of the composition root is dropped.
+    match revocation_poller_handle.await {
+        Ok(()) => {}
+        Err(error) => eprintln!("maos: RevocationPoller task failed during drain: {error}"),
+    }
 
     // Story 2.5 (A7 / D11) — drain the cap-audit channel deterministically
     // on graceful shutdown, replicating the one-shot arm's drain pattern
@@ -13571,6 +13732,7 @@ mod story_13_5a_enterprise_daemon_seam {
     /// fired: SSO verify, PDP evaluate, kernel mint + `identity.asserted` row,
     /// at-rest AEAD (real ciphertext, reached via `at_rest_seal_hook`), and a
     /// SIEM forward that lands records in the localhost sink.
+    #[cfg(all(not(feature = "kms-fault-inject"), not(feature = "sso-fault-inject")))]
     #[tokio::test]
     async fn story_13_5a_enterprise_governance_reaches_the_booted_cohort_daemon() {
         let _guard = env_lock();
@@ -13648,6 +13810,7 @@ mod story_13_5a_enterprise_daemon_seam {
     /// port unwired refuses daemon boot; (b) PDP-only configuration reaches and
     /// enforces the PDP; (c) configured-down KMS refuses plaintext fallback;
     /// (d) wired PDP deny refuses the read; (e) wired allow reaches every arm.
+    #[cfg(all(not(feature = "kms-fault-inject"), not(feature = "sso-fault-inject")))]
     #[tokio::test]
     async fn story_13_5a_daemon_governance_is_dead_wired_unwired_and_fails_closed_when_denied() {
         let _guard = env_lock();

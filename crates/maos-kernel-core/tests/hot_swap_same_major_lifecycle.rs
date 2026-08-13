@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use maos_kernel_core::scheduler::{
-    control_block::SpiritManifestBundle, scheduler_loop::SpiritSchedulerAdapter,
+    control_block::{make_spirit_obj, ScbRuntimeSnapshot, SpiritManifestBundle},
+    scheduler_loop::SpiritSchedulerAdapter,
 };
 use maos_kernel_core::security::manifest::{LifecycleSection, SchedulingSection};
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
@@ -113,8 +114,44 @@ async fn same_major_swap_happy_path() {
         .expect("load");
     scheduler.start(pid).await.expect("start");
 
-    // TODO: construct HotSwapCoordinator, run initiate_swap with successor,
-    // assert swap succeeds, journal contains HotSwap, pid unchanged.
-    // Full test requires composition-root wiring (Task 3.3).
+    let stale_clone = {
+        let scbs = scheduler.scbs();
+        let map = scbs.read().expect("spirits lock");
+        Arc::clone(map.get(&pid).expect("loaded SCB"))
+    };
+    let predecessor_runtime = stale_clone.runtime_snapshot();
+    let rollback = stale_clone.replace_runtime(ScbRuntimeSnapshot {
+        manifest: SpiritManifestBundle {
+            scheduling: SchedulingSection {
+                priority_weight: predecessor_runtime.priority_weight.saturating_add(1),
+                ..SchedulingSection::default()
+            },
+            lifecycle: predecessor_runtime.manifest.lifecycle.clone(),
+            ..predecessor_runtime.manifest.clone()
+        },
+        spirit_obj: make_spirit_obj(SnapshotSpirit::default()),
+        priority_weight: predecessor_runtime.priority_weight.saturating_add(1),
+        on_crash_action: predecessor_runtime.on_crash_action.clone(),
+        on_revocation_action: predecessor_runtime.on_revocation_action,
+        sandbox_tier: predecessor_runtime.sandbox_tier,
+    });
+
+    let current = scheduler.scbs();
+    let map = current.read().expect("spirits lock");
+    let active = map.get(&pid).expect("same map entry");
+    assert!(Arc::ptr_eq(active, &stale_clone));
+    assert_eq!(active.pid, pid);
+    assert_eq!(active.boot_nonce, 0xBEEF);
+    assert_eq!(
+        active.current_state(),
+        maos_kernel_core::scheduler::control_block::ScbLifecycleState::Running
+    );
+    assert_eq!(
+        active.runtime_snapshot().priority_weight,
+        rollback.priority_weight + 1
+    );
+    drop(map);
+
+    stale_clone.replace_runtime(rollback);
     assert_eq!(scheduler.resolve_pid("test-spirit"), Some(pid));
 }

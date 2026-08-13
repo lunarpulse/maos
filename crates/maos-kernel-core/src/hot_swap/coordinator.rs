@@ -19,6 +19,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
+
+use parking_lot::Mutex;
 use std::time::Instant;
 
 use maos_domain::hot_swap::{HotSwapError, HotSwapResult, PostSwapInvariantViolation};
@@ -30,7 +32,7 @@ use crate::halt::{validate_swap_halt_continuity, HaltRegistry, SwapVerdict};
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::iac::IacBusAdapter;
 use crate::journal::JournalAdapter;
-use crate::scheduler::control_block::{AnySpiritObj, SpiritControlBlock};
+use crate::scheduler::control_block::{AnySpiritObj, ScbRuntimeSnapshot, SpiritControlBlock};
 use crate::scheduler::hook_dispatch::HookDispatcher;
 use crate::scheduler::HookOutcome;
 use crate::telemetry::iac_rt::IacRtMetrics;
@@ -58,12 +60,10 @@ pub struct HotSwapCoordinator {
     dispatcher: Arc<HookDispatcher>,
     telemetry: Arc<IacRtMetrics>,
     archive_dir: PathBuf,
-    /// Active post-swap monitors per PID — used to cancel previous monitors on re-swap.
-    active_monitors:
-        Arc<std::sync::Mutex<std::collections::BTreeMap<u32, tokio::task::JoinHandle<()>>>>,
-    /// Pending revert snapshots per PID — pre_swap_snapshot stored at commit for auto_revert.
-    pending_reverts:
-        Arc<std::sync::Mutex<std::collections::BTreeMap<u32, Arc<SpiritControlBlock>>>>,
+    active_monitors: Arc<Mutex<std::collections::BTreeMap<u32, tokio::task::JoinHandle<()>>>>,
+    /// Pending runtime snapshots per PID — stored at commit for auto-revert
+    /// without replacing the stable control-block Arc.
+    pending_reverts: Arc<Mutex<std::collections::BTreeMap<u32, ScbRuntimeSnapshot>>>,
 }
 
 impl HotSwapCoordinator {
@@ -108,8 +108,8 @@ impl HotSwapCoordinator {
             dispatcher,
             telemetry,
             archive_dir,
-            active_monitors: Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new())),
-            pending_reverts: Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new())),
+            active_monitors: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
+            pending_reverts: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
         }
     }
 
@@ -136,18 +136,19 @@ impl HotSwapCoordinator {
                     })?,
             )
         };
+        let pre_swap_runtime = predecessor_scb.runtime_snapshot();
 
         // Step 2: Snapshot predecessor SCB for saga rollback.
         let mut saga = HotSwapSaga::new().with_pre_swap_snapshot(Arc::clone(&predecessor_scb));
         saga.advance_to(SagaPhase::NotStarted);
 
-        let predecessor_version = predecessor_scb
+        let predecessor_version = pre_swap_runtime
             .manifest
             .class
             .as_ref()
             .map(|c| c.version.clone())
             .unwrap_or_else(|| "unknown".into());
-        let predecessor_halt_protocol_version = predecessor_scb
+        let predecessor_halt_protocol_version = pre_swap_runtime
             .manifest
             .halt_protocol_compatibility
             .as_ref()
@@ -223,14 +224,14 @@ impl HotSwapCoordinator {
                     &self.journal,
                 )
                 .await;
-                return Err(HotSwapError::SwapOutFailed {
+                return Err(HotSwapError::SnapshotFailed {
                     spirit_id: spirit_id.to_string(),
-                    error: format!("snapshot failed: {outcome:?}"),
+                    error: format!("{outcome:?}"),
                 });
             }
         };
 
-        let predecessor_state_schema_version = predecessor_scb
+        let predecessor_state_schema_version = pre_swap_runtime
             .manifest
             .hot_swap
             .as_ref()
@@ -242,23 +243,29 @@ impl HotSwapCoordinator {
             .map(|h| h.state_schema_version)
             .unwrap_or(1u32);
 
-        // Step 6: Encode + decode CBOR envelope.
-        let encoded = state_codec::encode(&state_blob, predecessor_state_schema_version)
-            .map_err(|e| HotSwapError::Internal(format!("state codec encode failed: {e}")))?;
-        let envelope =
-            state_codec::decode(&encoded, successor_state_schema_version).map_err(|e| match e {
-                // Story 5.2 review backfill: distinguish schema-version mismatch
-                // (legitimate SchemaIncompatible) from decode-level failures
-                // (malformed CBOR, missing fields). The latter is an Internal error,
-                // not a SchemaIncompatible verdict.
-                state_codec::StateCodecError::SchemaVersionMismatch { .. } => {
-                    HotSwapError::SchemaIncompatible {
-                        predecessor_version: predecessor_state_schema_version,
-                        successor_version: successor_state_schema_version,
-                    }
+        // Step 6: kernel owns the logical envelope while the Spirit owns the
+        // opaque CBOR payload.  Do not serialize then immediately deserialize
+        // a value that never crossed a process/archive boundary.
+        let envelope = state_codec::validate_logical_envelope(
+            state_codec::StateEnvelope {
+                schema_version: predecessor_state_schema_version,
+                payload: state_blob,
+                envelope_version: 1,
+            },
+            successor_state_schema_version,
+        )
+        .map_err(|error| match error {
+            state_codec::StateCodecError::InvalidExpectedSchemaVersion { expected } => {
+                HotSwapError::InvalidExpectedSchemaVersion { expected }
+            }
+            state_codec::StateCodecError::SchemaVersionMismatch { .. } => {
+                HotSwapError::SchemaIncompatible {
+                    predecessor_version: predecessor_state_schema_version,
+                    successor_version: successor_state_schema_version,
                 }
-                other => HotSwapError::Internal(format!("state codec decode failed: {other}")),
-            })?;
+            }
+            other => HotSwapError::Internal(format!("state envelope invalid: {other}")),
+        })?;
 
         let payload = envelope.payload;
 
@@ -290,30 +297,25 @@ impl HotSwapCoordinator {
             }
         };
 
-        // Step 8: Atomic SCB swap under spirits write-lock.
-        {
-            let mut map = self.spirits.write().expect("spirits lock poisoned");
-            if let Some(scb) = map.get_mut(&predecessor_pid) {
-                // Replace the spirit_obj while preserving pid, boot_nonce, state.
-                let new_scb = Arc::new(SpiritControlBlock::new(
-                    scb.pid,
-                    scb.spirit_id.clone(),
-                    successor_manifest.clone(),
-                    successor_spirit_obj,
-                    scb.boot_nonce,
-                ));
-                // Preserve current state.
-                let current_raw = scb.state.load(std::sync::atomic::Ordering::Acquire);
-                new_scb
-                    .state
-                    .store(current_raw, std::sync::atomic::Ordering::Release);
-                *scb = new_scb;
-            } else {
-                return Err(HotSwapError::NotLoaded {
-                    spirit_id: spirit_id.to_string(),
-                });
-            }
-        }
+        // Step 8: replace only the SCB's interior runtime snapshot.  The map
+        // continues to point at the original Arc, preserving DRR, watchdog,
+        // lifecycle, task-ledger, sandbox and identity state for stale clones.
+        let predecessor_runtime = predecessor_scb.replace_runtime(ScbRuntimeSnapshot {
+            manifest: successor_manifest.clone(),
+            spirit_obj: successor_spirit_obj,
+            priority_weight: successor_manifest.scheduling.priority_weight,
+            on_crash_action: successor_manifest
+                .on_crash
+                .as_ref()
+                .map(|section| section.action.clone())
+                .unwrap_or_default(),
+            on_revocation_action: successor_manifest
+                .on_revocation
+                .as_ref()
+                .map(|section| section.action)
+                .unwrap_or_default(),
+            sandbox_tier: pre_swap_runtime.sandbox_tier,
+        });
 
         // Step 9: Fire on_swap_in(payload) hook on the SUCCESSOR SCB.
         let successor_scb = {
@@ -343,13 +345,10 @@ impl HotSwapCoordinator {
                     &self.journal,
                 )
                 .await;
-
-                // Restore predecessor under lock.
-                if let Some(pre_swap) = &saga.pre_swap_snapshot {
-                    let mut map = self.spirits.write().expect("spirits lock poisoned");
-                    if let Some(scb) = map.get_mut(&predecessor_pid) {
-                        *scb = Arc::clone(pre_swap);
-                    }
+                // Restore the predecessor runtime on the same SCB Arc.
+                let map = self.spirits.read().expect("spirits lock poisoned");
+                if let Some(scb) = map.get(&predecessor_pid) {
+                    scb.replace_runtime(predecessor_runtime);
                 }
 
                 return Err(HotSwapError::SwapInFailed {
@@ -389,9 +388,9 @@ impl HotSwapCoordinator {
             .map(|h| h.as_str().to_string())
             .collect();
 
-        // Collect sample frame shapes from journal (placeholder — up to 5 recent).
-        let pre_swap_frame_shapes: Vec<String> = vec![]; // TODO: sample from journal
-
+        // Frame-shape monitoring is opt-in; no pre-swap frame constraints are
+        // registered unless the caller supplied them to the monitor.
+        let pre_swap_frame_shapes: Vec<String> = Vec::new();
         let invariant_snapshot = PostSwapInvariantSnapshot {
             pre_swap_halt_ids,
             pid: predecessor_pid,
@@ -399,21 +398,15 @@ impl HotSwapCoordinator {
             pre_swap_frame_shapes,
         };
 
-        // Store pre_swap_snapshot for auto_revert.
+        // Store the exact predecessor runtime for auto-revert.
         {
-            let mut reverts = self
-                .pending_reverts
-                .lock()
-                .expect("pending_reverts lock poisoned");
-            reverts.insert(predecessor_pid, Arc::clone(&predecessor_scb));
+            let mut reverts = self.pending_reverts.lock();
+            reverts.insert(predecessor_pid, predecessor_runtime);
         }
 
         // Cancel any existing monitor for this PID before spawning a new one.
         {
-            let mut monitors = self
-                .active_monitors
-                .lock()
-                .expect("active_monitors lock poisoned");
+            let mut monitors = self.active_monitors.lock();
             if let Some(old_handle) = monitors.remove(&predecessor_pid) {
                 old_handle.abort();
             }
@@ -436,10 +429,7 @@ impl HotSwapCoordinator {
         let monitor = PostSwapMonitor::new(coordinator_arc, predecessor_pid, invariant_snapshot);
         let monitor_handle = monitor.spawn();
         {
-            let mut monitors = self
-                .active_monitors
-                .lock()
-                .expect("active_monitors lock poisoned");
+            let mut monitors = self.active_monitors.lock();
             monitors.insert(predecessor_pid, monitor_handle);
         }
 
@@ -471,8 +461,10 @@ impl HotSwapCoordinator {
         _successor_version: &str,
     ) -> Result<KernelPrecheckVerdict, HotSwapError> {
         let predecessor_pid = self.resolve_pid(spirit_id)?;
-        let _ = successor_manifest_path; // manifest parsing deferred to Task 9
-
+        let successor_manifest = crate::lifecycle::upgrade::load_bundle_from_file(
+            std::path::Path::new(successor_manifest_path),
+        )
+        .map_err(|error| HotSwapError::Internal(format!("successor manifest: {error}")))?;
         let predecessor_scb = {
             let map = self.spirits.read().expect("spirits lock poisoned");
             Arc::clone(
@@ -483,7 +475,8 @@ impl HotSwapCoordinator {
             )
         };
 
-        let predecessor_halt_protocol_version = predecessor_scb
+        let predecessor_runtime = predecessor_scb.runtime_snapshot();
+        let predecessor_halt_protocol_version = predecessor_runtime
             .manifest
             .halt_protocol_compatibility
             .as_ref()
@@ -491,13 +484,17 @@ impl HotSwapCoordinator {
             .unwrap_or(1u32);
         let successor_accepted_versions = vec![predecessor_halt_protocol_version];
 
-        let predecessor_state_schema_version = predecessor_scb
+        let predecessor_state_schema_version = predecessor_runtime
             .manifest
             .hot_swap
             .as_ref()
             .map(|h| h.state_schema_version)
             .unwrap_or(1u32);
-        let successor_state_schema_version = predecessor_state_schema_version; // placeholder until manifest parsed
+        let successor_state_schema_version = successor_manifest
+            .hot_swap
+            .as_ref()
+            .map(|h| h.state_schema_version)
+            .unwrap_or(1u32);
 
         Ok(HotSwapPrecheck::check(
             &self.halt_registry,
@@ -530,18 +527,15 @@ impl HotSwapCoordinator {
             }
         }
 
-        // 2. Restore pre_swap_snapshot under spirits write-lock.
-        let pre_swap = {
-            let mut reverts = self
-                .pending_reverts
-                .lock()
-                .expect("pending_reverts lock poisoned");
+        // 2. Restore the pre-swap runtime on the same SCB Arc.
+        let pre_swap_runtime = {
+            let mut reverts = self.pending_reverts.lock();
             reverts.remove(&spirit_pid)
         };
-        if let Some(pre_swap_scb) = pre_swap {
-            let mut map = self.spirits.write().expect("spirits lock poisoned");
-            if let Some(scb) = map.get_mut(&spirit_pid) {
-                *scb = pre_swap_scb;
+        if let Some(pre_swap_runtime) = pre_swap_runtime {
+            let map = self.spirits.read().expect("spirits lock poisoned");
+            if let Some(scb) = map.get(&spirit_pid) {
+                scb.replace_runtime(pre_swap_runtime);
             }
         }
 

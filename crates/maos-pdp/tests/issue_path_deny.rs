@@ -1,3 +1,5 @@
+#![cfg(not(feature = "pdp-fault-inject"))]
+
 //! Story 11.4a AC3 — end-to-end deny through the mediated issue path.
 //!
 //! This is the load-bearing test of the F2 + F3 integration: a real Cedar

@@ -7,6 +7,7 @@
 pub mod applier;
 pub mod parser;
 pub mod poller;
+pub(crate) mod rules;
 pub mod version_match;
 
 pub use applier::RevocationApplier;

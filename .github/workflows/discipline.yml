@@ -1184,8 +1184,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run revocation propagation bench
+      - name: Run 10k concurrent revocation propagation experiment
         run: cargo bench -p maos-kernel-core --bench revocation_propagation_p99
+      - name: Assert emitted NFR-Rel-9 p99 report
+        run: cargo run -p maos-kernel-core --bin assert-revocation-p99-floor -- target/reports/revocation-propagation.json --floor-ns 5000000000
 
   # Story 5.4 — upgrade policy corpus (AC1 + AC2 + AC3 + AC4)
   upgrade-policy-corpus:

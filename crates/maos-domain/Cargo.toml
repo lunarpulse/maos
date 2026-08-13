@@ -15,6 +15,7 @@ smallvec = { version = "1", features = ["serde"] }
 serde_json = "1.0"
 hex = "0.4"
 ed25519-dalek = { version = "2", features = ["std"] }
+sha2 = "0.10"
 getrandom = "0.3"
 # Per ADR-010, `maos-domain` carries the trait shapes; adapters in
 # `maos-a2a` implement. The `async-trait` macro is already pulled in by

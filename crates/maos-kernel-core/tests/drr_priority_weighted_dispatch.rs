@@ -49,10 +49,6 @@ fn drr_highest_weight_dominates() {
     for _ in 0..1000 {
         if let Some(pid) = pick_next_spirit_from_slice(&scbs) {
             counts[pid as usize] += 1;
-            if let Some(scb) = scbs.iter().find(|s| s.pid == pid) {
-                scb.deficit_counter
-                    .fetch_sub(SCHEDULER_QUANTUM, Ordering::SeqCst);
-            }
         }
     }
 
@@ -73,10 +69,6 @@ fn drr_equal_weights_rotate() {
     for _ in 0..3000 {
         if let Some(pid) = pick_next_spirit_from_slice(&scbs) {
             counts[pid as usize] += 1;
-            if let Some(scb) = scbs.iter().find(|s| s.pid == pid) {
-                scb.deficit_counter
-                    .fetch_sub(SCHEDULER_QUANTUM, Ordering::SeqCst);
-            }
         }
     }
 

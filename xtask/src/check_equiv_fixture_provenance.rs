@@ -1,25 +1,20 @@
 #![forbid(unsafe_code)]
 
-//! Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
+//! WASM component fixture provenance / drift guard.
 //!
-//! The committed `equiv-{identity,divergent,cosmetic}-spirit` `.wasm` fixtures
-//! are built (cargo-component + `wasm32-wasip2`, scoped nightly) from the guest
-//! sources under `crates/maos-wasm-host/guests/equiv-fixture/`. Without a guard
-//! a source edit can leave a STALE `.wasm` blob that `check-wasm-form-equiv`
-//! keeps consuming until the nightly regen — exactly the drift the review flags.
+//! The committed echo and equivalence `.wasm` fixtures are built from the guest
+//! sources and the canonical `wit/spirit.wit` contract. Without a guard, a WIT
+//! or guest edit can leave a stale component blob that tests keep consuming.
 //!
-//! This guard pins, per fixture, BOTH the committed-binary SHA-256 and the
-//! SHA-256 of the source inputs that produced it (sidecar
-//! `tests/fixtures/wasm/equiv-fixtures.provenance.toml`). It recomputes BOTH
-//! from the live tree and hard-fails on any mismatch:
-//!   - `wasm_sha256` mismatch   → the `.wasm` was swapped without a manifest
-//!                                 update (binary/manifest desync);
-//!   - `source_sha256` mismatch → source drifted since the `.wasm` was built
-//!                                 (stale blob until regen + manifest update).
+//! This gate pins both the committed-binary SHA-256 and the SHA-256 of every
+//! source input that produced it, including the canonical WIT, in
+//! `tests/fixtures/wasm/equiv-fixtures.provenance.toml`. It hard-fails on:
+//!   - `wasm_sha256` mismatch: the component changed without the manifest;
+//!   - `source_sha256` mismatch: source or WIT changed without regeneration.
 //!
-//! The residual gap (regen-from-changed-source + updating both hashes together)
-//! is a legitimate regen, closed by the scoped-nightly byte-rebuild job; this is
-//! the per-commit source↔binary↔manifest sync guard.
+//! The residual gap (regeneration plus updating both hashes together) is a
+//! legitimate fixture update and is closed by the scoped-nightly byte-rebuild
+//! job. This gate enforces per-commit source↔WIT↔binary↔manifest synchronization.
 
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -106,7 +101,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 if src_actual != entry.source_sha256 {
                     mismatches.push(format!(
                         "{}: source_sha256 drift — manifest={}, actual={} \
-                         (guest/logic source changed since this .wasm was built; rebuild via \
+                         (component source or WIT changed since this .wasm was built; rebuild via \
                          the scoped-nightly regen and update both hashes in {})",
                         entry.component, entry.source_sha256, src_actual, MANIFEST_REL
                     ));
@@ -128,7 +123,7 @@ pub fn run(json: bool) -> Result<(), String> {
             );
         } else {
             eprintln!(
-                "check-equiv-fixture-provenance: PASSED ({} fixtures in sync with source + manifest)",
+                "check-equiv-fixture-provenance: PASSED ({} fixtures in sync with source, WIT, and manifest)",
                 manifest.fixture.len()
             );
         }

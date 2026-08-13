@@ -68,6 +68,10 @@ pub enum SpawnError {
     SandboxImageMismatch { expected: String, observed: String },
     #[error("T3 container runtime unavailable: {reason}")]
     T3RuntimeUnavailable { reason: String },
+    #[error("T3 registry manifest inspection failed: {reason}")]
+    T3ImageInspect { reason: String },
+    #[error("T3 sandbox report commit failed: {reason}")]
+    T3ReportCommit { reason: String },
 }
 
 /// A sandbox violation detected from child exit status.

@@ -4,7 +4,7 @@ dev_model_used: claude-opus-4-7
 
 # Story 5.2: Implement Hot-Swap State Transfer and Cross-Major Migration Against HSIS ≥95%
 
-Status: in-review
+Status: done
 
 dev_model_used: claude
 
@@ -1301,6 +1301,7 @@ MODIFIED files (17):
 
 Current-HEAD audit closure evidence (2026-08-12):
 - `crates/maos-bin/src/main.rs`
+- `crates/maos-kernel-core/tests/hot_swap_saga_compensation.rs`
 
 ### Review Findings
 
@@ -1504,13 +1505,13 @@ This pass re-audits Story 5.2 at HEAD (commit `5108e6e`) on the Epic 6 retro day
 
 | # | Finding | Severity | Status | Resolution |
 |---|---|---|---|---|
-| 1 | Adjacent upward cross-major decode is rejected before migration dispatch because `state_codec.rs:153` uses directional `pred_major.wrapping_sub(succ_major) >= 2`. | Critical | open | Patch required — replace with symmetric major-distance logic and add an adjacent-major coordinator regression that reaches the migrator. |
+| 1 | Adjacent upward cross-major decode was rejected before migration dispatch because compatibility used directional wrapping subtraction. | Critical | **closed** | `crates/maos-kernel-core/src/hot_swap/state_codec.rs` uses symmetric `u32::abs_diff` major-distance validation. `crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs` proves an adjacent upward major reaches the migrator exactly once and installs the migrated payload. |
 | 2 | Post-swap halt monitoring used to include halts legitimately drained by the I14 gate. | — | closed | Fixed at HEAD: `crates/maos-kernel-core/src/hot_swap/coordinator.rs:379-390` snapshots only the post-drain survivor set; `crates/maos-kernel-core/src/hot_swap/post_swap_monitor.rs:113-126,213-254` distinguishes legitimate drains from genuine survivor loss. |
-| 3 | Snapshot-hook failure is still returned as `HotSwapError::SwapOutFailed`. | Medium | open | Patch required — `crates/maos-kernel-core/src/hot_swap/coordinator.rs:213-229` still misclassifies Step-5 state extraction as the Step-4 hook error. Add a snapshot-specific classification or map it to `Internal`, then cover the returned variant. |
-| 4 | The coordinator still wraps the snapshot blob in CBOR and immediately decodes it while the ABI also claims the Spirit emits CBOR. | Medium | open | Decision needed — choose Spirit-owned or kernel-owned envelope semantics, align ABI/docs/code/tests, and remove the redundant in-process encode/decode roundtrip at `crates/maos-kernel-core/src/hot_swap/coordinator.rs:245-271`. |
-| 5 | `decode(expected_schema_version = 0)` still reports `SchemaVersionMismatch { expected: 0, .. }`. | Low | open | Patch required — add an explicit invalid expected-version error and boundary test; current coordinator callers are protected by manifest validation/default 1. |
-| 6 | Step 8 still replaces the map's SCB `Arc` with a freshly constructed SCB. | High | open | Patch required — `crates/maos-kernel-core/src/hot_swap/coordinator.rs:293-310` resets in-flight/DRR/watchdog/sandbox state and permits stale cloned Arcs to dispatch the predecessor. Preserve full SCB continuity and make stale dispatch impossible. |
-| 7 | A declared-but-unimplemented migrator hook is still reported as `EMigratorMissing`. | Medium | open | Patch required — reserve `EMigratorMissing` for absent/nonmatching declarations; map `MigratorError::NotImplemented` at `crates/maos-kernel-core/src/hot_swap/migrator.rs:84-96` to a distinct implementation failure. |
+| 3 | Snapshot-hook failure was returned as `HotSwapError::SwapOutFailed`. | Medium | **closed** | `crates/maos-kernel-core/src/hot_swap/coordinator.rs` returns the distinct typed `HotSwapError::SnapshotFailed`, and `crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs` proves the Spirit id and panic payload survive classification. |
+| 4 | The coordinator wrapped the snapshot blob in CBOR and immediately decoded it while the ABI also claimed the Spirit emitted CBOR. | Medium | **closed** | The ownership decision is kernel logical envelope / Spirit opaque CBOR payload. `crates/maos-kernel-core/src/hot_swap/coordinator.rs` now constructs and validates `StateEnvelope` directly without an encode/decode roundtrip; `crates/maos-kernel-core/src/hot_swap/state_codec.rs` retains serialization only for archive/subprocess boundaries. |
+| 5 | `decode(expected_schema_version = 0)` reported `SchemaVersionMismatch { expected: 0, .. }`. | Low | **closed** | `crates/maos-kernel-core/src/hot_swap/state_codec.rs` adds `InvalidExpectedSchemaVersion` and checks zero before decoding or logical-envelope validation; unit and coordinator regressions assert the distinct typed result. |
+| 6 | Step 8 replaced the map's SCB `Arc` with a freshly constructed SCB. | High | **closed** | `crates/maos-kernel-core/src/hot_swap/coordinator.rs` swaps only the interior `ScbRuntimeSnapshot`, preserving the original SCB `Arc`, PID, boot nonce, lifecycle, DRR, watchdog, ledger, and sandbox state. `crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs` asserts `Arc::ptr_eq` after migration and rollback. |
+| 7 | A declared-but-unimplemented migrator hook was reported as `EMigratorMissing`. | Medium | **closed** | `crates/maos-kernel-core/src/hot_swap/migrator.rs` reserves `EMigratorMissing` for absent/nonmatching declarations and maps `MigratorError::NotImplemented` to `HotSwapError::MigratorNotImplemented`; `crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs` covers the distinction. |
 | 8 | `coordinator.rs::initiate_swap` Step 10 journal timestamp `SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default()` produces silent `Duration::ZERO` on clock skew → journal entries with `timestamp_ns = 0` for `HotSwap` events. Same anti-pattern in `auto_revert` (line 551-554) and `saga.rs::compensate` (line 103-106). Prior 2026-05-25 backfill row tracked this as deferred → Story 5.3 ("Story 5.3 already plans to centralize `wall_clock_now_ns()` helpers"). Three call sites still present at HEAD. | Moderate | deferred → Story 5.3 | Same target as the 2026-05-25 backfill row. Add `wall_clock_now_ns()` helper in `maos-domain` or `maos-kernel-core::time` and consolidate the three sites. Files: `crates/maos-kernel-core/src/hot_swap/coordinator.rs:373-376, 551-554` + `crates/maos-kernel-core/src/hot_swap/saga.rs:103-106`. |
 | 9 | `coordinator.rs::initiate_swap` step-11 spawns `Arc::new(Self { ... })` per swap — prior 2026-05-25 backfill row deferred to Story 5.5e. Story 5.5e shipped (Epic 5 close per git log) but the refactor did NOT land — coordinator.rs:424-436 still constructs a fresh `Arc<Self>` solely to give the monitor an `Arc<HotSwapCoordinator>`. The Epic 5 retro §A2 carry-forward closure is the natural place to roll this forward. | Moderate | deferred → Story 7.x (Epic 7 carry-forward) | Convert `HotSwapCoordinator` to always be wrapped in `Arc<Self>` at composition root; pass `&Arc<Self>` through `initiate_swap`. File: `crates/maos-kernel-core/src/hot_swap/coordinator.rs:424-436` + composition root `crates/maos-bin/src/main.rs`. |
 | 10 | `coordinator.rs::resolve_pid` linear scan over the spirits map on every `initiate_swap` call (line 584-594). Prior 2026-05-25 backfill row deferred to Epic 6. Epic 6 did not address this (no story owned the reverse-index). Same O(N) lookup pattern as `SpiritSchedulerAdapter::resolve_pid`. | Moderate | deferred → Epic 7 | Add reverse-index `BTreeMap<spirit_id, pid>` maintained alongside the SCB map at composition root. Defer remains acceptable until Spirit count exceeds ~10. File: `crates/maos-kernel-core/src/hot_swap/coordinator.rs:583-594`. |
@@ -1520,7 +1521,7 @@ This pass re-audits Story 5.2 at HEAD (commit `5108e6e`) on the Epic 6 retro day
 | 14 | Task 3.3 claimed composition-root wiring was pending although the coordinator is constructed exactly once. | — | closed | Documentation corrected in this audit after verifying `crates/maos-bin/src/main.rs:3219-3233` constructs one production coordinator from the shared scheduler/adapters. |
 | 15 | `state_codec.rs::encode` + `decode` use `serde_json::Value` as an intermediate then CBOR-encode it (layering smell flagged in 2026-05-25 backfill, deferred → 5.5x). Story 5.5x shipped (Epic 5 close); the refactor did NOT land. Now stacks with finding #4 (redundant encode/decode roundtrip) — if #4 strips the encode side, the layering smell concentrates on the decode side. | Moderate | deferred → Story 7.x or Epic 7 wire-format ADR | Real `#[derive(Serialize)]` struct with `serde_bytes` for the payload field. Halves encoded size and removes JSON→CBOR detour. File: `crates/maos-kernel-core/src/hot_swap/state_codec.rs:56-77, 86-162`. |
 
-**2026-08-12 current-HEAD disposition for the eight formerly open rows:** 2 closed, 6 open.
+**2026-08-13 closure disposition:** all six formerly open rows are closed with production behavior and focused executable evidence; zero current rows remain open or decision-needed.
 
 #### Pattern observations (Epic 6 retro backfill, 2026-05-28)
 

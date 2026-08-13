@@ -332,6 +332,8 @@ impl IacBusAdapter {
                 }
                 maos_spirit_abi::identity::FrameKind::SandboxBlock => "sandbox_block",
                 maos_spirit_abi::identity::FrameKind::InferenceCall => "inference_call",
+                maos_spirit_abi::identity::FrameKind::BudgetWarning => "budget_warning",
+                maos_spirit_abi::identity::FrameKind::BudgetExceeded => "budget_exceeded",
                 maos_spirit_abi::identity::FrameKind::CliSubprocessOutput => {
                     "cli_subprocess_output"
                 }
@@ -498,6 +500,12 @@ impl IacBusAdapter {
                 transparency_log::FrameKind::ConsentRequest
             }
             maos_spirit_abi::identity::FrameKind::Retract => transparency_log::FrameKind::Retract,
+            maos_spirit_abi::identity::FrameKind::BudgetWarning => {
+                transparency_log::FrameKind::BudgetWarning
+            }
+            maos_spirit_abi::identity::FrameKind::BudgetExceeded => {
+                transparency_log::FrameKind::BudgetExceeded
+            }
             maos_spirit_abi::identity::FrameKind::CapabilityInvocation => {
                 transparency_log::FrameKind::CapabilityInvocation
             }

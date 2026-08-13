@@ -219,7 +219,7 @@ mod tests {
         let client = Arc::new(
             maos_mcp::McpClientImpl::new(
                 transports,
-                maos_domain::ports::mcp::McpTransportId::StreamableHttp,
+                maos_domain::ports::mcp::McpTransportId::Stdio,
                 servers,
             )
             .unwrap(),
@@ -374,7 +374,7 @@ mod tests {
         let client = Arc::new(
             maos_mcp::McpClientImpl::new(
                 transports,
-                maos_domain::ports::mcp::McpTransportId::StreamableHttp,
+                maos_domain::ports::mcp::McpTransportId::Stdio,
                 servers,
             )
             .unwrap(),

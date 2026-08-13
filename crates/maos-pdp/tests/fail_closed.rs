@@ -15,6 +15,7 @@ use maos_domain::ports::{
 use maos_pdp::{scope_deny_key, CedarPolicyAdapter, FailClosedPosture, FailClosedReconciler};
 use std::collections::{HashMap, HashSet};
 
+#[cfg(not(feature = "pdp-fault-inject"))]
 #[test]
 fn no_policy_loaded_evaluate_is_unreachable() {
     // AC4 leg 2 (configured-down-at-startup, port-level): evaluating BEFORE a
@@ -55,6 +56,7 @@ fn loaded_policy_makes_adapter_healthy() {
     assert!(adapter.is_healthy());
 }
 
+#[cfg(not(feature = "pdp-fault-inject"))]
 #[test]
 fn evaluate_never_returns_silent_allow_on_error() {
     // The fail-OPEN P0 class: an error condition must NEVER degrade to a

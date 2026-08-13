@@ -26,7 +26,7 @@ use maos_spirit_abi::lifecycle::Spirit;
 /// Quantum size for deficit round-robin scheduling.
 pub const SCHEDULER_QUANTUM: u32 = 64;
 
-static NEXT_SPIRIT_PID: AtomicU32 = AtomicU32::new(0);
+static NEXT_SPIRIT_PID: AtomicU32 = AtomicU32::new(1);
 
 pub(crate) fn allocate_pid() -> u32 {
     NEXT_SPIRIT_PID.fetch_add(1, Ordering::Relaxed)
@@ -44,25 +44,33 @@ pub fn pick_next_spirit_from_slice(scbs: &[Arc<SpiritControlBlock>]) -> Option<u
         if scb.current_state() != ScbLifecycleState::Running {
             continue;
         }
-        let weight = scb.priority_weight as u32;
+        let weight = scb.runtime_snapshot().priority_weight as u32;
         scb.deficit_counter.fetch_add(weight, Ordering::SeqCst);
     }
 
     // Pass 2: find the best candidate (highest deficit ≥ quantum).
     let mut best: Option<u32> = None;
-    let mut best_deficit: u32 = 0;
+    let mut best_deficit = 0;
     for scb in scbs {
         if scb.current_state() != ScbLifecycleState::Running {
             continue;
         }
         let deficit = scb.deficit_counter.load(Ordering::SeqCst);
         if deficit >= SCHEDULER_QUANTUM && deficit > best_deficit {
-            best_deficit = deficit;
             best = Some(scb.pid);
+            best_deficit = deficit;
         }
     }
-
-    best
+    let winner = best?;
+    let scb = scbs.iter().find(|scb| scb.pid == winner)?;
+    // Selection and charge are one operation.  A concurrent picker cannot
+    // underflow the deficit or return a winner without paying its quantum.
+    scb.deficit_counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |deficit| {
+            deficit.checked_sub(SCHEDULER_QUANTUM)
+        })
+        .ok()
+        .map(|_| winner)
 }
 
 /// The Spirit Scheduler — kernel-side supervisor.
@@ -80,6 +88,9 @@ pub struct SpiritSchedulerAdapter {
     security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
     orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
     crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
+    /// Shared validated CRL rules. When configured by the revocation
+    /// composition root, admission and CRL application serialize on its gate.
+    revocation_rules: Arc<RwLock<Option<Arc<crate::revocation::rules::ValidatedRevocationRules>>>>,
 }
 
 impl SpiritSchedulerAdapter {
@@ -130,6 +141,7 @@ impl SpiritSchedulerAdapter {
             security_manager,
             orchestrator_registry,
             crash_detector,
+            revocation_rules: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -151,6 +163,18 @@ impl SpiritSchedulerAdapter {
         Arc::clone(&self.dispatcher)
     }
 
+    /// Bind the validated CRL store once at the composition root.  The
+    /// revocation applier installs this before any daemon admission occurs.
+    pub(crate) fn set_revocation_rules(
+        &self,
+        rules: Arc<crate::revocation::rules::ValidatedRevocationRules>,
+    ) {
+        *self
+            .revocation_rules
+            .write()
+            .expect("revocation rules binding lock poisoned") = Some(rules);
+    }
+
     pub fn resolve_pid(&self, spirit_id: &str) -> Option<u32> {
         let spirits = self.spirits.read().unwrap();
         for (pid, scb) in spirits.iter() {
@@ -161,6 +185,60 @@ impl SpiritSchedulerAdapter {
         None
     }
 
+    /// Read an exact sandbox report from the live SCB.  No report means that
+    /// this Spirit has not completed a concrete sandbox application.
+    pub fn sandbox_report_by_spirit_id(
+        &self,
+        spirit_id: &str,
+    ) -> Option<maos_domain::sandbox::SandboxInspectReport> {
+        self.spirits
+            .read()
+            .unwrap()
+            .values()
+            .find(|scb| scb.spirit_id == spirit_id)
+            .and_then(|scb| scb.sandbox_report())
+    }
+
+    /// Attach the concrete spawn/admission report to its existing live SCB.
+    /// Returns false instead of fabricating state when the Spirit is absent.
+    pub fn record_sandbox_report(
+        &self,
+        report: maos_domain::sandbox::SandboxInspectReport,
+    ) -> bool {
+        let spirits = self.spirits.read().unwrap();
+        let Some(scb) = spirits
+            .values()
+            .find(|scb| scb.spirit_id == report.spirit_id)
+        else {
+            return false;
+        };
+        scb.record_sandbox_report(report);
+        true
+    }
+
+    /// Commit a concrete sandbox application to the live SCB and lifecycle
+    /// journal.  The payload is the exact report served by operator HTTP.
+    pub fn record_sandbox_application(
+        &self,
+        report: maos_domain::sandbox::SandboxInspectReport,
+        journal: &dyn SpiritSchedulerPort,
+    ) -> Result<(), String> {
+        let spirit_id = report.spirit_id.clone();
+        let payload = serde_json::to_vec(&report)
+            .map_err(|error| format!("serialize sandbox report: {error}"))?;
+        if !self.record_sandbox_report(report) {
+            return Err(format!("sandbox report SCB not found for {spirit_id}"));
+        }
+        journal.journal_lifecycle(JournalEntry::Lifecycle(LifecycleEntry {
+            timestamp: crate::capability::cap_tokens::monotonic_now_ns(),
+            lifecycle_event: LifecycleEvent::SandboxApplied,
+            spirit_id,
+            payload: Some(payload),
+            effective_sandbox_tier: Some(maos_domain::invariants::i9::SandboxTier::T3),
+        }));
+        Ok(())
+    }
+
     /// Load a Spirit: create SCB, insert into map, fire on_load.
     pub async fn load<T: Spirit + Send + Sync + 'static>(
         &self,
@@ -169,6 +247,24 @@ impl SpiritSchedulerAdapter {
         spirit: T,
         boot_nonce: u64,
     ) -> Result<u32, LifecycleError> {
+        let revocation_rules = self
+            .revocation_rules
+            .read()
+            .expect("revocation rules binding lock poisoned")
+            .clone();
+        let _revocation_admission_guard = match revocation_rules.as_ref() {
+            Some(rules) => Some(rules.admission_guard().await),
+            None => None,
+        };
+        if revocation_rules
+            .as_ref()
+            .is_some_and(|rules| rules.rejects_manifest_locked(&manifest))
+        {
+            return Err(LifecycleError::Admission(
+                "spirit class/version is revoked by a validated CRL".into(),
+            ));
+        }
+
         if self.resolve_pid(spirit_id).is_some() {
             return Err(LifecycleError::AlreadyLoaded {
                 spirit_id: spirit_id.into(),

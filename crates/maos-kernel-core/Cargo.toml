@@ -81,7 +81,7 @@ windows = { version = "0.58", features = ["Win32_Security", "Win32_System_Thread
 [features]
 default = []
 # Story 4.3 — cross-Spirit isolation framework hooks for Story 4.5 corpus.
-spirit_test = ["maos-spirit-sdk"]
+spirit_test = ["maos-spirit-sdk", "maos-iac/spirit_test"]
 # Story 5.5b AC4 — records every http_post URL for air-gapped validation.
 io_call_journal = []
 # Story 5.5c — MCP fixture replay for adapter tests.

@@ -180,17 +180,18 @@ impl HookDispatcher {
     }
 
     fn hook_allowed(scb: &SpiritControlBlock, hook_name: &str) -> bool {
-        let enabled: Vec<&str> = scb
+        let runtime = scb.runtime_snapshot();
+        let enabled: Vec<&str> = runtime
             .manifest
             .lifecycle
             .enabled_hooks
             .iter()
-            .map(|s| s.as_str())
+            .map(|hook| hook.as_str())
             .collect();
         maos_spirit_abi::lifecycle::kernel_invocation_allowed(&enabled, hook_name)
     }
 
-    fn emit_budget_frame(
+    async fn emit_budget_frame(
         &self,
         scb: &SpiritControlBlock,
         hook_name: &str,
@@ -198,6 +199,61 @@ impl HookDispatcher {
         cap_seconds: u64,
         kind: FrameKind,
     ) {
+        let payload = maos_domain::frame::BudgetEnvelope {
+            spirit_pid: scb.pid,
+            hook_name: hook_name.to_owned(),
+            wall_ns,
+            cap_seconds,
+        };
+
+        if let Some(iac) = &self.iac {
+            let mut frame_id = [0_u8; 16];
+            frame_id[..4].copy_from_slice(&scb.pid.to_le_bytes());
+            frame_id[4..12].copy_from_slice(&wall_ns.to_le_bytes());
+            frame_id[12..].copy_from_slice(&(kind as u32).to_le_bytes());
+            let frame = maos_domain::frame::IacFrame {
+                frame_id,
+                timestamp_ns: crate::capability::cap_tokens::monotonic_now_ns(),
+                logical_clock: 0,
+                from: maos_domain::frame::FrameAddress {
+                    spirit_id: maos_spirit_abi::identity::SpiritId::from("kernel"),
+                    host_id: None,
+                    role: None,
+                },
+                to: vec![maos_domain::frame::FrameAddress {
+                    spirit_id: maos_spirit_abi::identity::SpiritId::from(scb.spirit_id.clone()),
+                    host_id: None,
+                    role: None,
+                }]
+                .into(),
+                kind: match kind {
+                    FrameKind::BudgetWarning => maos_spirit_abi::identity::FrameKind::BudgetWarning,
+                    FrameKind::BudgetExceeded => {
+                        maos_spirit_abi::identity::FrameKind::BudgetExceeded
+                    }
+                    _ => return,
+                },
+                intent: maos_domain::invariants::i1::IntentClass::Standard,
+                payload: match kind {
+                    FrameKind::BudgetWarning => {
+                        maos_domain::frame::FramePayload::BudgetWarning(payload)
+                    }
+                    FrameKind::BudgetExceeded => {
+                        maos_domain::frame::FramePayload::BudgetExceeded(payload)
+                    }
+                    _ => return,
+                },
+                auto_marker: FrameOrigin::Kernel,
+                consent_envelope: None,
+                intent_lineage: Default::default(),
+            };
+            if iac.deliver_typed(frame).await.is_ok() {
+                return;
+            }
+        }
+
+        // Keep the event auditable even when the invoking Spirit's mailbox has
+        // already disappeared; delivery failure must not erase budget evidence.
         let ratio = if cap_seconds > 0 {
             (wall_ns as f64) / (cap_seconds as f64 * 1_000_000_000.0)
         } else {
@@ -302,10 +358,11 @@ impl HookDispatcher {
     /// (`DEFAULT_TIME_CAP_SECONDS`). The kernel never learns what the budget
     /// bounds — only that this Spirit's hooks must finish within it.
     fn effective_cap_seconds(&self, scb: &SpiritControlBlock) -> u64 {
-        scb.manifest
+        scb.runtime_snapshot()
+            .manifest
             .budget
             .as_ref()
-            .map(|b| b.time_cap_seconds as u64)
+            .map(|budget| budget.time_cap_seconds as u64)
             .unwrap_or(self.time_cap_seconds)
     }
 
@@ -317,7 +374,7 @@ impl HookDispatcher {
         }
         let cap_seconds = self.effective_cap_seconds(scb);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
-        let spirit_obj = Arc::clone(&scb.spirit_obj);
+        let runtime = scb.runtime_cell();
 
         let spirit_pid = scb.pid;
         let spirits = self.spirits.clone();
@@ -332,6 +389,7 @@ impl HookDispatcher {
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }
+                let spirit_obj = runtime.read().spirit_obj.clone();
                 spirit_obj.snapshot(&mut kernel_ctx)
             }),
         );
@@ -376,7 +434,8 @@ impl HookDispatcher {
                     wall_ns,
                     cap_seconds,
                     crate::iac::transparency_log::FrameKind::BudgetExceeded,
-                );
+                )
+                .await;
                 Err(HookOutcome::BudgetExceeded {
                     wall_ns,
                     cap_seconds,
@@ -399,7 +458,7 @@ impl HookDispatcher {
         }
         let cap_seconds = self.effective_cap_seconds(scb);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
-        let spirit_obj = Arc::clone(&scb.spirit_obj);
+        let runtime = scb.runtime_cell();
         let predecessor_state = predecessor_state.to_vec();
 
         let spirit_pid = scb.pid;
@@ -415,6 +474,7 @@ impl HookDispatcher {
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }
+                let spirit_obj = runtime.read().spirit_obj.clone();
                 spirit_obj.migrate(&mut kernel_ctx, &predecessor_state)
             }),
         );
@@ -461,7 +521,8 @@ impl HookDispatcher {
                     wall_ns,
                     cap_seconds,
                     crate::iac::transparency_log::FrameKind::BudgetExceeded,
-                );
+                )
+                .await;
                 Err(maos_spirit_abi::lifecycle::MigratorError::new_internal(
                     "migrate hook timed out",
                 ))
@@ -505,7 +566,7 @@ impl HookDispatcher {
         let cap_seconds = self.effective_cap_seconds(scb);
         let wall_start = crate::capability::cap_tokens::monotonic_now_ns();
 
-        let spirit_obj = Arc::clone(&scb.spirit_obj);
+        let runtime = scb.runtime_cell();
         let payload = payload.to_vec(); // clone for 'static closure
 
         let spirit_pid = scb.pid;
@@ -521,12 +582,14 @@ impl HookDispatcher {
                 if let Some(ref s) = spirits {
                     kernel_ctx = kernel_ctx.with_spirits(Arc::clone(s));
                 }
+                let spirit_obj = runtime.read().spirit_obj.clone();
                 fire_fn(&spirit_obj, &mut kernel_ctx, &payload);
             }),
         );
 
-        let warn_seconds = std::cmp::max(1, cap_seconds * 4 / 5);
-        let warn_sleep = tokio::time::sleep(Duration::from_secs(warn_seconds));
+        // Preserve the 80% boundary below one second: whole-second rounding
+        // would turn a one-second cap into a 100%-time warning.
+        let warn_sleep = tokio::time::sleep(Duration::from_millis(cap_seconds.saturating_mul(800)));
         tokio::pin!(hook_future);
         tokio::pin!(warn_sleep);
 
@@ -545,7 +608,8 @@ impl HookDispatcher {
                     crate::capability::cap_tokens::monotonic_now_ns() - wall_start,
                     cap_seconds,
                     FrameKind::BudgetWarning,
-                );
+                )
+                .await;
                 // Continue waiting for the hook future to complete or time out.
                 hook_future.await
             }
@@ -606,7 +670,8 @@ impl HookDispatcher {
                         wall_ns,
                         cap_seconds,
                         FrameKind::BudgetWarning,
-                    );
+                    )
+                    .await;
                 }
                 self.emit_budget_frame(
                     scb,
@@ -614,7 +679,8 @@ impl HookDispatcher {
                     wall_ns,
                     cap_seconds,
                     FrameKind::BudgetExceeded,
-                );
+                )
+                .await;
                 HookOutcome::BudgetExceeded {
                     wall_ns,
                     cap_seconds,

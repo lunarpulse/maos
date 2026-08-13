@@ -711,19 +711,25 @@ fn check_a4_debt_1() -> Result<CheckResult, std::io::Error> {
         });
     }
 
-    let whitelist = fs::read_to_string("xtask/i9-whitelist.toml")?;
-    // Count entries — should have at least the ~14 metadata structs
-    let entry_count = whitelist
+    #[derive(serde::Deserialize)]
+    struct I9Whitelist {
+        paths: Vec<String>,
+    }
+    let whitelist: I9Whitelist = toml::from_str(&fs::read_to_string("xtask/i9-whitelist.toml")?)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    let exemptions = fs::read_to_string("docs/invariants/i9-exemptions.md")?;
+    let exemption_count = exemptions
         .lines()
-        .filter(|l| l.contains("rationale"))
+        .filter(|line| line.trim_start().starts_with("**Reason:**"))
         .count();
+    let path_count = whitelist.paths.len();
 
     Ok(CheckResult {
         id,
-        passed: entry_count >= 5, // Relaxed: at least 5 rationale entries
+        passed: path_count >= 3 && exemption_count >= 14,
         message: format!(
-            "i9-whitelist.toml ({} entries) + i9-exemptions.md present",
-            entry_count
+            "i9-whitelist.toml ({path_count} sanctioned paths) + i9-exemptions.md \
+             ({exemption_count} documented rationales)"
         ),
     })
 }

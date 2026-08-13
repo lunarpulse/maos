@@ -314,6 +314,7 @@ mod tests {
             scopes.len()
         );
     }
+    #[cfg(not(feature = "pdp-fault-inject"))]
     #[test]
     fn reconcile_collects_only_forbids() {
         // Operator pattern: PERMIT all, FORBID specific (Cedar `forbid` beats
@@ -338,6 +339,7 @@ mod tests {
         assert!(denies.contains(&loomwrite_key));
     }
 
+    #[cfg(not(feature = "pdp-fault-inject"))]
     #[test]
     fn empty_policy_denies_all_governed_cedar_default_deny() {
         // Cedar default-deny: an empty policy (no permits) denies everything.

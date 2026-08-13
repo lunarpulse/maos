@@ -33,6 +33,7 @@ use maos_kernel_core::capability::cap_audit::channel;
 /// producer-wired seam, and the detector reads that real row and raises an
 /// operator-observable anomaly. NOT the smoke `_probe`, NOT a stderr print, NOT
 /// an in-test `classify_exit` assertion — the full pipe.
+#[cfg(not(feature = "escape-fault-inject"))]
 #[test]
 fn real_seccomp_kill_produces_real_tl_row_and_detector_anomaly() {
     let (_dir, db_path, tl) = fresh_temp_tl();

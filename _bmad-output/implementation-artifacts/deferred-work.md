@@ -795,3 +795,13 @@ run and is filed with a live owner rather than patched here.
   **Owner: `14-4-v2-0-sweep-operational-surfaces`.**
 - **`EXPECTED_GATES` is hand-maintained and nothing derives it from the workflow.** Re-framed rather than re-filed: 13.6e added a genuine reverse check (`ledger_ship_badge_problems`, `xtask/src/check_ship_gate_completeness.rs:137-166`), so *"never validates anything CI produced"* is now FALSE. The surviving defect is the forward direction — 36 `EXPECTED_GATES` entries against the workflow's `check-*` jobs, with no derivation between them.
   **Owner: `14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition`** — handed by the Epic-13 retrospective §4 (2026-08-11): 14.6 owns the ceiling instrument and retro-residual discipline.
+
+- source_spec: none
+  summary: Replace simulated post-revocation capability denial with an issued-token to CRL-apply to verification production path.
+  evidence: Split from the critical remediation tranche because Story 5.4 finding 01 is independently shippable; Lunarpulse selected Story 5.2 finding 01 first on 2026-08-12.
+- source_spec: none
+  summary: Define successor Spirit instantiation so upgrades never reuse the predecessor runtime object as the successor.
+  evidence: Split from the critical remediation tranche because Story 5.4 finding 10 requires its own architecture decision and implementation; Lunarpulse selected Story 5.2 finding 01 first on 2026-08-12.
+- source_spec: none
+  summary: Replace the revocation applier pipeline stub with observable end-to-end propagation coverage.
+  evidence: Split from the critical remediation tranche because Story 5.4 finding 11 is independently shippable; Lunarpulse selected Story 5.2 finding 01 first on 2026-08-12.

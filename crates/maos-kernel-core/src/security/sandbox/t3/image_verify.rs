@@ -101,28 +101,192 @@ pub fn verify_image_attestation(
     Ok(())
 }
 
-/// Inspect the local image SHA-256 using the container runtime.
-/// Shells out to `<runtime> image inspect --format '{{.Id}}' <image_uri>`.
+/// Inspect the registry manifest digest recorded by the runtime's
+/// `RepoDigests` metadata.  Local `.Id` is a config/image identifier and must
+/// never be compared with an attested registry manifest digest.
 pub fn inspect_image_sha(runtime: &ContainerRuntime, image_uri: &str) -> Result<[u8; 32], T3Error> {
     let output = std::process::Command::new(&runtime.path)
-        .args(["image", "inspect", "--format", "{{.Id}}", image_uri])
+        .args([
+            "image",
+            "inspect",
+            "--format",
+            "{{json .RepoDigests}}",
+            image_uri,
+        ])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
-        .map_err(|e| T3Error::Inspect(format!("image inspect for {image_uri}: {e}")))?;
+        .map_err(|error| T3Error::Inspect(format!("image inspect for {image_uri}: {error}")))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(T3Error::Inspect(format!(
-            "image inspect failed for {image_uri}: {stderr}"
+            "image inspect failed for {image_uri}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
         )));
     }
 
-    let stdout_str = String::from_utf8_lossy(&output.stdout);
-    let id_str = stdout_str.trim();
-    let sha_hex = id_str.strip_prefix("sha256:").unwrap_or(id_str);
+    parse_repo_digest(&output.stdout, image_uri)
+}
+
+fn parse_repo_digest(stdout: &[u8], image_uri: &str) -> Result<[u8; 32], T3Error> {
+    let digests: Vec<String> = serde_json::from_slice(stdout).map_err(|error| {
+        T3Error::Inspect(format!(
+            "malformed RepoDigests output for {image_uri}: {error}"
+        ))
+    })?;
+    let expected_repo = normalize_repository(image_uri)?;
+    let digest = digests
+        .iter()
+        .find(|digest| {
+            digest.split_once("@sha256:").is_some_and(|(repo, _)| {
+                normalize_repository(repo).ok().as_deref() == Some(expected_repo.as_str())
+            })
+        })
+        .ok_or_else(|| {
+            T3Error::Inspect(format!(
+                "RepoDigests contains no manifest digest for repository {expected_repo}"
+            ))
+        })?;
+    let (_, hex_digest) = digest
+        .split_once("@sha256:")
+        .ok_or_else(|| T3Error::Inspect(format!("malformed repository digest '{digest}'")))?;
     let mut sha = [0u8; 32];
-    hex::decode_to_slice(sha_hex, &mut sha)
-        .map_err(|e| T3Error::Inspect(format!("parse image SHA '{sha_hex}': {e}")))?;
+    hex::decode_to_slice(hex_digest, &mut sha).map_err(|error| {
+        T3Error::Inspect(format!("malformed manifest digest '{digest}': {error}"))
+    })?;
     Ok(sha)
+}
+
+/// Remove a tag or digest suffix while preserving registry ports in the
+/// repository name.  This gives argv pinning and runtime inspection the same
+/// repository identity without constructing `@sha256:@sha256:` URIs.
+pub fn normalize_repository(image_uri: &str) -> Result<String, T3Error> {
+    let without_digest = image_uri
+        .split_once('@')
+        .map_or(image_uri, |(repository, _)| repository);
+    let last_slash = without_digest.rfind('/');
+    let tag_separator = without_digest.rfind(':');
+    let repository = match (last_slash, tag_separator) {
+        (Some(slash), Some(colon)) if colon > slash => &without_digest[..colon],
+        (None, Some(colon)) => &without_digest[..colon],
+        _ => without_digest,
+    };
+    if repository.is_empty() {
+        return Err(T3Error::Inspect("empty image repository".into()));
+    }
+    Ok(repository.to_ascii_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_repository, parse_repo_digest, T3Error};
+
+    #[test]
+    fn normalizer_removes_one_tag_or_digest_without_losing_registry_port() {
+        assert_eq!(
+            normalize_repository("registry.example:5000/team/spirit:stable").unwrap(),
+            "registry.example:5000/team/spirit"
+        );
+        assert_eq!(
+            normalize_repository(
+                "registry.example:5000/team/spirit@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+            .unwrap(),
+            "registry.example:5000/team/spirit"
+        );
+    }
+
+    #[test]
+    fn repo_digest_parser_selects_the_matching_repository() {
+        let expected = [0xAB; 32];
+        let stdout = serde_json::to_vec(&vec![
+            format!("registry.example/other@sha256:{}", "cd".repeat(32)),
+            format!(
+                "registry.example:5000/team/spirit@sha256:{}",
+                hex::encode(expected)
+            ),
+        ])
+        .unwrap();
+        assert_eq!(
+            parse_repo_digest(&stdout, "registry.example:5000/team/spirit:stable").unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn repo_digest_parser_preserves_malformed_and_missing_diagnostics() {
+        assert!(matches!(
+            parse_repo_digest(b"not-json", "registry.example/team/spirit"),
+            Err(T3Error::Inspect(reason)) if reason.contains("malformed RepoDigests")
+        ));
+        let unrelated = serde_json::to_vec(&vec![format!(
+            "registry.example/other@sha256:{}",
+            "ab".repeat(32)
+        )])
+        .unwrap();
+        assert!(matches!(
+            parse_repo_digest(&unrelated, "registry.example/team/spirit"),
+            Err(T3Error::Inspect(reason)) if reason.contains("contains no manifest digest")
+        ));
+    }
+
+    struct RejectCrypto;
+
+    impl maos_domain::ports::crypto::CryptoProvider for RejectCrypto {
+        fn verify_signature(
+            &self,
+            _: &[u8],
+            _: &[u8],
+            _: &[u8],
+        ) -> Result<(), maos_domain::ports::crypto::CryptoError> {
+            Err(maos_domain::ports::crypto::CryptoError::SignatureInvalid)
+        }
+
+        fn seal_for_export(
+            &self,
+            _: &[u8],
+            _: &[u8],
+            _: &[u8],
+            _: &[u8],
+        ) -> Result<Vec<u8>, maos_domain::ports::crypto::CryptoError> {
+            Err(maos_domain::ports::crypto::CryptoError::OperationFailed(
+                "unused",
+            ))
+        }
+
+        fn sign_capability_token(
+            &self,
+            _: &[u8],
+            _: &[u8],
+        ) -> Result<Vec<u8>, maos_domain::ports::crypto::CryptoError> {
+            Err(maos_domain::ports::crypto::CryptoError::OperationFailed(
+                "unused",
+            ))
+        }
+    }
+
+    #[test]
+    fn signed_lock_parser_rejects_an_invalid_signature_after_anchor_match() {
+        let json = serde_json::json!({
+            "id": vec![9; 32],
+            "schema_version": 1,
+            "signed_at_ns": 1,
+            "entries": [{
+                "image_uri": "registry.example/spirit",
+                "image_sha256": vec![8; 32],
+                "description": "test",
+                "default_for_v05": true
+            }],
+            "signature": vec![7; 64],
+            "signer_pub_key": vec![6; 32]
+        });
+        assert!(matches!(
+            super::parse_signed_image_attestation(
+                serde_json::to_string(&json).unwrap().as_bytes(),
+                &[6; 32],
+                &RejectCrypto,
+            ),
+            Err(maos_domain::sandbox::T3Error::SignatureInvalid)
+        ));
+    }
 }

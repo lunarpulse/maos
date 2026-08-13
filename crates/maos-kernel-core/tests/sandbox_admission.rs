@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use maos_domain::invariants::i10::LifecycleEvent;
 use maos_domain::invariants::i9::SandboxTier;
+use maos_domain::ports::CryptoProvider;
+use maos_domain::sandbox::{ImageAttestationId, T3ImageAttestation, T3ImageEntry};
 use maos_kernel_core::capability::cap_policy::{
     decision::TrustTier, ManifestCapabilityScope, PolicyTable, PolicyTableInner,
 };
@@ -11,8 +13,9 @@ use maos_kernel_core::capability::cap_tokens;
 use maos_kernel_core::journal::JournalAdapter;
 use maos_kernel_core::security::{
     CapabilitiesRequired, ClassSection, EpistemicPolicySection, OutputShape, PostureSection,
-    ResourceCaps, SandboxConfig, SecurityError, SecurityManagerAdapter,
+    ResourceCaps, RingCryptoProvider, SandboxConfig, SecurityError, SecurityManagerAdapter,
 };
+use ring::signature::{Ed25519KeyPair, KeyPair};
 
 fn test_class() -> ClassSection {
     ClassSection {
@@ -82,6 +85,47 @@ fn default_epistemic_policy() -> EpistemicPolicySection {
     EpistemicPolicySection::default_open_fail()
 }
 
+fn write_signed_t3_lock(tmpdir: &tempfile::TempDir) -> (std::path::PathBuf, [u8; 32]) {
+    let seed = [0x5A; 32];
+    let keypair = Ed25519KeyPair::from_seed_unchecked(&seed).expect("T3 test keypair");
+    let signer_pub_key: [u8; 32] = keypair
+        .public_key()
+        .as_ref()
+        .try_into()
+        .expect("Ed25519 public key");
+    let entries = vec![T3ImageEntry::new(
+        "registry.example/maos/t3-runtime",
+        [0xA5; 32],
+        "signed T3 admission fixture",
+        true,
+    )
+    .expect("T3 image entry")];
+    let signature: [u8; 64] = RingCryptoProvider
+        .sign_capability_token(
+            &seed,
+            &serde_json::to_vec(&entries).expect("serialize T3 entries"),
+        )
+        .expect("sign T3 entries")
+        .try_into()
+        .expect("Ed25519 signature");
+    let attestation = T3ImageAttestation::new(
+        ImageAttestationId([0x3A; 32]),
+        1,
+        1_700_000_000_000_000_000,
+        entries,
+        signature,
+        signer_pub_key,
+    )
+    .expect("T3 attestation");
+    let path = tmpdir.path().join("t3-image.lock");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&vec![attestation]).expect("serialize T3 lock"),
+    )
+    .expect("write T3 lock");
+    (path, signer_pub_key)
+}
+
 #[test]
 fn strictest_of_manifest_trust_operator() {
     let (adapter, journal, _tmpdir) = make_adapter_with_trust_floors();
@@ -130,7 +174,9 @@ fn strictest_of_manifest_trust_operator() {
 
 #[test]
 fn t3_effective_tier_admitted() {
-    let (adapter, journal, _tmpdir) = make_adapter_with_trust_floors();
+    let (adapter, journal, tmpdir) = make_adapter_with_trust_floors();
+    let (lock_path, trust_anchor_pub) = write_signed_t3_lock(&tmpdir);
+    let adapter = adapter.with_t3_image_verification(lock_path, trust_anchor_pub);
 
     let mut inner = (*adapter.policy().inner().load_full()).clone();
     inner.manifest_scopes.insert(

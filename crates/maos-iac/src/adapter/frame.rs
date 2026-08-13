@@ -16,7 +16,7 @@
 //! same `IacFrame` type as the port trait.
 
 pub use maos_domain::frame::{
-    ConsentEnvelope, ConsentRequestPayload, DecisionDispatchPayload, EpistemicHaltPayload,
-    FrameAddress, FramePayload, IacFrame, PostureHint, PosturePreferences, RetractPayload,
-    TaskAssignPayload, TaskCompletePayload, TelemetryEventPayload,
+    BudgetEnvelope, ConsentEnvelope, ConsentRequestPayload, DecisionDispatchPayload,
+    EpistemicHaltPayload, FrameAddress, FramePayload, IacFrame, PostureHint, PosturePreferences,
+    RetractPayload, TaskAssignPayload, TaskCompletePayload, TelemetryEventPayload,
 };

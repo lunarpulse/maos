@@ -1,3 +1,5 @@
+#![cfg(not(feature = "siem-fault-inject"))]
+
 //! Story 11.4c Task 4 (AC4) — SIEM redaction-before-forward contract (RED-first).
 //!
 //! Pins AC4 / landmine L6: SIEM export MUST route each Transparency-Log row

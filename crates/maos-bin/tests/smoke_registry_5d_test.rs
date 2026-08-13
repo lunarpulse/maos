@@ -6,12 +6,37 @@
 #![cfg(feature = "fixture_replay")]
 
 use std::process::Command;
+struct IsolatedDataHome {
+    path: std::path::PathBuf,
+}
+
+impl Drop for IsolatedDataHome {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+fn isolated_data_home() -> IsolatedDataHome {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "maos-smoke-registry-{}-{}",
+        std::process::id(),
+        nanos
+    ));
+    std::fs::create_dir_all(&path).unwrap();
+    IsolatedDataHome { path }
+}
 
 #[test]
 fn smoke_registry_5d_exits_zero_and_outputs_7_json_lines() {
     let bin = env!("CARGO_BIN_EXE_maos");
+    let data_home = isolated_data_home();
     let output = Command::new(bin)
         .env("MAOS_ONE_SHOT", "smoke-registry-5d")
+        .env("XDG_DATA_HOME", &data_home.path)
         .output()
         .expect("failed to execute maos-bin");
 

@@ -6,13 +6,13 @@
 //! Architecture §4.1 + Story 5.1 Task 3.
 
 use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+use parking_lot::RwLock;
 
 use crate::scheduler::kernel_ctx::KernelCtx;
 use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
 use maos_spirit_abi::lifecycle::Spirit;
-
-use std::sync::Mutex;
 
 use crate::security::manifest::{
     ClassSection, GatewaysSection, LifecycleSection, OnCrashSection, SchedulesSection,
@@ -21,6 +21,7 @@ use crate::security::manifest::{
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::task::TaskAssignmentRecord;
 use maos_domain::revocation::RevocationAction;
+use maos_domain::sandbox::SandboxInspectReport;
 use maos_domain::supervision::OnCrashAction;
 
 /// Kernel-side mirror of `maos_domain::lifecycle::SpiritLifecycleState`
@@ -191,7 +192,7 @@ pub fn make_spirit_obj<T: Spirit + Send + Sync + 'static>(spirit: T) -> Arc<dyn 
     Arc::new(VtableSpiritObj { spirit, vtable })
 }
 
-/// Bundled manifest sections held on the SCB.
+/// Bundled manifest sections held in the SCB's swappable runtime cell.
 #[derive(Debug, Clone)]
 pub struct SpiritManifestBundle {
     pub scheduling: SchedulingSection,
@@ -236,6 +237,19 @@ impl Default for SpiritManifestBundle {
     }
 }
 
+/// Mutable execution snapshot held inside the stable SCB allocation.
+/// Identity, lifecycle atomics, DRR deficit, watchdog clocks, task ledger and
+/// boot nonce deliberately remain outside this cell across hot swaps.
+#[derive(Clone)]
+pub struct ScbRuntimeSnapshot {
+    pub manifest: SpiritManifestBundle,
+    pub spirit_obj: Arc<dyn AnySpiritObj>,
+    pub priority_weight: u8,
+    pub on_crash_action: OnCrashAction,
+    pub on_revocation_action: RevocationAction,
+    pub sandbox_tier: SandboxTier,
+}
+
 /// Per-Spirit kernel-side control block — the PCB analog.
 #[maos_attrs::i9_exempt(
     reason = "per-Spirit kernel control block (PCB analog); supervised single-owner runtime state held under the scheduler supervisor per §4.0.8 — structural-state per I9, bounded by Spirit lifetime, keyed by spirit_id, no parameter drift (Story 7.1.7 baseline-reset)"
@@ -245,12 +259,6 @@ pub struct SpiritControlBlock {
     pub spirit_id: String,
     /// Atomic u8 encoding ScbLifecycleState.
     pub state: AtomicU8,
-    /// Manifest sections (scheduling, lifecycle).
-    pub manifest: SpiritManifestBundle,
-    /// Type-erased Spirit object for hook dispatch.
-    pub spirit_obj: Arc<dyn AnySpiritObj>,
-    /// Priority weight for DRR scheduling.
-    pub priority_weight: u8,
     /// DRR running deficit counter.
     pub deficit_counter: AtomicU32,
     /// Timestamp (ns) of last inbound frame — mutated by Mailbox::deliver.
@@ -265,26 +273,27 @@ pub struct SpiritControlBlock {
     pub last_stall_emit_ns: AtomicU64,
     /// Story 5.3 — timestamp (ns) of last `SilentFailureSuspect` emit (multi-fire avoidance).
     pub last_silent_failure_emit_ns: AtomicU64,
-    /// Story 5.3 — FR50 dead-Spirit task disposition policy.
-    pub on_crash_action: OnCrashAction,
-    /// Story 5.4 — revocation policy read from manifest at load time.
-    pub on_revocation_action: RevocationAction,
     /// Story 5.3 — per-SCB in-flight task ledger.
     pub task_assignments_in_flight: Mutex<Vec<TaskAssignmentRecord>>,
     /// Kernel boot nonce for token validation.
     pub boot_nonce: u64,
-    /// Story 5.3 — effective sandbox tier at admission / load time.
-    pub sandbox_tier: SandboxTier,
+    /// Last concrete sandbox application for the active process.  This stays
+    /// on the stable SCB, not the swappable runtime snapshot, so a live
+    /// operator report cannot regress to fabricated defaults during a swap.
+    sandbox_report: RwLock<Option<SandboxInspectReport>>,
+    /// The only hot-swappable portion of a control block.
+    runtime: Arc<RwLock<ScbRuntimeSnapshot>>,
 }
 
 impl std::fmt::Debug for SpiritControlBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let runtime = self.runtime_snapshot();
         f.debug_struct("SpiritControlBlock")
             .field("pid", &self.pid)
             .field("spirit_id", &self.spirit_id)
             .field("state", &self.current_state())
-            .field("manifest", &self.manifest)
-            .field("priority_weight", &self.priority_weight)
+            .field("manifest", &runtime.manifest)
+            .field("priority_weight", &runtime.priority_weight)
             .field(
                 "deficit_counter",
                 &self.deficit_counter.load(Ordering::Relaxed),
@@ -325,9 +334,6 @@ impl SpiritControlBlock {
             pid,
             spirit_id,
             state: AtomicU8::new(ScbLifecycleState::Loaded as u8),
-            manifest,
-            spirit_obj,
-            priority_weight,
             deficit_counter: AtomicU32::new(0),
             // Story 5.1 review backfill — seed `last_inbound_frame_ns` to SCB
             // creation time so the IdleWatchdog can fire on_idle even for
@@ -343,12 +349,45 @@ impl SpiritControlBlock {
             last_heartbeat_ns: AtomicU64::new(crate::capability::cap_tokens::monotonic_now_ns()),
             last_stall_emit_ns: AtomicU64::new(0),
             last_silent_failure_emit_ns: AtomicU64::new(0),
-            on_crash_action,
-            on_revocation_action,
             task_assignments_in_flight: Mutex::new(Vec::new()),
             boot_nonce,
-            sandbox_tier: SandboxTier::default(),
+            sandbox_report: RwLock::new(None),
+            runtime: Arc::new(RwLock::new(ScbRuntimeSnapshot {
+                manifest,
+                spirit_obj,
+                priority_weight,
+                on_crash_action,
+                on_revocation_action,
+                sandbox_tier: SandboxTier::default(),
+            })),
         }
+    }
+    /// Record the report emitted by actual T3 admission/spawn work.
+    pub fn record_sandbox_report(&self, report: SandboxInspectReport) {
+        debug_assert_eq!(report.spirit_id, self.spirit_id);
+        *self.sandbox_report.write() = Some(report);
+    }
+
+    /// Return the exact live report retained by this SCB.
+    pub fn sandbox_report(&self) -> Option<SandboxInspectReport> {
+        self.sandbox_report.read().clone()
+    }
+
+    /// Snapshot the current executable runtime without replacing the SCB Arc.
+    pub fn runtime_snapshot(&self) -> ScbRuntimeSnapshot {
+        self.runtime.read().clone()
+    }
+
+    /// Clone the runtime cell for a dispatch task that must resolve the active
+    /// object at execution time rather than retaining a predecessor snapshot.
+    pub(crate) fn runtime_cell(&self) -> Arc<RwLock<ScbRuntimeSnapshot>> {
+        Arc::clone(&self.runtime)
+    }
+
+    /// Replace only runtime-owned state and return the exact prior snapshot
+    pub fn replace_runtime(&self, runtime: ScbRuntimeSnapshot) -> ScbRuntimeSnapshot {
+        let mut current = self.runtime.write();
+        std::mem::replace(&mut *current, runtime)
     }
 
     /// Read the current lifecycle state.
@@ -567,7 +606,7 @@ mod tests {
         assert!(scb.last_heartbeat_ns.load(Ordering::Relaxed) <= now);
         assert_eq!(scb.last_stall_emit_ns.load(Ordering::Relaxed), 0);
         assert_eq!(scb.last_silent_failure_emit_ns.load(Ordering::Relaxed), 0);
-        assert_eq!(scb.on_crash_action, OnCrashAction::Nack);
+        assert_eq!(scb.runtime_snapshot().on_crash_action, OnCrashAction::Nack);
         assert!(scb.task_assignments_in_flight.lock().unwrap().is_empty());
     }
 
@@ -579,7 +618,10 @@ mod tests {
         });
         let spirit_obj = make_spirit_obj(TestSpirit);
         let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
-        assert_eq!(scb.on_crash_action, OnCrashAction::EscalateToOperator);
+        assert_eq!(
+            scb.runtime_snapshot().on_crash_action,
+            OnCrashAction::EscalateToOperator
+        );
     }
 
     #[test]
@@ -588,7 +630,7 @@ mod tests {
         let spirit_obj = make_spirit_obj(TestSpirit);
         let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
         assert_eq!(
-            scb.on_revocation_action,
+            scb.runtime_snapshot().on_revocation_action,
             RevocationAction::TerminateImmediately
         );
     }
@@ -602,7 +644,60 @@ mod tests {
         });
         let spirit_obj = make_spirit_obj(TestSpirit);
         let scb = SpiritControlBlock::new(42, "test-spirit".into(), bundle, spirit_obj, 0xCAFE);
-        assert_eq!(scb.on_revocation_action, RevocationAction::Quarantine);
+        assert_eq!(
+            scb.runtime_snapshot().on_revocation_action,
+            RevocationAction::Quarantine
+        );
+    }
+
+    #[test]
+    fn runtime_replacement_preserves_stable_identity_and_rolls_back_for_stale_clones() {
+        let scb = Arc::new(make_scb(ScbLifecycleState::Running));
+        let stale_clone = Arc::clone(&scb);
+        scb.deficit_counter.store(17, Ordering::Release);
+        scb.last_progress_iac_ns.store(91, Ordering::Release);
+        scb.task_assignments_in_flight
+            .lock()
+            .unwrap()
+            .push(TaskAssignmentRecord {
+                task_id: "in-flight".into(),
+                capability_token: maos_domain::invariants::i1::TokenId([0; 16]),
+                ttl_deadline_ns: 1,
+                intent_class: maos_domain::invariants::i1::IntentClass::Standard,
+                originator_spirit_id: "origin".into(),
+            });
+
+        let predecessor = scb.runtime_snapshot();
+        let successor = ScbRuntimeSnapshot {
+            manifest: predecessor.manifest.clone(),
+            spirit_obj: make_spirit_obj(TestSpirit),
+            priority_weight: predecessor.priority_weight.saturating_add(1),
+            on_crash_action: predecessor.on_crash_action.clone(),
+            on_revocation_action: predecessor.on_revocation_action,
+            sandbox_tier: predecessor.sandbox_tier,
+        };
+        let rollback = scb.replace_runtime(successor);
+
+        assert!(Arc::ptr_eq(&scb, &stale_clone));
+        assert_eq!(stale_clone.pid, 42);
+        assert_eq!(stale_clone.boot_nonce, 0xCAFE);
+        assert_eq!(stale_clone.current_state(), ScbLifecycleState::Running);
+        assert_eq!(stale_clone.deficit_counter.load(Ordering::Acquire), 17);
+        assert_eq!(stale_clone.last_progress_iac_ns.load(Ordering::Acquire), 91);
+        assert_eq!(
+            stale_clone.task_assignments_in_flight.lock().unwrap().len(),
+            1
+        );
+        assert!(!Arc::ptr_eq(
+            &predecessor.spirit_obj,
+            &stale_clone.runtime_snapshot().spirit_obj,
+        ));
+
+        stale_clone.replace_runtime(rollback);
+        assert!(Arc::ptr_eq(
+            &predecessor.spirit_obj,
+            &scb.runtime_snapshot().spirit_obj,
+        ));
     }
 
     #[test]

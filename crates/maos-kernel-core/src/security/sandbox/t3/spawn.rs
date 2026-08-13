@@ -19,12 +19,12 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use maos_domain::invariants::i9::SandboxTier;
-use maos_domain::sandbox::{T3Error, T3ImageAttestation};
+use maos_domain::sandbox::T3Error;
 
 use crate::security::sandbox::{SandboxSpec, SpawnError};
 
 use super::child::SandboxedContainerChild;
+use super::image_lock::VerifiedImageAttestation;
 use super::image_verify;
 use super::runtime_detect::{self};
 
@@ -53,7 +53,7 @@ pub struct T3SpawnContext {
 /// 6. Wrap in `SandboxedContainerChild`.
 pub fn spawn_t3(
     spec: &SandboxSpec,
-    image: &T3ImageAttestation,
+    image: &VerifiedImageAttestation,
     command: &[String],
     parent: T3SpawnContext,
 ) -> Result<SandboxedContainerChild, SpawnError> {
@@ -76,22 +76,21 @@ pub fn spawn_t3(
             }
         })?;
 
-        // 2. Verify local image SHA matches the attestation's pin
-        //    (v0.5-α: placeholder — see image_verify::inspect_image_sha)
-        if let Some(entry) = image.entries.first() {
-            let local_sha =
-                image_verify::inspect_image_sha(&runtime, &entry.image_uri).map_err(|e| {
-                    SpawnError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                })?;
-            if local_sha != entry.image_sha256 {
-                return Err(SpawnError::SandboxImageMismatch {
-                    expected: hex::encode(entry.image_sha256),
-                    observed: hex::encode(local_sha),
-                });
-            }
+        // 2. Compare the verified image's attested registry manifest digest
+        // against the runtime's RepoDigests entry for the same normalized
+        // repository.  Local image `.Id` is deliberately never consulted.
+        let entry = image.entry();
+        let local_sha =
+            image_verify::inspect_image_sha(&runtime, &entry.image_uri).map_err(|error| {
+                SpawnError::T3ImageInspect {
+                    reason: error.to_string(),
+                }
+            })?;
+        if local_sha != entry.image_sha256 {
+            return Err(SpawnError::SandboxImageMismatch {
+                expected: hex::encode(entry.image_sha256),
+                observed: hex::encode(local_sha),
+            });
         }
 
         // 3. Build argv via the pure-function argv builder.
@@ -107,8 +106,10 @@ pub fn spawn_t3(
             &spec.spirit_id,
             parent.boot_nonce,
             &parent.container_name,
-        );
-
+        )
+        .map_err(|error| SpawnError::T3ImageInspect {
+            reason: error.to_string(),
+        })?;
         // 4. Spawn via std::process::Command.
         // T3 has no pre_exec closure — the container itself is the boundary.
         let mut cmd = Command::new(&argv[0]);
@@ -131,6 +132,23 @@ pub fn spawn_t3(
             runtime,
         })
     }
+}
+
+/// Commit a successful spawn's observed identity to the owning live SCB and
+/// journal.  This is deliberately separate from process creation so callers
+/// can hand the child to their supervisor without holding a scheduler lock
+/// across runtime I/O, while still making the commit explicit and mandatory at
+/// the scheduler boundary.
+pub fn commit_spawn_report(
+    scheduler: &crate::scheduler::SpiritSchedulerAdapter,
+    journal: &dyn maos_domain::ports::scheduler::SpiritSchedulerPort,
+    child: &SandboxedContainerChild,
+    spirit_id: String,
+    image: &VerifiedImageAttestation,
+) -> Result<(), SpawnError> {
+    scheduler
+        .record_sandbox_application(child.inspect_report(spirit_id, image), journal)
+        .map_err(|reason| SpawnError::T3ReportCommit { reason })
 }
 
 /// Inspect the host-namespace PID of a container.

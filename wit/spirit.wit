@@ -32,6 +32,8 @@ interface frames {
         capability-invocation,  // 7
         sandbox-block,          // 8
         inference-call,         // 9
+        budget-warning,         // 12
+        budget-exceeded,        // 13
         cli-subprocess-output,  // 21
         consent-rupture,        // 22
         rate-limited,           // 23
@@ -163,6 +165,14 @@ interface frames {
         schedule-id: option<string>,
     }
 
+    // ── BudgetEnvelope (frame.rs) ─────────────────────────────────────
+    record budget-envelope {
+        spirit-pid: u32,
+        hook-name: string,
+        wall-ns: u64,
+        cap-seconds: u64,
+    }
+
     // ── FramePayload (frame.rs:63-75) ──────────────────────────────────
     // Discriminated union — one variant per routed FrameKind.
     variant frame-payload {
@@ -173,6 +183,8 @@ interface frames {
         telemetry-event(telemetry-event-body),
         consent-request(consent-request-body),
         retract(retract-body),
+        budget-warning(budget-envelope),
+        budget-exceeded(budget-envelope),
         consent-rupture(consent-rupture-body),
         rate-limited(rate-limited-body),
     }

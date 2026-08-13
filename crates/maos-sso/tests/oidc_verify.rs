@@ -1,3 +1,5 @@
+#![cfg(not(feature = "sso-fault-inject"))]
+
 //! Story 11.4c AC1 (Task 1) - the OIDC verify TRIPWIRE: a correctly-signed,
 //! in-audience, live assertion VERIFIES, and a token signed with the WRONG key
 //! is rejected (fail-closed). This is the per-commit offline leg that proves the

@@ -23,6 +23,7 @@ pub struct UpgradePolicyExpectedOutcome {
 
 pub struct UpgradePolicyCorpus {
     pub scenarios: Vec<UpgradePolicyScenario>,
+    root: std::path::PathBuf,
 }
 
 impl UpgradePolicyCorpus {
@@ -59,7 +60,10 @@ impl UpgradePolicyCorpus {
             scenarios.push(scenario);
         }
 
-        Ok(Self { scenarios })
+        Ok(Self {
+            scenarios,
+            root: dir.canonicalize().map_err(crate::CorpusError::Io)?,
+        })
     }
 
     pub fn len(&self) -> usize {
@@ -68,5 +72,36 @@ impl UpgradePolicyCorpus {
 
     pub fn is_empty(&self) -> bool {
         self.scenarios.is_empty()
+    }
+
+    /// Open the predecessor and successor manifests for every scenario.
+    /// Corpus validity includes executable inputs, not descriptor cardinality.
+    pub fn read_assets(
+        &self,
+    ) -> Result<Vec<(UpgradePolicyScenario, String, String)>, crate::CorpusError> {
+        let workspace_root = self.root.ancestors().nth(4).ok_or_else(|| {
+            crate::CorpusError::NotFound(format!(
+                "workspace root above corpus {}",
+                self.root.display()
+            ))
+        })?;
+        self.scenarios
+            .iter()
+            .cloned()
+            .map(|scenario| {
+                let asset = |path: &str| {
+                    let direct = std::path::Path::new(path);
+                    let resolved = if direct.is_absolute() || direct.exists() {
+                        direct.to_path_buf()
+                    } else {
+                        workspace_root.join(direct)
+                    };
+                    std::fs::read_to_string(resolved)
+                };
+                let predecessor = asset(&scenario.predecessor_manifest_path)?;
+                let successor = asset(&scenario.successor_manifest_path)?;
+                Ok((scenario, predecessor, successor))
+            })
+            .collect()
     }
 }
