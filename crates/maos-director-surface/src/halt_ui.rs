@@ -8,7 +8,7 @@
 use crate::notification::{DispatchReport, NotificationDispatcher, NotificationError};
 use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::{
-    HaltId, HaltJournal, HaltJournalError, HaltResolver, Resolution, ResolveError,
+    HaltId, HaltJournal, HaltJournalError, HaltResolver, Resolution, ResolutionError, ResolveError,
 };
 use maos_domain::notification::{NotificationEvent, NotificationLevel};
 use std::sync::Arc;
@@ -64,16 +64,20 @@ impl<R: HaltResolver> HaltFlow<R> {
             .dispatch(event, NotificationLevel::Immediate)
     }
 
-    /// Submit a resolution — resolves via the HaltResolver FIRST, then
-    /// journals to the Approval Decision Log (fail-closed: no journal
-    /// row if the resolver rejects). Structural fail-closed guarantee
-    /// means every caller gets correct sequencing automatically.
+    /// Submit a resolution — validates the payload, resolves via the
+    /// HaltResolver, then journals to the Approval Decision Log
+    /// (fail-closed: no resolver call and no journal row if the payload
+    /// is invalid; no journal row if the resolver rejects). Structural
+    /// fail-closed guarantee means every caller gets correct sequencing
+    /// automatically, including callers wired to a resolver that does
+    /// not validate (e.g. `MockHaltResolver`).
     pub fn submit_resolution(
         &self,
         halt_id: HaltId,
         resolution: Resolution,
         spirit_id: &str,
     ) -> Result<(), HaltUiError> {
+        resolution.validate()?;
         self.resolver.resolve(&halt_id, resolution.clone())?;
         self.journal
             .journal_halt_resolution("director", spirit_id, &halt_id, &resolution)?;
@@ -107,6 +111,8 @@ pub enum TapEvent {
 pub enum HaltUiError {
     #[error("halt resolver rejected: {0}")]
     Resolver(#[from] ResolveError),
+    #[error("invalid resolution payload: {0}")]
+    InvalidResolution(#[from] ResolutionError),
     #[error("notification dispatch failed: {0}")]
     Dispatch(#[from] NotificationError),
     #[error("audit journal write failed: {0}")]
@@ -119,16 +125,32 @@ mod tests {
     use maos_domain::halt::HaltJournalError;
     use std::sync::Mutex as StdMutex;
 
-    struct MockJournal;
+    /// Records every journal write so tests can prove the fail-closed
+    /// contract: nothing lands in the Approval Decision Log unless the
+    /// payload validated AND the resolver accepted.
+    #[derive(Default)]
+    struct MockJournal {
+        writes: StdMutex<Vec<(String, Resolution)>>,
+    }
+
+    impl MockJournal {
+        fn writes(&self) -> Vec<(String, Resolution)> {
+            self.writes.lock().unwrap().clone()
+        }
+    }
 
     impl HaltJournal for MockJournal {
         fn journal_halt_resolution(
             &self,
             _actor: &str,
             _spirit_id: &str,
-            _halt_id: &HaltId,
-            _resolution: &Resolution,
+            halt_id: &HaltId,
+            resolution: &Resolution,
         ) -> Result<(), HaltJournalError> {
+            self.writes
+                .lock()
+                .unwrap()
+                .push((halt_id.as_str().to_owned(), resolution.clone()));
             Ok(())
         }
     }
@@ -207,7 +229,7 @@ mod tests {
         let mut dispatcher = NotificationDispatcher::new();
         dispatcher.register(Box::new(capture));
 
-        let journal = Arc::new(MockJournal);
+        let journal = Arc::new(MockJournal::default());
         let resolver = Arc::new(TestResolver::new());
         let flow = HaltFlow::new(resolver, Arc::new(dispatcher), journal);
 
@@ -234,7 +256,7 @@ mod tests {
 
     #[test]
     fn submit_provided_context_calls_resolver_with_text() {
-        let journal = Arc::new(MockJournal);
+        let journal = Arc::new(MockJournal::default());
         let resolver = Arc::new(TestResolver::new());
         let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
 
@@ -255,7 +277,7 @@ mod tests {
 
     #[test]
     fn submit_accepted_halt_calls_resolver_with_correct_kind() {
-        let journal = Arc::new(MockJournal);
+        let journal = Arc::new(MockJournal::default());
         let resolver = Arc::new(TestResolver::new());
         let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
 
@@ -270,7 +292,7 @@ mod tests {
 
     #[test]
     fn submit_authorized_override_carries_operator_policy_ref() {
-        let journal = Arc::new(MockJournal);
+        let journal = Arc::new(MockJournal::default());
         let resolver = Arc::new(TestResolver::new());
         let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
 
@@ -288,19 +310,67 @@ mod tests {
     }
 
     #[test]
-    fn submit_resolution_surfaces_resolver_error() {
-        let journal = Arc::new(MockJournal);
+    fn submit_resolution_surfaces_resolver_error_and_writes_no_journal_row() {
+        let journal = Arc::new(MockJournal::default());
         let resolver = Arc::new(FailingResolver);
-        let flow = HaltFlow::new(resolver, Arc::new(NotificationDispatcher::new()), journal);
+        let flow = HaltFlow::new(
+            resolver,
+            Arc::new(NotificationDispatcher::new()),
+            journal.clone(),
+        );
 
         let hid = HaltId::new("halt-001").unwrap();
         let result = flow.submit_resolution(hid, Resolution::AcceptedHalt, "hello-spirit");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
+        let err = result.expect_err("failing resolver must surface an error");
         assert!(matches!(
             err,
             HaltUiError::Resolver(ResolveError::UnknownHalt(_))
         ));
+        assert!(
+            journal.writes().is_empty(),
+            "fail-closed: a rejected resolution must not be journaled"
+        );
+    }
+
+    /// Story 3.3 review closure (High) — the director surface refuses an
+    /// empty payload BEFORE the resolver is touched, so the guarantee holds
+    /// even against a resolver that performs no validation of its own.
+    #[test]
+    fn submit_resolution_rejects_empty_payload_before_resolver_and_journal() {
+        for invalid in [
+            Resolution::ProvidedContext {
+                text: String::new(),
+            },
+            Resolution::ProvidedContext { text: "  ".into() },
+            Resolution::AuthorizedOverride {
+                operator_policy_ref: String::new(),
+            },
+        ] {
+            let journal = Arc::new(MockJournal::default());
+            let resolver = Arc::new(TestResolver::new());
+            let flow = HaltFlow::new(
+                resolver.clone(),
+                Arc::new(NotificationDispatcher::new()),
+                journal.clone(),
+            );
+
+            let hid = HaltId::new("halt-empty").unwrap();
+            let err = flow
+                .submit_resolution(hid, invalid.clone(), "hello-spirit")
+                .expect_err("empty payload must be refused");
+            assert!(
+                matches!(err, HaltUiError::InvalidResolution(_)),
+                "{invalid:?}: expected InvalidResolution, got {err:?}"
+            );
+            assert!(
+                resolver.calls().is_empty(),
+                "{invalid:?}: resolver must not be invoked for an invalid payload"
+            );
+            assert!(
+                journal.writes().is_empty(),
+                "{invalid:?}: nothing may be journaled for an invalid payload"
+            );
+        }
     }
 
     #[test]

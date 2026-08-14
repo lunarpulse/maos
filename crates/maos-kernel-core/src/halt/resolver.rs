@@ -130,7 +130,7 @@ impl KernelHaltResolver {
 
 impl HaltResolver for KernelHaltResolver {
     fn resolve(&self, halt_id: &HaltId, resolution: Resolution) -> Result<(), ResolveError> {
-        // 1. Confirm halt is pending; transition state atomically
+        resolution.validate()?; // fail-closed: no state transition on an invalid payload
         let terminal = match &resolution {
             Resolution::ProvidedContext { .. } => HaltState::Resumed,
             Resolution::AcceptedHalt => HaltState::Terminated,
@@ -202,10 +202,10 @@ impl HaltResolver for KernelHaltResolver {
                 // Append OutputMarker::Override to the Spirit's output queue.
                 // Story 4.2's output_shape predicates consume this marker
                 // to gate subsequent output frames.
-                // Use OutputMarker::override_for to enforce non-empty validation.
+                // `validate()` refused empty policy refs; never drop a marker silently.
                 match OutputMarker::override_for(halt_id.clone(), operator_policy_ref.clone()) {
                     Ok(marker) => self.output_markers.append_for_halt(halt_id, marker),
-                    Err(_) => {} // Empty policy_ref rejected at director surface; skip marker
+                    Err(e) => return Err(ResolveError::Internal(e.to_string())),
                 }
             }
         }

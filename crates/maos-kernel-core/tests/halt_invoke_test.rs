@@ -373,6 +373,76 @@ fn kernel_resolver_authorized_override_enqueues_output_marker_and_marks_overridd
     );
 }
 
+/// Story 3.3 review closure (High) — an empty `text` / `operator_policy_ref`
+/// MUST be refused BEFORE the registry transition, so the halt stays
+/// resolvable instead of being stranded in a terminal state with no effect
+/// applied. Struct-literal construction is the bypass path being pinned.
+#[test]
+fn kernel_resolver_rejects_empty_payload_without_transitioning_halt_state() {
+    for (halt_id, invalid) in [
+        (
+            "halt-empty-text",
+            Resolution::ProvidedContext { text: "   ".into() },
+        ),
+        (
+            "halt-empty-policy",
+            Resolution::AuthorizedOverride {
+                operator_policy_ref: String::new(),
+            },
+        ),
+    ] {
+        let (
+            tl,
+            registry,
+            resolver,
+            output_markers,
+            _mailbox,
+            journal,
+            _tmpdir,
+            _memory,
+            _capability,
+            _mem_tmp,
+        ) = setup_kernel_resolver();
+
+        let payload = EpistemicHaltPayload::new(
+            halt_id.into(),
+            "t".into(),
+            0.5,
+            Some(0.4),
+            "p".into(),
+            "d".into(),
+        )
+        .unwrap();
+        invoke_halt(&tl, &journal, &registry, payload, 1, "s", 0xBEEF).unwrap();
+
+        let hid = HaltId::new(halt_id).unwrap();
+        let err = resolver.resolve(&hid, invalid).unwrap_err();
+        assert!(
+            matches!(err, maos_domain::halt::ResolveError::InvalidResolution(_)),
+            "{halt_id}: expected InvalidResolution, got {err:?}"
+        );
+
+        // No transition: the halt is still pending, so the director can
+        // resubmit a well-formed resolution.
+        assert_eq!(
+            registry.pending_halt_ids(),
+            vec![hid.clone()],
+            "{halt_id}: halt must remain PendingResolution after a rejected payload"
+        );
+        assert_eq!(
+            output_markers.pending_count(&hid),
+            0,
+            "{halt_id}: no override marker may be enqueued for a rejected payload"
+        );
+
+        // And the well-formed resubmission still succeeds.
+        resolver
+            .resolve(&hid, Resolution::AcceptedHalt)
+            .expect("resubmission after a rejected payload must succeed");
+        assert!(registry.pending_halt_ids().is_empty());
+    }
+}
+
 #[test]
 fn kernel_resolver_unknown_halt_returns_error() {
     let (

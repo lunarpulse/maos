@@ -48,6 +48,7 @@ pub enum ResolutionError {
 /// kernel-side consumer; Story 3.3's
 /// `halt_ui::submit_resolution` is the director-side producer.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "ResolutionWire")]
 pub enum Resolution {
     /// Director supplies the missing context the Spirit should append
     /// to its working memory before resuming. Memory Manager integration
@@ -66,25 +67,46 @@ pub enum Resolution {
 impl Resolution {
     /// Construct a `ProvidedContext` resolution with non-empty validation.
     pub fn provided_context(text: impl Into<String>) -> Result<Self, ResolutionError> {
-        let text = text.into();
-        if text.trim().is_empty() {
-            return Err(ResolutionError::EmptyText);
-        }
-        Ok(Self::ProvidedContext { text })
+        let r = Self::ProvidedContext { text: text.into() };
+        r.validate()?;
+        Ok(r)
     }
 
     /// Construct an `AuthorizedOverride` resolution with non-empty validation.
     pub fn authorized_override(
         operator_policy_ref: impl Into<String>,
     ) -> Result<Self, ResolutionError> {
-        let operator_policy_ref = operator_policy_ref.into();
-        if operator_policy_ref.trim().is_empty() {
-            return Err(ResolutionError::EmptyOperatorPolicyRef);
-        }
-        Ok(Self::AuthorizedOverride {
-            operator_policy_ref,
-        })
+        let r = Self::AuthorizedOverride {
+            operator_policy_ref: operator_policy_ref.into(),
+        };
+        r.validate()?;
+        Ok(r)
     }
+
+    /// Re-check the payload invariants regardless of how the value was
+    /// built. The variants carry public fields (crate-wide convention —
+    /// see `frame.rs`), so a struct literal bypasses the validated
+    /// constructors above. Every consumer that acts on a `Resolution`
+    /// MUST call this before taking an irreversible step; the kernel-side
+    /// chokepoint is `KernelHaltResolver::resolve`, which validates
+    /// BEFORE the halt-state transition.
+    ///
+    /// Deserialization is already gated: `Resolution` deserializes via
+    /// `ResolutionWire`, which funnels through this method.
+    pub fn validate(&self) -> Result<(), ResolutionError> {
+        match self {
+            Self::ProvidedContext { text } if text.trim().is_empty() => {
+                Err(ResolutionError::EmptyText)
+            }
+            Self::AuthorizedOverride {
+                operator_policy_ref,
+            } if operator_policy_ref.trim().is_empty() => {
+                Err(ResolutionError::EmptyOperatorPolicyRef)
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Stable label for the Approval Decision Log `intent` column.
     /// Returns one of `"provided_context"` / `"accepted_halt"` /
     /// `"authorized_override"` — these are the FR15 contract strings;
@@ -95,6 +117,36 @@ impl Resolution {
             Self::AcceptedHalt => "accepted_halt",
             Self::AuthorizedOverride { .. } => "authorized_override",
         }
+    }
+}
+
+/// Deserialization shim for `Resolution`. Mirrors the external-tag wire
+/// shape field-for-field so the pinned JSON encoding is byte-identical,
+/// while routing every deserialized value through `Resolution::validate`
+/// — an empty `text` / `operator_policy_ref` can no longer enter the
+/// process from the wire (ACP editor channel, CLI one-shot, IAC frame).
+#[derive(serde::Deserialize)]
+enum ResolutionWire {
+    ProvidedContext { text: String },
+    AcceptedHalt,
+    AuthorizedOverride { operator_policy_ref: String },
+}
+
+impl TryFrom<ResolutionWire> for Resolution {
+    type Error = ResolutionError;
+
+    fn try_from(wire: ResolutionWire) -> Result<Self, Self::Error> {
+        let resolution = match wire {
+            ResolutionWire::ProvidedContext { text } => Self::ProvidedContext { text },
+            ResolutionWire::AcceptedHalt => Self::AcceptedHalt,
+            ResolutionWire::AuthorizedOverride {
+                operator_policy_ref,
+            } => Self::AuthorizedOverride {
+                operator_policy_ref,
+            },
+        };
+        resolution.validate()?;
+        Ok(resolution)
     }
 }
 
@@ -129,6 +181,11 @@ pub enum ResolveError {
     /// failure in `ProvidedContext` arm).  Carries diagnostic-only context.
     #[error("internal resolution error: {0}")]
     Internal(String),
+    /// The submitted payload is structurally invalid (empty `text` /
+    /// `operator_policy_ref`). Returned BEFORE any halt-state transition
+    /// so an invalid payload can never leave a halt in a terminal state.
+    #[error("invalid resolution payload: {0}")]
+    InvalidResolution(#[from] ResolutionError),
 }
 
 /// Journal trait for halt resolution audit writes (Story 3.3, AC4).
@@ -446,6 +503,83 @@ mod tests {
         assert_eq!(r, back);
         let expected = r#"{"AuthorizedOverride":{"operator_policy_ref":"policy://x"}}"#;
         assert_eq!(json, expected);
+    }
+
+    // --- Story 3.3 review closure — empty payloads rejected on EVERY
+    // construction path, not just the validated constructors ---
+
+    #[test]
+    fn resolution_validate_rejects_struct_literal_empty_text() {
+        let r = Resolution::ProvidedContext {
+            text: String::new(),
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            ResolutionError::EmptyText
+        ));
+    }
+
+    #[test]
+    fn resolution_validate_rejects_struct_literal_whitespace_operator_policy_ref() {
+        let r = Resolution::AuthorizedOverride {
+            operator_policy_ref: " \t ".into(),
+        };
+        assert!(matches!(
+            r.validate().unwrap_err(),
+            ResolutionError::EmptyOperatorPolicyRef
+        ));
+    }
+
+    #[test]
+    fn resolution_validate_accepts_populated_and_unit_variants() {
+        assert!(Resolution::AcceptedHalt.validate().is_ok());
+        assert!(Resolution::ProvidedContext { text: "x".into() }
+            .validate()
+            .is_ok());
+        assert!(Resolution::AuthorizedOverride {
+            operator_policy_ref: "policy://x".into(),
+        }
+        .validate()
+        .is_ok());
+    }
+
+    #[test]
+    fn resolution_deserialize_rejects_empty_text() {
+        let err = serde_json::from_str::<Resolution>(r#"{"ProvidedContext":{"text":""}}"#)
+            .expect_err("empty text must not deserialize");
+        assert!(
+            err.to_string()
+                .contains("provided_context text must be non-empty"),
+            "serde error should carry the domain diagnostic, got: {err}"
+        );
+    }
+
+    #[test]
+    fn resolution_deserialize_rejects_whitespace_operator_policy_ref() {
+        let err = serde_json::from_str::<Resolution>(
+            r#"{"AuthorizedOverride":{"operator_policy_ref":"   "}}"#,
+        )
+        .expect_err("whitespace-only operator_policy_ref must not deserialize");
+        assert!(
+            err.to_string()
+                .contains("operator_policy_ref must be non-empty"),
+            "serde error should carry the domain diagnostic, got: {err}"
+        );
+    }
+
+    #[test]
+    fn resolution_deserialize_accepts_populated_payloads() {
+        // The validation gate must not narrow the accepted wire surface.
+        let r: Resolution =
+            serde_json::from_str(r#"{"ProvidedContext":{"text":"context here"}}"#).unwrap();
+        assert_eq!(
+            r,
+            Resolution::ProvidedContext {
+                text: "context here".into()
+            }
+        );
+        let r: Resolution = serde_json::from_str(r#""AcceptedHalt""#).unwrap();
+        assert_eq!(r, Resolution::AcceptedHalt);
     }
 
     // --- Story 4.1 — HaltReceipt + OutputMarker constructor tests ---

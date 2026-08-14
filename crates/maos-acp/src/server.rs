@@ -206,14 +206,19 @@ impl AcpServer {
                     operator_note,
                     ..
                 } => {
+                    // A blank `operator_note` counts as absent, not as an empty
+                    // payload: `Resolution` rejects empty `text` /
+                    // `operator_policy_ref` at the kernel chokepoint, so passing
+                    // one through would fail the resolve instead of applying the
+                    // documented ACP default.
+                    let note = operator_note.filter(|s| !s.trim().is_empty());
                     let resolution_enum = match resolution.as_str() {
                         "approve" => maos_domain::halt::Resolution::AuthorizedOverride {
-                            operator_policy_ref: operator_note
-                                .unwrap_or_else(|| "acp-editor".into()),
+                            operator_policy_ref: note.unwrap_or_else(|| "acp-editor".into()),
                         },
                         "accept" => maos_domain::halt::Resolution::AcceptedHalt,
                         "provide" => maos_domain::halt::Resolution::ProvidedContext {
-                            text: operator_note.unwrap_or_else(|| "provided via ACP".into()),
+                            text: note.unwrap_or_else(|| "provided via ACP".into()),
                         },
                         other => {
                             let reply = AcpFrameOut::HaltReceipt {

@@ -4,7 +4,7 @@ dev_model_used: deepseek-v4-pro
 
 # Story 3.3: Director's Halt Resolution UX + Decision Audit (I12)
 
-**Status:** in-review
+**Status:** done
 
 **Type:** Epic 3 third story — operationalizes the "director's surface"
 metaphor as a real UX path for halt resolution AND closes the I12
@@ -1147,13 +1147,11 @@ discipline)
         parallel to existing `CaptureChannel` exemption).
   - [x] T8.6 Updated `xtask/kernel-api-classes.toml` — classified
         new public symbols (halt mechanism → supervision, decision logger → data-movement).
-  - [x] T8.7 Review Findings table preserved (empty `### Review Findings
-
-- [ ] **[Medium]** [auditor] *defer* — Decision audit I12 capture does not redact PII from working_memory_digest_refs; GDPR Article 17 cascade needs redaction pass
-- [x] **[Medium]** [blind] *patch* — Halt resolution UX missing keyboard navigation for accessibility; added ARIA labels in 3-3 commit
-  - *Resolution: crates/maos-director-surface/src/ux/halt_resolution.rs:203-217*
-- [x] **[Low]** [edge] *dismissed* — I12 audit chain verification test is 2-phase (write then read); single-phase atomic test deferred to test-infra improvements
-  - *Rationale: Epic 4 retro test pattern*` row).
+  - [x] T8.7 Review Findings table populated per the Story 2.5 template
+        (one row per finding, explicit Status column). A garbled paste of the
+        template's own example rows previously sat here and presented a stray
+        unchecked box inside Tasks/Subtasks — removed 2026-08-14 so a grep-based
+        status sweep cannot read it as live open work.
   - [x] T8.8 Used proven capture-surface patterns (CaptureChannel shape,
         MockHaltResolver shape) rather than hand-rolling new mocks.
 
@@ -1652,7 +1650,8 @@ workspace members; the sentinel value does NOT need updating).
 
 ### Agent Model Used
 
-deepseek-v4-pro
+deepseek-v4-pro (original dev pass) · anthropic/claude-opus-5 (2026-08-14
+review-finding closure pass)
 
 ### Debug Log References
 
@@ -1670,6 +1669,67 @@ _No debug log references for this session._
 - **AC8 (Discipline):** `cargo build --workspace --locked` clean. `check-workspace-count` PASS (22). `check-unsafe` PASS (0 violations). `check-empty-kernel`: only pre-existing CaptureChannel violations remain (MockHaltResolver i9_exempt added). `check-service-boundary`: new symbols classified in `kernel-api-classes.toml`. `i9-exemptions.md` updated.
 - **Architecture deviation:** `HaltResolver` trait + `ResolveError` live in `maos-domain::halt` (not `maos-kernel-core::halt::resolver`) to avoid circular dependency: `maos-kernel-core → maos-director-surface` (NotificationDispatcher) and `maos-director-surface → HaltResolver` would cycle. `MockHaltResolver` and `FailingHaltResolver` remain in kernel-core as test doubles.
 - **I12 integration test relocation:** Original story spec referenced `crates/maos-audit/tests/i12_decision_audit_test.rs`. Test placed inline in `crates/maos-kernel-core/src/iac/mod.rs` because `IacBusAdapter::deliver_typed` is `pub(crate)` — integration tests in `tests/` directory are separate crates and cannot access `pub(crate)` methods.
+
+#### 2026-08-14 — review-finding closure pass (3 open rows → closed)
+
+- **[High] Empty `text` / `operator_policy_ref` accepted.** The pre-existing gap
+  was real on two axes: (a) `Resolution`'s variants carry public fields and
+  deserialization bypassed the validated constructors entirely, and (b)
+  `KernelHaltResolver::resolve` transitioned the halt to a terminal state
+  (`Resumed`/`Terminated`/`Overridden`) BEFORE inspecting the payload, then
+  swallowed the `AuthorizedOverride` marker rejection with `Err(_) => {}` — so a
+  blank policy ref stranded the halt as `Overridden` with no override marker and
+  no error. Now: `Resolution::validate()` is the single predicate (both validated
+  constructors delegate to it); `#[serde(try_from = "ResolutionWire")]` gates
+  deserialization without changing the pinned external-tag JSON encoding;
+  `KernelHaltResolver::resolve` validates as its FIRST statement and returns the
+  additive `ResolveError::InvalidResolution`; the marker rejection propagates as
+  `ResolveError::Internal`; `HaltFlow::submit_resolution` validates ahead of the
+  resolver AND the journal (`HaltUiError::InvalidResolution`) so the guarantee
+  survives a non-validating resolver; `maos-acp` treats a blank `operator_note` as
+  absent so it applies its documented default rather than injecting an empty
+  payload.
+- **KERNEL BUDGET: ZERO Δ.** `crates/maos-kernel-core/src/halt/resolver.rs` is
+  +3/−3 lines — the validate gate replaced the step-1 comment line and the marker
+  arm was rewritten inside its original 5-line footprint. `check-kernel-baseline`
+  and `maos-a2a-tcp::t12b_kernel_core_byte_identical_line_count` both hold at the
+  pinned 24472. No pin bump requested, no FLAG-Winston grant needed. (An earlier
+  draft of the gate ran +9 and reddened t12b; it was compressed rather than
+  re-pinned.)
+- **[Medium] AC6 CLI integration tests.** `halt_resolve_test.rs` rewritten: the
+  three positive kinds now read the Approval Decision Log back through a
+  read-only `rusqlite` connection and assert `capability`/`intent`/`reasoning`;
+  `NO_COLOR` exercises `halt list`; unknown-Spirit pins exit code 2 on both verbs;
+  a new case pins the blank-`--text` domain diagnostic end-to-end through the CLI.
+  The DB-inspection helper reuses `orchestrator_queue_test.rs`'s proven
+  spawn-and-inspect shape rather than a new mechanism (Epic 2 retro A4).
+- **[Medium] AC7 e2e smoke.** `halt_resolve_smoke.sh` now seeds the log, runs
+  `maosctl audit query` before AND after the resolution, and can no longer exit
+  green without proving the ADL row — `sqlite3`-absent falls back to python3's
+  stdlib `sqlite3` and hard-fails if neither reader exists. The post-halt query is
+  `--boot`-scoped to the seeded incarnation, because `AcceptedHalt` writes a
+  `task.orphaned` frame under the kernel's own boot_nonce and FR4 projection
+  refuses any row lacking a `capability_token` by design; scoping keeps the
+  assertion about the read path instead of about FR4's mediation gate. Exercised
+  locally end-to-end: PASS (python3 fallback path taken — this host has no
+  `sqlite3` binary).
+- **Discipline at closure.** `cargo fmt --all --check` clean; `abi-diff` PASSED
+  (additive only: `Resolution::validate`, `ResolveError::InvalidResolution` on a
+  `#[non_exhaustive]` enum, `HaltUiError::InvalidResolution`; `ResolutionWire` is
+  private); `check-workspace-count` PASSED (55/55); `check-unsafe` PASSED (0);
+  `check-kernel-baseline` PASSED (24472/24472). `check-empty-kernel` and
+  `check-service-boundary` still report their pre-existing Epic-5-era violations
+  (`ScbRuntimeSnapshot`, `SecurityManagerAdapter`, `VerifiedImageLock`, the
+  undocumented `#[i9_exempt]`s at `security/mod.rs:120` and
+  `revocation/rules.rs:16` — both verified present at HEAD via `git show` — and 6
+  unclassified Epic-5 kernel symbols). None is attributable to this pass: the
+  kernel-core delta is 3 lines inside an existing method body, adds no public
+  symbol and no persistent-state struct.
+- **Note on `parking_lot`:** the repo-wide rule prefers `parking_lot::Mutex` over
+  an immediately-unwrapped `std::sync::Mutex`. Not applied — `parking_lot` is not a
+  workspace dependency and is absent from `maos-director-surface`, and this story
+  forbids new deps. The new test double follows the module's existing
+  `std::sync::Mutex as StdMutex` convention.
 
 ### File List
 
@@ -1694,6 +1754,11 @@ _No debug log references for this session._
 | `crates/maos-bin/src/main.rs` | MODIFIED | AC7 (halt-resolve + halt-list arms) |
 | `docs/invariants/i9-exemptions.md` | MODIFIED | AC8 (MockHaltResolver exemption) |
 | `xtask/kernel-api-classes.toml` | MODIFIED | AC8 (new symbol classifications) |
+| `crates/maos-audit/tests/i12_decision_audit_test.rs` | NEW | AC5 (100% decision-frame refs gate) |
+| `crates/maos-cli/tests/halt_resolve_test.rs` | NEW | AC6 (CLI integration test; rewritten 2026-08-14 to assert ADL rows) |
+| `tests/integration/halt_resolve_smoke.sh` | NEW | AC7 (e2e shell smoke; hardened 2026-08-14) |
+| `crates/maos-kernel-core/tests/halt_invoke_test.rs` | MODIFIED | 2026-08-14 closure (no-transition-on-invalid-payload test) |
+| `crates/maos-acp/src/server.rs` | MODIFIED | 2026-08-14 closure (blank `operator_note` treated as absent) |
 
 ### Review Findings
 
@@ -1713,14 +1778,14 @@ _No debug log references for this session._
 
 | Finding | Severity | Status | Resolution |
 |---|---|---|---|
-| Missing CLI integration tests (AC6) | Medium | open | Patch required — 2026-08-12 HEAD audit: `crates/maos-cli/tests/halt_resolve_test.rs:39-207` now has six process tests, but the positive cases do not inspect Approval Decision Log capability/intent/reasoning, the `NO_COLOR` case exercises `halt resolve` instead of `halt list`, and the unknown-Spirit case does not pin exit code 2. |
-| Missing e2e smoke test (AC7) | Medium | open | Patch required — 2026-08-12 HEAD audit: `tests/integration/halt_resolve_smoke.sh:15-59` exists, but never runs `maosctl audit query` and exits green without proving the approval row when `sqlite3` is absent. |
+| Missing CLI integration tests (AC6) | Medium | closed | Patched 2026-08-14: `crates/maos-cli/tests/halt_resolve_test.rs` rewritten to 8 process tests. The three positive kinds now assert the Approval Decision Log row via a read-only `rusqlite` connection (`run_maosctl_and_inspect_db` + `only_halt_resolve_row`, reusing the `orchestrator_queue_test.rs::run_queue_and_inspect_db` capture pattern): `capability == "halt.resolve"`, `intent` == the `kind_label()` string, `reasoning` carrying `halt=<id>` / the supplied text / `operator_policy_ref=…`. `NO_COLOR` now exercises `halt list --spirit hello-spirit`; the unknown-Spirit cases pin `code() == Some(2)` for BOTH `halt resolve` and `halt list`; the missing-`--text` case pins the clap usage diagnostic. `cargo test -p maos-cli --test halt_resolve_test` → 8 passed. |
+| Missing e2e smoke test (AC7) | Medium | closed | Patched 2026-08-14: `tests/integration/halt_resolve_smoke.sh` now (a) seeds the log via `MAOS_ONE_SHOT=hello-spirit`, (b) runs `maosctl audit query --spirit hello-spirit --format ndjson` as a pre-halt baseline and again post-halt scoped with `--boot <seeded nonce>`, and (c) NEVER exits green without the row proof — the `sqlite3`-absent path falls back to python3's stdlib `sqlite3` (the reader `audit_spine_smoke.sh` already uses) and hard-fails when neither reader exists. The `--boot` scoping is deliberate and documented in the script header: `AcceptedHalt` emits `task.orphaned` under the kernel's own boot_nonce, and FR4 projection refuses any row without a `capability_token` by design (`maos-audit::to_fr4_ndjson`), so an unscoped post-halt query would assert against FR4's mediation gate rather than the read path. Verified locally: PASS (python3 fallback exercised — no `sqlite3` on this host). |
 | HaltFlow design deviation — no internal journaling (AC3/AC4) | — | closed | Fixed at HEAD: `crates/maos-director-surface/src/halt_ui.rs:35-80` owns `HaltJournal`, resolves first, journals internally, and propagates audit failures; `crates/maos-kernel-core/tests/halt_resolution_journaled.rs:96-118` covers the fail-closed path. |
 | I12 test at wrong file path (AC5) | — | closed | Fixed at HEAD: `crates/maos-audit/tests/i12_decision_audit_test.rs:1-106` is the exact AC5 artifact and exercises the public audit read path plus digest-ref deserialization. |
 | digest_provider not in composition root (AC5/AC7) | — | closed | Fixed at HEAD: `crates/maos-bin/src/main.rs:3110-3137` injects the Memory Manager-backed provider through `IacBusAdapter::with_digest_provider`. |
 | NotificationEvent::Halt duplicated halt_id | — | closed | Fixed at HEAD: `crates/maos-domain/src/notification.rs:41-45` carries only `payload`; rendering reads the single `payload.halt_id` source at `crates/maos-director-surface/src/notification.rs:178-197`. |
-| Empty text/operator_policy_ref accepted | High | open | Patch required — 2026-08-12 HEAD audit: validated constructors exist, but public enum variants and serde still permit empty strings; `crates/maos-kernel-core/src/halt/resolver.rs:132-216` mutates halt state before validating either payload. Enforce non-empty values before any transition. |
-| `required_if_eq` kebab vs snake_case | — | closed | Fixed at HEAD: `crates/maos-cli/src/cli.rs:593-611` uses matching `provided-context` and `authorized-override` spellings; the missing-text case is covered at `crates/maos-cli/tests/halt_resolve_test.rs:149-177`. |
+| Empty text/operator_policy_ref accepted | High | closed | Patched 2026-08-14, enforced at three layers. (1) Domain: `Resolution::validate()` is the single predicate; both validated constructors now funnel through it, and `Resolution` deserializes via `#[serde(try_from = "ResolutionWire")]` so an empty/whitespace `text` or `operator_policy_ref` can no longer enter from the wire (the external-tag JSON encoding is unchanged — the pinned round-trip tests still pass byte-for-byte). (2) Kernel chokepoint: `KernelHaltResolver::resolve` calls `resolution.validate()?` as its FIRST statement, BEFORE `registry.resolve(...)`, returning the new `ResolveError::InvalidResolution` (`ResolveError` is `#[non_exhaustive]` — additive); the `AuthorizedOverride` arm no longer swallows `OutputMarker::override_for` errors with `Err(_) => {}` but propagates `ResolveError::Internal`. (3) Producers: `HaltFlow::submit_resolution` validates before touching the resolver or the journal (new `HaltUiError::InvalidResolution`), so the guarantee holds even against a non-validating resolver such as `MockHaltResolver`; `maos-acp`'s `HaltResolve` arm treats a blank `operator_note` as absent so it applies the documented ACP default instead of injecting an empty payload. Tests: `kernel_resolver_rejects_empty_payload_without_transitioning_halt_state` proves the halt stays `PendingResolution`, enqueues no override marker, and still accepts a well-formed resubmission; `submit_resolution_rejects_empty_payload_before_resolver_and_journal` proves zero resolver calls and zero journal writes; six domain tests cover struct-literal and serde rejection. The kernel-core delta is +3/−3 lines, so `check-kernel-baseline` stays at the pinned 24472. |
+| `required_if_eq` kebab vs snake_case | — | closed | Fixed at HEAD: `crates/maos-cli/src/cli.rs:593-611` uses matching `provided-context` and `authorized-override` spellings; the missing-text case is covered by `crates/maos-cli/tests/halt_resolve_test.rs::halt_resolve_missing_text_rejected_by_clap`. |
 | `halt_id` discarded from audit trail | — | closed | Fixed at HEAD: `crates/maos-kernel-core/src/halt/mod.rs:51-79` persists `halt=<id>` in reasoning, asserted by `crates/maos-kernel-core/tests/halt_resolution_journaled.rs:39-45`. |
 | halt-list ignores unknown spirit filter | — | closed | Fixed at HEAD: both `crates/maos-cli/src/subcommands.rs:1321-1327` and `crates/maos-bin/src/main.rs:5551-5560` reject unknown Spirit filters before querying. |
 | `frame_carries_i12_refs` tautological | — | closed | Fixed at HEAD: `crates/maos-iac/src/adapter/decision_logger.rs:58-69,217-239` distinguishes empty decision refs, populated refs, and non-decision frames. |
@@ -1729,6 +1794,13 @@ _No debug log references for this session._
 | maos-audit unused dev-deps | — | dismissed | Obsolete at HEAD — `maos-spirit-abi` is absent; current audit integration tests use the remaining `maos-kernel-core` and `tempfile` dev dependencies. |
 
 **2026-08-12 current-HEAD disposition:** 14 rows audited — 10 closed, 1 dismissed, 3 open.
+
+**2026-08-14 closure:** the 3 open rows are CLOSED with executable proof (see the
+rows above). All 14 rows are now disposed — 13 closed, 1 dismissed, 0 open. The 6
+deferred rows below are unchanged (documented design decisions, not open work).
+
+| Finding | Severity | Status | Resolution |
+|---|---|---|---|
 | HaltResolver trait at wrong source file (AC2) | Medium | deferred | documented circular-dep design decision |
 | Re-export set differs from spec | Low | deferred | follows from trait relocation |
 | Tests fork mock/capture infrastructure | Medium | deferred | forced by circular dep |
@@ -1743,10 +1815,17 @@ _No debug log references for this session._
 - [x] Source-file references cited at line-precision (where applicable)
 - [x] "What this story is NOT" boundary documented (esp. 3.3 ↔ 4.1 seam)
 - [x] File-change inventory enumerated per AC
-- [ ] Dev pass — AC1 through AC8
-- [ ] Code review via `bmad-code-review` — parallel subagents (Blind Hunter,
-      Edge Case Hunter, Acceptance Auditor, +Test Infrastructure Auditor if
-      `dev_model_used` non-Claude/non-Codex)
-- [ ] Discipline sweep — check-workspace-count, check-empty-kernel, check-service-boundary, check-unsafe all PASS
-- [ ] ABI freeze holds — additive-only verified (signature-hash deltas classified per Story 3.1 AC10 precedent)
-- [ ] Story moved to `done` in sprint-status
+- [x] Dev pass — AC1 through AC8
+- [x] Code review via `bmad-code-review` — 4-layer adversarial pass (Blind Hunter,
+      Edge Case Hunter, Acceptance Auditor, Test Infrastructure Auditor). 20 rows
+      recorded; 2026-08-14 closure disposes the last 3 (13 closed, 1 dismissed,
+      6 deferred, 0 open)
+- [x] Discipline sweep — `check-workspace-count` PASS (55/55), `check-unsafe` PASS
+      (0), `check-kernel-baseline` PASS (24472/24472), `cargo fmt --all --check`
+      clean, `cargo test --workspace --no-fail-fast` 3733 passed / 0 failed across
+      457 test binaries. `check-empty-kernel` + `check-service-boundary` report
+      ONLY pre-existing Epic-5-era violations (verified present at HEAD; this
+      story's kernel-core delta is 3 lines inside an existing method body and adds
+      no public symbol)
+- [x] ABI freeze holds — `abi-diff` PASSED, additive-only
+- [x] Story moved to `done` in sprint-status
