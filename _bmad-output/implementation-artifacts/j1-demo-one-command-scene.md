@@ -1,6 +1,6 @@
 # Story J1-DEMO: One-Command Narrated Founder-Loop Scene (`xtask demo-j1`)
 
-Status: ready-for-dev
+Status: review  <!-- dev pass complete + verified end-to-end 2026-08-14. Ceiling grant REQUESTED WITH MEASUREMENT, GRANTED by Lunarpulse in-session, APPLIED (kloc.toml:203, xtask 37287->38609); kloc-check now ok for xtask. Four findings filed against commit 6827dc87 (1a) — two REPAIRED here (fmt gate red at HEAD; check-j1-loopback-delegation only passed on unformatted source), two NOT repaired and needing owners (three pre-existing ceiling breaches incl. kernel-core +685; one parallel test flake). See Dev Agent Record. -->
 
 <!-- Lane: POST-EPIC-13 BRIDGE (J1 cross-host developer-remote). Epic-external by operator-ratified
      decision (sprint-status.yaml:238-250, sprint-change-proposal-2026-07-16.md). Created 2026-08-14
@@ -42,15 +42,21 @@ A D0 rehearsal (`./target/debug/maos run spirits/topologies/j1-founder-loop.toml
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — BOUNDARY COMMIT — the story's ONLY writes to shared files; lands AFTER 1a commits** (AC4, AC1): one small commit containing (a) the `--once` drain drop-order fix in `crates/maos-bin/src/main.rs` plus its RED-at-HEAD → GREEN proven-red test in a NEW test file (e.g. `crates/maos-bin/tests/drain_once_audit_writer.rs`), and (b) the `demo-j1` module decl + arg-parse + dispatch rows in `xtask/src/main.rs` (mirroring demo-reza) calling a compiling `xtask/src/demo_j1.rs` stub that forwards the raw arg slice. **Sequencing (measured 2026-08-14): j1-crosshost-1a is already in-progress and holds BOTH shared files with uncommitted work — do NOT start T0 until 1a's changes are committed.** Re-derive every line pin at that point: 1a shifts `maos-bin/src/main.rs` by ≈+181 lines at the drain region (drain branch moves from ~4164-4181 to ~4345-4362) and deletes `mod example_spirit_regen;` at `xtask/src/main.rs:108`, immediately adjacent to where `mod demo_j1;` goes. **After T0 this story never writes `crates/maos-bin/src/main.rs` or `xtask/src/main.rs` again — everything else is new-files-only.**
-- [ ] **T1 — Scene runner** (AC1): implement `xtask/src/demo_j1.rs` behind the T0 dispatch. Flags `--live-codex`, `--keep-home <dir>`, `--skip-build` are parsed INSIDE `demo_j1.rs` from the forwarded arg slice, so later flag changes never re-touch `xtask/src/main.rs`.
-- [ ] **T2 — Provisioning** (AC1): temp-home creation (`XDG_DATA_HOME` + `MAOS_HOME`), binary resolution (`target/debug/maos`, `worker-cli-fixture` as daemon-sibling), `--skip-build` reuse; assert zero `journal:` warnings in the captured stream.
-- [ ] **T3 — Subprocess capture + event parse** (AC1): reuse the parsing approach of `journey_j1.rs:38-86` (JSON-per-line over captured stdout; ignore non-JSON banner lines) and the worker assertions of the 8.12 smoke (`child_pid` real, fixture stdout lines — `crates/maos-bin/tests/smoke_cli_wrapper_8_12.rs:14-50` pattern). Parse events by NAME only; never parse topology TOML internals (1a will change `priority_weight`/`host` keys — the demo must not couple to them).
-- [ ] **T4 — Beat model + claim table** (AC2, AC5): beat registry with executed vs declared-ABSENT beats, owner story per ABSENT beat, `EvidenceState` strings from `gate_common`, execution-order rendering, ledger consumption via `load_published_ledgers` + `validate_against` when `tests/reports/evidence-ledger-*.json` for J1 gates exist (post-1a `check-j1-loopback-delegation`, extended by 1b — consume, do not create gates here).
-- [ ] **T5 — Sealed-export parity check** (AC4): demo-side assertion that `maosctl audit sealed-export` over the demo home covers the run's rows (row-count parity is acceptable secondary evidence) — pure `demo_j1.rs`/test logic; the daemon-side fix itself shipped in T0.
-- [ ] **T6 — `--live-codex` leg** (AC3): preflight checks (auth.json refusal, grants file, `CODEX_API_KEY`), disposable demo dir, capture-JSON writer with exact spec fields, `record-capture` → `sealed-export --range` → `verify-bundle` invocation + claim-table row. Never store or echo key material; redact argv.
-- [ ] **T7 — Runbook one-pager** (AC1, AC3): `_bmad-output/test-artifacts/runbook-j1-demo.md` — the six-line "how to run it" sheet (default free take; live signed take; what each beat means; where the home/evidence land). One page; link the Tier-2 runbook for the signed path.
-- [ ] **T8 — Measurement + disclosures**: remeasure xtask tokei-CODE after the code exists (grant-after-measurement, `kloc.toml:57-65`; active xtask ceiling 37287 @ `kloc.toml:194-210`); record the measured delta in Dev Agent Record. Disclose in this story's record: the five story-file gates skip non-digit `j1-` names (operator-ratified 2026-08-14, sprint-status.yaml:246-250) — record dev model + review evidence anyway.
+- [x] **T0 — BOUNDARY COMMIT — the story's ONLY writes to shared files; lands AFTER 1a commits** (AC4, AC1): one small commit containing (a) the `--once` drain drop-order fix in `crates/maos-bin/src/main.rs` plus its RED-at-HEAD → GREEN proven-red test in a NEW test file (e.g. `crates/maos-bin/tests/drain_once_audit_writer.rs`), and (b) the `demo-j1` module decl + arg-parse + dispatch rows in `xtask/src/main.rs` (mirroring demo-reza) calling a compiling `xtask/src/demo_j1.rs` stub that forwards the raw arg slice. **Sequencing (measured 2026-08-14): j1-crosshost-1a is already in-progress and holds BOTH shared files with uncommitted work — do NOT start T0 until 1a's changes are committed.** Re-derive every line pin at that point: 1a shifts `maos-bin/src/main.rs` by ≈+181 lines at the drain region (drain branch moves from ~4164-4181 to ~4345-4362) and deletes `mod example_spirit_regen;` at `xtask/src/main.rs:108`, immediately adjacent to where `mod demo_j1;` goes. **After T0 this story never writes `crates/maos-bin/src/main.rs` or `xtask/src/main.rs` again — everything else is new-files-only.**
+  - **CLOSED 2026-08-15** on top of 1a's `6827dc87`, as **three** commits rather than one. The reason T0 wanted a single commit — minimize the collision window while 1a held both shared files uncommitted — expired when 1a closed, and splitting honours the boundary more precisely: **each commit writes at most ONE shared file**, and each is independently revertible.
+    - **`246660f9` `fix(j1)`** — every F1 fmt repair (all six files) + the F2 `structural()` matcher, together, so neither blocking gate is red at any commit.
+    - **`296aa2ce` `fix(maos-bin)`** — T0(a): the drain drop-order fix + its proven-red test. The **only** write to `crates/maos-bin/src/main.rs`.
+    - **`f792f77d` `feat(xtask)`** — T0(b) plus T1–T8: the registration rows (the **only** write to `xtask/src/main.rs`) shipped **atomically** with `demo_j1.rs`, `tests/demo_j1_tests.rs` and the `kloc.toml` grant, because `mod demo_j1;` without the module does not compile, the module `include!`s its test file, and a measured ceiling grant must land with the lines it authorizes or `kloc-check` reds at that commit. **No stub was ever committed** — a stub commit would be fabricated history.
+  - **Split defect found by per-commit verification and repaired before the record was written.** The first attempt at this split (`76457723` / `37056bf6` / `eb683c16`, rewritten, never pushed) left `cargo fmt --all -- --check` **RED at the first two commits**: the fmt repair to `xtask/src/main.rs` had been bundled into the third commit along with the registration rows, so the very commit whose job was "make the gates green" did not. This also surfaced the F1 undercount (six unformatted files, not four). The three commits were rebuilt with the fmt-only `xtask/src/main.rs` in the repair commit; `git diff` proves the final tree is **byte-identical** to the pre-rewrite tree, so only history layout changed.
+  - **Verified per commit, in a clean detached worktree, not just at HEAD:** all three are `fmt=0`, `check-j1-loopback-delegation=0`, `check-kernel-baseline=0`. `kloc-check` still reds on the three pre-existing crates (`maos-bin` 16219/16178, `maos-domain` 8694/8644, `maos-kernel-core` 18933/18248) at every commit including `6827dc87` itself — those are D13/D14/D15, not this story's, and `xtask` reads **37855/38609 ok**.
+- [x] **T1 — Scene runner** (AC1): implement `xtask/src/demo_j1.rs` behind the T0 dispatch. Flags `--live-codex`, `--keep-home <dir>`, `--skip-build` are parsed INSIDE `demo_j1.rs` from the forwarded arg slice, so later flag changes never re-touch `xtask/src/main.rs`.
+- [x] **T2 — Provisioning** (AC1): temp-home creation (`XDG_DATA_HOME` + `MAOS_HOME`), binary resolution (`target/debug/maos`, `worker-cli-fixture` as daemon-sibling), `--skip-build` reuse; assert zero `journal:` warnings in the captured stream.
+- [x] **T3 — Subprocess capture + event parse** (AC1): reuse the parsing approach of `journey_j1.rs:38-86` (JSON-per-line over captured stdout; ignore non-JSON banner lines) and the worker assertions of the 8.12 smoke (`child_pid` real, fixture stdout lines — `crates/maos-bin/tests/smoke_cli_wrapper_8_12.rs:14-50` pattern). Parse events by NAME only; never parse topology TOML internals (1a will change `priority_weight`/`host` keys — the demo must not couple to them).
+- [x] **T4 — Beat model + claim table** (AC2, AC5): beat registry with executed vs declared-ABSENT beats, owner story per ABSENT beat, `EvidenceState` strings from `gate_common`, execution-order rendering, ledger consumption via `load_published_ledgers` + `validate_against` when `tests/reports/evidence-ledger-*.json` for J1 gates exist (post-1a `check-j1-loopback-delegation`, extended by 1b — consume, do not create gates here).
+- [x] **T5 — Sealed-export parity check** (AC4): demo-side assertion that `maosctl audit sealed-export` over the demo home covers the run's rows (row-count parity is acceptable secondary evidence) — pure `demo_j1.rs`/test logic; the daemon-side fix itself shipped in T0.
+- [x] **T6 — `--live-codex` leg** (AC3): preflight checks (auth.json refusal, grants file, `CODEX_API_KEY`), disposable demo dir, capture-JSON writer with exact spec fields, `record-capture` → `sealed-export --range` → `verify-bundle` invocation + claim-table row. Never store or echo key material; redact argv. **Implemented fail-closed; the PAID path was never executed, so the `tier2-live-agent-signed` beat correctly reads ABSENT.**
+- [x] **T7 — Runbook one-pager** (AC1, AC3): `_bmad-output/test-artifacts/runbook-j1-demo.md` — the six-line "how to run it" sheet (default free take; live signed take; what each beat means; where the home/evidence land). One page; link the Tier-2 runbook for the signed path.
+- [x] **T8 — Measurement + disclosures**: remeasure xtask tokei-CODE after the code exists (grant-after-measurement, `kloc.toml:57-65`; active xtask ceiling 37287 @ `kloc.toml:194-210`); record the measured delta in Dev Agent Record. Disclose in this story's record: the five story-file gates skip non-digit `j1-` names (operator-ratified 2026-08-14, sprint-status.yaml:246-250) — record dev model + review evidence anyway.
 
 ## Dev Notes
 
@@ -117,10 +123,79 @@ A D0 rehearsal (`./target/debug/maos run spirits/topologies/j1-founder-loop.toml
 
 ### Agent Model Used
 
-_(to be filled by dev-story)_
+anthropic/claude-opus-5 (scene runner + registration); delegated sub-agent for the AC4 drain fix.
 
 ### Debug Log References
 
+- **Pre-fix rehearsal (2026-08-14, shared operator home):** `maos run … --once` = 5.2s wall, of which **5.0s was `audit writer topology drain timed out after 5s`**, plus 2 ambient `journal: WARNING` lines from pre-existing corruption.
+- **Proven-red (AC4):** `cargo test -p maos-bin --test drain_once_audit_writer` at HEAD → `FAILED … topology --once must drain the audit writer before exit`, 5.24s. After the fix → **1 passed, 0.19s**.
+- **Post-fix isolated run:** exit 0, **0.182s** wall, 14 events, zero journal warnings.
+- **Scene smoke:** `cargo run -p xtask -- demo-j1` → exit 0, 8 executed beats `PROVEN_BLOCKING`, 4 `ABSENT` with owners named, founder loop 0.162–0.186s.
+- **Unit tests:** 11 passed (`cargo test -p xtask --bin xtask demo_j1`).
+- **`check-kernel-baseline`: PASSED** — `maos-kernel-core/src = 24472`, pinned 24472. **ZERO kernel-Δ confirmed** for both halves of the story.
+
 ### Completion Notes List
 
+**Delivered.** AC1, AC2, AC4, AC5 implemented and verified end to end. AC3 (`--live-codex`) implemented with fail-closed preflight; its paid path is operator-local and was not executed here (no metered key spent), so `tier2-live-agent-signed` correctly reads `ABSENT` on every take made so far.
+
+**Root cause of AC4 went deeper than the story predicted.** The story named `memory → capability → audit_tx`. Actual live retention graph at the drain point also included `iac → digest_memory → memory`, `crash_detector → capability`, `hot_swap_coordinator → capability`, `revocation_poller → revocation_applier → capability`, and `upgrade_orchestrator → scheduler/hot_swap_coordinator`. Fourteen owners are now dropped before the await; the 5s timeout is retained as a safety net, not as the mechanism. `memory_any` needed no drop (it had already moved into `distillate_writer`). Story 1b.5b's comment block at the `MAOS_ONE_SHOT` path was the template for both the fix and its comment voice.
+
+**Design deviations from the story text, and why:**
+1. **`delegation-frame-crosses-loopback` is an EXECUTED beat, not `ABSENT`.** The story was written while 1a was `ready-for-dev`; 1a landed (commit `6827dc87`) and now emits `delegation_routed` + `delegation_completed`, and `topology_worker_admit` carries `frame_borne`. The beat is proven live today, and `check-j1-loopback-delegation` is called as its judge.
+2. **Flags are declared in the clap enum**, not parsed from a forwarded arg slice. The repo convention is clap derive (`DemoReza` precedent); the "never re-touch `main.rs`" motive was a 1a-collision guard that expired when 1a committed.
+3. **`--codex-topology` added.** AC3 assumed a codex topology existed; it does not — the repo ships only `spirits/worker/manifest.toml` (fixture). The codex profile is operator-authored per the Tier-2 runbook Phase 1.5, so `--live-codex` requires an explicit path and refuses without one.
+4. **`--skip-gate` added**, mirroring demo-reza's `--skip-gates`, for a fast scene-only take.
+5. **Test body moved to `xtask/src/tests/demo_j1_tests.rs`** via the `include!` shape (`rebaseline_check.rs:176-179`) — that path is kloc-excluded (`kloc.toml:2`), verified empirically: `tokei xtask/src` 39942 − `src/tests/` 1919 = 38023, exactly kloc's reported figure.
+
+**Ceiling grant — REQUESTED WITH MEASUREMENT, GRANTED, APPLIED.**
+
+| | tokei CODE |
+|---|---|
+| xtask before this story | 37138 |
+| prior ceiling | 37287 → **149 lines of slack** |
+| this story's production charge | **708** |
+| xtask after (formatted) | **37855** |
+| **granted ceiling** | **38609** = formatted measured 37851 + max(100, ceil(2%)=758) → `kloc-check` **✅ ok** |
+
+The free reduction was taken BEFORE asking (178 test lines to the kloc-excluded path). The residual was untrimmable: 708 production lines against 149 of slack would require deleting an AC. Per the CEILING RULE (`kloc.toml:58-65`) the formula is never silently re-run to fit, so `kloc.toml` was NOT edited until Lunarpulse authorized it in-session on 2026-08-14; the grant is recorded at `kloc.toml:203` with the arithmetic, the driver, and the explicit note that the xtask growth rate remains decision D11 (owned by 14.6) and is NOT settled by this grant. This is the eighth consecutive xtask re-base.
+
+### Findings filed against commit `6827dc87` (j1-crosshost-1a) — NOT caused by this story
+
+Measured in a clean `git worktree` at HEAD before any of this story's changes:
+
+1. **The blocking `cargo fmt --all -- --check` gate was RED at HEAD** (`discipline.yml:151`, added by the Epic-12 retro B4 precisely so "a `cargo fmt` reflow must red at its ORIGIN commit"). **CORRECTED 2026-08-15 — SIX 1a files were unformatted, not four.** The count was first written from the four files the fix touched under `crates/`, which is a filtered measurement of exactly the kind Mary's ledger warns about; enumerating the gate's own `Diff in` lines in a clean worktree at `6827dc87` gives: `crates/maos-a2a/src/pairing.rs`, `crates/maos-iac/src/adapter/mailbox.rs`, **`crates/maos-iac/tests/mailbox_a2a_router_installer_1a.rs`**, `crates/maos-bin/src/lib.rs`, `crates/maos-journey-test/tests/journey_j1.rs`, and **`xtask/src/main.rs`**. All six **repaired** in `246660f9` (rustfmt reflows and one import reorder; zero behavioural change) because leaving a blocking gate red serves nobody — attribution recorded rather than absorbed. Kernel-core was clean, so the pin never moved.
+2. **`check-j1-loopback-delegation` only passed on UNFORMATTED source — the two blocking gates were mutually exclusive at HEAD.** Its oracle hard-coded the single-line spelling `let router = self.a2a_router.get().ok_or_else`; formatting `mailbox.rs` split that chain and the needle stopped matching a fail-closed branch that was **still present** (`mailbox.rs:523-524`). A Blocking gate a formatter can flip is a false-alarm machine. **Fixed** by matching a whitespace-stripped structural skeleton (`structural()` in `check_j1_loopback_delegation.rs`), so the oracle depends on code structure, not layout. **Teeth verified intact: all 10 planted regressions in `xtask/tests/j1_crosshost_1a_proven_red.rs` still RED** (including `route_locally_anyway_by_removing_the_production_fail_closed_error`). `j1-crosshost-1b` should use the same normalization for its refusal legs.
+3. **`kloc-check` was ALREADY RED at HEAD** for three crates, none of them this story's: `maos-kernel-core` 18933/18248 (**+685**), `maos-domain` 8694/8644 (**+50**), `maos-bin` 16211/16178 (**+33**). NOT covered by this story's xtask-only grant. Note kernel-core's *pin* is green (24472 = pinned) while its *ceiling* is breached — the pin counts physical `.rs` lines (`check_kernel_baseline.rs:99-110`), the ceiling counts tokei CODE with tests excluded (`kloc_check.rs:163-213`): anti-drift vs anti-growth (`kloc.toml:53-59`). This story adds **+8** to maos-bin (the drain fix), taking it from +33 to +41. **OWNERS ASSIGNED 2026-08-14** as numbered decisions in `epic-14-preflight-decisions.md`: **D13** kernel-core — split into (a) breach repair owned by `spec-epic-5-review-finding-closure` (in-progress; its `af788c3e` took the FLAG-Winston *pin* grant, +741 recorded, but never the paired *ceiling* grant, and its gate list at `:79` runs `fmt --check` + workspace suites but not `kloc-check`) and (b) the instrument question owned by **14-6** via D11/C5, which may NOT grant it away under Epic 14's ZERO kernel-Δ posture (`kloc.toml:407-408`); **D14** maos-domain → **14-7** with an explicit AC expansion (cause is Story-3.3 halt growth, 3.3 `done`); **D15** maos-bin → **`j1-crosshost-1b`**, taking one measured grant covering 1a's +33 and this story's +8 together.
+4. **Suite-wide test-isolation defect, not one flake.** `cross_wall_recall_live_path_uses_verified_state_and_home_team` (`crates/maos-bin/tests/cross_team_consent_13_3.rs:243`) fails under default parallel `cargo test -p maos-bin` — **5/5 failures at HEAD**, passes 3/3 with `--test-threads=1`. `std::env::set_var("MAOS_HOME", …)` is process-global and locking is inconsistent across three files (`cross_team_consent_13_3.rs:40-47,243-247,502-505,534`; `cross_team_crossing_13_6b.rs:2725-2727,2761-2768`; `cross_wall_log_read_13_6d.rs:15-17,31-33,65-68`). Pattern authored by Story 13.3 (`e58d0df0`), propagated through 13.6a/b/d/e — all closed. NOT repaired here. **OWNER ASSIGNED 2026-08-14: decision D16** — no existing Epic-14 vehicle's ACs cover runtime test isolation, so it follows the D5/D6 pattern (**14-0** decomposes into a named story, owner Murat, deadline before `14-1` leaves `backlog`). `--test-threads=1` is recorded there as a masking workaround, never a resolution.
+
+### Verification (final state)
+
+| Check | Result |
+|---|---|
+| `cargo fmt --all -- --check` | **exit 0** (was RED at HEAD) |
+| `check-kernel-baseline` | **PASSED** 24472 = pinned 24472 |
+| `kloc-check` — xtask | **37855 / 38609 ✅ ok** |
+| `kloc-check` — residual | 3 crates over, all pre-existing (finding 3) |
+| `check-j1-loopback-delegation` | **exit 0**, 10/10 planted regressions still RED |
+| `cargo run -p xtask -- demo-j1` | **exit 0**, 8 executed beats PROVEN_BLOCKING, 4 ABSENT |
+| `cargo test -p xtask` | **exit 0** (642 tests incl. 11 new) |
+| `cargo test -p maos-journey-test` / `-p maos-iac` / `-p maos-a2a` | **exit 0** |
+| `cargo test -p maos-bin` | green single-threaded; one pre-existing parallel flake (finding 4) |
+
+**Disclosure (T8):** this story's key carries the non-digit `j1-` lane prefix, so the five story-file gates skip it (operator-ratified 2026-08-14, `sprint-status.yaml:246-250`). Dev model and evidence are recorded here anyway, as the lane requires.
+
+**Not done here, by design:** no evidence-ledger gate was created (1a owns the gate; this scene is a consumer via `load_published_ledgers` + `validate_against`); no CI step added (the drain test rides the normal `cargo test` suite); `discipline.yml` and `tests/coverage-matrix.yaml` untouched.
+
 ### File List
+
+| File | Change |
+|---|---|
+| `xtask/src/demo_j1.rs` | NEW — the scene runner (708 tokei CODE). |
+| `xtask/src/tests/demo_j1_tests.rs` | NEW — 11 unit tests, kloc-excluded path. |
+| `xtask/src/main.rs` | `use std::path::{Path, PathBuf}`; `mod demo_j1;`; `DemoJ1` command variant; dispatch arm. |
+| `crates/maos-bin/src/main.rs` | AC4 — `--once` drain branch drops all 14 live `audit_tx` owners before awaiting the writer. |
+| `crates/maos-bin/tests/drain_once_audit_writer.rs` | NEW — the proven-red test (RED at HEAD, GREEN after). |
+| `_bmad-output/test-artifacts/runbook-j1-demo.md` | NEW — the one-page run sheet. |
+| `xtask/src/check_j1_loopback_delegation.rs` | Finding 2 repair — oracle matches a whitespace-stripped structural skeleton so a formatter cannot flip a Blocking gate. Planted-regression teeth verified (10/10 still RED). |
+| `xtask/kloc.toml` | The granted xtask ceiling 37287 → 38609, with arithmetic, driver, and the D11 non-ratification note. |
+| `crates/maos-a2a/src/pairing.rs`, `crates/maos-iac/src/adapter/mailbox.rs`, `crates/maos-bin/src/lib.rs`, `crates/maos-journey-test/tests/journey_j1.rs` | Finding 1 repair — `cargo fmt` only (whitespace, zero behavioural change); these were 1a's unformatted files leaving the blocking fmt gate RED at HEAD. |

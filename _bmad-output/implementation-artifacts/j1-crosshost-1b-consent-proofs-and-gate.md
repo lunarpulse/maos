@@ -12,7 +12,7 @@ review: §A6 full-layer net (Blind + Edge + Acceptance + Test-Infra + runtime) �
 
 # j1-crosshost-1b — ADR-012 consent proofs + `check-j1-loopback-delegation` legs
 
-Status: blocked (on `j1-crosshost-1a`) — **round-table consensus applied 2026-08-14**
+Status: backlog — **UNBLOCKED 2026-08-14**: `j1-crosshost-1a` reached `done` (commit `6827dc87`), so the wire this story judges now exists and the gate skeleton it adds legs to is registered, `Blocking`, and PASSING at HEAD. Round-table consensus applied 2026-08-14. **Preflight must also settle decision D15** (`epic-14-preflight-decisions.md`): this story receives the `maos-bin` ceiling breach — 1a's **+33** (16211/16178) plus `j1-demo-one-command-scene`'s **+8** drain fix = **16219 / +41** — and takes ONE grant covering both, measured at HEAD in a clean worktree, never on an estimate.
 
 **Kernel-Δ: ZERO on both axes.** No `maos-kernel-core/src` lines (pin 24472), no ABI surface change —
 that movement belongs to 1a. This story's budget risk is entirely `xtask`.
