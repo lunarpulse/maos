@@ -152,6 +152,13 @@ pub fn run(
 
     let bins = preflight(skip_build)?;
     let home = provision_home(keep_home.as_deref())?;
+    // Every `?` below returns before the "Where it landed" block, so without this
+    // guard a failed run leaves its state home behind. The guard is the backstop;
+    // the normal path still removes it explicitly so the result can be reported.
+    let _home_guard = EphemeralHome {
+        path: home.clone(),
+        keep: keep_home.is_some(),
+    };
 
     section("The scene");
     for (name, what) in [
@@ -196,6 +203,26 @@ pub fn run(
     );
 
     let mut beats = evaluate_beats(&obs);
+
+    // T5 — the sealed-export parity control. The drain fix is only meaningful if
+    // the rows it flushed are actually COVERED by a signature, so cross-check an
+    // independent reader (`audit query`) against what the signer sealed. Without
+    // this the scene could render `audit-drain-clean` green while an export over
+    // the same window silently omitted rows.
+    beats.push(match sealed_export_parity(&bins, &home) {
+        Ok((queried, exported)) => Beat::executed(
+            "sealed-export-covers-the-run",
+            "what an independent reader sees in the window is what the signer sealed",
+            state_of(queried > 0 && exported >= queried),
+            format!("audit query saw {queried} row(s); the signed bundle covers {exported}"),
+        ),
+        Err(why) => Beat::executed(
+            "sealed-export-covers-the-run",
+            "what an independent reader sees in the window is what the signer sealed",
+            EvidenceState::Indeterminate,
+            format!("parity NOT established: {why}"),
+        ),
+    });
 
     if skip_gate {
         beats.push(Beat::absent(
@@ -268,10 +295,19 @@ pub fn run(
 
     section("Where it landed");
     match &keep_home {
-        Some(path) => println!("  state home       {} (kept: --keep-home)", path.display()),
+        // AC5 forbids absolute workstation paths in scene output. The operator
+        // supplied this path, so naming its leaf is enough to find it again.
+        Some(path) => println!(
+            "  state home       kept at your --keep-home path (leaf `{}`)",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        ),
         None => {
-            let _ = std::fs::remove_dir_all(&home);
-            println!("  state home       ephemeral, removed on exit (pass --keep-home to inspect)");
+            match std::fs::remove_dir_all(&home) {
+                Ok(()) => {
+                    println!("  state home       ephemeral, removed on exit (pass --keep-home to inspect)")
+                }
+                Err(e) => println!("  state home       ephemeral, but removal FAILED: {e}"),
+            }
         }
     }
     println!("  runbook          _bmad-output/test-artifacts/runbook-j1-demo.md");
@@ -297,8 +333,33 @@ pub fn run(
     Ok(())
 }
 
+/// Removes the isolated state home on EVERY return path, including the early `?`
+/// ones. `remove_dir_all` on an already-removed home is ignored, so the normal
+/// path can still delete it explicitly and report the outcome.
+struct EphemeralHome {
+    path: PathBuf,
+    keep: bool,
+}
+
+impl Drop for EphemeralHome {
+    fn drop(&mut self) {
+        if !self.keep {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
 /// The Tier-2 beat name, referenced from both the declaration and the live take.
 const TIER2_BEAT: &str = "tier2-live-agent-signed";
+
+/// The founder loop has exactly three class Spirits, so `on_idle_fired` must
+/// arrive three times. Fewer means a Spirit never went idle.
+const EXPECTED_IDLE_FIRES: usize = 3;
+
+/// `worker_cli.name()` for the paid Codex adapter (`maos-bin/src/worker_cli.rs`
+/// `SUPPORTED_WORKER_CLIS` = fixture | codex | claude). A Tier-2 take signed off
+/// a fixture identity would be the overclaim this leg exists to prevent.
+const CODEX_WORKER_CLI: &str = "codex";
 
 /// Resolved binaries the scene drives.
 struct Bins {
@@ -312,6 +373,7 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
     let dir = PathBuf::from("target/debug");
     let maos = dir.join("maos");
     let fixture = dir.join("worker-cli-fixture");
+    let maosctl = dir.join("maosctl");
 
     if skip_build {
         println!("  build            skipped (--skip-build)");
@@ -326,7 +388,11 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
         }
     }
 
-    for (label, path) in [("maos", &maos), ("worker-cli-fixture", &fixture)] {
+    for (label, path) in [
+        ("maos", &maos),
+        ("worker-cli-fixture", &fixture),
+        ("maosctl", &maosctl),
+    ] {
         if !path.exists() {
             return Err(format!(
                 "demo-j1: {label} not found at {} — build the workspace first (drop --skip-build)",
@@ -334,6 +400,15 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
             ));
         }
     }
+    // ABSOLUTE, never repo-relative: the live take spawns the daemon with
+    // `current_dir` set to a disposable workspace, and a relative program path is
+    // resolved against the CHILD's cwd — where `target/debug/maos` does not
+    // exist, so every live take would fail at spawn. Resolving once here fixes it
+    // for the PATH prepend and the `maosctl` sibling lookup at the same time.
+    let dir = dir
+        .canonicalize()
+        .map_err(|e| format!("demo-j1: cannot resolve target/debug: {e}"))?;
+    let maos = dir.join("maos");
     println!("  binaries         maos + worker-cli-fixture present as siblings in target/debug");
     Ok(Bins { maos, dir })
 }
@@ -343,7 +418,23 @@ fn preflight(skip_build: bool) -> Result<Bins, String> {
 /// resolves to the same fresh tree.
 fn provision_home(keep: Option<&Path>) -> Result<PathBuf, String> {
     let home = match keep {
-        Some(path) => path.to_path_buf(),
+        Some(path) => {
+            // A retained home is only isolated if it starts empty. Leftover
+            // journal/transparency-log files would be read by this run, and on the
+            // signed path `sealed-export --range 1d` would sign the PREVIOUS run's
+            // rows alongside this capture — attribution by leftover file.
+            if let Ok(mut entries) = std::fs::read_dir(path) {
+                if entries.next().is_some() {
+                    return Err(format!(
+                        "demo-j1: --keep-home {} is not empty. A retained home must start \
+                         empty or this run reads the previous run's journal and a signed \
+                         export could cover its rows",
+                        path.display()
+                    ));
+                }
+            }
+            path.to_path_buf()
+        }
         None => {
             let nanos = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -354,7 +445,56 @@ fn provision_home(keep: Option<&Path>) -> Result<PathBuf, String> {
     };
     std::fs::create_dir_all(&home)
         .map_err(|e| format!("demo-j1: cannot create state home {}: {e}", home.display()))?;
-    Ok(home)
+    // Absolute so the live child's `current_dir` change cannot reinterpret it.
+    home.canonicalize()
+        .map_err(|e| format!("demo-j1: cannot resolve state home {}: {e}", home.display()))
+}
+
+/// T5 — cross-check the signed window against an independent read of it.
+///
+/// `audit query` walks the Transparency Log; `sealed-export` signs the rows it
+/// covers. If the signer's entry count falls short of what a plain reader can
+/// see, the bundle is incomplete — exactly the failure the `--once` drain fix
+/// exists to prevent, and a failure a row-count comparison can actually catch.
+/// The key is generated INSIDE the disposable home, so this costs nothing and
+/// leaves no operator key behind.
+fn sealed_export_parity(bins: &Bins, home: &Path) -> Result<(usize, usize), String> {
+    let maosctl = bins.dir.join("maosctl");
+    let key = home.join("demo-parity.key");
+    let bundle = home.join("demo-parity-bundle.json");
+
+    run_checked(
+        Command::new(&maosctl)
+            .args(["audit", "keygen", "--output"])
+            .arg(&key)
+            .env("MAOS_HOME", home)
+            .env("XDG_DATA_HOME", home),
+        "audit keygen",
+    )?;
+
+    let queried = run_checked(
+        Command::new(&maosctl)
+            .args(["audit", "query", "--range", "1d", "--format", "ndjson"])
+            .env("MAOS_HOME", home)
+            .env("XDG_DATA_HOME", home),
+        "audit query",
+    )?;
+    let rows = queried
+        .lines()
+        .filter(|l| l.trim_start().starts_with('{'))
+        .count();
+
+    let exported = run_checked(
+        Command::new(&maosctl)
+            .args(["audit", "sealed-export", "--range", "1d", "--audit-key"])
+            .arg(&key)
+            .arg("--output")
+            .arg(&bundle)
+            .env("MAOS_HOME", home)
+            .env("XDG_DATA_HOME", home),
+        "sealed-export",
+    )?;
+    Ok((rows, entry_count(&exported)))
 }
 
 fn run_scene(bins: &Bins, home: &Path) -> Result<SceneObservation, String> {
@@ -506,6 +646,26 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
         },
     ));
 
+    // P5b — AC1 also names the wrapped CLI's exit row and the three idle
+    // callbacks. Without them the scene could narrate a clean loop while the
+    // subprocess never reported an exit and no Spirit ever went idle.
+    let exit_ev = obs.event("cli_wrapper_exit");
+    let crashed = exit_ev
+        .and_then(|e| e["is_crash"].as_bool())
+        .unwrap_or(true);
+    let idle_fired = obs.events_named("on_idle_fired").len();
+    beats.push(Beat::executed(
+        "worker-exited-and-loop-went-idle",
+        "the wrapped CLI reported a non-crash exit and every class Spirit fired on_idle",
+        state_of(exit_ev.is_some() && !crashed && idle_fired == EXPECTED_IDLE_FIRES),
+        format!(
+            "exit_cause {}, is_crash {crashed}, on_idle_fired {idle_fired}/{EXPECTED_IDLE_FIRES}",
+            exit_ev
+                .and_then(|e| e["exit_cause"].as_str())
+                .unwrap_or("absent")
+        ),
+    ));
+
     // P6a — the isolated home stayed clean.
     let journal_warnings = obs
         .stderr
@@ -519,24 +679,77 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
         format!("{journal_warnings} journal warning(s) in an isolated home"),
     ));
 
+    // P6a-order — the claim table is titled "execution order", so verify the
+    // order instead of implying it. Each stage must appear EXACTLY once and in
+    // sequence; a duplicate or a completion that precedes its own delegation
+    // could otherwise satisfy every beat independently.
+    const ORDERED_STAGES: [&str; 5] = [
+        "delegation_routed",
+        "cli_wrapper_loaded",
+        "worker_completion",
+        "delegation_completed",
+        "drain",
+    ];
+    let mut previous = None;
+    let mut order_problem = None;
+    for stage in ORDERED_STAGES {
+        let hits: Vec<usize> = obs
+            .events
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e["event"].as_str() == Some(stage))
+            .map(|(i, _)| i)
+            .collect();
+        match hits.as_slice() {
+            [] => order_problem = Some(format!("`{stage}` never arrived")),
+            [at] => {
+                if previous.is_some_and(|prev| *at < prev) {
+                    order_problem = Some(format!("`{stage}` arrived out of order"));
+                }
+                previous = Some(*at);
+            }
+            many => {
+                order_problem = Some(format!("`{stage}` arrived {} times, not once", many.len()))
+            }
+        }
+    }
+    beats.push(Beat::executed(
+        "lifecycle-stages-in-order",
+        "one delegation, one worker run, one completion — in that sequence, each exactly once",
+        state_of(order_problem.is_none()),
+        match &order_problem {
+            Some(why) => format!("stream order NOT proven: {why}"),
+            None => format!("{} stages, each once, in sequence", ORDERED_STAGES.len()),
+        },
+    ));
+
     // P6b — the drain. This is the beat the 2026-08-14 rehearsal caught: a
     // timeout here means queued capability rows can be lost, so a later
     // sealed-export over this window would sign an incomplete bundle.
     let drain_timed_out = obs.stderr.contains("audit writer topology drain timed out");
+    // The daemon also has a NON-FATAL writer-failure diagnostic
+    // (`maos-bin/src/main.rs:4314`): the join returns an error, the message is
+    // printed, and the process still exits 0. Queued rows are not proven
+    // persisted in that case, so this beat must not read green.
+    let writer_failed = obs.stderr.contains("audit writer task failed");
     let drained = obs.event("drain").is_some();
     beats.push(Beat::executed(
         "audit-drain-clean",
         "every queued audit row reached SQLite before the process exited",
-        state_of(drained && !drain_timed_out),
+        state_of(drained && !drain_timed_out && !writer_failed),
         if drain_timed_out {
             format!(
                 "DRAIN TIMED OUT — queued rows may be lost, so a sealed-export over this \
                  window could sign an incomplete bundle (wall {:.3}s)",
                 obs.wall.as_secs_f64()
             )
+        } else if writer_failed {
+            "AUDIT WRITER TASK FAILED during drain — the daemon reports this and still \
+             exits 0, so queued rows are NOT proven persisted"
+                .to_string()
         } else {
             format!(
-                "drain observed, no timeout, wall {:.3}s",
+                "drain observed, no timeout, no writer failure, wall {:.3}s",
                 obs.wall.as_secs_f64()
             )
         },
@@ -629,12 +842,27 @@ fn apply_published_ledgers(beats: &mut [Beat]) {
         );
         for leg in &ledger.legs {
             if let Some(beat) = beats.iter_mut().find(|b| b.name == leg.name) {
-                beat.state = match leg.evidence_state.as_str() {
+                let published = match leg.evidence_state.as_str() {
                     "PROVEN_BLOCKING" => EvidenceState::ProvenBlocking,
                     "PROVEN_LIVE_SIGNED" => EvidenceState::ProvenLiveSigned,
                     "ABSENT" => EvidenceState::Absent,
                     _ => EvidenceState::Indeterminate,
                 };
+                // A ledger may LIGHT a beat this run never executed. It must never
+                // PROMOTE one this run executed and watched fail: outside GitHub
+                // Actions `load_published_ledgers` has no build binding to compare,
+                // so a stale green report left in `tests/reports/` by an older
+                // checkout would otherwise bury a live failure and exit 0.
+                if beat.executed && !beat.state.is_proven() && published.is_proven() {
+                    println!(
+                        "    {:<36} ledger claims {} — IGNORED, this run observed {}",
+                        beat.name,
+                        leg.evidence_state,
+                        beat.state.as_str()
+                    );
+                    continue;
+                }
+                beat.state = published;
                 beat.detail = format!("from published ledger: {}", leg.evidence_state);
                 beat.executed = beat.state != EvidenceState::Absent;
                 beat.owner = None;
@@ -721,10 +949,15 @@ fn live_codex_take(
     std::fs::create_dir_all(&demo_dir)
         .map_err(|e| format!("cannot create the disposable demo dir: {e}"))?;
 
+    // `--once` is REQUIRED. Without it `maos run` falls through to the continuous
+    // serving loop (`maos-bin/src/main.rs:5232`) while `.output()` waits for the
+    // child to exit — so a SUCCESSFUL paid take would hang forever and never
+    // reach capture, sealing, or verification.
     let out = Command::new(&bins.maos)
         .arg("run")
         .arg(topology.canonicalize().unwrap_or(topology.clone()))
         .arg("--live")
+        .arg("--once")
         .current_dir(&demo_dir)
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
@@ -732,6 +965,27 @@ fn live_codex_take(
         .output()
         .map_err(|e| format!("cannot run the live daemon: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    // Refuse, never downgrade. `worker_completion` is emitted mid-run, so the
+    // event alone does not mean the daemon finished cleanly.
+    if !out.status.success() {
+        return Err(format!(
+            "the live daemon exited nonzero ({:?}) — nothing to sign: {}",
+            out.status.code(),
+            stderr.trim()
+        ));
+    }
+    if stderr.contains("audit writer task failed")
+        || stderr.contains("audit writer topology drain timed out")
+    {
+        return Err(
+            "the audit writer did not drain cleanly, so a sealed export over this window \
+             could sign an INCOMPLETE bundle — refusing to sign"
+                .to_string(),
+        );
+    }
+
     let completion = stdout
         .lines()
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l.trim()).ok())
@@ -748,6 +1002,14 @@ fn live_codex_take(
     {
         return Err("the live worker did not complete — nothing to sign".to_string());
     }
+    // The topology is OPERATOR-authored, so nothing else stops the hermetic
+    // fixture from reaching the signing path and earning a Tier-2 label.
+    if identity != CODEX_WORKER_CLI {
+        return Err(format!(
+            "the live worker identity is `{identity}`, not `{CODEX_WORKER_CLI}` — a fixture \
+             or unknown CLI must never earn {TIER2_BEAT}"
+        ));
+    }
     let tl_ref = completion
         .as_ref()
         .and_then(|e| e["completion_tl_ref"].as_str())
@@ -757,6 +1019,19 @@ fn live_codex_take(
         "  live run         {identity} completed, worker TL ref {}",
         short_ref(&tl_ref)
     );
+
+    // AC3 records `redaction_result: "verified"`. VERIFY it rather than assert
+    // it: `record-capture` only checks that the field reads "verified", so an
+    // unchecked literal would place an unearned control claim inside a SIGNED
+    // bundle. Compare against the real secret and never print it.
+    let secret = std::env::var("CODEX_API_KEY").unwrap_or_default();
+    if !secret.is_empty() && (stdout.contains(&secret) || stderr.contains(&secret)) {
+        return Err(
+            "the live run echoed the CODEX_API_KEY value into its own output — refusing to \
+             sign a capture that claims redaction was verified"
+                .to_string(),
+        );
+    }
 
     // The capture carries NON-SECRET fields only, spelled exactly as
     // `record-capture` validates them: it refuses a credential-shaped value and
@@ -798,7 +1073,7 @@ fn live_codex_take(
     // `--range`, never `--spirit`: the window must cover the worker rows AND the
     // fresh capture row.
     let bundle = home.join("j1-demo-bundle.json");
-    run_checked(
+    let export_out = run_checked(
         Command::new(&maosctl)
             .args(["audit", "sealed-export", "--range", "1d", "--audit-key"])
             .arg(&key)
@@ -809,9 +1084,34 @@ fn live_codex_take(
         "sealed-export",
     )?;
 
+    // The signed bytes are what leaves this machine, so scan THEM too — not only
+    // the console stream.
+    if !secret.is_empty() {
+        let signed = std::fs::read_to_string(&bundle)
+            .map_err(|e| format!("cannot re-read the sealed bundle to check redaction: {e}"))?;
+        if signed.contains(&secret) {
+            return Err(
+                "the sealed bundle contains the CODEX_API_KEY value — refusing to sign".to_string(),
+            );
+        }
+    }
+
+    // `verify-bundle` REQUIRES `--pubkey` (`maos-cli/src/cli.rs`: `pubkey: String`
+    // with no default), so omitting it exits at argument parsing AFTER the paid
+    // run has already happened — the defect this leg shipped with. `sealed-export`
+    // prints the pubkey it signed with; carry that hex into the verifier, and
+    // refuse when it is absent instead of guessing.
+    let pubkey = pubkey_hex(&export_out).ok_or_else(|| {
+        format!(
+            "sealed-export reported no pubkey, so the bundle cannot be verified: {}",
+            export_out.trim()
+        )
+    })?;
     let verify = Command::new(&maosctl)
         .args(["audit", "verify-bundle"])
         .arg(&bundle)
+        .arg("--pubkey")
+        .arg(pubkey)
         .env("MAOS_HOME", home)
         .env("XDG_DATA_HOME", home)
         .output()
@@ -826,6 +1126,15 @@ fn live_codex_take(
     }
     println!("  signed bundle    verify OK — {}", verify_out.trim());
     Ok(entry_count(&verify_out))
+}
+
+/// `sealed-export` prints `… (<N> entries, pubkey <64-hex>)`. Pull that hex out:
+/// `verify-bundle` requires it and has no default.
+fn pubkey_hex(output: &str) -> Option<&str> {
+    output
+        .split_whitespace()
+        .map(|token| token.trim_end_matches([')', ',', '.']))
+        .find(|t| t.len() == 64 && t.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 /// Pull the entry count out of `verify-bundle`'s "OK (<N> entries, seq <n>)".
@@ -844,7 +1153,7 @@ fn entry_count(output: &str) -> usize {
         .unwrap_or(0)
 }
 
-fn run_checked(command: &mut Command, label: &str) -> Result<(), String> {
+fn run_checked(command: &mut Command, label: &str) -> Result<String, String> {
     let out = command
         .output()
         .map_err(|e| format!("cannot run {label}: {e}"))?;
@@ -854,7 +1163,11 @@ fn run_checked(command: &mut Command, label: &str) -> Result<(), String> {
             String::from_utf8_lossy(&out.stderr).trim()
         ));
     }
-    Ok(())
+    Ok(format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    ))
 }
 
 /// A hermetic, reproducible observation that held is `PROVEN_BLOCKING`: CI can

@@ -134,15 +134,12 @@ fn structural(src: &str) -> String {
 /// contains `CrossHostNotConfigured` assertions that must not keep this gate
 /// green after the production branch is removed.
 fn absent_router_branch_fails_closed(src: &str) -> bool {
-    let flat = structural(src);
-    let Some(branch_start) = flat.find("letrouter=self.a2a_router.get().ok_or_else") else {
-        return false;
-    };
-    let branch = &flat[branch_start..];
-    let Some(branch_end) = branch.find("})?;") else {
-        return false;
-    };
-    branch[..branch_end + "})?;".len()].contains("IacBusError::CrossHostNotConfigured")
+    let flat = structural(production_before_tests(src));
+    flat.contains(
+        "letrouter=self.a2a_router.get().ok_or_else(||IacBusError::CrossHostNotConfigured{",
+    ) || flat.contains(
+        "letrouter=self.a2a_router.get().ok_or_else(||{IacBusError::CrossHostNotConfigured{",
+    )
 }
 
 /// LEG 1 — the proven-red. Each condition is necessary for the delegation to be

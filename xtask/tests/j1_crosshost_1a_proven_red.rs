@@ -198,6 +198,29 @@ fn route_locally_anyway_by_removing_the_production_fail_closed_error() {
     );
 }
 
+/// Replacing the production closure with local delivery must RED even if a test
+/// module preserves the exact fail-closed expression. The gate must not let
+/// `#[cfg(test)]` source satisfy the production invariant.
+#[test]
+fn route_locally_anyway_but_keep_a_matching_expression_in_a_test_module() {
+    let v = run_gate(|root| {
+        let production_fallback = "fn phase_three() {\n    deliver_locally(frame)?;\n}\n";
+        let test_only_match = "\n#[cfg(test)]\nmod tests {\n    fn preserves_fail_closed_shape() {\n        \
+                               let router = self.a2a_router.get().ok_or_else(|| {\n            \
+                               IacBusError::CrossHostNotConfigured { host_id: hosts }\n        })?;\n    }\n}\n";
+        write_file(
+            root,
+            MAILBOX_RS,
+            &format!("{production_fallback}{test_only_match}"),
+        );
+    });
+    assert_red(
+        &v,
+        "must fail closed",
+        "production fallback with matching test-only fail-closed expression",
+    );
+}
+
 /// Drop the pump's `host_id` strip. The re-delivered frame re-enters the cross-host
 /// branch and loops instead of reaching the consumer.
 #[test]

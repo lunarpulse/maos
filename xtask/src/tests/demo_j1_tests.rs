@@ -9,6 +9,14 @@ fn obs(events: Vec<serde_json::Value>, stderr: &str) -> SceneObservation {
     }
 }
 
+/// Evaluate the observation and pull out one named beat.
+fn beat_named(observation: &SceneObservation, name: &str) -> Beat {
+    evaluate_beats(observation)
+        .into_iter()
+        .find(|b| b.name == name)
+        .unwrap_or_else(|| panic!("beat `{name}` must be evaluated"))
+}
+
 /// The whole honest-labeling contract in one assertion: a beat nobody has built
 /// yet is visible, owned, and does NOT fail the scene.
 #[test]
@@ -180,11 +188,22 @@ fn the_full_post_1a_stream_proves_every_executed_beat() {
                 "completion_tl_ref": "01a003bfb38d20e97fcb08c16274374c",
             }),
             serde_json::json!({
+                "event": "cli_wrapper_exit",
+                "child_pid": 1308069,
+                "stdout_lines": 3,
+                "stderr_lines": 0,
+                "exit_cause": "Exited { code: 0 }",
+                "is_crash": false,
+            }),
+            serde_json::json!({
                 "event": "delegation_completed",
                 "result": "completed",
                 "orchestrator_frames_drained": 1,
                 "orchestrator_safe_point": true,
             }),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "reviewer"}),
             serde_json::json!({"event": "drain"}),
         ],
         "",
@@ -196,7 +215,151 @@ fn the_full_post_1a_stream_proves_every_executed_beat() {
         .map(|b| b.name)
         .collect();
     assert!(failed.is_empty(), "unexpected failures: {failed:?}");
-    assert_eq!(beats.len(), 7, "all seven executed beats must be evaluated");
+    assert_eq!(beats.len(), 9, "all nine executed beats must be evaluated");
+}
+
+/// The claim table is titled "execution order". Before the 2026-08-15 review each
+/// beat independently took the FIRST event with a matching name, so a stream whose
+/// completion preceded its own delegation — or which repeated a stage — could
+/// satisfy every beat and still be printed as an execution-order proof.
+#[test]
+fn a_completion_before_its_own_delegation_fails_the_order_beat() {
+    let observation = obs(
+        vec![
+            serde_json::json!({"event": "worker_completion", "completed": true}),
+            serde_json::json!({"event": "delegation_routed", "to_host": DELEGATION_HOST}),
+            serde_json::json!({"event": "cli_wrapper_loaded", "child_pid": 7}),
+            serde_json::json!({"event": "delegation_completed", "result": "completed"}),
+            serde_json::json!({"event": "drain"}),
+        ],
+        "",
+    );
+    let beat = beat_named(&observation, "lifecycle-stages-in-order");
+    assert!(
+        beat.failed(),
+        "a completion that precedes its delegation is not an execution order"
+    );
+}
+
+#[test]
+fn a_repeated_lifecycle_stage_fails_the_order_beat() {
+    let observation = obs(
+        vec![
+            serde_json::json!({"event": "delegation_routed", "to_host": DELEGATION_HOST}),
+            serde_json::json!({"event": "cli_wrapper_loaded", "child_pid": 7}),
+            serde_json::json!({"event": "worker_completion", "completed": true}),
+            serde_json::json!({"event": "worker_completion", "completed": false}),
+            serde_json::json!({"event": "delegation_completed", "result": "completed"}),
+            serde_json::json!({"event": "drain"}),
+        ],
+        "",
+    );
+    let beat = beat_named(&observation, "lifecycle-stages-in-order");
+    assert!(
+        beat.failed(),
+        "two worker_completion rows means the run cannot claim one correlated worker run"
+    );
+    assert!(
+        beat.detail.contains("not once"),
+        "the narration must name the duplicate, got {:?}",
+        beat.detail
+    );
+}
+
+/// AC1 names `cli_wrapper_exit` and `on_idle_fired` ×3 as evidence. Before the
+/// 2026-08-15 review the scene parsed neither, so a run whose worker never
+/// reported an exit — or whose Spirits never went idle — still narrated success.
+#[test]
+fn a_missing_worker_exit_row_fails_the_idle_beat() {
+    let observation = obs(
+        vec![
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "reviewer"}),
+        ],
+        "",
+    );
+    let beat = beat_named(&observation, "worker-exited-and-loop-went-idle");
+    assert!(beat.failed(), "no cli_wrapper_exit row is not a clean loop");
+}
+
+#[test]
+fn a_crashed_worker_exit_fails_the_idle_beat() {
+    let observation = obs(
+        vec![
+            serde_json::json!({
+                "event": "cli_wrapper_exit",
+                "exit_cause": "Signaled { signal: 9 }",
+                "is_crash": true,
+            }),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "reviewer"}),
+        ],
+        "",
+    );
+    let beat = beat_named(&observation, "worker-exited-and-loop-went-idle");
+    assert!(beat.failed(), "a crash is never a clean exit");
+}
+
+#[test]
+fn a_spirit_that_never_idled_fails_the_idle_beat() {
+    let observation = obs(
+        vec![
+            serde_json::json!({
+                "event": "cli_wrapper_exit",
+                "exit_cause": "Exited { code: 0 }",
+                "is_crash": false,
+            }),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "orchestrator"}),
+            serde_json::json!({"event": "on_idle_fired", "spirit_id": "architect"}),
+        ],
+        "",
+    );
+    let beat = beat_named(&observation, "worker-exited-and-loop-went-idle");
+    assert!(
+        beat.failed(),
+        "two idle callbacks for three class Spirits is not proof the loop went idle"
+    );
+}
+
+/// The daemon prints `audit writer task failed during topology drain` and STILL
+/// exits 0 (`maos-bin/src/main.rs:4314`). Queued rows are not proven persisted,
+/// so the drain beat must not read green on that stderr.
+#[test]
+fn a_writer_task_failure_fails_the_drain_beat() {
+    let observation = obs(
+        vec![serde_json::json!({"event": "drain"})],
+        "maos run: audit writer task failed during topology drain: channel closed",
+    );
+    let beat = beat_named(&observation, "audit-drain-clean");
+    assert!(
+        beat.failed(),
+        "a failed writer join means the queue was never proven flushed"
+    );
+    assert!(
+        beat.detail.contains("AUDIT WRITER TASK FAILED"),
+        "the narration must name the writer failure, got {:?}",
+        beat.detail
+    );
+}
+
+/// `verify-bundle` requires `--pubkey` and has no default, so the hex must be
+/// carried from what `sealed-export` printed. Guessing is not an option.
+#[test]
+fn the_sealed_export_pubkey_is_carried_into_verification() {
+    let hex = "61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766";
+    assert_eq!(
+        pubkey_hex(&format!(
+            "maosctl: sealed export written to /tmp/b.json (247 entries, pubkey {hex})"
+        )),
+        Some(hex)
+    );
+    // Too short, too long, and non-hex must all be refused rather than passed on
+    // as a bogus key that would fail verification after the paid run.
+    assert_eq!(pubkey_hex("(247 entries, pubkey deadbeef)"), None);
+    assert_eq!(pubkey_hex(&format!("pubkey {}", "z".repeat(64))), None);
+    assert_eq!(pubkey_hex("no pubkey at all"), None);
 }
 
 #[test]
