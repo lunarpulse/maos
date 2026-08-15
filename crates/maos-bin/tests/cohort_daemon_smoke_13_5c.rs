@@ -860,7 +860,7 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 13] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 15] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -904,6 +904,12 @@ fn composition_root_does_not_seed_manifest_scopes() {
             "cross_wall_log_read.rs",
             include_str!("../src/cross_wall_log_read.rs"),
         ),
+        // j1-crosshost-1a — the frame-borne delegation leg and the topology parser.
+        // Listed so the 13.5d negative covers them: the delegation consumer receives
+        // a consent-bearing frame and spawns a worker, and it must never seed the
+        // manifest-derived policy table at the composition root.
+        ("delegation.rs", include_str!("../src/delegation.rs")),
+        ("topology.rs", include_str!("../src/topology.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

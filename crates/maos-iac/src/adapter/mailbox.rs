@@ -120,9 +120,15 @@ pub struct Mailbox {
     broadcast_sender: broadcast::Sender<IacFrame>,
     metrics: Arc<IacRtMetrics>,
     scbs: Mutex<Option<Arc<dyn SpiritActivityTracker>>>,
-    /// Story 6.3 — A2A router installed at composition root. `None` means
-    /// no peer is configured; cross-host frames fire `CrossHostNotConfigured`.
-    a2a_router: Option<Arc<dyn A2ARouter>>,
+    /// Story 6.3 — A2A router installed at composition root. Unset means no
+    /// peer is configured; cross-host frames fire `CrossHostNotConfigured`.
+    ///
+    /// j1-crosshost-1a AC2.1 — `OnceLock`, not `Option`, so the router can be
+    /// installed on an already-`Arc`'d mailbox (`&self`, see
+    /// [`Mailbox::install_a2a_router`]) AND so it is **set-once**: nothing can
+    /// swap the cross-host router after boot. Set-once is the security property;
+    /// the `&self` ergonomics are the side effect.
+    a2a_router: std::sync::OnceLock<Arc<dyn A2ARouter>>,
     /// Story 6.4 — per-recipient consent gate (Phase 1.5). `OnceLock` allows
     /// post-construction injection from the composition root since the gate
     /// may need types built later in the wiring sequence.
@@ -143,7 +149,7 @@ impl std::fmt::Debug for Mailbox {
                 "tracker_present",
                 &self.scbs.lock().map(|g| g.is_some()).unwrap_or(false),
             )
-            .field("a2a_router_present", &self.a2a_router.is_some())
+            .field("a2a_router_present", &self.a2a_router.get().is_some())
             .field("consent_gate_present", &self.consent_gate.get().is_some())
             .field(
                 "transparency_log_present",
@@ -161,7 +167,7 @@ impl Mailbox {
             broadcast_sender,
             metrics,
             scbs: Mutex::new(None),
-            a2a_router: None,
+            a2a_router: std::sync::OnceLock::new(),
             consent_gate: std::sync::OnceLock::new(),
             transparency_log: std::sync::OnceLock::new(),
         }
@@ -177,16 +183,19 @@ impl Mailbox {
             broadcast_sender,
             metrics,
             scbs: Mutex::new(Some(tracker)),
-            a2a_router: None,
+            a2a_router: std::sync::OnceLock::new(),
             consent_gate: std::sync::OnceLock::new(),
             transparency_log: std::sync::OnceLock::new(),
         }
     }
 
     /// Story 6.3 — install the A2A router at composition root. Returns
-    /// `self` to allow chained builders.
-    pub fn with_a2a_router(mut self, router: Arc<dyn A2ARouter>) -> Self {
-        self.a2a_router = Some(router);
+    /// `self` to allow chained builders. Retained for the pre-`Arc` builder
+    /// callers; the production composition root uses
+    /// [`Mailbox::install_a2a_router`] because it wires the mailbox behind an
+    /// `Arc` before the router exists.
+    pub fn with_a2a_router(self, router: Arc<dyn A2ARouter>) -> Self {
+        let _ = self.a2a_router.set(router);
         self
     }
 
@@ -218,6 +227,20 @@ impl Mailbox {
     /// adapter. Returns `Ok(())` if set for the first time, `Err` if already set.
     pub fn install_transparency_log(&self, tl: Arc<TransparencyLogAdapter>) -> Result<(), ()> {
         self.transparency_log.set(tl).map_err(|_| ())
+    }
+
+    /// j1-crosshost-1a AC2.1 — post-construction installer for the A2A router,
+    /// mirroring [`Mailbox::install_consent_gate`] /
+    /// [`Mailbox::install_transparency_log`]. Returns `Ok(())` if set for the
+    /// first time, `Err` if already set.
+    ///
+    /// Required because the production composition root wraps the mailbox in an
+    /// `Arc` before the router's peer configs and TOFU store exist, so
+    /// [`Mailbox::with_a2a_router`] (which consumes `self`) can never be reached
+    /// there. The set-once refusal is a security property, not an ergonomic: a
+    /// cross-host router cannot be swapped after boot.
+    pub fn install_a2a_router(&self, router: Arc<dyn A2ARouter>) -> Result<(), ()> {
+        self.a2a_router.set(router).map_err(|_| ())
     }
 
     pub fn register_spirit(&self, spirit_id: &str) -> Result<SpiritMailboxHandle, IacBusError> {
@@ -495,7 +518,7 @@ impl Mailbox {
             // Per-target error collection: deliver to all reachable peers, return
             // the first error (or Ok if all succeed).
             if !cross_host_targets.is_empty() {
-                let router = self.a2a_router.as_ref().ok_or_else(|| {
+                let router = self.a2a_router.get().ok_or_else(|| {
                     IacBusError::CrossHostNotConfigured {
                         host_id: cross_host_targets
                             .iter()

@@ -40,15 +40,63 @@
 use std::sync::{Arc, Mutex};
 
 use maos_domain::frame::{
-    FrameAddress, FramePayload, IacFrame, PosturePreferences, PriorDistillateRef, TaskAssignPayload,
+    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, PriorDistillateRef,
+    TaskAssignPayload,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::orchestrator::OrchestratorInstruction;
-use maos_spirit_abi::identity::{FrameKind, SpiritId, SpiritRole};
+use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use maos_spirit_sdk::{spirit, Ctx, Spirit};
 use serde::{Deserialize, Serialize};
+
+/// j1-crosshost-1a AC1.4 — the consent intent a `developer-remote` delegation
+/// carries.
+///
+/// ADR-012 names **effect authority**, not verbs and not job categories: its own
+/// worked example contrasts `diagnosis-handoff:read-only-evidence` with
+/// `code-mutation-directive`, and neither names a verb. What this frame actually
+/// grants is a T3 worker running `codex exec --sandbox workspace-write` —
+/// arbitrary code execution and filesystem mutation **on the receiver**. The
+/// most powerful grant in the system must say so out loud, because a rung-2
+/// operator reads this string when deciding whether to admit the frame from a
+/// remote peer. `task:assign` describes the envelope; `development-task`
+/// describes a job category; neither states the authority.
+///
+/// Canonical under `A2AIntent::is_canonical` (`maos-domain/src/invariants/i8.rs`):
+/// `namespace:verb`, one colon, kebab segments. `task.assign` is NOT — the `.`
+/// is rejected, and such a frame fails closed at `prepare_outbound`
+/// (`maos-a2a-core/src/router.rs:696-701`) before it ever routes. Both facts are
+/// pinned in `unit_tests::delegation_intent_is_canonical_and_task_assign_is_not`.
+pub const DELEGATION_CONSENT_INTENT: &str = "development-task:write-workspace";
+
+/// A remote dispatch cannot cross a consent boundary with missing or malformed
+/// provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemoteFrameError {
+    EmptyIntentLineage,
+    NonCanonicalIntent(String),
+}
+
+impl std::fmt::Display for RemoteFrameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyIntentLineage => {
+                f.write_str("remote frame intent lineage must not be empty")
+            }
+            Self::NonCanonicalIntent(intent) => {
+                write!(
+                    f,
+                    "remote frame intent lineage contains non-canonical intent '{intent}'"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for RemoteFrameError {}
 
 /// One Orchestrator dispatch decision, serialized to exactly the manifest
 /// `[output_shape]` `required_fields` (`target_role` / `goal` /
@@ -251,6 +299,74 @@ impl Orchestrator {
         }
     }
 
+    /// j1-crosshost-1a AC1.3 — the **remote** dispatch frame: the same
+    /// `task.assign` [`Self::assign_frame`] builds, promoted onto the A2A wire.
+    ///
+    /// A NEW entry point rather than a widened [`Self::assign_frame`] signature:
+    /// `assign_frame` has 12 call sites across 4 files and every one of them
+    /// wants the same-Host shape (`host_id: None`, `consent_envelope: None`).
+    ///
+    /// Three fields the local shape leaves unset, and why each is load-bearing:
+    ///
+    /// * `to[..].host_id = to_host` — selects the Phase-3 cross-host branch in
+    ///   `Mailbox::deliver` and picks the peer's `send_allowlist`.
+    /// * `from.host_id = from_host` — the receiver identifies the peer by
+    ///   `frame.from.host_id` and applies THAT peer's `accept_allowlist`
+    ///   (`maos-a2a-core/src/router.rs:1087-1090`). On loopback the allowlist is
+    ///   keyed by the SOURCE host, not the destination.
+    /// * `consent_envelope` — `granter == frame.from` on BOTH `spirit_id` and
+    ///   `host_id`, or intake NACKs `CODE_CONSENT_GRANTER_MISMATCH`
+    ///   (`router.rs:1169-1206`). `None` fails closed at the sender's
+    ///   `prepare_outbound` as `ConsentUnclassified`.
+    ///
+    /// `intent` names the **effect authority** the receiving host grants, per
+    /// ADR-012 — see [`DELEGATION_CONSENT_INTENT`]. `lineage` must be non-empty
+    /// with every entry canonical (AC1.5): an empty lineage on a Spirit-emitted
+    /// cross-Spirit frame is rejected `EIntentLineageBroken` (architecture
+    /// §7.3.2).
+    ///
+    /// Note (trap 19): [`ConsentEnvelope::with_fine_grained_intent`] mints a
+    /// non-expiring envelope (`timestamp_ns = 0`, `valid_until_ns = None`). That
+    /// is stated, not fixed — a consent TTL is `j1-crosshost-2` surface.
+    #[allow(clippy::too_many_arguments)]
+    pub fn assign_frame_remote(
+        &self,
+        seq: u64,
+        run_nonce: u64,
+        to_id: &str,
+        to_role: SpiritRole,
+        payload: TaskAssignPayload,
+        lineage: IntentLineage,
+        to_host: &str,
+        from_host: &str,
+        intent: A2AIntent,
+    ) -> Result<IacFrame, RemoteFrameError> {
+        if lineage.is_empty() {
+            return Err(RemoteFrameError::EmptyIntentLineage);
+        }
+        if let Some(non_canonical) = lineage
+            .as_slice()
+            .iter()
+            .find(|entry| !entry.is_canonical())
+        {
+            return Err(RemoteFrameError::NonCanonicalIntent(
+                non_canonical.as_str().to_string(),
+            ));
+        }
+
+        let mut frame = self.assign_frame(seq, to_id, to_role, payload, lineage);
+        frame.frame_id[8..16].copy_from_slice(&run_nonce.to_le_bytes());
+        for addr in frame.to.iter_mut() {
+            addr.host_id = Some(HostId(to_host.to_string()));
+        }
+        frame.from.host_id = Some(HostId(from_host.to_string()));
+        frame.consent_envelope = Some(ConsentEnvelope::with_fine_grained_intent(
+            frame.from.clone(),
+            intent,
+        ));
+        Ok(frame)
+    }
+
     /// The FIRST dispatch of a fan-out — no predecessor, so `prior_distillate_ref`
     /// is `None` (the FR21 gate accepts a `None` first dispatch).
     pub fn first_dispatch(
@@ -429,5 +545,139 @@ mod unit_tests {
             lineage(),
         );
         assert_eq!(o.dispatched_count(), 2);
+    }
+
+    // ── j1-crosshost-1a AC1.3-1.5 — the remote delegation emit ──────────────
+
+    /// AC1.4 pin — the delegation intent is canonical under `i8.rs:85-115`, and
+    /// `task.assign` is NOT. Without this pair the trap is unpinned: a `.` in a
+    /// consent intent fails closed at `prepare_outbound` (`router.rs:696-701`)
+    /// BEFORE routing, so the frame would never reach a peer and the failure
+    /// would look like a transport bug.
+    #[test]
+    fn delegation_intent_is_canonical_and_task_assign_is_not() {
+        assert!(
+            A2AIntent::new(DELEGATION_CONSENT_INTENT).is_canonical(),
+            "the delegation consent intent must be canonical (namespace:verb, one colon, kebab)"
+        );
+        assert!(
+            !A2AIntent::new("task.assign").is_canonical(),
+            "`task.assign` contains a `.` and is NOT a legal consent intent — it would fail \
+             closed at prepare_outbound, never route"
+        );
+    }
+
+    #[test]
+    fn assign_frame_remote_sets_both_host_ids_and_a_granter_bound_envelope() {
+        let o = Orchestrator::new("orchestrator");
+        let payload = o.build_task_assign("delegated goal", "exit 0", None);
+        let f = o
+            .assign_frame_remote(
+                9,
+                0xA11CE,
+                "developer-remote",
+                SpiritRole::Worker,
+                payload,
+                IntentLineage::new(vec![A2AIntent::new(DELEGATION_CONSENT_INTENT)]),
+                "developer-remote-host",
+                "founder-loop-host",
+                A2AIntent::new(DELEGATION_CONSENT_INTENT),
+            )
+            .expect("canonical, non-empty lineage builds a remote frame");
+
+        assert_eq!(&f.frame_id[..8], &9u64.to_le_bytes());
+        assert_eq!(&f.frame_id[8..], &0xA11CEu64.to_le_bytes());
+
+        // AC1.3 — every recipient carries the destination host, and `from`
+        // carries the sender host (the intake peer key, `router.rs:1087-1090`).
+        assert!(!f.to.is_empty());
+        for addr in f.to.iter() {
+            assert_eq!(
+                addr.host_id.as_ref().map(|h| h.as_str()),
+                Some("developer-remote-host")
+            );
+        }
+        assert_eq!(
+            f.from.host_id.as_ref().map(|h| h.as_str()),
+            Some("founder-loop-host")
+        );
+
+        // AC1.3 — granter binding (`router.rs:1169-1206`): granter == frame.from
+        // on BOTH spirit_id and host_id, else intake NACKs
+        // CODE_CONSENT_GRANTER_MISMATCH.
+        let env = f.consent_envelope.as_ref().expect(
+            "a remote frame must carry a consent envelope — None fails closed at the sender",
+        );
+        assert_eq!(env.granter.spirit_id, f.from.spirit_id);
+        assert_eq!(env.granter.host_id, f.from.host_id);
+        assert_eq!(
+            env.intent_class.as_ref().map(|i| i.as_str()),
+            Some(DELEGATION_CONSENT_INTENT)
+        );
+        // Trap 19 — `with_fine_grained_intent` never expires. Stated, not fixed:
+        // a TTL is rung-2 surface (`j1-crosshost-2`).
+        assert!(env.valid_until_ns.is_none());
+
+        // AC1.5 — non-empty lineage whose every entry is canonical.
+        assert!(!f.intent_lineage.is_empty());
+        assert!(f
+            .intent_lineage
+            .as_slice()
+            .iter()
+            .all(A2AIntent::is_canonical));
+    }
+
+    #[test]
+    fn assign_frame_remote_rejects_empty_lineage_before_recording_a_dispatch() {
+        let o = Orchestrator::new("orchestrator");
+        let payload = o.build_task_assign("delegated goal", "exit 0", None);
+        let err = o
+            .assign_frame_remote(
+                1,
+                2,
+                "developer-remote",
+                SpiritRole::Worker,
+                payload,
+                IntentLineage::default(),
+                "developer-remote-host",
+                "founder-loop-host",
+                A2AIntent::new(DELEGATION_CONSENT_INTENT),
+            )
+            .expect_err("empty remote lineage must fail closed");
+        assert_eq!(err, RemoteFrameError::EmptyIntentLineage);
+        assert_eq!(o.dispatched_count(), 0);
+    }
+
+    #[test]
+    fn assign_frame_remote_rejects_non_canonical_lineage_before_recording_a_dispatch() {
+        let o = Orchestrator::new("orchestrator");
+        let payload = o.build_task_assign("delegated goal", "exit 0", None);
+        let err = o
+            .assign_frame_remote(
+                1,
+                2,
+                "developer-remote",
+                SpiritRole::Worker,
+                payload,
+                IntentLineage::new(vec![A2AIntent::new("task.assign")]),
+                "developer-remote-host",
+                "founder-loop-host",
+                A2AIntent::new(DELEGATION_CONSENT_INTENT),
+            )
+            .expect_err("non-canonical remote lineage must fail closed");
+        assert_eq!(
+            err,
+            RemoteFrameError::NonCanonicalIntent("task.assign".to_string())
+        );
+        assert_eq!(o.dispatched_count(), 0);
+    }
+
+    #[test]
+    fn assign_frame_remote_leaves_local_assign_frame_untouched() {
+        let o = Orchestrator::new("orchestrator");
+        let local = o.first_dispatch(1, "worker", SpiritRole::Worker, "a", "x", lineage());
+        assert!(local.to.iter().all(|a| a.host_id.is_none()));
+        assert!(local.from.host_id.is_none());
+        assert!(local.consent_envelope.is_none());
     }
 }

@@ -105,7 +105,10 @@ mod corpus_staleness;
 mod corpus_types;
 mod coverage_matrix;
 mod coverage_matrix_nfr_test_3;
-mod example_spirit_regen;
+// j1-crosshost-1a AC4 — the J1 loopback delegation gate. Blocking skeleton with
+// one proven-red leg + one recorded boundary; `j1-crosshost-1b` adds the consent
+// refusal legs to a gate that already blocks.
+mod check_j1_loopback_delegation;
 // Story 13.6 closure follow-on — the one-command Reza scene. Orchestration
 // only: it runs the journey test and the four gates, and narrates them.
 mod demo_reza;
@@ -540,6 +543,14 @@ enum Commands {
     /// allowlisted dev model + a §A6 review artifact (Blocking; closes E11-A1).
     #[command(name = "check-dev-model-tier")]
     CheckDevModelTier {
+        #[arg(long)]
+        json: bool,
+    },
+    /// j1-crosshost-1a AC4 — the J1 `developer-remote` delegation must be provably
+    /// FRAME-BORNE. Proven-red leg: any "route locally anyway" regression reds this.
+    /// Boundary leg: loopback `frame.from.host_id` is unverified until rung 2.
+    #[command(name = "check-j1-loopback-delegation")]
+    CheckJ1LoopbackDelegation {
         #[arg(long)]
         json: bool,
     },
@@ -1181,6 +1192,9 @@ fn main() {
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
+        Commands::CheckJ1LoopbackDelegation { json } => {
+            check_j1_loopback_delegation::run(json)
+        }
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
         Commands::CheckHostSurface { json } => check_host_surface::run(json),

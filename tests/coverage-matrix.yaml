@@ -470,11 +470,15 @@ coverage:
     valid_until: '2027-05-12'
     notes: split into FR23a (v0.8 loopback) and FR23b (v1.0 full mesh)
   FR23a:
-    gates: []
+    gates: [check-j1-loopback-delegation]
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
-    notes: v0.8 loopback A2A; v1.0 full mesh at FR23b
+    notes: v0.8 loopback A2A; v1.0 full mesh at FR23b. j1-crosshost-1a landed the
+      first binding gate on this row — the J1 developer-remote delegation is
+      frame-borne over the loopback A2A layer, and the gate's proven-red leg reds on
+      any "route locally anyway" regression. j1-crosshost-1b adds the ADR-012 consent
+      refusal legs (no ADR-012 row exists; the refusals belong to this row too).
   FR23b:
     gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement

@@ -1,10 +1,10 @@
 [topology]
 name = "j4-mira-nash"
 
+# Ordering is FILE ORDER — `priority_weight` was dead config the parser never
+# read (j1-crosshost-1a AC1.2); unknown keys are now REJECTED.
 [[topology.spirits]]
 manifest = "../mira/manifest.toml"
-priority_weight = 2
 
 [[topology.spirits]]
 manifest = "../nash/manifest.toml"
-priority_weight = 1

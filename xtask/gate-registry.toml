@@ -93,6 +93,11 @@ gates = [
     "check-rotation-real-timing",
     "check-mobile-push-on-halt",
     "check-j4-latency",
+    # j1-crosshost-1a AC4 — the J1 `developer-remote` delegation must be provably
+    # FRAME-BORNE. One proven-red leg (any "route locally anyway" regression reds it)
+    # plus one recorded boundary (loopback `frame.from.host_id` is unverified until
+    # rung 2). `j1-crosshost-1b` adds the ADR-012 consent refusal legs to it.
+    "check-j1-loopback-delegation",
     # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
     "check-skill-conformance",
     # Story 11.2a (AC5, D10) — cross-region convergent replication gate
@@ -265,6 +270,15 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-j4-latency"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+
+# j1-crosshost-1a AC4.1 — `BindingClass::Blocking` from the day it lands, not
+# "advisory now, blocking later". The gate is hermetic (it reads committed sources),
+# so there is no substrate to wait for, and the regression it catches ships silently:
+# route the delegation locally and the founder loop still exits 0. `j1-crosshost-1b`
+# adds legs to a gate that already blocks rather than standing one up in a green field.
+[[ship_gate]]
+name = "check-j1-loopback-delegation"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 
 # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
 # transport (operator-facing halt wire). Advisory at v1.0 (feature ships at

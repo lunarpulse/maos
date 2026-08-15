@@ -38,6 +38,9 @@
 //!   recovery ≤24h`) plus a reported (non-binding) `rto_secs ≤4h` axis.
 
 pub mod adapter;
+/// Bilateral loopback pairing — one router instance carrying both endpoints, with
+/// the send/accept allowlist asymmetry made explicit.
+pub mod pairing;
 
 // Re-export the moved modules so the historical paths still resolve:
 //   `maos_a2a::error::…`, `maos_a2a::transport::json_rpc::…`,

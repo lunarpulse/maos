@@ -84,6 +84,99 @@ fn j1_founder_loop_topology_run_once() {
         has_topology_drain,
         "topology run should terminate through the drain-complete seam; events:\n{events:?}"
     );
+
+    // ── j1-crosshost-1a AC1.7 — the leg this journey exists to prove ──────────
+    //
+    // Before this story `journey_j1` asserted NOTHING about the Worker: it proved
+    // three class Spirits loaded and the run drained. The delegated Worker could
+    // have been skipped entirely and this test stayed green. These assertions are
+    // the positive control.
+    let event = |name: &str| {
+        events
+            .iter()
+            .find(|e| e.get("event").and_then(|v| v.as_str()) == Some(name))
+            .unwrap_or_else(|| panic!("missing `{name}` event; events:\n{events:?}"))
+    };
+
+    // (1) A real `task.assign` was routed over the loopback A2A layer, carrying the
+    //     ADR-012 effect-authority intent — not a job title, not `task.assign`
+    //     (which is not even a legal consent intent).
+    let routed = event("delegation_routed");
+    assert_eq!(
+        routed.get("intent").and_then(|v| v.as_str()),
+        Some("development-task:write-workspace"),
+        "the delegation must carry the namespaced effect-authority intent"
+    );
+    assert_eq!(
+        routed.get("to_host").and_then(|v| v.as_str()),
+        Some("developer-remote-host")
+    );
+    assert_eq!(
+        routed.get("recipient").and_then(|v| v.as_str()),
+        Some("developer-remote")
+    );
+    let delegated_goal = routed
+        .get("goal")
+        .and_then(|v| v.as_str())
+        .expect("the routed frame must carry a goal drained from its TaskAssign payload");
+    assert!(
+        !delegated_goal.is_empty(),
+        "an empty goal would mean the consumer drained nothing"
+    );
+
+    // (2) The Worker was admitted through the FRAME, not an env var. `frame_borne`
+    //     is false if the topology entry lost its `host` key, which is exactly how
+    //     this leg would silently regress to a local load.
+    let admit = event("topology_worker_admit");
+    assert_eq!(
+        admit.get("frame_borne").and_then(|v| v.as_bool()),
+        Some(true),
+        "the Worker must be admitted from a routed frame, never from an environment variable"
+    );
+
+    // (3) The Worker actually RAN: a real child process, clean exit.
+    let loaded = event("cli_wrapper_loaded");
+    let child_pid = loaded
+        .get("child_pid")
+        .and_then(|v| v.as_u64())
+        .expect("a real subprocess reports its pid");
+    assert_ne!(
+        child_pid,
+        std::process::id() as u64,
+        "the Worker must be a separate process, not the harness"
+    );
+    let exit = event("cli_wrapper_exit");
+    assert_eq!(exit.get("is_crash").and_then(|v| v.as_bool()), Some(false));
+
+    // (4) And COMPLETED, by the adapter's oracle over captured output.
+    let completion = event("worker_completion");
+    assert_eq!(
+        completion.get("completed").and_then(|v| v.as_bool()),
+        Some(true),
+        "the delegated Worker must complete; events:\n{events:?}"
+    );
+
+    // (5) The completion was journaled as a real frame and the Orchestrator
+    //     received it, closing the FR20 safe point. `orchestrator_frames_drained`
+    //     of 0 would mean the completion frame was emitted into a void.
+    let completed = event("delegation_completed");
+    assert_eq!(
+        completed.get("result").and_then(|v| v.as_str()),
+        Some("completed")
+    );
+    assert!(
+        completed
+            .get("orchestrator_frames_drained")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            >= 1,
+        "the TaskComplete frame must reach the Orchestrator's handle; events:\n{events:?}"
+    );
+    assert_eq!(
+        completed.get("orchestrator_safe_point").and_then(|v| v.as_bool()),
+        Some(true),
+        "the in-flight delegation must be closed out (FR20 safe point re-opened)"
+    );
 }
 
 #[test]

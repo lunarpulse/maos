@@ -1788,6 +1788,38 @@ jobs:
       - name: Run check-dev-model-tier
         run: cargo run -p xtask -- check-dev-model-tier --json
 
+  # j1-crosshost-1a AC4 — the J1 `developer-remote` delegation must be provably
+  # FRAME-BORNE. Hermetic and Blocking from the day it lands: the regression it
+  # catches ("route locally anyway") ships silently, because the founder loop still
+  # exits 0 with the delegation removed.
+  #
+  # Three steps, and the second and third are the point:
+  #   * the gate itself;
+  #   * its proven-red vectors, following the story_10_5_proven_red idiom — a
+  #     proven-red only a human ran is not a control (AC4.3);
+  #   * the behavioural delegation legs, which live in `maos-bin` and are therefore
+  #     invisible to this workflow's `-p worker` / `-p maos-journey-test` steps. A
+  #     test not run by CI is not a control (AC5.5), so the gate's job is where they
+  #     get invoked.
+  check-j1-loopback-delegation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-j1-loopback-delegation
+        run: cargo run -p xtask -- check-j1-loopback-delegation --json
+      - name: Run j1-crosshost-1a proven-red vectors (AC4.3)
+        run: cargo test -p xtask --test j1_crosshost_1a_proven_red -- --test-threads=1
+      - name: Run the frame-borne delegation legs (AC2.4-2.5, AC3.1-3.4)
+        run: |
+          cargo test -p maos-iac --test mailbox_a2a_router_installer_1a
+          cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a
+
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
   check-kernel-baseline:
     runs-on: ubuntu-latest
@@ -3142,6 +3174,7 @@ jobs:
       - check-live-bilateral-consent
       - check-rotation-real-timing
       - check-j4-latency
+      - check-j1-loopback-delegation
       - check-mobile-push-on-halt
       - check-ff-j6
       - check-skill-conformance
@@ -3200,6 +3233,7 @@ jobs:
           echo "| check-trial-attestation | ${{ needs.check-trial-attestation.result }} | cargo run -p xtask -- check-trial-attestation |"
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
           echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
+          echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -3228,6 +3262,7 @@ jobs:
           echo "  check-scale-churn: ${{ needs.check-scale-churn.result }}"
           echo "  check-cohort-mesh: ${{ needs.check-cohort-mesh.result }}"
           echo "  check-multi-tenant-loom: ${{ needs.check-multi-tenant-loom.result }}"
+          echo "  check-j1-loopback-delegation: ${{ needs.check-j1-loopback-delegation.result }}"
           echo "  check-reza-production-path: ${{ needs.check-reza-production-path.result }}"
           echo "  check-enterprise-pdp: ${{ needs.check-enterprise-pdp.result }}"
           echo "  check-enterprise-identity: ${{ needs.check-enterprise-identity.result }}"

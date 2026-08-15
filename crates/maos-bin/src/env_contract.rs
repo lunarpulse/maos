@@ -417,11 +417,6 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
-        name: "MAOS_WORKER_TASK",
-        purpose: "The bounded task text routed to the CliWrapper Worker's argv (trailing arg after the hashed argv_prefix); operator-supplied for the J1 Tier-2 live run (j1-tier2-live-agent-signed-bridge)",
-        stability: EnvStability::UserFacing,
-    },
-    EnvVar {
         name: "MAOS_LIVE_AGENT",
         purpose: "Opt in to spawning a REAL agent-CLI Worker subprocess (codex/claude) instead of the hermetic fixture; local-only, never CI. Distinct from --live (which selects the real reasoning provider for class Spirits) (j1-tier2-live-agent-signed-bridge)",
         stability: EnvStability::UserFacing,

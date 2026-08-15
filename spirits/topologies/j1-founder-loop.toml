@@ -1,24 +1,30 @@
 [topology]
 name = "j1-founder-loop"
 
+# Ordering is FILE ORDER. `priority_weight` used to sit on every entry here and
+# was never read by the parser (j1-crosshost-1a AC1.2) — the keys claimed a
+# scheduling behavior that never happened, inside a signed demo. Unknown keys
+# are now REJECTED, so a re-added unread key fails the run loudly.
 [[topology.spirits]]
 manifest = "../orchestrator/manifest.toml"
-priority_weight = 3
 
 [[topology.spirits]]
 manifest = "../architect/manifest.toml"
-priority_weight = 2
 
 [[topology.spirits]]
 manifest = "../reviewer/manifest.toml"
-priority_weight = 1
 
 # The host-authorized Developer-Worker (a [cli_wrapper] member, NOT a class
 # Spirit). Last so it "executes" after the Orchestrator has loaded. Admitted
-# through the host-managed grant + WorkerCli adapter + live bridge; runs the
-# delegated task (MAOS_WORKER_TASK), journaling its output to the Transparency
-# Log. The hermetic profile wraps `worker-cli-fixture`; the live signed run
-# swaps it (+ MAOS_HOST_GRANTS) for `codex` — binary + argv only.
+# through the host-managed grant + WorkerCli adapter + live bridge, journaling
+# its output to the Transparency Log. The hermetic profile wraps
+# `worker-cli-fixture`; the live signed run swaps it (+ MAOS_HOST_GRANTS) for
+# `codex` — binary + argv only.
+#
+# `host` makes the delegation FRAME-BORNE (j1-crosshost-1a AC1.1): the
+# composition root emits a real `task.assign` to `developer-remote` over the
+# loopback A2A layer and the delegation consumer hands the payload's goal to the
+# worker. The task text is no longer inherited from an environment variable.
 [[topology.spirits]]
 manifest = "../worker/manifest.toml"
-priority_weight = 1
+host = "developer-remote-host"

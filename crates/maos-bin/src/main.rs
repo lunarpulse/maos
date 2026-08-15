@@ -659,32 +659,6 @@ fn caps_required_or_empty(
     })
 }
 
-#[cfg(feature = "network")]
-fn topology_manifest_entries(root: &toml::Value) -> Result<Option<Vec<String>>, String> {
-    let Some(topology) = root.get("topology") else {
-        return Ok(None);
-    };
-    let spirits = topology
-        .get("spirits")
-        .and_then(toml::Value::as_array)
-        .ok_or("maos run: [topology] manifest must declare [[topology.spirits]] entries")?;
-    let mut entries = Vec::with_capacity(spirits.len());
-    for (idx, spirit) in spirits.iter().enumerate() {
-        let manifest = spirit
-            .get("manifest")
-            .or_else(|| spirit.get("path"))
-            .and_then(toml::Value::as_str)
-            .ok_or_else(|| {
-                format!("maos run: [[topology.spirits]] entry {idx} must declare manifest")
-            })?;
-        entries.push(manifest.to_string());
-    }
-    if entries.is_empty() {
-        return Err("maos run: [topology] manifest has no spirits".into());
-    }
-    Ok(Some(entries))
-}
-
 /// Story 9.6 — boot-loud predicate keyed to synchronous scalar halt transport,
 /// not posture. The current manifests expose transport structurally through the
 /// scalar tags consumed by in-process ports: Butler's belief/preference scalars
@@ -936,14 +910,15 @@ permitted_egress_destinations = ["api.openai.com"]
     }
 }
 
-/// The default Worker task when the operator sets no `MAOS_WORKER_TASK`. Kept
-/// deterministic so the hermetic fixture path stays bit-stable in CI (the
-/// fixture ignores the task text; the live run overrides it via the env var).
+/// j1-crosshost-1a AC1.6 — `DEFAULT_WORKER_TASK` and the `MAOS_WORKER_TASK` read
+/// are DELETED. The Worker's task is frame-borne: `delegated_task` carries the
+/// `goal` drained from the delegation `task.assign` payload, and `None` means
+/// there was no delegation (the standalone `[cli_wrapper]` path), not a default.
+///
+/// Returns the adapter-parsed completion label so the caller can journal it as a
+/// real `FrameKind::TaskComplete` frame (AC3.10).
 #[cfg(feature = "network")]
-const DEFAULT_WORKER_TASK: &str =
-    "founder-loop: acknowledge the delegated assignment and report completion";
-
-#[cfg(feature = "network")]
+#[allow(clippy::too_many_arguments)]
 fn run_cli_wrapper_manifest(
     manifest_root: &toml::Value,
     run: &RunArgs,
@@ -952,7 +927,8 @@ fn run_cli_wrapper_manifest(
     spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
-) -> Result<(), Box<dyn std::error::Error>> {
+    delegated_task: Option<&str>,
+) -> Result<worker_cli::WorkerCompletion, Box<dyn std::error::Error>> {
     use maos_domain::host_grant::HostGrantAllowlist;
     use maos_domain::invariants::i9::SandboxTier;
     use maos_kernel_core::lifecycle::cli_wrapper::{
@@ -1085,9 +1061,20 @@ fn run_cli_wrapper_manifest(
             }
         }
     }
-    let worker_task =
-        std::env::var("MAOS_WORKER_TASK").unwrap_or_else(|_| DEFAULT_WORKER_TASK.to_string());
-    let task_args = worker_cli.argv(&worker_task);
+    // j1-crosshost-1a AC1.6 / AC3.5 — the task is FRAME-BORNE. It arrives as a
+    // parameter drained from the delegation `task.assign` payload; the
+    // `MAOS_WORKER_TASK` env read and its `DEFAULT_WORKER_TASK` fallback are
+    // DELETED, not bypassed.
+    //
+    // `None` is the absence of a delegation, NOT a default: the standalone
+    // `[cli_wrapper]` path has no delegating Orchestrator, so the worker runs with
+    // no trailing task argv (the fixture falls back to its canned first line —
+    // see `spirits/worker/src/bin/worker-cli-fixture.rs`). Reintroducing a default
+    // string here would recreate exactly the shortcut this story removed.
+    let task_args = match delegated_task {
+        Some(task) => worker_cli.argv(task),
+        None => Vec::new(),
+    };
     // Non-secret CLI env only (e.g. codex CODEX_NON_INTERACTIVE). Credentials are
     // injected host-side on the live path, never in this argv/env shaping code.
     let worker_env = worker_cli.nonsecret_env();
@@ -1295,7 +1282,10 @@ fn run_cli_wrapper_manifest(
         })
     );
 
-    Ok(())
+    // AC3.10 — return the typed oracle outcome. The topology caller emits
+    // `TaskComplete` only for `WorkerCompletion::Completed`; a crash or missing
+    // marker must leave the delegation in flight and fail the run.
+    Ok(completion)
 }
 
 /// Story 8.11 / AC6 — the **production** `EpistemicScalarPort` adapter. A local
@@ -3148,6 +3138,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = mailbox.install_transparency_log(Arc::clone(&transparency_log));
     eprintln!("maos: Mailbox TL installer wired (Story 6.4)");
 
+    // j1-crosshost-1a AC2.1-2.3 — the loopback A2A delegation leg, installed
+    // HERE (beside the TL installer) and not at the mailbox construction site,
+    // because the mailbox is already behind an `Arc` there and the router's peer
+    // configs + TOFU store do not exist yet. `install_a2a_router` is set-once:
+    // nothing can swap the cross-host router after boot.
+    //
+    // Installed unconditionally so the negative control is real: with the leg
+    // present a `host`-bearing frame routes; with it absent the same frame fails
+    // closed on `CrossHostNotConfigured` rather than being delivered locally.
+    let mut delegation_leg = maos_bin::delegation::DelegationLeg::install(
+        Arc::clone(&mailbox),
+        &maos_domain::invariants::i8::A2AIntent::new(orchestrator::DELEGATION_CONSENT_INTENT),
+    )
+    .await?;
+    eprintln!(
+        "maos: loopback A2A delegation leg installed ({} -> {}, intent {}) (j1-crosshost-1a)",
+        maos_bin::delegation::FROM_HOST,
+        maos_bin::delegation::TO_HOST,
+        orchestrator::DELEGATION_CONSENT_INTENT
+    );
+
     // Story 5.1 — wire the real Spirit Scheduler replacing the v0.1-β
     // `_scheduler = SpiritSchedulerAdapter::default()` placeholder.
     let mut scheduler = Arc::new(maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
@@ -3805,7 +3816,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .get(section)
                 .and_then(|v| toml::to_string(v).ok())
         };
-        if let Some(topology_entries) = topology_manifest_entries(&manifest_root)? {
+        if let Some(topology_entries) =
+            maos_bin::topology::topology_manifest_entries(&manifest_root)?
+        {
             let topology_base = manifest_path
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new("."));
@@ -3814,9 +3827,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // topology members (not scheduler class Spirits). Tracked separately
             // for the drain event.
             let mut loaded_workers: Vec<String> = Vec::new();
+            // j1-crosshost-1a — monotonic sequence within this run. Frame IDs
+            // combine it with the random per-run `boot_nonce`, so a later process
+            // reusing the same Transparency Log cannot collide with sequence 1/2.
+            let mut delegation_seq: u64 = 1;
+            // j1-crosshost-1a AC3.6 — the composition root's OWN Orchestrator, used
+            // only to build the delegation frame. The scheduler-loaded Orchestrator
+            // Spirit is MOVED into `scheduler.load(...)` below and is unreachable
+            // from here, and `on_idle` is inert with zero callers — so nothing in
+            // MAOS drives a dispatch today. This story deliberately does not build
+            // that loop; one composition-root-driven delegation is the v0.8 rung.
+            // The id must equal `delegation::FROM_SPIRIT` because the consent
+            // envelope's granter is compared against `frame.from` at intake.
+            let delegation_emitter =
+                orchestrator::Orchestrator::new(maos_bin::delegation::FROM_SPIRIT);
             for entry in topology_entries {
                 let child_path = {
-                    let p = std::path::PathBuf::from(&entry);
+                    let p = std::path::PathBuf::from(&entry.manifest);
                     if p.is_absolute() {
                         p
                     } else {
@@ -3835,6 +3862,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         child_path.display()
                     )
                 })?;
+                maos_bin::topology::validate_remote_topology_target(&entry, &child_root)?;
                 // T1 — a [cli_wrapper] topology member is a host-authorized
                 // Developer-Worker (NOT a scheduler class Spirit). Admit it
                 // through the SAME host-grant + adapter + bridge path as the
@@ -3850,15 +3878,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         )
                         .into());
                     }
+                    // j1-crosshost-1a AC3.6 — the frame-borne delegation trigger.
+                    // The composition root calls `assign_frame_remote` directly,
+                    // once per `host`-bearing topology entry, at topology-load
+                    // time. THIS STORY DOES NOT BUILD AN ORCHESTRATOR DISPATCH
+                    // LOOP: `on_idle` is inert and nothing drives the Orchestrator
+                    // today, so one composition-root-driven delegation IS the v0.8
+                    // rung. The absence of a loop here is deliberate, not an
+                    // oversight — do not "fix" it by inventing a scheduler hook.
+                    //
+                    // AC3.5 — ordering is decided: emit → route → pump → drain,
+                    // ALL completed before the worker admit below.
+                    // `run_cli_wrapper_manifest` stays synchronous and receives the
+                    // already-drained goal.
+                    let delegated_task = match &entry.host {
+                        None => None,
+                        Some(to_host) => {
+                            let intent = maos_domain::invariants::i8::A2AIntent::new(
+                                orchestrator::DELEGATION_CONSENT_INTENT,
+                            );
+                            let payload = delegation_emitter.build_task_assign(
+                                format!(
+                                    "founder-loop: execute the delegated assignment from {}",
+                                    maos_bin::delegation::FROM_HOST
+                                ),
+                                "the worker reports completion through its adapter's \
+                                 parse_completion oracle",
+                                None,
+                            );
+                            let frame = delegation_emitter.assign_frame_remote(
+                                delegation_seq,
+                                boot_nonce,
+                                maos_bin::delegation::RECIPIENT_SPIRIT,
+                                maos_spirit_abi::identity::SpiritRole::Worker,
+                                payload,
+                                maos_domain::invariants::i13::IntentLineage::new(vec![
+                                    intent.clone()
+                                ]),
+                                to_host,
+                                maos_bin::delegation::FROM_HOST,
+                                intent,
+                            )?;
+                            delegation_emitter.begin_delegation();
+                            let goal = delegation_leg.delegate(&iac, frame).await?;
+                            println!(
+                                "{}",
+                                serde_json::json!({
+                                    "event": "delegation_routed",
+                                    "to_host": to_host,
+                                    "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
+                                    "intent": orchestrator::DELEGATION_CONSENT_INTENT,
+                                    "goal": goal,
+                                })
+                            );
+                            delegation_seq += 1;
+                            Some(goal)
+                        }
+                    };
                     println!(
                         "{}",
                         serde_json::json!({
                             "event": "topology_worker_admit",
                             "manifest": child_path.display().to_string(),
                             "topology": true,
+                            "frame_borne": delegated_task.is_some(),
                         })
                     );
-                    run_cli_wrapper_manifest(
+                    let completion = run_cli_wrapper_manifest(
                         &child_root,
                         &run,
                         Arc::clone(&transparency_log),
@@ -3866,7 +3952,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         spirit_host.clone(),
                         enterprise_runtime.clone(),
                         enterprise_pdp_runtime.as_ref(),
+                        delegated_task.as_deref(),
                     )?;
+                    // AC3.10 — only an oracle-confirmed success becomes the
+                    // EXISTING `TaskComplete` frame. A crash or missing completion
+                    // marker must not close the in-flight delegation or reopen FR20.
+                    if delegated_task.is_some() {
+                        if !completion.is_completed() {
+                            return Err(format!(
+                                "maos run: delegated worker did not complete ({})",
+                                completion.label()
+                            )
+                            .into());
+                        }
+                        let drained = delegation_leg
+                            .journal_completion(&iac, delegation_seq, boot_nonce)
+                            .await?;
+                        delegation_emitter.complete_delegation();
+                        delegation_seq += 1;
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "event": "delegation_completed",
+                                "result": completion.label(),
+                                "orchestrator_frames_drained": drained,
+                                "orchestrator_safe_point": delegation_emitter.is_safe_point(),
+                            })
+                        );
+                    }
                     loaded_workers.push(child_path.display().to_string());
                     continue;
                 }
@@ -4213,6 +4326,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .into(),
                     );
                 }
+                // j1-crosshost-1a AC3.5 — the standalone `[cli_wrapper]` path has
+                // no delegating Orchestrator and no topology `host`, so there is no
+                // frame to drain: `None`, not a default task string.
                 run_cli_wrapper_manifest(
                     &manifest_root,
                     &run,
@@ -4221,6 +4337,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     spirit_host.clone(),
                     enterprise_runtime.clone(),
                     enterprise_pdp_runtime.as_ref(),
+                    None,
                 )?;
                 return Ok(());
             }
@@ -12747,30 +12864,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn story_9_6_parses_topology_manifest_entries() {
-        let root: toml::Value = toml::from_str(
-            r#"
-            [topology]
-            name = "founder-loop"
-
-            [[topology.spirits]]
-            manifest = "spirits/orchestrator/manifest.toml"
-
-            [[topology.spirits]]
-            manifest = "spirits/architect/manifest.toml"
-            "#,
-        )
-        .unwrap();
-        let entries = topology_manifest_entries(&root).unwrap().unwrap();
-        assert_eq!(
-            entries,
-            vec![
-                "spirits/orchestrator/manifest.toml".to_string(),
-                "spirits/architect/manifest.toml".to_string(),
-            ]
-        );
-    }
     #[tokio::test]
     async fn test_live_butler_mcp_port_new() {
         struct MockMcpClientPort;
@@ -12870,78 +12963,13 @@ mod tests {
         assert!(requires_epistemic_halt_port(Some(&policy)));
     }
 
-    // ── Patch 10: topology_manifest_entries parser edge-case tests ──
-
-    #[test]
-    fn story_9_6_topology_empty_spirits_array_is_error() {
-        let root: toml::Value = toml::from_str(
-            r#"
-            [topology]
-            name = "empty"
-            spirits = []
-            "#,
-        )
-        .unwrap();
-        let err = topology_manifest_entries(&root).unwrap_err();
-        assert!(
-            err.contains("no spirits"),
-            "expected 'no spirits' error, got: {err}"
-        );
-    }
-
-    #[test]
-    fn story_9_6_topology_missing_manifest_key_is_error() {
-        let root: toml::Value = toml::from_str(
-            r#"
-            [topology]
-            name = "bad"
-
-            [[topology.spirits]]
-            role = "worker"
-            "#,
-        )
-        .unwrap();
-        let err = topology_manifest_entries(&root).unwrap_err();
-        assert!(
-            err.contains("must declare manifest"),
-            "expected 'must declare manifest' error, got: {err}"
-        );
-    }
-
-    #[test]
-    fn story_9_6_non_topology_manifest_returns_none() {
-        let root: toml::Value = toml::from_str(
-            r#"
-            [class]
-            name = "butler"
-            "#,
-        )
-        .unwrap();
-        assert!(topology_manifest_entries(&root).unwrap().is_none());
-    }
-
-    #[test]
-    fn story_9_6_topology_table_without_spirits_key_is_error() {
-        let root: toml::Value = toml::from_str(
-            r#"
-            [topology]
-            name = "incomplete"
-            "#,
-        )
-        .unwrap();
-        let err = topology_manifest_entries(&root).unwrap_err();
-        assert!(
-            err.contains("must declare [[topology.spirits]]"),
-            "expected spirits-required error, got: {err}"
-        );
-    }
-
     // ── Patch 12: Single-driver guard — compile-time + API-shape test ──
 
     #[test]
     fn story_9_6_single_driver_guard_classify_round_trips() {
-        // Verify every LoadedSpiritKind variant is reachable from classify_spirit
-        // and that the topology parser produces the expected entry count.
+        // Verify every LoadedSpiritKind variant is reachable from classify_spirit.
+        // (The topology-parser entry-count tail moved to
+        // `tests/topology_delegation_1a.rs` with the parser itself.)
         let all_names = [
             "butler",
             "researcher",
@@ -12966,23 +12994,6 @@ mod tests {
         );
         // Unknown class returns None.
         assert!(classify_spirit("unknown").is_none());
-
-        // Verify topology parser count matches for a 2-spirit manifest.
-        let root: toml::Value = toml::from_str(
-            r#"
-            [topology]
-            name = "test"
-
-            [[topology.spirits]]
-            manifest = "a/manifest.toml"
-
-            [[topology.spirits]]
-            manifest = "b/manifest.toml"
-            "#,
-        )
-        .unwrap();
-        let entries = topology_manifest_entries(&root).unwrap().unwrap();
-        assert_eq!(entries.len(), 2);
     }
 
     #[test]

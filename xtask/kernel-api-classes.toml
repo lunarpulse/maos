@@ -268,6 +268,27 @@
 "maos_kernel_core::iac::mailbox::Mailbox::subscribe_telemetry" = "data-movement"
 "maos_kernel_core::iac::mailbox::SpiritMailboxHandle"      = "data-movement"
 
+# ── j1-crosshost-1a AC5.1(b) — the SECOND kernel axis ──
+#
+# `crates/maos-kernel-core/src/iac.rs` is `pub use maos_iac::*;`, so adding a method
+# to `maos_iac::Mailbox` grows `maos-kernel-core`'s PUBLIC API even though
+# `src_lines` does not move (`check-kernel-baseline` stayed green at 24472). The
+# ratified card conflated the two axes; they are different mechanisms.
+#
+# MEASURED, and it corrects the story's premise: NO gate observes this growth.
+# `abi-diff` (`xtask/src/abi_diff.rs`) and `check-abi-ratification` both scope to
+# `crates/maos-spirit-abi/Cargo.toml` ONLY, and `check-service-boundary` walks
+# `maos-kernel-core/src`'s own AST, where line 13 is a `syn::Item::Use` that never
+# expands to `Mailbox::install_a2a_router`. All three were run: none demanded
+# ratification, so there is NO FLAG-Winston trigger — and nothing was re-pinned.
+#
+# This row is therefore DOCUMENTATION of a declared surface, not an enforced
+# classification — exactly like the six rows above it, which name methods this
+# walker has never emitted either. It is recorded so the declaration exists if a
+# future gate widens to follow the re-export, and so the next reader is not misled
+# into believing the axis is currently guarded. Filed as evidence, not as a control.
+"maos_kernel_core::iac::mailbox::Mailbox::install_a2a_router" = "data-movement"
+
 # ── Story 3.1 — IAC frame re-exports ──
 "maos_kernel_core::iac::frame::*"                           = "data-movement"
 

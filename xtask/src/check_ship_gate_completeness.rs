@@ -50,6 +50,10 @@ const EXPECTED_GATES: &[&str] = &[
     // Story 10.4c — J4 §13.1 real in-kernel scalar.tap latency gate (replaces
     // the 10.4b proven-RED placeholder `check-j4-placeholder-red`).
     "check-j4-latency",
+    // j1-crosshost-1a AC4.1 — the J1 loopback delegation gate. Blocking from the day
+    // it lands: its proven-red leg catches a "route locally anyway" regression that
+    // otherwise ships with the founder loop still exiting 0.
+    "check-j1-loopback-delegation",
     // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
     "check-skill-conformance",
     // Story 11.2a (AC5, D10) — cross-region convergent replication gate (ADR-049).

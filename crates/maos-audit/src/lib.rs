@@ -683,6 +683,14 @@ fn kind_to_string(kind: i64) -> String {
         28 => "governance.event",
         29 => "cost.attribution",
         30 => "identity.asserted",
+        // j1-crosshost-1a AC3.11 — `CliSubprocessOutput` was a real
+        // `FrameKind` variant (`maos-spirit-abi::identity::FrameKind = 21`) that
+        // this mapping never listed, so every Worker-output row rendered
+        // `unknown` on read — 159 of the 247 entries in the signed J1 Tier-2
+        // bundle. The frame-borne completion this story journals CITES those rows
+        // as its evidence, and a legible verdict citing illegible evidence is not
+        // evidence. Kept symmetric with `kind_from_string` below.
+        21 => "cli.subprocess.output",
         // J1 Tier-2 — a human-authored signed-run capture attestation, written
         // at the bin/CLI boundary as a raw kind int (like `identity.asserted`
         // above) so it renders here on read WITHOUT a kernel `FrameKind` variant
@@ -712,6 +720,11 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "distillate" | "Distillate" => Some(11),
         "spirit.revoked" | "SpiritRevoked" => Some(17),
         "spirit.admitted" | "SpiritAdmitted" => Some(19),
+        // j1-crosshost-1a AC3.11 — the reverse arm. Every other kind in this table
+        // is symmetric; a one-way mapping would render kind 21 but leave
+        // `maosctl audit query --kind cli.subprocess.output` unable to select it,
+        // which is the same defect in the other direction.
+        "cli.subprocess.output" | "CliSubprocessOutput" => Some(21),
         "consent.rupture" | "ConsentRupture" => Some(22),
         "governance.event" | "GovernanceEvent" => Some(28),
         "cost.attribution" | "CostAttribution" => Some(29),
