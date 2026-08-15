@@ -4275,12 +4275,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     })
                 );
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                // Story J1-DEMO — drain the cap-audit channel deterministically before
+                // exit. `audit_tx` is cloned into `CapabilityRegistryAdapter::new`
+                // (line ~2600), so dropping the local `capability` is not enough:
+                // `memory` retains `capability`, which retains the surviving `audit_tx`.
+                // `memory_any` was moved into `distillate_writer`, so drop that owner
+                // before `memory`; then the writer task sees channel-close and the
+                // queued CapabilityInvocation exit row reaches SQLite before process exit.
+                // Without this, the writer is `tokio::spawn`-ed and the runtime drops
+                // mid-flush on process exit.
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
+                // Story 5.1 — scheduler + orchestrator hold Arc<CapabilityRegistryAdapter>
+                // which holds audit_tx clones; drop them so the channel closes.
                 drop(orchestrator);
                 drop(scheduler);
                 drop(lifecycle_resolver);
+                // The topology composition root retains additional capability owners:
+                // UpgradeOrchestrator -> HotSwapCoordinator/Scheduler, RevocationPoller
+                // -> RevocationApplier, CrashDetector, and IAC -> digest_memory -> memory.
+                // Drop each outer owner before its inner dependency.
+                drop(upgrade_orchestrator);
+                drop(revocation_poller);
+                drop(revocation_applier);
+                drop(hot_swap_coordinator);
+                drop(crash_detector);
+                drop(iac);
+                // `memory_any` was moved into `distillate_writer`; releasing the writer
+                // first releases that erased Arc clone before dropping the concrete memory.
+                drop(distillate_writer);
+                drop(memory);
                 match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
                     .await
                 {
