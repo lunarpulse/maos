@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 
 mod abi_diff;
@@ -109,6 +109,11 @@ mod coverage_matrix_nfr_test_3;
 // one proven-red leg + one recorded boundary; `j1-crosshost-1b` adds the consent
 // refusal legs to a gate that already blocks.
 mod check_j1_loopback_delegation;
+// Story j1-demo-one-command-scene — the one-command J1 founder-loop scene.
+// Orchestration only: it runs the founder loop in an isolated state home, calls
+// the delegation gate as the judge, and narrates the beat ledger (including the
+// beats no story has delivered yet).
+mod demo_j1;
 // Story 13.6 closure follow-on — the one-command Reza scene. Orchestration
 // only: it runs the journey test and the four gates, and narrates them.
 mod demo_reza;
@@ -938,6 +943,27 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Run the J1 founder-loop scene: isolated state home, frame-borne
+    /// delegation, adapter-parsed completion, and the honest beat ledger —
+    /// including the beats that have NOT landed.
+    #[command(name = "demo-j1")]
+    DemoJ1 {
+        /// Take the paid Tier-2 leg: one real codex run, captured and sealed.
+        #[arg(long)]
+        live_codex: bool,
+        /// The operator-authored codex topology that `--live-codex` runs.
+        #[arg(long, value_name = "PATH")]
+        codex_topology: Option<PathBuf>,
+        /// Keep the isolated state home at this path instead of a temp dir.
+        #[arg(long, value_name = "DIR")]
+        keep_home: Option<PathBuf>,
+        /// Reuse the existing `target/debug` binaries instead of building.
+        #[arg(long)]
+        skip_build: bool,
+        /// Narrate the scene without running the Blocking delegation gate.
+        #[arg(long)]
+        skip_gate: bool,
+    },
     /// Run the Reza Cortex scene end to end: substrate, journey, gates, verdict.
     #[command(name = "demo-reza")]
     DemoReza {
@@ -1304,6 +1330,13 @@ fn main() {
         Commands::CheckFkcs { json } => check_fkcs::run(json),
         Commands::CheckTrialAttestation { json } => check_trial_attestation::run(json),
         Commands::CheckEscapeDetector { json } => check_escape_detector::run(json),
+        Commands::DemoJ1 {
+            live_codex,
+            codex_topology,
+            keep_home,
+            skip_build,
+            skip_gate,
+        } => demo_j1::run(live_codex, codex_topology, keep_home, skip_build, skip_gate),
         Commands::DemoReza {
             provision,
             skip_gates,
