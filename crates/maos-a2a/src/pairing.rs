@@ -24,7 +24,7 @@ use std::sync::Arc;
 use maos_a2a_core::config::{A2APeerConfig, A2AProfile, DEFAULT_CONSENT_TTL_SECS};
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::tofu::{InMemoryTofuPinStore, TofuPinStore};
-use maos_a2a_core::{ConsentAllowlists, A2AError};
+use maos_a2a_core::{A2AError, ConsentAllowlists};
 use maos_domain::frame::IacFrame;
 use maos_domain::invariants::i8::A2AIntent;
 
@@ -98,8 +98,13 @@ pub async fn paired_loopback_router(
     for endpoint in endpoints {
         let cfg = endpoint.config();
         cfg.validate()?;
-        tofu.pin_first_contact(&cfg.peer_id, &cfg.cert_fingerprint, &cfg.cert_fingerprint, 1)
-            .await?;
+        tofu.pin_first_contact(
+            &cfg.peer_id,
+            &cfg.cert_fingerprint,
+            &cfg.cert_fingerprint,
+            1,
+        )
+        .await?;
         configs.push(cfg);
     }
     let router = Arc::new(LoopbackA2ARouter::new(configs, tofu));

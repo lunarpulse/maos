@@ -1192,9 +1192,7 @@ fn main() {
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
-        Commands::CheckJ1LoopbackDelegation { json } => {
-            check_j1_loopback_delegation::run(json)
-        }
+        Commands::CheckJ1LoopbackDelegation { json } => check_j1_loopback_delegation::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
         Commands::CheckHostSurface { json } => check_host_surface::run(json),

@@ -64,7 +64,9 @@ fn task_assign_frame(to: &str, host: Option<&str>) -> IacFrame {
         }),
         auto_marker: FrameOrigin::SpiritAuto,
         consent_envelope: None,
-        intent_lineage: IntentLineage::new(vec![A2AIntent::new("development-task:write-workspace")]),
+        intent_lineage: IntentLineage::new(vec![A2AIntent::new(
+            "development-task:write-workspace",
+        )]),
     }
 }
 

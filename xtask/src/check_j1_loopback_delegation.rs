@@ -110,22 +110,39 @@ fn production_before_tests(src: &str) -> &str {
         .map_or(src, |(production, _)| production)
 }
 
+/// Strip comment-only lines, then ALL whitespace, leaving a structural skeleton.
+///
+/// A `Blocking` gate a formatter can flip is a false-alarm machine. This one was:
+/// its needle hard-coded the single-line spelling
+/// `self.a2a_router.get().ok_or_else`, so when `cargo fmt` split that chain onto
+/// separate lines (`mailbox.rs` was unformatted at commit `6827dc87`, and the
+/// blocking `cargo fmt --all -- --check` gate at `discipline.yml:151` demands it
+/// be formatted) the needle stopped matching a fail-closed branch that was still
+/// there. Found 2026-08-14 by story `j1-demo-one-command-scene`, whose scene
+/// calls this gate as its judge. Matching the skeleton makes the oracle depend on
+/// code STRUCTURE, never on layout — `j1-crosshost-1b`'s refusal legs should use
+/// the same normalization.
+fn structural(src: &str) -> String {
+    live_lines(src)
+        .flat_map(str::chars)
+        .filter(|c| !c.is_whitespace())
+        .collect()
+}
+
 /// Match the actual Phase-3 absent-router expression, not an error-name
 /// occurrence elsewhere in the file. In particular, the `#[cfg(test)]` module
 /// contains `CrossHostNotConfigured` assertions that must not keep this gate
 /// green after the production branch is removed.
 fn absent_router_branch_fails_closed(src: &str) -> bool {
-    let Some(branch_start) = src.find("let router = self.a2a_router.get().ok_or_else") else {
+    let flat = structural(src);
+    let Some(branch_start) = flat.find("letrouter=self.a2a_router.get().ok_or_else") else {
         return false;
     };
-    let branch = &src[branch_start..];
+    let branch = &flat[branch_start..];
     let Some(branch_end) = branch.find("})?;") else {
         return false;
     };
-    contains_live(
-        &branch[..branch_end + "})?;".len()],
-        "IacBusError::CrossHostNotConfigured",
-    )
+    branch[..branch_end + "})?;".len()].contains("IacBusError::CrossHostNotConfigured")
 }
 
 /// LEG 1 — the proven-red. Each condition is necessary for the delegation to be

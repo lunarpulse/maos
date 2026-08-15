@@ -518,15 +518,16 @@ impl Mailbox {
             // Per-target error collection: deliver to all reachable peers, return
             // the first error (or Ok if all succeed).
             if !cross_host_targets.is_empty() {
-                let router = self.a2a_router.get().ok_or_else(|| {
-                    IacBusError::CrossHostNotConfigured {
-                        host_id: cross_host_targets
-                            .iter()
-                            .map(|h| h.as_str().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    }
-                })?;
+                let router =
+                    self.a2a_router
+                        .get()
+                        .ok_or_else(|| IacBusError::CrossHostNotConfigured {
+                            host_id: cross_host_targets
+                                .iter()
+                                .map(|h| h.as_str().to_string())
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        })?;
                 let mut first_err: Option<IacBusError> = None;
                 for host_id in &cross_host_targets {
                     if let Err(e) = router.route_outbound(frame.clone(), host_id).await {

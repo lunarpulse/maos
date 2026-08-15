@@ -173,7 +173,9 @@ fn j1_founder_loop_topology_run_once() {
         "the TaskComplete frame must reach the Orchestrator's handle; events:\n{events:?}"
     );
     assert_eq!(
-        completed.get("orchestrator_safe_point").and_then(|v| v.as_bool()),
+        completed
+            .get("orchestrator_safe_point")
+            .and_then(|v| v.as_bool()),
         Some(true),
         "the in-flight delegation must be closed out (FR20 safe point re-opened)"
     );
