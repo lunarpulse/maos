@@ -38,14 +38,29 @@ const A2A_ROUTER_RS: &str = "crates/maos-a2a-core/src/router.rs";
 const WORKER_CLI_RS: &str = "crates/maos-bin/src/worker_cli.rs";
 const BIN_LIB_RS: &str = "crates/maos-bin/src/lib.rs";
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
+/// j1-crosshost-1b reaches into THIS fixture tree twice, and both would fail
+/// SILENTLY if skipped. (1) `crates/maos-bin/tests/consent_refusal_1b.rs` is the
+/// gate's TENTH governed file, and `read()` pushes a Finding when a governed file
+/// is missing — so a tree that does not lay it reds the gate on the tree ITSELF, at
+/// which point every planted vector below "passes" for the wrong reason while CI
+/// reports green. (2) the enrolled `cargo test` set is now DERIVED from
+/// `crates/maos-bin/tests/`, so the tree must lay the targets whose enrollment it
+/// asserts — including `2a`'s two, or `2a`'s own enrollment vectors go vacuous.
+/// `lay_green` exists in THREE files now (`1a`, `2a`, `1b`); all three carry these.
+const CONSENT_REFUSAL_RS: &str = "crates/maos-bin/tests/consent_refusal_1b.rs";
+const WORKER_COMPLETION_TEST: &str = "crates/maos-bin/tests/worker_completion_2a.rs";
+const WORKER_MANIFESTS_TEST: &str = "crates/maos-bin/tests/worker_manifests_2a.rs";
 
 const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
      [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
      [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\n\
      host = \"developer-remote-host\"\n";
 
-const GOOD_DELEGATION: &str =
-    "pub async fn delegate(&mut self) {\n    for addr in routed.to.iter_mut() {\n\
+/// j1-crosshost-1b AC2.2a — the repaired boundary leg reads the COMPOSITION ROOT,
+/// so this fixture must carry the loopback pairing call it keys on.
+const GOOD_DELEGATION: &str = "pub async fn install(mailbox: Arc<Mailbox>, intent: &A2AIntent) {\n\
+     \x20   let (router, rx) = maos_a2a::pairing::paired_loopback_router(&[]).await?;\n}\n\
+     pub async fn delegate(&mut self) {\n    for addr in routed.to.iter_mut() {\n\
      \x20       addr.host_id = None;\n    }\n}\n";
 
 const GOOD_MAILBOX: &str = "fn phase_three() {\n\
@@ -81,8 +96,47 @@ const GOOD_WORKER_CLI: &str = "fn codex_jsonl_oracle(stdout: &[String], exit: Wo
 const GOOD_BIN_LIB: &str = "#[cfg(feature = \"network\")]\npub mod worker_cli;\n";
 
 const GOOD_WORKFLOW: &str = "jobs:\n  check-j1-loopback-delegation:\n    steps:\n\
+     \x20     - run: cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a -- --test-threads=1\n\
      \x20     - run: cargo test -p maos-bin --test worker_completion_2a -- --test-threads=1\n\
-     \x20     - run: cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1\n";
+     \x20     - run: cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1\n\
+     \x20     - run: cargo test -p maos-bin --test consent_refusal_1b -- --test-threads=1\n";
+
+/// The refusal-proof assertion skeletons the `consent-refusal-proofs` leg needles.
+/// Structural (whitespace- and comment-insensitive), so this fixture carries the
+/// SHAPES rather than a copy of the real 480-line test file.
+const GOOD_CONSENT_REFUSAL: &str =
+    "#[tokio::test]\nasync fn allowlisted_delegation_intent_is_admitted() {\n\
+     \x20   assert_eq!(delivered.intent_class, Some(DELEGATION_CONSENT_INTENT.to_string()));\n}\n\
+     #[tokio::test]\nasync fn pin_both_peer_ids() {\n\
+     \x20   assert_eq!(TO_HOST, \"developer-remote-host\");\n\
+     \x20   assert_eq!(FROM_HOST, \"founder-loop-host\");\n}\n\
+     #[tokio::test]\nasync fn minus_32001_at_peer() {\n\
+     \x20   match error {\n\
+     \x20       A2AError::IntentDeniedAtPeer { peer, message } => {\n\
+     \x20           assert_eq!(peer, TO_HOST, \"destination\");\n\
+     \x20           assert!(message.contains(FROM_HOST));\n\
+     \x20       }\n    }\n}\n\
+     #[tokio::test]\nasync fn minus_32009_send_seam() {\n\
+     \x20   match error {\n\
+     \x20       A2AError::ConsentUnclassified { direction: IntentDirection::Send, reason } => {\n\
+     \x20           assert_eq!(reason, expected);\n\
+     \x20       }\n    }\n}\n\
+     #[tokio::test]\nasync fn minus_32009_accept_seam() {\n\
+     \x20   assert_eq!(nack.error.code, CODE_CONSENT_UNCLASSIFIED, \"accept seam\");\n\
+     \x20   let reason = serde_json::from_value::<UnclassifiedReason>(v.clone()).unwrap();\n\
+     \x20   assert_eq!(nack_reason(&nack.error), expected, \"accept seam reason\");\n\
+     \x20   let reachable = [UnclassifiedReason::Absent, UnclassifiedReason::NonCanonical, \
+     UnclassifiedReason::Oversized];\n}\n\
+     #[tokio::test]\nasync fn non_conflation_both_ways() {\n\
+     \x20   assert_ne!(nack.error.code, CODE_CONSENT_UNCLASSIFIED, \"-32001 direction\");\n\
+     \x20   assert_ne!(nack.error.code, CODE_INTENT_DENIED, \"-32009 direction\");\n}\n\
+     #[tokio::test]\nasync fn the_third_code() {\n\
+     \x20   assert_eq!(nack.error.code, CODE_CONSENT_EXPIRED, \"expiry stays distinct\");\n}\n";
+
+/// The derived enrollment set's other two members. Content is irrelevant — the
+/// derivation keys on the FILENAME; what matters is that they exist, so `2a`'s
+/// enrollment vectors still have something to be un-enrolled.
+const GOOD_TEST_STUB: &str = "#[test]\nfn placeholder() {}\n";
 
 fn write_file(root: &Path, rel: &str, content: &str) {
     let path = root.join(rel);
@@ -102,6 +156,27 @@ fn lay_green(root: &Path) {
     write_file(root, WORKER_CLI_RS, GOOD_WORKER_CLI);
     write_file(root, BIN_LIB_RS, GOOD_BIN_LIB);
     write_file(root, WORKFLOW, GOOD_WORKFLOW);
+    // j1-crosshost-1b: the tenth governed file, plus the two other members of the
+    // DERIVED enrollment set. Miss any of them and this tree's own
+    // `baseline_fixture_tree_is_green` reds, which makes every vector below pass
+    // for the wrong reason while CI still reports green.
+    write_file(root, CONSENT_REFUSAL_RS, GOOD_CONSENT_REFUSAL);
+    write_file(root, WORKER_COMPLETION_TEST, GOOD_TEST_STUB);
+    write_file(root, WORKER_MANIFESTS_TEST, GOOD_TEST_STUB);
+    // §A6 review P8 — the derivation walks suffixes `_1a|_1b|_2a`; a tree that
+    // lays no `_1a` target cannot notice `"_1a.rs"` being deleted from
+    // `J1_TEST_SUFFIXES`, and the real gate would silently stop enforcing the
+    // 1a enrollment behind every green vector.
+    write_file(
+        root,
+        "crates/maos-bin/tests/delegation_leg_1a.rs",
+        GOOD_TEST_STUB,
+    );
+    write_file(
+        root,
+        "crates/maos-bin/tests/topology_delegation_1a.rs",
+        GOOD_TEST_STUB,
+    );
 }
 
 struct Verdict {
@@ -320,8 +395,9 @@ fn dotted_consent_intent_is_caught_but_the_pin_test_is_not() {
 // AC4.4 — Vex's boundary leg
 // ═══════════════════════════════════════════════════════════════════
 
-/// The boundary is RECORDED, not failed: on the loopback profile `frame.from.host_id`
-/// is self-asserted, because only `handle_intake_verified` binds wire identity.
+/// The boundary is RECORDED, not failed: the J1 delegation composes
+/// `paired_loopback_router`, whose transport calls `handle_intake` directly, so
+/// `frame.from.host_id` is self-asserted and the frame chooses its own judge.
 #[test]
 fn loopback_from_host_is_recorded_as_unverified_not_as_a_failure() {
     let v = run_gate(|_| {});
@@ -341,17 +417,29 @@ fn loopback_from_host_is_recorded_as_unverified_not_as_a_failure() {
 
 /// When rung 2 turns verification on, the leg must not pass silently — the boundary
 /// moving is the event this leg exists to surface.
+///
+/// Retargeted by j1-crosshost-1b AC2.2a. The old vector deleted
+/// `pub async fn handle_intake_verified` from `router.rs`, which was a mutation of a
+/// needle that could never actually flip: the token was ALSO pinned by
+/// `handle_intake_verified`'s own TLS-mismatch message literal, and rung 2's real
+/// trigger is a change of composition root, not a text change in `router.rs`. Both
+/// doors are now plantable — this one is the shared-intake door; the
+/// composition-root door is `j1_crosshost_1b_proven_red.rs`.
 #[test]
-fn boundary_leg_reds_when_the_wire_identity_boundary_moves() {
+fn boundary_leg_reds_when_the_shared_intake_stops_self_asserting() {
     let v = run_gate(|root| {
         write_file(
             root,
             A2A_ROUTER_RS,
             &GOOD_A2A_ROUTER.replace(
-                "pub async fn handle_intake_verified",
-                "async fn removed_verified",
+                "let peer_host = match &frame.from.host_id {",
+                "let peer_host = self.tls_verified_peer(&conn); if false {",
             ),
         );
     });
-    assert_red(&v, "boundary MOVED", "verified intake entry point removed");
+    assert_red(
+        &v,
+        "boundary MOVED",
+        "shared intake no longer resolves the peer from the frame's own host_id",
+    );
 }

@@ -1817,10 +1817,31 @@ jobs:
         run: cargo test -p xtask --test j1_crosshost_1a_proven_red -- --test-threads=1
       - name: Run j1-crosshost-2a proven-red vectors (AC1.9)
         run: cargo test -p xtask --test j1_crosshost_2a_proven_red -- --test-threads=1
-      - name: Run the frame-borne delegation legs (AC2.4-2.5, AC3.1-3.4)
+      - name: Run j1-crosshost-1b proven-red vectors (AC2.4)
+        run: cargo test -p xtask --test j1_crosshost_1b_proven_red -- --test-threads=1
+      # j1-crosshost-1b AC2.11-2.12 — the demo's beat-ledger assertions live in an
+      # in-`src` `#[cfg(test)]` module (`xtask/src/tests/demo_j1_tests.rs`, reached
+      # via `include!`), and NO job runs `cargo test -p xtask` unscoped: every
+      # invocation names a test or a `--test` target, so those 40-odd assertions were
+      # executed by no CI job at all. Enrolled here rather than left as a suggestion,
+      # because one of them is this story's own control that the refusal beat no
+      # longer renders ABSENT — a claim about whether the narrated artifact tells the
+      # truth about its own work.
+      - name: Run the demo beat-ledger assertions (1b AC2.11-2.12)
+        run: cargo test -p xtask demo_j1 -- --test-threads=1
+      # j1-crosshost-1b AC2.5 — `--test consent_refusal_1b` on the line below IS the
+      # control. The gate is a static oracle: it has never observed a frame being
+      # refused and cannot, it greps source text. The behaviour is proven by THIS
+      # step, a different mechanism in a different file, so this line is the only
+      # thing connecting the linter to the judge. Delete it and the gate still finds
+      # the right words in `consent_refusal_1b.rs` and goes green while the test
+      # never runs. The gate's `completion-vectors-enrolled` leg DERIVES the required
+      # set from `crates/maos-bin/tests/*_{1a,1b,2a}.rs`, so a new J1 test file that
+      # is not named here reds the gate by construction, not by remembering.
+      - name: Run the frame-borne delegation + consent-refusal legs (AC2.4-2.5, AC3.1-3.4; 1b AC1)
         run: |
           cargo test -p maos-iac --test mailbox_a2a_router_installer_1a
-          cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a
+          cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a --test consent_refusal_1b -- --test-threads=1
       # j1-crosshost-2a AC1.8 — the completion-oracle vectors and the worker-manifest
       # reader. Enrolled HERE, on a job that is already BindingClass::Blocking, in
       # `gate-registry.toml`, and a `needs` of the aggregate — rather than in a sixth
@@ -1840,6 +1861,21 @@ jobs:
           cargo build -p worker --bin worker-cli-fixture
           cargo test -p maos-bin --test worker_completion_2a -- --test-threads=1
           cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1
+      # j1-crosshost-1b AC2.6 — close the `smoke_cli_wrapper_8_12` null control. The
+      # Tier-1 claim "CI physically cannot spawn a paid agent" held by env-var
+      # omission, not by an executed assertion: this file had ZERO CI invocation.
+      # Enrolled by EXACT TEST NAME, not by file (the `discipline.yml:2599` idiom):
+      # the file's other test, `maos_run_cli_wrapper_worker_spawns_real_subprocess`,
+      # needs `worker-cli-fixture` on PATH and would red on a fresh runner. This one
+      # needs no secret and no network — it writes its own 2-line /bin/sh fake
+      # `codex` and asserts the REFUSAL path.
+      - name: Run the CI-cannot-spawn-a-paid-agent control (1b AC2.6)
+        # §A6 review P7 — Rust's harness exits 0 when an `--exact` filter
+        # matches ZERO tests, so a renamed test would silently re-kill this
+        # control. The grep guard makes the rename RED instead of dead.
+        run: |
+          grep -q 'fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag' crates/maos-bin/tests/smoke_cli_wrapper_8_12.rs
+          cargo test -p maos-bin --test smoke_cli_wrapper_8_12 ci_local_split_refuses_a_granted_real_agent_without_the_live_flag -- --exact
 
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
   check-kernel-baseline:

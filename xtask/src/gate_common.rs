@@ -102,6 +102,82 @@ pub fn dev_enforced_red_blocks(class: BindingClass, substrate_present: bool) -> 
 }
 
 // ---------------------------------------------------------------------------
+// j1-crosshost-1b AC2.2 — the shared vacuous-green guard.
+//
+// Every gate in this crate aggregates the same way: `oracle_green =
+// findings.is_empty()`. That cannot tell a leg that PASSED from a leg that read
+// nothing and pushed nothing — a leg whose needle file moved, whose derived
+// input set came back empty, or whose body early-returned is indistinguishable
+// from a leg that held. Several `check_*.rs` gates hand-roll their own guard
+// (`check_vetting_attestation.rs:225-235` is the reference implementation);
+// there was no shared home, which is why each one is bespoke.
+//
+// This is deliberately NOT a framework: two types, three methods, one predicate.
+// The fields are private to this module, so a gate cannot mint a check count it
+// did not perform — the same compile-time guarantee `EvidenceVerdict` gives the
+// evidence projection. Migrating the other hand-rolled guards is instrument work
+// (14-6), not a side effect of landing the home.
+// ---------------------------------------------------------------------------
+
+/// One leg's execution record: was the leg body entered, and how many concrete
+/// checks did it actually perform?
+///
+/// `checks` counts *evaluated conditions*, not findings: a leg that ran ten
+/// checks and found nothing wrong is honest, a leg that ran zero is not.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct LegAudit {
+    leg: &'static str,
+    ran: bool,
+    checks: usize,
+}
+
+impl LegAudit {
+    pub fn new(leg: &'static str) -> Self {
+        Self {
+            leg,
+            ran: false,
+            checks: 0,
+        }
+    }
+
+    /// The leg body was entered. Recorded separately from [`Self::checked`] so a
+    /// leg that ran and then early-returned on a missing subject is reported as
+    /// vacuous rather than as absent.
+    pub fn entered(&mut self) {
+        self.ran = true;
+    }
+
+    /// One concrete condition was evaluated.
+    pub fn checked(&mut self) {
+        self.ran = true;
+        self.checks += 1;
+    }
+
+    pub fn leg(&self) -> &'static str {
+        self.leg
+    }
+
+    pub fn checks(&self) -> usize {
+        self.checks
+    }
+
+    /// A leg that did not run, or ran and evaluated nothing, proves nothing.
+    pub fn is_vacuous(&self) -> bool {
+        !self.ran || self.checks == 0
+    }
+}
+
+/// Every leg that reported no executed check. A non-empty result MUST hard-FAIL
+/// the gate: it is the one condition `findings.is_empty()` is blind to.
+pub fn vacuous_legs(audits: &[LegAudit]) -> Vec<&'static str> {
+    audits
+        .iter()
+        .filter(|audit| audit.is_vacuous())
+        .map(LegAudit::leg)
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Story 13.6e — the evidence ledger's ONE projection (AC1).
 //
 // `epic-13:200` requires every journey-relevant leg to emit exactly one

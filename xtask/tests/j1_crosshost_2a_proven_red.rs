@@ -46,14 +46,27 @@ const A2A_ROUTER_RS: &str = "crates/maos-a2a-core/src/router.rs";
 const WORKER_CLI_RS: &str = "crates/maos-bin/src/worker_cli.rs";
 const BIN_LIB_RS: &str = "crates/maos-bin/src/lib.rs";
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
+/// j1-crosshost-1b: `lay_green` exists TWICE (here and in
+/// `j1_crosshost_1a_proven_red.rs`) and a governed file this tree does not lay reds
+/// the gate on the TREE, at which point every vector below passes for the wrong
+/// reason while CI reports green. `1b` added `consent_refusal_1b.rs` as the tenth
+/// governed file AND turned the enrolled `cargo test` set into a derivation over
+/// `crates/maos-bin/tests/` — so the two targets THIS file's enrollment vectors
+/// un-enroll must exist as files, or those vectors go vacuous.
+const CONSENT_REFUSAL_RS: &str = "crates/maos-bin/tests/consent_refusal_1b.rs";
+const WORKER_COMPLETION_TEST: &str = "crates/maos-bin/tests/worker_completion_2a.rs";
+const WORKER_MANIFESTS_TEST: &str = "crates/maos-bin/tests/worker_manifests_2a.rs";
 
 const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
      [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
      [[topology.spirits]]\nmanifest = \"../worker/manifest.toml\"\n\
      host = \"developer-remote-host\"\n";
 
-const GOOD_DELEGATION: &str =
-    "pub async fn delegate(&mut self) {\n    for addr in routed.to.iter_mut() {\n\
+/// j1-crosshost-1b AC2.2a — the repaired boundary leg reads the COMPOSITION ROOT,
+/// so this fixture must carry the loopback pairing call it keys on.
+const GOOD_DELEGATION: &str = "pub async fn install(mailbox: Arc<Mailbox>, intent: &A2AIntent) {\n\
+     \x20   let (router, rx) = maos_a2a::pairing::paired_loopback_router(&[]).await?;\n}\n\
+     pub async fn delegate(&mut self) {\n    for addr in routed.to.iter_mut() {\n\
      \x20       addr.host_id = None;\n    }\n}\n";
 
 const GOOD_MAILBOX: &str = "fn phase_three() {\n\
@@ -91,8 +104,45 @@ const GOOD_BIN_LIB: &str = "#[cfg(feature = \"network\")]\npub mod worker_cli;\n
 /// The enrollment surface. Both `--test` targets must be here or the vectors that
 /// prove the oracle never execute in CI.
 const GOOD_WORKFLOW: &str = "jobs:\n  check-j1-loopback-delegation:\n    steps:\n\
+     \x20     - run: cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a -- --test-threads=1\n\
      \x20     - run: cargo test -p maos-bin --test worker_completion_2a -- --test-threads=1\n\
-     \x20     - run: cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1\n";
+     \x20     - run: cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1\n\
+     \x20     - run: cargo test -p maos-bin --test consent_refusal_1b -- --test-threads=1\n";
+
+/// The refusal-proof assertion skeletons `1b`'s `consent-refusal-proofs` leg
+/// needles. Structural, so this carries the SHAPES, not a copy of the real file.
+const GOOD_CONSENT_REFUSAL: &str =
+    "#[tokio::test]\nasync fn allowlisted_delegation_intent_is_admitted() {\n\
+     \x20   assert_eq!(delivered.intent_class, Some(DELEGATION_CONSENT_INTENT.to_string()));\n}\n\
+     #[tokio::test]\nasync fn pin_both_peer_ids() {\n\
+     \x20   assert_eq!(TO_HOST, \"developer-remote-host\");\n\
+     \x20   assert_eq!(FROM_HOST, \"founder-loop-host\");\n}\n\
+     #[tokio::test]\nasync fn minus_32001_at_peer() {\n\
+     \x20   match error {\n\
+     \x20       A2AError::IntentDeniedAtPeer { peer, message } => {\n\
+     \x20           assert_eq!(peer, TO_HOST, \"destination\");\n\
+     \x20           assert!(message.contains(FROM_HOST));\n\
+     \x20       }\n    }\n}\n\
+     #[tokio::test]\nasync fn minus_32009_send_seam() {\n\
+     \x20   match error {\n\
+     \x20       A2AError::ConsentUnclassified { direction: IntentDirection::Send, reason } => {\n\
+     \x20           assert_eq!(reason, expected);\n\
+     \x20       }\n    }\n}\n\
+     #[tokio::test]\nasync fn minus_32009_accept_seam() {\n\
+     \x20   assert_eq!(nack.error.code, CODE_CONSENT_UNCLASSIFIED, \"accept seam\");\n\
+     \x20   let reason = serde_json::from_value::<UnclassifiedReason>(v.clone()).unwrap();\n\
+     \x20   assert_eq!(nack_reason(&nack.error), expected, \"accept seam reason\");\n\
+     \x20   let reachable = [UnclassifiedReason::Absent, UnclassifiedReason::NonCanonical, \
+     UnclassifiedReason::Oversized];\n}\n\
+     #[tokio::test]\nasync fn non_conflation_both_ways() {\n\
+     \x20   assert_ne!(nack.error.code, CODE_CONSENT_UNCLASSIFIED, \"-32001 direction\");\n\
+     \x20   assert_ne!(nack.error.code, CODE_INTENT_DENIED, \"-32009 direction\");\n}\n\
+     #[tokio::test]\nasync fn the_third_code() {\n\
+     \x20   assert_eq!(nack.error.code, CODE_CONSENT_EXPIRED, \"expiry stays distinct\");\n}\n";
+
+/// The derived enrollment set keys on FILENAMES, so content is irrelevant — what
+/// matters is that the targets this file un-enrolls actually exist.
+const GOOD_TEST_STUB: &str = "#[test]\nfn placeholder() {}\n";
 
 fn write_file(root: &Path, rel: &str, content: &str) {
     let path = root.join(rel);
@@ -114,6 +164,26 @@ fn lay_green(root: &Path) {
     // AC1.9's cost, paid deliberately: without the workflow in the fixture tree the
     // enrollment leg has nothing to read and its vector cannot fire.
     write_file(root, WORKFLOW, GOOD_WORKFLOW);
+    // j1-crosshost-1b: the tenth governed file, plus the two derived enrollment
+    // targets THIS file's vectors un-enroll. Miss any and `baseline_fixture_tree_is_green`
+    // reds, at which point every vector below passes for the wrong reason.
+    write_file(root, CONSENT_REFUSAL_RS, GOOD_CONSENT_REFUSAL);
+    write_file(root, WORKER_COMPLETION_TEST, GOOD_TEST_STUB);
+    write_file(root, WORKER_MANIFESTS_TEST, GOOD_TEST_STUB);
+    // §A6 review P8 — the derivation walks suffixes `_1a|_1b|_2a`; a tree that
+    // lays no `_1a` target cannot notice `"_1a.rs"` being deleted from
+    // `J1_TEST_SUFFIXES`, and the real gate would silently stop enforcing the
+    // 1a enrollment behind every green vector.
+    write_file(
+        root,
+        "crates/maos-bin/tests/delegation_leg_1a.rs",
+        GOOD_TEST_STUB,
+    );
+    write_file(
+        root,
+        "crates/maos-bin/tests/topology_delegation_1a.rs",
+        GOOD_TEST_STUB,
+    );
 }
 
 struct Verdict {
@@ -488,7 +558,9 @@ fn reformatting_the_enrollment_step_does_not_flip_the_leg() {
             "jobs:\n  check-j1-loopback-delegation:\n    steps:\n      - run: |\n\
              \x20         cargo test -p maos-bin \\\n            --test worker_completion_2a \\\n\
              \x20         -- --test-threads=1\n          cargo test -p maos-bin \\\n\
-             \x20         --test worker_manifests_2a -- --test-threads=1\n",
+             \x20         --test worker_manifests_2a -- --test-threads=1\n\
+             \x20         cargo test -p maos-bin \\\n            --test consent_refusal_1b \\\n\
+     \x20         -- --test-threads=1\n          cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a -- --test-threads=1\n",
         );
     });
     assert!(

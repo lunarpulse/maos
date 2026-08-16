@@ -287,6 +287,12 @@ measurement — see AC4.2.)*
    does not bind wire identity the way `handle_intake_verified` does (`router.rs:1478-1479`). When
    rung 2 turns verification on, this leg flips from "documented gap" to "now enforced" and the
    change is **visible in a CI diff** instead of buried in a story nobody re-reads.
+   *(CORRECTED 2026-08-16 by `1b`'s §A6 review, AC2.2a: the leg as shipped here was a NULL CONTROL —
+   both needles were permanent features of `router.rs`, and `handle_intake_verified`'s own TLS-mismatch
+   message literal at `:1514` pinned the token needle green in every possible future. `1b` rebuilt it
+   to key on the composition root (`crates/maos-bin/src/delegation.rs`) with `router.rs`'s
+   production-half resolution expression as a second door; it flips only when the loopback
+   construction is actually replaced. See `j1-crosshost-1b-consent-proofs-and-gate.md` AC2.2a.)*
 5. **This story does not fix the dead-code class.** `#![deny(dead_code)]` on `xtask` plus
    `-D warnings` in CI would red today across ~12 further sites in live gates
    (`check_abi_ratification.rs:22`, `check_pentest_gate.rs:24`, `check_red_team_gate.rs:59`,

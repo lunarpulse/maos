@@ -42,13 +42,50 @@ fn a_fixture_take_never_claims_tier2() {
     assert_eq!(tier2.state.as_str(), "ABSENT");
 }
 
+/// Rung 2 was SPLIT on 2026-08-15 into `2a` (done) / `2b` / `2c`, and there is no
+/// `j1-crosshost-2` sprint-status row any more. An ABSENT beat must name an owner
+/// that exists, or the claim table defers into a document nobody holds.
 #[test]
-fn the_two_host_rung_is_owned_by_crosshost_2() {
+fn the_two_host_rung_is_owned_by_crosshost_2b() {
     let rung = unlanded_beats()
         .into_iter()
         .find(|b| b.name == "two-host-signed-run")
         .expect("declared");
-    assert_eq!(rung.owner, Some("j1-crosshost-2"));
+    assert_eq!(rung.owner, Some("j1-crosshost-2b"));
+}
+
+/// j1-crosshost-1b AC2.11 — the beat this story owns must NOT still render ABSENT.
+/// If the refusal proofs land and the demo keeps declaring them unlanded, the
+/// narrated artifact prints a false claim about its own work.
+#[test]
+fn the_refusal_beat_is_no_longer_declared_unlanded() {
+    assert!(
+        !unlanded_beats()
+            .iter()
+            .any(|b| b.name == "disallowed-intent-refused-blocking"),
+        "j1-crosshost-1b landed the refusal proofs; the beat is emitted from the \
+         gate-judging path now, never declared ABSENT"
+    );
+}
+
+/// §A6 review P5 — the flipped beat must be EMITTED, not merely absent from the
+/// unlanded list. Deleting the `beats.push` in `run_delegation_gate()` left
+/// `the_refusal_beat_is_no_longer_declared_unlanded` green while the beat
+/// vanished from every claim table. (State is deliberately NOT asserted here:
+/// the judge runs against the real tree, which a unit-test CWD cannot promise.)
+#[test]
+fn the_refusal_beat_is_emitted_by_the_gate_judging_path() {
+    let beats = run_delegation_gate();
+    let beat = beats
+        .iter()
+        .find(|b| b.name == "disallowed-intent-refused-blocking")
+        .expect("run_delegation_gate must emit the refusal beat");
+    assert!(beat.executed, "the refusal beat is an executed judgement");
+    assert_eq!(
+        beats.len(),
+        crate::check_j1_loopback_delegation::ledger_leg_names().len() + 1,
+        "one beat per published gate leg, plus the conjunction beat"
+    );
 }
 
 #[test]

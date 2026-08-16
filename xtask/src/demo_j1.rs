@@ -233,14 +233,29 @@ pub fn run(
     });
 
     if skip_gate {
+        // One ABSENT beat per leg, not one for the gate: a claim table that says
+        // "the gate did not run" under a single leg's name is a claim about the
+        // wrong thing.
+        for leg in crate::check_j1_loopback_delegation::ledger_leg_names() {
+            beats.push(Beat::absent(
+                leg,
+                "the wire is judged by a Blocking gate, not by this narration",
+                "--skip-gate was passed",
+            ));
+        }
+        // §A6 review P5 — the conjunction beat LEFT `unlanded_beats()` and is
+        // emitted only by `run_delegation_gate()`, which this branch skips:
+        // omit it here and a `--skip-gate` claim table silently stops claiming
+        // the refusal work exists at all. Honest labeling means ABSENT, not
+        // absent-from-the-table.
         beats.push(Beat::absent(
-            "frame-borne-route-intact",
-            "the wire is judged by a Blocking gate, not by this narration",
+            "disallowed-intent-refused-blocking",
+            "a disallowed intent must be REFUSED (-32001 CODE_INTENT_DENIED, distinct from -32009)",
             "--skip-gate was passed",
         ));
     } else {
         section("Running the judge");
-        beats.push(run_delegation_gate());
+        beats.extend(run_delegation_gate());
     }
 
     beats.extend(unlanded_beats());
@@ -288,10 +303,12 @@ pub fn run(
     section("What this run does NOT claim");
     println!("  rung             v0.8 — loopback rehearsal. `developer-remote` is a peer id on");
     println!("                   THIS host; no packet left the machine. Two real hosts over");
-    println!("                   mTLS/TOFU is j1-crosshost-2 and reads ABSENT above.");
+    println!("                   mTLS/TOFU is j1-crosshost-2b and reads ABSENT above.");
     println!("  peer auth        on loopback `frame.from.host_id` is self-asserted — the frame");
-    println!("                   picks which allowlist judges it. Rung 2 binds it to a");
-    println!("                   TLS-verified identity (1a's recorded boundary leg).");
+    println!("                   picks which allowlist judges it. Rung 2b binds it to a");
+    println!("                   TLS-verified identity; until then the gate's");
+    println!("                   loopback-from-host-unverified leg watches the composition");
+    println!("                   root and flips when a verified transport lands there.");
     println!("  cap mediation    the cli_wrapper token path proceeds under host-grant authority;");
     println!("                   kernel `proc.exec` mediation is an Epic-9 operator-policy");
     println!("                   surface, and a Cedar permit alone cannot green it. The");
@@ -788,37 +805,74 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
     beats
 }
 
-/// Invoke 1a's hermetic gate as the judge of the wire. It reads committed
-/// sources, so it is cheap and needs no substrate.
-fn run_delegation_gate() -> Beat {
-    match crate::check_j1_loopback_delegation::run(false) {
-        Ok(()) => Beat::executed(
-            "frame-borne-route-intact",
-            "the Blocking gate agrees the route is frame-borne",
-            EvidenceState::ProvenBlocking,
-            format!(
-                "{DELEGATION_GATE} exit 0; legs {:?}",
-                crate::check_j1_loopback_delegation::ledger_leg_names()
-            ),
-        ),
-        Err(why) => Beat::executed(
-            "frame-borne-route-intact",
-            "the Blocking gate judges the wire",
-            EvidenceState::Indeterminate,
-            format!("{DELEGATION_GATE} reported findings: {why}"),
-        ),
+/// What each published gate leg MEANS, for the claim table. Hard-matched on the
+/// names `ledger_leg_names()` publishes; a rename falls through to the catch-all,
+/// which is deliberately honest rather than silent.
+fn leg_narration(leg: &str) -> &'static str {
+    match leg {
+        "frame-borne-route-intact" => "the route is frame-borne, not local",
+        "loopback-from-host-unverified" => "the wire-identity boundary is where rung 1 says",
+        "completion-oracle-per-adapter" => "each adapter reads its OWN structured output",
+        "worker-cli-under-library" => "the adapter seam stays nameable by its vectors",
+        "completion-vectors-enrolled" => "every J1 test target is actually invoked by CI",
+        "consent-refusal-proofs" => "-32001 / -32009 / -32003 stay distinct and asserted",
+        _ => "a gate leg this narration has no description for",
     }
+}
+
+/// Invoke the hermetic gate as the judge of the wire and narrate it **one beat per
+/// leg**. It reads committed sources, so it is cheap and needs no substrate.
+///
+/// j1-crosshost-1b AC2.10 — until this story the whole gate collapsed into a single
+/// boolean emitted under the name `frame-borne-route-intact`, so after `2a` grew the
+/// gate to five legs a red *completion-oracle* or *enrollment* leg printed
+/// `FAIL frame-borne-route-intact`: the narrated artifact named the wrong failure.
+/// With `1b`'s consent leg that would have been six legs behind one name.
+///
+/// The trailing `disallowed-intent-refused-blocking` beat is AC2.11's, flipped out
+/// of `unlanded_beats()` in code. It is a CONJUNCTION on purpose: the refusal is
+/// PROVEN-BLOCKING only when the assertions exist (`consent-refusal-proofs`, a
+/// static source oracle) AND CI executes them (`completion-vectors-enrolled`). This
+/// gate has never observed a frame being refused and cannot, so claiming the first
+/// half alone would print something the artifact cannot back.
+fn run_delegation_gate() -> Vec<Beat> {
+    use crate::check_j1_loopback_delegation as gate;
+    let judged = gate::judge(Path::new("."));
+    // A leg with no audit is UNKNOWN, never green — `leg_green` returns `None` and
+    // this maps it to a non-proven state, not to a silent pass.
+    let green = |leg: &str| judged.leg_green(leg).unwrap_or(false);
+    let mut beats: Vec<Beat> = gate::ledger_leg_names()
+        .into_iter()
+        .map(|leg| {
+            let detail = judged
+                .leg_detail(leg)
+                .unwrap_or_else(|| format!("{DELEGATION_GATE} published no audit for `{leg}`"));
+            Beat::executed(leg, leg_narration(leg), state_of(green(leg)), detail)
+        })
+        .collect();
+
+    let written = green("consent-refusal-proofs");
+    let run = green("completion-vectors-enrolled");
+    beats.push(Beat::executed(
+        "disallowed-intent-refused-blocking",
+        "a disallowed intent must be REFUSED (-32001 CODE_INTENT_DENIED, distinct from -32009)",
+        state_of(written && run),
+        format!(
+            "refusal assertions asserted = {written}, enrolled in CI = {run} \
+             (crates/maos-bin/tests/consent_refusal_1b.rs, judged by {DELEGATION_GATE})"
+        ),
+    ));
+    beats
 }
 
 /// The beats no story has delivered yet. Declared so they are visible, owned so
 /// nobody has to guess who closes them.
+///
+/// `disallowed-intent-refused-blocking` LEFT this list in `j1-crosshost-1b`: the
+/// refusal proofs landed, so leaving it here would have made the narrated artifact
+/// state that this work was never done.
 fn unlanded_beats() -> Vec<Beat> {
     vec![
-        Beat::absent(
-            "disallowed-intent-refused-blocking",
-            "a disallowed intent must be REFUSED (-32001 CODE_INTENT_DENIED, distinct from -32009)",
-            "j1-crosshost-1b",
-        ),
         Beat::absent(
             TIER2_BEAT,
             "one real paid agent run (codex OR claude), captured and sealed under a named human signer",
@@ -827,7 +881,7 @@ fn unlanded_beats() -> Vec<Beat> {
         Beat::absent(
             "two-host-signed-run",
             "two real hosts over mTLS/TOFU, heterogeneous worker, one reconciled signed bundle",
-            "j1-crosshost-2",
+            "j1-crosshost-2b",
         ),
         Beat::absent(
             "halt-resume-referential-identity",
