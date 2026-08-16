@@ -1,0 +1,47 @@
+# J1 Founder's Loop — LIVE profile (codex Developer-Worker).
+#
+# Identical to j1-founder-loop.toml EXCEPT the worker points at the codex
+# manifest (manifest-codex.toml) instead of the hermetic fixture. The fixture
+# topology stays the CI/hermetic baseline; this is the T6 signed-run topology.
+# Run it LOCALLY with MAOS_LIVE_AGENT=1 + MAOS_HOST_GRANTS + CODEX_API_KEY.
+#
+# PORTED VERBATIM from 60d4080a (branch maos-j1-live, "Save J1 live worktree
+# files") with `git show`, then repaired — NOT re-authored. The argv_prefix in
+# manifest-codex.toml is TOCTOU-hashed and the Ed25519-signed T6 capture attests
+# its exact bytes, so hand-transcribing it would silently desynchronize the
+# committed manifest from the signed bundle.
+#
+# Two repairs, both required for this file to run at all under j1-crosshost-1a:
+#  1. The four `priority_weight` keys are STRIPPED. The parser never read them —
+#     ordering has always been file order — and 1a's strict parser now REJECTS
+#     unknown keys, so a verbatim commit would red
+#     `crosshost_1a_every_shipped_topology_parses_under_strict_keys`, which
+#     iterates this whole directory in a blocking CI job.
+#  2. `host` is ADDED to the worker entry. Without it `delegated_task` is `None`,
+#     the frame-borne emit is skipped, `task_args` is empty and the completion
+#     enforcement is bypassed entirely — codex would be spawned with no task.
+
+[topology]
+name = "j1-founder-loop-codex"
+
+[[topology.spirits]]
+manifest = "../orchestrator/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../architect/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../reviewer/manifest.toml"
+
+# The host-authorized codex Developer-Worker. Admitted through the host-managed
+# grant (MAOS_HOST_GRANTS: attested_image="codex", signing_key_id="OpenAI") +
+# CodexCli adapter + live bridge; runs the delegated task, journaling its output
+# to the Transparency Log.
+#
+# The task is FRAME-BORNE: `host` makes the composition root emit a real
+# `task.assign` over the loopback A2A layer and hand the drained payload goal to
+# the worker. `MAOS_WORKER_TASK` was DELETED by j1-crosshost-1a — the reference
+# to it in the ported comment above was stale at birth.
+[[topology.spirits]]
+manifest = "../worker/manifest-codex.toml"
+host = "developer-remote-host"

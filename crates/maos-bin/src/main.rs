@@ -40,9 +40,11 @@ mod escape_detector_consumer;
 mod migration_plan;
 // J1 Tier-2 bridge (T2) — the swappable Worker-CLI adapter (codex/claude/fixture
 // share one trait). Composition-root only; runtime.rs stays CLI-agnostic (ZERO
-// kernel-Δ). Declared here, NOT in api.rs (not a kernel-core adapter).
+// kernel-Δ). Declared in `lib.rs`, NOT in api.rs (not a kernel-core adapter) and
+// NOT `mod` here: j1-crosshost-2a AC1.1 moved it under the library so
+// `crates/maos-bin/tests/worker_completion_2a.rs` can execute the oracle.
 #[cfg(feature = "network")]
-mod worker_cli;
+use maos_bin::worker_cli;
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -823,6 +825,20 @@ fn parse_host_grants_toml(text: &str) -> Result<Vec<maos_domain::host_grant::Hos
 /// agent-CLI grants (codex/claude + egress) via a `MAOS_HOST_GRANTS` TOML file.
 /// A manifest whose (image, author) matches no grant fails CLOSED at
 /// `resolve_cli_wrapper_tier` — never self-granted.
+///
+/// **Disposition of the unreadable/unparseable branch, stated rather than
+/// inherited (j1-crosshost-2a AC2.4).** A `MAOS_HOST_GRANTS` file that cannot be
+/// read or parsed does NOT abort the run: it warns and continues with the
+/// built-in grants only. That is SAFE today — the built-in set grants the
+/// hermetic fixture and nothing else, so every real agent CLI then fails closed
+/// at `resolve_cli_wrapper_tier` and no unauthorized image can spawn. It is
+/// nevertheless a SILENT DOWNGRADE OF AN OPERATOR-INTENT FILE: the operator
+/// asked for a specific grant set and got a different one, and the only signal
+/// is a line on stderr. It stays a warning because tightening it to a hard
+/// refusal changes the failure mode of every hermetic run that happens to have a
+/// stale variable exported, which is a separate decision from this story's. The
+/// safety argument above is the reason it is tolerable, not an argument that it
+/// is correct.
 #[cfg(feature = "network")]
 fn load_host_grant_allowlist() -> maos_domain::host_grant::StaticHostGrantAllowlist {
     let mut grants = vec![builtin_fixture_grant()];
@@ -1043,22 +1059,46 @@ fn run_cli_wrapper_manifest(
     worker_cli::live_agent_gate(worker_cli.name(), live_agent)
         .map_err(|e| format!("maos run: {e}"))?;
     // T5 — clean-home invariant on the live path: refuse an ambient auth file
-    // (codex's ~/.codex/auth.json) that would shadow the injected API key with a
-    // token MAOS never holds (redaction unattestable). The child inherits HOME
-    // (the bridge does not clear the env), so this is a real footgun.
+    // (codex's `~/.codex/auth.json`, claude's `~/.claude/.credentials.json`) that
+    // would let the child use a credential MAOS never holds. `HOME` is read here,
+    // not `MAOS_HOME` or `XDG_DATA_HOME`: the child inherits the real `HOME`
+    // because the bridge does not clear the env, so this is the variable that
+    // decides which credential file the CLI actually finds.
+    //
+    // j1-crosshost-2a AC2.4 — an UNSET `HOME` used to skip the check entirely,
+    // which is a fail-OPEN: the CLI's own home resolution does not necessarily
+    // give up when the variable is missing, so "we could not look" was silently
+    // treated as "there is nothing there". On the live path an unverifiable
+    // clean-home invariant is a REFUSAL. The hermetic path is untouched — this
+    // whole block is `live_agent`-gated and CI never sets that flag.
     if live_agent {
-        if let Some(home) = std::env::var_os("HOME") {
-            if let Err(p) =
-                worker_cli::refuse_ambient_auth(worker_cli.as_ref(), std::path::Path::new(&home))
-            {
-                return Err(format!(
-                    "maos run: ambient auth file {} present in the sandbox home — refusing the \
-                     live run. It shadows the injected API key with a token MAOS never holds, so \
-                     redaction is unattestable (a failed Tier-2). Wipe it or use a clean sandbox home.",
-                    p.display()
-                )
-                .into());
+        // Review 2a-P7 — EMPTY is as unverifiable as UNSET: an empty `HOME`
+        // yields RELATIVE `.codex/auth.json` paths that scan the daemon's cwd
+        // while the child may apply its own empty-HOME fallback, so the
+        // invariant would read "satisfied" while proving nothing.
+        let home = match std::env::var_os("HOME") {
+            Some(h) if !h.is_empty() => h,
+            _ => {
+                return Err(
+                    "maos run: HOME is unset or empty on the live path, so the clean-home \
+                            invariant cannot be checked — refusing. An unverifiable credential \
+                            control is not a satisfied one: set HOME to the run's sandbox home."
+                        .into(),
+                );
             }
+        };
+        if let Err(p) =
+            worker_cli::refuse_ambient_auth(worker_cli.as_ref(), std::path::Path::new(&home))
+        {
+            return Err(format!(
+                "maos run: ambient auth file {} present in the sandbox home — refusing the \
+                 live run. It lets the worker use a credential MAOS never holds, so redaction \
+                 is unattestable (a failed Tier-2). Wipe it or use a clean sandbox home. Note \
+                 this is a FILENAME control: renaming the file satisfies it without removing \
+                 the credential, and the inherited environment channel is not covered at all.",
+                p.display()
+            )
+            .into());
         }
     }
     // j1-crosshost-1a AC1.6 / AC3.5 — the task is FRAME-BORNE. It arrives as a
@@ -1129,6 +1169,23 @@ fn run_cli_wrapper_manifest(
     // before the kernel's frozen `CapabilityToken` is minted. Enterprise SSO
     // verifies `MAOS_SSO_ASSERTION`; Enterprise PDP receives the verified
     // principal attributes; only then does the kernel issue the token.
+    // AC1.3 — the adapter's completion oracle depends on argv flags the adapter
+    // itself cannot see: flags live only in the manifest and are hashed into the
+    // cap-token. Refuse HERE, where `config.argv_prefix` is in scope and before
+    // the hash is bound and the child is spawned, so a manifest that ships prose
+    // to a JSON oracle fails loud instead of journaling a real success as a
+    // non-completion (F4's inversion). For claude this also enforces `--bare`,
+    // which is a REPRODUCIBILITY precondition, not only credential hygiene (F21).
+    worker_cli::refuse_missing_argv_flags(worker_cli.as_ref(), &config.argv_prefix)
+        .map_err(|e| format!("maos run: {e}"))?;
+    // Review 2a-P2 — a bypass or repeated isolation flag makes the HASHED
+    // posture a lie the sealed capture would then repeat: adapters re-parse
+    // repeated flags last-wins, so the run can execute without the jail the
+    // manifest declares, and claude's bypass modes also suppress the
+    // `permission_denials` signal the oracle's verdict rests on. Same seam,
+    // still before the hash is bound and the child spawned.
+    worker_cli::refuse_unsafe_argv(worker_cli.as_ref(), &config.argv_prefix)
+        .map_err(|e| format!("maos run: {e}"))?;
     let aph = argv_prefix_hash(&config.argv_prefix);
     let token_id = match issue_enterprise_governed_capability(
         capability.as_ref(),
@@ -1233,7 +1290,18 @@ fn run_cli_wrapper_manifest(
     };
     let mut wc_stdout: Vec<String> = Vec::new();
     let mut wc_stderr: Vec<String> = Vec::new();
-    let mut completion_tl_ref: Option<[u8; 16]> = None;
+    // j1-crosshost-2a AC1.6 — NAMED for what it is. This is the last stdout
+    // `CliSubprocessOutput` frame_id, assigned on EVERY stdout row and causally
+    // unrelated to the oracle's verdict (which is computed below, at `:1281`).
+    // The old name `completion_tl_ref` implied the oracle produced it, so the
+    // demo's P4 beat conjoined two unrelated facts and the `tl_ref` half was a
+    // null control that was true whenever the worker printed anything at all.
+    //
+    // It stays UNCONDITIONAL on purpose: the run you most need a citable TL
+    // reference for is the one that FAILED. Gating emission on `Completed` would
+    // delete the evidence pointer at exactly the moment someone asks what the
+    // worker actually printed.
+    let mut last_stdout_tl_ref: Option<[u8; 16]> = None;
     match transparency_log.query_frames(FrameFilter {
         kind: Some(FrameKind::CliSubprocessOutput),
         since_ns: Some(worker_run_since_ns),
@@ -1255,7 +1323,7 @@ fn run_cli_wrapper_manifest(
                     .to_string();
                 match v.get("stream").and_then(|s| s.as_str()) {
                     Some("stdout") => {
-                        completion_tl_ref = Some(row.frame_id);
+                        last_stdout_tl_ref = Some(row.frame_id);
                         wc_stdout.push(line);
                     }
                     Some("stderr") => wc_stderr.push(line),
@@ -1277,8 +1345,9 @@ fn run_cli_wrapper_manifest(
             "completed": completion.is_completed(),
             // Non-secret: the last stdout CliSubprocessOutput frame_id (hex) — the
             // Worker-produced TL reference a digest cites. `null` if none captured.
-            "completion_tl_ref":
-                completion_tl_ref.map(|id| id.iter().map(|b| format!("{b:02x}")).collect::<String>()),
+            // NOT a completion witness: see the declaration above.
+            "last_stdout_tl_ref":
+                last_stdout_tl_ref.map(|id| id.iter().map(|b| format!("{b:02x}")).collect::<String>()),
         })
     );
 
@@ -3954,17 +4023,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         enterprise_pdp_runtime.as_ref(),
                         delegated_task.as_deref(),
                     )?;
-                    // AC3.10 — only an oracle-confirmed success becomes the
-                    // EXISTING `TaskComplete` frame. A crash or missing completion
-                    // marker must not close the in-flight delegation or reopen FR20.
+                    // AC3.10 + review 2a-P4 — the verdict is enforced for EVERY
+                    // topology `[cli_wrapper]` entry, not only the delegated
+                    // ones: an entry without `host` gets `delegated_task =
+                    // None`, and gating on `is_some()` here was the SAME
+                    // false-success surface AC1.5 closed for the standalone
+                    // path, one branch over. Only an oracle-confirmed success
+                    // becomes the EXISTING `TaskComplete` frame; a crash or
+                    // missing completion marker must not close an in-flight
+                    // delegation (FR20) — and must fail the run.
+                    if !completion.is_completed() {
+                        return Err(format!(
+                            "maos run: topology cli_wrapper worker did not complete ({})",
+                            completion.label()
+                        )
+                        .into());
+                    }
                     if delegated_task.is_some() {
-                        if !completion.is_completed() {
-                            return Err(format!(
-                                "maos run: delegated worker did not complete ({})",
-                                completion.label()
-                            )
-                            .into());
-                        }
                         let drained = delegation_leg
                             .journal_completion(&iac, delegation_seq, boot_nonce)
                             .await?;
@@ -4354,7 +4429,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // j1-crosshost-1a AC3.5 — the standalone `[cli_wrapper]` path has
                 // no delegating Orchestrator and no topology `host`, so there is no
                 // frame to drain: `None`, not a default task string.
-                run_cli_wrapper_manifest(
+                let completion = run_cli_wrapper_manifest(
                     &manifest_root,
                     &run,
                     Arc::clone(&transparency_log),
@@ -4364,6 +4439,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     enterprise_pdp_runtime.as_ref(),
                     None,
                 )?;
+                // j1-crosshost-2a AC1.5 — the SECOND false-success surface. This
+                // path used to DISCARD the returned `WorkerCompletion` and
+                // `return Ok(())`, so `maos run <manifest> --once` exited 0 when the
+                // oracle said `completed: false`. The absent *task* (the `None`
+                // above) and the dropped *verdict* are different things, and only
+                // the first one was deliberate.
+                //
+                // Why it is CLOSED rather than documented as tolerable: the signed
+                // run's own runbook sends the operator down this path first, to
+                // sanity-check that the worker actually WRITES. A standalone path
+                // that exits 0 on a refusal is the pre-flight check certifying the
+                // exact defect this story exists to catch.
+                if !completion.is_completed() {
+                    return Err(format!(
+                        "maos run: standalone cli_wrapper worker did not complete ({})",
+                        completion.label()
+                    )
+                    .into());
+                }
                 return Ok(());
             }
 

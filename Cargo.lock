@@ -6523,6 +6523,7 @@ dependencies = [
  "clap",
  "hex",
  "maos-audit",
+ "maos-bin",
  "maos-domain",
  "maos-eval",
  "maos-fkcs",

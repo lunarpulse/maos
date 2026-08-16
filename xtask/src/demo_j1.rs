@@ -62,6 +62,14 @@ const REPORTS_DIR: &str = "tests/reports";
 const EGRESS_POSTURE: &str = "declared-not-enforced";
 const EGRESS_FOLLOWUP: &str = "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT";
 
+/// FS-jail posture the run declares (j1-crosshost-2a AC4.1/4.2), mirroring the
+/// egress precedent: a stated posture a capture cannot overclaim, plus a named
+/// follow-up so the residual has an owner. The claim, in three checkable clauses:
+/// the FS jail is the ADAPTER's, DECLARED by MAOS in a hashed manifest, ENFORCED
+/// by the adapter, not by MAOS. `CaptureDoc::validate` refuses any other value.
+const FS_JAIL_POSTURE: &str = "adapter-enforced-maos-declared";
+const FS_JAIL_FOLLOWUP: &str = "FOLLOWUP-EPIC14-MAOS-ENFORCED-WORKER-ISOLATION";
+
 /// One narrated beat of the journey.
 ///
 /// `executed` separates "this run exercised it and it held" from "declared so you
@@ -289,6 +297,11 @@ pub fn run(
     println!("                   surface, and a Cedar permit alone cannot green it. The");
     println!("                   CapabilityInvocation exit row IS journaled either way.");
     println!("  egress           {EGRESS_POSTURE} ({EGRESS_FOLLOWUP}).");
+    println!("  fs jail          {FS_JAIL_POSTURE} — the jail is the ADAPTER's, DECLARED by");
+    println!("                   MAOS in a hashed argv_prefix and ENFORCED by the adapter, not");
+    println!("                   by MAOS: the spawn has no namespace, no rlimit, no process");
+    println!("                   group, and the adapter is chosen by BASENAME with no realpath,");
+    println!("                   hash or signature check ({FS_JAIL_FOLLOWUP}).");
     println!("  halt/resume      safe shutdown with no in-flight delegation is proven; the");
     println!("                   post-resume digest citing the exact pre-halt ref is NOT —");
     println!("                   FOLLOWUP-J1-RESUME-SEAM.");
@@ -356,10 +369,17 @@ const TIER2_BEAT: &str = "tier2-live-agent-signed";
 /// arrive three times. Fewer means a Spirit never went idle.
 const EXPECTED_IDLE_FIRES: usize = 3;
 
-/// `worker_cli.name()` for the paid Codex adapter (`maos-bin/src/worker_cli.rs`
-/// `SUPPORTED_WORKER_CLIS` = fixture | codex | claude). A Tier-2 take signed off
-/// a fixture identity would be the overclaim this leg exists to prevent.
-const CODEX_WORKER_CLI: &str = "codex";
+/// The `worker_cli.name()` values a Tier-2 take may sign for — an ALLOWLIST, not
+/// a single provider (`maos-bin/src/worker_cli.rs` `SUPPORTED_WORKER_CLIS` =
+/// fixture | codex | claude).
+///
+/// j1-crosshost-2a AC3.4 — this WIDENED from the literal `"codex"`; it was NOT
+/// deleted, and it must never be. The topology is OPERATOR-authored, so nothing
+/// else stops the hermetic fixture from reaching the signing path and earning a
+/// Tier-2 label. The check is an anti-overclaim control, not a hardcode: adding
+/// `claude` is a widening; removing the check is a regression to
+/// "worker-cli-fixture earns PROVEN_LIVE_SIGNED".
+const SIGNABLE_WORKER_CLIS: &[&str] = &["codex", "claude"];
 
 /// Resolved binaries the scene drives.
 struct Bins {
@@ -614,17 +634,27 @@ fn evaluate_beats(obs: &SceneObservation) -> Vec<Beat> {
     let completed = completion
         .and_then(|e| e["completed"].as_bool())
         .unwrap_or(false);
+    // j1-crosshost-2a AC1.6 — `last_stdout_tl_ref` (renamed from
+    // `completion_tl_ref`) is assigned on EVERY stdout row, independently of the
+    // oracle. This beat used to score `completed && !tl_ref.is_empty()`, which
+    // conjoined two causally unrelated facts and made the tl_ref half a NULL
+    // CONTROL: it was true whenever the worker printed anything at all. The beat
+    // now asserts the oracle's verdict alone; the TL ref is reported as the
+    // evidence pointer it is, and is deliberately still emitted on a FAILED run.
     let tl_ref = completion
-        .and_then(|e| e["completion_tl_ref"].as_str())
+        .and_then(|e| e["last_stdout_tl_ref"].as_str())
         .unwrap_or_default();
     let label = completion
         .and_then(|e| e["completion"].as_str())
         .unwrap_or("none");
     beats.push(Beat::executed(
         "worker-completed-by-adapter-oracle",
-        "completion came from the adapter's parse_completion, never from an exit code",
-        state_of(completed && !tl_ref.is_empty()),
-        format!("completion `{label}`, worker TL ref {}", short_ref(tl_ref)),
+        "completion came from the adapter's structured-output oracle, never from an exit code",
+        state_of(completed),
+        format!(
+            "completion `{label}`; last worker stdout TL ref {} (evidence pointer, not the verdict)",
+            short_ref(tl_ref)
+        ),
     ));
 
     // P5 — the delegation closed cleanly.
@@ -791,8 +821,8 @@ fn unlanded_beats() -> Vec<Beat> {
         ),
         Beat::absent(
             TIER2_BEAT,
-            "one real paid agent run, captured and sealed under a named human signer",
-            "--live-codex (operator-local, never CI)",
+            "one real paid agent run (codex OR claude), captured and sealed under a named human signer",
+            "--live-codex (operator-local, never CI; the adapter comes from the topology, not the flag name)",
         ),
         Beat::absent(
             "two-host-signed-run",
@@ -871,6 +901,134 @@ fn apply_published_ledgers(beats: &mut [Beat]) {
     }
 }
 
+/// The worker adapter + manifest a topology will ACTUALLY drive, resolved by
+/// reading the topology the operator supplied.
+///
+/// j1-crosshost-2a AC2.6/AC3.5 — the Tier-2 leg used to hardcode codex's clean-home
+/// path and codex's credential variable, and it wrote a literal
+/// `"maos run <codex topology> …"` into the SIGNED capture's `command_metadata`.
+/// Once the identity allowlist widened, that literal would have made a claude run
+/// sign a bundle asserting it was codex — the same defect class this story exists
+/// to fix, one layer deeper. Everything provider-specific is now ASKED OF THE
+/// ADAPTER, and the manifest it came from is carried into the capture.
+struct TopologyWorker {
+    cli: Box<dyn maos_bin::worker_cli::WorkerCli>,
+    manifest: PathBuf,
+    argv_prefix: Vec<String>,
+}
+
+fn resolve_topology_worker(topology: &Path) -> Result<TopologyWorker, String> {
+    let text = std::fs::read_to_string(topology)
+        .map_err(|e| format!("cannot read the topology {}: {e}", topology.display()))?;
+    let root: toml::Value = toml::from_str(&text)
+        .map_err(|e| format!("topology {} is not valid TOML: {e}", topology.display()))?;
+    let base = topology.parent().unwrap_or(Path::new("."));
+    let spirits = root
+        .get("topology")
+        .and_then(|t| t.get("spirits"))
+        .and_then(|s| s.as_array())
+        .ok_or_else(|| {
+            format!(
+                "topology {} declares no [[topology.spirits]]",
+                topology.display()
+            )
+        })?;
+    // Review 2a-P5 — production runs EVERY `[cli_wrapper]` member, but this
+    // preflight and the post-run scan attest exactly ONE worker. Rather than
+    // seal a capture that describes worker #1 while workers #2..N run with
+    // their credential variable unscanned and their isolation unasserted, a
+    // multi-worker topology is REFUSED outright: the signing machinery attests
+    // one worker by construction.
+    let mut found: Vec<TopologyWorker> = Vec::new();
+    for entry in spirits {
+        let Some(rel) = entry
+            .get("manifest")
+            .or_else(|| entry.get("path"))
+            .and_then(|m| m.as_str())
+        else {
+            continue;
+        };
+        let p = {
+            let raw = PathBuf::from(rel);
+            if raw.is_absolute() {
+                raw
+            } else {
+                base.join(raw)
+            }
+        };
+        let Ok(child) = std::fs::read_to_string(&p) else {
+            continue;
+        };
+        let Ok(child_root) = toml::from_str::<toml::Value>(&child) else {
+            continue;
+        };
+        let Some(cw) = child_root.get("cli_wrapper") else {
+            continue;
+        };
+        let command = cw
+            .get("command")
+            .and_then(|c| c.as_str())
+            .ok_or_else(|| format!("{} has no [cli_wrapper] command", p.display()))?;
+        let cli = maos_bin::worker_cli::select_worker_cli(command).ok_or_else(|| {
+            format!(
+                "{} names worker CLI '{command}', which no adapter supports (supported: {:?})",
+                p.display(),
+                maos_bin::worker_cli::SUPPORTED_WORKER_CLIS
+            )
+        })?;
+        let argv_prefix = cw
+            .get("argv_prefix")
+            .and_then(|a| a.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        found.push(TopologyWorker {
+            cli,
+            manifest: p,
+            argv_prefix,
+        });
+    }
+    if found.len() > 1 {
+        let names: Vec<&str> = found.iter().map(|w| w.cli.name()).collect();
+        return Err(format!(
+            "topology {} declares {} [cli_wrapper] members ({names:?}) — the Tier-2 \
+             signing machinery verifies and attests exactly ONE worker, so a multi-worker \
+             topology would be signed with worker #1's credential scan and isolation posture \
+             while the others run unverified. Split the topology.",
+            topology.display(),
+            found.len()
+        ));
+    }
+    found.into_iter().next().ok_or_else(|| {
+        format!(
+            "topology {} has no [cli_wrapper] member — there is no worker to sign for",
+            topology.display()
+        )
+    })
+}
+
+/// AC3.5 — `command_metadata` is DERIVED (never a hardcoded literal) from the
+/// adapter and manifest actually used, and says INHERITED, never "injected
+/// host-side": MAOS holds no credential and injects nothing (F22).
+fn derive_command_metadata(
+    manifest: &Path,
+    topology: &Path,
+    identity: &str,
+    argv_prefix: &[String],
+    secret_var: &str,
+) -> String {
+    format!(
+        "maos run {} --live --once (topology {}); worker adapter `{identity}` with \
+         argv_prefix {argv_prefix:?}; {secret_var} inherited from the operator's environment — \
+         MAOS neither injects nor holds it (value redacted, scanned)",
+        manifest.display(),
+        topology.display()
+    )
+}
+
 /// The Tier-2 leg: one real paid agent run, captured, journaled, sealed, verified.
 ///
 /// Every precondition is checked BEFORE anything is spawned, and each failure is
@@ -901,23 +1059,85 @@ fn live_codex_take(
         ));
     }
 
-    // Clean-home invariant: an ambient subscription token cannot be attested, so
-    // it must never enter a signed run's sandbox.
-    if let Some(base) = std::env::var_os("HOME").map(PathBuf::from) {
-        if base.join(".codex/auth.json").exists() {
-            return Err(
-                "~/.codex/auth.json exists — a signed run must use the metered \
-                        API-key path. Remove it and retry (runbook Phase 1.3)"
-                    .to_string(),
-            );
-        }
+    // Resolve WHICH adapter this topology drives before anything else — every
+    // provider-specific precondition below is derived from it.
+    let worker = resolve_topology_worker(&topology)?;
+    // AC3.4 — refuse an unsignable adapter BEFORE the money is spent, not only
+    // after. The post-run identity check below still stands: this one refuses the
+    // declared intent, that one refuses what actually ran.
+    if !SIGNABLE_WORKER_CLIS.contains(&worker.cli.name()) {
+        return Err(format!(
+            "topology worker {} names adapter `{}`, which may never earn {TIER2_BEAT} \
+             (signable: {SIGNABLE_WORKER_CLIS:?}) — a fixture or unknown CLI must not reach the \
+             signing path",
+            worker.manifest.display(),
+            worker.cli.name()
+        ));
     }
-    if std::env::var_os("CODEX_API_KEY").is_none() {
-        return Err(
-            "CODEX_API_KEY unset — `codex exec` IGNORES OPENAI_API_KEY for auth \
-                    (401 Missing bearer). Set CODEX_API_KEY=\"$OPENAI_API_KEY\""
-                .to_string(),
-        );
+    // Clean-home invariant, ASKED OF THE ADAPTER (AC2.6). Hardcoding
+    // `~/.codex/auth.json` here made the demo's own preflight blind to claude for
+    // exactly the reason the production path was. EMPTY is as unverifiable as
+    // UNSET (review 2a-P7): an empty HOME makes the credential paths RELATIVE
+    // while the child may apply its own fallback.
+    let home_base = std::env::var_os("HOME")
+        .filter(|h| !h.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            "HOME is unset or empty, so the clean-home invariant cannot be checked — \
+             refusing. An unverifiable credential control is not a satisfied one."
+                .to_string()
+        })?;
+    if let Err(p) = maos_bin::worker_cli::refuse_ambient_auth(worker.cli.as_ref(), &home_base) {
+        return Err(format!(
+            "{} exists — a signed run must use the metered API-key path. Remove it and retry \
+             (runbook Phase 1.3). Note this is a FILENAME control: renaming the file satisfies \
+             it without removing the credential.",
+            p.display()
+        ));
+    }
+    // AC1.3 — the adapter's oracle depends on argv flags. `maos run` refuses a
+    // manifest that omits them, but that refusal would land AFTER this leg has
+    // already announced it is about to spend money; refuse here too.
+    maos_bin::worker_cli::refuse_missing_argv_flags(worker.cli.as_ref(), &worker.argv_prefix)
+        .map_err(|e| format!("{} is not signable: {e}", worker.manifest.display()))?;
+    // Review 2a-P2/P3 — same two argv gates the composition root enforces, run
+    // here too so a bypassing or isolation-less topology is refused BEFORE the
+    // money is spent, and so the `fs_jail: adapter-enforced-maos-declared`
+    // claim below is never sealed over an argv that did not declare the jail.
+    maos_bin::worker_cli::refuse_unsafe_argv(worker.cli.as_ref(), &worker.argv_prefix)
+        .map_err(|e| format!("{} is not signable: {e}", worker.manifest.display()))?;
+    worker
+        .cli
+        .refuse_missing_isolation(&worker.argv_prefix)
+        .map_err(|e| {
+            format!(
+                "{} cannot earn an fs_jail claim: {e}",
+                worker.manifest.display()
+            )
+        })?;
+    // AC2.5(a) — the credential variable is the ADAPTER's, not codex's. Scanning
+    // for `CODEX_API_KEY` on a claude run is a silent no-op.
+    let secret_var = worker.cli.credential_env_var().ok_or_else(|| {
+        format!(
+            "adapter `{}` declares no credential variable, so a signed run cannot \
+             prove it scanned for one",
+            worker.cli.name()
+        )
+    })?;
+    // AC2.5(b) — an UNEXECUTED scan must be structurally unable to emit
+    // `"verified"`. `CaptureDoc::validate` accepts `redaction_result` on string
+    // equality, so "the operator forgot to export the variable" and "the scan ran
+    // and passed" used to produce BYTE-IDENTICAL signed evidence. Refuse the
+    // signing rather than teaching the validator a second accepted string: a
+    // `"not-scanned"` value would re-create the defect one identifier over.
+    let secret = std::env::var(secret_var).unwrap_or_default();
+    if secret.is_empty() {
+        return Err(format!(
+            "{secret_var} is unset or empty, so the redaction scan cannot execute — refusing to \
+             sign a capture whose `redaction_result` would read \"verified\" without a scan \
+             having run. Set {secret_var} to the metered key the `{}` adapter reads.",
+            worker.cli.name()
+        ));
     }
     let grants = std::env::var_os("MAOS_HOST_GRANTS")
         .map(PathBuf::from)
@@ -1003,16 +1223,28 @@ fn live_codex_take(
         return Err("the live worker did not complete — nothing to sign".to_string());
     }
     // The topology is OPERATOR-authored, so nothing else stops the hermetic
-    // fixture from reaching the signing path and earning a Tier-2 label.
-    if identity != CODEX_WORKER_CLI {
+    // fixture from reaching the signing path and earning a Tier-2 label. This
+    // check WIDENED to an allowlist (AC3.4); it must never be deleted.
+    if !SIGNABLE_WORKER_CLIS.contains(&identity.as_str()) {
         return Err(format!(
-            "the live worker identity is `{identity}`, not `{CODEX_WORKER_CLI}` — a fixture \
-             or unknown CLI must never earn {TIER2_BEAT}"
+            "the live worker identity is `{identity}`, which is not signable \
+             (signable: {SIGNABLE_WORKER_CLIS:?}) — a fixture or unknown CLI must never earn \
+             {TIER2_BEAT}"
+        ));
+    }
+    // ...and it must be the adapter the topology declared. A mismatch means the
+    // capture would attest a different provider than the preflight verified —
+    // including the credential variable that was scanned for.
+    if identity != worker.cli.name() {
+        return Err(format!(
+            "the live worker identity is `{identity}` but the topology declared `{}` — \
+             refusing to sign a capture whose provider claim does not match the run",
+            worker.cli.name()
         ));
     }
     let tl_ref = completion
         .as_ref()
-        .and_then(|e| e["completion_tl_ref"].as_str())
+        .and_then(|e| e["last_stdout_tl_ref"].as_str())
         .unwrap_or_default()
         .to_string();
     println!(
@@ -1024,29 +1256,51 @@ fn live_codex_take(
     // it: `record-capture` only checks that the field reads "verified", so an
     // unchecked literal would place an unearned control claim inside a SIGNED
     // bundle. Compare against the real secret and never print it.
-    let secret = std::env::var("CODEX_API_KEY").unwrap_or_default();
-    if !secret.is_empty() && (stdout.contains(&secret) || stderr.contains(&secret)) {
-        return Err(
-            "the live run echoed the CODEX_API_KEY value into its own output — refusing to \
+    //
+    // `secret` is guaranteed non-empty by the preflight (AC2.5b) — the
+    // `if !secret.is_empty()` guard that used to sit here is GONE, because it made
+    // "the operator forgot to export the variable" and "the scan ran and passed"
+    // emit byte-identical signed evidence. The scan now always executes.
+    if stdout.contains(&secret) || stderr.contains(&secret) {
+        return Err(format!(
+            "the live run echoed the {secret_var} value into its own output — refusing to \
              sign a capture that claims redaction was verified"
-                .to_string(),
-        );
+        ));
     }
 
     // The capture carries NON-SECRET fields only, spelled exactly as
     // `record-capture` validates them: it refuses a credential-shaped value and
     // refuses an overclaimed control (egress "enforced", redaction not
     // "verified"), so the gate stays open rather than signing a lie.
+    //
+    // AC3.5 — `command_metadata` is DERIVED from the adapter and manifest actually
+    // used. It used to be the literal `"maos run <codex topology> --live;
+    // CODEX_API_KEY injected host-side (value redacted)"`, sealed into the signed
+    // bundle: the moment the identity allowlist widened, a claude run would have
+    // signed a bundle asserting it was codex.
+    //
+    // AC2.2/F22 — "injected host-side" is also GONE, because MAOS does not inject
+    // it. There is no setter for any provider credential anywhere in
+    // `crates/maos-bin/src` and the spawn has no `env_clear`, so the child
+    // INHERITS the operator's variable. The capture now says what actually happens.
+    let command_metadata = derive_command_metadata(
+        &worker.manifest,
+        &topology,
+        &identity,
+        &worker.argv_prefix,
+        secret_var,
+    );
     let capture = serde_json::json!({
         "signer": format!("{signer} (named human signer)"),
         "live_agent_identity": identity,
-        "command_metadata":
-            "maos run <codex topology> --live; CODEX_API_KEY injected host-side (value redacted)",
+        "command_metadata": command_metadata,
         "host_grant_disposition":
             "host-managed grant admitted; a mismatch would have refused",
         "audit_refs": [tl_ref],
         "egress": EGRESS_POSTURE,
         "egress_followup": EGRESS_FOLLOWUP,
+        "fs_jail": FS_JAIL_POSTURE,
+        "fs_jail_followup": FS_JAIL_FOLLOWUP,
         "redaction_result": "verified",
         "outcome":
             "worker completed via adapter oracle; no secret persisted; demo-j1 scene take",
@@ -1085,17 +1339,22 @@ fn live_codex_take(
     )?;
 
     // The signed bytes are what leaves this machine, so scan THEM too — not only
-    // the console stream.
-    if !secret.is_empty() {
-        let signed = std::fs::read_to_string(&bundle)
-            .map_err(|e| format!("cannot re-read the sealed bundle to check redaction: {e}"))?;
-        if signed.contains(&secret) {
-            return Err(
-                "the sealed bundle contains the CODEX_API_KEY value — refusing to sign".to_string(),
-            );
-        }
+    // the console stream. Unconditional (AC2.5b): the `if !secret.is_empty()` guard
+    // that used to wrap this made the scan a silent no-op whenever the provider
+    // variable was unset, while the capture still claimed `"verified"`.
+    let signed = std::fs::read_to_string(&bundle)
+        .map_err(|e| format!("cannot re-read the sealed bundle to check redaction: {e}"))?;
+    if signed.contains(&secret) {
+        // Review 2a-P6 — the bundle already exists on disk at this point, and
+        // under `--keep-home` it would OUTLIVE this refusal: delete the signed
+        // artifact itself, so "refusing to sign" does not leave a signed lie
+        // behind for the operator to find later.
+        let _ = std::fs::remove_file(&bundle);
+        return Err(format!(
+            "the sealed bundle contains the {secret_var} value — refusing to sign; the \
+             dirty bundle has been deleted"
+        ));
     }
-
     // `verify-bundle` REQUIRES `--pubkey` (`maos-cli/src/cli.rs`: `pubkey: String`
     // with no default), so omitting it exits at argument parsing AFTER the paid
     // run has already happened — the defect this leg shipped with. `sealed-export`

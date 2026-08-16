@@ -131,17 +131,27 @@ fn a_delegation_to_the_wrong_host_fails() {
     assert!(beat.failed());
 }
 
-/// A raw exit code is never completion — only the adapter's oracle is, and it
-/// must carry the worker TL ref a digest can cite.
+/// A raw exit code is never completion — only the adapter's oracle is.
+///
+/// j1-crosshost-2a AC1.6 INVERTED the old premise of this test. It used to assert
+/// that `completed: true` with a null TL ref FAILS the beat, because the beat
+/// scored `completed && !tl_ref.is_empty()`. That conjunction was a null control:
+/// `last_stdout_tl_ref` (then `completion_tl_ref`) is assigned on EVERY stdout
+/// row, independently of the oracle, so its non-emptiness only ever proved "the
+/// worker printed something". The beat now rests on the oracle's verdict alone,
+/// and this test proves BOTH directions of that.
 #[test]
-fn completion_requires_the_oracle_and_a_tl_ref() {
+fn completion_comes_from_the_oracle_not_from_a_tl_ref() {
+    // (a) The oracle said completed. A missing evidence pointer does not overturn
+    //     the verdict — and the ref is deliberately still emitted on failures, so
+    //     absence here means the worker printed nothing, not that it failed.
     let observation = obs(
         vec![serde_json::json!({
             "event": "worker_completion",
             "worker_cli": "worker-cli-fixture",
             "completion": "completed",
             "completed": true,
-            "completion_tl_ref": serde_json::Value::Null,
+            "last_stdout_tl_ref": serde_json::Value::Null,
         })],
         "",
     );
@@ -150,7 +160,33 @@ fn completion_requires_the_oracle_and_a_tl_ref() {
         .iter()
         .find(|b| b.name == "worker-completed-by-adapter-oracle")
         .expect("beat present");
-    assert!(beat.failed(), "a completion with no TL ref is not evidence");
+    assert!(
+        !beat.failed(),
+        "the oracle's verdict is the beat; the TL ref is an evidence pointer"
+    );
+
+    // (b) The load-bearing direction: a NON-completion with a perfectly good TL
+    //     ref must fail. Under the old conjunction this case was reachable only by
+    //     accident; it is the whole point now.
+    let observation = obs(
+        vec![serde_json::json!({
+            "event": "worker_completion",
+            "worker_cli": "codex",
+            "completion": "not_completed:no_effect_evidence",
+            "completed": false,
+            "last_stdout_tl_ref": "01a003bfb38d20e97fcb08c16274374c",
+        })],
+        "",
+    );
+    let beats = evaluate_beats(&observation);
+    let beat = beats
+        .iter()
+        .find(|b| b.name == "worker-completed-by-adapter-oracle")
+        .expect("beat present");
+    assert!(
+        beat.failed(),
+        "a citable TL ref must never launder a non-completion into a pass"
+    );
 }
 
 /// The verbatim post-1a stream from the 2026-08-14 isolated run: every executed
@@ -185,7 +221,7 @@ fn the_full_post_1a_stream_proves_every_executed_beat() {
                 "worker_cli": "worker-cli-fixture",
                 "completion": "completed",
                 "completed": true,
-                "completion_tl_ref": "01a003bfb38d20e97fcb08c16274374c",
+                "last_stdout_tl_ref": "01a003bfb38d20e97fcb08c16274374c",
             }),
             serde_json::json!({
                 "event": "cli_wrapper_exit",
@@ -369,4 +405,126 @@ fn entry_count_reads_the_verify_line() {
         247
     );
     assert_eq!(entry_count("no count here"), 0);
+}
+
+// ── Review 2a-P11 — the signing controls had ZERO regression coverage ───────
+
+/// A topology+worker fixture pair laid into a tempdir, so `resolve_topology_worker`
+/// is tested against REAL files the way the preflight reads them.
+fn lay_topology(worker_manifests: &[(&str, &str)]) -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut entries = String::new();
+    for (i, (command, argv)) in worker_manifests.iter().enumerate() {
+        let m = dir.path().join(format!("worker-{i}.toml"));
+        std::fs::write(
+            &m,
+            format!(
+                "[cli_wrapper]\ncommand = \"{command}\"\nargv_prefix = {argv}\n\
+                 output_shape_version = \"1.0.0\"\n[sandbox]\ntier = \"T3\"\n"
+            ),
+        )
+        .unwrap();
+        entries.push_str(&format!(
+            "[[topology.spirits]]\nmanifest = \"{}\"\nhost = \"developer-remote-host\"\n",
+            m.display()
+        ));
+    }
+    let topo = dir.path().join("topology.toml");
+    std::fs::write(&topo, format!("[topology]\nname = \"t\"\n\n{entries}")).unwrap();
+    (dir, topo)
+}
+
+#[test]
+fn resolve_topology_worker_resolves_the_single_wrapper() {
+    let (_dir, topo) = lay_topology(&[(
+        "codex",
+        r#"["exec", "--sandbox", "workspace-write", "--json"]"#,
+    )]);
+    let w = resolve_topology_worker(&topo).unwrap();
+    assert_eq!(w.cli.name(), "codex");
+    assert_eq!(w.argv_prefix.len(), 4);
+}
+
+#[test]
+fn resolve_topology_worker_refuses_a_topology_with_no_wrapper() {
+    let dir = tempfile::tempdir().unwrap();
+    let topo = dir.path().join("topology.toml");
+    std::fs::write(
+        &topo,
+        "[topology]\nname = \"t\"\n\n[[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n",
+    )
+    .unwrap();
+    let err = resolve_topology_worker(&topo)
+        .map(|_| ())
+        .unwrap_err();
+    assert!(err.contains("no [cli_wrapper] member"), "got: {err}");
+}
+
+#[test]
+fn resolve_topology_worker_refuses_multiple_wrappers() {
+    // Review 2a-P5 — production runs EVERY wrapper; the signing preflight
+    // attests ONE. Two wrappers must be refused, not silently first-picked.
+    let (_dir, topo) = lay_topology(&[
+        (
+            "codex",
+            r#"["exec", "--sandbox", "workspace-write", "--json"]"#,
+        ),
+        (
+            "claude",
+            r#"["--print", "--output-format", "json", "--bare"]"#,
+        ),
+    ]);
+    let err = resolve_topology_worker(&topo).map(|_| ()).unwrap_err();
+    assert!(
+        err.contains("2 [cli_wrapper] members"),
+        "must name the count: {err}"
+    );
+    assert!(
+        err.contains("unverified"),
+        "must say WHY multi-worker topologies are refused: {err}"
+    );
+}
+
+#[test]
+fn resolve_topology_worker_refuses_an_unsupported_cli() {
+    let (_dir, topo) = lay_topology(&[("rm", "[]")]);
+    let err = resolve_topology_worker(&topo).map(|_| ()).unwrap_err();
+    assert!(err.contains("no adapter supports"), "got: {err}");
+}
+
+#[test]
+fn command_metadata_is_derived_and_never_says_injected() {
+    // Review 2a-P11 + AC3.5/F22 — the sealed `command_metadata` must name the
+    // manifest, the topology, the adapter identity and the adapter's OWN
+    // credential variable, and must say INHERITED, never "injected host-side"
+    // (MAOS holds no credential and injects nothing).
+    let manifest = std::path::Path::new("/tmp/manifest-codex.toml");
+    let topology = std::path::Path::new("/tmp/topo.toml");
+    let argv: Vec<String> = ["exec", "--json"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let meta = derive_command_metadata(manifest, topology, "codex", &argv, "CODEX_API_KEY");
+    assert!(meta.contains("manifest-codex.toml"), "got: {meta}");
+    assert!(meta.contains("topo.toml"), "got: {meta}");
+    assert!(meta.contains("`codex`"), "got: {meta}");
+    assert!(meta.contains("CODEX_API_KEY"), "got: {meta}");
+    assert!(
+        meta.contains("inherited from the operator's environment"),
+        "got: {meta}"
+    );
+    assert!(!meta.contains("injected host-side"), "got: {meta}");
+    // A claude run derives ANTHROPIC_API_KEY — the variable the scan targets.
+    let meta = derive_command_metadata(manifest, topology, "claude", &argv, "ANTHROPIC_API_KEY");
+    assert!(meta.contains("ANTHROPIC_API_KEY"), "got: {meta}");
+}
+
+#[test]
+fn the_signable_allowlist_admits_both_real_adapters_and_refuses_the_fixture() {
+    // AC3.4/F8 — WIDENED to an allowlist, never deleted: the fixture must never
+    // earn PROVEN_LIVE_SIGNED, and an unknown identity must never appear in it.
+    assert!(SIGNABLE_WORKER_CLIS.contains(&"codex"));
+    assert!(SIGNABLE_WORKER_CLIS.contains(&"claude"));
+    assert!(!SIGNABLE_WORKER_CLIS.contains(&"worker-cli-fixture"));
+    assert_eq!(SIGNABLE_WORKER_CLIS.len(), 2);
 }

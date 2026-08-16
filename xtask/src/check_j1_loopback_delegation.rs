@@ -58,11 +58,45 @@ const MAILBOX_RS: &str = "crates/maos-iac/src/adapter/mailbox.rs";
 const MAIN_RS: &str = "crates/maos-bin/src/main.rs";
 const ORCHESTRATOR_RS: &str = "spirits/orchestrator/src/lib.rs";
 const A2A_ROUTER_RS: &str = "crates/maos-a2a-core/src/router.rs";
+/// j1-crosshost-2a AC1.7 — the completion-oracle seam and the library boundary
+/// that makes its tests executable at all.
+const WORKER_CLI_RS: &str = "crates/maos-bin/src/worker_cli.rs";
+const BIN_LIB_RS: &str = "crates/maos-bin/src/lib.rs";
+/// j1-crosshost-2a AC1.7(iii) — the workflow itself is GOVERNED now.
+///
+/// Without this the gate had no eyes on the file its own enrollment lives in, so
+/// deleting a `--test` line left the gate green and AC1.9's falsifier was a
+/// falsifier standing in for a falsifier. Two in-repo idioms already read this
+/// file from a gate (`check_loom_substrate_drift`'s `WORKFLOW` const and
+/// `check_epic_6_bridge`'s `discipline_yml_has_step`); this is the third.
+const WORKFLOW: &str = ".github/workflows/discipline.yml";
+
+/// The `cargo test` targets that MUST be enrolled in this gate's own CI job. A
+/// test file that is not named here and in the workflow is a suggestion: 24 of 28
+/// `crates/maos-bin/tests/` targets are invoked by no job at all.
+const ENROLLED_TEST_TARGETS: &[&str] = &["worker_completion_2a", "worker_manifests_2a"];
+
+/// The shared oracle both real adapters used to delegate to. Its whole contract
+/// was "clean exit + a non-empty final stdout line", which scored a live refusal
+/// that exited 0 as `completed: true`. It is DELETED; this gate exists so it
+/// cannot come back, in that name or by that shape.
+const RETIRED_SHARED_ORACLE: &str = "final_stdout_message_oracle";
+/// The per-adapter oracles that replaced it, each derived from its own CLI's
+/// machine-readable contract.
+const CODEX_ORACLE: &str = "codex_jsonl_oracle";
+const CLAUDE_ORACLE: &str = "claude_result_object_oracle";
 
 /// The leg names this gate publishes, so enrollment surfaces and `1b`'s additions
 /// can be reconciled against one list rather than against prose.
 pub fn ledger_leg_names() -> Vec<&'static str> {
-    vec!["frame-borne-route-intact", "loopback-from-host-unverified"]
+    vec![
+        "frame-borne-route-intact",
+        "loopback-from-host-unverified",
+        // j1-crosshost-2a AC1.7
+        "completion-oracle-per-adapter",
+        "worker-cli-under-library",
+        "completion-vectors-enrolled",
+    ]
 }
 
 #[derive(Debug)]
@@ -292,6 +326,192 @@ fn leg_loopback_from_host_unverified(root: &Path, findings: &mut Vec<Finding>) -
     unverified
 }
 
+/// LEG 3 — j1-crosshost-2a AC1.7(i). Neither real adapter may decide completion
+/// from "clean exit + a non-empty final stdout line".
+///
+/// That shared oracle is the whole defect: a live `claude -p` refused a write,
+/// printed a fluent explanation, exited 0, and was scored `completed: true` — and
+/// that verdict is the admission condition for signing. Each adapter must instead
+/// consume its OWN machine-readable contract (codex's `--json` `ThreadEvent`
+/// stream, claude's `--output-format json` result object), so the leg asserts both
+/// the absence of the retired oracle and the presence of the two that replaced it.
+///
+/// Source-STRUCTURAL and root-relative, over the production half only: a
+/// `#[cfg(test)]` vector that mentions the retired name must not red the gate, and
+/// a `cargo`-invoking leg would inherit the proven-red tempdir (which has no
+/// `Cargo.toml`) and vacuum every planted vector while CI reported green.
+fn leg_completion_oracle_per_adapter(root: &Path, findings: &mut Vec<Finding>) {
+    const CHECK: &'static str = "completion-oracle-per-adapter";
+    let Some(src) = read(root, WORKER_CLI_RS, findings, CHECK) else {
+        return;
+    };
+    let flat = structural(production_before_tests(&src));
+    if flat.contains(RETIRED_SHARED_ORACLE) {
+        findings.push(Finding {
+            check: CHECK,
+            detail: format!(
+                "{WORKER_CLI_RS} still carries `{RETIRED_SHARED_ORACLE}` in production code. \
+                 That oracle is \"clean exit + non-empty final stdout line\": it certified a \
+                 live refusal that exited 0 as a completion. Each real adapter must consume \
+                 its own structured output instead"
+            ),
+        });
+    }
+    // Review 2a-P8 — needle on the CALL FORM, not the function name: the green
+    // fixture of the proven-red suite passes with EMPTY oracle stubs, so a
+    // name-presence check stayed green while `parse_completion` delegated to
+    // anything. The call form is the wiring; a named-but-unwired helper no
+    // longer satisfies the leg.
+    for (adapter, oracle_call) in [
+        ("CodexCli", "codex_jsonl_oracle(stdout,exit)"),
+        ("ClaudeCli", "claude_result_object_oracle(stdout,exit)"),
+    ] {
+        if !flat.contains(oracle_call) {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{WORKER_CLI_RS} does not CALL `{oracle_call}` — {adapter}'s \
+                     parse_completion must be WIRED to its own structured-output oracle. A \
+                     named-but-unwired helper keeps the name while the verdict comes from \
+                     somewhere else"
+                ),
+            });
+        }
+    }
+    // The seam that makes the structured oracles honest: an adapter whose oracle
+    // assumes a flag must be able to DEMAND it, or a manifest shipping prose turns
+    // a real success into a false negative — F4's inversion.
+    if !flat.contains("fnrequired_argv_flags") {
+        findings.push(Finding {
+            check: CHECK,
+            detail: format!(
+                "{WORKER_CLI_RS} has no `required_argv_flags` — without it an adapter cannot \
+                 demand the structured-output flag its oracle parses, and a manifest that \
+                 omits it converts a REAL success into a non-completion"
+            ),
+        });
+    }
+    // The clean-home invariant must not be codex-only again: `ClaudeCli` asserting
+    // `None` here was a false claim with a green test behind it, and it made
+    // `refuse_ambient_auth` a no-op for claude.
+    if !flat.contains(".claude\").join(\".credentials.json") {
+        findings.push(Finding {
+            check: CHECK,
+            detail: format!(
+                "{WORKER_CLI_RS} does not name claude's ambient credential file \
+                 (`~/.claude/.credentials.json`) — `refuse_ambient_auth` is then a NO-OP for \
+                 claude and a signed claude run would stamp an unattestable redaction claim"
+            ),
+        });
+    }
+}
+
+/// LEG 4 — j1-crosshost-2a AC1.7(ii). `worker_cli` must stay under the library.
+///
+/// This is the regression that would silently re-orphan every relocated test: the
+/// module was `mod worker_cli;` in `main.rs`, so nothing under
+/// `crates/maos-bin/tests/` could name `ClaudeCli`, `CodexCli` or
+/// `parse_completion`, and its 204-line in-`src` test module was both charged to
+/// the crate's KLOC budget and executed by no CI job. Move it back and the vectors
+/// do not fail — they cease to exist.
+fn leg_worker_cli_under_library(root: &Path, findings: &mut Vec<Finding>) {
+    const CHECK: &'static str = "worker-cli-under-library";
+    if let Some(src) = read(root, BIN_LIB_RS, findings, CHECK) {
+        if !contains_live(&src, "pub mod worker_cli") {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{BIN_LIB_RS} does not export `pub mod worker_cli` — every completion-oracle \
+                     vector under crates/maos-bin/tests/ is then unable to NAME the adapters, so \
+                     the controls do not fail, they vanish"
+                ),
+            });
+        }
+    }
+    if let Some(src) = read(root, MAIN_RS, findings, CHECK) {
+        // `main.rs` must CONSUME the library module, never re-declare it: a
+        // `mod worker_cli;` here compiles a SECOND copy that the tests cannot see.
+        if contains_live(&src, "mod worker_cli;")
+            && !contains_live(&src, "use maos_bin::worker_cli")
+        {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{MAIN_RS} re-declares `mod worker_cli;` instead of consuming \
+                     `maos_bin::worker_cli` — that compiles a second, test-invisible copy of the \
+                     adapter seam"
+                ),
+            });
+        }
+    }
+    // The in-`src` test module must stay gone: it is budget-charged and CI-invisible.
+    if let Some(src) = read(root, WORKER_CLI_RS, findings, CHECK) {
+        if src.contains("\n#[cfg(test)]") {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{WORKER_CLI_RS} has an in-`src` `#[cfg(test)]` module again. It is charged \
+                     to maos-bin's KLOC ceiling and executed by NO CI job (every invocation is \
+                     `--test <name>`); the vectors belong in crates/maos-bin/tests/"
+                ),
+            });
+        }
+    }
+}
+
+/// LEG 5 — j1-crosshost-2a AC1.7(iii) / AC1.9. The ENROLLMENT leg.
+///
+/// Without eyes on the workflow, this gate could not see whether its own vectors
+/// were ever RUN. Deleting a `--test` line left the gate green, which made the
+/// AC1.9 falsifier vacuous — a falsifier standing in for a falsifier. The read is
+/// static (a file, not a `cargo` invocation), so it stays safe inside the
+/// proven-red tempdir.
+fn leg_completion_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>) {
+    const CHECK: &'static str = "completion-vectors-enrolled";
+    let Some(src) = read(root, WORKFLOW, findings, CHECK) else {
+        return;
+    };
+    // Review 2a-P8 — SCOPE to this gate's own job block. AC1.7(iii)/AC1.8
+    // require the `check-j1-loopback-delegation` JOB (BindingClass::Blocking,
+    // gate-registry-enrolled, a `needs` of the aggregate) to carry the vectors;
+    // a workflow-wide scan stayed green when the lines merely existed SOMEWHERE,
+    // including a non-blocking job. The job block ends at the next top-level
+    // `  <name>:` key (2-space indent, GitHub Actions job syntax).
+    let Some((_, job_rest)) = src.split_once("check-j1-loopback-delegation:") else {
+        findings.push(Finding {
+            check: CHECK,
+            detail: format!(
+                "{WORKFLOW} declares no `check-j1-loopback-delegation` job — the gate's own \
+                 enrollment home is gone, so its vectors run nowhere"
+            ),
+        });
+        return;
+    };
+    let job_block: String = job_rest
+        .lines()
+        // Stop at the next top-level job key: exactly 2-space indented
+        // (`runs-on:`/`steps:` and deeper lines carry 4+).
+        .take_while(|l| !(l.starts_with("  ") && !l.starts_with("   ")))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let flat = structural(&job_block);
+    for target in ENROLLED_TEST_TARGETS {
+        if !flat.contains(&format!("--test{target}")) {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{WORKFLOW}'s `check-j1-loopback-delegation` JOB does not invoke `cargo \
+                     test -p maos-bin --test {target}` (an occurrence in a DIFFERENT job does \
+                     not count — only this job is Blocking, in gate-registry.toml, and a needs \
+                     of the aggregate). An un-enrolled test target is a suggestion, not a \
+                     control: no CI job runs `-p maos-bin` unscoped, so the vectors would \
+                     never execute",
+                ),
+            });
+        }
+    }
+}
+
 pub fn run(json: bool) -> Result<(), String> {
     run_with_root(json, Path::new("."))
 }
@@ -302,6 +522,9 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
 
     leg_frame_borne_route_intact(&root, &mut findings);
     let from_host_unverified = leg_loopback_from_host_unverified(&root, &mut findings);
+    leg_completion_oracle_per_adapter(&root, &mut findings);
+    leg_worker_cli_under_library(&root, &mut findings);
+    leg_completion_vectors_enrolled(&root, &mut findings);
 
     let oracle_green = findings.is_empty();
     // Hermetic: a RED oracle hard-fails at HEAD regardless of CURRENT_PHASE.

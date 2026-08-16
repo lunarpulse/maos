@@ -1,0 +1,108 @@
+# MAOS Worker — LIVE profile: the claude Developer-Worker as a [cli_wrapper].
+#
+# LIVE-ONLY. Not hermetic, NEVER run in CI. The fixture manifest
+# (spirits/worker/manifest.toml) stays the CI/hermetic baseline. This file is the
+# HETEROGENEOUS half of the J1 claim: two hosts can run different worker CLIs
+# under one protocol, with no adapter code change — `select_worker_cli("claude")`
+# picks ClaudeCli (worker_cli.rs) and argv = argv_prefix ++ [<frame-borne task>].
+#
+# Authored fresh (there is no earlier revision to port), so every flag below is
+# justified in place. `ClaudeCli::required_argv_flags` REFUSES the run when
+# `--print`, `--output-format`, `json` or `--bare` is missing from this list.
+#
+# ┌─ WHY `-p` ALONE CANNOT DO THE WORK — this is the ship-blocker's mechanism ──┐
+# │ `claude 2.1.233` carries the literal deny strings "Current permission mode  │
+# │ (${mode}) requires approval for this ${e} command" and "Claude requested     │
+# │ permissions to use ${e}, but you haven't granted it yet". Under `--print`    │
+# │ there is NO TTY to approve, so the tool call is denied, the model explains    │
+# │ itself in fluent prose, and the process EXITS 0. Under the old completion     │
+# │ oracle ("clean exit + non-empty final stdout line") that scored              │
+# │ `completed: true` over a file that was never written — and that verdict is   │
+# │ the admission condition for signing. An explicit permission posture is       │
+# │ therefore a CORRECTNESS requirement, not a convenience.                      │
+# └────────────────────────────────────────────────────────────────────────────┘
+
+[cli_wrapper]
+command = "claude"                 # basename dispatch → ClaudeCli
+# → claude --print --output-format json --bare --permission-mode acceptEdits \
+#          --settings '<inline JSON>' "<frame-borne task>"
+#
+# Flag by flag, and none of these is decoration:
+#
+#  --print                  non-interactive. Required for --output-format.
+#
+#  --output-format json     what `claude_result_object_oracle` parses. The result
+#                           object's `permission_denials` array is the ONLY field
+#                           that distinguishes a refusal from a success — a
+#                           refusal is emitted as `subtype: "success"`,
+#                           `is_error: false`. Without this flag the oracle sees
+#                           prose, cannot parse, and reports a REAL success as a
+#                           non-completion (the inverse defect).
+#
+#  --bare                   TWO independent reasons, and deleting it as redundant
+#                           credential hygiene breaks the second one:
+#                           (a) CREDENTIAL: auth becomes strictly
+#                               ANTHROPIC_API_KEY or an apiKeyHelper named in
+#                               --settings; "OAuth and keychain are never read"
+#                               (help text, verbatim). It DELETES two of claude's
+#                               eight credential surfaces rather than mitigating
+#                               them, and --settings is itself argv-hashed, so
+#                               MAOS owns the helper channel.
+#                           (b) REPRODUCIBILITY: it also skips hooks, LSP, plugin
+#                               sync, attribution, auto-memory, background
+#                               prefetches and CLAUDE.md AUTO-DISCOVERY. The
+#                               spawn sets no cwd, so the child inherits `maos`'s
+#                               working directory — and this repository ships a
+#                               tracked CLAUDE.md, with another in the operator's
+#                               ~/.claude/. Without --bare a signed run's
+#                               behaviour is a function of instruction files that
+#                               appear in no manifest, no argv_prefix_hash and
+#                               possibly no git, so "reproducible from the repo"
+#                               would be a false claim inside a signed artifact.
+#
+#  --permission-mode        the posture the box above demands. `acceptEdits`
+#    acceptEdits            grants file edits WITHOUT granting a shell bypass. Do
+#                           NOT use `bypassPermissions` or `dontAsk`: those are
+#                           the permission-skip this project's c-constraint
+#                           forbids, and they would also hide the very denial
+#                           signal the oracle depends on.
+#
+#  --settings '<JSON>'      claude's ISOLATION posture, and the reason the two
+#                           adapters are SYMMETRIC on this axis: `--settings`
+#                           accepts an inline JSON string, so the posture rides in
+#                           argv_prefix and is TOCTOU-hashed into the cap-token
+#                           exactly like codex's `--sandbox workspace-write` flag.
+#                           `sandbox.enabled` is claude's FAIL-CLOSED hard gate —
+#                           it exits with an error at startup if the sandbox
+#                           cannot start — and denyRead/denyWrite bound the jail.
+#
+# THE POSTURE THIS FILE RATIFIES, in three checkable clauses: the FS jail is the
+# ADAPTER's, DECLARED by MAOS here in a hashed manifest, ENFORCED by the adapter,
+# NOT by MAOS. MAOS's own spawn is a bare `Command::new` with no namespace, no
+# rlimit and no process group, and the adapter is selected by BASENAME with no
+# realpath, hash or signature check. `CaptureDoc::validate` refuses a capture that
+# claims otherwise (`fs_jail` must read `adapter-enforced-maos-declared`).
+argv_prefix = [
+    "--print",
+    "--output-format",
+    "json",
+    "--bare",
+    "--permission-mode",
+    "acceptEdits",
+    "--settings",
+    "{\"sandbox\":{\"enabled\":true},\"permissions\":{\"deny\":[\"Read(./.git/**)\",\"Read(**/.env*)\",\"Write(./.git/**)\"]}}",
+]
+output_shape_version = "1.0.0"
+recovery_policy = "respawn_fresh"
+
+[cli_wrapper.posture]
+stdio_shape = "ndjson_over_stdio"
+control_channel = "signals"
+shutdown_signal = "SIGTERM"
+
+[sandbox]
+tier = "T3"
+
+[author]
+name = "Anthropic"                 # MUST equal the host-grant `signing_key_id`
+homepage = "https://www.anthropic.com"

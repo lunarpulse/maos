@@ -1,0 +1,72 @@
+# MAOS Worker — LIVE profile: the codex Developer-Worker as a [cli_wrapper].
+#
+# LIVE-ONLY. Not hermetic, NEVER run in CI. The fixture manifest
+# (spirits/worker/manifest.toml) stays the CI/hermetic baseline; THIS file is the
+# T6 signed-run profile. `select_worker_cli("codex")` picks the CodexCli adapter
+# (worker_cli.rs): argv = argv_prefix ++ [<frame-borne task>].
+#
+# PORTED VERBATIM from 60d4080a with `git show`, then repaired. The argv_prefix
+# below is TOCTOU-hashed into the cap-token and the Ed25519-signed T6 capture
+# attests its exact bytes, so the `--sandbox workspace-write` LONG FORM is never
+# retyped: `-s` is the same flag to codex and DIFFERENT BYTES to
+# `argv_prefix_hash`. Only `--json` was APPENDED.
+#
+# Three claims in the ported header were stale at birth and are corrected here:
+#  1. `MAOS_WORKER_TASK` was DELETED by j1-crosshost-1a. The task is FRAME-BORNE,
+#     drained from a `task.assign` payload, and the topology entry's `host` key is
+#     what makes that happen.
+#  2. The completion oracle is NO LONGER "clean exit 0 AND a non-empty final
+#     stdout line" (`final_stdout_message_oracle`, now deleted). That oracle scored
+#     a live refusal that exited 0 as `completed: true`. It is now
+#     `codex_jsonl_oracle` over the `codex exec --json` event stream: a terminal
+#     `turn.completed` AND at least one applied `item.completed`/`file_change`.
+#  3. `--json` is therefore MANDATORY, not decorative. `CodexCli::required_argv_flags`
+#     refuses the run when `exec`, `--json`, `--sandbox` or `workspace-write` is
+#     missing from this list — without `--json` the oracle would read prose and
+#     report a REAL success as a non-completion.
+#
+# `--sandbox workspace-write` is also load-bearing for correctness, not only for
+# isolation: it is what makes "completed a turn and wrote nothing" a genuine
+# non-completion rather than a read-only task's legitimate silence. The FS jail it
+# creates is the ADAPTER's — declared by MAOS here, in a hashed manifest, and
+# enforced by codex. MAOS does not enforce it (the spawn has no namespace, no
+# rlimit and no process group).
+#
+# ┌─ ⚠️  VERIFY BEFORE THE SIGNED RUN ─────────────────────────────────────────┐
+# │ argv_prefix is TOCTOU-hashed, so it must be the EXACT argv you tested.      │
+# │ 1. Pin the invocation that actually WRITES to $DEMO standalone first:       │
+# │      cd "$DEMO" && codex exec --sandbox workspace-write --json \            │
+# │        "write hi to ./h.txt"                                               │
+# │    Confirm: h.txt appears, codex exits 0, AND the JSONL stream carries an   │
+# │    `item.completed` file_change with status "completed" plus a terminal     │
+# │    `turn.completed`. A final prose message is NOT the oracle any more.      │
+# │    NOTE: `maos run <this manifest> --once` now FAILS on a non-completion    │
+# │    too, so the standalone pre-flight can no longer certify a refusal.       │
+# │ 2. `git show 60d4080a:<path>` and APPEND, never hand-transcribe (order      │
+# │    matters, and the bytes are attested).                                   │
+# │ 3. Use codex's SANDBOXED autonomous mode (keeps the workspace-write jail).  │
+# │    DO NOT add a bypass flag (--dangerously-bypass-approvals-and-sandbox /   │
+# │    full-access / yolo) — c-constraint: no permission-skip, no auto-commit.  │
+# │ 4. codex's writable root follows its CWD, and MAOS does NOT set the child   │
+# │    CWD — it inherits `maos`'s. So launch `maos run` FROM $DEMO (see runbook)│
+# │    to bound codex's workspace-write jail to the disposable demo dir.        │
+# └────────────────────────────────────────────────────────────────────────────┘
+
+[cli_wrapper]
+command = "codex"
+# → codex exec --sandbox workspace-write --json "<frame-borne task>"
+argv_prefix = ["exec", "--sandbox", "workspace-write", "--json"]
+output_shape_version = "1.0.0"
+recovery_policy = "respawn_fresh"
+
+[cli_wrapper.posture]
+stdio_shape = "ndjson_over_stdio"
+control_channel = "signals"
+shutdown_signal = "SIGTERM"
+
+[sandbox]
+tier = "T3"
+
+[author]
+name = "OpenAI"                    # MUST equal the host-grant `signing_key_id`
+homepage = "https://openai.com"

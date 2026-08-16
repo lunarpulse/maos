@@ -52,6 +52,14 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 maos-iac = { path = "../crates/maos-iac" }
 maos-audit = { path = "../crates/maos-audit" }
 maos-domain = { path = "../crates/maos-domain" }
+# j1-crosshost-2a AC2.6/AC3.5 — `demo-j1`'s signing preflight must ASK THE
+# ADAPTER for the clean-home path and the credential variable instead of
+# hardcoding codex's, and must derive the signed capture's `command_metadata`
+# from the adapter and manifest actually used. Re-deriving either here is how the
+# demo's own preflight went blind to claude and how a claude run would have
+# signed a bundle asserting it was codex. maos-bin does not depend on xtask, and
+# `check-dependency-closure` scopes to the maos-kernel-core/maos-domain trees.
+maos-bin = { path = "../crates/maos-bin" }
 # Story 10.4a — RTO drill gate needs the SQLite backup API for cold-restore
 # timing (same bundled+backup features as maos-audit).
 rusqlite = { version = "0.31", features = ["bundled", "backup"] }

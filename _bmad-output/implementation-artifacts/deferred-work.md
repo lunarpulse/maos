@@ -805,3 +805,9 @@ run and is filed with a live owner rather than patched here.
 - source_spec: none
   summary: Replace the revocation applier pipeline stub with observable end-to-end propagation coverage.
   evidence: Split from the critical remediation tranche because Story 5.4 finding 11 is independently shippable; Lunarpulse selected Story 5.2 finding 01 first on 2026-08-12.
+
+## Deferred from: code review of j1-crosshost-2a-signable-heterogeneous-worker (2026-08-16)
+
+- Clean-home TOCTOU window between `refuse_ambient_auth` and the spawn (10s liveness probe in between) — a credential file appearing after the check is available to the child while the signed run asserts a clean home. Real closure is spawn-time enforcement on the kernel lane (F22 `env_clear` adjacency, FLAG-Winston). Evidence: crates/maos-bin/src/main.rs:1084→1221.
+- The sealed capture's completion claim cites `last_stdout_tl_ref` (documented in-code as NOT a completion witness) and the oracle verdict itself is println-only, never journaled — owner j1-crosshost-2b (typed task-outcome vocabulary, Trap 15). Evidence: crates/maos-bin/src/main.rs:1324-1337; xtask/src/demo_j1.rs:1241.
+- `record-capture` accepts caller-asserted control strings (`fs_jail`, `redaction_result`, free-form `audit_refs`) with no run evidence — pre-existing `egress`-precedent shape inherited by the new AC4.2 fields. Evidence: crates/maos-cli/src/subcommands.rs `CaptureDoc::validate`.

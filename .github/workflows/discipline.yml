@@ -1815,10 +1815,31 @@ jobs:
         run: cargo run -p xtask -- check-j1-loopback-delegation --json
       - name: Run j1-crosshost-1a proven-red vectors (AC4.3)
         run: cargo test -p xtask --test j1_crosshost_1a_proven_red -- --test-threads=1
+      - name: Run j1-crosshost-2a proven-red vectors (AC1.9)
+        run: cargo test -p xtask --test j1_crosshost_2a_proven_red -- --test-threads=1
       - name: Run the frame-borne delegation legs (AC2.4-2.5, AC3.1-3.4)
         run: |
           cargo test -p maos-iac --test mailbox_a2a_router_installer_1a
           cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a
+      # j1-crosshost-2a AC1.8 — the completion-oracle vectors and the worker-manifest
+      # reader. Enrolled HERE, on a job that is already BindingClass::Blocking, in
+      # `gate-registry.toml`, and a `needs` of the aggregate — rather than in a sixth
+      # green box. `--test-threads=1` is mandatory: `MAOS_HOME` is process-global
+      # (D16), so `-p maos-bin` is red under default parallel flags.
+      #
+      # The gate's own `completion-vectors-enrolled` leg READS this file and reds if
+      # either `--test` name below disappears, which is what makes AC1.9's
+      # enrollment falsifier able to fire at all.
+      - name: Run the completion-oracle + worker-manifest legs (2a AC1.1-1.6, AC2, AC3.3, AC4.1)
+        run: |
+          # Review 2a-P1 — `worker_completion_2a`'s fixture-immunity vector resolves
+          # `worker-cli-fixture` at RUNTIME (exe-sibling, then $PATH), and nothing
+          # else in this job builds package `worker`'s bin: without this line the
+          # enrolled step is red on every fresh runner (reproduced 39/40 locally on
+          # a clean target dir; the journey job carries the same pre-build).
+          cargo build -p worker --bin worker-cli-fixture
+          cargo test -p maos-bin --test worker_completion_2a -- --test-threads=1
+          cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1
 
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
   check-kernel-baseline:

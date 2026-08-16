@@ -2288,6 +2288,23 @@ fn audit_keygen(output: &Option<PathBuf>) -> ExitCode {
 const CAPTURE_EGRESS_DECLARED_NOT_ENFORCED: &str = "declared-not-enforced";
 /// Redaction result the capture MUST assert.
 const CAPTURE_REDACTION_VERIFIED: &str = "verified";
+/// FS-jail posture the capture MUST declare, verbatim (j1-crosshost-2a AC4.1/4.2).
+///
+/// The ratified claim, in three checkable clauses: **the FS jail is the ADAPTER's,
+/// DECLARED by MAOS in a hashed manifest, ENFORCED by the adapter, not by MAOS.**
+/// All three are true at HEAD — the signed T6 run really did pass
+/// `codex exec --sandbox workspace-write`, supplied by MAOS through the manifest
+/// and bound into `argv_prefix_hash`, and codex really did enforce it. What MAOS
+/// does NOT do is enforce it itself: `spawn_and_bridge` is a bare `Command::new`
+/// with no namespace, no rlimit and no process group, and the basename allowlist
+/// that selects the adapter has no realpath, hash or signature check, so a shim
+/// named `codex` resolves and is admitted.
+///
+/// Mirrors [`CAPTURE_EGRESS_DECLARED_NOT_ENFORCED`] exactly: a stated posture a
+/// capture cannot OVERCLAIM. `"maos-enforced"` is the overclaim direction and is
+/// refused, because a reader who believes MAOS enforced the jail would draw a
+/// stronger conclusion from the signature than the evidence supports.
+const CAPTURE_FS_JAIL_ADAPTER_ENFORCED: &str = "adapter-enforced-maos-declared";
 
 /// The capture-doc schema `maosctl audit record-capture` validates before
 /// journaling. Fields mirror the runbook Phase-4 capture template. Extra fields
@@ -2317,6 +2334,12 @@ struct CaptureDoc {
     /// The egress-enforcement follow-up ID (Epic-14 v2.0).
     #[serde(default)]
     egress_followup: String,
+    /// FS-jail posture — MUST equal `adapter-enforced-maos-declared`.
+    #[serde(default)]
+    fs_jail: String,
+    /// The MAOS-enforced-isolation follow-up ID.
+    #[serde(default)]
+    fs_jail_followup: String,
     /// Redaction result — MUST equal `verified`.
     #[serde(default)]
     redaction_result: String,
@@ -2327,8 +2350,9 @@ struct CaptureDoc {
 
 impl CaptureDoc {
     /// Fail-closed field validation. Every required field must be non-empty; the
-    /// two control-statement fields are value-constrained so a dishonest capture
-    /// (egress "enforced", redaction not "verified") cannot be journaled and then
+    /// three control-statement fields are value-constrained so a dishonest capture
+    /// (egress "enforced", FS jail "maos-enforced", redaction not "verified")
+    /// cannot be journaled and then
     /// signed. Returns the first violation as an operator-facing message.
     fn validate(&self) -> Result<(), String> {
         let required = [
@@ -2337,6 +2361,7 @@ impl CaptureDoc {
             ("command_metadata", self.command_metadata.trim()),
             ("host_grant_disposition", self.host_grant_disposition.trim()),
             ("egress_followup", self.egress_followup.trim()),
+            ("fs_jail_followup", self.fs_jail_followup.trim()),
             ("outcome", self.outcome.trim()),
         ];
         for (name, val) in required {
@@ -2359,6 +2384,17 @@ impl CaptureDoc {
                  (this run DECLARES egress, it does not enforce it — enforced egress is Epic-14 \
                  v2.0 hardening); got \"{}\"",
                 self.egress.trim()
+            ));
+        }
+        if self.fs_jail.trim() != CAPTURE_FS_JAIL_ADAPTER_ENFORCED {
+            return Err(format!(
+                "capture field `fs_jail` must be exactly \
+                 \"{CAPTURE_FS_JAIL_ADAPTER_ENFORCED}\" — the FS jail is the ADAPTER's, \
+                 DECLARED by MAOS in a hashed manifest and ENFORCED by the adapter, NOT by \
+                 MAOS (the spawn has no namespace, no rlimit and no process group, and the \
+                 adapter is selected by basename with no realpath/hash/signature check); got \
+                 \"{}\"",
+                self.fs_jail.trim()
             ));
         }
         if self.redaction_result.trim() != CAPTURE_REDACTION_VERIFIED {
@@ -3845,11 +3881,13 @@ mod tests {
         serde_json::json!({
             "signer": "Myoungki Jung (Lunarpulse)",
             "live_agent_identity": "codex 0.5.0",
-            "command_metadata": "codex exec <task>; OPENAI_API_KEY injected host-side (value redacted)",
+            "command_metadata": "codex exec --sandbox workspace-write <task>; CODEX_API_KEY inherited from the operator's environment — MAOS neither injects nor holds it (value redacted, scanned)",
             "host_grant_disposition": "exact-match grant admitted (codex @ OpenAI, T3)",
             "audit_refs": ["aabbccddeeff00112233445566778899", "99887766554433221100ffeeddccbbaa"],
             "egress": "declared-not-enforced",
             "egress_followup": "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT",
+            "fs_jail": "adapter-enforced-maos-declared",
+            "fs_jail_followup": "FOLLOWUP-EPIC14-MAOS-ENFORCED-WORKER-ISOLATION",
             "redaction_result": "verified",
             "outcome": "worker completed; no secret persisted",
             "note": "operator may add extra fields — preserved verbatim"
@@ -3941,6 +3979,48 @@ mod tests {
         assert!(
             err.contains("egress") && err.contains("declared-not-enforced"),
             "must refuse the egress overclaim and state the required value: {err}"
+        );
+    }
+
+    #[test]
+    fn capture_validation_refuses_maos_enforced_fs_jail_overclaim() {
+        // j1-crosshost-2a AC4.2 — the FS-jail claim mirrors the egress precedent
+        // exactly: a stated posture that a capture cannot OVERCLAIM.
+        //
+        // The overclaim direction is what matters. MAOS genuinely DECLARES the jail
+        // (codex's `--sandbox workspace-write` and claude's `--settings` document
+        // both ride in the hashed `argv_prefix`), and the adapter genuinely ENFORCES
+        // it. What MAOS does not do is enforce it: the spawn is a bare
+        // `Command::new` with no namespace, no rlimit and no process group, and the
+        // adapter is selected by BASENAME with no realpath, hash or signature check
+        // — so a shim named `codex` resolves, is admitted, and satisfies the host
+        // grant's `attested_image` by plain string equality. A capture claiming
+        // MAOS enforced the jail would let a reader draw a stronger conclusion from
+        // the signature than the evidence supports.
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        v["fs_jail"] = serde_json::json!("maos-enforced");
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(
+            err.contains("fs_jail") && err.contains("adapter-enforced-maos-declared"),
+            "must refuse the FS-jail overclaim and state the required value: {err}"
+        );
+        // The under-claim direction is refused too — the posture is a fixed
+        // statement, not a free-text field, for the same reason `egress` is.
+        v["fs_jail"] = serde_json::json!("none");
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(err.contains("fs_jail"), "the posture is exact-match: {err}");
+    }
+
+    #[test]
+    fn capture_validation_requires_an_fs_jail_followup() {
+        // The egress precedent pairs a stated gap with a NAMED follow-up so the
+        // residual has an owner instead of being a sentence in a story file.
+        let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+        v["fs_jail_followup"] = serde_json::json!("  ");
+        let err = parse_and_validate_capture(&v.to_string()).unwrap_err();
+        assert!(
+            err.contains("fs_jail_followup"),
+            "a stated posture without a named follow-up is a gap with no owner: {err}"
         );
     }
 

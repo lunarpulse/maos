@@ -31,6 +31,13 @@ const MAILBOX_RS: &str = "crates/maos-iac/src/adapter/mailbox.rs";
 const MAIN_RS: &str = "crates/maos-bin/src/main.rs";
 const ORCHESTRATOR_RS: &str = "spirits/orchestrator/src/lib.rs";
 const A2A_ROUTER_RS: &str = "crates/maos-a2a-core/src/router.rs";
+/// j1-crosshost-2a added three files to the gate's governed list, so this fixture
+/// tree must carry them or every 1a vector below reds for the WRONG reason (a
+/// missing governed file is a finding, never a skip). 2a's own vectors live in
+/// `j1_crosshost_2a_proven_red.rs`; these are green stand-ins only.
+const WORKER_CLI_RS: &str = "crates/maos-bin/src/worker_cli.rs";
+const BIN_LIB_RS: &str = "crates/maos-bin/src/lib.rs";
+const WORKFLOW: &str = ".github/workflows/discipline.yml";
 
 const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
      [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
@@ -61,6 +68,22 @@ const GOOD_A2A_ROUTER: &str = "fn intake() {\n\
      \x20   let peer_host = match &frame.from.host_id { Some(h) => h.clone(), None => loopback() };\n}\n\
      pub async fn handle_intake_verified(&self, r: Req, p: &PeerId) {}\n";
 
+const GOOD_WORKER_CLI: &str = "fn codex_jsonl_oracle(stdout: &[String], exit: WorkerExit) {}\n\
+     fn claude_result_object_oracle(stdout: &[String], exit: WorkerExit) {}\n\
+     fn parse_completion(&self, stdout: &[String], stderr: &[String], exit: WorkerExit) -> WorkerCompletion {\n\
+     \x20   codex_jsonl_oracle(stdout, exit)\n}\n\
+     fn parse_completion_claude(&self, stdout: &[String], stderr: &[String], exit: WorkerExit) -> WorkerCompletion {\n\
+     \x20   claude_result_object_oracle(stdout, exit)\n}\n\
+     fn required_argv_flags(&self) -> &'static [&'static [&'static str]] { &[] }\n\
+     fn ambient_auth_path(&self, home: &Path) -> Option<PathBuf> {\n\
+     \x20   Some(home.join(\".claude\").join(\".credentials.json\"))\n}\n";
+
+const GOOD_BIN_LIB: &str = "#[cfg(feature = \"network\")]\npub mod worker_cli;\n";
+
+const GOOD_WORKFLOW: &str = "jobs:\n  check-j1-loopback-delegation:\n    steps:\n\
+     \x20     - run: cargo test -p maos-bin --test worker_completion_2a -- --test-threads=1\n\
+     \x20     - run: cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1\n";
+
 fn write_file(root: &Path, rel: &str, content: &str) {
     let path = root.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -76,6 +99,9 @@ fn lay_green(root: &Path) {
     write_file(root, MAIN_RS, GOOD_MAIN);
     write_file(root, ORCHESTRATOR_RS, GOOD_ORCHESTRATOR);
     write_file(root, A2A_ROUTER_RS, GOOD_A2A_ROUTER);
+    write_file(root, WORKER_CLI_RS, GOOD_WORKER_CLI);
+    write_file(root, BIN_LIB_RS, GOOD_BIN_LIB);
+    write_file(root, WORKFLOW, GOOD_WORKFLOW);
 }
 
 struct Verdict {
