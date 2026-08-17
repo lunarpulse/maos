@@ -42,16 +42,32 @@ fn a_fixture_take_never_claims_tier2() {
     assert_eq!(tier2.state.as_str(), "ABSENT");
 }
 
-/// Rung 2 was SPLIT on 2026-08-15 into `2a` (done) / `2b` / `2c`, and there is no
-/// `j1-crosshost-2` sprint-status row any more. An ABSENT beat must name an owner
-/// that exists, or the claim table defers into a document nobody holds.
+/// The split assigns its gate-derived crossing to `2b`; its explicit skip
+/// counterpart remains owned by that story, while the later signed rung is `2c`.
 #[test]
-fn the_two_host_rung_is_owned_by_crosshost_2b() {
-    let rung = unlanded_beats()
+fn two_host_beats_are_owned_by_their_crosshost_stories() {
+    let delegation = absent_two_host_delegation();
+    let signed_run = unlanded_beats()
         .into_iter()
-        .find(|b| b.name == "two-host-signed-run")
+        .find(|beat| beat.name == "two-host-signed-run")
         .expect("declared");
-    assert_eq!(rung.owner, Some("j1-crosshost-2b"));
+    assert_eq!(delegation.owner, Some("j1-crosshost-2b"));
+    assert_eq!(signed_run.owner, Some("j1-crosshost-2c"));
+    // §A6 review P10 (AC4.4) — the 2c-owned beat must render ABSENT, not merely
+    // be declared unlanded: a state change short of execution (e.g. a future
+    // "planned") must still red this pin so the narrated artifact cannot hint
+    // at a signed rung nobody built.
+    assert_eq!(
+        signed_run.state.as_str(), "ABSENT",
+        "two-host-signed-run stays ABSENT until j1-crosshost-2c delivers it"
+    );
+
+    assert!(
+        run_delegation_gate()
+            .iter()
+            .any(|beat| beat.name == "two-host-delegation" && beat.executed),
+        "the gate-derived beat must be present; its state depends on the real-tree judge"
+    );
 }
 
 /// j1-crosshost-1b AC2.11 — the beat this story owns must NOT still render ABSENT.
@@ -83,8 +99,8 @@ fn the_refusal_beat_is_emitted_by_the_gate_judging_path() {
     assert!(beat.executed, "the refusal beat is an executed judgement");
     assert_eq!(
         beats.len(),
-        crate::check_j1_loopback_delegation::ledger_leg_names().len() + 1,
-        "one beat per published gate leg, plus the conjunction beat"
+        crate::check_j1_loopback_delegation::ledger_leg_names().len() + 2,
+        "one beat per published gate leg, plus the refusal conjunction and the cross-host beat"
     );
 }
 

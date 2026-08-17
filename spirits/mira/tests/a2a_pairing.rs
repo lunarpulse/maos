@@ -148,7 +148,7 @@ async fn bilateral_pair_routes_advisory_over_real_loopback_with_tofu() {
         .expect("pin host_b");
 
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu.clone());
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
 
     let advisory_json = mira_advisory_json();
@@ -319,7 +319,7 @@ async fn confused_deputy_directive_denied_while_advisory_admitted() {
         .await
         .unwrap();
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
 
     // The read-only evidence advisory is admitted at Nash.

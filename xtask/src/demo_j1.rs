@@ -23,9 +23,9 @@
 //! 1. `ABSENT` never becomes green, and an unlanded beat never fails the run — it
 //!    is a visible placeholder, not a silent skip (the Family-B discipline from
 //!    Story 13.6e).
-//! 2. Loopback beats are labeled `v0.8 rung — loopback rehearsal`. "cross-host"
-//!    is never claimed while `two-host-signed-run` is not `PROVEN_LIVE_SIGNED`;
-//!    that rung belongs to `j1-crosshost-2`.
+//! 2. Loopback beats are labeled `v0.8 rung — loopback rehearsal`.
+//!    `two-host-delegation` is judged separately; the later
+//!    `two-host-signed-run` rung belongs to `j1-crosshost-2c`.
 //! 3. A fixture take never claims the Tier-2 beat. Only `--live-codex` ending in
 //!    a verified sealed bundle earns `PROVEN_LIVE_SIGNED`.
 //!
@@ -253,6 +253,7 @@ pub fn run(
             "a disallowed intent must be REFUSED (-32001 CODE_INTENT_DENIED, distinct from -32009)",
             "--skip-gate was passed",
         ));
+        beats.push(absent_two_host_delegation());
     } else {
         section("Running the judge");
         beats.extend(run_delegation_gate());
@@ -302,13 +303,15 @@ pub fn run(
 
     section("What this run does NOT claim");
     println!("  rung             v0.8 — loopback rehearsal. `developer-remote` is a peer id on");
-    println!("                   THIS host; no packet left the machine. Two real hosts over");
-    println!("                   mTLS/TOFU is j1-crosshost-2b and reads ABSENT above.");
+    println!("                   THIS host; no packet left the machine. This demo does not");
+    println!("                   exercise the cross-host path: the crossing is proven in two logs");
+    println!(
+        "                   by `two-host-delegation`; Rung 2b binds it to a TLS-verified identity."
+    );
     println!("  peer auth        on loopback `frame.from.host_id` is self-asserted — the frame");
-    println!("                   picks which allowlist judges it. Rung 2b binds it to a");
-    println!("                   TLS-verified identity; until then the gate's");
-    println!("                   loopback-from-host-unverified leg watches the composition");
-    println!("                   root and flips when a verified transport lands there.");
+    println!("                   picks which allowlist judges it. The gate's");
+    println!("                   loopback-from-host-unverified leg remains the permanent");
+    println!("                   loopback-arm boundary.");
     println!("  cap mediation    the cli_wrapper token path proceeds under host-grant authority;");
     println!("                   kernel `proc.exec` mediation is an Epic-9 operator-policy");
     println!("                   surface, and a Cedar permit alone cannot green it. The");
@@ -816,6 +819,9 @@ fn leg_narration(leg: &str) -> &'static str {
         "worker-cli-under-library" => "the adapter seam stays nameable by its vectors",
         "completion-vectors-enrolled" => "every J1 test target is actually invoked by CI",
         "consent-refusal-proofs" => "-32001 / -32009 / -32003 stay distinct and asserted",
+        "cross-host-identity-proof" => {
+            "the crossing is proven in two logs under a verified wire identity"
+        }
         _ => "a gate leg this narration has no description for",
     }
 }
@@ -862,7 +868,24 @@ fn run_delegation_gate() -> Vec<Beat> {
              (crates/maos-bin/tests/consent_refusal_1b.rs, judged by {DELEGATION_GATE})"
         ),
     ));
+    // This derives only from the seventh leg: Leg 2 permanently describes the
+    // loopback rehearsal arm and must never become this crossing's proxy.
+    beats.push(Beat::executed(
+        "two-host-delegation",
+        "two real hosts over mTLS/TOFU, a frame crossed, a worker ran on the far side, both logs carry the same sixteen bytes",
+        state_of(green("cross-host-identity-proof")),
+        "judged by cross-host-identity-proof".to_string(),
+    ));
     beats
+}
+
+/// The explicit `--skip-gate` counterpart for the gate-derived delegation beat.
+fn absent_two_host_delegation() -> Beat {
+    Beat::absent(
+        "two-host-delegation",
+        "two real hosts over mTLS/TOFU, a frame crossed, a worker ran on the far side, both logs carry the same sixteen bytes",
+        "j1-crosshost-2b",
+    )
 }
 
 /// The beats no story has delivered yet. Declared so they are visible, owned so
@@ -881,7 +904,7 @@ fn unlanded_beats() -> Vec<Beat> {
         Beat::absent(
             "two-host-signed-run",
             "two real hosts over mTLS/TOFU, heterogeneous worker, one reconciled signed bundle",
-            "j1-crosshost-2b",
+            "j1-crosshost-2c",
         ),
         Beat::absent(
             "halt-resume-referential-identity",

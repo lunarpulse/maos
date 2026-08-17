@@ -519,7 +519,7 @@ async fn g7_unclassified_frame_denied_on_wire() {
     let addr = nash.local_addr().unwrap();
 
     // Observe deliveries: install a sink on the shared core; it must stay empty.
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     nash.core().install_intake_sink(tx).await;
 
     let mut framed =
@@ -562,7 +562,7 @@ async fn g8_present_but_empty_envelope_denied_on_wire() {
     let nash = bind_nash(&clock, &ca, &mira, &nash_leaf, &[FINE]).await;
     let addr = nash.local_addr().unwrap();
 
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     nash.core().install_intake_sink(tx).await;
 
     let mut framed =
@@ -647,7 +647,7 @@ async fn g10_handle_intake_verified_delegates_unclassified() {
     let nash = bind_nash(&clock, &ca, &mira, &nash_leaf, &[FINE]).await;
     let addr = nash.local_addr().unwrap();
 
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     nash.core().install_intake_sink(tx).await;
 
     let mut framed =

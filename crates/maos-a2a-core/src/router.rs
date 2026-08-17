@@ -172,7 +172,7 @@ pub struct A2ARouterCore {
     local_leaf_fingerprint: Option<PeerCertFingerprint>,
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
-    intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<IacFrame>>>>,
+    intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::Sender<IacFrame>>>>,
     /// Fail-closed persistence seam for consent ruptures. The sink appends
     /// synchronously before the deny response is returned, so queue pressure,
     /// shutdown, or a detached drain task cannot silently erase evidence.
@@ -340,11 +340,58 @@ impl A2ARouterCore {
         self.consent_now_ns.unwrap_or_else(wall_now_ns)
     }
 
-    /// Install an intake sink — test-only hook. Accepted frames are forwarded
-    /// to the sink AFTER all validation passes.
-    pub async fn install_intake_sink(&self, sink: tokio::sync::mpsc::UnboundedSender<IacFrame>) {
+    /// Install the intake sink — the seam a receiving Host attaches its frame
+    /// consumer through. Live transports install this before exposing their
+    /// listener; tests may replace it explicitly.
+    ///
+    /// **This doc said "test-only hook" until j1-crosshost-2b, and that sentence
+    /// was load-bearing wrong** (G1 / G14.i). The loopback pair installs it in
+    /// PRODUCTION (`crates/maos-a2a/src/pairing.rs:112`) and the J1 composition
+    /// root DRAINS it in production (`crates/maos-bin/src/delegation.rs:173`,
+    /// `:190`); the live TCP transport now installs it inside its bind chain
+    /// before `TcpListener::bind` (`maos-a2a-tcp/src/transport.rs`,
+    /// `bind_with_intake_sink`). Because the word "test-only" was believed, a
+    /// real daemon authenticated its peer, ran TOFU, checked the boot nonce,
+    /// evaluated consent, advanced the Lamport clock,
+    /// ACKed `delivered: true` — and dropped the frame on the floor, because
+    /// nothing production-side ever called this. Do not restore that wording.
+    pub async fn install_intake_sink(&self, sink: tokio::sync::mpsc::Sender<IacFrame>) {
         let mut guard = self.intake_sink.lock().await;
         *guard = Some(sink);
+    }
+
+    /// Hand an accepted frame to the installed intake sink.
+    ///
+    /// Three outcomes, and the third one is why this function exists
+    /// (j1-crosshost-2b AC1.2 / G1b.ii; §A6 review D2/P17 bounded the channel):
+    ///
+    /// * **no sink installed** → `Ok(())`. A deployment with no J1 consumer (the
+    ///   cohort daemon's reserved-intent paths, `smoke-a2a-tcp-8-6`) is not an
+    ///   error, and this is the pre-existing behaviour, stated rather than
+    ///   inherited.
+    /// * **sink installed, send accepted** → `Ok(())`.
+    /// * **sink installed, receiver DROPPED *or channel FULL*** → `Err(())`. The
+    ///   old code was `let _ = sink.send(frame.clone());` at BOTH push sites,
+    ///   which folded every failure into success: a consumer whose receiver had
+    ///   been dropped silently discarded every frame **while the sender was still
+    ///   told `delivered: true`** — G1's exact shape one layer in. The §A6 review
+    ///   (D2, ratified) additionally BOUNDED the channel: an authenticated peer
+    ///   must not be able to queue unbounded frames behind one slow worker, so a
+    ///   FULL channel is the same verdict as a dead consumer — `try_send`, never
+    ///   a blocking `send` that would park the accept loop. Callers MUST convert
+    ///   `Err` into a NACK; an ACK here is a lie about durability, and the sender
+    ///   has no other way to learn the frame is gone.
+    ///   *Known rendering gap, filed for `j1-crosshost-2c`:* the resulting
+    ///   `CODE_INTERNAL` NACK itself falls through `interpret_response`'s
+    ///   catch-all into `TransportFailed` at the sender — the same misattribution
+    ///   shape as H13, on a code this story newly emits. 2c's fault-injection
+    ///   preflight owns typing it.
+    async fn push_to_intake_sink(&self, frame: &IacFrame) -> Result<(), ()> {
+        let guard = self.intake_sink.lock().await;
+        match guard.as_ref() {
+            Some(sink) => sink.try_send(frame.clone()).map_err(|_| ()),
+            None => Ok(()),
+        }
     }
 
     /// Install the fail-closed rupture persistence seam. Live transports install
@@ -1046,6 +1093,45 @@ impl A2ARouterCore {
                         intent: Self::nack_str(data, "intent"),
                     })
                 }
+                // j1-crosshost-2b AC4.1 / H13 — the ONE arm this story owes, and it
+                // is a security repair, not a nicety.
+                //
+                // Host B detects a boot-nonce mismatch, PERMANENTLY invalidates the
+                // pin (`tofu.rs` sets `Invalidated::SpiritRestarted`) and NACKs
+                // `-32004`. Until this arm existed that NACK fell through the
+                // catch-all below into `A2AError::TransportFailed`, which
+                // `map_a2a_error_to_iac_bus` turns into
+                // `IacBusError::CrossHostTransportFailure` — so the operator was told
+                // **the network broke**, and the action that implies, retry, is the
+                // one action that can never work: the pin is dead until a config is
+                // edited and a process restarted (`await_repin_consent` has zero
+                // production callers and its default hook returns `TimedOut`).
+                // A permanent security refusal presented as a transient fault.
+                //
+                // It was structurally UNREACHABLE in rung 1: `if request.boot_nonce
+                // != 0` guards the detection and loopback stamps the zero sentinel,
+                // so the branch had never executed. Two processes with real nonces
+                // make it reachable — this story. A defect that was unreachable,
+                // inherited by the story that makes it reachable.
+                //
+                // `PinInvalidated` is not a new type and is semantically exact:
+                // restart detection IS pin invalidation, re-pin IS the designed
+                // recovery, and the variant already maps typed to
+                // `IacBusError::CrossHostPinMismatch`. Lands in `maos-a2a-core` at
+                // ZERO headroom as a correctness repair on a security path, which
+                // **`xtask/kloc.toml:87`** says a ceiling must never block.
+                //
+                // SCOPE WALL: this repairs ONLY the code this story makes reachable.
+                // `interpret_response` types **9 of the 16** defined NACK codes; the
+                // remaining six fall-throughs (`PARSE_ERROR`, `INVALID_REQUEST`,
+                // `METHOD_NOT_FOUND`, `TIMEOUT`, `FRAME_TOO_LARGE`, `INTERNAL`) are
+                // not newly reachable here. The 9-of-16 census is recorded in the
+                // j1-crosshost-2b dev record with a named owner; a nine-arm refactor
+                // inside a frozen crate is a different story.
+                CODE_SPIRIT_RESTART_DETECTED => Err(A2AError::PinInvalidated {
+                    peer: peer.as_str().to_string(),
+                    awaiting_repin: true,
+                }),
                 _ => Err(A2AError::TransportFailed(n.error.message)),
             },
         }
@@ -1276,11 +1362,16 @@ impl A2ARouterCore {
             match self.digest_read_port.observe_reply(&peer_host, frame) {
                 Ok(DigestReplyObservation::Accepted) => {
                     let new_clock = self.clock.recv_advance(frame.logical_clock);
-                    let sink_guard = self.intake_sink.lock().await;
-                    if let Some(sink) = sink_guard.as_ref() {
-                        let _ = sink.send(frame.clone());
+                    // j1-crosshost-2b AC1.2 (G1b.i) — the SECOND intake-sink push
+                    // site. A fix applied only to the delegation path at `(5)`
+                    // below would leave this one still discarding the send result.
+                    if self.push_to_intake_sink(frame).await.is_err() {
+                        return A2AJsonRpcResponse::nack(
+                            request.id,
+                            CODE_INTERNAL,
+                            "intake sink full or receiver dropped — digest reply NOT delivered",
+                        );
                     }
-                    drop(sink_guard);
                     return A2AJsonRpcResponse::ack(
                         request.id,
                         AckBody {
@@ -1450,12 +1541,18 @@ impl A2ARouterCore {
         // (4) Lamport recv_advance.
         let new_clock = self.clock.recv_advance(frame.logical_clock);
 
-        // (5) Push to intake sink (test hook).
-        let sink_guard = self.intake_sink.lock().await;
-        if let Some(sink) = sink_guard.as_ref() {
-            let _ = sink.send(frame.clone());
+        // (5) Hand the accepted frame to the receiving Host's intake consumer.
+        // NOT a "test hook" — that comment was the same false claim as the one on
+        // `install_intake_sink`, and it is why this line dropped every cross-host
+        // delegation frame in production while ACKing `delivered: true` (G1).
+        // A configured-but-dead consumer must NEVER be reported as delivered.
+        if self.push_to_intake_sink(frame).await.is_err() {
+            return A2AJsonRpcResponse::nack(
+                request.id,
+                CODE_INTERNAL,
+                "intake sink full or receiver dropped — frame NOT delivered",
+            );
         }
-        drop(sink_guard);
 
         A2AJsonRpcResponse::ack(
             request.id,
@@ -2113,7 +2210,7 @@ mod tests {
             accept_allowlist: vec![A2AIntent::new("standard")],
         };
         let core = pinned_core(allow).await;
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
         core.install_intake_sink(tx).await;
         let frame = make_frame(Some("loopback"));
         let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);

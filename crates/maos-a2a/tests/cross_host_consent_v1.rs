@@ -127,7 +127,7 @@ async fn scenario_3_2_both_admit_succeeds() {
         .await
         .expect("tofu pin");
     let router = LoopbackA2ARouter::new(vec![cfg], tofu);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
     let frame = make_frame("loopback");
     LocalRouter::route_outbound(&router, frame, &HostId("loopback".into()))

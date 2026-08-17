@@ -252,6 +252,46 @@ fn crosshost_2a_codex_manifest_keeps_the_attested_long_form_sandbox_spelling() {
     );
 }
 
+/// j1-crosshost-2b Q3 — every shipped topology must be LOADABLE, judged by the real
+/// production function and not by a re-implementation of it.
+///
+/// Loadable means: every named member manifest exists, and every entry survives
+/// `validate_remote_topology_target` — which refuses `host` on a class Spirit. A
+/// decorative `host` key therefore reds at the commit that adds it, instead of
+/// sitting in a shipped file for two stories claiming a routing behaviour the parser
+/// rejects (which is what happened to `bilateral-2-host-mira-nash.toml`).
+fn validate_topology_is_loadable(
+    path: &std::path::Path,
+    entries: &[maos_bin::topology::TopologyEntry],
+    base: &std::path::Path,
+) {
+    use maos_bin::topology::validate_remote_topology_target;
+    for entry in entries {
+        let raw = std::path::PathBuf::from(&entry.manifest);
+        let child = if raw.is_absolute() {
+            raw
+        } else {
+            base.join(raw)
+        };
+        assert!(
+            child.exists(),
+            "{} names topology member {} which does not exist",
+            path.display(),
+            child.display()
+        );
+        let child_root: toml::Value =
+            toml::from_str(&std::fs::read_to_string(&child).unwrap()).unwrap();
+        validate_remote_topology_target(entry, &child_root).unwrap_or_else(|err| {
+            panic!(
+                "{} is not loadable: {err}\n  Every shipped topology must load. If a `host` key \
+                 here is decorative, DELETE it (1a's `priority_weight` precedent); do not extend \
+                 remote routing to class Spirits to make a stale key parse.",
+                path.display()
+            )
+        });
+    }
+}
+
 /// Every topology this repo ships must point at member manifests that EXIST, and
 /// the founder-loop topologies must be fully ROUTABLE.
 ///
@@ -264,13 +304,22 @@ fn crosshost_2a_codex_manifest_keeps_the_attested_long_form_sandbox_spelling() {
 /// Routability is judged by the REAL production function
 /// (`validate_remote_topology_target`), not by a re-implementation of it.
 ///
-/// MEASURED FACT, recorded rather than asserted away: `bilateral-2-host-mira-nash.toml`
-/// declares `host` on CLASS Spirits (mira/nash), which that function REFUSES —
-/// story 1a implements remote routing only for `[cli_wrapper]` workers. That
-/// topology therefore parses but cannot be loaded today. It is a forward
-/// declaration of a two-host scene that `j1-crosshost-2b` owns, it is not on this
-/// story's path, and `2a` does not repair it. What `2a` DOES assert is that the
-/// topologies on its own lane are routable end to end.
+/// **j1-crosshost-2b Q3 — the stem filter is GONE and the measured fact it recorded
+/// is REPAIRED.** `2a` recorded that `bilateral-2-host-mira-nash.toml` declares
+/// `host` on CLASS Spirits, which `validate_remote_topology_target` refuses, so the
+/// file parsed but could never load — and called it "a forward declaration of a
+/// two-host scene that `j1-crosshost-2b` owns". Measured, it was neither: it was
+/// 1a's own `priority_weight` defect, missed in 1a's own pass — a key claiming
+/// behaviour the parser rejects. Q3 stripped the two keys on 1a's ratified
+/// precedent (a key is consumed or deleted).
+///
+/// With the only unloadable file now loadable, routability is asserted for **every**
+/// shipped topology, not just the `j1-founder-loop*` stem. That ordering matters:
+/// strip first and this widening lands GREEN on day one, and the next decorative
+/// `host` key reds at its ORIGIN commit instead of being discovered two stories
+/// later. The `j1-founder-loop*` stem still carries the EXTRA obligation of
+/// declaring exactly one delegation target; every other topology must simply be
+/// routable-or-hostless.
 #[test]
 fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
     use maos_bin::topology::{topology_manifest_entries, validate_remote_topology_target};
@@ -295,6 +344,8 @@ fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
         };
         let base = path.parent().unwrap();
         let is_founder_loop = name.starts_with("j1-founder-loop");
+        // Widened by j1-crosshost-2b Q3: no file is exempt from loadability.
+        validate_topology_is_loadable(&path, &entries, base);
         let mut delegation_targets = 0usize;
         for e in &entries {
             let child = {
@@ -353,8 +404,16 @@ fn crosshost_2a_founder_loop_topologies_are_routable_end_to_end() {
         routable_founder_loops,
         vec![
             "j1-founder-loop".to_string(),
-            "j1-founder-loop-codex".to_string()
+            "j1-founder-loop-codex".to_string(),
+            // j1-crosshost-2b AC2.2 — the cross-host scene. Deliberately edited here
+            // rather than named outside the `j1-founder-loop*` prefix: the prefix is
+            // what subjects a file to the routability + exactly-one-delegation-target
+            // obligations above, so renaming around this list would have been the
+            // WEAKER posture (it exempts the new file from the controls instead of
+            // enrolling it).
+            "j1-founder-loop-crosshost".to_string(),
         ],
-        "the hermetic founder loop AND the ported codex profile must both be routable"
+        "the hermetic founder loop, the ported codex profile, AND the cross-host scene must all \
+         be routable"
     );
 }

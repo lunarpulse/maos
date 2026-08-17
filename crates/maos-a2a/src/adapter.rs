@@ -57,9 +57,11 @@ impl LoopbackA2ARouter {
         self
     }
 
-    /// Install an intake sink — test-only hook. Accepted frames are forwarded
-    /// to the sink AFTER all validation passes.
-    pub async fn install_intake_sink(&self, sink: tokio::sync::mpsc::UnboundedSender<IacFrame>) {
+    /// Install the intake sink — the seam a frame consumer attaches through.
+    /// The loopback pair installs it in PRODUCTION (`pairing.rs`), so this is
+    /// NOT a test-only hook — the same false claim j1-crosshost-2b removed from
+    /// `A2ARouterCore::install_intake_sink` lived here too until the §A6 review.
+    pub async fn install_intake_sink(&self, sink: tokio::sync::mpsc::Sender<IacFrame>) {
         self.core.install_intake_sink(sink).await;
     }
 
@@ -238,7 +240,7 @@ mod tests {
             accept_allowlist: vec![A2AIntent::new("standard")],
         };
         let router = pinned_router(allow).await;
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
         router.install_intake_sink(tx).await;
         let frame = make_frame(Some("loopback"));
         let req = A2AJsonRpcRequest::new("iac.deliver", frame, 1);

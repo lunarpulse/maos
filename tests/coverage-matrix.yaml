@@ -488,13 +488,18 @@ coverage:
       CLOSURE - `corpora` stays EMPTY on purpose. FR23a's PRD floor is
       "cross-Spirit consent 30 scenarios with 100% disallowed blocked"; this row now
       carries a handful of refusal legs on the J1 loopback path, which is a
-      different and much smaller claim. Two stated non-coverages are inherited by
-      j1-crosshost-2b — loopback peer authentication is not exercised at all (the
-      frame's own from.host_id selects which accept_allowlist judges it), and the
-      production error path still conflates the deny codes above the router seam
-      (D18, resolved as a decision, live as code). Also note this file cannot fail —
-      mode is `warning` and coverage_matrix.rs only hard-fails on "hard", so a
-      misspelled gate name in this row reds nothing.
+      different and much smaller claim. Two stated non-coverages were inherited by
+      j1-crosshost-2b. Loopback peer authentication is NOT discharged for the
+      loopback arm — the frame's own from.host_id still selects which
+      accept_allowlist judges it, permanently. The cross-host path now binds wire
+      identity, proven by the two-daemon test. D18 is NOT this story's repair —
+      map_a2a_error_to_iac_bus has exactly two call sites, both outbound, and host B
+      never calls it. This story repaired the adjacent H13 defect instead —
+      CODE_SPIRIT_RESTART_DETECTED now becomes the typed A2AError::PinInvalidated
+      rather than falling through interpret_response's catch-all to a transient
+      A2AError::TransportFailed. Also note this file cannot fail — mode is
+      `warning` and coverage_matrix.rs only hard-fails on "hard", so a misspelled
+      gate name in this row reds nothing.
   FR23b:
     gates: [check-cohort-mesh]
     enforcement: advisory-until-engagement

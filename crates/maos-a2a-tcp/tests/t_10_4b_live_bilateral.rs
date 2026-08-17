@@ -179,7 +179,7 @@ async fn send_recv(
 /// `route_outbound` returns `Ok` the frame is already buffered; `recv` returns
 /// them without real delay. A 2s per-recv timeout guards against any stall.
 async fn drain_intake(
-    rx: &mut tokio::sync::mpsc::UnboundedReceiver<IacFrame>,
+    rx: &mut tokio::sync::mpsc::Receiver<IacFrame>,
     expected: usize,
 ) -> Vec<IacFrame> {
     let mut out = Vec::with_capacity(expected);
@@ -408,7 +408,7 @@ async fn t_10_4b_live_bilateral_50_scenario_corpus() {
     let (mira, nash) = bind_bilateral(&clock, &ca, &mira_leaf, &nash_leaf, &[FINE], &[FINE]).await;
 
     // Capture every frame Nash delivers (post all consent gates).
-    let (sink_tx, mut sink_rx) = tokio::sync::mpsc::unbounded_channel::<IacFrame>();
+    let (sink_tx, mut sink_rx) = tokio::sync::mpsc::channel::<IacFrame>(1024);
     nash.core().install_intake_sink(sink_tx).await;
 
     let corpus = build_corpus();
@@ -658,7 +658,7 @@ async fn t_10_4b_binding_records_all_carry_checked() {
     let nash_leaf = valid_leaf(&ca, &clock);
     let (mira, nash) = bind_bilateral(&clock, &ca, &mira_leaf, &nash_leaf, &[FINE], &[FINE]).await;
 
-    let (sink_tx, mut sink_rx) = tokio::sync::mpsc::unbounded_channel::<IacFrame>();
+    let (sink_tx, mut sink_rx) = tokio::sync::mpsc::channel::<IacFrame>(1024);
     nash.core().install_intake_sink(sink_tx).await;
 
     let corpus = build_corpus();

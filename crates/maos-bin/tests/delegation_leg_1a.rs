@@ -75,7 +75,13 @@ fn delegation_frame(
 #[tokio::test]
 async fn delegation_round_trips_the_goal_through_the_real_wire() {
     let mut h = harness().await;
-    let goal = h
+    // j1-crosshost-2b AC2.1 — `delegate` now returns a typed `DelegationOutcome`
+    // because `DelegationLeg::install` chooses its router. This harness installs the
+    // LOOPBACK arm, so the frame never leaves the process and the goal is drained
+    // locally: `RehearsedLocally` is the correct outcome here, and a
+    // `SentCrossHost` would mean this rung-1 control silently started exercising
+    // rung 2's path.
+    let outcome = h
         .leg
         .delegate(
             &h.iac,
@@ -83,7 +89,12 @@ async fn delegation_round_trips_the_goal_through_the_real_wire() {
         )
         .await
         .expect("the frame routes, pumps, and is drained by the consumer");
-    assert_eq!(goal, "build the thing");
+    assert_eq!(
+        outcome,
+        maos_bin::delegation::DelegationOutcome::RehearsedLocally {
+            goal: "build the thing".to_string()
+        }
+    );
 }
 
 /// AC3.4 — the recursion guard, asserted DIRECTLY: a routed frame produces
@@ -116,7 +127,10 @@ async fn routed_frame_produces_exactly_one_local_delivery_and_no_reemit() {
         .await
         .expect("a second, distinct delegation also delivers exactly once");
     assert_eq!(
-        second, "second goal",
+        second,
+        maos_bin::delegation::DelegationOutcome::RehearsedLocally {
+            goal: "second goal".to_string()
+        },
         "each delegation must drain ITS OWN frame — a stale queued copy would return the first goal"
     );
 

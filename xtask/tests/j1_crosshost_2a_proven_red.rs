@@ -56,6 +56,9 @@ const WORKFLOW: &str = ".github/workflows/discipline.yml";
 const CONSENT_REFUSAL_RS: &str = "crates/maos-bin/tests/consent_refusal_1b.rs";
 const WORKER_COMPLETION_TEST: &str = "crates/maos-bin/tests/worker_completion_2a.rs";
 const WORKER_MANIFESTS_TEST: &str = "crates/maos-bin/tests/worker_manifests_2a.rs";
+const TWO_HOST_PROOF_TEST: &str = "crates/maos-bin/tests/two_host_delegation_2b.rs";
+const HOST_GRANTS_TEST: &str = "crates/maos-bin/tests/host_grants_2b.rs";
+const BOUNDED_POSTURES_TEST: &str = "crates/maos-bin/tests/bounded_postures_2b.rs";
 
 const GOOD_TOPOLOGY: &str = "[topology]\nname = \"j1-founder-loop\"\n\n\
      [[topology.spirits]]\nmanifest = \"../orchestrator/manifest.toml\"\n\n\
@@ -107,7 +110,10 @@ const GOOD_WORKFLOW: &str = "jobs:\n  check-j1-loopback-delegation:\n    steps:\
      \x20     - run: cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a -- --test-threads=1\n\
      \x20     - run: cargo test -p maos-bin --test worker_completion_2a -- --test-threads=1\n\
      \x20     - run: cargo test -p maos-bin --test worker_manifests_2a -- --test-threads=1\n\
-     \x20     - run: cargo test -p maos-bin --test consent_refusal_1b -- --test-threads=1\n";
+     \x20     - run: cargo test -p maos-bin --test consent_refusal_1b -- --test-threads=1\n\
+     \x20     - run: cargo test -p maos-bin --test two_host_delegation_2b -- --test-threads=1\n\
+     \x20     - run: cargo test -p maos-bin --test host_grants_2b -- --test-threads=1\n\
+     \x20     - run: cargo test -p maos-bin --test bounded_postures_2b -- --test-threads=1\n";
 
 /// The refusal-proof assertion skeletons `1b`'s `consent-refusal-proofs` leg
 /// needles. Structural, so this carries the SHAPES, not a copy of the real file.
@@ -144,6 +150,8 @@ const GOOD_CONSENT_REFUSAL: &str =
 /// matters is that the targets this file un-enrolls actually exist.
 const GOOD_TEST_STUB: &str = "#[test]\nfn placeholder() {}\n";
 
+const GOOD_TWO_HOST_PROOF: &str = "#[test]\nfn crossing() { let _ = env!(\"CARGO_BIN_EXE_maos\"); mint_pems(); let worker_manifest = (); assert!(matches!(first, HostBOutcome::Ran { .. })); assert_eq!(host_a_frame_id, host_b_frame_id); let _ = MAOS_AUDIT_DB; }\n#[test]\nfn sink_uninstalled() {}\n#[test]\nfn duplicate() { assert!(matches!(second, HostBOutcome::Duplicate { .. })); }\nimpl Drop for RunningDaemon {}\n";
+
 fn write_file(root: &Path, rel: &str, content: &str) {
     let path = root.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -170,6 +178,9 @@ fn lay_green(root: &Path) {
     write_file(root, CONSENT_REFUSAL_RS, GOOD_CONSENT_REFUSAL);
     write_file(root, WORKER_COMPLETION_TEST, GOOD_TEST_STUB);
     write_file(root, WORKER_MANIFESTS_TEST, GOOD_TEST_STUB);
+    write_file(root, TWO_HOST_PROOF_TEST, GOOD_TWO_HOST_PROOF);
+    write_file(root, HOST_GRANTS_TEST, GOOD_TEST_STUB);
+    write_file(root, BOUNDED_POSTURES_TEST, GOOD_TEST_STUB);
     // §A6 review P8 — the derivation walks suffixes `_1a|_1b|_2a`; a tree that
     // lays no `_1a` target cannot notice `"_1a.rs"` being deleted from
     // `J1_TEST_SUFFIXES`, and the real gate would silently stop enforcing the
@@ -560,7 +571,10 @@ fn reformatting_the_enrollment_step_does_not_flip_the_leg() {
              \x20         -- --test-threads=1\n          cargo test -p maos-bin \\\n\
              \x20         --test worker_manifests_2a -- --test-threads=1\n\
              \x20         cargo test -p maos-bin \\\n            --test consent_refusal_1b \\\n\
-     \x20         -- --test-threads=1\n          cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a -- --test-threads=1\n",
+     \x20         -- --test-threads=1\n          cargo test -p maos-bin --test delegation_leg_1a --test topology_delegation_1a -- --test-threads=1\n\
+     \x20         cargo test -p maos-bin --test two_host_delegation_2b -- --test-threads=1\n\
+     \x20         cargo test -p maos-bin --test host_grants_2b -- --test-threads=1\n\
+     \x20         cargo test -p maos-bin --test bounded_postures_2b -- --test-threads=1\n",
         );
     });
     assert!(

@@ -244,7 +244,7 @@ async fn classified_not_allowlisted_is_minus_32001_not_minus_32009() {
 #[tokio::test]
 async fn classified_allowlisted_admitted() {
     let core = fail_closed_core(allow(&[FINE], &[FINE])).await;
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     core.install_intake_sink(tx).await;
 
     // Send admits.

@@ -36,8 +36,8 @@ pub use mailbox_stub::MailboxStub;
 pub use metrics::IacRtMetrics;
 pub use redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 pub use transparency_log::{
-    reconcile_correlated_frames, AuditError, FrameFilter, FrameKind, TeamTransparencyLogEntry,
-    TransparencyLogAdapter, TransparencyLogEntry,
+    reconcile_correlated_frames, AuditError, FrameFilter, FrameKind, FrameRowWrite,
+    TeamTransparencyLogEntry, TransparencyLogAdapter, TransparencyLogEntry,
 };
 
 /// Adapter for the IAC Bus port trait.
@@ -301,11 +301,29 @@ impl IacBusAdapter {
     }
 
     /// Typed deliver (Story 3.1).
+    ///
+    /// **j1-crosshost-2b AC3.2 — the `Ok` value now carries [`FrameRowWrite`].**
+    /// `frame_id` is `BLOB NOT NULL PRIMARY KEY` in the Transparency Log and the
+    /// value is **peer-supplied** on the cross-host path, where J1 mints it
+    /// deterministically as `seq ‖ run_nonce` with no ULID entropy. Before this
+    /// change a peer that re-sent one frame drove the plain `INSERT` into the
+    /// `panic!` inside `insert_frame_row_with_correlation` — a **remote-triggerable
+    /// kernel halt**, unreachable only because the receiver ACKed and dropped every
+    /// frame. AC1.2's production intake sink is what made it reachable, so the
+    /// repair ships in the same change.
+    ///
+    /// On `Duplicate` the frame is **not re-delivered**: the row is already in the
+    /// log, so the I2 guarantee holds and re-running the recipient's side effects
+    /// (on host B: spawning a worker) would be the actual bug. That makes the typed
+    /// path idempotent end-to-end, which matches what the transport already is —
+    /// at-most-once (G3), never at-least-once.
     pub async fn deliver_typed(
         &self,
         frame: maos_domain::frame::IacFrame,
     ) -> Result<
-        maos_domain::invariants::i2::LogBeforeDeliver<()>,
+        maos_domain::invariants::i2::LogBeforeDeliver<
+            crate::adapter::transparency_log::FrameRowWrite,
+        >,
         maos_domain::iac_bus_types::IacBusError,
     > {
         // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
@@ -532,17 +550,10 @@ impl IacBusAdapter {
             }
         };
 
-        // Story 6.2 AC4 — populate the frame_lineage_cache so retract() can
-        // recover the original lineage. Bounded by MAX_LINEAGE_CACHE_ENTRIES.
-        if self.frame_lineage_cache.len() < MAX_LINEAGE_CACHE_ENTRIES {
-            self.frame_lineage_cache
-                .insert(frame.frame_id, frame.intent_lineage.clone());
-        }
-
         // I2: log before deliver.
         // Story 6.1 — use DRR scheduler if present, otherwise synchronous write.
         let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
-        if let Some(ref drr) = self.drr_scheduler {
+        let write = if let Some(drr) = &self.drr_scheduler {
             let lineage_bytes = match serde_json::to_vec(&frame.intent_lineage) {
                 Ok(b) => b,
                 Err(_) => Vec::new(),
@@ -556,23 +567,46 @@ impl IacBusAdapter {
                 frame.auto_marker,
                 lineage_bytes,
             )
-            .await?;
+            .await?
+            .into_inner()
         } else {
-            self.transparency_log.insert_frame_event_with_id(
-                Some(frame.frame_id),
-                tl_kind,
-                spirit_pid,
-                frame.from.spirit_id.as_str(),
-                to_spirit_id,
-                None,
-                intent_str,
-                &payload_bytes,
-                frame.auto_marker,
-            );
-        }
+            self.transparency_log
+                .insert_frame_event_with_id(
+                    Some(frame.frame_id),
+                    tl_kind,
+                    spirit_pid,
+                    frame.from.spirit_id.as_str(),
+                    to_spirit_id,
+                    None,
+                    intent_str,
+                    &payload_bytes,
+                    frame.auto_marker,
+                )
+                .into_inner()
+        };
 
-        // 3. Route through Mailbox (async for backpressure)
-        self.mailbox.deliver(frame).await
+        // 3. Route through Mailbox (async for backpressure) — UNLESS the row was
+        // already there. A replayed frame must not re-run the recipient's side
+        // effects; the journal already holds the evidence, so a duplicate returns
+        // the typed outcome and delivers nothing (AC3.2).
+        if write == transparency_log::FrameRowWrite::Written {
+            // Story 6.2 AC4 — populate the frame_lineage_cache so retract() can
+            // recover the original lineage. Bounded by MAX_LINEAGE_CACHE_ENTRIES.
+            // §A6 review P5: the insert moved INTO the `Written` branch. It used
+            // to run BEFORE the write, so a same-id REPLAY with altered lineage
+            // overwrote the cache even though the log row (and the verdict)
+            // said Duplicate — at baseline that poison was unreachable because a
+            // duplicate PANICKED; once duplicates are typed, surviving with the
+            // attacker's lineage in the cache would decouple retract() from the
+            // persisted original. Only a frame whose row THIS call wrote may
+            // teach the cache.
+            if self.frame_lineage_cache.len() < MAX_LINEAGE_CACHE_ENTRIES {
+                self.frame_lineage_cache
+                    .insert(frame.frame_id, frame.intent_lineage.clone());
+            }
+            self.mailbox.deliver(frame).await?;
+        }
+        Ok(maos_domain::invariants::i2::LogBeforeDeliver::new(write))
     }
 
     /// Typed register_spirit (Story 3.1).

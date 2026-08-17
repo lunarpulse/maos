@@ -22,7 +22,7 @@ use maos_domain::iac_bus_types::IacBusError;
 use maos_domain::invariants::i2::LogBeforeDeliver;
 use maos_domain::invariants::i3::FrameOrigin;
 
-use super::transparency_log::{FrameKind, TransparencyLogAdapter};
+use super::transparency_log::{FrameKind, FrameRowWrite, TransparencyLogAdapter};
 
 // ── constants ───────────────────────────────────────────────
 
@@ -54,7 +54,11 @@ struct Submission {
     intent_str: String,
     auto_marker: FrameOrigin,
     intent_lineage: Vec<u8>,
-    done: oneshot::Sender<Result<LogBeforeDeliver<()>, IacBusError>>,
+    /// j1-crosshost-2b AC3.2 — carries the typed row-write outcome so the
+    /// duplicate-`frame_id` verdict survives the scheduler hop instead of being
+    /// flattened back into `()` (which would re-hide the peer replay this repair
+    /// exists to surface).
+    done: oneshot::Sender<Result<LogBeforeDeliver<FrameRowWrite>, IacBusError>>,
 }
 
 impl DrrScheduler {
@@ -79,7 +83,7 @@ impl DrrScheduler {
         intent_str: String,
         auto_marker: FrameOrigin,
         intent_lineage: Vec<u8>,
-    ) -> Result<LogBeforeDeliver<()>, IacBusError> {
+    ) -> Result<LogBeforeDeliver<FrameRowWrite>, IacBusError> {
         let (done_tx, done_rx) = oneshot::channel();
         let sub = Submission {
             frame,

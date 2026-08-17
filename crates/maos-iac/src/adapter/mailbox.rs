@@ -663,7 +663,25 @@ impl IacBusPort for super::IacBusAdapter {
     }
 
     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError> {
-        self.deliver_typed(frame).await
+        // The `IacBusPort` trait lives in `maos-domain` and its signature is frozen
+        // (ADR-010 / the ABI pin), so the j1-crosshost-2b AC3.2 `FrameRowWrite`
+        // discriminant is dropped HERE and nowhere else. Port callers keep the
+        // pre-existing `LogBeforeDeliver<()>` contract; the cross-host receiver
+        // (host B's intake consumer) calls `deliver_typed` directly precisely
+        // because it is the one caller that must act on a peer replay.
+        //
+        // §A6 review P6 — SEMANTICS CHANGE, STATED: through this wrapper a
+        // duplicate `frame_id` now returns `Ok` WITHOUT delivering to the
+        // mailbox, where pre-2b code PANICKED (the plain INSERT halted). Legacy
+        // port callers therefore no longer halt on a same-id redelivery — the
+        // row is present (I2 holds) and nothing is re-delivered, but any caller
+        // that depended on the halt as its duplicate signal must move to
+        // `deliver_typed`. Kernel-minted-id writers keep their halt via
+        // `halt_on_duplicate` inside the TL adapter.
+        self.deliver_typed(frame).await.map(|logged| {
+            let _ = logged.into_inner();
+            LogBeforeDeliver::new(())
+        })
     }
 
     fn register_spirit(&self, spirit_id: &SpiritId) -> Result<Self::MailboxHandle, IacBusError> {

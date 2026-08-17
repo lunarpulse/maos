@@ -253,6 +253,24 @@ pub enum AuditError {
     LegalHoldAuthorityUnbound,
 }
 
+/// j1-crosshost-2b AC3.2 — the outcome of one Transparency Log row write.
+///
+/// The shape mirrors `DigestReplyObservation::{Accepted, Duplicate, Unauthorized}`
+/// (`crates/maos-a2a-core/src/cohort.rs:285-296`) — the vocabulary, not its
+/// in-memory implementation. **This is not a general dedup store** and no such
+/// store was built (AC3.5): the uniqueness constraint already lives at the storage
+/// layer, where `frame_id` is `BLOB NOT NULL PRIMARY KEY`, and a second in-memory
+/// guard in front of it would be the weaker of the two.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameRowWrite {
+    /// The row was newly inserted.
+    Written,
+    /// A row with this `frame_id` was already present. The I2 log-before-deliver
+    /// guarantee still holds — the frame IS journaled — so the caller decides
+    /// idempotency instead of the kernel halting on a peer's replay.
+    Duplicate,
+}
+
 /// SQL schema for both tables.
 const SCHEMA_SQL: &str = "\
 CREATE TABLE IF NOT EXISTS transparency_log (
@@ -612,13 +630,15 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
+        // Kernel-minted `frame_id` (`None` below), so a duplicate here is a kernel
+        // sequence collision, not a peer replay — it keeps halting (AC3.2 scope).
         if kind == FrameKind::Distillate {
             panic!(
                 "MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows \
                  may only be inserted via DistillateWriter"
             );
         }
-        self.insert_frame_row_with_correlation(
+        Self::halt_on_duplicate(self.insert_frame_row_with_correlation(
             None,
             kind,
             spirit_pid,
@@ -629,7 +649,7 @@ impl TransparencyLogAdapter {
             intent,
             payload,
             origin,
-        )
+        ))
     }
 
     /// Insert a frame event with sender tracking. Returns `LogBeforeDeliver<()>` per I2 typestate:
@@ -653,16 +673,21 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
-        self.insert_frame_event_with_id(
-            None,
-            kind,
-            spirit_pid,
-            from_spirit_id,
-            to_spirit_id,
-            capability_token,
-            intent,
-            payload,
-            origin,
+        // Kernel-minted `frame_id` (`None`): a duplicate is a kernel sequence
+        // collision, never a peer replay, so it keeps halting (AC3.2 scope wall).
+        Self::halt_on_duplicate(
+            self.insert_frame_event_with_id(
+                None,
+                kind,
+                spirit_pid,
+                from_spirit_id,
+                to_spirit_id,
+                capability_token,
+                intent,
+                payload,
+                origin,
+            )
+            .into_inner(),
         )
     }
 
@@ -671,6 +696,18 @@ impl TransparencyLogAdapter {
     /// Use this when the frame ID is externally generated (e.g. an IAC frame
     /// that must be retrievable by its original frame_id for retraction).
     /// Pass `None` for `frame_id` to auto-generate one.
+    ///
+    /// **Returns [`FrameRowWrite`] inside the I2 typestate (j1-crosshost-2b
+    /// AC3.2).** This is the one writer that accepts a **peer-supplied**
+    /// `frame_id` on the cross-host path, and J1 ids are deterministic
+    /// `seq ‖ run_nonce` with no ULID entropy — so a peer that re-sends one frame
+    /// used to halt the receiving Host through the `panic!` in
+    /// `insert_frame_row_with_correlation`. It became reachable the moment
+    /// AC1.2 installed a production intake sink, which is why the repair landed in
+    /// the same change. `Duplicate` means *the row is already in the log*: the I2
+    /// guarantee holds, nothing was lost, and the caller decides idempotency.
+    /// Callers that mint their own ids and cannot express a duplicate stay on
+    /// [`Self::insert_frame_event_with_sender`], which still halts.
     pub fn insert_frame_event_with_id(
         &self,
         frame_id: Option<[u8; 16]>,
@@ -682,7 +719,7 @@ impl TransparencyLogAdapter {
         intent: &str,
         payload: &[u8],
         origin: FrameOrigin,
-    ) -> LogBeforeDeliver<()> {
+    ) -> LogBeforeDeliver<FrameRowWrite> {
         // Story 8.10 AC2 (I11 citer-authorization gate): a `Distillate` row may
         // ONLY be inserted via `insert_distillate_frame` (which the
         // `DistillateWriter` holds the `DistillateWriteToken` for). A direct
@@ -697,7 +734,7 @@ impl TransparencyLogAdapter {
                  I11 audit-chain + citer-authorization checks and is forbidden."
             );
         }
-        self.insert_frame_row(
+        LogBeforeDeliver::new(self.insert_frame_row(
             frame_id,
             kind,
             spirit_pid,
@@ -707,7 +744,7 @@ impl TransparencyLogAdapter {
             intent,
             payload,
             origin,
-        )
+        ))
     }
 
     /// Token-guarded `Distillate` inserter (Story 8.10 AC2). The ONLY path that
@@ -727,7 +764,9 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         origin: FrameOrigin,
     ) -> LogBeforeDeliver<()> {
-        self.insert_frame_row(
+        // I11 distillate ids are kernel/writer-minted, never peer-supplied, so a
+        // duplicate stays a halt (AC3.2 scope wall).
+        Self::halt_on_duplicate(self.insert_frame_row(
             frame_id,
             FrameKind::Distillate,
             spirit_pid,
@@ -737,7 +776,7 @@ impl TransparencyLogAdapter {
             intent,
             payload,
             origin,
-        )
+        ))
     }
 
     /// Internal row writer (no FrameKind gating). Shared by the public
@@ -754,7 +793,7 @@ impl TransparencyLogAdapter {
         intent: &str,
         payload: &[u8],
         origin: FrameOrigin,
-    ) -> LogBeforeDeliver<()> {
+    ) -> FrameRowWrite {
         self.insert_frame_row_with_correlation(
             frame_id,
             kind,
@@ -782,7 +821,7 @@ impl TransparencyLogAdapter {
         intent: &str,
         payload: &[u8],
         origin: FrameOrigin,
-    ) -> LogBeforeDeliver<()> {
+    ) -> FrameRowWrite {
         let redacted = self.redaction.redact(payload);
         let mut inner = self
             .inner
@@ -815,8 +854,15 @@ impl TransparencyLogAdapter {
         );
 
         match result {
-            Ok(_) => LogBeforeDeliver::new(()),
+            Ok(_) => FrameRowWrite::Written,
+            Err(e) if Self::is_duplicate_primary_key(&e) => FrameRowWrite::Duplicate,
             Err(e) => {
+                // j1-crosshost-2b AC3.2 — EVERY other write error still halts, and
+                // that is deliberate. This `panic!` IS the I2 log-before-deliver
+                // guarantee: converting it wholesale would trade a denial-of-service
+                // for SILENT AUDIT LOSS, which is strictly worse. Only the
+                // duplicate-primary-key arm above is exempt, because a row that is
+                // already in the log has not been lost. Do not widen this.
                 panic!(
                     "MAOS kernel panic — Transparency Log write failed: {e}. \
                      Architecture §7.3 I2: log-before-deliver guarantee broken; \
@@ -825,6 +871,49 @@ impl TransparencyLogAdapter {
             }
         }
     }
+
+    /// Is this write error EXACTLY a duplicate-primary-key (or unique-index)
+    /// violation?
+    ///
+    /// j1-crosshost-2b AC3.2 — discriminate on the **extended** code, never on
+    /// `rusqlite::ErrorCode::ConstraintViolation`. `ErrorCode` is a re-export of
+    /// the ffi enum and `ConstraintViolation` is mapped from the *primary* code
+    /// `SQLITE_CONSTRAINT`, which also covers `NOT NULL`, `CHECK` and
+    /// `FOREIGN KEY`. `transparency_log` declares `NOT NULL` on **ten of its
+    /// twelve columns** (only `capability_token` and `correlation_id` are
+    /// nullable), so matching the primary code would silently reclassify a genuine
+    /// NOT-NULL defect as "already journaled" — the exact inversion of this
+    /// repair's intent. Pinned deps: `rusqlite 0.31` / `libsqlite3-sys 0.28`.
+    /// `pub` so the extended-code discrimination itself is testable from
+    /// `crates/maos-iac/tests/` (§A6 review P4: the AC3.2 negative — a planted
+    /// NOT NULL violation must NOT classify as a duplicate — is the control
+    /// that stops the next author from widening the arm back to
+    /// `ErrorCode::ConstraintViolation`).
+    pub fn is_duplicate_primary_key(error: &rusqlite::Error) -> bool {
+        let rusqlite::Error::SqliteFailure(e, _) = error else {
+            return false;
+        };
+        e.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY
+            || e.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
+    }
+
+    /// Preserve the pre-j1-crosshost-2b halt for the writers whose `frame_id` is
+    /// **kernel-minted** and therefore cannot legitimately collide: a duplicate
+    /// there is a sequence defect in this process, not a peer replaying a
+    /// deterministic cross-host id. AC3.2's scope wall in one function — only the
+    /// peer-supplied path ([`Self::insert_frame_event_with_id`]) returns the typed
+    /// outcome; everyone else still halts, and every non-duplicate write error
+    /// halts everywhere.
+    fn halt_on_duplicate(write: FrameRowWrite) -> LogBeforeDeliver<()> {
+        assert!(
+            write == FrameRowWrite::Written,
+            "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
+             KERNEL-MINTED id (Architecture §7.3 I2). Not a peer replay — that is handled typed \
+             at insert_frame_event_with_id. Audit the SQLite file and the id source."
+        );
+        LogBeforeDeliver::new(())
+    }
+
     /// Story 9.2 — overwrite a Distillate frame's payload with a redaction
     /// tombstone.  This is the body-scrub half of Decision C; the marker
     /// frame is appended separately so the audit chain remains append-only.

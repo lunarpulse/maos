@@ -101,7 +101,7 @@ const DISALLOWED_INTENT: &str = "development-task:destroy-workspace";
 async fn asymmetric_pair(
     to_send: &[&str],
     from_accept: &[&str],
-) -> (Arc<LoopbackA2ARouter>, UnboundedReceiver<IacFrame>) {
+) -> (Arc<LoopbackA2ARouter>, tokio::sync::mpsc::Receiver<IacFrame>) {
     let intents = |names: &[&str]| names.iter().map(|n| A2AIntent::new(*n)).collect::<Vec<_>>();
     paired_loopback_router(&[
         LoopbackEndpoint {

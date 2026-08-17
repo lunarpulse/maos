@@ -246,7 +246,7 @@ async fn intent_class_round_trips_byte_equal_through_wire() {
     );
 
     // And it is what the receiver actually consults: delivery succeeds.
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     core.install_intake_sink(tx).await;
     assert!(matches!(
         core.handle_intake(decoded).await,

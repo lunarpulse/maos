@@ -17,6 +17,14 @@
 //! 13.5d `story_10_4a_ac1_proven_red.rs` harness.
 
 const MAIN: &str = include_str!("../src/main.rs");
+/// j1-crosshost-2b AC1.1 — `issue_enterprise_governed_capability` (and with it the
+/// single `.issue_with_mediation(` call) RELOCATED from `main.rs` into the library
+/// so `crates/maos-bin/tests/` can name the worker-spawn surface. The
+/// bypass-absence invariant is unchanged in substance — *exactly one* direct kernel
+/// mint in the composition root — but the composition root is now this PAIR of
+/// files, so the count is taken over both. Counting only `main.rs` would read 0 and
+/// a second mint added in `worker_spawn.rs` would be invisible.
+const WORKER_SPAWN: &str = include_str!("../src/worker_spawn.rs");
 
 /// Return the source of the `{ … }` block that opens at `open_at`, matched by
 /// brace depth. Rust string literals in the scanned regions carry no unbalanced
@@ -106,11 +114,18 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
 
     // ── 4. The governed seam REUSES the 11.4c wrapper. The single
     // `.issue_with_mediation(` call site is the 11.4c bypass-absence invariant:
-    // a second one would mean the daemon minted around SSO/PDP.
+    // a second one would mean the daemon minted around SSO/PDP. Counted over the
+    // composition-root PAIR (`main.rs` + the relocated `worker_spawn.rs`) — see
+    // the `WORKER_SPAWN` doc.
     assert_eq!(
-        MAIN.matches(".issue_with_mediation(").count(),
+        MAIN.matches(".issue_with_mediation(").count()
+            + WORKER_SPAWN.matches(".issue_with_mediation(").count(),
         1,
         "the composition root must keep exactly ONE direct kernel mint — the governed wrapper"
+    );
+    assert!(
+        WORKER_SPAWN.contains("pub fn issue_enterprise_governed_capability("),
+        "the governed mint wrapper must remain the one that owns that call site"
     );
     let seam = block_from(find("fn govern_collective_read("));
     for required in [

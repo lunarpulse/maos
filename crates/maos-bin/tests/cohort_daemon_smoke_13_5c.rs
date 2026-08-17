@@ -860,7 +860,7 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 15] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 16] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -910,6 +910,12 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // manifest-derived policy table at the composition root.
         ("delegation.rs", include_str!("../src/delegation.rs")),
         ("topology.rs", include_str!("../src/topology.rs")),
+        // j1-crosshost-2b AC1.1 — the relocated `maos run` worker-spawn surface
+        // (`[cli_wrapper]` admission, host grants, the enterprise-governed mint,
+        // the subprocess bridge). Listed so the 13.5d negative covers it: the
+        // worker-spawn path receives a host-granted tier and a cap-token and must
+        // never seed the manifest-derived policy table.
+        ("worker_spawn.rs", include_str!("../src/worker_spawn.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

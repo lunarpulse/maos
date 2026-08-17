@@ -52,6 +52,7 @@
 | 5 | Region provenance is **presence-based**: the region guard enforces that `source_log_ref` is present, not that it is cryptographically valid. | That region provenance is independently cryptographically validated. | Trusted applied-root registry — distinct from the completed Reza evidence claim. |
 | 6 | Malformed nested `source_log_ref` is silently dropped; oversized receipt depth truncates. | That receipt ingestion is total. Both are pre-existing deserialization limits; no Epic 13 path produces the oversized depth. | v2.5 provenance hardening. |
 | 7 | 13.5g TL-artifact replacement TOCTOU — individual opens are no-follow, but phase-to-open identity is not continuous. | That artifact identity is stable across phases against an adversary. The benign concurrent-boot half was fixed in-story. | Descriptor/snapshot design. |
+| 8 | `j1-crosshost-2b`: the crossing is proven in two logs; there is **NO** round trip, **NO** signing, and **NO** reconciled bundle (those are `j1-crosshost-2c`); the loopback rehearsal arm permanently does not bind wire identity; peer boot-nonce provisioning is manual with no automated channel; peers are bare `IP:port` with no DNS. | That any of the excluded `j1-crosshost-2c` properties are available, or that the loopback arm binds wire identity, boot-nonce provisioning is automated, or peers support DNS. | `j1-crosshost-2c` for the listed follow-on claims; loopback identity non-binding and manual/IP-only provisioning remain boundaries. |
 
 ## GA-tag procedure (do not tag until both clear)
 

@@ -107,22 +107,31 @@ const WORKFLOW: &str = ".github/workflows/discipline.yml";
 /// `-p maos-bin` unscoped — every invocation names explicit `--test` targets — so
 /// 24 of the 30 files in this directory are invoked by no job at all.
 const MAOS_BIN_TESTS_DIR: &str = "crates/maos-bin/tests";
-const J1_TEST_SUFFIXES: &[&str] = &["_1a.rs", "_1b.rs", "_2a.rs"];
+/// j1-crosshost-2b AC4.3 — `_2b.rs` is added here BEFORE any
+/// `crates/maos-bin/tests/*_2b.rs` file exists, because `derive_enrolled_targets`
+/// reads this list: a `_2b.rs` file written first would be invisible to the
+/// derivation, un-enrolled in CI, and therefore a suggestion rather than a control.
+const J1_TEST_SUFFIXES: &[&str] = &["_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs"];
 
 /// j1-crosshost-1b AC1 — the refusal proofs themselves, the gate's TENTH governed
 /// file. The gate can only check that the assertions are WRITTEN; only the CI
 /// enrollment above proves they RUN.
 const CONSENT_REFUSAL_RS: &str = "crates/maos-bin/tests/consent_refusal_1b.rs";
 
+/// j1-crosshost-2b AC2.3(b) — the two-daemon proof, this gate's ELEVENTH governed
+/// file and the only source of the cross-host wire-identity fact. The gate checks
+/// that its assertions are WRITTEN and REGISTERED; only the CI enrollment in
+/// [`leg_completion_vectors_enrolled`] proves they RUN.
+const TWO_HOST_PROOF_RS: &str = "crates/maos-bin/tests/two_host_delegation_2b.rs";
+/// Registered test functions the two-daemon proof must carry: the crossing itself,
+/// the sink-uninstalled falsifier, and the duplicate-frame replay negative.
+const REQUIRED_CROSS_HOST_TESTS: usize = 3;
+
 /// The shared oracle both real adapters used to delegate to. Its whole contract
 /// was "clean exit + a non-empty final stdout line", which scored a live refusal
 /// that exited 0 as `completed: true`. It is DELETED; this gate exists so it
 /// cannot come back, in that name or by that shape.
 const RETIRED_SHARED_ORACLE: &str = "final_stdout_message_oracle";
-/// The per-adapter oracles that replaced it, each derived from its own CLI's
-/// machine-readable contract.
-const CODEX_ORACLE: &str = "codex_jsonl_oracle";
-const CLAUDE_ORACLE: &str = "claude_result_object_oracle";
 
 /// The leg names this gate publishes, so enrollment surfaces and `1b`'s additions
 /// can be reconciled against one list rather than against prose.
@@ -136,6 +145,10 @@ pub fn ledger_leg_names() -> Vec<&'static str> {
         "completion-vectors-enrolled",
         // j1-crosshost-1b AC2.1
         "consent-refusal-proofs",
+        // j1-crosshost-2b AC2.3(b) — the SPLIT half of the boundary fact: the
+        // cross-host claim, derived from an executed two-daemon proof rather than
+        // from source text (leg 2 keeps the permanent loopback half).
+        "cross-host-identity-proof",
     ]
 }
 
@@ -343,9 +356,44 @@ fn leg_frame_borne_route_intact(root: &Path, findings: &mut Vec<Finding>, audit:
     }
 }
 
-/// LEG 2 — Vex's boundary leg. NOT a failure: a recorded gap with a defined flip.
+/// LEG 2 — Vex's boundary leg. NOT a failure: a recorded, PERMANENT property.
 ///
-/// Returns `true` while the J1 delegation path does not bind wire identity.
+/// Returns `true` while the J1 **loopback rehearsal** path does not bind wire
+/// identity — which is forever, because that arm exists forever.
+///
+/// ## RE-SPECIFIED by `j1-crosshost-2b` AC2.3 — it promised a flip it must never make
+///
+/// `1b` wrote this leg expecting rung 2 to REPLACE the loopback router, so its
+/// finding text told the next author that "rung 2 flips this". Measured at `2b`:
+/// **wrong, in both directions.**
+///
+/// * `2b` does not replace the loopback arm, it FORKS beside it
+///   (`DelegationLeg::install_with_router`). `paired_loopback_router(` therefore
+///   survives in `delegation.rs`, `loopback_composed` stays `true`, and the
+///   `!loopback_composed` guard on `verified_composed` (§A6 review P6, correct on
+///   its own terms) means `unverified` stays `true` and the gate stays GREEN — while
+///   the story that was supposed to flip it has shipped. A tripwire that cannot fire
+///   inside the leg written to repair one.
+/// * And the honest value IS `true`. `LoopbackA2ARouter` is untouched: it still
+///   calls `handle_intake` DIRECTLY (`crates/maos-a2a/src/adapter.rs:82`, `:97`), so
+///   run `maos run` with the loopback topology after `2b` and the frame still picks
+///   its own judge. Asserting `true → false` would assert something that must never
+///   happen.
+/// * **No grep can fix this.** Once `install_with_router` chooses at RUNTIME, source
+///   text cannot know which arm ran. This is the limit already recorded against this
+///   gate: a linter can only check that the judge is still written down.
+///
+/// So the fact is SPLIT (AC2.3, round-table 2026-08-16, unanimous). This leg keeps
+/// the **static** half and states it correctly: the loopback rehearsal arm
+/// self-asserts its peer, permanently. The **cross-host** half — *does the J1
+/// cross-host path bind wire identity?* — is a different question, answered by
+/// EXECUTION in [`leg_cross_host_identity_proof`] + the CI enrollment that makes its
+/// two-daemon proof run, never by source text here.
+///
+/// `boundary MOVED` therefore no longer means "rung 2 arrived". It now means only
+/// what it can mean: one of the two static doors changed shape, and a human must
+/// look. Deleting the loopback arm is a legitimate future change; silently losing
+/// the self-asserted resolution is not.
 ///
 /// ## REPAIRED by `j1-crosshost-1b` AC2.2a — it was a null control
 ///
@@ -367,18 +415,16 @@ fn leg_frame_borne_route_intact(root: &Path, findings: &mut Vec<Finding>, audit:
 ///   — in `maos-bin` and `maos-a2a-tcp` — not a text change in `router.rs`, the
 ///   only file the leg read.
 ///
-/// So the leg now reads the **composition root of the J1 delegation**. While it
-/// builds its router through `maos_a2a::pairing::paired_loopback_router`, the
-/// transport is [`LoopbackA2ARouter`], which calls `handle_intake` **directly**
-/// (`crates/maos-a2a/src/adapter.rs:82`, `:97`) — so there is no TLS-verified peer
-/// to bind `frame.from.host_id` to, and the frame chooses which `accept_allowlist`
-/// judges it. When `j1-crosshost-2b` composes a verified transport here instead,
-/// this leg genuinely flips, and `xtask/tests/j1_crosshost_1b_proven_red.rs` plants
-/// that flipped state as a vector.
+/// So the leg reads the **composition root of the J1 delegation**. While that root
+/// composes a router through `maos_a2a::pairing::paired_loopback_router`, the
+/// loopback transport is [`LoopbackA2ARouter`], which calls `handle_intake`
+/// **directly** (`crates/maos-a2a/src/adapter.rs:82`, `:97`) — so there is no
+/// TLS-verified peer to bind `frame.from.host_id` to, and the frame chooses which
+/// `accept_allowlist` judges it.
 ///
-/// `router.rs` stays governed as the SECOND door the flip can arrive through: if
-/// the shared intake body ever binds identity itself, the J1 path becomes verified
-/// without the composition root changing a line. That term needles the peer
+/// `router.rs` stays governed as the SECOND door (`2b` AC2.3(a) keeps it): if the
+/// shared intake body ever binds identity itself, the J1 loopback path becomes
+/// verified without the composition root changing a line. That term needles the peer
 /// RESOLUTION EXPRESSION, never the bare `frame.from.host_id` token — which is what
 /// the old leg did, and why `handle_intake_verified`'s own NACK message pinned it
 /// green.
@@ -395,11 +441,16 @@ fn leg_loopback_from_host_unverified(
     audit.checked();
     let flat = structural(production_before_tests(&src));
     let loopback_composed = flat.contains("paired_loopback_router(");
-    // Rung 2's flip, named by both of the shapes it can arrive in: a verified
-    // intake entry point, or the live TCP transport crate at the composition
-    // root. §A6 review P6: gated on loopback NOT being composed — a
-    // preparatory `use maos_a2a_tcp` beside a still-loopback router must not
-    // flip the boundary; only replacing the loopback construction does.
+    // `verified_composed` = the loopback arm was REMOVED and replaced by a verified
+    // one. §A6 review P6's `!loopback_composed` guard is retained and is correct: a
+    // `use maos_a2a_tcp` beside a still-present loopback router must not claim the
+    // loopback arm became verified.
+    //
+    // j1-crosshost-2b AC2.3 — note what this deliberately does NOT try to detect:
+    // the FORK. `install_with_router` picks its arm at runtime, so both needles are
+    // present at once and no static term can say which one executed. That question is
+    // not asked here; it is answered by execution in
+    // [`leg_cross_host_identity_proof`].
     let verified_composed = !loopback_composed
         && (flat.contains("handle_intake_verified") || flat.contains("maos_a2a_tcp"));
 
@@ -418,22 +469,145 @@ fn leg_loopback_from_host_unverified(
 
     let unverified = loopback_composed && self_asserted_resolution && !verified_composed;
     if !unverified {
-        // The boundary CHANGED. That is not a violation, but it must not pass
-        // silently: rung 2 turning verification on is exactly the event this leg
-        // exists to surface in a CI diff.
+        // A static door CHANGED SHAPE. Not a violation, and — since `2b` — NOT a
+        // claim that "rung 2 arrived": the cross-host arm shipped WITHOUT moving
+        // either needle, which is exactly why the cross-host fact is derived from
+        // execution instead. What this now surfaces is narrower and true: the
+        // loopback rehearsal arm, or the shared intake body's self-asserted peer
+        // resolution, is no longer written where this leg can see it.
         findings.push(Finding {
             check: CHECK,
             detail: format!(
-                "the J1 wire-identity boundary MOVED (loopback_composed={loopback_composed}, \
-                 self_asserted_resolution={self_asserted_resolution}, \
+                "the STATIC loopback boundary shape changed (loopback_composed=\
+                 {loopback_composed}, self_asserted_resolution={self_asserted_resolution}, \
                  verified_composed={verified_composed}) across {DELEGATION_RS} + \
-                 {A2A_ROUTER_RS}. If rung 2 composed a verified transport, update this leg, the \
-                 AC1.5(a) non-coverage statement in j1-crosshost-2b, and the story records — do \
-                 not delete the leg"
+                 {A2A_ROUTER_RS}. This leg reports a PERMANENT property of the loopback \
+                 rehearsal arm, which must stay `true` while that arm exists — it is NOT a \
+                 rung-2 tripwire, and a `true -> false` transition is not something any story \
+                 should assert. If the loopback arm was deliberately retired, update this leg \
+                 and the story records; do NOT delete the leg, and do NOT re-key the needles to \
+                 chase a runtime fork (see leg `cross-host-identity-proof`)"
             ),
         });
     }
     unverified
+}
+
+/// LEG 7 — j1-crosshost-2b AC2.3(b). **Does the J1 CROSS-HOST path bind wire
+/// identity?** Derived from an executed two-daemon proof, never from grep.
+///
+/// Leg 2 answers a different question and answers it permanently: the loopback
+/// rehearsal arm self-asserts its peer, forever. This leg answers the one that
+/// actually changed at `2b` — and it cannot be answered statically, because
+/// `DelegationLeg::install_with_router` picks its arm at RUNTIME. Source text sees
+/// both arms and knows which executed: neither.
+///
+/// So the fact is routed the way `1b` routed `disallowed-intent-refused-blocking`:
+/// **the gate publishes it only because a named test ran.** Two mechanisms, joined
+/// by one CI line and nothing else:
+///
+/// 1. THIS leg refuses to let the two-daemon proof's assertions be deleted or
+///    weakened, and refuses to let its `#[test]` registrations disappear (needles
+///    alone cannot tell an executing test from an assertion-shaped dead function —
+///    the `smoke_cli_wrapper_8_12` failure mode).
+/// 2. [`leg_completion_vectors_enrolled`] refuses to let the file go un-run: the
+///    enrolled target set is DERIVED from `crates/maos-bin/tests/`, and `_2b.rs` is
+///    in [`J1_TEST_SUFFIXES`], so an un-enrolled `*_2b.rs` reds this gate by
+///    construction. No CI job runs `-p maos-bin` unscoped.
+///
+/// Neither half claims to have watched a frame cross a socket — this gate has never
+/// observed a frame and cannot. What the pair guarantees is that a Blocking gate
+/// reds unless the proof that DOES observe it is both written and wired.
+///
+/// The needles below are assertion skeletons, matched
+/// whitespace- and comment-insensitively via `structural(production_before_tests(…))`,
+/// with **no closing delimiters** — `cargo fmt` adds a trailing comma when it breaks
+/// a macro across lines, which is the `246660f9` false-alarm class this gate has
+/// already been bitten by twice.
+fn leg_cross_host_identity_proof(root: &Path, findings: &mut Vec<Finding>, audit: &mut LegAudit) {
+    const CHECK: &'static str = "cross-host-identity-proof";
+    audit.entered();
+    let Some(src) = read(root, TWO_HOST_PROOF_RS, findings, CHECK) else {
+        return;
+    };
+    let flat = structural(production_before_tests(&src));
+
+    // Each needle IS an assertion, and each one closes a specific way the proof
+    // could look green while proving nothing. What they prove is documented here, in
+    // comments, which cost no budget.
+    const REQUIRED: &[&str] = &[
+        // TWO REAL PROCESSES, not one process with two routers. `CARGO_BIN_EXE_maos`
+        // is the only way to get a second `maos` with its own boot nonce, its own
+        // data home and its own listener — an in-process pair would silently make
+        // the boot-nonce and TLS-identity checks unreachable again.
+        "env!(\"CARGO_BIN_EXE_maos\")",
+        // REAL mTLS, minted per fixture. Reusing a checked-in cert would let the
+        // proof pass against a pinning failure.
+        "mint_pems(",
+        // The receiver ACTED on the frame: the intake sink is installed and drained
+        // (`install_intake_sink` reaching production is the whole story), and the
+        // typed drain outcome — not a log line — is what the test asserts on.
+        // §A6 review P12: the needles are ASSERTION-SHAPED. Matching the bare
+        // type name let the green fixture carry an inert `let outcome =
+        // HostBOutcome::Ran` binding — a real assertion replaced by a no-op
+        // binding kept this leg green. The needles now pin the assert site.
+        "worker_manifest",
+        "assert!(matches!(first,HostBOutcome::Ran",
+        // THE JOIN, on the sixteen frame-id BYTES and never on `kind`:
+        // `insert_kernel_event_returning_id` stamps `TaskComplete` on every kernel
+        // event across nine production callers, so `kind` is a contaminated oracle.
+        "assert_eq!(host_a_frame_id,host_b_frame_id",
+        // TWO DISTINCT DATA HOMES. One shared Transparency Log would make the "join"
+        // a self-join against a single row and prove nothing crossed.
+        "MAOS_AUDIT_DB",
+        // THE FALSIFIER for AC1.2: with the sink UNINSTALLED the frame is still
+        // ACKed and the proof must RED. Without this the whole file could pass
+        // against the pre-2b ACK-and-drop receiver.
+        "fnsink_uninstalled",
+        // THE REPLAY negative for AC3.2: a duplicate `frame_id` must come back typed
+        // and leave the process ALIVE. `frame_id` is a peer-supplied primary key, so
+        // this is the remote-triggerable halt the intake sink made reachable.
+        // §A6 review P12: assertion-shaped, same rationale as the Ran needle.
+        "assert!(matches!(second,HostBOutcome::Duplicate",
+        // THE TEARDOWN GUARD 13_5c lacks: a panic before `reap` leaks a daemon.
+        "implDropforRunningDaemon",
+    ];
+    for needle in REQUIRED {
+        audit.checked();
+        if !flat.contains(needle) {
+            findings.push(Finding {
+                check: CHECK,
+                detail: format!(
+                    "{TWO_HOST_PROOF_RS} no longer asserts `{needle}`. The cross-host \
+                     wire-identity fact is published ONLY because this proof runs; weakening it \
+                     while this gate stays green re-creates the claim-without-a-control shape \
+                     this lane keeps catching. Repair the proof, never this needle"
+                ),
+            });
+        }
+    }
+
+    // Registration count — the other half of "written" vs "executes". Delete the
+    // attributes and `cargo test --test two_host_delegation_2b` runs ZERO tests,
+    // exits 0, and both this gate and CI stay green.
+    let registered = src
+        .lines()
+        .filter(|l| {
+            let l = l.trim();
+            l == "#[test]" || l == "#[tokio::test]"
+        })
+        .count();
+    audit.checked();
+    if registered < REQUIRED_CROSS_HOST_TESTS {
+        findings.push(Finding {
+            check: CHECK,
+            detail: format!(
+                "{TWO_HOST_PROOF_RS} carries {registered} registered test functions, expected at \
+                 least {REQUIRED_CROSS_HOST_TESTS} — the assertion shapes exist but nothing \
+                 executes them"
+            ),
+        });
+    }
 }
 
 /// LEG 3 — j1-crosshost-2a AC1.7(i). Neither real adapter may decide completion
@@ -887,8 +1061,8 @@ pub fn judge(root: &Path) -> Judgement {
     // reconciliation: add a leg to `ledger_leg_names()` without wiring it here (or
     // vice versa) and this stops compiling.
     let mut audits: Vec<LegAudit> = ledger_leg_names().into_iter().map(LegAudit::new).collect();
-    let [leg1, leg2, leg3, leg4, leg5, leg6] = &mut audits[..] else {
-        panic!("ledger_leg_names() must publish exactly the six legs judge() invokes");
+    let [leg1, leg2, leg3, leg4, leg5, leg6, leg7] = &mut audits[..] else {
+        panic!("ledger_leg_names() must publish exactly the seven legs judge() invokes");
     };
 
     leg_frame_borne_route_intact(&root, &mut findings, leg1);
@@ -898,6 +1072,7 @@ pub fn judge(root: &Path) -> Judgement {
     leg_worker_cli_under_library(&root, &mut findings, leg4);
     leg_completion_vectors_enrolled(&root, &mut findings, leg5);
     leg_consent_refusal_proofs(&root, &mut findings, leg6);
+    leg_cross_host_identity_proof(&root, &mut findings, leg7);
 
     // The vacuous-green guard (AC2.2), consuming the SHARED primitive. A leg that
     // read nothing and pushed nothing is indistinguishable from a leg that passed
@@ -951,9 +1126,22 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
                 "consent_refusal_proofs": judgement
                     .leg_green("consent-refusal-proofs")
                     .unwrap_or(false),
-                // Recorded as a BOUNDARY, not a failure (AC4.4). `true` means the
-                // J1 delegation path still does not bind wire identity.
+                // Recorded as a BOUNDARY, not a failure (AC4.4). `true` means the J1
+                // **loopback rehearsal** arm does not bind wire identity — a
+                // PERMANENT property of that arm, not a rung-2 tripwire
+                // (j1-crosshost-2b AC2.3(a) re-specified this; it was previously
+                // documented as something rung 2 would flip, which it must never do
+                // while the loopback arm exists).
                 "loopback_from_host_unverified": from_host_unverified,
+                // j1-crosshost-2b AC2.3(b) — the OTHER half of the split fact. `true`
+                // means the J1 CROSS-HOST path's wire-identity binding is proven, and
+                // it is `true` only because the two-daemon proof is written,
+                // registered and CI-enrolled. Derived from execution; NEVER from a
+                // grep over the composition root, which cannot see which arm of a
+                // runtime fork ran.
+                "cross_host_identity_proven": judgement
+                    .leg_green("cross-host-identity-proof")
+                    .unwrap_or(false),
                 "delegation_intent": DELEGATION_INTENT,
                 "findings": findings.iter().map(|f| serde_json::json!({
                     "check": f.check, "detail": f.detail,
@@ -963,8 +1151,9 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
     } else if oracle_green {
         eprintln!(
             "check-j1-loopback-delegation: PASS — frame-borne route intact, consent refusals \
-             proven and enrolled; boundary: J1 `frame.from.host_id` unverified = \
-             {from_host_unverified} (rung-2 flips this)"
+             proven and enrolled, cross-host wire identity proven by the two-daemon test; \
+             boundary: the loopback rehearsal arm's `frame.from.host_id` is unverified = \
+             {from_host_unverified} (permanent for that arm — NOT a rung-2 flip)"
         );
     } else {
         eprintln!(

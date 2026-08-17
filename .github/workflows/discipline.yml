@@ -1819,6 +1819,13 @@ jobs:
         run: cargo test -p xtask --test j1_crosshost_2a_proven_red -- --test-threads=1
       - name: Run j1-crosshost-1b proven-red vectors (AC2.4)
         run: cargo test -p xtask --test j1_crosshost_1b_proven_red -- --test-threads=1
+      - name: Run cross-host delegation controls (2b AC2.3, AC4.3)
+        run: |
+          cargo test -p maos-bin --test two_host_delegation_2b -- --test-threads=1
+          cargo test -p maos-bin --test host_grants_2b -- --test-threads=1
+          cargo test -p xtask --test j1_crosshost_2b_proven_red
+          cargo test -p maos-bin --test cohort_daemon_smoke_13_5c -- --test-threads=1
+          cargo test -p maos-bin --test bounded_postures_2b -- --test-threads=1
       # j1-crosshost-1b AC2.11-2.12 — the demo's beat-ledger assertions live in an
       # in-`src` `#[cfg(test)]` module (`xtask/src/tests/demo_j1_tests.rs`, reached
       # via `include!`), and NO job runs `cargo test -p xtask` unscoped: every

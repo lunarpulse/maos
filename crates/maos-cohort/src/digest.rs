@@ -329,17 +329,37 @@ pub fn journal_rupture_frame(log: &TransparencyLogAdapter, frame: &IacFrame) -> 
         .ok_or_else(|| "rupture frame is missing denied intent attribution".to_string())?;
     let payload_bytes = serde_json::to_vec(&frame.payload).map_err(|error| error.to_string())?;
     let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
-    log.insert_frame_event_with_id(
-        Some(frame.frame_id),
-        TlFrameKind::ConsentRupture,
-        0,
-        frame.from.spirit_id.as_str(),
-        to_spirit_id,
-        None,
-        intent,
-        &payload_bytes,
-        frame.auto_marker,
-    );
+    // j1-crosshost-2b §A6 review P6 — the typed write verdict is CHECKED. This
+    // sink's ids mix a peer frame-id half with a process-local counter, so a
+    // post-restart collision is possible; pre-2b code HALTED there (the plain
+    // INSERT panicked), and silently swallowing the `Duplicate` now would
+    // suppress a NEW durable rupture record — exactly the fail-loud behaviour
+    // this ConsentRupture path was built to keep. Surface it as an error so the
+    // rupture is never quietly missing from the TL.
+    let write = log
+        .insert_frame_event_with_id(
+            Some(frame.frame_id),
+            TlFrameKind::ConsentRupture,
+            0,
+            frame.from.spirit_id.as_str(),
+            to_spirit_id,
+            None,
+            intent,
+            &payload_bytes,
+            frame.auto_marker,
+        )
+        .into_inner();
+    if write == maos_iac::FrameRowWrite::Duplicate {
+        return Err(format!(
+            "rupture row {} was already present — this rupture event was NOT journaled \
+             (id collision across restarts?); audit before trusting the TL's rupture set",
+            frame
+                .frame_id
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        ));
+    }
     Ok(())
 }
 

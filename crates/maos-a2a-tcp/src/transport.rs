@@ -279,6 +279,80 @@ impl TcpA2ATransport {
         rupture_sink: Option<Arc<dyn ConsentRuptureSink>>,
         crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
     ) -> Result<Self, TcpTransportError> {
+        Self::bind_with_intake_sink(
+            tcp_config,
+            peer_configs,
+            own_boot_nonce,
+            timeouts,
+            retry_policy,
+            validation_time,
+            consent_now_ns,
+            cohort_manifest_gate,
+            halt_receipt_observer,
+            digest_read_port,
+            rupture_sink,
+            crossing_port,
+            None,
+        )
+        .await
+    }
+
+    /// j1-crosshost-2b AC1.2 — the SIXTH optional seam, and the one that makes a
+    /// receiving Host act on a frame instead of acknowledging and discarding it.
+    ///
+    /// Before this existed, **zero** `install_intake_sink` calls lived anywhere in
+    /// `crates/maos-a2a-tcp/src/`. A real daemon authenticated the peer, bound the
+    /// wire identity, ran TOFU, checked the boot nonce, evaluated consent, advanced
+    /// the Lamport clock and ACKed `delivered: true` — then dropped the frame,
+    /// because `A2ARouterCore::intake_sink` was `None` and the doc on
+    /// `install_intake_sink` called it a "test-only hook" (G1). The whole receiving
+    /// mechanism was one missing call and a consumer behind it.
+    ///
+    /// The sink is installed **beside `install_rupture_sink`, before
+    /// `TcpListener::bind`** — deliberately, not incidentally. `install_intake_sink`
+    /// is already filed as racy against in-flight frames
+    /// (`deferred-work.md:309-314`); installing before the listener exists is the
+    /// ordering under which no inbound connection can observe a sink-less router
+    /// (Trap 17, and the same P7c discipline 13.6b applied to its ports).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn bind_with_intake_sink(
+        tcp_config: TcpA2AConfig,
+        peer_configs: Vec<A2APeerConfig>,
+        own_boot_nonce: u64,
+        timeouts: TcpTimeouts,
+        retry_policy: HandshakeRetryPolicy,
+        validation_time: Option<UnixTime>,
+        consent_now_ns: Option<u64>,
+        cohort_manifest_gate: Option<Arc<dyn CohortManifestGate>>,
+        halt_receipt_observer: Option<Arc<dyn HaltReceiptObserver>>,
+        digest_read_port: Option<Arc<dyn DigestReadPort>>,
+        rupture_sink: Option<Arc<dyn ConsentRuptureSink>>,
+        crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
+        intake_sink: Option<tokio::sync::mpsc::Sender<IacFrame>>,
+    ) -> Result<Self, TcpTransportError> {
+        // j1-crosshost-2b §A6 review P8 (AC4.1) — the cross-host path REFUSES the
+        // `boot_nonce = 0` sentinel. Loopback stamps it to skip restart detection
+        // (`crates/maos-a2a/src/adapter.rs`); carrying that habit onto TCP would
+        // ship the first cross-host wire with `router.rs`'s
+        // `if request.boot_nonce != 0` restart check structurally dead — the exact
+        // escape AC4.1 forbids. Checked FIRST, before any identity work, so the
+        // refusal is reachable by a unit test with no certs.
+        if own_boot_nonce == 0 {
+            return Err(TcpTransportError::Config(
+                "cross-host transport refuses boot_nonce = 0 — the loopback sentinel \
+                 would disable NFR-Rel-6 restart detection on a live wire"
+                    .to_string(),
+            ));
+        }
+        for pin in &tcp_config.peer_pins {
+            if pin.boot_nonce == 0 {
+                return Err(TcpTransportError::Config(format!(
+                    "peer pin '{}' carries boot_nonce = 0 — the loopback sentinel is \
+                     not a valid cross-host pin; NFR-Rel-6 restart detection would be dead",
+                    pin.peer_id
+                )));
+            }
+        }
         let pins = tcp_config.build_pin_store().await?;
         let posture = tcp_config.trust_posture()?;
         let (own_chain, own_key) = tcp_config.load_identity()?;
@@ -322,6 +396,12 @@ impl TcpA2ATransport {
         let core = Arc::new(core_inner);
         if let Some(sink) = rupture_sink {
             core.install_rupture_sink(sink).await;
+        }
+        // j1-crosshost-2b AC1.2 — install BEFORE `TcpListener::bind` below, for the
+        // same reason `install_rupture_sink` is here: no inbound connection may ever
+        // observe a sink-less router (Trap 17 / the P7c window).
+        if let Some(sink) = intake_sink {
+            core.install_intake_sink(sink).await;
         }
 
         let server_config = Arc::new(build_server_config(
@@ -384,7 +464,14 @@ impl TcpA2ATransport {
         })
     }
 
-    /// The shared engine (for tests that drive intake directly).
+    /// The shared engine. Tests drive intake through it directly, and the J1
+    /// composition root reads it to reach the router's installed seams.
+    ///
+    /// **This doc said "for tests that drive intake directly" until
+    /// j1-crosshost-2b** (G14.ii) — the same false test-only framing as the one on
+    /// `A2ARouterCore::install_intake_sink`. A production intake consumer is wired
+    /// through [`Self::bind_with_intake_sink`], which is the supported path;
+    /// `core()` remains the general accessor and is not test-scoped.
     pub fn core(&self) -> Arc<A2ARouterCore> {
         self.core.clone()
     }

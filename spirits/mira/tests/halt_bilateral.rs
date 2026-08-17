@@ -317,7 +317,7 @@ async fn pinned_router(accept_a: &[&str]) -> Arc<LoopbackA2ARouter> {
 async fn nash_informed_via_consent_and_non_allowlisted_intent_denied() {
     // Positive — Nash accepts the readonly advisory and architects.
     let router = pinned_router(&[ADVISORY_CONSENT_INTENT]).await;
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
     LocalRouter::route_outbound(
         &*router,

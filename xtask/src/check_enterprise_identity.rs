@@ -441,11 +441,25 @@ fn run_release_graph_absence_leg() -> LegResult {
 }
 
 fn run_issuance_bypass_absence_leg() -> LegResult {
-    let src_path = Path::new("crates/maos-bin/src/main.rs");
-    let src = match std::fs::read_to_string(src_path) {
+    // j1-crosshost-2b AC1.1 — the governed mint wrapper RELOCATED from `main.rs`
+    // into the library's `worker_spawn.rs`, so the composition root is now this
+    // PAIR of files and the exactly-ONE-direct-mint invariant is counted over both.
+    // `main.rs` alone would score count=0 on a pure relocation AND would leave a
+    // second mint added in the relocated file invisible.
+    let src = match [
+        "crates/maos-bin/src/main.rs",
+        "crates/maos-bin/src/worker_spawn.rs",
+    ]
+    .iter()
+    .try_fold(String::new(), |mut acc, rel| {
+        std::fs::read_to_string(Path::new(rel)).map(|s| {
+            acc.push_str(&s);
+            acc
+        })
+    }) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("{GATE_NAME}: cannot read {}: {e}", src_path.display());
+            eprintln!("{GATE_NAME}: cannot read the composition-root pair: {e}");
             return LegResult {
                 label: "issuance-bypass-absence",
                 passed: 0,

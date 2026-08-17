@@ -12,12 +12,24 @@
 name = "bilateral-2-host-mira-nash"
 
 # Ordering is FILE ORDER — `priority_weight` was dead config the parser never
-# read (j1-crosshost-1a AC1.2); unknown keys are now REJECTED. `host` IS read
-# (it is the key j1-crosshost-1a's typed entry parses).
+# read (j1-crosshost-1a AC1.2); unknown keys are now REJECTED.
+#
+# j1-crosshost-2b Q3 (round-table 2026-08-16, unanimous) — the two `host = …`
+# keys that used to sit on these entries are DELETED, on 1a's own ratified
+# precedent: a key is consumed or it is deleted. They were never a forward
+# declaration of a two-host scene. `host` is only read for `[cli_wrapper]`
+# members: `validate_remote_topology_target` REFUSES it on a CLASS Spirit, and
+# mira/nash are class Spirits — so this file PARSED but could never LOAD, while
+# the keys advertised remote routing that the parser rejects. Exactly 1a's
+# `priority_weight` defect, missed in 1a's own pass.
+#
+# Nothing is lost: the header above already states that the bilateral join rides
+# on the operator-supplied `A2APeerConfig` (ADR-003), not on manifest fields, and
+# `j4-mira-nash.toml` is the same pair with no `host` keys and loads fine.
+# Extending remote routing to class Spirits is a DIFFERENT mechanism belonging to
+# the Mira/Nash scene; it is deliberately not built here.
 [[topology.spirits]]
 manifest = "../mira/manifest.toml"
-host = "host-a-prod-edge"
 
 [[topology.spirits]]
 manifest = "../nash/manifest.toml"
-host = "host-b-dev"

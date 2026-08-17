@@ -31,6 +31,9 @@ default = []
 spirit_test = ["dep:maos-spirit-sdk"]
 
 [dev-dependencies]
+# rusqlite: §A6 review P4 — constructs rusqlite errors for the duplicate-
+# discrimination negative; same pinned version as the normal dependency.
+rusqlite = { version = "0.31", features = ["bundled"] }
 tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time", "test-util"] }
 tempfile = "3"
 async-trait = "0.1"

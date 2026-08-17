@@ -1,0 +1,59 @@
+# j1-crosshost-2b AC2.2 — the CROSS-HOST founder-loop scene.
+#
+# Identical in shape to `j1-founder-loop.toml`; it exists as a separate file
+# because that one is pinned by two Blocking controls to exactly one
+# `developer-remote-host` entry (`xtask/src/check_j1_loopback_delegation.rs`
+# leg 1, and `crates/maos-bin/tests/topology_delegation_1a.rs`), so extending it
+# is forbidden. `j1-crosshost-2a` established the escape by adding
+# `j1-founder-loop-codex.toml` and landing green.
+#
+# ── WHERE THE TRANSPORT CONFIG IS NOT ─────────────────────────────────────────
+#
+# Nothing here names a TLS endpoint, a cert, a pin or a boot nonce, and nothing
+# here can. `TOPOLOGY_SPIRIT_KEYS` is a STRICT allowlist — `["manifest", "path",
+# "host"]` — and an unknown key is a hard error, not a warning
+# (`crates/maos-bin/src/topology.rs`). `host` is an identity, not an address: it
+# is the destination `peer_id` that selects the `send_allowlist` at
+# `prepare_outbound`, and the address it resolves to comes from the operator's
+# `MAOS_COHORT_DAEMON_CONFIG` (`[tcp]` + `[[peers]]`). Widening the allowlist to
+# carry an endpoint here would put deployment addresses inside a signed scene
+# description; it is deliberately not done.
+#
+# ── WHAT RUNS WHERE ───────────────────────────────────────────────────────────
+#
+# With a daemon config present and this process NOT in `cohort-a2a-daemon` mode,
+# `DelegationLeg::install` composes the cross-host TCP/mTLS router, the
+# `task.assign` below leaves on a real socket, and THIS Host does not spawn the
+# worker at all — the receiving Host does, journals its worker's real six-value
+# outcome, and both logs carry the same sixteen `frame_id` bytes.
+#
+# With no daemon config the same file runs the loopback rehearsal, byte-for-byte
+# the `j1-founder-loop.toml` behaviour: the frame is emitted, pumped, drained
+# locally, and this Host runs the worker itself.
+#
+# This file claims NO round trip and NO signing. Nothing comes back in rung 2b;
+# the reconciled signed run is `j1-crosshost-2c`.
+
+[topology]
+name = "j1-founder-loop-crosshost"
+
+# Ordering is FILE ORDER. `priority_weight` is absent deliberately: 1a deleted it
+# from every topology because the parser never read it, and unknown keys are now
+# REJECTED, so a re-added unread key fails the run loudly.
+[[topology.spirits]]
+manifest = "../orchestrator/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../architect/manifest.toml"
+
+[[topology.spirits]]
+manifest = "../reviewer/manifest.toml"
+
+# The host-authorized Developer-Worker (a [cli_wrapper] member, NOT a class
+# Spirit — `validate_remote_topology_target` refuses `host` on a class Spirit).
+# Last so it is reached after the Orchestrator has loaded. The hermetic profile
+# wraps `worker-cli-fixture`; swapping in a real agent CLI is a manifest +
+# MAOS_HOST_GRANTS change, never a change here.
+[[topology.spirits]]
+manifest = "../worker/manifest.toml"
+host = "developer-remote-host"

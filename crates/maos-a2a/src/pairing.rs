@@ -89,7 +89,7 @@ pub async fn paired_loopback_router(
 ) -> Result<
     (
         Arc<LoopbackA2ARouter>,
-        tokio::sync::mpsc::UnboundedReceiver<IacFrame>,
+        tokio::sync::mpsc::Receiver<IacFrame>,
     ),
     A2AError,
 > {
@@ -108,7 +108,10 @@ pub async fn paired_loopback_router(
         configs.push(cfg);
     }
     let router = Arc::new(LoopbackA2ARouter::new(configs, tofu));
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    // §A6 review P17 — bounded like the cross-host sink; the loopback rehearsal
+    // pumps at most one frame per delegation, so a generous bound changes
+    // nothing in-process while keeping the type uniform with the TCP path.
+    let (tx, rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
     Ok((router, rx))
 }

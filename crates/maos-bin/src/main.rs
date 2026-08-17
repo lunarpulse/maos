@@ -29,8 +29,6 @@
 //! to run the reference Spirit once and print JSON to stdout.
 
 mod cassette_replay;
-#[cfg(feature = "network")]
-mod enterprise_pdp_runtime;
 mod env_contract;
 // Story 11.4b — out-of-kernel sandbox-escape detector consumer (ADR-024).
 // Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
@@ -43,8 +41,22 @@ mod migration_plan;
 // kernel-Δ). Declared in `lib.rs`, NOT in api.rs (not a kernel-core adapter) and
 // NOT `mod` here: j1-crosshost-2a AC1.1 moved it under the library so
 // `crates/maos-bin/tests/worker_completion_2a.rs` can execute the oracle.
+//
+// j1-crosshost-2b AC1.1 — the `maos run` worker-spawn surface (`[cli_wrapper]`
+// admission, host grants, the enterprise-governed capability mint, the subprocess
+// bridge) ALSO moved under the library, for the same reason: `crates/maos-bin/tests/`
+// cannot name a private item of the binary crate, so a typed `WorkerCompletion`
+// assertion or a port injection was impossible from an integration test.
+// `enterprise_pdp_runtime` follows it because the governed mint takes
+// `&EnterprisePdpRuntime`; both are CONSUMED here, never re-declared as a second,
+// test-invisible `mod`.
 #[cfg(feature = "network")]
-use maos_bin::worker_cli;
+use maos_bin::enterprise_pdp_runtime;
+#[cfg(feature = "network")]
+use maos_bin::worker_spawn::{
+    issue_enterprise_governed_capability, parse_run_args, resolve_cli_binary,
+    run_cli_wrapper_manifest,
+};
 
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -62,7 +74,7 @@ use maos_domain::orchestrator::OrchestratorInstruction;
 #[cfg(feature = "network")]
 use maos_domain::orchestrator::OrchestratorInstructionId;
 #[cfg(feature = "network")]
-use maos_domain::ports::{scope_action_key, CapabilityRegistryPort, CryptoProvider, PolicyVerdict};
+use maos_domain::ports::{CapabilityRegistryPort, CryptoProvider};
 #[cfg(feature = "network")]
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter, RingCryptoProvider,
@@ -180,77 +192,6 @@ fn enforce_vetted_upgrade_precondition(
         now_unix_ms,
     )
     .map_err(|error| error.to_string())
-}
-
-#[cfg(feature = "network")]
-fn principal_attributes_for_pdp(
-    principal: &maos_domain::ports::AuthenticatedPrincipal,
-) -> std::collections::HashMap<String, String> {
-    let mut attrs = principal.attributes.clone();
-    attrs
-        .entry("sub".to_string())
-        .or_insert_with(|| principal.subject.clone());
-    attrs
-        .entry("iss".to_string())
-        .or_insert_with(|| principal.issuer.clone());
-    attrs
-        .entry("aud".to_string())
-        .or_insert_with(|| principal.audience.clone());
-    attrs
-}
-
-#[cfg(feature = "network")]
-fn issue_enterprise_governed_capability(
-    capability: &CapabilityRegistryAdapter,
-    enterprise_runtime: Option<&maos_bin::enterprise_identity::EnterpriseRuntime>,
-    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
-    spirit_pid: u32,
-    scope: Scope,
-    ttl_secs: u32,
-    posture_hash: [u8; 32],
-    intent_class: IntentClass,
-) -> Result<CapabilityToken, String> {
-    let capability_key = scope_action_key(&scope).to_string();
-    let principal = match enterprise_runtime {
-        Some(runtime) if runtime.sso_configured() => {
-            let assertion = std::env::var("MAOS_SSO_ASSERTION").map_err(|_| {
-                format!(
-                    "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
-                )
-            })?;
-            runtime
-                .verify_principal_for_issuance(spirit_pid, &assertion)
-                .map_err(|e| e.to_string())?
-        }
-        _ => None,
-    };
-
-    if let Some(pdp) = enterprise_pdp_runtime {
-        let principal_attributes = principal.as_ref().map(principal_attributes_for_pdp);
-        match pdp
-            .evaluate_issuance(spirit_pid, &capability_key, principal_attributes)
-            .map_err(|e| format!("enterprise PDP issuance evaluation failed: {e}"))?
-        {
-            PolicyVerdict::Allow => {}
-            PolicyVerdict::Deny => {
-                return Err(format!(
-                    "enterprise PDP denied capability issuance for {capability_key}"
-                ));
-            }
-        }
-    }
-
-    let token = capability
-        .issue_with_mediation(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
-        .map_err(|e| format!("kernel capability mediation failed: {e}"))?;
-
-    if let (Some(runtime), Some(principal)) = (enterprise_runtime, principal.as_ref()) {
-        runtime
-            .persist_identity_asserted(spirit_pid, principal, &capability_key)
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(token)
 }
 
 /// Story 11.4c / 13.5a — ONE SIEM export tick against a shared in-memory
@@ -429,64 +370,6 @@ impl maos_providers::Provider for UnconfiguredProvider {
 // ─────────────────────────────────────────────────────────────────────────────
 // Story 8.11 — `maos run <manifest> [--live] [--once]` production run surface.
 // ─────────────────────────────────────────────────────────────────────────────
-
-#[cfg(feature = "network")]
-/// Parsed `maos run` invocation. `None` (from [`parse_run_args`]) means no `run`
-/// subcommand was given → preserve the existing `MAOS_ONE_SHOT` / Spirit-less
-/// serving behavior.
-#[cfg(feature = "network")]
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct RunArgs {
-    manifest_path: String,
-    /// `--live` → real Inference provider; absent → deterministic replay/stub.
-    live: bool,
-    /// `--once` → single `on_idle` pass + graceful drain (headless tests).
-    once: bool,
-}
-
-#[cfg(feature = "network")]
-/// Parse `run <manifest-path> [--live] [--once]` from the process args (the args
-/// AFTER the binary name). Manual parsing — the binary has no clap dependency.
-/// Returns `None` when the first arg is not `run` (the env-gated paths win).
-fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<RunArgs>, String> {
-    let mut it = args.into_iter();
-    if it.next().as_deref() != Some("run") {
-        return Ok(None);
-    }
-    let mut manifest_path: Option<String> = None;
-    let mut live = false;
-    let mut once = false;
-    for a in it {
-        match a.as_str() {
-            "--live" => live = true,
-            "--once" => once = true,
-            // `--replay-llm` is the explicit hermetic flag JB-3's PTY command
-            // uses; it is the DEFAULT (no `--live`) and accepted as a no-op so
-            // the documented command string stays stable.
-            "--replay-llm" => live = false,
-            other if !other.starts_with("--") && manifest_path.is_none() => {
-                manifest_path = Some(other.to_string());
-            }
-            other => {
-                return Err(format!(
-                    "maos run: unknown argument '{}' — expected: <manifest> [--live] [--once]",
-                    other
-                ));
-            }
-        }
-    }
-    match manifest_path {
-        Some(manifest_path) => Ok(Some(RunArgs {
-            manifest_path,
-            live,
-            once,
-        })),
-        None => Err(
-            "maos run: missing manifest path — expected: maos run <manifest> [--live] [--once]"
-                .into(),
-        ),
-    }
-}
 
 #[cfg(feature = "network")]
 fn parse_cross_wall_traceback_args<I: IntoIterator<Item = String>>(
@@ -682,679 +565,6 @@ fn requires_epistemic_halt_port(
                 "belief_variance" | "user_preference_drift" | "diagnostic_confidence"
             )
     })
-}
-
-/// Story 8.12 — map a `[sandbox] tier = "T3"` string to the operational tier.
-#[cfg(feature = "network")]
-fn parse_sandbox_tier(s: &str) -> Result<maos_domain::invariants::i9::SandboxTier, String> {
-    use maos_domain::invariants::i9::SandboxTier;
-    match s.trim().to_ascii_uppercase().as_str() {
-        "T0" => Ok(SandboxTier::T0),
-        "T1" => Ok(SandboxTier::T1),
-        "T2" => Ok(SandboxTier::T2),
-        "T3" => Ok(SandboxTier::T3),
-        "T4" => Ok(SandboxTier::T4),
-        other => Err(format!("maos run: unknown sandbox tier '{other}'")),
-    }
-}
-
-/// Story 8.12 — resolve a CliWrapper `command` to a runnable path. The
-/// deterministic fixture-CLI (`worker-cli-fixture`) is built as a sibling of the
-/// daemon binary in the cargo target dir; tests run the daemon from
-/// `target/debug/deps/`, so the parent dir is also checked, then `$PATH`.
-#[cfg(feature = "network")]
-fn resolve_cli_binary(command: &str) -> Result<String, String> {
-    let p = std::path::Path::new(command);
-    if p.is_absolute() {
-        return if p.exists() {
-            Ok(command.to_string())
-        } else {
-            Err(format!(
-                "maos run: cli_wrapper command not found at absolute path '{command}'"
-            ))
-        };
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let cand = dir.join(command);
-            if cand.is_file() {
-                return Ok(cand.to_string_lossy().into_owned());
-            }
-            if let Some(up) = dir.parent() {
-                let cand2 = up.join(command);
-                if cand2.is_file() {
-                    return Ok(cand2.to_string_lossy().into_owned());
-                }
-            }
-        }
-    }
-    if let Some(pathv) = std::env::var_os("PATH") {
-        for d in std::env::split_paths(&pathv) {
-            let c = d.join(command);
-            if c.is_file() {
-                return Ok(c.to_string_lossy().into_owned());
-            }
-        }
-    }
-    Err(format!(
-        "maos run: cli_wrapper command '{command}' not found (checked daemon-sibling, deps/ parent, and $PATH)"
-    ))
-}
-
-/// Story 8.12 AC3 — load + run a `[cli_wrapper]` manifest under the daemon.
-///
-/// Admits the wrapper through the full gate stack — `reject_respawn_with_context`
-/// (AC1 FORK C), `resolve_cli_wrapper_tier` against the host-side grant allowlist
-/// (AC5 FORK A), then the existing journaled output-shape probe (Story 7.4
-/// `admit_cli_wrapper_journaled`) — then issues a `Scope::CliSubprocessSpawn`
-/// cap-token bound to the `argv_prefix_hash`, spawns the REAL subprocess through
-/// the AC1 [`spawn_and_bridge`] bridge, journals each captured line as a
-/// `FrameKind::CliSubprocessOutput=21` row, and on exit revokes the cap-token
-/// with `RevokeReason::CliSubprocessExit`. Composition-root only — the kernel
-/// receives a constructed handle and decides no topology.
-/// Follow-up ID for the deferred packet-level egress enforcement. Run one records
-/// egress `declared-not-enforced`; enforced egress is an Epic-14 v2.0 hardening.
-#[cfg(feature = "network")]
-const EGRESS_ENFORCEMENT_FOLLOWUP: &str = "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT";
-
-/// The built-in HOST grant for the hermetic fixture Worker. Host-side and
-/// image-keyed — the host independently grants THIS known image; it never echoes
-/// the manifest's self-declared fields (the AC5 trust-direction inversion).
-#[cfg(feature = "network")]
-fn builtin_fixture_grant() -> maos_domain::host_grant::HostGrant {
-    maos_domain::host_grant::HostGrant {
-        attested_image: "worker-cli-fixture".to_string(),
-        signing_key_id: "MAOS Project".to_string(),
-        permitted_tier: maos_domain::invariants::i9::SandboxTier::T3,
-        permitted_egress_destinations: vec![], // hermetic: no egress
-    }
-}
-
-/// Parse an operator `MAOS_HOST_GRANTS` TOML file into host grants. Schema:
-/// ```toml
-/// [[grant]]
-/// attested_image = "codex"
-/// signing_key_id = "OpenAI"
-/// permitted_tier = "T3"
-/// permitted_egress_destinations = ["api.openai.com"]
-/// ```
-/// A grant missing a required field is an ERROR — never a silent admit.
-#[cfg(feature = "network")]
-fn parse_host_grants_toml(text: &str) -> Result<Vec<maos_domain::host_grant::HostGrant>, String> {
-    let root: toml::Value = toml::from_str(text).map_err(|e| format!("toml parse: {e}"))?;
-    let Some(arr) = root.get("grant").and_then(|g| g.as_array()) else {
-        return Ok(Vec::new());
-    };
-    let mut out = Vec::with_capacity(arr.len());
-    for (i, g) in arr.iter().enumerate() {
-        let attested_image = g
-            .get("attested_image")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| format!("grant[{i}]: missing attested_image"))?
-            .to_string();
-        let signing_key_id = g
-            .get("signing_key_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| format!("grant[{i}]: missing signing_key_id"))?
-            .to_string();
-        let permitted_tier = match g.get("permitted_tier").and_then(|v| v.as_str()) {
-            Some(s) => parse_sandbox_tier(s)?,
-            None => maos_domain::invariants::i9::SandboxTier::T3,
-        };
-        let permitted_egress_destinations = g
-            .get("permitted_egress_destinations")
-            .and_then(|v| v.as_array())
-            .map(|a| {
-                a.iter()
-                    .filter_map(|x| x.as_str().map(String::from))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-        out.push(maos_domain::host_grant::HostGrant {
-            attested_image,
-            signing_key_id,
-            permitted_tier,
-            permitted_egress_destinations,
-        });
-    }
-    Ok(out)
-}
-
-/// Load the HOST-MANAGED grant allowlist (replaces the v0.9 self-grant). The
-/// built-in fixture grant keeps the hermetic path green; the operator adds real
-/// agent-CLI grants (codex/claude + egress) via a `MAOS_HOST_GRANTS` TOML file.
-/// A manifest whose (image, author) matches no grant fails CLOSED at
-/// `resolve_cli_wrapper_tier` — never self-granted.
-///
-/// **Disposition of the unreadable/unparseable branch, stated rather than
-/// inherited (j1-crosshost-2a AC2.4).** A `MAOS_HOST_GRANTS` file that cannot be
-/// read or parsed does NOT abort the run: it warns and continues with the
-/// built-in grants only. That is SAFE today — the built-in set grants the
-/// hermetic fixture and nothing else, so every real agent CLI then fails closed
-/// at `resolve_cli_wrapper_tier` and no unauthorized image can spawn. It is
-/// nevertheless a SILENT DOWNGRADE OF AN OPERATOR-INTENT FILE: the operator
-/// asked for a specific grant set and got a different one, and the only signal
-/// is a line on stderr. It stays a warning because tightening it to a hard
-/// refusal changes the failure mode of every hermetic run that happens to have a
-/// stale variable exported, which is a separate decision from this story's. The
-/// safety argument above is the reason it is tolerable, not an argument that it
-/// is correct.
-#[cfg(feature = "network")]
-fn load_host_grant_allowlist() -> maos_domain::host_grant::StaticHostGrantAllowlist {
-    let mut grants = vec![builtin_fixture_grant()];
-    if let Some(path) = std::env::var_os("MAOS_HOST_GRANTS") {
-        let display = std::path::Path::new(&path).display().to_string();
-        match std::fs::read_to_string(&path) {
-            Ok(text) => match parse_host_grants_toml(&text) {
-                Ok(mut extra) => grants.append(&mut extra),
-                Err(e) => eprintln!(
-                    "maos run: MAOS_HOST_GRANTS parse error ({display}): {e}; \
-                     using built-in grants only (real agent CLIs will fail closed)"
-                ),
-            },
-            Err(e) => eprintln!(
-                "maos run: MAOS_HOST_GRANTS unreadable ({display}): {e}; \
-                 using built-in grants only (real agent CLIs will fail closed)"
-            ),
-        }
-    }
-    maos_domain::host_grant::StaticHostGrantAllowlist::new(grants)
-}
-
-#[cfg(all(test, feature = "network"))]
-mod host_grant_tests {
-    use super::*;
-    use maos_domain::host_grant::{HostGrantAllowlist, StaticHostGrantAllowlist};
-    use maos_domain::invariants::i9::SandboxTier;
-    use maos_kernel_core::lifecycle::cli_wrapper::resolve_cli_wrapper_tier;
-
-    #[test]
-    fn builtin_allowlist_grants_the_fixture_only() {
-        // No MAOS_HOST_GRANTS in the test env → built-in fixture grant only.
-        let al = load_host_grant_allowlist();
-        assert!(
-            al.lookup("worker-cli-fixture", "MAOS Project").is_some(),
-            "the built-in host grant must cover the hermetic fixture"
-        );
-        assert!(
-            al.lookup("codex", "OpenAI").is_none(),
-            "codex must NOT be granted without an operator MAOS_HOST_GRANTS entry"
-        );
-    }
-
-    #[test]
-    fn a_manifest_cannot_self_grant_an_unlisted_image() {
-        // Trust-direction proof: a manifest claiming to be `codex` is NOT granted
-        // by the host allowlist → fail closed. Under the old self-grant it would
-        // have auto-granted itself.
-        let al = StaticHostGrantAllowlist::new(vec![builtin_fixture_grant()]);
-        assert!(
-            resolve_cli_wrapper_tier(SandboxTier::T3, "codex", "anyone", &al).is_err(),
-            "an unlisted image must fail closed, not self-grant"
-        );
-        assert!(matches!(
-            resolve_cli_wrapper_tier(SandboxTier::T3, "worker-cli-fixture", "MAOS Project", &al),
-            Ok(t) if t == SandboxTier::T3
-        ));
-    }
-
-    #[test]
-    fn operator_grants_file_parses_real_cli_with_egress() {
-        let toml = r#"
-[[grant]]
-attested_image = "codex"
-signing_key_id = "OpenAI"
-permitted_tier = "T3"
-permitted_egress_destinations = ["api.openai.com"]
-"#;
-        let grants = parse_host_grants_toml(toml).expect("valid grants file parses");
-        assert_eq!(grants.len(), 1);
-        assert_eq!(grants[0].attested_image, "codex");
-        assert_eq!(
-            grants[0].permitted_egress_destinations,
-            vec!["api.openai.com".to_string()]
-        );
-        assert_eq!(grants[0].permitted_tier, SandboxTier::T3);
-    }
-
-    #[test]
-    fn malformed_grants_file_errors_never_silently_admits() {
-        assert!(
-            parse_host_grants_toml("[[grant]]\nsigning_key_id = \"x\"\n").is_err(),
-            "a grant missing attested_image must error, never silently admit"
-        );
-    }
-}
-
-/// j1-crosshost-1a AC1.6 — `DEFAULT_WORKER_TASK` and the `MAOS_WORKER_TASK` read
-/// are DELETED. The Worker's task is frame-borne: `delegated_task` carries the
-/// `goal` drained from the delegation `task.assign` payload, and `None` means
-/// there was no delegation (the standalone `[cli_wrapper]` path), not a default.
-///
-/// Returns the adapter-parsed completion label so the caller can journal it as a
-/// real `FrameKind::TaskComplete` frame (AC3.10).
-#[cfg(feature = "network")]
-#[allow(clippy::too_many_arguments)]
-fn run_cli_wrapper_manifest(
-    manifest_root: &toml::Value,
-    run: &RunArgs,
-    transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
-    capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
-    spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
-    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
-    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
-    delegated_task: Option<&str>,
-) -> Result<worker_cli::WorkerCompletion, Box<dyn std::error::Error>> {
-    use maos_domain::host_grant::HostGrantAllowlist;
-    use maos_domain::invariants::i9::SandboxTier;
-    use maos_kernel_core::lifecycle::cli_wrapper::{
-        admit_cli_wrapper_journaled, argv_prefix_hash, reject_respawn_with_context,
-        resolve_cli_wrapper_tier, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
-    };
-    use maos_kernel_core::security::manifest::CliWrapperConfig;
-
-    // 1. Parse [cli_wrapper].
-    let cw_toml = toml::to_string(
-        manifest_root
-            .get("cli_wrapper")
-            .ok_or("maos run: missing [cli_wrapper] section")?,
-    )
-    .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
-    let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
-        .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
-
-    // 2. Requested sandbox tier (defaults to the T3 CliWrapper floor).
-    let requested_tier = match manifest_root
-        .get("sandbox")
-        .and_then(|s| s.get("tier"))
-        .and_then(|t| t.as_str())
-    {
-        Some(s) => parse_sandbox_tier(s)?,
-        None => SandboxTier::T3,
-    };
-
-    // 3. AC1 FORK C — fail loud at load on the deferred respawn_with_context.
-    reject_respawn_with_context(&config).map_err(|e| format!("maos run: {e}"))?;
-
-    // 4. AC5 FORK A — host-grant tier gate (T3: self-grant KILLED). The manifest
-    //    supplies only the REQUEST (its claimed image + author); the allowlist is
-    //    HOST-MANAGED (built-in fixture grant + operator `MAOS_HOST_GRANTS` file),
-    //    never populated from the manifest's own fields. A (image, author) that
-    //    matches no host grant fails CLOSED at `resolve_cli_wrapper_tier`
-    //    (ECliWrapperTierNotGranted) — the artifact can no longer decide its own
-    //    tier. See host_grant.rs module doc + `load_host_grant_allowlist`.
-    let attested_image = config.command.clone();
-    let signing_key_id = manifest_root
-        .get("author")
-        .and_then(|a| a.get("name"))
-        .and_then(|n| n.as_str())
-        .unwrap_or("unknown")
-        .to_string();
-    let allowlist = load_host_grant_allowlist();
-    let granted_tier =
-        resolve_cli_wrapper_tier(requested_tier, &attested_image, &signing_key_id, &allowlist)
-            .map_err(|e| format!("maos run: {e}"))?;
-
-    // Egress disposition (spec c3): run one records egress `declared-not-enforced`
-    // with a follow-up ID; enforced packet-level egress is an Epic-14 v2.0
-    // hardening. The permitted destinations come from the HOST grant, not the
-    // manifest.
-    let permitted_egress = allowlist
-        .lookup(&attested_image, &signing_key_id)
-        .map(|g| g.permitted_egress_destinations.clone())
-        .unwrap_or_default();
-    println!(
-        "{}",
-        serde_json::json!({
-            "event": "host_grant_disposition",
-            "attested_image": attested_image,
-            "signing_key_id": signing_key_id,
-            "granted_tier": format!("{granted_tier:?}"),
-            "egress": "declared-not-enforced",
-            "egress_enforced": false,
-            "permitted_egress": permitted_egress,
-            "egress_followup": EGRESS_ENFORCEMENT_FOLLOWUP,
-        })
-    );
-
-    // 5. Resolve the CLI binary path; pin it into the config for the probe.
-    let resolved = resolve_cli_binary(&config.command)?;
-    config.command = resolved.clone();
-
-    // Story 11.1a AC1 — invoke the SpiritHostPort at the exact point the
-    // kernel's BridgeSpawnSpec.program is computed. `[cli_wrapper]` manifests
-    // declare no authoring form field (schema extension is out of 11.1a's
-    // scope — see story "Explicitly NOT in 11.1a"), so every request here is
-    // `NativeSubprocess`; when `spirit_host` is `Some`, this is a REAL,
-    // non-inert call (identity resolution) rather than dead code. Absent a
-    // port (native-only default build), `resolved` is used directly —
-    // byte-identical to pre-11.1a behavior.
-    let resolved = match &spirit_host {
-        Some(host) => {
-            host.resolve_launch(&maos_host::SpiritLaunchRequest {
-                form: maos_host::SpiritForm::NativeSubprocess,
-                artifact: resolved,
-                form_config: vec![],
-            })
-            .map_err(|e| format!("maos run: spirit host resolve_launch: {e}"))?
-            .program
-        }
-        None => resolved,
-    };
-
-    // T2/T1 — select the swappable Worker-CLI adapter by resolved binary and
-    // route the typed task into its argv. An unsupported wrapper fails CLOSED
-    // here, before the admission probe or any spawn (spec: "refuse before
-    // probe/spawn"; "fail closed on ... unsupported wrappers").
-    let worker_cli = worker_cli::select_worker_cli(&resolved).ok_or_else(|| {
-        format!(
-            "maos run: unsupported cli_wrapper command '{resolved}'; supported worker CLIs: {:?}",
-            worker_cli::SUPPORTED_WORKER_CLIS
-        )
-    })?;
-    // T5 — CI/local split: a real agent CLI needs MAOS_LIVE_AGENT (local opt-in);
-    // the fixture always runs. CI never sets the flag, so CI cannot spawn a paid
-    // agent — the paid path is physically local-only. Fails closed before spawn.
-    let live_agent = std::env::var_os("MAOS_LIVE_AGENT").is_some_and(|v| !v.is_empty());
-    worker_cli::live_agent_gate(worker_cli.name(), live_agent)
-        .map_err(|e| format!("maos run: {e}"))?;
-    // T5 — clean-home invariant on the live path: refuse an ambient auth file
-    // (codex's `~/.codex/auth.json`, claude's `~/.claude/.credentials.json`) that
-    // would let the child use a credential MAOS never holds. `HOME` is read here,
-    // not `MAOS_HOME` or `XDG_DATA_HOME`: the child inherits the real `HOME`
-    // because the bridge does not clear the env, so this is the variable that
-    // decides which credential file the CLI actually finds.
-    //
-    // j1-crosshost-2a AC2.4 — an UNSET `HOME` used to skip the check entirely,
-    // which is a fail-OPEN: the CLI's own home resolution does not necessarily
-    // give up when the variable is missing, so "we could not look" was silently
-    // treated as "there is nothing there". On the live path an unverifiable
-    // clean-home invariant is a REFUSAL. The hermetic path is untouched — this
-    // whole block is `live_agent`-gated and CI never sets that flag.
-    if live_agent {
-        // Review 2a-P7 — EMPTY is as unverifiable as UNSET: an empty `HOME`
-        // yields RELATIVE `.codex/auth.json` paths that scan the daemon's cwd
-        // while the child may apply its own empty-HOME fallback, so the
-        // invariant would read "satisfied" while proving nothing.
-        let home = match std::env::var_os("HOME") {
-            Some(h) if !h.is_empty() => h,
-            _ => {
-                return Err(
-                    "maos run: HOME is unset or empty on the live path, so the clean-home \
-                            invariant cannot be checked — refusing. An unverifiable credential \
-                            control is not a satisfied one: set HOME to the run's sandbox home."
-                        .into(),
-                );
-            }
-        };
-        if let Err(p) =
-            worker_cli::refuse_ambient_auth(worker_cli.as_ref(), std::path::Path::new(&home))
-        {
-            return Err(format!(
-                "maos run: ambient auth file {} present in the sandbox home — refusing the \
-                 live run. It lets the worker use a credential MAOS never holds, so redaction \
-                 is unattestable (a failed Tier-2). Wipe it or use a clean sandbox home. Note \
-                 this is a FILENAME control: renaming the file satisfies it without removing \
-                 the credential, and the inherited environment channel is not covered at all.",
-                p.display()
-            )
-            .into());
-        }
-    }
-    // j1-crosshost-1a AC1.6 / AC3.5 — the task is FRAME-BORNE. It arrives as a
-    // parameter drained from the delegation `task.assign` payload; the
-    // `MAOS_WORKER_TASK` env read and its `DEFAULT_WORKER_TASK` fallback are
-    // DELETED, not bypassed.
-    //
-    // `None` is the absence of a delegation, NOT a default: the standalone
-    // `[cli_wrapper]` path has no delegating Orchestrator, so the worker runs with
-    // no trailing task argv (the fixture falls back to its canned first line —
-    // see `spirits/worker/src/bin/worker-cli-fixture.rs`). Reintroducing a default
-    // string here would recreate exactly the shortcut this story removed.
-    let task_args = match delegated_task {
-        Some(task) => worker_cli.argv(task),
-        None => Vec::new(),
-    };
-    // Non-secret CLI env only (e.g. codex CODEX_NON_INTERACTIVE). Credentials are
-    // injected host-side on the live path, never in this argv/env shaping code.
-    let worker_env = worker_cli.nonsecret_env();
-
-    // 6. Admission — adapter-aware. The hermetic fixture speaks the kernel's
-    //    Story 7.4 `--maos-bridge-probe` output-shape handshake, so it uses the
-    //    journaled kernel path (probe + shape assert + T3 floor). A real
-    //    adapter-backed CLI (codex/claude) does NOT implement that handshake —
-    //    it exits non-zero on the probe flag, which is why the fixture was the
-    //    only worker that ever admitted. For real CLIs the WorkerCli adapter's
-    //    `parse_completion` IS the output-shape contract (verified at COMPLETION),
-    //    so admission runs a liveness probe and re-asserts the T3 floor here.
-    match worker_cli.probe_strategy() {
-        worker_cli::ProbeStrategy::BridgeHandshake => {
-            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
-                .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
-        }
-        worker_cli::ProbeStrategy::Liveness { argv } => {
-            // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
-            // this; preserve it on the real-CLI path).
-            if !matches!(granted_tier, maos_domain::invariants::i9::SandboxTier::T3) {
-                return Err(format!(
-                    "maos run: cli_wrapper admission failed: {} requires SandboxTier::T3, \
-                     host-granted {granted_tier:?}",
-                    worker_cli.name()
-                )
-                .into());
-            }
-            worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
-                .map_err(|e| {
-                    format!("maos run: cli_wrapper admission failed: liveness probe: {e}")
-                })?;
-            eprintln!(
-                "maos run: cli_wrapper '{}' admitted via liveness probe (real adapter-backed CLI; \
-                 output shape is verified at completion by the {} adapter, not a bridge handshake)",
-                resolved,
-                worker_cli.name()
-            );
-        }
-    }
-
-    // 7. Issue the Scope::CliSubprocessSpawn cap-token (binds argv_prefix_hash).
-    //    Mediation requires the operator policy to grant `proc.exec` for the CLI
-    //    binary — the operator-facing capability grant is Epic 9 surface (FORK B /
-    //    Cross-Impact #2). When the policy has not (yet) granted it, the spawn
-    //    proceeds under the AC5 host-grant authority (attested-image + tier grant,
-    //    a STRONGER operator authorization than the cap-token policy) with a LOUD
-    //    audit note — never a silent bypass. The CapabilityInvocation exit row is
-    //    journaled regardless. The full cap-token issue→bind→revoke lifecycle is
-    //    proven in `maos-capability::cap_tokens::tests::cli_subprocess_exit_revoke`.
-    // Story 11.4c AC2 — SSO/PDP governance happens at the composition root,
-    // before the kernel's frozen `CapabilityToken` is minted. Enterprise SSO
-    // verifies `MAOS_SSO_ASSERTION`; Enterprise PDP receives the verified
-    // principal attributes; only then does the kernel issue the token.
-    // AC1.3 — the adapter's completion oracle depends on argv flags the adapter
-    // itself cannot see: flags live only in the manifest and are hashed into the
-    // cap-token. Refuse HERE, where `config.argv_prefix` is in scope and before
-    // the hash is bound and the child is spawned, so a manifest that ships prose
-    // to a JSON oracle fails loud instead of journaling a real success as a
-    // non-completion (F4's inversion). For claude this also enforces `--bare`,
-    // which is a REPRODUCIBILITY precondition, not only credential hygiene (F21).
-    worker_cli::refuse_missing_argv_flags(worker_cli.as_ref(), &config.argv_prefix)
-        .map_err(|e| format!("maos run: {e}"))?;
-    // Review 2a-P2 — a bypass or repeated isolation flag makes the HASHED
-    // posture a lie the sealed capture would then repeat: adapters re-parse
-    // repeated flags last-wins, so the run can execute without the jail the
-    // manifest declares, and claude's bypass modes also suppress the
-    // `permission_denials` signal the oracle's verdict rests on. Same seam,
-    // still before the hash is bound and the child spawned.
-    worker_cli::refuse_unsafe_argv(worker_cli.as_ref(), &config.argv_prefix)
-        .map_err(|e| format!("maos run: {e}"))?;
-    let aph = argv_prefix_hash(&config.argv_prefix);
-    let token_id = match issue_enterprise_governed_capability(
-        capability.as_ref(),
-        enterprise_runtime.as_deref(),
-        enterprise_pdp_runtime,
-        0,
-        Scope::CliSubprocessSpawn {
-            cli_binary_path: resolved.clone(),
-            argv_prefix_hash: aph,
-            output_shape_version: config.output_shape_version.clone(),
-        },
-        300,
-        [0u8; 32],
-        IntentClass::Standard,
-    ) {
-        Ok(t) => Some(t.token_id),
-        Err(e) => {
-            eprintln!(
-                "maos run: cli_wrapper cap-token mediation not granted ({e}); proceeding under \
-                 AC5 host-grant authority (operator policy `proc.exec` grant is Epic 9 surface). \
-                 The CapabilityInvocation exit row is still journaled."
-            );
-            None
-        }
-    };
-
-    // 8. Spawn the REAL bridge. The typed task is routed as the trailing argv
-    //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
-    let spec = BridgeSpawnSpec {
-        program: resolved,
-        argv_prefix: config.argv_prefix.clone(),
-        task_args,
-        expected_argv_prefix_hash: aph,
-        from_spirit_id: "worker".to_string(),
-        stdio_shape: config.posture.stdio_shape,
-        control_channel: config.posture.control_channel,
-        shutdown_signal: config.posture.shutdown_signal.clone(),
-        channel_capacity: 256,
-        backpressure: Backpressure::Block,
-        env: worker_env,
-    };
-    // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
-    // rows (the adapter's oracle reads the persisted evidence, not the raw exit).
-    let worker_run_since_ns = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(0);
-    let mut bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
-    let child_pid = bridge.child_pid();
-    println!(
-        "{}",
-        serde_json::json!({
-            "event": "cli_wrapper_loaded",
-            "spirit_id": "worker",
-            "granted_tier": format!("{granted_tier:?}"),
-            "child_pid": child_pid,
-            "live": run.live,
-        })
-    );
-
-    let pump = bridge.pump_to_journal(
-        &transparency_log,
-        0,
-        "kernel",
-        &config.command,
-        &["cli-wrapper-run".to_string()],
-    );
-
-    let cap_for_revoke = Arc::clone(&capability);
-    let exit = bridge.wait_and_finalize(&transparency_log, 0, move |exit_code| {
-        if let Some(tid) = token_id {
-            let _ = cap_for_revoke.revoke_cli_subprocess_exit(tid, 0, exit_code);
-        }
-    });
-
-    println!(
-        "{}",
-        serde_json::json!({
-            "event": "cli_wrapper_exit",
-            "child_pid": child_pid,
-            "stdout_lines": pump.stdout_lines,
-            "stderr_lines": pump.stderr_lines,
-            "exit_cause": format!("{:?}", exit.cause),
-            "is_crash": exit.cause.is_crash(),
-        })
-    );
-    eprintln!(
-        "maos run: cli_wrapper '{}' exited ({:?}); {} CliSubprocessOutput row(s) journaled to the Transparency Log",
-        config.command,
-        exit.cause,
-        pump.stdout_lines + pump.stderr_lines
-    );
-
-    // T2/T1 — completion is decided by the adapter over the JOURNALED Worker
-    // output (redacted at insert), never by the raw exit code. Reconstruct the
-    // Worker's stdout/stderr from the CliSubprocessOutput rows this run wrote,
-    // then let the adapter's per-CLI oracle rule. The last stdout frame is the
-    // Worker-produced Transparency Log reference a digest would cite.
-    let worker_exit = match exit.cause.exit_code() {
-        Some(code) => worker_cli::WorkerExit::Exited(code),
-        None => worker_cli::WorkerExit::Crashed,
-    };
-    let mut wc_stdout: Vec<String> = Vec::new();
-    let mut wc_stderr: Vec<String> = Vec::new();
-    // j1-crosshost-2a AC1.6 — NAMED for what it is. This is the last stdout
-    // `CliSubprocessOutput` frame_id, assigned on EVERY stdout row and causally
-    // unrelated to the oracle's verdict (which is computed below, at `:1281`).
-    // The old name `completion_tl_ref` implied the oracle produced it, so the
-    // demo's P4 beat conjoined two unrelated facts and the `tl_ref` half was a
-    // null control that was true whenever the worker printed anything at all.
-    //
-    // It stays UNCONDITIONAL on purpose: the run you most need a citable TL
-    // reference for is the one that FAILED. Gating emission on `Completed` would
-    // delete the evidence pointer at exactly the moment someone asks what the
-    // worker actually printed.
-    let mut last_stdout_tl_ref: Option<[u8; 16]> = None;
-    match transparency_log.query_frames(FrameFilter {
-        kind: Some(FrameKind::CliSubprocessOutput),
-        since_ns: Some(worker_run_since_ns),
-        ..Default::default()
-    }) {
-        Ok(rows) => {
-            for row in &rows {
-                if row.from_spirit_id != "worker" {
-                    continue;
-                }
-                let Ok(v) = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
-                else {
-                    continue;
-                };
-                let line = v
-                    .get("line")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                match v.get("stream").and_then(|s| s.as_str()) {
-                    Some("stdout") => {
-                        last_stdout_tl_ref = Some(row.frame_id);
-                        wc_stdout.push(line);
-                    }
-                    Some("stderr") => wc_stderr.push(line),
-                    _ => {}
-                }
-            }
-        }
-        Err(e) => {
-            eprintln!("maos run: could not read worker output rows for completion: {e}")
-        }
-    }
-    let completion = worker_cli.parse_completion(&wc_stdout, &wc_stderr, worker_exit);
-    println!(
-        "{}",
-        serde_json::json!({
-            "event": "worker_completion",
-            "worker_cli": worker_cli.name(),
-            "completion": completion.label(),
-            "completed": completion.is_completed(),
-            // Non-secret: the last stdout CliSubprocessOutput frame_id (hex) — the
-            // Worker-produced TL reference a digest cites. `null` if none captured.
-            // NOT a completion witness: see the declaration above.
-            "last_stdout_tl_ref":
-                last_stdout_tl_ref.map(|id| id.iter().map(|b| format!("{b:02x}")).collect::<String>()),
-        })
-    );
-
-    // AC3.10 — return the typed oracle outcome. The topology caller emits
-    // `TaskComplete` only for `WorkerCompletion::Completed`; a crash or missing
-    // marker must leave the delegation in flight and fail the run.
-    Ok(completion)
 }
 
 /// Story 8.11 / AC6 — the **production** `EpistemicScalarPort` adapter. A local
@@ -1669,7 +879,9 @@ impl LiveResearcherMcpPort {
                         posture_hash,
                         IntentClass::Standard,
                     )
-                    .map_err(researcher::ResearcherMcpError::TokenIssuanceFailed)?;
+                    .map_err(|e| {
+                        researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
+                    })?;
                     let response = mcp_client.call(&token, server, tool, args).map_err(|e| {
                         researcher::ResearcherMcpError::CallFailed {
                             server: server.into(),
@@ -1770,7 +982,9 @@ impl LiveResearcherMcpPort {
                         posture_hash,
                         IntentClass::Standard,
                     )
-                    .map_err(researcher::ResearcherMcpError::TokenIssuanceFailed)?;
+                    .map_err(|e| {
+                        researcher::ResearcherMcpError::TokenIssuanceFailed(e.to_string())
+                    })?;
                     let response = mcp_client
                         .call(&token, fetch_server, fetch_tool, args)
                         .map_err(|e| researcher::ResearcherMcpError::CallFailed {
@@ -1872,7 +1086,7 @@ impl LiveResearcherCollectivePort {
             [0u8; 32],
             intent_class,
         )
-        .map_err(researcher::ResearcherCollectiveError::Denied)
+        .map_err(|e| researcher::ResearcherCollectiveError::Denied(e.to_string()))
     }
 }
 
@@ -3207,22 +2421,81 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = mailbox.install_transparency_log(Arc::clone(&transparency_log));
     eprintln!("maos: Mailbox TL installer wired (Story 6.4)");
 
-    // j1-crosshost-1a AC2.1-2.3 — the loopback A2A delegation leg, installed
-    // HERE (beside the TL installer) and not at the mailbox construction site,
-    // because the mailbox is already behind an `Arc` there and the router's peer
-    // configs + TOFU store do not exist yet. `install_a2a_router` is set-once:
-    // nothing can swap the cross-host router after boot.
+    // j1-crosshost-1a AC2.1-2.3 — the A2A delegation leg, installed HERE (beside
+    // the TL installer) and not at the mailbox construction site, because the
+    // mailbox is already behind an `Arc` there and the router's peer configs + TOFU
+    // store do not exist yet. `install_a2a_router` is set-once: nothing can swap the
+    // cross-host router after boot.
     //
     // Installed unconditionally so the negative control is real: with the leg
     // present a `host`-bearing frame routes; with it absent the same frame fails
     // closed on `CrossHostNotConfigured` rather than being delivered locally.
-    let mut delegation_leg = maos_bin::delegation::DelegationLeg::install(
+    //
+    // ── j1-crosshost-2b AC2.1 — WHICH router, decided here, applied inside ──
+    //
+    // The choice lives in `DelegationLeg::install_with_router`, not at this call
+    // site: `Mailbox::install_a2a_router` is a set-once `OnceLock` with exactly one
+    // production caller, and this line runs ~5,000 lines BEFORE the `MAOS_ONE_SHOT`
+    // dispatch, so a daemon arm can never install a router of its own afterwards.
+    // Moving this line past the dispatch would place it after the daemon arm
+    // returns — a dead end, deliberately not attempted.
+    //
+    // The cross-host arm is taken only when BOTH hold:
+    //   * an operator supplied `MAOS_COHORT_DAEMON_CONFIG` (so real certs, pins and
+    //     peer endpoints exist — there is no default and nothing is invented), and
+    //   * this process is NOT the receiving daemon. Host B builds its own
+    //     `TcpA2ATransport` inside `build_cohort_a2a_daemon_runtime`; binding a
+    //     second one here would take the same `listen_addr` twice and fail the boot.
+    //
+    // Anything else keeps the loopback rehearsal, which is the honest default: it is
+    // what `demo-j1` drives and what rung 1's refusal proofs run on.
+    let cross_host_delegation_router: Option<Arc<dyn maos_domain::ports::a2a::A2ARouter>> =
+        match cohort_daemon.as_ref() {
+            Some(bootstrap)
+                if std::env::var("MAOS_ONE_SHOT").as_deref() != Ok("cohort-a2a-daemon") =>
+            {
+                let transport = maos_a2a_tcp::TcpA2ATransport::bind(
+                    bootstrap.tcp.clone(),
+                    bootstrap.peers.clone(),
+                    boot_nonce,
+                    maos_a2a_tcp::TcpTimeouts::production(std::time::Duration::from_secs(30)),
+                    maos_a2a_core::HandshakeRetryPolicy::default(),
+                    None,
+                    None,
+                )
+                .await
+                .map_err(|error| {
+                    format!("j1 cross-host delegation transport bind failed: {error}")
+                })?;
+                // `local_addr` comes from the `A2ATransport` trait, imported locally
+                // so the composition root does not carry a crate-wide `use` for one
+                // diagnostic line.
+                {
+                    use maos_a2a_core::router::A2ATransport as _;
+                    eprintln!(
+                        "maos: J1 delegation router = CROSS-HOST TCP/mTLS (listening on {}); \
+                         frame.from.host_id is bound to the TLS-verified peer at the receiver",
+                        transport
+                            .local_addr()
+                            .map(|addr| addr.to_string())
+                            .unwrap_or_else(|| "<unbound>".to_string())
+                    );
+                }
+                Some(Arc::new(transport) as Arc<dyn maos_domain::ports::a2a::A2ARouter>)
+            }
+            _ => None,
+        };
+    let mut delegation_leg = maos_bin::delegation::DelegationLeg::install_with_router(
         Arc::clone(&mailbox),
         &maos_domain::invariants::i8::A2AIntent::new(orchestrator::DELEGATION_CONSENT_INTENT),
+        match cross_host_delegation_router {
+            Some(router) => maos_bin::delegation::DelegationRouter::CrossHostVerified(router),
+            None => maos_bin::delegation::DelegationRouter::LoopbackRehearsal,
+        },
     )
     .await?;
     eprintln!(
-        "maos: loopback A2A delegation leg installed ({} -> {}, intent {}) (j1-crosshost-1a)",
+        "maos: A2A delegation leg installed ({} -> {}, intent {}) (j1-crosshost-1a/2b)",
         maos_bin::delegation::FROM_HOST,
         maos_bin::delegation::TO_HOST,
         orchestrator::DELEGATION_CONSENT_INTENT
@@ -3960,6 +3233,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // ALL completed before the worker admit below.
                     // `run_cli_wrapper_manifest` stays synchronous and receives the
                     // already-drained goal.
+                    // `delegated_task` is `Some(goal)` only on the loopback rehearsal
+                    // arm. On the cross-host arm it is `None` AND
+                    // `crossed_the_wire` is set, because the FAR Host runs the worker
+                    // — see the skip below.
+                    let mut crossed_the_wire = false;
                     let delegated_task = match &entry.host {
                         None => None,
                         Some(to_host) => {
@@ -3989,21 +3267,93 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 intent,
                             )?;
                             delegation_emitter.begin_delegation();
-                            let goal = delegation_leg.delegate(&iac, frame).await?;
-                            println!(
-                                "{}",
-                                serde_json::json!({
-                                    "event": "delegation_routed",
-                                    "to_host": to_host,
-                                    "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
-                                    "intent": orchestrator::DELEGATION_CONSENT_INTENT,
-                                    "goal": goal,
-                                })
-                            );
-                            delegation_seq += 1;
-                            Some(goal)
+                            // j1-crosshost-2b AC2.1 — the two arms diverge here.
+                            // On loopback the frame never left, so THIS Host runs
+                            // the worker with the drained goal. On the cross-host
+                            // arm the frame is on a real mTLS socket and the FAR
+                            // Host runs it: `delegated_task` stays `None`, so the
+                            // local `[cli_wrapper]` admit below runs with no
+                            // trailing task argv — the absence of a delegation, not
+                            // a default (`delegated_task: None` has always meant
+                            // exactly that).
+                            //
+                            // This is also why nothing here claims a round trip:
+                            // the emit row is the evidence this Host holds, and the
+                            // receiver's row is joined to it on `frame_id` by
+                            // `j1-crosshost-2c`. No frame comes back in 2b.
+                            match delegation_leg.delegate(&iac, frame).await? {
+                                maos_bin::delegation::DelegationOutcome::RehearsedLocally {
+                                    goal,
+                                } => {
+                                    println!(
+                                        "{}",
+                                        serde_json::json!({
+                                            "event": "delegation_routed",
+                                            "to_host": to_host,
+                                            "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
+                                            "intent": orchestrator::DELEGATION_CONSENT_INTENT,
+                                            "transport": "loopback-rehearsal",
+                                            "goal": goal,
+                                        })
+                                    );
+                                    delegation_seq += 1;
+                                    Some(goal)
+                                }
+                                maos_bin::delegation::DelegationOutcome::SentCrossHost {
+                                    frame_id,
+                                } => {
+                                    println!(
+                                        "{}",
+                                        serde_json::json!({
+                                            "event": "delegation_routed",
+                                            "to_host": to_host,
+                                            "recipient": maos_bin::delegation::RECIPIENT_SPIRIT,
+                                            "intent": orchestrator::DELEGATION_CONSENT_INTENT,
+                                            "transport": "cross-host-tcp-mtls",
+                                            // The sixteen bytes the receiving Host's
+                                            // own row will carry. NOT a signed
+                                            // reconciliation and NOT a round trip.
+                                            "frame_id": frame_id
+                                                .iter()
+                                                .map(|b| format!("{b:02x}"))
+                                                .collect::<String>(),
+                                        })
+                                    );
+                                    delegation_seq += 1;
+                                    crossed_the_wire = true;
+                                    None
+                                }
+                            }
                         }
                     };
+                    // j1-crosshost-2b AC2.1 — the work went to another machine, so
+                    // this Host does NOT also run it. Spawning the local worker here
+                    // would double-execute the delegated task and let host A journal
+                    // a completion for work it did not do — the "developer-remote"
+                    // claim would then be decorative on both ends.
+                    //
+                    // The completion enforcement 2a hoisted above every
+                    // `[cli_wrapper]` entry is NOT bypassed: there is no local worker
+                    // to have a verdict about. Host B enforces its own worker's
+                    // verdict and journals the real six-value label
+                    // (`DelegationLeg::journal_inbound_outcome`), and the two logs are
+                    // joined on the frame_id printed above. No `TaskComplete` is
+                    // journaled here: host A's in-flight delegation stays in flight,
+                    // which is what FR20 requires and what `j1-crosshost-2c` closes.
+                    if crossed_the_wire {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "event": "topology_worker_delegated_offhost",
+                                "manifest": child_path.display().to_string(),
+                                "topology": true,
+                                "frame_borne": true,
+                                "local_worker_spawned": false,
+                            })
+                        );
+                        loaded_workers.push(child_path.display().to_string());
+                        continue;
+                    }
                     println!(
                         "{}",
                         serde_json::json!({
@@ -4022,6 +3372,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         enterprise_runtime.clone(),
                         enterprise_pdp_runtime.as_ref(),
                         delegated_task.as_deref(),
+                        // Local `maos run` path keeps 2a's ratified FORK B posture.
+                        false,
                     )?;
                     // AC3.10 + review 2a-P4 — the verdict is enforced for EVERY
                     // topology `[cli_wrapper]` entry, not only the delegated
@@ -4438,6 +3790,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     enterprise_runtime.clone(),
                     enterprise_pdp_runtime.as_ref(),
                     None,
+                    false,
                 )?;
                 // j1-crosshost-2a AC1.5 — the SECOND false-success surface. This
                 // path used to DISCARD the returned `WorkerCompletion` and
@@ -8232,6 +7585,24 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "network")]
         if mode == "cohort-a2a-daemon" {
+            // j1-crosshost-2b — FOUND BY THE TWO-DAEMON PROOF, and it is a real
+            // defect this story made reachable.
+            //
+            // `Mailbox::deliver`'s Phase 2 calls
+            // `maos_capability::cap_tokens::monotonic_now_ns()`, which PANICS
+            // ("called before init_monotonic_base()") until the base is set. Every
+            // OTHER `MAOS_ONE_SHOT` arm and the `maos run` path initialize it inside
+            // their own branch; the `cohort-a2a-daemon` arm never did, because
+            // before AC1.2 installed a production intake sink the daemon NEVER
+            // delivered a frame through the Mailbox — it authenticated the frame,
+            // ACKed `delivered: true`, and dropped it (G1). The moment host B's
+            // drain journals an inbound frame it reaches Phase 2 and the receiving
+            // Host panics.
+            //
+            // Same shape as G16 and H13: a defect that was UNREACHABLE, inherited by
+            // the story that makes it reachable. Idempotent (`store` + `OnceLock`
+            // `set`), so this is safe even though the arm is one of many.
+            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
             // Story 13.5a — close the dead-wire: the `EnterpriseRuntime`
             // constructed above never reached the daemon, so every collective
             // read this process served ran with no SSO principal, no PDP
@@ -8257,6 +7628,14 @@ description = "smoke test spirit successor"
                 enterprise_daemon_governance,
                 collective_store.clone(),
                 tenant_spirit_map.clone(),
+                // j1-crosshost-2b AC1.3 — host B's intake wiring. The delegation leg
+                // is MOVED: it owns the set-once `developer-remote` mailbox handle,
+                // and this dispatch never returns.
+                delegation_leg,
+                Arc::clone(&iac),
+                Arc::clone(&capability),
+                enterprise_runtime.clone(),
+                enterprise_pdp_runtime.clone().map(Arc::new),
             )
             .await;
         }
@@ -9476,6 +8855,23 @@ struct CohortDaemonFileConfig {
     local_host: String,
     control_spirit: String,
     digest_summary: maos_cohort::DigestSummary,
+    /// j1-crosshost-2b AC1.2/AC2.2 — the `[cli_wrapper]` manifest THIS Host runs
+    /// when a peer delegates to it.
+    ///
+    /// `None` (the default, and every pre-2b config) means the daemon installs NO
+    /// intake sink: byte-for-byte the pre-2b behaviour, where a verified frame is
+    /// ACKed and dropped. The sink is installed only when an operator has
+    /// configured what host B is allowed to run, so "the receiver acts on frames"
+    /// is an explicit deployment decision, never an accident of linking.
+    ///
+    /// Routed through THIS config and not through the topology file because
+    /// `TOPOLOGY_SPIRIT_KEYS` is a strict `["manifest", "path", "host"]` allowlist
+    /// that hard-errors on an unknown key, and two Blocking controls pin
+    /// `j1-founder-loop.toml` to exactly one `developer-remote-host` entry (G6).
+    /// `own_boot_nonce` deliberately stays absent — 13.5c removed it and a config
+    /// carrying it must still fail to boot (`cohort_daemon_smoke_13_5c.rs:642`).
+    #[serde(default)]
+    worker_manifest: Option<std::path::PathBuf>,
 }
 
 // Story 13.5c — everything the cohort-a2a-daemon needs from its config file,
@@ -9492,6 +8888,9 @@ struct CohortDaemonBootstrap {
     local_host: maos_spirit_abi::identity::HostId,
     control_spirit: maos_spirit_abi::identity::SpiritId,
     digest_summary: maos_cohort::DigestSummary,
+    /// j1-crosshost-2b — the operator-configured `[cli_wrapper]` manifest host B
+    /// runs for an inbound delegation. `None` ⇒ no intake sink, no J1 consumer.
+    worker_manifest: Option<std::path::PathBuf>,
 }
 
 // Story 13.5c — read MAOS_COHORT_DAEMON_CONFIG (if set) and load the verified
@@ -9557,6 +8956,7 @@ fn load_cohort_daemon_bootstrap(
         local_host,
         control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
         digest_summary: file.digest_summary,
+        worker_manifest: file.worker_manifest,
     })
 }
 
@@ -9905,6 +9305,77 @@ fn validate_enterprise_daemon_wiring(
     }
 }
 
+/// j1-crosshost-2b AC1.2/AC2.2 — build host B's worker-spawn context from the
+/// daemon config, or `None` when the operator configured no `worker_manifest`.
+///
+/// `None` is the fail-CLOSED default and the pre-2b behaviour: no context means the
+/// caller installs no intake sink, so a verified frame is still ACKed and dropped.
+/// That is a deliberate deployment posture, not an oversight — a Host executes work
+/// a peer asks for only when its operator has said which manifest it may run.
+///
+/// The manifest is read and parsed HERE, at boot, so a broken one fails the daemon
+/// start instead of surfacing per-frame on a live wire.
+#[cfg(feature = "network")]
+fn host_b_worker_context(
+    bootstrap: &CohortDaemonBootstrap,
+    transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+    capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
+) -> Result<Option<maos_bin::delegation::HostBWorkerContext>, Box<dyn std::error::Error>> {
+    let Some(path) = bootstrap.worker_manifest.as_ref() else {
+        return Ok(None);
+    };
+    let text = std::fs::read_to_string(path).map_err(|error| {
+        format!(
+            "cohort daemon: worker_manifest {} is unreadable: {error}",
+            path.display()
+        )
+    })?;
+    let manifest_root: toml::Value = toml::from_str(&text).map_err(|error| {
+        format!(
+            "cohort daemon: worker_manifest {} does not parse: {error}",
+            path.display()
+        )
+    })?;
+    if manifest_root.get("cli_wrapper").is_none() {
+        return Err(format!(
+            "cohort daemon: worker_manifest {} declares no [cli_wrapper] section — host B has \
+             nothing to spawn for an inbound delegation, so installing an intake sink would \
+             admit frames it can only fail on",
+            path.display()
+        )
+        .into());
+    }
+    Ok(Some(maos_bin::delegation::HostBWorkerContext {
+        manifest_root,
+        // §A6 review P16 (D1): the receiving path fails closed on governance.
+        remote_requested: true,
+        run: maos_bin::worker_spawn::RunArgs {
+            manifest_path: path.display().to_string(),
+            // The daemon serves continuously; `--live`/`--once` are `maos run` CLI
+            // shapes with no meaning on this path. `live` is reported in the
+            // `cli_wrapper_loaded` event only, and the worker's real provider is
+            // decided by the adapter the resolved binary selects.
+            live: false,
+            once: true,
+        },
+        transparency_log: std::sync::Arc::clone(transparency_log),
+        capability: Arc::clone(capability),
+        // Story 11.1a's Spirit Host Port is a `maos run` composition; the daemon
+        // composes no WASM host, so every host-B spawn is a native subprocess —
+        // byte-identical to the `None` branch `run_cli_wrapper_manifest` already has.
+        spirit_host: None,
+        // Host B mints a `Scope::CliSubprocessSpawn` cap-token for work a REMOTE
+        // Host asked for. The SSO/PDP governance the local `maos run` path applies
+        // is threaded here rather than dropped: minting unguarded on the inbound
+        // side would make the receiving Host the weaker endpoint at exactly the
+        // place the trust boundary is.
+        enterprise_runtime,
+        enterprise_pdp_runtime,
+    }))
+}
+
 #[cfg(feature = "network")]
 async fn run_cohort_a2a_daemon(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
@@ -9917,6 +9388,19 @@ async fn run_cohort_a2a_daemon(
     // crossing applier and no crossing emitter, byte-for-byte as before.
     collective_store: Option<Arc<maos_loom_lite::store::LoomLiteStore>>,
     tenant_spirit_map: Option<Arc<maos_bin::tenant_map::TenantMapAdapter>>,
+    // j1-crosshost-2b AC1.3 — the pieces host B's intake consumer needs, threaded
+    // from the composition root rather than rebuilt here. `delegation_leg` is MOVED
+    // in: it owns the `developer-remote` mailbox handle registered at boot
+    // (`install_a2a_router` and `register_spirit` are both set-once), so the drain
+    // cannot register its own and must reuse this one. In daemon mode the dispatch
+    // never returns to `main`, so moving it costs nothing. The enterprise pair is
+    // threaded so host B's cap-token mint for a REMOTE request runs the same
+    // SSO/PDP governance a local `maos run` applies.
+    delegation_leg: maos_bin::delegation::DelegationLeg,
+    iac: Arc<IacBusAdapter>,
+    capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    host_b_enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+    host_b_enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport as _;
     // The state is loaded at the composition root when the config is present;
@@ -9984,6 +9468,48 @@ async fn run_cohort_a2a_daemon(
         // port stays installed and a crossing frame is never applied.
         _ => None,
     };
+    // ── j1-crosshost-2b AC1.2/AC1.3 — HOST B's INTAKE ────────────────────────
+    //
+    // Rung 1 proved a delegation frame can be EMITTED. `2a` proved one Host can
+    // tell the truth about whether its worker did the work. This is where a MAOS
+    // Host first ACTS on a frame another Host sent it.
+    //
+    // The receiver was never missing (G1): the full admission chain — mTLS peer
+    // authentication, `frame.from.host_id` bound to the TLS-verified peer, TOFU,
+    // the boot-nonce restart check, consent granter/expiry, the accept-allowlist,
+    // the Lamport advance — already ran, and then `router.rs`'s
+    // `if let Some(sink)` found `None`, ACKed `delivered: true`, and dropped the
+    // frame. There were ZERO `install_intake_sink` calls in
+    // `crates/maos-a2a-tcp/src/` outside its own tests. This channel and the drain
+    // below are that missing consumer.
+    //
+    // Conditional on the operator having configured `worker_manifest`: no manifest
+    // means no sink is installed at all and the daemon behaves exactly as it did
+    // before this story. "This Host executes work a peer asks for" is a deployment
+    // decision, never a side effect of linking.
+    let host_b = match host_b_worker_context(
+        &bootstrap,
+        &transparency_log,
+        &capability,
+        host_b_enterprise_runtime,
+        host_b_enterprise_pdp_runtime,
+    )? {
+        Some(context) => {
+            // §A6 review P17 (decision D2, ratified) — BOUNDED, and the bound is
+            // the peer-visible admission control: the router `try_send`s into
+            // this channel and NACKs (CODE_INTERNAL) when it is full, so an
+            // authenticated peer can no longer queue unbounded frames behind one
+            // slow worker. 64 in-flight delegations is far beyond any legitimate
+            // founder-loop rhythm and small enough that the exhaustion vector is
+            // closed. NOTE for j1-crosshost-2c: the peer currently sees that NACK
+            // rendered as `TransportFailed` via `interpret_response`'s catch-all —
+            // same misattribution shape as H13, filed to 2c's preflight.
+            let (tx, rx) = tokio::sync::mpsc::channel(64);
+            Some((tx, rx, Arc::new(context)))
+        }
+        None => None,
+    };
+    let intake_sink = host_b.as_ref().map(|(tx, _, _)| tx.clone());
     let runtime = build_cohort_a2a_daemon_runtime(
         Arc::clone(&transparency_log),
         boot_nonce,
@@ -9991,8 +9517,25 @@ async fn run_cohort_a2a_daemon(
         enterprise_posture_required,
         enterprise_daemon_governance,
         crossing_port,
+        intake_sink,
     )
     .await?;
+    // Spawned AFTER the bind so the sink is installed before the listener exists,
+    // and BEFORE the readiness line below, so a peer that connects the instant the
+    // daemon announces itself finds a live consumer rather than a full queue with
+    // nobody reading it.
+    let host_b_drain = host_b.map(|(_, rx, context)| {
+        let cancel = runtime.cancel.child_token();
+        let leg = delegation_leg;
+        let iac_for_intake = Arc::clone(&iac);
+        tokio::spawn(maos_bin::delegation::serve_host_b_intake(
+            leg,
+            iac_for_intake,
+            context,
+            rx,
+            cancel,
+        ))
+    });
     runtime.assert_collective_serve_port_fails_closed()?;
     let listen_addr = runtime
         .transport
@@ -10035,7 +9578,17 @@ async fn run_cohort_a2a_daemon(
     }
     tokio::signal::ctrl_c().await?;
     siem_cancel.cancel();
-    runtime.shutdown().await
+    let shutdown = runtime.shutdown().await;
+    // The drain observes the runtime's cancellation token, so it is already told to
+    // stop; awaiting it means an in-flight worker's outcome row is journaled before
+    // the process exits rather than being lost to a `Drop`. A join error is
+    // reported, never swallowed and never fatal — the daemon is already going down.
+    if let Some(handle) = host_b_drain {
+        if let Err(error) = handle.await {
+            eprintln!("host B intake drain did not shut down cleanly: {error}");
+        }
+    }
+    shutdown
 }
 
 #[cfg(feature = "network")]
@@ -10199,6 +9752,11 @@ async fn build_cohort_a2a_daemon_runtime(
     // legacy no-op port, so a node without a collective store never applies a
     // crossing.
     crossing_port: Option<Arc<dyn maos_a2a_core::CrossTeamCrossingPort>>,
+    // j1-crosshost-2b AC1.2 — host B's intake sink SENDER. `Some` only when the
+    // operator configured a `worker_manifest`; the transport installs it on the
+    // router INSIDE its bind chain, before `TcpListener::bind`, so no inbound
+    // connection can observe a sink-less router (Trap 17).
+    intake_sink: Option<tokio::sync::mpsc::Sender<maos_domain::frame::IacFrame>>,
 ) -> Result<CohortDaemonRuntime, Box<dyn std::error::Error>> {
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     let CohortDaemonBootstrap {
@@ -10208,6 +9766,7 @@ async fn build_cohort_a2a_daemon_runtime(
         local_host,
         control_spirit,
         digest_summary,
+        worker_manifest: _,
     } = bootstrap;
     let pull_peers: Vec<maos_spirit_abi::identity::HostId> = peer_configs
         .iter()
@@ -10238,7 +9797,7 @@ async fn build_cohort_a2a_daemon_runtime(
     let rupture_sink: std::sync::Arc<dyn maos_a2a_core::ConsentRuptureSink> =
         std::sync::Arc::new(maos_cohort::CohortRuptureLogSink::new(transparency_log));
     let transport = std::sync::Arc::new(
-        maos_a2a_tcp::TcpA2ATransport::bind_with_cohort_wiring_and_crossing(
+        maos_a2a_tcp::TcpA2ATransport::bind_with_intake_sink(
             tcp_config,
             peer_configs,
             boot_nonce,
@@ -10251,6 +9810,7 @@ async fn build_cohort_a2a_daemon_runtime(
             Some(std::sync::Arc::clone(&digest_port)),
             Some(rupture_sink),
             crossing_port,
+            intake_sink,
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,
@@ -10502,6 +10062,10 @@ async fn emit_collective_erase_reconciliation(
         bootstrap,
         false,
         None,
+        None,
+        // j1-crosshost-2b — no intake sink: this runtime EMITS or is asserted
+        // against directly; it receives no delegation, so it keeps the pre-2b
+        // ACK-and-drop receiver unchanged.
         None,
     )
     .await?;
@@ -10879,7 +10443,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         vec![host_b_view_of_a.clone()],
         host_b_tofu.clone(),
     ));
-    let (intake_tx, _intake_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (intake_tx, _intake_rx) = tokio::sync::mpsc::channel(1024);
     host_b_router.install_intake_sink(intake_tx).await;
 
     // Step 4 — ALLOWED frames: send 3 frames in sequence and verify
@@ -10937,7 +10501,7 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         vec![host_a_view_smoke.clone()],
         host_b_tofu.clone(),
     ));
-    let (intake_tx_smoke, mut intake_rx_smoke) = tokio::sync::mpsc::unbounded_channel();
+    let (intake_tx_smoke, mut intake_rx_smoke) = tokio::sync::mpsc::channel(1024);
     host_b_router_smoke
         .install_intake_sink(intake_tx_smoke)
         .await;
@@ -11130,7 +10694,7 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
     tofu.pin_first_contact(&PeerId::new("host_b"), &fb, &fb, 1)
         .await?;
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
 
     let make_frame = |seq: u64, intent: &str| {
@@ -11317,7 +10881,7 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     // Fail-closed unconditionally (Option 2 — A2ARouterCore has no band-fallback toggle).
     let router = LoopbackA2ARouter::new(vec![cfg_a, cfg_b], tofu);
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     router.install_intake_sink(tx).await;
 
     let from = || FrameAddress {
@@ -13736,6 +13300,10 @@ mod story_13_5a_enterprise_daemon_seam {
             true,
             governance,
             None,
+            // j1-crosshost-2b — no intake sink: this runtime EMITS or is asserted
+            // against directly; it receives no delegation, so it keeps the pre-2b
+            // ACK-and-drop receiver unchanged.
+            None,
         )
         .await
         .map_err(|error| error.to_string())?;
@@ -13873,11 +13441,20 @@ mod story_13_5a_enterprise_daemon_seam {
         // AC5 proven-red: the reach leg itself observes the production dispatch,
         // so deleting the enterprise argument reds this runtime leg and the
         // dedicated source-inspection leg.
+        //
+        // j1-crosshost-2b §A6 review P1 — the window is 2_600 chars, not 2_000.
+        // 2b's dispatch-site threading (the monotonic-base repair + the host-B
+        // intake arguments) legitimately grew the arm by ~380 chars and pushed
+        // the enterprise tokens past the old window, which reded THIS leg while
+        // its twin in `tests/enterprise_daemon_seam_13_5a.rs` was updated — a
+        // masked regression the fail-fast workspace tally could not see. The
+        // tokens still must appear promptly: if they drift beyond THIS window,
+        // the dispatch has grown something that needs a human look.
         let source = include_str!("main.rs");
         let dispatch_start = source
             .find(r#"if mode == "cohort-a2a-daemon""#)
             .expect("cohort daemon dispatch");
-        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 2_000)];
+        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 2_600)];
         assert!(
             dispatch.contains("build_enterprise_daemon_governance(")
                 && dispatch.contains("enterprise_posture_required,")
@@ -14162,6 +13739,10 @@ mod story_13_5a_enterprise_daemon_seam {
             bootstrap,
             true,
             Some(governance),
+            None,
+            // j1-crosshost-2b — no intake sink: this runtime EMITS or is asserted
+            // against directly; it receives no delegation, so it keeps the pre-2b
+            // ACK-and-drop receiver unchanged.
             None,
         )
         .await
