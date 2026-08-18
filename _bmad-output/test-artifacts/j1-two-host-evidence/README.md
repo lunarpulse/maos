@@ -46,9 +46,12 @@ two keyed identities signed; not two machines, two processes, or two operators
 
 ### Overclaim tripwires
 
-The gate scans the whole capture text (case-insensitive) and refuses `two machines`,
-`two operators` and `fully automated pairing` unless the phrase is negated in place
-(`not two machines`). Nothing in this story proves any of them.
+Each operator-authored string field is scanned (case-insensitive, with `-` and `_`
+normalized to spaces) for `two machines`, `two operators` and `fully automated
+pairing`. An occurrence is excused only when the word `not` immediately precedes
+it in the same field; a negation elsewhere in the capture disarms nothing. The
+verbatim `claim_scope` field is pinned byte-for-byte and never scanned. Nothing
+in this story proves any of the three phrases.
 
 ## Two operator steps that must actually be performed
 

@@ -226,6 +226,16 @@ pub enum SealedExportError {
     DuplicateHostClaim(String),
     #[error("the two logs share no frame_id, so they did not witness one run")]
     NoSharedFrames,
+    #[error(
+        "receipt schema '{0}' is not the ratified two-host receipt schema — a \
+         future schema must be verified by its own verifier, not re-signed into this one"
+    )]
+    UnsupportedReceiptSchema(String),
+    #[error(
+        "receipt claims scope '{0}' — a receipt may carry only the ratified two-host \
+         claim scope; the signature proves authorship of the words, not bounds on them"
+    )]
+    UnratifiedClaimScope(String),
 }
 
 // ─── Core functions ────────────────────────────────────────────────────────
@@ -467,6 +477,14 @@ pub fn reconcile_two_host_bundles(
         .host
         .as_deref()
         .ok_or(SealedExportError::MissingHostClaim)?;
+    // §A6 review 2026-08-18 (P16): a blank claim is no claim. The CLI producer
+    // trims and refuses whitespace-only `--host`, but reconciliation reads the
+    // artifact, and a hand-forged `Some("")` must not count as a discriminator.
+    for host in [a_host, b_host] {
+        if host.trim().is_empty() {
+            return Err(SealedExportError::MissingHostClaim);
+        }
+    }
     if a_host == b_host {
         return Err(SealedExportError::DuplicateHostClaim(a_host.to_string()));
     }
@@ -568,6 +586,21 @@ pub fn verify_two_host_receipt(
 ) -> Result<(), SealedExportError> {
     let verifying_key = VerifyingKey::from_bytes(operator_pubkey)
         .map_err(|e| SealedExportError::InvalidPubkey(format!("{e}")))?;
+    // §A6 review 2026-08-18 (P5): the payload was rebuilt from RECEIPT-SUPPLIED
+    // `schema_version`/`claim_scope`, so a receipt re-signed with a widened scope
+    // verified — the signature proved authorship of the words, not bounds on
+    // them. Pin both against the constants the producer stamps; a divergent
+    // receipt is refused before any signature is even parsed.
+    if receipt.schema_version != TWO_HOST_RECEIPT_SCHEMA {
+        return Err(SealedExportError::UnsupportedReceiptSchema(
+            receipt.schema_version.clone(),
+        ));
+    }
+    if receipt.claim_scope != TWO_HOST_CLAIM_SCOPE {
+        return Err(SealedExportError::UnratifiedClaimScope(
+            receipt.claim_scope.clone(),
+        ));
+    }
     let payload = two_host_receipt_payload(
         &receipt.schema_version,
         &receipt.host_a,

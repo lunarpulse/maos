@@ -1913,6 +1913,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      # §A6 review D-1 (2026-08-18): the AC2.1 stranger's path
+      # (tools/verify-audit-bundle/verify.py) requires a Python Ed25519
+      # backend; the Blocking lane's substrate must be guaranteed, not hoped for.
+      - name: Ensure the stranger's Python Ed25519 backend (AC2.1)
+        run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
       - name: Run check-j1-two-host-signed-run
         run: cargo run -p xtask -- check-j1-two-host-signed-run --json
       - name: Run j1-crosshost-2c proven-red vectors (AC5.1)

@@ -164,11 +164,16 @@ fn a_host_less_bundle_is_byte_identical_to_the_pre_2c_surface() {
 fn region_cannot_discriminate_two_hosts_but_host_can() {
     let region = maos_domain::region::Region::canonicalize("eu-west-1").expect("region");
     // One shared root, one region: two "different hosts" derive the SAME key.
+    // §A6 review 2026-08-18 (P9): this used to compare the identical expression
+    // to itself — a vacuous green. The honest assertion is the WELD IDENTITY:
+    // the region tag reaches the key material only through
+    // `derive_region_signing_seed`, and nothing host-shaped enters it at all.
     let shared = [0x5b; 32];
     assert_eq!(
         sealed_export::derive_region_pubkey(&shared, &region),
-        sealed_export::derive_region_pubkey(&shared, &region),
-        "region is a jurisdiction tag, not a host discriminator"
+        sealed_export::derive_pubkey(&sealed_export::derive_region_signing_seed(&shared, &region)),
+        "region is a jurisdiction tag welded into the key material — it has no \
+         host input, so it cannot discriminate two hosts under one root"
     );
 
     // Independent roots produce different keys — that, plus the host field, is
@@ -187,6 +192,81 @@ fn region_cannot_discriminate_two_hosts_but_host_can() {
     // boot_nonce cannot do it either: both halves carry the same one here, and
     // a real `--range 1d` export sweeps many.
     assert_eq!(a.entries[0].boot_nonce, b.entries[0].boot_nonce);
+}
+
+// ── §A6 review 2026-08-18 — the receipt's own bounds ──────────────────────
+
+/// A receipt re-signed with a WIDENED claim scope must be refused: the
+/// signature proves authorship of the words, not bounds on them, so the
+/// verifier pins the ratified scope instead of trusting the receipt's copy.
+#[test]
+fn a_receipt_with_a_widened_claim_scope_is_refused() {
+    let a = signed_half("host-a", &SEED_A, &["aa11"]);
+    let b = signed_half("host-b", &SEED_B, &["aa11"]);
+    let join = sealed_export::reconcile_two_host_bundles(
+        &a,
+        &sealed_export::derive_pubkey(&SEED_A),
+        &b,
+        &sealed_export::derive_pubkey(&SEED_B),
+    )
+    .expect("independent halves reconcile");
+
+    let operator_seed = [0x0c; 32];
+    let mut receipt = sealed_export::build_two_host_receipt(&operator_seed, &join, 3_000);
+    assert!(
+        sealed_export::verify_two_host_receipt(
+            &receipt,
+            &sealed_export::derive_pubkey(&operator_seed)
+        )
+        .is_ok(),
+        "the untampered receipt must verify"
+    );
+
+    receipt.claim_scope = "two machines, two operators, fully automated pairing".to_string();
+    assert!(
+        matches!(
+            sealed_export::verify_two_host_receipt(
+                &receipt,
+                &sealed_export::derive_pubkey(&operator_seed)
+            ),
+            Err(SealedExportError::UnratifiedClaimScope(_))
+        ),
+        "a receipt carrying a wider scope than its controls must be refused"
+    );
+
+    receipt.claim_scope = sealed_export::TWO_HOST_CLAIM_SCOPE.to_string();
+    receipt.schema_version = "maos.two-host-receipt.v999".to_string();
+    assert!(
+        matches!(
+            sealed_export::verify_two_host_receipt(
+                &receipt,
+                &sealed_export::derive_pubkey(&operator_seed)
+            ),
+            Err(SealedExportError::UnsupportedReceiptSchema(_))
+        ),
+        "an unratified schema version must be refused before any signature is parsed"
+    );
+}
+
+/// A hand-forged blank host claim is no claim: the producer trims and refuses
+/// whitespace, but reconciliation reads the ARTIFACT.
+#[test]
+fn a_blank_host_claim_is_refused_as_no_claim() {
+    let a = signed_half("host-a", &SEED_A, &["aa11"]);
+    let blank = sealed_export::build_bundle(vec![], vec![], vec![], freshness());
+    let blank = sealed_export::sign_bundle(blank.with_host("   "), &SEED_B).expect("sign");
+    assert!(
+        matches!(
+            sealed_export::reconcile_two_host_bundles(
+                &a,
+                &sealed_export::derive_pubkey(&SEED_A),
+                &blank,
+                &sealed_export::derive_pubkey(&SEED_B),
+            ),
+            Err(SealedExportError::MissingHostClaim)
+        ),
+        "Some(\"\") must not count as a host discriminator"
+    );
 }
 
 // ── AC2.2 / AC2.3 — the two-bundle verb, reconciled on frame_id ────────────

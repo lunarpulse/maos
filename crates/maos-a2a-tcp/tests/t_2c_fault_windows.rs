@@ -150,12 +150,20 @@ async fn t_2c_window_a_silent_peer_is_a_typed_partition_before_the_ack() {
                 "the reported window is the operator-configured partition_timeout_secs"
             );
         }
-        // A silent peer can also stall the TLS handshake rather than the write,
-        // which is a bounded handshake timeout — still bounded, still not a
-        // receiver-side fault, which is what this window asserts.
+        // §A6 review 2026-08-18 (P7): this fixture (a TCP peer that never
+        // speaks TLS) can only stall the HANDSHAKE, so the tolerated
+        // untyped outcome is the bounded handshake timeout SPECIFICALLY. The
+        // old fallback accepted any "timeout|partition" message — which let
+        // the frozen-map degradation (`TcpTransportError::PartitionTimeout`
+        // collapsing back into `TransportFailed("partition timeout …")`,
+        // `error.rs`) pass for green. A degraded send-side partition mint
+        // fails this arm now; a live typed-arm fixture is not
+        // kernel-deterministic on loopback (send-buffer autotune absorbs a
+        // sub-codec-cap body), recorded in the story's review findings.
         A2AError::TransportFailed(m) => assert!(
-            m.contains("timeout") || m.contains("partition"),
-            "a stalled peer must render as a timeout class, got: {m}"
+            m.contains("handshake"),
+            "a silent TCP peer can only stall the handshake — any other untyped \
+             outcome means the typed partition mint degraded: {m}"
         ),
         other => panic!("window (a) must be a wire-side timeout, got {other:?}"),
     }

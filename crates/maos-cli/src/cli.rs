@@ -513,6 +513,11 @@ pub enum AuditQuery {
         /// Filter by Spirit name.
         #[arg(long)]
         spirit: Option<String>,
+        /// Disambiguate when the spirit name resolves to multiple boots
+        /// (§A6 review 2026-08-18: the multi-pair refusal named a remedy this
+        /// verb could not fulfill).
+        #[arg(long)]
+        boot: Option<u64>,
         /// Time range filter (e.g. "30d", "7d", "1h").
         #[arg(long)]
         range: Option<String>,

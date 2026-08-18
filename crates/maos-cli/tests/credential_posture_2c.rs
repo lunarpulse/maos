@@ -126,6 +126,65 @@ fn a_correctly_redacted_log_reports_no_escape() {
     );
 }
 
+/// §A6 review 2026-08-18 (P1): the write path DELIBERATELY retains exact-32-hex
+/// frame refs under `clause_sources` — the digest distillation shape. The scan
+/// must exempt exactly that shape, or every honest digest row is a false alarm
+/// and the runbook's "0 hex-run escapes" abort condition blocks the paid run on
+/// correctly-redacted logs.
+#[test]
+fn a_digest_clause_sources_row_is_not_an_escape() {
+    let payload = format!(
+        "{{\"summary\":\"outage digested\",\"clause_sources\":{{\"frame-a\":\"{}\",\"frame-b\":\"{}\"}}}}",
+        "aabbccddeeff00112233445566778899",
+        "99887766554433221100ffeeddccbbaa"
+    );
+    let (_dir, db) = seeded_log(&[payload.as_bytes()]);
+    let out = scan(&db);
+    assert!(
+        out.status.success(),
+        "a digest row whose only hex is sanctioned clause_sources frame refs must \
+         exit 0: {}",
+        combined(&out)
+    );
+    let text = combined(&out);
+    assert!(text.contains("0 hex-run escapes"), "{text}");
+}
+
+/// The carve-out is NARROW: a longer run under `clause_sources` is not a frame
+/// ref (frame ids are exactly 16 bytes / 32 hex) and must still be flagged —
+/// the exemption must not become a blind spot of its own.
+#[test]
+fn a_too_long_hex_run_under_clause_sources_is_still_an_escape() {
+    let payload = format!(
+        "{{\"clause_sources\":{{\"sneaky\":\"{}\"}}}}",
+        "ab".repeat(24) // 48 hex chars — not a compact frame ref
+    );
+    let (_dir, db) = seeded_log(&[payload.as_bytes()]);
+    let out = scan(&db);
+    assert!(
+        !out.status.success(),
+        "a 48-hex run is not a frame ref and must be an escape: {}",
+        combined(&out)
+    );
+    assert!(combined(&out).contains("1 hex-run escapes"));
+}
+
+/// §A6 review 2026-08-18 (P19): a 32+-char UPPERCASE hex run is as much a secret
+/// as a lowercase one. The write path's `a-f`-only predicate is pre-existing;
+/// the read-path detector must not inherit the blind spot it exists to catch.
+#[test]
+fn an_uppercase_hex_run_is_reported_as_an_escape() {
+    let payload = format!("bearer status: {}", "AB".repeat(20));
+    let (_dir, db) = seeded_log(&[payload.as_bytes()]);
+    let out = scan(&db);
+    assert!(
+        !out.status.success(),
+        "an uppercase hex run must be an escape: {}",
+        combined(&out)
+    );
+    assert!(combined(&out).contains("1 hex-run escapes"));
+}
+
 /// A provider-prefix credential that reached the store is an escape — the class
 /// `detect_credential` reports.
 #[test]

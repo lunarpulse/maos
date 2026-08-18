@@ -707,14 +707,24 @@ async fn serve_connection(
             let classified = TcpTransportError::classify_handshake(&e.to_string());
             if classified.is_tofu_mismatch() {
                 // Best-effort: a journaling failure must not become a way to keep
-                // the listener from refusing.
-                let _ = core
+                // the listener from refusing — but it must not be SILENT either
+                // (§A6 review 2026-08-18): the Err contract on
+                // `journal_peer_identity_refusal` says "fails loudly"; discarding
+                // it here was the pre-AC3.6 silence with a different spelling.
+                if let Err(journal_err) = core
                     .journal_peer_identity_refusal(
                         PeerRefusalDirection::Listen,
                         peer_addr_hint.as_str(),
                         &classified.to_string(),
                     )
-                    .await;
+                    .await
+                {
+                    tracing::error!(
+                        "peer-identity refusal was NOT journaled ({}): {}",
+                        journal_err,
+                        classified
+                    );
+                }
             }
             return;
         }
@@ -736,13 +746,19 @@ async fn serve_connection(
             // handshake passed the "any active pin" check but no peer owns the
             // negotiated leaf. Journal it rather than only warning.
             tracing::warn!("resolve_verified_peer: no active pin for negotiated client cert — closing connection without intake");
-            let _ = core
+            if let Err(journal_err) = core
                 .journal_peer_identity_refusal(
                     PeerRefusalDirection::Listen,
                     peer_addr_hint.as_str(),
                     "no active pin owns the negotiated client leaf",
                 )
-                .await;
+                .await
+            {
+                tracing::error!(
+                    "peer-identity refusal was NOT journaled ({journal_err}): no \
+                     active pin owns the negotiated client leaf"
+                );
+            }
             return;
         }
     };
@@ -942,6 +958,20 @@ impl A2APeerRouter for TcpA2ATransport {
         let partition =
             Duration::from_secs(peer_cfg.partition_timeout_secs).min(self.timeouts.idle);
 
+        // §A6 review 2026-08-18 (P14): the clamp is deliberate (see above) but
+        // it was SILENT — an operator who ratified a 300s window was being
+        // honored at 60s with no trace. Say so, once, at the clamp.
+        let configured = Duration::from_secs(peer_cfg.partition_timeout_secs);
+        if configured > partition {
+            tracing::warn!(
+                peer = %peer.as_str(),
+                configured_secs = peer_cfg.partition_timeout_secs,
+                effective_secs = partition.as_secs(),
+                "partition window exceeds the idle wall — clamped; raise the idle \
+                 timeout or lower the configured window"
+            );
+        }
+
         // Transport-side retry (AC-T12: the ONLY retrier). Retries fire ONLY on
         // cert-class failures per `HandshakeRetryPolicy::is_retryable`.
         let max = self.retry_policy.max_attempts.max(1);
@@ -983,14 +1013,20 @@ impl A2APeerRouter for TcpA2ATransport {
                     // ONCE — before the retry decision, since a pin mismatch is
                     // never retryable.
                     if last_err.is_tofu_mismatch() {
-                        let _ = self
+                        if let Err(journal_err) = self
                             .core
                             .journal_peer_identity_refusal(
                                 PeerRefusalDirection::Dial,
                                 peer.as_str(),
                                 &last_err.to_string(),
                             )
-                            .await;
+                            .await
+                        {
+                            tracing::error!(
+                                "peer-identity refusal was NOT journaled ({journal_err}): {}",
+                                last_err
+                            );
+                        }
                     }
                     let a2a = last_err.to_a2a_error();
                     if attempt >= max || !self.retry_policy.is_retryable(&a2a) {

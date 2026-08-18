@@ -345,10 +345,16 @@ fn contains_hex_token(haystack: &[u8]) -> bool {
 /// scrubs runs of at least `TOKEN_HEX_MIN_LEN` hex bytes, and
 /// [`detect_credential`] deliberately does not report them.
 ///
-/// A correctly-redacted stored row can contain **neither**: the write path scrubs
-/// both. So a hit on either is a redaction escape — and asserting only the prefix
-/// half would leave the scan blind to exactly the class whose miss would never
-/// have been logged in the first place.
+/// Two properties mirror the WRITE path so "escape" keeps meaning "the write
+/// path would have scrubbed it" (§A6 review 2026-08-18):
+///
+/// * **The `clause_sources` carve-out.** The write path deliberately RETAINS
+///   exact-32-hex frame refs under `clause_sources` (see [`RedactionPolicy::redact`]);
+///   the scan exempts exactly the same shape, or every digest distillation row
+///   would be a false alarm on the runbook's own abort condition.
+/// * **Case-insensitive hex.** `is_hex_byte` is `a-f` only (pre-existing write-path
+///   posture), but a detector that misses `A-F` runs inherits the exact blind spot
+///   it exists to catch after the fact — so the scan counts both cases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CredentialShape {
     /// Matched one of the provider prefixes in [`RULES`]; carries its class.
@@ -393,19 +399,65 @@ pub fn scan_stored_payload(bytes: &[u8]) -> Vec<CredentialShape> {
             findings.push(CredentialShape::Prefix(rule.class));
         }
     }
-    let longest = longest_hex_run(bytes);
+    // §A6 review 2026-08-18: when the payload names `clause_sources`, walk it
+    // JSON-aware with the write path's own exemption (compact frame refs under
+    // that key survive storage BY CONTRACT) instead of scanning raw bytes.
+    if contains_prefix(bytes, b"\"clause_sources\"") {
+        if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
+            let mut longest = 0usize;
+            scan_json_hex_runs(&value, false, &mut longest);
+            if longest >= TOKEN_HEX_MIN_LEN {
+                findings.push(CredentialShape::HexRun { len: longest });
+            }
+            return findings;
+        }
+        // Not parseable JSON that still names the key: fall through to the raw
+        // scan — a malformed digest row is exactly the shape an operator should
+        // have to look at, not silently wave through.
+    }
+    let longest = longest_hex_run_ci(bytes);
     if longest >= TOKEN_HEX_MIN_LEN {
         findings.push(CredentialShape::HexRun { len: longest });
     }
     findings
 }
 
-/// The longest run of consecutive hex bytes anywhere in `bytes`.
-fn longest_hex_run(bytes: &[u8]) -> usize {
+/// The longest qualifying hex run in a parsed JSON value, exempting exactly the
+/// strings the write path's [`RedactionPolicy::redact`] retains
+/// (`under_clause_sources && is_compact_frame_ref`). Object KEYS are scanned:
+/// the write path scrubs shape-matching keys too.
+fn scan_json_hex_runs(value: &serde_json::Value, under_clause_sources: bool, longest: &mut usize) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            for (key, value) in fields {
+                *longest = (*longest).max(longest_hex_run_ci(key.as_bytes()));
+                let protected = under_clause_sources || key == "clause_sources";
+                scan_json_hex_runs(value, protected, longest);
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                scan_json_hex_runs(value, under_clause_sources, longest);
+            }
+        }
+        serde_json::Value::String(s) => {
+            let exempt = under_clause_sources && is_compact_frame_ref(s);
+            if !exempt {
+                *longest = (*longest).max(longest_hex_run_ci(s.as_bytes()));
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The longest run of consecutive hex bytes anywhere in `bytes` — the SCAN-side
+/// predicate, case-insensitive (`A-F` counts; see the [`CredentialShape`] doc for
+/// why a read-path detector must not inherit the write path's case blind spot).
+fn longest_hex_run_ci(bytes: &[u8]) -> usize {
     let mut best = 0;
     let mut run = 0;
     for &b in bytes {
-        if is_hex_byte(b) {
+        if b.is_ascii_hexdigit() {
             run += 1;
             if run > best {
                 best = run;

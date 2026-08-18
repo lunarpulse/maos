@@ -75,15 +75,11 @@ const REDACTION_RS: &str = "crates/maos-iac/src/adapter/redaction.rs";
 const BUNDLE_SCHEMA: &str = "schemas/audit-bundle.schema.json";
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
 
-/// The DIRECTORY the enrolled test set is DERIVED from, and the suffix that marks
-/// a target as this story's. Never a hand-maintained const list: add a `_2c.rs`
-/// file, forget the line, and the file is dead in CI while the gate stays green.
-const TESTS_DIRS: &[&str] = &[
-    "crates/maos-cli/tests",
-    "crates/maos-audit/tests",
-    "crates/maos-a2a-core/tests",
-    "crates/maos-a2a-tcp/tests",
-];
+/// The suffix that marks a test target as this story's, and the prefix the
+/// `maos-a2a-tcp` convention adds on top. Never a hand-maintained directory
+/// list: the enrolled set is DERIVED by walking `crates/*/tests` at run time
+/// (§A6 review 2026-08-18 — the const list was the hand-maintained-shape
+/// failure this leg exists to prevent, re-created one level up).
 const STORY_TEST_SUFFIX: &str = "_2c.rs";
 /// `crates/maos-a2a-tcp/tests/` names its targets `t_<story>_<topic>.rs`
 /// (`t_12_4a_digest_read.rs`, `t_12_3_cohort_halt_receipt.rs`), so a suffix-only
@@ -333,19 +329,32 @@ fn leg_host_discriminator(root: &Path, findings: &mut Vec<Finding>) -> LegAudit 
         check,
         "sign_bundle must carry the host through to the signed bundle",
     );
-    // Byte-identity: the field must be omitted when absent.
+    // Byte-identity: the field must be omitted when absent — on EVERY
+    // declaration, not just the first one the source happens to carry
+    // (§A6 review 2026-08-18, P12: a first-match-only window audited the
+    // wrong struct if one were ever added above `AuditBundle`).
     audit.checked();
-    let host_decl_idx = src.find("pub host: Option<String>");
-    let omitted = host_decl_idx
-        .and_then(|i| src[..i].rfind("skip_serializing_if"))
-        .map(|j| host_decl_idx.unwrap() - j < 200)
-        .unwrap_or(false);
-    if !omitted {
+    let mut stamped = 0usize;
+    let mut search_from = 0usize;
+    while let Some(i) = src[search_from..].find("pub host: Option<String>") {
+        let at = search_from + i;
+        if src[..at]
+            .rfind("skip_serializing_if")
+            .is_some_and(|j| at - j < 200)
+        {
+            stamped += 1;
+        }
+        search_from = at + 1;
+    }
+    if stamped < 2 {
         findings.push(Finding {
             check,
-            detail: "`host` must be `skip_serializing_if = \"Option::is_none\"` — otherwise \
-                     every pre-2c bundle stops replaying byte-identically"
-                .to_string(),
+            detail: format!(
+                "`host` must be `skip_serializing_if = \"Option::is_none\"` on every \
+                 declaration ({stamped}/2 carry it) — otherwise pre-2c bundles stop \
+                 replaying byte-identically"
+            )
+            .to_string(),
         });
     }
     require(
@@ -894,22 +903,55 @@ fn leg_paid_run_capture(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
             return (audit, present);
         }
     };
-    for field in [
-        "host_a",
-        "host_b",
-        "shape",
-        "claim_scope",
-        "trust_anchor_established_out_of_band",
-        "host_b_audit_key_provisioned_separately",
-        "stranger_verification",
-    ] {
+    // §A6 review 2026-08-18 (P2): presence-only validation let
+    // `trust_anchor_established_out_of_band: false`, empty attestations, and
+    // `host_a == host_b` mint the claim. The gate reads VALUES now — a sworn
+    // property stated as false is not an attestation.
+    for field in ["host_a", "host_b", "shape", "stranger_verification"] {
         audit.checked();
-        if capture.get(field).is_none() {
+        let empty = capture
+            .get(field)
+            .and_then(|v| v.as_str())
+            .map_or(true, |s| s.trim().is_empty());
+        if empty {
             findings.push(Finding {
                 check,
                 detail: format!(
-                    "{CAPTURE} omits `{field}` — the capture must state the SYSTEM properties \
-                     that bound its claim, not leave them to a story file"
+                    "{CAPTURE} omits or leaves `{field}` empty — the capture must \
+                     state the SYSTEM properties that bound its claim, not leave \
+                     them to a story file"
+                ),
+            });
+        }
+    }
+    for field in [
+        "trust_anchor_established_out_of_band",
+        "host_b_audit_key_provisioned_separately",
+    ] {
+        audit.checked();
+        if capture.get(field).and_then(|v| v.as_bool()) != Some(true) {
+            findings.push(Finding {
+                check,
+                detail: format!(
+                    "{CAPTURE}.{field} must be present and TRUE — the capture must \
+                     state the SYSTEM properties that bound its claim; an honest \
+                     `false` means the property the claim scope depends on does not \
+                     hold, and a claim cannot stand on it"
+                ),
+            });
+        }
+    }
+    audit.checked();
+    if let (Some(a), Some(b)) = (
+        capture.get("host_a").and_then(|v| v.as_str()),
+        capture.get("host_b").and_then(|v| v.as_str()),
+    ) {
+        if a.trim() == b.trim() {
+            findings.push(Finding {
+                check,
+                detail: format!(
+                    "{CAPTURE} names one host twice (`{a}`) — identical host claims \
+                     are one host, whatever the keys say"
                 ),
             });
         }
@@ -924,32 +966,82 @@ fn leg_paid_run_capture(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
             ),
         });
     }
+    // §A6 review 2026-08-18 (P8): RF-2 excluded the pinned `claim_scope` from
+    // the scan, but the NEGATION stayed document-global — one `not two
+    // machines` anywhere disarmed an overclaim everywhere, and the README said
+    // "negated in place" while the code accepted negation any place. Scan each
+    // operator-authored string field per occurrence (hyphen/underscore
+    // normalized) and accept only an ADJACENT negation.
     audit.checked();
-    let blob = text.to_lowercase().replace(&CLAIM_SCOPE.to_lowercase(), "");
-    for overclaim in ["two machines", "two operators", "fully automated pairing"] {
-        if blob.contains(overclaim) && !blob.contains(&format!("not {overclaim}")) {
-            findings.push(Finding {
-                check,
-                detail: format!(
-                    "{CAPTURE} asserts `{overclaim}`, which no control in this story proves"
-                ),
-            });
+    if let Some(fields) = capture.as_object() {
+        for (name, value) in fields {
+            if name == "claim_scope" {
+                continue; // pinned byte-for-byte above; it needs no scanning
+            }
+            let Some(text) = value.as_str() else {
+                continue;
+            };
+            let norm = text.to_lowercase().replace(['-', '_'], " ");
+            for overclaim in ["two machines", "two operators", "fully automated pairing"] {
+                let mut start = 0;
+                while let Some(i) = norm[start..].find(overclaim) {
+                    let at = start + i;
+                    if !preceded_by_not(&norm[..at]) {
+                        findings.push(Finding {
+                            check,
+                            detail: format!(
+                                "{CAPTURE}.{name} asserts `{overclaim}`, which no \
+                                 control in this story proves"
+                            ),
+                        });
+                    }
+                    start = at + overclaim.len();
+                }
+            }
         }
     }
-    // Both halves must be present when the capture claims a two-host run.
-    for rel in [CAPTURE_BUNDLE_A, CAPTURE_BUNDLE_B] {
+    // Both halves must be present when the capture claims a two-host run — and
+    // they must be the halves the capture NAMES (§A6 review 2026-08-18: a
+    // capture claiming alice/bob over host-a/host-b bundles passed).
+    for (rel, capture_field) in [(CAPTURE_BUNDLE_A, "host_a"), (CAPTURE_BUNDLE_B, "host_b")] {
         audit.checked();
-        if !root.join(rel).exists() {
+        let Ok(text) = fs::read_to_string(root.join(rel)) else {
             findings.push(Finding {
                 check,
                 detail: format!(
-                    "the capture claims a two-host signed run but {rel} is absent — a claim \
-                     without its artifact is the thing this gate exists to refuse"
+                    "the capture claims a two-host signed run but {rel} is absent — a \
+                     claim without its artifact is the thing this gate exists to refuse"
                 ),
             });
+            continue;
+        };
+        let expected = capture.get(capture_field).and_then(|v| v.as_str());
+        if let (Ok(bundle), Some(expected)) =
+            (serde_json::from_str::<serde_json::Value>(&text), expected)
+        {
+            if bundle.get("host").and_then(|v| v.as_str()) != Some(expected) {
+                findings.push(Finding {
+                    check,
+                    detail: format!(
+                        "{rel} stamps host `{}` while the capture claims \
+                         `{capture_field} = {expected}` — the capture must attest the \
+                         halves it names",
+                        bundle.get("host").and_then(|v| v.as_str()).unwrap_or("")
+                    ),
+                });
+            }
         }
     }
     (audit, present)
+}
+
+/// Is the text immediately before an overclaim occurrence the word `not`?
+fn preceded_by_not(prefix: &str) -> bool {
+    let trimmed = prefix.trim_end();
+    match trimmed.strip_suffix("not") {
+        Some(rest) => rest.is_empty() || !rest.chars().last().is_some_and(|c| c.is_alphanumeric()),
+        None => false,
+    }
 }
 
 // ── Leg 10 — AC5.2 ─────────────────────────────────────────────────────────
@@ -960,20 +1052,42 @@ fn leg_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
     audit.entered();
 
     let mut derived: Vec<String> = Vec::new();
-    for dir in TESTS_DIRS {
-        let Ok(entries) = fs::read_dir(root.join(dir)) else {
+    // §A6 review 2026-08-18 (P11): the directory list was itself a
+    // hand-maintained const — the failure mode this leg exists to prevent,
+    // re-created one level up. DERIVE it: walk every workspace crate's
+    // `tests/` and fail closed when the walk itself cannot run.
+    let Ok(members) = fs::read_dir(root.join("crates")) else {
+        findings.push(Finding {
+            check,
+            detail: "cannot read `crates/` to derive the enrolled test set — a \
+                     derivation that cannot walk is decorative"
+                .to_string(),
+        });
+        return (audit, derived);
+    };
+    for member in members.flatten() {
+        let tests_dir = member.path().join("tests");
+        if !tests_dir.exists() {
+            continue; // a crate with no tests/ is normal
+        }
+        let Ok(entries) = fs::read_dir(&tests_dir) else {
+            findings.push(Finding {
+                check,
+                detail: format!(
+                    "cannot read {} — a story test directory that cannot be walked \
+                     is a silent gap in the enrollment control",
+                    tests_dir.display()
+                ),
+            });
             continue;
         };
+        let crate_name = member.file_name().to_string_lossy().to_string();
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.ends_with(STORY_TEST_SUFFIX)
                 || (name.starts_with(STORY_TEST_PREFIX) && name.ends_with(".rs"))
             {
-                derived.push(format!(
-                    "{}::{}",
-                    dir.split('/').nth(1).unwrap_or(dir),
-                    name.trim_end_matches(".rs")
-                ));
+                derived.push(format!("{}::{}", crate_name, name.trim_end_matches(".rs")));
             }
         }
     }
@@ -984,10 +1098,10 @@ fn leg_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
         findings.push(Finding {
             check,
             detail: format!(
-                "no `*{STORY_TEST_SUFFIX}` or `{STORY_TEST_PREFIX}*.rs` targets were derived \
-                 from {TESTS_DIRS:?}. A \
-                 derivation that comes back empty is how a filesystem-derived leg goes \
-                 quietly decorative"
+                "no `*{STORY_TEST_SUFFIX}` or `{STORY_TEST_PREFIX}*.rs` targets were \
+                 derived from the workspace's `crates/*/tests` directories. A \
+                 derivation that comes back empty is how a filesystem-derived leg \
+                 goes quietly decorative"
             ),
         });
         return (audit, derived);
@@ -1014,8 +1128,13 @@ fn leg_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
     for target in &derived {
         audit.checked();
         let (crate_name, test_name) = target.split_once("::").unwrap_or(("", target.as_str()));
-        let enrolled = job.contains(&format!("--test {test_name}"))
-            && job.contains(&format!("-p {crate_name}"));
+        // §A6 review 2026-08-18 (P11): two independent substring checks over
+        // the whole job blob could be satisfied by two DIFFERENT lines, and
+        // `-p maos-a2a-tcp` prefix-matches `-p maos-a2a-tcp2`. The pair must
+        // appear on ONE line, each at a token boundary.
+        let enrolled = job.lines().any(|line| {
+            has_flag_arg(line, "--test", test_name) && has_flag_arg(line, "-p", crate_name)
+        });
         if !enrolled {
             findings.push(Finding {
                 check,
@@ -1037,7 +1156,33 @@ fn leg_vectors_enrolled(root: &Path, findings: &mut Vec<Finding>) -> (LegAudit, 
                 .to_string(),
         });
     }
+
     (audit, derived)
+}
+
+/// Does `line` carry `flag value` at a token boundary? `-p maos-a2a-tcp` must
+/// not match `-p maos-a2a-tcp2`, and neither flag may be satisfied by a
+/// different line of the job (§A6 review 2026-08-18, P11).
+fn has_flag_arg(line: &str, flag: &str, value: &str) -> bool {
+    let needle = format!("{flag} {value}");
+    let mut start = 0;
+    while let Some(i) = line[start..].find(&needle) {
+        let at = start + i;
+        let after = at + needle.len();
+        let right_clear = line[after..]
+            .chars()
+            .next()
+            .is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'));
+        let left_clear = line[..at]
+            .chars()
+            .last()
+            .is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'));
+        if right_clear && left_clear {
+            return true;
+        }
+        start = at + 1;
+    }
+    false
 }
 
 // ── Judgement ──────────────────────────────────────────────────────────────
@@ -1111,11 +1256,20 @@ pub fn verify_capture_signature(root: &Path) -> Result<String, String> {
         .into_iter()
         .filter(|r| r.payload.gate == GATE)
         .collect();
-    let record = records.first().ok_or_else(|| {
-        format!("{CAPTURE_TRANSCRIPT} carries no MAOS-EVIDENCE-V1 record for {GATE}")
-    })?;
-    verifier.verify(record)?;
-    Ok(record.payload.test.clone())
+    // §A6 review 2026-08-18 (P6): `records.first()` verified ONE record and
+    // ignored any others — including contradictory ones for the same gate.
+    // Every record bound to this gate must verify or the transcript is refused.
+    if records.is_empty() {
+        return Err(format!(
+            "{CAPTURE_TRANSCRIPT} carries no MAOS-EVIDENCE-V1 record for {GATE}"
+        ));
+    }
+    let mut verified_test = String::new();
+    for record in &records {
+        verifier.verify(record)?;
+        verified_test = record.payload.test.clone();
+    }
+    Ok(verified_test)
 }
 
 pub fn run(json: bool) -> Result<(), String> {
@@ -1126,6 +1280,19 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
     let judgement = judge(root);
     let findings = &judgement.findings;
     let oracle_green = findings.is_empty();
+    // §A6 review 2026-08-18 (P6): a present capture cannot mint the claim on
+    // shape alone. Verify the transcript's signature when the substrate allows
+    // it; when it does not, the claim is REFUSED (see the JSON fields below) —
+    // never silently assumed. On CI the capture is absent, so this stays false
+    // and the hermetic legs are unaffected.
+    let (capture_signature_verified, signature_reason) = if judgement.capture_present {
+        match verify_capture_signature(root) {
+            Ok(_) => (true, String::new()),
+            Err(reason) => (false, reason),
+        }
+    } else {
+        (false, String::new())
+    };
     // ONE binding class for the whole gate. Hermetic: a RED oracle hard-fails at
     // HEAD regardless of CURRENT_PHASE. The paid run is a validated capture, never
     // a substrate-gated leg — see the module docs.
@@ -1145,7 +1312,18 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
                 // API key by ratified design. The control is that nothing may CLAIM
                 // the run while this is false — never a binding class that cannot fire.
                 "paid_run_capture_present": judgement.capture_present,
-                "two_host_signed_run_claimed": judgement.capture_present && oracle_green,
+                // §A6 review 2026-08-18 (P6): the claim now REQUIRES the
+                // capture transcript's signature to have verified this run.
+                // An unverifiable signature (no key, no binding, bad
+                // signature) does not RED the hermetic legs — it refuses the
+                // CLAIM, which is the only thing this gate is trusted to mint.
+                // The demo lane mints `PROVEN_LIVE_SIGNED` and already calls
+                // the same verifier.
+                "capture_signature_verified": capture_signature_verified,
+                "capture_signature_reason": signature_reason,
+                "two_host_signed_run_claimed": judgement.capture_present
+                    && oracle_green
+                    && capture_signature_verified,
                 "claim_scope": CLAIM_SCOPE,
                 "enrolled_vectors": judgement.enrolled,
                 "findings": findings.iter().map(|f| serde_json::json!({

@@ -258,6 +258,117 @@ fn one_root_signing_both_halves_is_refused() {
     );
 }
 
+/// §A6 review 2026-08-18 (P4): the in-code `key_a == key_b` check compares the
+/// two RESOLVED keys — and `resolve_verify_key` derives each half's key from
+/// that half's CLAIMED region, so one base seed exported under two region pins
+/// produces two distinct keys that both verify. The CLI must refuse it: both
+/// halves trace to one root no matter which regions were claimed.
+#[test]
+fn one_base_seed_under_two_claimed_regions_is_refused() {
+    let shared = [0x5b; 32];
+    let a = Host::new("host-a", shared, &[frame(0x22)]);
+    let b = Host::new("host-b", shared, &[frame(0x22)]);
+
+    // Two region pins, ONE seed: the halves claim different jurisdictions, so
+    // their derived keys differ and the naive shared-root check passes.
+    for (host, region) in [(&a, "eu-west-1"), (&b, "us-east-1")] {
+        let mut c = host.cmd();
+        c.env("MAOS_REGION_HOME", region)
+            .args(["audit", "sealed-export"])
+            .arg("--output")
+            .arg(&host.bundle);
+        c.arg("--host").arg(&host.name);
+        let out = c.output().expect("run region-pinned sealed-export");
+        assert!(
+            out.status.success(),
+            "region-pinned export must succeed: {}",
+            combined(&out)
+        );
+    }
+
+    // Each half verifies against the SAME seed file derived for its own region.
+    let referee = TempDir::new().expect("tempdir");
+    let out = Command::new(maosctl_path())
+        .env("HOME", referee.path())
+        .env("XDG_CONFIG_HOME", referee.path().join("config"))
+        .env("XDG_DATA_HOME", referee.path().join("data"))
+        .env_remove("MAOS_HOME")
+        .env_remove("MAOS_AUDIT_KEY")
+        .env_remove("MAOS_REGION_HOME")
+        .args(["audit", "reconcile-hosts"])
+        .arg("--bundle-a")
+        .arg(&a.bundle)
+        .arg("--seed-a")
+        .arg(&a.key)
+        .arg("--bundle-b")
+        .arg(&b.bundle)
+        .arg("--seed-b")
+        .arg(&b.key)
+        .output()
+        .expect("run reconcile-hosts");
+    let text = combined(&out);
+    assert!(
+        !out.status.success(),
+        "one base seed must not attest a two-host run even under two claimed \
+         regions: {text}"
+    );
+    assert!(
+        text.contains("ONE base seed"),
+        "the refusal must name the one-root escape: {text}"
+    );
+}
+
+/// The split-presentation shape of the same forgery: host A's key derived from
+/// the seed, host B "published" as an explicit pubkey — which happens to be the
+/// SAME seed derived under host B's claimed region. The cross-derivation check
+/// must refuse it.
+#[test]
+fn a_seed_and_the_seeds_own_derived_pubkey_are_one_root() {
+    let shared = [0x5b; 32];
+    let a = Host::new("host-a", shared, &[frame(0x22)]);
+    let b = Host::new("host-b", shared, &[frame(0x22)]);
+    for (host, region) in [(&a, "eu-west-1"), (&b, "us-east-1")] {
+        let mut c = host.cmd();
+        c.env("MAOS_REGION_HOME", region)
+            .args(["audit", "sealed-export"])
+            .arg("--output")
+            .arg(&host.bundle)
+            .arg("--host")
+            .arg(&host.name);
+        let out = c.output().expect("run region-pinned sealed-export");
+        assert!(out.status.success(), "{}", combined(&out));
+    }
+    let region_b =
+        maos_domain::region::Region::canonicalize("us-east-1").expect("canonical region");
+    let derived_pubkey_b = maos_audit::sealed_export::derive_region_pubkey(&shared, &region_b);
+
+    let referee = TempDir::new().expect("tempdir");
+    let out = Command::new(maosctl_path())
+        .env("HOME", referee.path())
+        .env("XDG_CONFIG_HOME", referee.path().join("config"))
+        .env("XDG_DATA_HOME", referee.path().join("data"))
+        .env_remove("MAOS_HOME")
+        .env_remove("MAOS_AUDIT_KEY")
+        .env_remove("MAOS_REGION_HOME")
+        .args(["audit", "reconcile-hosts"])
+        .arg("--bundle-a")
+        .arg(&a.bundle)
+        .arg("--seed-a")
+        .arg(&a.key)
+        .arg("--bundle-b")
+        .arg(&b.bundle)
+        .arg("--pubkey-b")
+        .arg(hex::encode(derived_pubkey_b))
+        .output()
+        .expect("run reconcile-hosts");
+    let text = combined(&out);
+    assert!(
+        !out.status.success(),
+        "a seed and its own derived pubkey are ONE root: {text}"
+    );
+    assert!(text.contains("ONE base seed"), "{text}");
+}
+
 /// A half with no host claim cannot be half of a two-host run — otherwise the
 /// two indistinguishable bundles silently become "two hosts".
 #[test]
@@ -393,9 +504,15 @@ fn the_python_twin_verifies_a_host_stamped_bundle() {
         .output()
         .expect("run verify.py");
     let text = combined(&out);
-    if text.contains("No Ed25519 backend available") {
-        eprintln!("skipping: no python Ed25519 backend on this machine");
-        return;
+    // §A6 review D-1 (decided 2026-08-18: require the backend, fail loud). The
+    // old sentinel matched nothing verify.py can print, so a backend-less
+    // machine failed mislabeled as a signature mismatch.
+    if text.to_lowercase().contains("no ed25519 library found") {
+        panic!(
+            "the stranger's path requires a Python Ed25519 backend — pip install \
+             cryptography (verify.py said: {})",
+            text.trim()
+        );
     }
     assert!(
         out.status.success(),

@@ -11,10 +11,17 @@ review: §A6 full-layer net (Blind + Edge + Acceptance + Test-Infra + runtime) �
 
 # j1-crosshost-2c — the two-host signed run
 
-Status: **review** — dev pass complete 2026-08-17 (`anthropic/claude-opus-5`, baseline
-`7aa07ee3` == HEAD). All 15 tasks T0-T14 done, all 5 ACs delivered, D19 RESOLVED under
-vehicle 14-0. **AWAITING §A6** — full-layer net, NON-DEGRADABLE, reviewer model MUST
-differ from the dev model.
+Status: **done** — §A6 net CLOSED 2026-08-18 (reviewer `zai/glm-5.3` ≠ dev
+`anthropic/claude-opus-5`; 4 layers: Blind + Edge + Acceptance + Test-Infra; runtime layer
+re-executed by the reviewer: kernel 24472==24472, story gate PASS 10 legs). 41 raw findings →
+25 retained (1 decision resolved → patch, 20 patches applied + verified, 4 deferred), 3
+dismissed. All five ACs verified MET in substance by the Acceptance Auditor. Post-patch
+verification: proven-red 42/42, d19 governance 11/11, full `-p xtask` 761/0, focused suites
+green (two_host_bundle 12, reconcile 9, credential_posture 12, signing 7, fault windows 5,
+pin journal 4), `cargo fmt --check` clean, kloc reds only the standing D13/D14 keys; four
+measured review grants recorded in `kloc.toml` (xtask 39960, maos-audit 6847, maos-cli
+5095, maos-iac 6960). Original dev pass: 2026-08-17 (`anthropic/claude-opus-5`, baseline
+`7aa07ee3`), all 15 tasks T0-T14 done, all 5 ACs delivered, D19 RESOLVED under vehicle 14-0.
 
 > **Blocking conditions at close.** (1) **DISCHARGED** — `2b` was committed as
 > `7aa07ee3` and `crates/`/`xtask/`/`.github/` were clean before T1; every R1 number
@@ -691,9 +698,10 @@ named in the artifact rather than in a story file nobody reads.
    finding text), and `demo_j1_tests.rs` (the pin) — and the proven-red `GOOD_DEMO_J1` fixture with
    them, or the baseline reds. Mirror
    `demo_j1.rs:264-282` (find by name, set `state`/`detail`/`executed = true`/`owner = None`). The
-   ledger route is structurally dead twice (F5) — do not attempt it. **Do not re-fix the owner string:**
-   `demo_j1.rs:907` already reads `"j1-crosshost-2c"` and the literal `"j1-crosshost-2"` has zero hits
-   repo-wide. Assert that as a fact, then flip the beat.
+   ledger route is structurally dead twice (F5) — do not attempt it. **RF-0 (2026-08-18) landed the
+   re-point:** `unlanded_beats` names `j1-crosshost-2d-paid-two-host-run` (the pre-filed instruction
+   to "verify, don't edit" described `2b`'s state and expired the moment the lane gained a
+   successor — see the §A6 findings for the six record sites corrected with it).
 4. **`PROVEN_LIVE_SIGNED` follows Reza's posture, and the vocabulary is real.** Use `MAOS_AUDIT_KEY`
    (a **path**, `audit_key.rs:92`), `release_verify::sign_sha256sums`, a `MAOS-EVIDENCE-V1` record bound
    to `MAOS_EVIDENCE_COMMIT`/`MAOS_EVIDENCE_NONCE`, verified by `verify_release_signature`
@@ -738,7 +746,9 @@ named in the artifact rather than in a story file nobody reads.
 3. **Do not claim `PROVEN_LIVE_SIGNED` is unreached** (F4). 27 legs, operator lane. The ledger files are
    gitignored (`.gitignore:36`) — absence in a fresh clone proves nothing.
 4. **Do not flip the beat via a published ledger** (F5). Dead twice.
-5. **Do not re-fix the beat owner string** (R7). Already `"j1-crosshost-2c"`. Verify, don't edit.
+5. **Do not re-fix the beat owner string.** RF-0 (2026-08-18) re-pointed it to
+   `j1-crosshost-2d-paid-two-host-run`; the §A6 record sweep corrected the sites that still said
+   "verified, not edited".
 6. **Do not restate P3's false clauses** (F6): `PartitionTimeout` has a match arm
    (`router.rs:1807-1813`), and `route_outbound` **does** read `peer_cfg` (`:860`, `:863`) — just not
    `partition_timeout_secs`.
@@ -822,8 +832,10 @@ named in the artifact rather than in a story file nobody reads.
       bundle-schema validation into this gate and correct the schema in the same change** (or delete the
       schema); acceptance = a planted extra field REDs it. Take the `xtask` grant **after** a free
       reduction.
-- [x] **T12 (AC5.3, AC5.4)** — Executed-leg beat flip (**verify** the owner string, don't edit it);
-      Reza-posture signing with the real vocabulary; correct `sprint-status.yaml:269`.
+- [x] **T12 (AC5.3, AC5.4)** — Executed-leg beat flip (RF-0 re-pointed the owner to
+      `j1-crosshost-2d-paid-two-host-run`; the original T12 text said "verify, don't edit", which
+      described `2b`'s state and was corrected by the §A6 review); Reza-posture signing with the
+      real vocabulary; correct `sprint-status.yaml:269`.
 - [x] **T13 (AC5.5, AC2.1)** — The bounded claim as a capture that cannot overclaim, with the
       overclaim-refusing negative. **State both human-performed steps as system properties** (out-of-band
       trust anchor; separately hand-provisioned host-B audit key), and **run
@@ -903,6 +915,38 @@ reviewer's baseline stays clean.**
   it"** — true when written, false the moment the lane gained a successor. **A residual that was TRUE
   and EXPIRED**, in the AC written to stop exactly that. Re-point it, and update AC5.3's instruction in
   the same change so the next reader is not told to verify a value that must move.
++
+#### §A6 net 2026-08-18 (4 layers: Blind + Edge + Acceptance + Test-Infra; reviewer `zai/glm-5.3` ≠ dev `anthropic/claude-opus-5`)
+
+_25 findings retained from 41 raw (cross-layer merges applied), 3 dismissed. Runtime layer re-executed at HEAD by the reviewer: `check-kernel-baseline` PASS 24472==24472; `check-j1-two-host-signed-run` PASS (10 legs, capture absent ⇒ claim refused)._
+
+- [x] [Review][Patch] AC2.1 stranger-path substrate — the skip sentinel `two_host_reconcile_2c.rs:396` (`"No Ed25519 backend available"`) matches nothing `verify.py` can print (actual: `"Error: no Ed25519 library found"`, `tools/verify-audit-bundle/verify.py:67`); the graceful-skip branch is dead code and a backend-less machine fails the Blocking lane mislabeled as a signature mismatch. **DECIDED 2026-08-18 (Lunarpulse): require the backend, fail loud** — replace the dead skip with a fail carrying the install instruction, and add a CI step ensuring `cryptography` is present so the Blocking control has a guaranteed substrate. — sources: test-infra + acceptance — LOW
+- [x] [Review][Patch] `scan-credentials` reports correctly-redacted digest rows as hex-run escapes and exits 1 — `crates/maos-iac/src/adapter/redaction.rs:382` `scan_stored_payload` has no `clause_sources` carve-out while the write path (`:269-289`) deliberately retains exact-32-hex frame refs; the scan's own doc (`:348`) states the now-false premise "a correctly-redacted row can contain neither"; runbook Phase 7.5 makes 0-escapes an abort condition, so the honest operator is blocked at this story's own gate; fix by mirroring the write-path carve-out + a `clause_sources` fixture in `credential_posture_2c.rs` [redaction.rs:382-401] — sources: blind+edge — **HIGH** — **LANDED**: JSON-aware carve-out + case-insensitive hex; 3 new fixtures (sanctioned refs clean, 48-hex still flagged, uppercase flagged).
+- [x] [Review][Patch] Leg 9 validates field PRESENCE only — `xtask/src/check_j1_two_host_signed_run.rs:897-915`: `trust_anchor_established_out_of_band:false`, `host_b_audit_key_provisioned_separately:false`, empty `stranger_verification`, `host_a == host_b`, and capture↔bundle host mismatches all still mint `two_host_signed_run_claimed:true` (`:1148`); the halves themselves need only exist (`:940-949` — no signature or host cross-check); value-check the two booleans == true, require non-empty strings, refuse `host_a == host_b`, cross-check capture hosts against the bundle host stamps, add vectors [check_j1_two_host_signed_run.rs:897-949] — sources: blind+edge+test-infra — **HIGH** — **LANDED**: all value checks + capture↔bundle host cross-check; 4 new vectors (false booleans, empty attestation, host-twice, mismatch); template still admissible.
+- [x] [Review][Patch] RF-0's record half did not land — six sites still assert the beat owner was "verified, not edited" while this commit moved it to `j1-crosshost-2d-paid-two-host-run`: `xtask/src/demo_j1.rs:927-929`, this file `:693-696` (AC5.3), `:741` (guardrail 5), `:825` (T12), `:1167-1170` (Dev Agent Record — a false completion claim), `traceability-matrix.md:119`; leg 9 only greps for the new literal so nothing machine-checks the stale records [demo_j1.rs:927-929] — sources: acceptance+blind — **HIGH** — **LANDED**: all six sites corrected (demo_j1 comment + module doc, AC5.3, guardrail 5, T12, Dev Agent Record, traceability).
+- [x] [Review][Patch] `reconcile-hosts` escapes `SharedAttesterRoot` with one base seed under two claimed regions — `subcommands.rs:2969` → `resolve_verify_key:2764-2781` derives each half's key from that half's claimed region, so the same seed file for both halves yields distinct keys and `sealed_export.rs:456-458` passes; refuse byte-identical base seeds when both halves used `--seed`, add a same-seed/different-region test, and note the two-invocation `MAOS_REGION_HOME` residual against RELEASE-HOLDS row 9's "refuses two halves attested by one root" wording [subcommands.rs:2764-2781] — source: acceptance — **MEDIUM**
+- [x] [Review][Patch] `verify_two_host_receipt` does not pin `claim_scope`/`schema_version` — `sealed_export.rs:571-580` rebuilds the signed payload from receipt-supplied values, so a receipt re-signed with a widened scope or bumped schema verifies; pin both against `TWO_HOST_CLAIM_SCOPE`/`TWO_HOST_RECEIPT_SCHEMA` + test [sealed_export.rs:565-593] — sources: blind+edge — **MEDIUM**
+- [x] [Review][Patch] The gate path never verifies the capture transcript's signature — `verify_capture_signature` (`check_j1_two_host_signed_run.rs:1102-1119`) has no caller in `judge`/`run_with_root` (sole consumer is the demo lane), and it verifies `records.first()` only; unsigned capture + bundle files mint `two_host_signed_run_claimed:true` in the gate JSON; call it in leg 9's present branch and fail closed when the verification key is absent [check_j1_two_host_signed_run.rs:1102-1148] — source: blind — **MEDIUM**
+- [x] [Review][Patch] Window-(a)'s typed `PartitionTimeout` arm is unreachable — `t_2c_fault_windows.rs:44-54`'s silent endpoint never completes TLS, so `transport.rs:573-582`'s handshake timeout wins and the fallback arm (`:156-159`) tolerates the degraded `TransportFailed` mapping; leg 5 (`:649-654`) only text-greps the source; the send-side typed mint (`transport.rs:591-600`) has zero behavioral coverage — add a fixture that completes TLS then stalls the read and assert the typed arm [t_2c_fault_windows.rs:140-165] — sources: blind+test-infra — **MEDIUM** — **LANDED PARTIALLY, deliberately**: a live typed-arm fixture is not kernel-deterministic on loopback (send-buffer autotune absorbs a sub-codec-cap body; SO_RCVBUF pins at listener and accept both proved insufficient on this kernel), so the fix that IS deterministic landed — the fallback arm now accepts ONLY the bounded handshake timeout, so the frozen-map degradation (`PartitionTimeout` collapsing into `TransportFailed("partition timeout …")`) reds the test. The live typed-arm residual is text-grep + unit-seam coverage; owned by the 2d preflight alongside the deferred read-phase typing.
+- [x] [Review][Patch] Overclaim negation is document-global and the README misdescribes the tripwire — `check_j1_two_host_signed_run.rs:928-930`: one `not two machines` anywhere disarms every overclaim; `j1-two-host-evidence/README.md:49-51` claims "negated in place" and "whole capture text" (both wrong); no proven-red vector pins the negation-smuggle; hyphenated/underscore token forms evade; scope the negation to the occurrence's field/window, align the README, add the vector [check_j1_two_host_signed_run.rs:928-938] — sources: edge+test-infra+acceptance — **MEDIUM**
+- [x] [Review][Patch] Tautological assertion — `two_host_bundle_2c.rs:168-172` compares `derive_region_pubkey(&shared, &region)` to itself, so AC2.5's headline claim rests on a vacuous green (8.13-P5 class); replace with the weld identity (`derive_region_pubkey(s,r) == derive_pubkey(derive_region_signing_seed(s,r))`) or defer to the real control (same-root refusal) [two_host_bundle_2c.rs:164-172] — source: test-infra — **MEDIUM**
+- [x] [Review][Patch] Planted-red coverage is partial — the d19 suite exercises 4/7 converted walker sites (`check-dev-model-tier`, both `check-epic-6-bridge` legs unexercised end-to-end); the proven-red missing-governed-file vector covers 6/13 governed files; ~15 gate needles unmutated (leg 1 `ArgGroup`, leg 3 typed-refusal needles, leg 5 `A2AError::PartitionTimeout`, leg 6 cohort needle, leg 9 absent-branch owner, invalid-JSON arms) — "34/34" is a vector count, not a per-needle seal; add the missing vectors [d19_story_file_governance.rs; j1_crosshost_2c_proven_red.rs] — sources: acceptance+edge+test-infra — LOW
+- [x] [Review][Patch] Leg-10 derivation/enrollment robustness — hardcoded four `TESTS_DIRS` (`check_j1_two_host_signed_run.rs:81-86`; a `_2c.rs` in any other crate is a dead test), silent `read_dir` skip (`:963-966`), and `--test`/`-p` matched as independent substrings over the whole job blob (`:1016-1018`; `-p maos-a2a-tcp` prefix-matches `-p maos-a2a-tcp2`) [check_j1_two_host_signed_run.rs:81-86,963-1018] — sources: blind+edge+test-infra — LOW
+- [x] [Review][Patch] Leg-2 heuristic is first-match-only on `pub host: Option<String>` with a 200-char attribute window (`check_j1_two_host_signed_run.rs:338-342`); `BundleForSigning`'s host stamp is not independently pinned [check_j1_two_host_signed_run.rs:338-342] — source: edge — LOW
+- [x] [Review][Patch] `journal_peer_identity_refusal`'s `Err` is discarded at all three production call sites (`transport.rs:711-717, 739-745, 986-995`) — the "fails loudly rather than silently" contract (`router.rs:500-513`) lives only in the API; emit `tracing::error!` on `Err` [transport.rs:711-995] — source: blind — LOW
+- [x] [Review][Patch] Partition window silently clamped to idle — `transport.rs:942-943` honors `min(partition_timeout_secs, idle)` with no warning, so a ratified 300s window is silently 60s; emit a `tracing::warn` on clamp or validate ≤ idle at config load [transport.rs:942-943] — source: blind — LOW
+- [x] [Review][Patch] Traceability row says 33 vectors; the enrolled file carries 34 (`traceability-matrix.md:118`) — source: acceptance — LOW
+- [x] [Review][Patch] `scan-credentials --spirit` multi-pair dead end — the error says "disambiguate" (`subcommands.rs:2993-2998`) but the verb exposes only `spirit`/`range` (`cli.rs:512-519`); add `--boot` (RecordCapture precedent) or reword the remedy [subcommands.rs:2986-2998] — source: edge — LOW
+- [x] [Review][Patch] Reconcile accepts blank host claims from hand-forged bundles — `sealed_export.rs:462-472` byte-compares raw values (`Some("")` passes `MissingHostClaim`); the CLI producer trims (`subcommands.rs:2263`), so this is reconcile-side hardening only [sealed_export.rs:462-472] — source: edge (core claim disproved at HEAD; residual kept) — LOW
+- [x] [Review][Patch] Test-record nits — scraper-twin citation points at `demo_j1.rs:1469-1474` while the scraper is at `:1527-1532` (`signing_identity_2c.rs:116-117`); the d19 suite doc claims `--stories-dir`/`--sprint-status` flag isolation while the tests rely on cwd-clap defaults (`d19_story_file_governance.rs:18-20` vs `:105`) [signing_identity_2c.rs:116-117] — source: test-infra — LOW
+- [x] [Review][Patch] Declared sprint keys with no story file escape all seven walkers — `gate_common.rs:54-68` never checks member existence, so `rm <story>.md` silently shrinks the governed set; fail closed on missing members [gate_common.rs:54-68] — source: edge — LOW
+- [x] [Review][Patch] The read-path scan is blind to uppercase hex — `is_hex_byte` accepts only `a-f` (`redaction.rs:135-137`), so a 32+-char `A-F` secret neither scrubs (pre-existing) nor scans; accept `A-F` in `scan_stored_payload`'s run counting [redaction.rs:135-137,404-418] — source: edge — LOW
+- [x] [Review][Defer] Read-phase `awaiting response` is bounded by `idle`, not the partition window (`transport.rs:602-603`) — the most common post-handshake partition shape renders as untyped `TransportFailed` with no frame id; out of ratified AC3.1 scope (connect/send only) — deferred, owner: 2d preflight / a2a lane
+- [x] [Review][Defer] Intake-sink mutex held across the durable audit append (`router.rs:1490-1501`) — serializes pushes/replies behind audit-DB latency; the lock scope is load-bearing for the nothing-Duplicate-until-durable invariant, so narrowing needs a redesign + load evidence — deferred, perf follow-up
+- [x] [Review][Defer] `CODE_INTERNAL`/`CODE_TIMEOUT` collapse into `CrossHostRouteFailure` with hand-duplicated display strings (`error.rs:200,206` vs `router.rs:1955-1964`) — two sources of truth for the same rendered text, no sync test; design acknowledged in-code — deferred
+- [x] [Review][Defer] Write-path redaction blind to uppercase hex (`redaction.rs:135-137`) — pre-existing; only the read-path scan half is this story's (kept as patch above) — deferred, pre-existing
+
+_Dismissed as noise/false-positive (3): "untrimmed `--host` flows into the bundle" (false at HEAD — `subcommands.rs:2263` trims; residual kept as the blank-host patch above); "undeclared `.md` invisible to walkers" (documented deliberate design — manifest membership over filename shape; the inverse direction is kept as the missing-member patch); "`live_lines` treats `/* */` blocks as live" (accepted limitation of text-grounded legs; behavior is pinned by the cargo suites and proven-red vectors)._
 
 ---
 
@@ -1164,10 +1208,12 @@ against it with a dependency-free `additionalProperties`/`required` validator. F
 proven-red vector families guard it, including AC2.6's named acceptance: a planted
 extra field REDs the gate.
 
-**AC5.3 — the owner string was VERIFIED, not edited.** `demo_j1.rs` already reads
-`"j1-crosshost-2c"`; `"j1-crosshost-2"` has zero hits repo-wide. The beat flips by an
-executed leg (`apply_two_host_signed_run` runs the judge in-process), never by a
-published ledger, which is structurally dead twice.
+**AC5.3 — the owner string was RE-POINTED by RF-0.** `unlanded_beats` reads
+`"j1-crosshost-2d-paid-two-host-run"` (the dev pass initially recorded this as
+"verified, not edited" — a claim about `2b`'s state that expired with the 2d
+split; corrected by the §A6 review, together with five other record sites). The
+beat flips by an executed leg (`apply_two_host_signed_run` runs the judge
+in-process), never by a published ledger, which is structurally dead twice.
 
 **D19 RESOLVED, not disclosed.** Option (a) under vehicle 14-0: ONE shared helper at
 all SEVEN walk sites; six `j1-*` files are now governed by five Blocking gates; the

@@ -879,6 +879,136 @@ fn a_capture_with_a_rewritten_claim_scope_reds() {
     );
 }
 
+/// §A6 review 2026-08-18 (P2): a sworn property stated as FALSE is not an
+/// attestation — the gate used to check only field PRESENCE, so the honest
+/// default passed as the attestation itself.
+#[test]
+fn a_false_sworn_property_reds() {
+    for field in [
+        "trust_anchor_established_out_of_band",
+        "host_b_audit_key_provisioned_separately",
+    ] {
+        let verdict = run_gate(|root| {
+            let mut capture = good_capture();
+            capture[field] = serde_json::json!(false);
+            write_file(root, CAPTURE, &capture.to_string());
+            write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+            write_file(root, BUNDLE_B, &good_bundle("host-b").to_string());
+        });
+        assert_red(&verdict, "must be present and TRUE", field);
+    }
+}
+
+/// An empty attestation string is an omission with a key in front of it.
+#[test]
+fn an_empty_stranger_verification_reds() {
+    let verdict = run_gate(|root| {
+        let mut capture = good_capture();
+        capture["stranger_verification"] = serde_json::json!("   ");
+        write_file(root, CAPTURE, &capture.to_string());
+        write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+        write_file(root, BUNDLE_B, &good_bundle("host-b").to_string());
+    });
+    assert_red(
+        &verdict,
+        "omits or leaves `stranger_verification` empty",
+        "empty stranger verification",
+    );
+}
+
+/// A capture naming one host twice is one host, whatever the keys say.
+#[test]
+fn a_capture_naming_one_host_twice_reds() {
+    let verdict = run_gate(|root| {
+        let mut capture = good_capture();
+        capture["host_b"] = serde_json::json!("host-a");
+        write_file(root, CAPTURE, &capture.to_string());
+        write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+        write_file(root, BUNDLE_B, &good_bundle("host-a").to_string());
+    });
+    assert_red(&verdict, "names one host twice", "host_a == host_b");
+}
+
+/// The capture must attest the halves it NAMES: a capture claiming alice/bob
+/// over host-a/host-b bundles used to pass.
+#[test]
+fn a_capture_disagreeing_with_its_bundle_host_reds() {
+    let verdict = run_gate(|root| {
+        let mut capture = good_capture();
+        capture["host_a"] = serde_json::json!("alice");
+        write_file(root, CAPTURE, &capture.to_string());
+        write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+        write_file(root, BUNDLE_B, &good_bundle("host-b").to_string());
+    });
+    assert_red(
+        &verdict,
+        "the capture must attest the halves it names",
+        "capture/bundle host mismatch",
+    );
+}
+
+/// A capture present but unparseable is worse than absent.
+#[test]
+fn an_invalid_json_capture_reds() {
+    let verdict = run_gate(|root| {
+        write_file(root, CAPTURE, "{not json");
+    });
+    assert_red(
+        &verdict,
+        "present but not valid JSON",
+        "invalid capture JSON",
+    );
+}
+
+/// A bundle half present but unparseable must RED the schema leg — `Err(e)`
+/// paths are guards too.
+#[test]
+fn an_invalid_json_bundle_half_reds() {
+    let verdict = run_gate(|root| {
+        write_file(root, BUNDLE_B, "{not json");
+    });
+    assert_red(&verdict, "is not valid JSON", "invalid bundle JSON");
+}
+
+/// §A6 review 2026-08-18 (P8): the negation used to be document-global — one
+/// `not two machines` anywhere disarmed an overclaim everywhere. The smuggle
+/// shape: negate the phrase IN THE SAME BREATH as the overclaim.
+#[test]
+fn a_negation_smuggle_in_one_field_reds() {
+    let verdict = run_gate(|root| {
+        let mut capture = good_capture();
+        capture["shape"] =
+            serde_json::json!("this is not two machines — two machines in two datacentres");
+        write_file(root, CAPTURE, &capture.to_string());
+        write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+        write_file(root, BUNDLE_B, &good_bundle("host-b").to_string());
+    });
+    assert_red(
+        &verdict,
+        "which no control in this story proves",
+        "negation smuggle",
+    );
+}
+
+/// The adjacent negation is still honored — a capture that says the honest
+/// negative stays GREEN. Without this the smuggle fix could be "satisfied" by
+/// refusing every negation outright.
+#[test]
+fn an_adjacent_negation_still_excuses() {
+    let verdict = run_gate(|root| {
+        let mut capture = good_capture();
+        capture["shape"] = serde_json::json!("not two machines: two keyed identities on one box");
+        write_file(root, CAPTURE, &capture.to_string());
+        write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+        write_file(root, BUNDLE_B, &good_bundle("host-b").to_string());
+    });
+    assert!(
+        verdict.passed && verdict.success,
+        "an adjacent negation must not over-block\nstdout:\n{}",
+        verdict.stdout
+    );
+}
+
 /// **The enrollment falsifier.** A `_2c.rs` file that exists but is not named in
 /// the job is dead in CI behind a green gate. The derived set makes it RED.
 #[test]
@@ -949,11 +1079,18 @@ fn deleting_the_gates_job_reds() {
 fn a_missing_governed_file_is_a_finding_not_a_skip() {
     for rel in [
         SUBCOMMANDS_RS,
+        CLI_RS,
         SEALED_EXPORT_RS,
+        AUDIT_MANIFEST,
         ROUTER_RS,
+        COHORT_RS,
         TRANSPORT_RS,
+        A2A_TCP_MANIFEST,
+        COHORT_STATE_RS,
         REDACTION_RS,
         BUNDLE_SCHEMA,
+        WORKFLOW,
+        DEMO_J1_RS,
     ] {
         let verdict = run_gate(|root| {
             std::fs::remove_file(root.join(rel)).unwrap();

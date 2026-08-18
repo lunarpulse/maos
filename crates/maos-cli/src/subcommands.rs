@@ -1888,9 +1888,11 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             receipt_out.as_ref(),
             receipt_key,
         ),
-        Some(AuditQuery::ScanCredentials { spirit, range }) => {
-            audit_scan_credentials(spirit.as_deref(), range.as_deref())
-        }
+        Some(AuditQuery::ScanCredentials {
+            spirit,
+            boot,
+            range,
+        }) => audit_scan_credentials(spirit.as_deref(), *boot, range.as_deref()),
         Some(AuditQuery::SubjectAccess { principal, format }) => {
             audit_subject_access(principal, *format, color)
         }
@@ -2880,20 +2882,60 @@ fn audit_reconcile_hosts(
     receipt_out: Option<&PathBuf>,
     receipt_key: &Option<PathBuf>,
 ) -> ExitCode {
-    let (bundle_a, key_a) = match load_host_half(&a) {
+    let (bundle_a, key_a, base_seed_a) = match load_host_half(&a) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("maosctl: audit reconcile-hosts — host A: {e}");
             return ExitCode::from(2);
         }
     };
-    let (bundle_b, key_b) = match load_host_half(&b) {
+    let (bundle_b, key_b, base_seed_b) = match load_host_half(&b) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("maosctl: audit reconcile-hosts — host B: {e}");
             return ExitCode::from(2);
         }
     };
+
+    // §A6 review 2026-08-18 (P4): the in-code root check compares the two
+    // RESOLVED keys, so ONE base seed under two claimed regions yields two
+    // distinct keys and slips past `key_a == key_b`. When either half's key was
+    // derived from a seed the operator supplied HERE, derive that seed under
+    // the OTHER half's claimed identity and refuse any collision — that closes
+    // both the same-seed-twice shape and the seed-plus-its-own-derived-pubkey
+    // shape. (The two-invocation `MAOS_REGION_HOME` shape is undetectable at
+    // reconcile and stays bounded by the sworn capture field; RELEASE-HOLDS
+    // row 9 wording.)
+    let one_root = |seed: &[u8; 32],
+                    other_bundle: &maos_audit::sealed_export::AuditBundle,
+                    other_key: &[u8; 32]| {
+        let derived = match &other_bundle.region {
+            Some(tag) => match maos_domain::region::Region::canonicalize(tag) {
+                Ok(region) => maos_audit::sealed_export::derive_region_pubkey(seed, &region),
+                Err(_) => maos_audit::sealed_export::derive_pubkey(seed),
+            },
+            None => maos_audit::sealed_export::derive_pubkey(seed),
+        };
+        derived == *other_key
+    };
+    if let Some(seed) = &base_seed_a {
+        if seed == base_seed_b.as_ref().unwrap_or(seed) || one_root(seed, &bundle_b, &key_b) {
+            eprintln!(
+                "maosctl: audit reconcile-hosts — refused: both halves trace to ONE base \
+                 seed; a two-host receipt requires independently provisioned roots (AC2.4)"
+            );
+            return ExitCode::from(1);
+        }
+    }
+    if let Some(seed) = &base_seed_b {
+        if one_root(seed, &bundle_a, &key_a) {
+            eprintln!(
+                "maosctl: audit reconcile-hosts — refused: both halves trace to ONE base \
+                 seed; a two-host receipt requires independently provisioned roots (AC2.4)"
+            );
+            return ExitCode::from(1);
+        }
+    }
 
     let join = match maos_audit::sealed_export::reconcile_two_host_bundles(
         &bundle_a, &key_a, &bundle_b, &key_b,
@@ -2958,16 +3000,32 @@ fn audit_reconcile_hosts(
     ExitCode::SUCCESS
 }
 
-/// Read and parse one half plus the key it must verify against.
+/// Read and parse one half plus the key it must verify against. When the key
+/// was DERIVED from a seed path, the base seed travels back too — the one-root
+/// closure in [`audit_reconcile_hosts`] needs it (§A6 review 2026-08-18).
 fn load_host_half(
     half: &HostHalfArgs<'_>,
-) -> Result<(maos_audit::sealed_export::AuditBundle, [u8; 32]), String> {
+) -> Result<
+    (
+        maos_audit::sealed_export::AuditBundle,
+        [u8; 32],
+        Option<[u8; 32]>,
+    ),
+    String,
+> {
     let text = std::fs::read_to_string(half.bundle)
         .map_err(|e| format!("read error on {}: {e}", half.bundle.display()))?;
     let bundle: maos_audit::sealed_export::AuditBundle =
         serde_json::from_str(&text).map_err(|e| format!("invalid bundle JSON: {e}"))?;
+    let base_seed = match half.seed {
+        Some(path) => Some(
+            maos_domain::audit_key::load_audit_key_seed(&Some(path.clone()))
+                .map_err(|e| format!("cannot load base seed: {e}"))?,
+        ),
+        None => None,
+    };
     let key = resolve_verify_key(&bundle, half.pubkey, half.seed)?;
-    Ok((bundle, key))
+    Ok((bundle, key, base_seed))
 }
 
 /// `j1-crosshost-2c` AC4.1 — the read-path credential scan.
@@ -2977,26 +3035,44 @@ fn load_host_half(
 /// site is pre-write, so nothing before this could see an escape after the fact.
 ///
 /// Both classes are reported distinctly (ratified 2026-08-17): provider prefixes,
-/// and the hex-run heuristic the write-path filter scrubs *silently*. A correctly
-/// redacted row carries neither, so a hit on either is an escape.
-fn audit_scan_credentials(spirit: Option<&str>, range: Option<&str>) -> ExitCode {
+/// and the hex-run heuristic the write-path filter scrubs *silently*. A hit on
+/// either is an escape — with one carve-out mirroring the write path: exact
+/// 32-hex frame refs under `clause_sources` are retained BY CONTRACT (digest
+/// rows), so they are not escapes (§A6 review 2026-08-18).
+fn audit_scan_credentials(
+    spirit: Option<&str>,
+    boot: Option<u64>,
+    range: Option<&str>,
+) -> ExitCode {
     let db_path = default_transparency_log_path();
     let mut filter = maos_audit::AuditFilter::default();
     if let Some(name) = spirit {
-        match resolve_spirit_pid(name, &db_path, false) {
-            Ok(pairs) => match pairs.as_slice() {
-                [] => {}
-                [pair] => {
-                    filter.spirit_pid = Some(pair.1);
-                    filter.boot_nonce = Some(pair.0);
+        // §A6 review 2026-08-18 (P17): mirror record-capture's boot-scoped
+        // resolution — the multi-pair arm used to tell the operator to
+        // "disambiguate" with a flag this verb did not have.
+        let all_boots = boot.is_some();
+        match resolve_spirit_pid(name, &db_path, all_boots) {
+            Ok(pairs) => {
+                let chosen = match boot {
+                    Some(b) => pairs.iter().find(|(bn, _)| *bn == b).copied(),
+                    None => pairs.first().copied(),
+                };
+                match chosen {
+                    Some((boot_nonce, spirit_pid)) => {
+                        filter.spirit_pid = Some(spirit_pid);
+                        filter.boot_nonce = Some(boot_nonce);
+                    }
+                    None => {
+                        eprintln!(
+                            "maosctl: audit scan-credentials — spirit '{name}' has no \
+                             matching boot {} in the TL",
+                            boot.map(|b| b.to_string())
+                                .unwrap_or_else(|| "(latest)".to_string())
+                        );
+                        return ExitCode::from(2);
+                    }
                 }
-                _ => {
-                    eprintln!(
-                        "maosctl: audit scan-credentials — spirit '{name}' resolves to multiple (boot_nonce, pid) pairs; disambiguate"
-                    );
-                    return ExitCode::from(2);
-                }
-            },
+            }
             Err(diag) => {
                 eprintln!("maosctl: audit scan-credentials — {diag}");
                 return ExitCode::from(2);

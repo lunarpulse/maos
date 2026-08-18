@@ -53,9 +53,21 @@ pub const SPRINT_STATUS_FILE: &str = "sprint-status.yaml";
 /// invisible to `findings.is_empty()`.
 pub fn governed_story_keys(stories_dir: &Path) -> Result<BTreeSet<String>, String> {
     let path = stories_dir.join(SPRINT_STATUS_FILE);
-    let keys: BTreeSet<String> = crate::sprint_status::load_sprint_status(&path.to_string_lossy())
-        .into_keys()
-        .filter(|key| !key.starts_with("epic-") && !key.contains("retro"))
+    let statuses = crate::sprint_status::load_sprint_status(&path.to_string_lossy());
+    let keys: BTreeSet<String> = statuses
+        .iter()
+        // §A6 review 2026-08-18: the shared parser splits ANY line on ':' —
+        // including provenance comment lines that contain one — so a key is
+        // only a key if it is shaped like one. Without this filter the
+        // missing-file check below flags phantom comment keys.
+        .filter(|(key, _)| {
+            !key.is_empty()
+                && key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        })
+        .filter(|(key, _)| !key.starts_with("epic-") && !key.contains("retro"))
+        .map(|(key, _)| key.clone())
         .collect();
     if keys.is_empty() {
         return Err(format!(
@@ -63,6 +75,34 @@ pub fn governed_story_keys(stories_dir: &Path) -> Result<BTreeSet<String>, Strin
              cannot be derived. Refusing to walk an empty set: a gate that governs \
              nothing passes for the wrong reason (D19)",
             path.display()
+        ));
+    }
+    // §A6 review of j1-crosshost-2c (2026-08-18): the INVERSE direction. A
+    // DECLARED key whose file is missing shrank the governed set silently —
+    // `rm <story>.md` and its dev-record/model-tier/review-findings discipline
+    // evaporated with no red. Scope: ACTIVE stories (review/in-progress/
+    // ready-for-dev and any unrecognized status) must have their file.
+    // `backlog` keys are exempt (a ratified successor is scope text until its
+    // file is authored), and `done` keys are exempt because closing work
+    // inline in a sibling story's file is established practice (11-0,
+    // j1-tier2 bridge, 13-5f all landed that way).
+    let missing: Vec<String> = keys
+        .iter()
+        .filter(|key| {
+            let status = statuses
+                .get(*key)
+                .map(|s| s.split('#').next().unwrap_or(s).trim())
+                .unwrap_or("unknown");
+            !matches!(status, "backlog" | "done") && !stories_dir.join(format!("{key}.md")).exists()
+        })
+        .cloned()
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "declared ACTIVE story key(s) with no story file in {}: {missing:?} — a \
+             story whose file is gone silently escapes every governance walker (the \
+             inverse of the D19 hole)",
+            stories_dir.display()
         ));
     }
     Ok(keys)

@@ -113,8 +113,9 @@ fn maosctl_path() -> PathBuf {
     PathBuf::from("maosctl")
 }
 
-/// Byte-for-byte the scraper in `xtask/src/demo_j1.rs:1469-1474`. If the shape
-/// of the printed line ever changes, this fails the same way `demo-j1` would.
+/// Byte-for-byte the scraper in `xtask/src/demo_j1.rs:1527-1532` (`pubkey_hex`).
+/// If the shape of the printed line ever changes, this fails the same way
+/// `demo-j1` would. (§A6 review 2026-08-18: the citation had drifted.)
 fn pubkey_hex(output: &str) -> Option<&str> {
     output
         .split_whitespace()

@@ -25,7 +25,8 @@
 //!    Story 13.6e).
 //! 2. Loopback beats are labeled `v0.8 rung — loopback rehearsal`.
 //!    `two-host-delegation` is judged separately; the later
-//!    `two-host-signed-run` rung belongs to `j1-crosshost-2c`.
+//!    `two-host-signed-run` rung belongs to `j1-crosshost-2d-paid-two-host-run`
+//!    (RF-0, 2026-08-18: `2c` owns the judge, `2d` owns the run).
 //! 3. A fixture take never claims the Tier-2 beat. Only `--live-codex` ending in
 //!    a verified sealed bundle earns `PROVEN_LIVE_SIGNED`.
 //!
@@ -924,9 +925,9 @@ fn unlanded_beats() -> Vec<Beat> {
 /// `ledger_gates()` is the four Postgres substrate gates. So this mirrors the
 /// in-process Tier-2 flip: run the judge, read what it observed.
 ///
-/// The owner string is NOT re-fixed here — `unlanded_beats` already names
-/// `j1-crosshost-2c`, verified rather than edited (the literal `"j1-crosshost-2"`
-/// has zero hits repo-wide).
+/// The owner string was re-pointed to `j1-crosshost-2d-paid-two-host-run` by
+/// RF-0 (§A6 round-table, 2026-08-18): `2c` owns the judge, `2d` owns the run.
+/// `unlanded_beats` above carries it; leg 9 of the judge enforces it.
 ///
 /// Three outcomes, and only one of them claims anything:
 ///   * no capture → the beat stays ABSENT. `Beat::absent` sets `executed: false`,

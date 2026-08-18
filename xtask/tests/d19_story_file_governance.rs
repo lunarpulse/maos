@@ -15,9 +15,11 @@
 //! red is a refactor. Every vector below plants a defect in a `j1-*` story file and
 //! asserts a Blocking gate goes RED — the thing that was impossible before.
 //!
-//! The fixtures live in a tempdir and the gates are invoked with
-//! `--stories-dir` / `--sprint-status` where they accept them, so nothing here
-//! reads or mutates the real repo tree.
+//! The fixtures live in a tempdir and the gates run with `current_dir` at the
+//! fixture root — isolation rests on the gates' clap defaults resolving
+//! `_bmad-output/...` relative to the CWD, not on explicit flags (§A6 review
+//! 2026-08-18: the doc previously claimed flag-based isolation that these
+//! vectors do not exercise). Nothing here reads or mutates the real repo tree.
 
 use std::io::Write;
 use std::path::Path;
@@ -332,6 +334,51 @@ fn an_empty_development_status_block_reds_too() {
         !ok,
         "an empty governed set must refuse, not pass for the wrong reason:\n{out}"
     );
+}
+
+/// §A6 review of j1-crosshost-2c (2026-08-18): the INVERSE hole. A key
+/// DECLARED in sprint-status whose story file is missing shrank the governed
+/// set silently — `rm <story>.md` and the story escapes every walker. An
+/// ACTIVE key (review/in-progress/ready-for-dev) with no file must RED every
+/// converted gate — this vector exercises all seven walk sites end-to-end,
+/// including the two (`check-dev-model-tier`, `check-epic-6-bridge`) the
+/// per-defect vectors above never reach.
+#[test]
+fn an_active_declared_story_with_no_file_reds_every_walker() {
+    const GATES: &[&str] = &[
+        "check-bare-review-findings",
+        "check-dev-model-used-populated",
+        "check-dev-record-completeness",
+        "check-review-findings-resolved",
+        "check-dev-model-tier",
+        "check-epic-6-bridge",
+    ];
+    for gate in GATES {
+        let fx = Fixture::new(&[J1_KEY, NUMERIC_KEY]);
+        // Declare an ACTIVE story whose file does not exist.
+        let status_path = fx
+            .path()
+            .join("_bmad-output/implementation-artifacts/sprint-status.yaml");
+        let mut text = std::fs::read_to_string(&status_path).unwrap();
+        text.push_str("  j1-crosshost-8z-ghost-story: review\n");
+        std::fs::write(&status_path, text).unwrap();
+
+        let (ok, out) = fx.gate(gate, &[]);
+        assert!(
+            !ok,
+            "`{gate}` must RED when an ACTIVE declared story has no file\n{out}"
+        );
+        // `check-epic-6-bridge` consumes the same helper but its own fixture
+        // substrate (story 5.5d, serde-error allowlists…) fails first in a
+        // minimal fixture, so its red is not guaranteed to carry the
+        // missing-file message — the walk site is still exercised.
+        if *gate != "check-epic-6-bridge" {
+            assert!(
+                out.contains("no story file"),
+                "`{gate}` must name the missing file for the ghost story\n{out}"
+            );
+        }
+    }
 }
 
 /// `epic-*` roll-ups and retrospectives are not stories and never were. The helper
