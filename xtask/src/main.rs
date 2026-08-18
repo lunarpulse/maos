@@ -109,6 +109,10 @@ mod coverage_matrix_nfr_test_3;
 // one proven-red leg + one recorded boundary; `j1-crosshost-1b` adds the consent
 // refusal legs to a gate that already blocks.
 mod check_j1_loopback_delegation;
+// j1-crosshost-2c AC5.1 — the two-host signed-run judge. ONE always-`Blocking`
+// hermetic gate: the paid run's evidence is a validated CAPTURE, not a substrate,
+// because a job needing an operator + two hosts + a funded key could never fire.
+mod check_j1_two_host_signed_run;
 // Story j1-demo-one-command-scene — the one-command J1 founder-loop scene.
 // Orchestration only: it runs the founder loop in an isolated state home, calls
 // the delegation gate as the judge, and narrates the beat ledger (including the
@@ -556,6 +560,17 @@ enum Commands {
     /// Boundary leg: loopback `frame.from.host_id` is unverified until rung 2.
     #[command(name = "check-j1-loopback-delegation")]
     CheckJ1LoopbackDelegation {
+        #[arg(long)]
+        json: bool,
+    },
+    /// j1-crosshost-2c AC5.1 — the two-host signed run's judge. Holds the controls
+    /// that decide what a signed two-host artifact may assert: the signing-identity
+    /// repair, the host discriminator under the signature, a reconciliation that
+    /// refuses one root, an enforced bundle schema, typed+bounded faults, nothing
+    /// `Duplicate` until durable, pin refusals journaled both sides, and a
+    /// stored-row scan. ONE binding class; the paid run is a validated capture.
+    #[command(name = "check-j1-two-host-signed-run")]
+    CheckJ1TwoHostSignedRun {
         #[arg(long)]
         json: bool,
     },
@@ -1219,6 +1234,7 @@ fn main() {
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
         Commands::CheckJ1LoopbackDelegation { json } => check_j1_loopback_delegation::run(json),
+        Commands::CheckJ1TwoHostSignedRun { json } => check_j1_two_host_signed_run::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
         Commands::CheckHostSurface { json } => check_host_surface::run(json),

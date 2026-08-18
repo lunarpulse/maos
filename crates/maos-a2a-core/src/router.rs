@@ -18,8 +18,9 @@ use crate::cohort::{
     ConsentRuptureSink, CrossTeamCrossingPort, CrossingOutcome, CrossingRefusal, DigestFrameClass,
     DigestReadPort, DigestReplyObservation, HaltReceiptObserver, LegacyCohortManifestGate,
     LegacyCrossTeamCrossingPort, LegacyDigestReadPort, LegacyHaltReceiptObserver,
-    COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ, CROSSING_EVENT_TYPE,
-    CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    PeerRefusalDirection, COHORT_INTENT_COLLECTIVE_SHARE, COHORT_INTENT_DIGEST_READ,
+    CROSSING_EVENT_TYPE, CROSS_TEAM_COLLECTIVE_ERASE_INTENT, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE,
 };
 use crate::config::A2APeerConfig;
 use crate::consent::{AllowlistDirection, ConsentAllowlists, EIntentDenied};
@@ -31,7 +32,7 @@ use crate::transport::json_rpc::{
     CODE_CONSENT_GRANTER_MISMATCH, CODE_CONSENT_UNCLASSIFIED, CODE_CROSSING_SOURCE_TEAM_UNBOUND,
     CODE_CROSS_TEAM_CROSSING_REFUSED, CODE_INTENT_DENIED, CODE_INTERNAL,
     CODE_PEER_IDENTITY_MISMATCH, CODE_PIN_MISMATCH_NOT_PINNED, CODE_SPIRIT_RESTART_DETECTED,
-    CODE_TEAM_IDENTITY_MISMATCH,
+    CODE_TEAM_IDENTITY_MISMATCH, CODE_TIMEOUT,
 };
 use crate::transport::logical_clock::LamportClock;
 use async_trait::async_trait;
@@ -360,6 +361,13 @@ impl A2ARouterCore {
         *guard = Some(sink);
     }
 
+    /// The NACK message a failed digest-reply intake push produces. Named because
+    /// `j1-crosshost-2c` AC3.5 makes it the reply path's commit-guard error, so the
+    /// router can tell it apart from a genuine audit/state failure without
+    /// string-matching a literal in two places.
+    const DIGEST_REPLY_NOT_DELIVERED: &'static str =
+        "intake sink full or receiver dropped — digest reply NOT delivered";
+
     /// Hand an accepted frame to the installed intake sink.
     ///
     /// Three outcomes, and the third one is why this function exists
@@ -381,11 +389,16 @@ impl A2ARouterCore {
     ///   a blocking `send` that would park the accept loop. Callers MUST convert
     ///   `Err` into a NACK; an ACK here is a lie about durability, and the sender
     ///   has no other way to learn the frame is gone.
-    ///   *Known rendering gap, filed for `j1-crosshost-2c`:* the resulting
-    ///   `CODE_INTERNAL` NACK itself falls through `interpret_response`'s
-    ///   catch-all into `TransportFailed` at the sender — the same misattribution
-    ///   shape as H13, on a code this story newly emits. 2c's fault-injection
-    ///   preflight owns typing it.
+    ///
+    ///   *Rendering gap CLOSED by `j1-crosshost-2c` AC3.2:* the resulting
+    ///   `CODE_INTERNAL` NACK used to fall through `interpret_response`'s catch-all
+    ///   into `TransportFailed` at the sender — byte-identical to a genuine
+    ///   partition. It is now typed as `A2AError::PeerInternalFailure`.
+    ///
+    ///   *The digest-reply path no longer calls this* (`j1-crosshost-2c` AC3.5):
+    ///   there the same `try_send` runs as `observe_reply_guarded`'s commit guard,
+    ///   so the dedup record is never published for a frame that was not handed
+    ///   over. This function remains the delegation path's push site.
     async fn push_to_intake_sink(&self, frame: &IacFrame) -> Result<(), ()> {
         let guard = self.intake_sink.lock().await;
         match guard.as_ref() {
@@ -459,6 +472,91 @@ impl A2ARouterCore {
             consent_envelope: frame.consent_envelope.clone(),
             intent_lineage: frame.intent_lineage.clone(),
         };
+        sink.append(&rupture)
+    }
+
+    /// `j1-crosshost-2c` AC3.6 — journal a TLS-layer peer-identity refusal as a
+    /// durable `ConsentRupture`, from a point where **no `IacFrame` exists**.
+    ///
+    /// A pin mismatch is refused inside the rustls verifier callback, which
+    /// provably cannot reach a Transparency Log: `maos-a2a-tcp` carries no
+    /// `maos-iac`/`maos-cohort`/`maos-kernel-core` production dependency (and
+    /// adding one reds `t12a_kernel_zero_auto_retry_dep_absent`), the
+    /// `TofuPinningVerifier` owns only pins/posture/direction, and its trait
+    /// methods are synchronous. So the refusal was surfaced typed on the DIAL
+    /// side and left **zero trace** on the LISTEN side.
+    ///
+    /// This seam closes that without touching the verifier: the composition root
+    /// already installs a synchronous [`ConsentRuptureSink`] here, and both TCP
+    /// sides hold an `Arc<A2ARouterCore>`.
+    ///
+    /// `peer_hint` is deliberately a `&str` rather than a verified [`PeerId`]:
+    /// on the listen side the whole point is that identity did NOT resolve, so an
+    /// unverified label is the only honest thing available. `direction` records
+    /// which side observed the refusal, because the two sides are not equally
+    /// strong — the listen side accepts ANY active pin, while per-peer scoping
+    /// exists only on the dial side.
+    ///
+    /// Returns `Err` when no sink is installed, so a deployment that expects
+    /// journaling and has none fails loudly rather than silently.
+    pub async fn journal_peer_identity_refusal(
+        &self,
+        direction: PeerRefusalDirection,
+        peer_hint: &str,
+        detail: &str,
+    ) -> Result<(), String> {
+        let sink = {
+            let guard = self.rupture_sink.lock().await;
+            guard.as_ref().cloned()
+        };
+        let Some(sink) = sink else {
+            return Err("peer-identity rupture sink is not installed".into());
+        };
+        let now_ns = self.consent_now_ns();
+        let mut rupture_id = [0u8; 16];
+        rupture_id[..8].copy_from_slice(&now_ns.to_le_bytes());
+        rupture_id[8..].copy_from_slice(&self.alloc_id().to_le_bytes());
+
+        let unverified = maos_domain::frame::FrameAddress {
+            spirit_id: maos_spirit_abi::identity::SpiritId::from(direction.as_str()),
+            host_id: Some(HostId(peer_hint.to_string())),
+            role: None,
+        };
+        let local = maos_domain::frame::FrameAddress {
+            spirit_id: maos_spirit_abi::identity::SpiritId::from("a2a-transport"),
+            host_id: None,
+            role: None,
+        };
+        let payload = maos_domain::frame::ConsentRupturePayload {
+            rupture_id,
+            original_frame_id: rupture_id,
+            original_kind: maos_spirit_abi::identity::FrameKind::ConsentRupture,
+            accepted: vec![],
+            rejected: vec![maos_domain::frame::RuptureRejection {
+                address: local.clone(),
+                reason: maos_domain::frame::RuptureReason::PeerIdentityUnverified,
+            }],
+            ruptured_at_ns: now_ns,
+        };
+        let rupture = IacFrame {
+            frame_id: rupture_id,
+            timestamp_ns: now_ns,
+            logical_clock: self.clock.current(),
+            from: local,
+            to: std::iter::once(unverified).collect(),
+            kind: maos_spirit_abi::identity::FrameKind::ConsentRupture,
+            intent: maos_domain::invariants::i1::IntentClass::HighPrivilege,
+            payload: maos_domain::frame::FramePayload::ConsentRupture(payload),
+            auto_marker: maos_domain::invariants::i3::FrameOrigin::SpiritAuto,
+            consent_envelope: None,
+            intent_lineage: maos_domain::invariants::i13::IntentLineage::default(),
+        };
+        tracing::warn!(
+            direction = direction.as_str(),
+            peer = peer_hint,
+            detail = detail,
+            "a2a peer identity refused — journaling ConsentRupture"
+        );
         sink.append(&rupture)
     }
 
@@ -1122,15 +1220,33 @@ impl A2ARouterCore {
                 // **`xtask/kloc.toml:87`** says a ceiling must never block.
                 //
                 // SCOPE WALL: this repairs ONLY the code this story makes reachable.
-                // `interpret_response` types **9 of the 16** defined NACK codes; the
-                // remaining six fall-throughs (`PARSE_ERROR`, `INVALID_REQUEST`,
-                // `METHOD_NOT_FOUND`, `TIMEOUT`, `FRAME_TOO_LARGE`, `INTERNAL`) are
-                // not newly reachable here. The 9-of-16 census is recorded in the
-                // j1-crosshost-2b dev record with a named owner; a nine-arm refactor
-                // inside a frozen crate is a different story.
+                //
+                // `j1-crosshost-2c` AC3.2 discharged the two fall-throughs it
+                // newly needed. The census is now **12 of the 16** defined NACK
+                // codes typed, with FOUR fall-throughs left — `PARSE_ERROR`,
+                // `INVALID_REQUEST`, `METHOD_NOT_FOUND`, `FRAME_TOO_LARGE`. The
+                // prior comment here claimed 9 typed and named `TIMEOUT` and
+                // `INTERNAL` among the untyped six as "not newly reachable"; both
+                // halves were wrong at the time it was written — the arm below
+                // made it 10, and the same story newly emitted `INTERNAL` at
+                // `:1371` and `:1549`. The census is machine-checked in
+                // `crates/maos-bin/tests/bounded_postures_2b.rs`, not here.
                 CODE_SPIRIT_RESTART_DETECTED => Err(A2AError::PinInvalidated {
                     peer: peer.as_str().to_string(),
                     awaiting_repin: true,
+                }),
+                // `j1-crosshost-2c` AC3.2 — SHIP-BLOCKER for AC3's fault windows.
+                // Both of these used to land in the catch-all below, which made a
+                // dropped-receiver internal NACK and a genuine wire partition the
+                // SAME observable at the sender. Same `kloc.toml:87`
+                // correctness-repair grant, same binding scope wall as H13.
+                CODE_INTERNAL => Err(A2AError::PeerInternalFailure {
+                    peer: peer.as_str().to_string(),
+                    message: n.error.message,
+                }),
+                CODE_TIMEOUT => Err(A2AError::PeerIntakeTimeout {
+                    peer: peer.as_str().to_string(),
+                    message: n.error.message,
                 }),
                 _ => Err(A2AError::TransportFailed(n.error.message)),
             },
@@ -1359,19 +1475,33 @@ impl A2ARouterCore {
                 DigestFrameClass::Reply { .. }
             )
         {
-            match self.digest_read_port.observe_reply(&peer_host, frame) {
+            // `j1-crosshost-2c` AC3.5 (`deferred-work.md:819`) — the push is now the
+            // reply's COMMIT GUARD. `observe_reply` used to record the dedup and
+            // only then push, so a sender retrying after a dropped-receiver NACK was
+            // answered `Duplicate` (an ACK with `delivered: true`) while the frame
+            // was still gone. Nothing is `Duplicate` until something is durable.
+            //
+            // The sink lock is taken for the whole guarded observation so the
+            // `try_send` decision and the dedup commit cannot interleave. The send
+            // itself is synchronous (`try_send`, never a blocking `send` that would
+            // park the accept loop — 2b's D2 backpressure contract), which is what
+            // lets it be a `FnMut` guard at all.
+            let mut push_failed = false;
+            let observed = {
+                let sink_guard = self.intake_sink.lock().await;
+                let mut push = || match sink_guard.as_ref() {
+                    Some(sink) => sink.try_send(frame.clone()).map_err(|_| {
+                        push_failed = true;
+                        Self::DIGEST_REPLY_NOT_DELIVERED.to_string()
+                    }),
+                    None => Ok(()),
+                };
+                self.digest_read_port
+                    .observe_reply_guarded(&peer_host, frame, &mut push)
+            };
+            match observed {
                 Ok(DigestReplyObservation::Accepted) => {
                     let new_clock = self.clock.recv_advance(frame.logical_clock);
-                    // j1-crosshost-2b AC1.2 (G1b.i) — the SECOND intake-sink push
-                    // site. A fix applied only to the delegation path at `(5)`
-                    // below would leave this one still discarding the send result.
-                    if self.push_to_intake_sink(frame).await.is_err() {
-                        return A2AJsonRpcResponse::nack(
-                            request.id,
-                            CODE_INTERNAL,
-                            "intake sink full or receiver dropped — digest reply NOT delivered",
-                        );
-                    }
                     return A2AJsonRpcResponse::ack(
                         request.id,
                         AckBody {
@@ -1394,7 +1524,11 @@ impl A2ARouterCore {
                     return A2AJsonRpcResponse::nack(
                         request.id,
                         CODE_INTERNAL,
-                        format!("digest reply audit/state transition failed: {error}"),
+                        if push_failed {
+                            error
+                        } else {
+                            format!("digest reply audit/state transition failed: {error}")
+                        },
                     );
                 }
             }
@@ -1810,6 +1944,23 @@ pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
                 frame_id,
                 timeout_secs,
             }
+        }
+        // `j1-crosshost-2c` AC3.2 — both receiver-side faults route to the generic
+        // route-failure port type, following the Story 8.9 precedent directly
+        // below: NO new `IacBusError` variant, so `maos-domain` takes a ZERO delta
+        // (it is already at a pre-existing D14 ceiling breach that is not ours).
+        // The distinction survives anyway, because it is carried in the rendered
+        // text and because neither can be confused with the typed
+        // `CrossHostPartitionTimeout` above — which is the whole point.
+        A2AError::PeerInternalFailure { peer: p_peer, message } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "peer {p_peer} reported an internal failure — frame NOT delivered: {message}"
+            ))
+        }
+        A2AError::PeerIntakeTimeout { peer: p_peer, message } => {
+            IacBusError::CrossHostRouteFailure(format!(
+                "peer {p_peer} reported an intake timeout: {message}"
+            ))
         }
         A2AError::TransportFailed(detail)
         | A2AError::DeserializationFailed(detail)

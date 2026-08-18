@@ -2,7 +2,8 @@
 
 //! Gate — `check-bare-review-findings`.
 //!
-//! Walks all `_bmad-output/implementation-artifacts/[0-9]*.md` files and asserts
+//! Walks every story file the project DECLARES in `sprint-status.yaml` (D19 —
+//! previously `[0-9]*.md`, which made the whole `j1-*` lane invisible) and asserts
 //! ZERO `_No review findings._` placeholder strings remain across the workspace.
 //! Reports the file paths if any match (diagnostic uplift).
 //! Template files at `<template>.md` are excluded from the scan.
@@ -17,6 +18,9 @@ pub fn run(json: bool) -> Result<(), String> {
 }
 
 fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
+    // D19 — the governed set comes from the project's own story list, not from a
+    // filename convention. Fails closed rather than walking nothing.
+    let keys = crate::gate_common::governed_story_keys(std::path::Path::new(stories_dir))?;
     let mut bare_files: Vec<String> = Vec::new();
 
     let entries = match fs::read_dir(stories_dir) {
@@ -32,7 +36,7 @@ fn run_with_dir(json: bool, stories_dir: &str) -> Result<(), String> {
         if name.contains("template") || name.contains("example") {
             continue;
         }
-        if !name.starts_with(|c: char| c.is_ascii_digit()) {
+        if !crate::gate_common::is_governed_story_file(&keys, &name) {
             continue;
         }
 
@@ -95,6 +99,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn write_story(dir: &TempDir, name: &str, content: &str) {
+        crate::gate_common::register_fixture_story(dir.path(), name);
         let path = dir.path().join(name);
         let mut f = std::fs::File::create(&path).unwrap();
         write!(f, "{}", content).unwrap();

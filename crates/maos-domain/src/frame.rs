@@ -393,6 +393,15 @@ pub enum RuptureReason {
     PrincipalRevoked,
     /// Receiver's mailbox channel is closed (Spirit unloaded mid-frame).
     RecipientUnloaded,
+    /// `j1-crosshost-2c` AC3.6 — the mTLS peer could not be identified: its leaf
+    /// certificate did not match an active TOFU pin, or the handshake itself was
+    /// rejected at the pin layer. The identity axis, distinct from every reason
+    /// above, all of which presuppose a KNOWN counterparty.
+    ///
+    /// Recording a pin mismatch as an allowlist or posture failure would be a
+    /// claim standing in for a control, so this variant exists rather than
+    /// reusing one that is merely adjacent.
+    PeerIdentityUnverified,
 }
 
 /// Story 6.4 / NFR-Scale-4 — RateLimited payload.

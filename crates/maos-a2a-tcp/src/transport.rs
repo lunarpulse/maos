@@ -22,7 +22,7 @@ use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
 use maos_a2a_core::{
     A2AError, A2AJsonRpcRequest, A2AJsonRpcResponse, A2APeerConfig, CohortManifestGate,
     ConsentRuptureSink, DigestReadPort, HaltReceiptObserver, HandshakeRetryPolicy,
-    InMemoryTofuPinStore, TofuPinStore,
+    InMemoryTofuPinStore, PeerRefusalDirection, TofuPinStore,
 };
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
@@ -542,16 +542,32 @@ impl TcpA2ATransport {
     /// One dial+handshake+send+recv round, returning the typed transport result
     /// or a classified error. `client_config` is the per-peer scoped dialing
     /// config (patch P1).
+    ///
+    /// `partition` is the operator-configured partition window for this peer
+    /// (`j1-crosshost-2c` AC3.1/AC3.3). Every step that can block on a
+    /// non-cooperating peer is bounded by it or by the injected handshake wall;
+    /// nothing here waits on an OS backstop.
     async fn dial_once(
         &self,
         addr: SocketAddr,
         request: &A2AJsonRpcRequest,
         client_config: &Arc<ClientConfig>,
+        partition: Duration,
     ) -> Result<A2AJsonRpcResponse, TcpTransportError> {
         let connector = TlsConnector::from(client_config.clone());
-        let tcp = TcpStream::connect(addr)
-            .await
-            .map_err(|e| TcpTransportError::Io(format!("connect {addr}: {e}")))?;
+        // AC3.1 — `TcpStream::connect` was a bare `.await`. Against a black-holed
+        // address it hangs on the kernel's SYN-retry backstop (~130s on Linux),
+        // far past any partition window an operator can configure.
+        let tcp = match tokio::time::timeout(partition, TcpStream::connect(addr)).await {
+            Err(_) => {
+                return Err(TcpTransportError::PartitionTimeout {
+                    phase: format!("connect {addr}"),
+                    secs: partition.as_secs(),
+                })
+            }
+            Ok(Err(e)) => return Err(TcpTransportError::Io(format!("connect {addr}: {e}"))),
+            Ok(Ok(s)) => s,
+        };
         let server_name = ServerName::IpAddress(addr.ip().into());
 
         let tls = match tokio::time::timeout(
@@ -568,10 +584,20 @@ impl TcpA2ATransport {
         let mut framed = Framed::new(tls, length_delimited_codec());
         let body = serde_json::to_vec(request)
             .map_err(|e| TcpTransportError::Protocol(format!("serialize request: {e}")))?;
-        framed
-            .send(Bytes::from(body))
-            .await
-            .map_err(|e| TcpTransportError::Io(format!("send: {e}")))?;
+        // AC3.1 — `framed.send` was ALSO unbounded, and it is the CHEAPER real
+        // partition: a peer that completes the handshake and then stops reading
+        // fills the socket buffer and hangs `route_outbound` forever with NO OS
+        // backstop at all. Nothing bounded this before.
+        match tokio::time::timeout(partition, framed.send(Bytes::from(body))).await {
+            Err(_) => {
+                return Err(TcpTransportError::PartitionTimeout {
+                    phase: "sending request".to_string(),
+                    secs: partition.as_secs(),
+                })
+            }
+            Ok(Err(e)) => return Err(TcpTransportError::Io(format!("send: {e}"))),
+            Ok(Ok(())) => {}
+        }
 
         match tokio::time::timeout(self.timeouts.idle, framed.next()).await {
             Err(_) => Err(TcpTransportError::Timeout("awaiting response".into())),
@@ -659,11 +685,40 @@ async fn serve_connection(
     active_connections.fetch_add(1, Ordering::SeqCst);
     let _gauge = ConnGauge(active_connections);
 
+    // AC3.6 — the only identity available when the pin check fails is the socket
+    // address. Captured BEFORE `tcp` moves into the acceptor.
+    let peer_addr_hint = tcp
+        .peer_addr()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+
     // Handshake — bounded; a plaintext client (AC-T9) or a half-open client
     // (AC-T10) fails here and the task ends without ever entering intake.
+    //
+    // `j1-crosshost-2c` AC3.6 — the old code was a blanket `_ => return`, so a
+    // client whose leaf failed the TOFU pin verifier left **ZERO trace** on this
+    // host: no rupture row, no typed error, nothing an operator could query. The
+    // verifier itself provably cannot reach a Transparency Log, but `core` is in
+    // scope here and already carries the installed synchronous
+    // `ConsentRuptureSink`.
     let tls = match tokio::time::timeout(timeouts.handshake, acceptor.accept(tcp)).await {
         Ok(Ok(s)) => s,
-        _ => return,
+        Ok(Err(e)) => {
+            let classified = TcpTransportError::classify_handshake(&e.to_string());
+            if classified.is_tofu_mismatch() {
+                // Best-effort: a journaling failure must not become a way to keep
+                // the listener from refusing.
+                let _ = core
+                    .journal_peer_identity_refusal(
+                        PeerRefusalDirection::Listen,
+                        peer_addr_hint.as_str(),
+                        &classified.to_string(),
+                    )
+                    .await;
+            }
+            return;
+        }
+        Err(_) => return,
     };
 
     // Story 8.9 / AC1 (G8) — re-derive the TLS-VERIFIED peer identity from the
@@ -677,7 +732,17 @@ async fn serve_connection(
     let (verified_peer, peer_leaf_fingerprint) = match resolve_verified_peer(&tls, &pins) {
         Some(resolved) => resolved,
         None => {
+            // AC3.6 — this arm is the other half of the same silence: the
+            // handshake passed the "any active pin" check but no peer owns the
+            // negotiated leaf. Journal it rather than only warning.
             tracing::warn!("resolve_verified_peer: no active pin for negotiated client cert — closing connection without intake");
+            let _ = core
+                .journal_peer_identity_refusal(
+                    PeerRefusalDirection::Listen,
+                    peer_addr_hint.as_str(),
+                    "no active pin owns the negotiated client leaf",
+                )
+                .await;
             return;
         }
     };
@@ -853,7 +918,7 @@ impl A2APeerRouter for TcpA2ATransport {
     async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), A2AError> {
         // Shared steps (1)–(4): allowlist + TOFU verify + clock tick + build
         // request (carrying THIS Host's boot_nonce — Correction #3 / NFR-Rel-6).
-        let (request, peer_cfg, _frame_id) = self
+        let (request, peer_cfg, frame_id) = self
             .core
             .prepare_outbound(frame, peer, self.own_boot_nonce)
             .await?;
@@ -863,6 +928,20 @@ impl A2APeerRouter for TcpA2ATransport {
             .scoped_client_config(&peer_cfg.peer_id)
             .map_err(A2AError::from)?;
 
+        // `j1-crosshost-2c` AC3.3 — WIRE the operator-configured partition window
+        // to the TCP path. Its only production consumer was
+        // `LoopbackA2ARouter::route_outbound` (`maos-a2a/src/adapter.rs:83`);
+        // `maos-a2a-tcp` read it ZERO times and the wire was bounded by hardcoded
+        // `TcpTimeouts::production()` instead.
+        //
+        // Clamped by `timeouts.idle` for two reasons, neither of them cosmetic:
+        // `TcpTimeouts` is the injected test seam (H5) that keeps this crate's
+        // suite inside its 51x-per-push budget, and the response read below is
+        // ALREADY bounded by `idle` — so a write window longer than the idle wall
+        // could never be observed by a caller anyway.
+        let partition =
+            Duration::from_secs(peer_cfg.partition_timeout_secs).min(self.timeouts.idle);
+
         // Transport-side retry (AC-T12: the ONLY retrier). Retries fire ONLY on
         // cert-class failures per `HandshakeRetryPolicy::is_retryable`.
         let max = self.retry_policy.max_attempts.max(1);
@@ -871,12 +950,48 @@ impl A2APeerRouter for TcpA2ATransport {
         loop {
             self.last_dial_attempts
                 .store(attempt as usize, Ordering::SeqCst);
-            match self.dial_once(addr, &request, &scoped_cfg).await {
+            match self.dial_once(addr, &request, &scoped_cfg, partition).await {
                 Ok(response) => {
                     return self.core.interpret_response(peer, response);
                 }
                 Err(e) => {
                     last_err = e;
+                    // AC3.3 — a partition is NOT a generic transport failure. This
+                    // is the one place that holds both the peer and the frame id,
+                    // so it is the one place that can mint the typed variant the
+                    // §7.2 claim has always described.
+                    if let TcpTransportError::PartitionTimeout { phase, secs } = &last_err {
+                        tracing::warn!(
+                            peer = %peer.as_str(),
+                            phase = %phase,
+                            timeout_secs = *secs,
+                            "a2a partition timeout — frame NOT delivered, no kernel auto-retry"
+                        );
+                        return Err(A2AError::PartitionTimeout {
+                            peer: peer.as_str().to_string(),
+                            frame_id,
+                            timeout_secs: if *secs == 0 {
+                                peer_cfg.partition_timeout_secs
+                            } else {
+                                *secs
+                            },
+                        });
+                    }
+                    // AC3.6 — the DIAL side already surfaced this typed at the
+                    // composition root, but it left no row either. Journal it here
+                    // so both sides of a pin mismatch are queryable, and journal it
+                    // ONCE — before the retry decision, since a pin mismatch is
+                    // never retryable.
+                    if last_err.is_tofu_mismatch() {
+                        let _ = self
+                            .core
+                            .journal_peer_identity_refusal(
+                                PeerRefusalDirection::Dial,
+                                peer.as_str(),
+                                &last_err.to_string(),
+                            )
+                            .await;
+                    }
                     let a2a = last_err.to_a2a_error();
                     if attempt >= max || !self.retry_policy.is_retryable(&a2a) {
                         return Err(a2a);

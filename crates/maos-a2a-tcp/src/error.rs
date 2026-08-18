@@ -26,6 +26,13 @@ pub enum TcpTransportError {
     Handshake(String),
     /// A bounded timeout fired (handshake / intake / idle) — AC-T7.
     Timeout(String),
+    /// `j1-crosshost-2c` AC3.1/AC3.3 — the operator-configured partition window
+    /// expired while dialing or writing. Distinct from [`Self::Timeout`], which is
+    /// a handshake/intake/idle wall: this one is the §7.2 partition, and
+    /// `route_outbound` renders it as `A2AError::PartitionTimeout` with the frame
+    /// id, so a partition and a receiver-side failure are never the same
+    /// observable.
+    PartitionTimeout { phase: String, secs: u64 },
     /// An inbound frame exceeded the codec cap (AC-T8).
     FrameTooLarge(String),
     /// Socket / IO error (connection refused, reset, EOF mid-frame).
@@ -53,7 +60,15 @@ impl TcpTransportError {
     }
 
     pub fn is_timeout(&self) -> bool {
-        matches!(self, TcpTransportError::Timeout(_))
+        matches!(
+            self,
+            TcpTransportError::Timeout(_) | TcpTransportError::PartitionTimeout { .. }
+        )
+    }
+
+    /// Is this the §7.2 partition window rather than a handshake/intake wall?
+    pub fn is_partition_timeout(&self) -> bool {
+        matches!(self, TcpTransportError::PartitionTimeout { .. })
     }
 
     /// Map to the frozen `A2AError` surface (AC-A6: consumed unchanged). The
@@ -80,6 +95,14 @@ impl TcpTransportError {
                 message: m.clone(),
             },
             TcpTransportError::Timeout(m) => A2AError::TransportFailed(format!("timeout: {m}")),
+            // `j1-crosshost-2c` AC3.3 — this layer has no frame id, so the typed
+            // `A2AError::PartitionTimeout` is minted at the ONE call site that
+            // does (`route_outbound`, which already holds `prepare_outbound`'s
+            // `frame_id`). This arm is the fallback for any other consumer and
+            // still says "partition", never a bare "timeout".
+            TcpTransportError::PartitionTimeout { phase, secs } => {
+                A2AError::TransportFailed(format!("partition timeout after {secs}s: {phase}"))
+            }
             TcpTransportError::FrameTooLarge(m) => {
                 A2AError::TransportFailed(format!("frame too large: {m}"))
             }
@@ -129,6 +152,9 @@ impl fmt::Display for TcpTransportError {
             TcpTransportError::CertExpired(m) => write!(f, "certificate validity: {m}"),
             TcpTransportError::Handshake(m) => write!(f, "handshake failed: {m}"),
             TcpTransportError::Timeout(m) => write!(f, "timeout: {m}"),
+            TcpTransportError::PartitionTimeout { phase, secs } => {
+                write!(f, "partition timeout after {secs}s: {phase}")
+            }
             TcpTransportError::FrameTooLarge(m) => write!(f, "frame too large: {m}"),
             TcpTransportError::Io(m) => write!(f, "io error: {m}"),
             TcpTransportError::Config(m) => write!(f, "config error: {m}"),

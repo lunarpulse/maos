@@ -98,6 +98,11 @@ gates = [
     # plus one recorded boundary (loopback `frame.from.host_id` is unverified until
     # rung 2). `j1-crosshost-1b` adds the ADR-012 consent refusal legs to it.
     "check-j1-loopback-delegation",
+    # j1-crosshost-2c AC5.1 — the two-host signed-run judge: signing-identity repair,
+    # host discriminator under the signature, reconciliation that refuses one root,
+    # enforced bundle schema, typed+bounded faults, nothing Duplicate until durable,
+    # pin refusals journaled both sides, stored-row scan, validated paid-run capture.
+    "check-j1-two-host-signed-run",
     # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
     "check-skill-conformance",
     # Story 11.2a (AC5, D10) — cross-region convergent replication gate
@@ -278,6 +283,21 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 # adds legs to a gate that already blocks rather than standing one up in a green field.
 [[ship_gate]]
 name = "check-j1-loopback-delegation"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+
+# j1-crosshost-2c AC5.1/AC5.2 — the two-host signed-run judge. `blocking` at v1.0,
+# not "advisory now": the gate is hermetic (it reads committed sources plus any
+# capture artifact already in the tree), so there is no substrate to wait for.
+#
+# Deliberately ONE job with ONE binding class. The rejected alternative was a
+# second `AdvisorySubstrate` job for the paid run — but that job's substrate is an
+# operator, two hosts and a funded API key, which CI has never had and never will,
+# so it would take the ABSENT branch on every run for its entire lifetime. A gate
+# whose substrate cannot exist is a monument, not a control. The paid run's
+# evidence is instead a capture this gate VALIDATES when present and refuses to let
+# anything CLAIM when absent.
+[[ship_gate]]
+name = "check-j1-two-host-signed-run"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 
 # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp

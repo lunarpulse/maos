@@ -40,6 +40,10 @@ toml = "0.8"
 # regression-pinned (Murat round-1 condition), using the already-vendored
 # `tracing-subscriber` (no new external crate) rather than `tracing-test`.
 tracing-subscriber = "0.3"
+# j1-crosshost-2c AC3.5 — test-only fake correlation ports whose interior
+# mutability is locked and immediately used; `parking_lot` avoids the poisoning
+# unwrap boilerplate the project rule forbids. Already vendored via maos-iac.
+parking_lot = "0.12"
 
 [features]
 default = []

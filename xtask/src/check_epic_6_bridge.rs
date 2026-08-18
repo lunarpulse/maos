@@ -2557,28 +2557,34 @@ fn check_7_1_5_bare_rf_count() -> CheckResult {
     let dir = "_bmad-output/implementation-artifacts";
     let mut bare_count = 0;
     let mut bare_files: Vec<String> = Vec::new();
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".md") && name.starts_with(|c: char| c.is_ascii_digit()) {
-                if let Ok(content) = fs::read_to_string(entry.path()) {
-                    if let Some(rf_start) = content.find("\n### Review Findings") {
-                        let rf_section = &content[rf_start..];
-                        let rf_end = rf_section[1..]
-                            .find("\n## ")
-                            .map(|i| i + 1)
-                            .unwrap_or(rf_section.len());
-                        let rf_content = &rf_section[..rf_end];
-                        if rf_content.contains("_No review findings._") {
-                            bare_count += 1;
-                            bare_files.push(name);
+    // D19 — governed by the project's own story list. An unreadable list yields an
+    // empty governed set, which this check reports as FAIL rather than 0-bare-PASS:
+    // "walked nothing" and "found nothing wrong" must not look alike.
+    let governed = crate::gate_common::governed_story_keys(std::path::Path::new(dir));
+    if let Ok(ref keys) = governed {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if crate::gate_common::is_governed_story_file(keys, &name) {
+                    if let Ok(content) = fs::read_to_string(entry.path()) {
+                        if let Some(rf_start) = content.find("\n### Review Findings") {
+                            let rf_section = &content[rf_start..];
+                            let rf_end = rf_section[1..]
+                                .find("\n## ")
+                                .map(|i| i + 1)
+                                .unwrap_or(rf_section.len());
+                            let rf_content = &rf_section[..rf_end];
+                            if rf_content.contains("_No review findings._") {
+                                bare_count += 1;
+                                bare_files.push(name);
+                            }
                         }
                     }
                 }
             }
         }
     }
-    let passed = bare_count == 0;
+    let passed = governed.is_ok() && bare_count == 0;
     CheckResult {
         id,
         passed,
@@ -2586,10 +2592,10 @@ fn check_7_1_5_bare_rf_count() -> CheckResult {
             "blocking_7_1_5: {} stories with bare RF placeholders: {:?} → {}",
             bare_count,
             bare_files,
-            if passed {
-                "PASS"
-            } else {
-                "FAIL — bare placeholders remain"
+            match &governed {
+                Err(why) => why.as_str(),
+                Ok(_) if passed => "PASS",
+                Ok(_) => "FAIL — bare placeholders remain",
             }
         ),
     }
@@ -2602,27 +2608,31 @@ fn check_7_1_5_dmu_missing_count() -> CheckResult {
     let mut missing_files: Vec<String> = Vec::new();
     let mut empty_count = 0;
     let mut empty_files: Vec<String> = Vec::new();
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".md") && name.starts_with(|c: char| c.is_ascii_digit()) {
-                if let Ok(content) = fs::read_to_string(entry.path()) {
-                    // Only check the YAML frontmatter section (between --- delimiters)
-                    let frontmatter = extract_frontmatter(&content);
-                    if !frontmatter.contains("dev_model_used:") {
-                        missing_count += 1;
-                        missing_files.push(name);
-                    } else if frontmatter.contains("dev_model_used: TBD-set-at-story-start")
-                        || frontmatter.contains("dev_model_used: <set by dev at story start>")
-                    {
-                        empty_count += 1;
-                        empty_files.push(name);
+    // D19 — same governed set, same fail-closed rule as the bare-RF check above.
+    let governed = crate::gate_common::governed_story_keys(std::path::Path::new(dir));
+    if let Ok(ref keys) = governed {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if crate::gate_common::is_governed_story_file(keys, &name) {
+                    if let Ok(content) = fs::read_to_string(entry.path()) {
+                        // Only check the YAML frontmatter section (between --- delimiters)
+                        let frontmatter = extract_frontmatter(&content);
+                        if !frontmatter.contains("dev_model_used:") {
+                            missing_count += 1;
+                            missing_files.push(name);
+                        } else if frontmatter.contains("dev_model_used: TBD-set-at-story-start")
+                            || frontmatter.contains("dev_model_used: <set by dev at story start>")
+                        {
+                            empty_count += 1;
+                            empty_files.push(name);
+                        }
                     }
                 }
             }
         }
     }
-    let passed = missing_count == 0 && empty_count == 0;
+    let passed = governed.is_ok() && missing_count == 0 && empty_count == 0;
     CheckResult {
         id,
         passed,
@@ -2630,10 +2640,10 @@ fn check_7_1_5_dmu_missing_count() -> CheckResult {
             "blocking_7_1_5: {} missing + {} empty DMU fields → {}. Missing: {:?} Empty: {:?}",
             missing_count,
             empty_count,
-            if passed {
-                "PASS"
-            } else {
-                "FAIL — DMU fields incomplete"
+            match &governed {
+                Err(why) => why.as_str(),
+                Ok(_) if passed => "PASS",
+                Ok(_) => "FAIL — DMU fields incomplete",
             },
             missing_files,
             empty_files

@@ -23,6 +23,7 @@
 //! dominant pattern; pathological table formatting (escaped pipes, multi-line
 //! cells) is acceptable as v0.5-α deferred work.
 
+use std::collections::BTreeSet;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,23 +48,20 @@ struct StoryReview {
     file_list_entries: HashSet<String>,
 }
 
-fn story_key_from_filename(path: &Path) -> Option<String> {
+/// D19 — a story key is governed iff the project's own `development_status` list
+/// declares it. The prior test was a leading ASCII digit, which made every
+/// non-numeric key (the whole `j1-*` lane) invisible to this gate.
+fn story_key_from_filename(keys: &BTreeSet<String>, path: &Path) -> Option<String> {
     let name = path.file_stem()?.to_str()?;
     // Skip retro files, dependency files, index files.
     if name.contains("retro") || name.starts_with("epic-") || name == "index" {
         return None;
     }
-    // Must match pattern N-N-... or Na-N-...
-    let mut chars = name.chars();
-    let first = chars.next()?;
-    if !first.is_ascii_digit() {
-        return None;
-    }
-    Some(name.to_string())
+    keys.contains(name).then(|| name.to_string())
 }
 
-fn parse_story(path: &Path) -> Option<StoryReview> {
-    let story_key = story_key_from_filename(path)?;
+fn parse_story(keys: &BTreeSet<String>, path: &Path) -> Option<StoryReview> {
+    let story_key = story_key_from_filename(keys, path)?;
     let content = fs::read_to_string(path).ok()?;
     let checklist_gated = content.contains("<!-- review-findings-checklist-gated -->");
     let lines: Vec<&str> = content.lines().collect();
@@ -197,13 +195,15 @@ pub fn run(stories_dir: &str, sprint_status_path: &str, json: bool) -> Result<()
     if !dir.is_dir() {
         return Err(format!("stories_dir not found: {stories_dir}"));
     }
+    // D19 — fails closed rather than reducing this gate to a no-op.
+    let governed = crate::gate_common::governed_story_keys(dir)?;
     let mut reviews = Vec::new();
     let entries = fs::read_dir(dir).map_err(|e| format!("read_dir {stories_dir}: {e}"))?;
     for entry in entries {
         let entry = entry.map_err(|e| format!("dir entry: {e}"))?;
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
-            if let Some(r) = parse_story(&path) {
+            if let Some(r) = parse_story(&governed, &path) {
                 reviews.push(r);
             }
         }
@@ -287,6 +287,7 @@ mod tests {
     use std::io::Write;
 
     fn write_story(dir: &Path, name: &str, content: &str) -> PathBuf {
+        crate::gate_common::register_fixture_story(dir, name);
         let p = dir.join(name);
         let mut f = fs::File::create(&p).unwrap();
         f.write_all(content.as_bytes()).unwrap();

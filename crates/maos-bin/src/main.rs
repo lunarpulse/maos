@@ -9122,12 +9122,13 @@ impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
         self.inner.authorize_reply_send(peer, request_id)
     }
 
-    fn observe_reply(
+    fn observe_reply_guarded(
         &self,
         peer: &maos_spirit_abi::identity::HostId,
         frame: &maos_domain::frame::IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<maos_a2a_core::DigestReplyObservation, String> {
-        self.inner.observe_reply(peer, frame)
+        self.inner.observe_reply_guarded(peer, frame, before_commit)
     }
 }
 

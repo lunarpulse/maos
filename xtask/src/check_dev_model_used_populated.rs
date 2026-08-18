@@ -128,12 +128,11 @@ fn run_with_dir_and_status(
         Err(e) => return Err(format!("Cannot read {}: {}", stories_dir, e)),
     };
     let mut skipped_pre_development = 0usize;
+    // D19 — governed by the project's own story list, not a filename convention.
+    let keys = crate::gate_common::governed_story_keys(std::path::Path::new(stories_dir))?;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if !name.ends_with(".md") {
-            continue;
-        }
-        if !name.starts_with(|c: char| c.is_ascii_digit()) {
+        if !crate::gate_common::is_governed_story_file(&keys, &name) {
             continue;
         }
 
@@ -373,6 +372,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn write_story(dir: &TempDir, name: &str, content: &str) {
+        crate::gate_common::register_fixture_story(dir.path(), name);
         let path = dir.path().join(name);
         let mut f = std::fs::File::create(&path).unwrap();
         write!(f, "{}", content).unwrap();

@@ -188,6 +188,24 @@ pub enum A2AError {
         timeout_secs: u64,
     },
 
+    /// `j1-crosshost-2c` AC3.2 — the receiver answered `CODE_INTERNAL`: it failed
+    /// internally and the frame was **NOT delivered**.
+    ///
+    /// Before this variant existed the code fell through `interpret_response`'s
+    /// catch-all into [`Self::TransportFailed`], so a dropped-receiver internal
+    /// NACK was byte-identical at the sender to a genuine network partition —
+    /// filed against this story in `router.rs` by `j1-crosshost-2b`, which newly
+    /// emits the code at two sites. A fault-injection suite cannot assert on
+    /// faults it cannot tell apart.
+    #[error("peer {peer} reported an internal failure — frame NOT delivered: {message}")]
+    PeerInternalFailure { peer: String, message: String },
+
+    /// `j1-crosshost-2c` AC3.2 — the receiver answered `CODE_TIMEOUT`: its own
+    /// intake exceeded its bound. Distinct from [`Self::PartitionTimeout`], which
+    /// is the SENDER observing the wire; here the peer answered.
+    #[error("peer {peer} reported an intake timeout: {message}")]
+    PeerIntakeTimeout { peer: String, message: String },
+
     /// JSON-RPC framing or transport-level failure.
     #[error("a2a transport failure: {0}")]
     TransportFailed(String),

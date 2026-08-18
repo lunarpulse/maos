@@ -1845,11 +1845,13 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             range,
             output,
             audit_key,
+            host,
         }) => audit_sealed_export(
             spirit.as_deref(),
             range.as_deref(),
             output,
             audit_key,
+            host.as_deref(),
             color,
         ),
         Some(AuditQuery::Keygen { output }) => audit_keygen(output),
@@ -1858,7 +1860,37 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             spirit,
             boot,
         }) => audit_record_capture(capture, spirit.as_deref(), *boot),
-        Some(AuditQuery::VerifyBundle { bundle, pubkey }) => audit_verify_bundle(bundle, pubkey),
+        Some(AuditQuery::VerifyBundle {
+            bundle,
+            pubkey,
+            seed,
+        }) => audit_verify_bundle(bundle, pubkey.as_deref(), seed.as_ref()),
+        Some(AuditQuery::ReconcileHosts {
+            bundle_a,
+            pubkey_a,
+            seed_a,
+            bundle_b,
+            pubkey_b,
+            seed_b,
+            receipt_out,
+            receipt_key,
+        }) => audit_reconcile_hosts(
+            HostHalfArgs {
+                bundle: bundle_a,
+                pubkey: pubkey_a.as_deref(),
+                seed: seed_a.as_ref(),
+            },
+            HostHalfArgs {
+                bundle: bundle_b,
+                pubkey: pubkey_b.as_deref(),
+                seed: seed_b.as_ref(),
+            },
+            receipt_out.as_ref(),
+            receipt_key,
+        ),
+        Some(AuditQuery::ScanCredentials { spirit, range }) => {
+            audit_scan_credentials(spirit.as_deref(), range.as_deref())
+        }
         Some(AuditQuery::SubjectAccess { principal, format }) => {
             audit_subject_access(principal, *format, color)
         }
@@ -2095,6 +2127,7 @@ fn audit_sealed_export(
     range: Option<&str>,
     output: &Option<PathBuf>,
     audit_key: &Option<PathBuf>,
+    host: Option<&str>,
     _color: ColorChoice,
 ) -> ExitCode {
     // Load audit signing key
@@ -2202,13 +2235,33 @@ fn audit_sealed_export(
         maos_audit::sealed_export::build_bundle(entries, i12_refs, i11_content, freshness);
     // Story 9.4b AC-5 — region-pin the export when MAOS_REGION_HOME is set so a
     // foreign-region verifier cannot validate it (None ⇒ byte-identical to pre-9.4b).
-    let unsigned = match resolve_region_home() {
-        Ok(Some(r)) => unsigned.with_region(&r),
-        Ok(None) => unsigned,
+    //
+    // `j1-crosshost-2c` AC1.1 — bind the resolved region to a local BEFORE the
+    // match consumes it. `sign_bundle` welds its signing seed from this same
+    // value, so the pubkey printed below MUST be derived from it too: printing
+    // `derive_pubkey(&seed)` while signing with the region-welded seed produced a
+    // bundle nobody could verify with the key it advertised — and `demo-j1`
+    // scrapes that printed key straight into `verify-bundle`.
+    let region_home = match resolve_region_home() {
+        Ok(r) => r,
         Err(e) => {
             eprintln!("maosctl: audit sealed-export — invalid region config: {e}");
             return ExitCode::from(2);
         }
+    };
+    let unsigned = match &region_home {
+        Some(r) => unsigned.with_region(r),
+        None => unsigned,
+    };
+    // `j1-crosshost-2c` AC2.1 — stamp the host discriminator. Refuse a blank tag:
+    // `Some("")` would alter the canonical bytes while discriminating nothing.
+    let unsigned = match host {
+        Some(h) if h.trim().is_empty() => {
+            eprintln!("maosctl: audit sealed-export — --host must not be empty");
+            return ExitCode::from(2);
+        }
+        Some(h) => unsigned.with_host(h.trim()),
+        None => unsigned,
     };
 
     let signed = match maos_audit::sealed_export::sign_bundle(unsigned, &seed) {
@@ -2226,6 +2279,11 @@ fn audit_sealed_export(
             return ExitCode::from(2);
         }
     };
+    // The key that ACTUALLY signed — derived from the same region binding.
+    let pubkey = match &region_home {
+        Some(r) => maos_audit::sealed_export::derive_region_pubkey(&seed, r),
+        None => maos_audit::sealed_export::derive_pubkey(&seed),
+    };
 
     match output {
         Some(path) => {
@@ -2239,7 +2297,6 @@ fn audit_sealed_export(
                 eprintln!("maosctl: audit sealed-export — write error: {e}");
                 return ExitCode::from(2);
             }
-            let pubkey = maos_audit::sealed_export::derive_pubkey(&seed);
             eprintln!(
                 "maosctl: sealed export written to {} ({} entries, pubkey {})",
                 path.display(),
@@ -2254,6 +2311,14 @@ fn audit_sealed_export(
                 eprintln!("maosctl: audit sealed-export — write error: {e}");
                 return ExitCode::from(2);
             }
+            // AC1.3 — stdout carries the bundle, stderr carries the key, exactly
+            // as `--output` mode already does. Without this line a stdout-mode
+            // export is an unverifiable artifact you can produce by accident.
+            eprintln!(
+                "maosctl: sealed export written to stdout ({} entries, pubkey {})",
+                signed.entries.len(),
+                hex::encode(pubkey),
+            );
         }
     }
 
@@ -2306,6 +2371,38 @@ const CAPTURE_REDACTION_VERIFIED: &str = "verified";
 /// stronger conclusion from the signature than the evidence supports.
 const CAPTURE_FS_JAIL_ADAPTER_ENFORCED: &str = "adapter-enforced-maos-declared";
 
+// ─── j1-crosshost-2c AC5.5 — the two-host posture, same shape ──────────────
+//
+// Two human-performed steps hold this claim up, and a reader who is told "these
+// two hosts authenticated" will not guess that "these two hosts were
+// INTRODUCED". They are stated here as PROPERTIES OF THE SYSTEM — value-
+// constrained exactly like the two above — rather than as questions about our
+// diligence, which belong in the story's blocking conditions.
+
+/// The mTLS trust anchor between the two hosts is established **out of band by a
+/// human operator**, not by the protocol. `2b` shipped the boot-nonce gap as a
+/// stated boundary, not a fix: in a release build the nonce is always random, and
+/// the documented path is an operator reading host A's nonce from its own
+/// `cohort:daemon-started` TL row and hand-transcribing it into host B's static
+/// peer-pin config. There is no automated channel.
+///
+/// The overclaim direction is `"protocol-negotiated"`, and it is refused.
+const CAPTURE_TRUST_ANCHOR_OUT_OF_BAND: &str = "out-of-band-human-operator";
+
+/// Host B's audit signing key is **provisioned separately, by hand**. Without two
+/// independent roots "two hosts" degrades to "two identities": the region→team
+/// derivation template exists to make keys derivable from ONE base seed, so a
+/// welded per-host key would let one seed holder sign both halves.
+///
+/// The overclaim direction is `"derived-from-shared-root"`, and it is refused.
+const CAPTURE_HOST_B_KEY_HAND_PROVISIONED: &str = "hand-provisioned-separately";
+
+/// The honest shapes a two-host run may claim. `2b`'s mechanism proof is two real
+/// OS processes on one box, each with its own config, audit DB and mTLS identity —
+/// architecturally two Hosts in MAOS's vocabulary, but a reader hears "two
+/// machines", so the capture must say which it was. Free prose is refused.
+const CAPTURE_TWO_HOST_SHAPES: &[&str] = &["two-processes-one-box", "two-machines"];
+
 /// The capture-doc schema `maosctl audit record-capture` validates before
 /// journaling. Fields mirror the runbook Phase-4 capture template. Extra fields
 /// are permitted (the operator may add notes) and are preserved verbatim in the
@@ -2346,6 +2443,22 @@ struct CaptureDoc {
     /// Run outcome (e.g. "worker completed; no secret persisted").
     #[serde(default)]
     outcome: String,
+    /// `j1-crosshost-2c` AC5.5 — the two-host shape actually run. EMPTY for a
+    /// single-host capture (every pre-2c capture stays valid); when non-empty this
+    /// capture claims a two-host run and the three fields below become REQUIRED
+    /// and value-constrained.
+    #[serde(default)]
+    two_host_shape: String,
+    /// How the mTLS trust anchor between the two hosts was established.
+    #[serde(default)]
+    two_host_trust_anchor: String,
+    /// How host B's audit signing key was provisioned.
+    #[serde(default)]
+    two_host_host_b_audit_key: String,
+    /// The stranger's verification: `tools/verify-audit-bundle/verify.py`'s output.
+    /// Our own `verify-bundle` is a self-check and does not discharge this.
+    #[serde(default)]
+    two_host_stranger_verification: String,
 }
 
 impl CaptureDoc {
@@ -2403,6 +2516,57 @@ impl CaptureDoc {
                  (the injected key's value must be proven absent from the TL); got \"{}\"",
                 self.redaction_result.trim()
             ));
+        }
+        self.validate_two_host()?;
+        Ok(())
+    }
+
+    /// `j1-crosshost-2c` AC5.5 — a two-host capture may not overclaim.
+    ///
+    /// Skipped entirely when `two_host_shape` is empty, so every single-host
+    /// capture written before this story stays valid. Once a capture DOES claim a
+    /// two-host run, all four fields are required and three are value-constrained,
+    /// exactly like `egress` and `fs_jail`: the overclaim direction is refused
+    /// rather than documented, because a reader who believes the protocol
+    /// negotiated the trust anchor, or that both keys descend from one root, would
+    /// draw a stronger conclusion from the signature than the evidence supports.
+    fn validate_two_host(&self) -> Result<(), String> {
+        let shape = self.two_host_shape.trim();
+        if shape.is_empty() {
+            return Ok(());
+        }
+        if !CAPTURE_TWO_HOST_SHAPES.contains(&shape) {
+            return Err(format!(
+                "capture field `two_host_shape` must be one of {CAPTURE_TWO_HOST_SHAPES:?} — a \
+                 reader hears \"two machines\", so the capture must say which it was; got \"{shape}\""
+            ));
+        }
+        let anchor = self.two_host_trust_anchor.trim();
+        if anchor != CAPTURE_TRUST_ANCHOR_OUT_OF_BAND {
+            return Err(format!(
+                "capture field `two_host_trust_anchor` must be exactly \
+                 \"{CAPTURE_TRUST_ANCHOR_OUT_OF_BAND}\" — the boot-nonce pairing between these \
+                 two hosts is performed BY A HUMAN with no automated channel, so a capture may \
+                 not claim the protocol negotiated it; got \"{anchor}\""
+            ));
+        }
+        let key = self.two_host_host_b_audit_key.trim();
+        if key != CAPTURE_HOST_B_KEY_HAND_PROVISIONED {
+            return Err(format!(
+                "capture field `two_host_host_b_audit_key` must be exactly \
+                 \"{CAPTURE_HOST_B_KEY_HAND_PROVISIONED}\" — without two INDEPENDENT roots \
+                 \"two hosts\" degrades to \"two identities\", because one seed holder can \
+                 derive every welded key; got \"{key}\""
+            ));
+        }
+        if self.two_host_stranger_verification.trim().is_empty() {
+            return Err(
+                "capture field `two_host_stranger_verification` is required for a two-host \
+                 claim: record `tools/verify-audit-bundle/verify.py`'s output. Verifying our \
+                 own artifact with our own verify-bundle is a self-check, and the premise of \
+                 this artifact is a claim a STRANGER can check"
+                    .to_string(),
+            );
         }
         Ok(())
     }
@@ -2589,8 +2753,73 @@ fn audit_record_capture(
     ExitCode::SUCCESS
 }
 
+/// Resolve the expected attester key for `bundle` from exactly one operator-supplied
+/// source.
+///
+/// `seed_path` DERIVES the key from the bundle's **claimed** region — the rule a
+/// third-party verifier must follow, mirroring `verify_replication_bundle`'s
+/// derive-from-claimed-identity contract. `pubkey_arg` is taken as already the
+/// signing key. Neither path ever reads `signature_block.attester_pubkey`
+/// (R-RG1): a bundle may not nominate the key that checks it.
+fn resolve_verify_key(
+    bundle: &maos_audit::sealed_export::AuditBundle,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> Result<[u8; 32], String> {
+    if let Some(path) = seed_path {
+        let seed = maos_domain::audit_key::load_audit_key_seed(&Some(path.clone()))
+            .map_err(|e| format!("cannot load base seed: {e}"))?;
+        return match &bundle.region {
+            Some(tag) => {
+                let region = maos_domain::region::Region::canonicalize(tag)
+                    .map_err(|e| format!("bundle claims an invalid region '{tag}': {e}"))?;
+                Ok(maos_audit::sealed_export::derive_region_pubkey(
+                    &seed, &region,
+                ))
+            }
+            None => Ok(maos_audit::sealed_export::derive_pubkey(&seed)),
+        };
+    }
+    let pubkey_arg = pubkey_arg.ok_or("one of --pubkey or --seed is required")?;
+    // Resolve public key: distinguish file path from hex string.
+    // A hex pubkey is exactly 64 hex chars (32 bytes). A file path typically
+    // has an extension or directory separator — use that as the discriminator.
+    let path = std::path::Path::new(pubkey_arg);
+    // Treat as file if it has a file extension (.hex, .pub, .txt, etc.)
+    // or contains a directory separator — avoids treating hex strings as
+    // file paths on systems where a 64-char hex string happens to name a
+    // real filesystem entry.
+    let looks_like_file = path.extension().is_some()
+        || pubkey_arg.contains('/')
+        || pubkey_arg.contains(std::path::MAIN_SEPARATOR);
+    let pubkey_hex = if looks_like_file && path.exists() {
+        std::fs::read_to_string(pubkey_arg)
+            .map_err(|e| format!("cannot read pubkey file '{pubkey_arg}': {e}"))?
+            .trim()
+            .to_string()
+    } else if looks_like_file {
+        return Err(format!("pubkey file '{pubkey_arg}' not found"));
+    } else {
+        pubkey_arg.to_string()
+    };
+    hex::decode(&pubkey_hex)
+        .map_err(|e| format!("invalid pubkey hex: {e}"))?
+        .try_into()
+        .map_err(|bytes: Vec<u8>| {
+            format!(
+                "wrong pubkey length: expected 32 bytes (64 hex chars), got {} bytes ({} hex chars)",
+                bytes.len(),
+                pubkey_hex.len()
+            )
+        })
+}
+
 /// FR44 — verify a sealed-export bundle.
-fn audit_verify_bundle(bundle: &PathBuf, pubkey_arg: &str) -> ExitCode {
+fn audit_verify_bundle(
+    bundle: &PathBuf,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> ExitCode {
     // Read bundle
     let bundle_bytes = match std::fs::read_to_string(bundle) {
         Ok(b) => b,
@@ -2608,50 +2837,8 @@ fn audit_verify_bundle(bundle: &PathBuf, pubkey_arg: &str) -> ExitCode {
         }
     };
 
-    // Resolve public key: distinguish file path from hex string.
-    // A hex pubkey is exactly 64 hex chars (32 bytes). A file path typically
-    // has an extension or directory separator — use that as the discriminator.
-    let pubkey_hex = {
-        let path = std::path::Path::new(pubkey_arg);
-        // Treat as file if it has a file extension (.hex, .pub, .txt, etc.)
-        // or contains a directory separator — avoids treating hex strings as
-        // file paths on systems where a 64-char hex string happens to name a
-        // real filesystem entry.
-        let looks_like_file = path.extension().is_some()
-            || pubkey_arg.contains('/')
-            || pubkey_arg.contains(std::path::MAIN_SEPARATOR);
-        if looks_like_file && path.exists() {
-            match std::fs::read_to_string(pubkey_arg) {
-                Ok(s) => s.trim().to_string(),
-                Err(e) => {
-                    eprintln!(
-                        "maosctl: audit verify-bundle — cannot read pubkey file '{}': {e}",
-                        pubkey_arg
-                    );
-                    return ExitCode::from(2);
-                }
-            }
-        } else if looks_like_file {
-            eprintln!(
-                "maosctl: audit verify-bundle — pubkey file '{}' not found",
-                pubkey_arg
-            );
-            return ExitCode::from(2);
-        } else {
-            pubkey_arg.to_string()
-        }
-    };
-
-    let pubkey_bytes: [u8; 32] = match hex::decode(&pubkey_hex)
-        .map_err(|e| format!("invalid pubkey hex: {e}"))
-        .and_then(|bytes| bytes.try_into().map_err(|bytes: Vec<u8>| {
-            format!(
-                "wrong pubkey length: expected 32 bytes (64 hex chars), got {} bytes ({} hex chars)",
-                bytes.len(),
-                pubkey_hex.len()
-            )
-        })) {
-        Ok(arr) => arr,
+    let pubkey_bytes = match resolve_verify_key(&bundle, pubkey_arg, seed_path) {
+        Ok(k) => k,
         Err(e) => {
             eprintln!("maosctl: audit verify-bundle — {e}");
             return ExitCode::from(2);
@@ -2671,6 +2858,211 @@ fn audit_verify_bundle(bundle: &PathBuf, pubkey_arg: &str) -> ExitCode {
             eprintln!("maosctl: audit verify-bundle — verification failed: {e}");
             ExitCode::from(1)
         }
+    }
+}
+
+/// One half of a two-host run as the operator supplied it on the command line.
+struct HostHalfArgs<'a> {
+    bundle: &'a PathBuf,
+    pubkey: Option<&'a str>,
+    seed: Option<&'a PathBuf>,
+}
+
+/// `j1-crosshost-2c` AC2.2 — reconcile two independently-signed halves of one
+/// cross-host run on `frame_id`, and optionally emit a signed receipt.
+///
+/// Each half is verified against the key resolved for THAT half — derived from
+/// its claimed region when `--seed-*` is used. `attester_pubkey` is never read to
+/// decide anything (R-RG1), and two halves attested by one root are refused.
+fn audit_reconcile_hosts(
+    a: HostHalfArgs<'_>,
+    b: HostHalfArgs<'_>,
+    receipt_out: Option<&PathBuf>,
+    receipt_key: &Option<PathBuf>,
+) -> ExitCode {
+    let (bundle_a, key_a) = match load_host_half(&a) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("maosctl: audit reconcile-hosts — host A: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let (bundle_b, key_b) = match load_host_half(&b) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("maosctl: audit reconcile-hosts — host B: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let join = match maos_audit::sealed_export::reconcile_two_host_bundles(
+        &bundle_a, &key_a, &bundle_b, &key_b,
+    ) {
+        Ok(j) => j,
+        Err(e) => {
+            eprintln!("maosctl: audit reconcile-hosts — refused: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    eprintln!(
+        "maosctl: audit reconcile-hosts — OK (hosts {} + {}, {} shared frame_ids, {} A-only, {} B-only)",
+        join.host_a,
+        join.host_b,
+        join.shared_frame_ids.len(),
+        join.host_a_only.len(),
+        join.host_b_only.len(),
+    );
+    eprintln!(
+        "  claim scope: {}",
+        maos_audit::sealed_export::TWO_HOST_CLAIM_SCOPE
+    );
+
+    let Some(path) = receipt_out else {
+        return ExitCode::SUCCESS;
+    };
+    let operator_seed = match maos_domain::audit_key::load_audit_key_seed(receipt_key) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("maosctl: audit reconcile-hosts — cannot load receipt key: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let receipt = maos_audit::sealed_export::build_two_host_receipt(&operator_seed, &join, now_ns);
+    let json = match serde_json::to_string_pretty(&receipt) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("maosctl: audit reconcile-hosts — serialization error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("maosctl: audit reconcile-hosts — cannot create receipt dir: {e}");
+            return ExitCode::from(2);
+        }
+    }
+    if let Err(e) = std::fs::write(path, json) {
+        eprintln!("maosctl: audit reconcile-hosts — receipt write error: {e}");
+        return ExitCode::from(2);
+    }
+    eprintln!(
+        "maosctl: two-host receipt written to {} (pubkey {})",
+        path.display(),
+        hex::encode(maos_audit::sealed_export::derive_pubkey(&operator_seed)),
+    );
+    ExitCode::SUCCESS
+}
+
+/// Read and parse one half plus the key it must verify against.
+fn load_host_half(
+    half: &HostHalfArgs<'_>,
+) -> Result<(maos_audit::sealed_export::AuditBundle, [u8; 32]), String> {
+    let text = std::fs::read_to_string(half.bundle)
+        .map_err(|e| format!("read error on {}: {e}", half.bundle.display()))?;
+    let bundle: maos_audit::sealed_export::AuditBundle =
+        serde_json::from_str(&text).map_err(|e| format!("invalid bundle JSON: {e}"))?;
+    let key = resolve_verify_key(&bundle, half.pubkey, half.seed)?;
+    Ok((bundle, key))
+}
+
+/// `j1-crosshost-2c` AC4.1 — the read-path credential scan.
+///
+/// Walks Transparency-Log rows that are ALREADY ON DISK and reports credential
+/// shapes in the stored `payload_redacted` bytes. Every existing redaction call
+/// site is pre-write, so nothing before this could see an escape after the fact.
+///
+/// Both classes are reported distinctly (ratified 2026-08-17): provider prefixes,
+/// and the hex-run heuristic the write-path filter scrubs *silently*. A correctly
+/// redacted row carries neither, so a hit on either is an escape.
+fn audit_scan_credentials(spirit: Option<&str>, range: Option<&str>) -> ExitCode {
+    let db_path = default_transparency_log_path();
+    let mut filter = maos_audit::AuditFilter::default();
+    if let Some(name) = spirit {
+        match resolve_spirit_pid(name, &db_path, false) {
+            Ok(pairs) => match pairs.as_slice() {
+                [] => {}
+                [pair] => {
+                    filter.spirit_pid = Some(pair.1);
+                    filter.boot_nonce = Some(pair.0);
+                }
+                _ => {
+                    eprintln!(
+                        "maosctl: audit scan-credentials — spirit '{name}' resolves to multiple (boot_nonce, pid) pairs; disambiguate"
+                    );
+                    return ExitCode::from(2);
+                }
+            },
+            Err(diag) => {
+                eprintln!("maosctl: audit scan-credentials — {diag}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+    if let Some(range_str) = range {
+        match parse_range(range_str) {
+            Ok((since, until)) => {
+                filter.since_ns = since;
+                if let Some(u) = until {
+                    filter.until_ns = Some(u);
+                }
+            }
+            Err(e) => {
+                eprintln!("maosctl: audit scan-credentials — {e}");
+                return ExitCode::from(2);
+            }
+        }
+    }
+
+    let entries = match maos_audit::query(&db_path, filter) {
+        Ok(e) => e,
+        Err(maos_audit::AuditError::Open(_)) => {
+            eprintln!(
+                "maosctl: audit scan-credentials — no Transparency Log found at {}",
+                db_path.display()
+            );
+            return ExitCode::from(2);
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit scan-credentials — error: {e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    let mut prefix_hits = 0usize;
+    let mut hex_hits = 0usize;
+    for entry in &entries {
+        for shape in maos_iac::adapter::redaction::scan_stored_payload(entry.payload.as_bytes()) {
+            if shape.is_prefix() {
+                prefix_hits += 1;
+            } else {
+                hex_hits += 1;
+            }
+            // The finding names the row and the class. The offending bytes are
+            // NEVER echoed: a scan that prints the secret it found is the leak.
+            println!(
+                "{{\"frame_id\":\"{}\",\"kind\":\"{}\",\"class\":\"{}\",\"escape\":true}}",
+                entry.frame_id_hex,
+                entry.kind,
+                shape.class(),
+            );
+        }
+    }
+
+    eprintln!(
+        "maosctl: audit scan-credentials — {} rows scanned, {} prefix escapes, {} hex-run escapes",
+        entries.len(),
+        prefix_hits,
+        hex_hits,
+    );
+    if prefix_hits + hex_hits > 0 {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
@@ -3021,13 +3413,18 @@ fn audit_trajectory_export(
         redaction_policy.to_string(),
     );
     // Story 9.4b AC-5 — region-pin the trajectory export when MAOS_REGION_HOME is set.
-    let unsigned = match resolve_region_home() {
-        Ok(Some(r)) => unsigned.with_region(&r),
-        Ok(None) => unsigned,
+    // `j1-crosshost-2c` AC1.2 — same defect, second site: bind the region local so
+    // the printed pubkey can be derived from the identity that signed.
+    let region_home = match resolve_region_home() {
+        Ok(r) => r,
         Err(e) => {
             eprintln!("maosctl: audit export — invalid region config: {e}");
             return ExitCode::from(2);
         }
+    };
+    let unsigned = match &region_home {
+        Some(r) => unsigned.with_region(r),
+        None => unsigned,
     };
 
     let signed = match maos_audit::sealed_export::sign_bundle(unsigned, &seed) {
@@ -3045,6 +3442,11 @@ fn audit_trajectory_export(
             return ExitCode::from(2);
         }
     };
+    // The key that ACTUALLY signed — derived from the same region binding.
+    let pubkey = match &region_home {
+        Some(r) => maos_audit::sealed_export::derive_region_pubkey(&seed, r),
+        None => maos_audit::sealed_export::derive_pubkey(&seed),
+    };
 
     match output {
         Some(path) => {
@@ -3058,7 +3460,6 @@ fn audit_trajectory_export(
                 eprintln!("maosctl: audit export — write error: {e}");
                 return ExitCode::from(2);
             }
-            let pubkey = maos_audit::sealed_export::derive_pubkey(&seed);
             eprintln!(
                 "maosctl: trajectory export written to {} ({} entries, applied_redaction={}, pubkey {})",
                 path.display(),
@@ -3074,6 +3475,13 @@ fn audit_trajectory_export(
                 eprintln!("maosctl: audit export — write error: {e}");
                 return ExitCode::from(2);
             }
+            // AC1.3 — stdout carries the bundle, stderr carries the key.
+            eprintln!(
+                "maosctl: trajectory export written to stdout ({} entries, applied_redaction={}, pubkey {})",
+                signed.entries.len(),
+                signed.applied_redaction,
+                hex::encode(pubkey),
+            );
         }
     }
 
@@ -4011,6 +4419,84 @@ mod tests {
         assert!(err.contains("fs_jail"), "the posture is exact-match: {err}");
     }
 
+    /// `j1-crosshost-2c` AC5.5 — the two-host posture, same shape and same rule.
+    ///
+    /// A single-host capture is untouched: `two_host_shape` empty ⇒ the block is
+    /// skipped, so every pre-2c capture stays valid. Once a capture CLAIMS a
+    /// two-host run, the two human-performed steps become stated properties of the
+    /// system, and the overclaim direction of each is refused.
+    #[test]
+    fn capture_validation_refuses_the_two_host_overclaim_directions() {
+        // The existing single-host capture must still validate — additive, not a
+        // new requirement on work already captured.
+        parse_and_validate_capture(&valid_capture_json())
+            .expect("a single-host capture must stay valid");
+
+        let two_host = |mutate: &dyn Fn(&mut serde_json::Value)| -> String {
+            let mut v: serde_json::Value = serde_json::from_str(&valid_capture_json()).unwrap();
+            v["two_host_shape"] = serde_json::json!("two-processes-one-box");
+            v["two_host_trust_anchor"] = serde_json::json!("out-of-band-human-operator");
+            v["two_host_host_b_audit_key"] = serde_json::json!("hand-provisioned-separately");
+            v["two_host_stranger_verification"] =
+                serde_json::json!("verify.py: signature OK (1 entries)");
+            mutate(&mut v);
+            v.to_string()
+        };
+
+        // The honest capture validates.
+        parse_and_validate_capture(&two_host(&|_| {}))
+            .expect("an honestly-bounded two-host capture must validate");
+
+        // OVERCLAIM 1 — "the protocol negotiated the trust anchor". It did not: the
+        // boot nonce is hand-transcribed by an operator and there is no automated
+        // channel. A reader told "these two hosts authenticated" will not guess
+        // that "these two hosts were INTRODUCED".
+        let err = parse_and_validate_capture(&two_host(&|v| {
+            v["two_host_trust_anchor"] = serde_json::json!("protocol-negotiated");
+        }))
+        .unwrap_err();
+        assert!(
+            err.contains("two_host_trust_anchor") && err.contains("BY A HUMAN"),
+            "must refuse the trust-anchor overclaim and say why: {err}"
+        );
+
+        // OVERCLAIM 2 — "host B's key was derived from the shared root". That is the
+        // exact property that collapses "two hosts" into "two identities": one seed
+        // holder can derive every welded key, so one machine could sign both halves.
+        let err = parse_and_validate_capture(&two_host(&|v| {
+            v["two_host_host_b_audit_key"] = serde_json::json!("derived-from-shared-root");
+        }))
+        .unwrap_err();
+        assert!(
+            err.contains("two_host_host_b_audit_key") && err.contains("two identities"),
+            "must refuse the shared-root key claim: {err}"
+        );
+
+        // OVERCLAIM 3 — free prose in the shape field. "two hosts" is exactly the
+        // ambiguity the field exists to remove.
+        for prose in ["two hosts", "two datacentres", "distributed"] {
+            let err = parse_and_validate_capture(&two_host(&|v| {
+                v["two_host_shape"] = serde_json::json!(prose);
+            }))
+            .unwrap_err();
+            assert!(
+                err.contains("two_host_shape"),
+                "`{prose}` must be refused: the shape is exact-match, not prose: {err}"
+            );
+        }
+
+        // And the STRANGER's path is not optional: our own verify-bundle is a
+        // self-check, and no stranger has ever checked one of these artifacts.
+        let err = parse_and_validate_capture(&two_host(&|v| {
+            v["two_host_stranger_verification"] = serde_json::json!("  ");
+        }))
+        .unwrap_err();
+        assert!(
+            err.contains("STRANGER"),
+            "a two-host claim must carry the field-agnostic verifier's output: {err}"
+        );
+    }
+
     #[test]
     fn capture_validation_requires_an_fs_jail_followup() {
         // The egress precedent pairs a stated gap with a NAMED follow-up so the
@@ -4365,9 +4851,14 @@ mod tests {
         .expect("audit verify-bundle must parse");
         match &cli.command {
             Subcommand::Audit(args) => match &args.query {
-                Some(AuditQuery::VerifyBundle { bundle, pubkey }) => {
+                Some(AuditQuery::VerifyBundle {
+                    bundle,
+                    pubkey,
+                    seed,
+                }) => {
                     assert_eq!(bundle.to_str(), Some("/tmp/bundle.json"));
-                    assert_eq!(pubkey, "abc123");
+                    assert_eq!(pubkey.as_deref(), Some("abc123"));
+                    assert!(seed.is_none());
                 }
                 _ => panic!("expected AuditQuery::VerifyBundle"),
             },

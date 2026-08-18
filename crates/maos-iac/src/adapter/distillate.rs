@@ -486,17 +486,6 @@ fn hex_char_to_nibble(c: u8) -> Option<u8> {
     }
 }
 
-/// Parse a frame_id from a JSON field value.
-fn parse_frame_id_hex_field(
-    v: &serde_json::Value,
-    field: &str,
-) -> Result<[u8; 16], DistillationError> {
-    v.get(field)
-        .and_then(|s| s.as_str())
-        .and_then(|s| parse_hex_frame_id(s))
-        .ok_or_else(|| DistillationError::Storage(format!("missing or invalid {field} in receipt")))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

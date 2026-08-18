@@ -1006,10 +1006,11 @@ impl DigestReadPort for CohortManifestState {
             .unwrap_or(false)
     }
 
-    fn observe_reply(
+    fn observe_reply_guarded(
         &self,
         peer: &HostId,
         frame: &IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<DigestReplyObservation, String> {
         let DigestReadControl::Reply {
             request_id,
@@ -1046,6 +1047,15 @@ impl DigestReadPort for CohortManifestState {
         if grant.manifest_version != version || grant.scope != DIGEST_DAILY_SCOPE {
             return Ok(DigestReplyObservation::Unauthorized);
         }
+        // `j1-crosshost-2c` AC3.5 (`deferred-work.md:819`) — INVARIANT: nothing is
+        // `Duplicate` until something is durable. Every authorization and conflict
+        // check above has passed; nothing below this line has been published yet.
+        // If the caller's commit fails, we publish NO dedup state and NO receipt
+        // audit row, so the grant stays outstanding and the reply stays RETRYABLE.
+        // Ordering matters: `DigestReplyReceived` asserts the reply "consumed a
+        // live capability and was durably recorded", which is exactly what did not
+        // happen when the commit fails.
+        before_commit()?;
         self.audit
             .append(&CohortAuditEvent::DigestReplyReceived {
                 member: peer.as_str().to_string(),
@@ -1656,6 +1666,74 @@ mod tests {
         assert_eq!(
             DigestReadPort::observe_reply(&state, &peer, &revoked).unwrap(),
             DigestReplyObservation::Unauthorized
+        );
+    }
+
+    /// `j1-crosshost-2c` AC3.5 (`deferred-work.md:819`) — **nothing is `Duplicate`
+    /// until something is durable.**
+    ///
+    /// The router hands the intake-sink push in as `before_commit`. When that push
+    /// fails, the reply must publish NO dedup state: the grant stays outstanding,
+    /// no summary is recorded, no receipt is audited, and a retry is answered
+    /// `Accepted` rather than `Duplicate`. Before this fix a retry after a
+    /// dropped-receiver NACK was told `Duplicate` — an ACK claiming
+    /// `delivered: true` — while the frame was still gone.
+    #[test]
+    fn a_failed_commit_leaves_the_digest_reply_retryable_never_duplicate() {
+        let signer = signing_key(21);
+        let audit = Arc::new(InMemoryCohortAuditSink::default());
+        let state = state(1, &signer, audit.clone());
+        let peer = HostId("host-b".into());
+        state
+            .note_digest_request_sent(&peer, "host-a:0001", DIGEST_DAILY_SCOPE)
+            .unwrap();
+        let summary = DigestSummary {
+            frames: 7,
+            halts: 0,
+            conflicts: 0,
+        };
+        let reply = digest_frame(
+            "host-b",
+            "host-a",
+            DigestReadControl::Reply {
+                request_id: "host-a:0001".into(),
+                summary: summary.clone(),
+            },
+        );
+
+        let audited_before = audit.events().len();
+        let error = DigestReadPort::observe_reply_guarded(&state, &peer, &reply, &mut || {
+            Err("intake sink full or receiver dropped — digest reply NOT delivered".to_string())
+        })
+        .expect_err("a failed commit must surface, not be swallowed");
+        assert!(error.contains("NOT delivered"), "{error}");
+
+        // NOTHING was published.
+        assert_eq!(
+            state.digest_summary(&peer, "host-a:0001"),
+            None,
+            "a reply that was never handed over must not be recorded"
+        );
+        assert_eq!(
+            audit.events().len(),
+            audited_before,
+            "no DigestReplyReceived receipt may be audited for an undelivered reply"
+        );
+
+        // And the retry is RETRYABLE — this is the assertion `:819` was about.
+        let observation = DigestReadPort::observe_reply(&state, &peer, &reply)
+            .expect("the grant must still be outstanding");
+        assert_eq!(
+            observation,
+            DigestReplyObservation::Accepted,
+            "a retry after a failed commit must be accepted, never reported Duplicate"
+        );
+        assert_eq!(state.digest_summary(&peer, "host-a:0001"), Some(summary));
+
+        // Only NOW is a second attempt a duplicate.
+        assert_eq!(
+            DigestReadPort::observe_reply(&state, &peer, &reply).unwrap(),
+            DigestReplyObservation::Duplicate
         );
     }
     #[test]

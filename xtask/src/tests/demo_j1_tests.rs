@@ -52,7 +52,7 @@ fn two_host_beats_are_owned_by_their_crosshost_stories() {
         .find(|beat| beat.name == "two-host-signed-run")
         .expect("declared");
     assert_eq!(delegation.owner, Some("j1-crosshost-2b"));
-    assert_eq!(signed_run.owner, Some("j1-crosshost-2c"));
+    assert_eq!(signed_run.owner, Some("j1-crosshost-2d-paid-two-host-run"));
     // §A6 review P10 (AC4.4) — the 2c-owned beat must render ABSENT, not merely
     // be declared unlanded: a state change short of execution (e.g. a future
     // "planned") must still red this pin so the narrated artifact cannot hint

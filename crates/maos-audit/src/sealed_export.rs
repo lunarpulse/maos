@@ -109,6 +109,22 @@ pub struct AuditBundle {
     /// tag, so tampering it breaks verification (R-RG4′).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
+    /// `j1-crosshost-2c` AC2.1 — the host discriminator. Additive and covered by
+    /// the signature, exactly as `region` behaves and as `source_team` was added
+    /// to `CrossRegionReplicationBundle`: `None` is omitted from the canonical
+    /// bytes so every pre-2c bundle stays byte-identical.
+    ///
+    /// This is an ANTI-FORGERY control, not a label. `2b` writes the *same*
+    /// `frame_id` into both hosts' logs, so the two halves of a two-host run are
+    /// otherwise indistinguishable: `region` cannot separate two hosts in one
+    /// jurisdiction (same derived key), `boot_nonce` is per-boot and one
+    /// `--range 1d` export swept eight, and `attester_pubkey` is bundle-supplied
+    /// so R-RG1 forbids trusting it. Without this field one host can produce
+    /// BOTH halves of a "two-host" bundle.
+    ///
+    /// Bounded honestly: it proves [`TWO_HOST_CLAIM_SCOPE`] and nothing more.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
     pub signature_block: SignatureBlock,
 }
 
@@ -156,6 +172,11 @@ pub struct BundleForSigning {
     /// post-sign tamper of the region field fails verification (R-RG4′).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
+    /// `j1-crosshost-2c` AC2.1 — host tag covered by the signature. `None` is
+    /// omitted from canonical bytes; `Some` is signed, so a post-sign tamper of
+    /// the host field fails verification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -168,6 +189,15 @@ impl BundleForSigning {
     /// key in [`sign_bundle`].
     pub fn with_region(mut self, region: &Region) -> Self {
         self.region = Some(region.as_str().to_string());
+        self
+    }
+
+    /// Stamp the host discriminator (`j1-crosshost-2c` AC2.1). Unlike
+    /// [`with_region`](Self::with_region) it does NOT change the signing key —
+    /// the two hosts of a run hold independent roots (AC2.4), so the host tag is
+    /// bound by the signature rather than folded into the derivation.
+    pub fn with_host(mut self, host: &str) -> Self {
+        self.host = Some(host.to_string());
         self
     }
 }
@@ -186,6 +216,16 @@ pub enum SealedExportError {
     Serialization(String),
     #[error("signature verification failed")]
     VerificationFailed,
+    #[error(
+        "both halves were attested by the SAME root — one seed holder cannot attest two identities"
+    )]
+    SharedAttesterRoot,
+    #[error("bundle carries no host claim, so it cannot be half of a two-host run")]
+    MissingHostClaim,
+    #[error("both halves claim host '{0}' — identical host claims are one host")]
+    DuplicateHostClaim(String),
+    #[error("the two logs share no frame_id, so they did not witness one run")]
+    NoSharedFrames,
 }
 
 // ─── Core functions ────────────────────────────────────────────────────────
@@ -210,6 +250,7 @@ pub fn build_bundle(
         applied_redaction: false,
         redaction_policy: String::new(),
         region: None,
+        host: None,
     }
 }
 
@@ -234,6 +275,7 @@ pub fn build_trajectory_bundle(
         applied_redaction,
         redaction_policy,
         region: None,
+        host: None,
     }
 }
 
@@ -272,6 +314,7 @@ pub fn sign_bundle(
         applied_redaction: bundle_for_signing.applied_redaction,
         redaction_policy: bundle_for_signing.redaction_policy,
         region: bundle_for_signing.region,
+        host: bundle_for_signing.host,
         signature_block: SignatureBlock {
             algorithm: "Ed25519".to_string(),
             attester_pubkey: hex::encode(pubkey_bytes),
@@ -296,8 +339,11 @@ pub fn verify_bundle(
         applied_redaction: bundle.applied_redaction,
         redaction_policy: bundle.redaction_policy.clone(),
         // AC-5/R-RG4′: region is covered by the signature — a post-sign tamper
-        // changes the recomputed digest and verification fails.
+        // changes the recomputed digest and verification fails. `j1-crosshost-2c`
+        // AC2.1: the host tag is bound the same way, so a forger cannot relabel
+        // a half of a two-host run.
         region: bundle.region.clone(),
+        host: bundle.host.clone(),
     };
 
     let canonical = canonicalize(&unsigned)?;
@@ -316,6 +362,233 @@ pub fn verify_bundle(
 
     verifying_key
         .verify(&digest, &signature)
+        .map_err(|_| SealedExportError::VerificationFailed)
+}
+
+// ─── j1-crosshost-2c AC2.2/AC2.3 — two-host reconciliation ─────────────────
+//
+// PORTED, not invented: this is `maos-loom-lite`'s
+// `verify_replication_bundle` / `build_reattestation_receipt` /
+// `verify_reattestation_receipt` shape (`replication/bundle.rs:536`, `:982`,
+// `:1011`) — "source X's bundle landed at dest Y" is exactly the two-host claim.
+//
+// HOSTED HERE, natively, on purpose: `maos-loom-lite` already depends on
+// `maos-audit`, so a `maos-audit -> maos-loom-lite` edge would close a
+// dependency CYCLE. The alternative — calling loom-lite's verbs from
+// `maos-cli`, which depends on both — would make two-TL reconciliation a
+// feature of our binary rather than of the artifact format. Reimplementing the
+// pattern here adds ZERO dependency edges.
+
+/// Schema id for the signed two-host run receipt.
+pub const TWO_HOST_RECEIPT_SCHEMA: &str = "maos.two-host-run-receipt.v1";
+
+/// Ed25519 signing-domain separator for [`TwoHostRunReceipt`]. Pinned — changing
+/// it invalidates every receipt ever issued.
+const TWO_HOST_RECEIPT_DOMAIN: &[u8] = b"maos.two-host-run-receipt.v1";
+
+/// **The exact reach of the two-host claim.** Reproduced verbatim into every
+/// receipt so the artifact carries its own bound rather than deferring it to a
+/// story file nobody reads.
+///
+/// The host field defeats a forger who does not hold the other host's key. It
+/// does NOT prove physical separation, and under a shared base seed it proves
+/// nothing at all — which is why [`reconcile_two_host_bundles`] refuses a shared
+/// root outright.
+pub const TWO_HOST_CLAIM_SCOPE: &str =
+    "two keyed identities signed; not two machines, two processes, or two operators";
+
+/// The reconciled join of two independently-signed halves of one run.
+///
+/// The join key is `frame_id_hex`: `2b` writes the *received* frame's id, so both
+/// Transparency Logs carry the same sixteen bytes — proven by an executed CI test
+/// (`two_host_delegation_2b.rs:533-535`). `correlation_id` is NOT the join key and
+/// is deliberately not projected.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TwoHostJoin {
+    pub host_a: String,
+    pub host_b: String,
+    /// Hex attester keys the halves were verified AGAINST — the caller-supplied,
+    /// separately published keys, never `signature_block.attester_pubkey`.
+    pub attester_a: String,
+    pub attester_b: String,
+    /// `frame_id`s present in BOTH logs, sorted. This is the crossing.
+    pub shared_frame_ids: Vec<String>,
+    /// Present only in host A's log — work A recorded that B never saw.
+    pub host_a_only: Vec<String>,
+    /// Present only in host B's log.
+    pub host_b_only: Vec<String>,
+}
+
+/// Signed attestation over a [`TwoHostJoin`].
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TwoHostRunReceipt {
+    pub schema_version: String,
+    pub host_a: String,
+    pub host_b: String,
+    pub attester_a: String,
+    pub attester_b: String,
+    pub shared_frame_ids: Vec<String>,
+    pub timestamp_ns: u64,
+    /// The bound this receipt is allowed to assert ([`TWO_HOST_CLAIM_SCOPE`]).
+    pub claim_scope: String,
+    pub signature: String,
+}
+
+/// Verify both halves of a two-host run and join their logs on `frame_id`.
+///
+/// Each half is verified against **the key supplied for that half** — which the
+/// caller derived from the half's CLAIMED identity, mirroring
+/// `verify_replication_bundle`'s derive-from-claimed-identity rule. Neither the
+/// half's own `attester_pubkey` nor anything else the artifact carries is ever
+/// trusted (R-RG1).
+///
+/// Refuses, in order: an unverifiable half; a half with no host claim; two halves
+/// claiming one host; **two halves attested by one root** (AC2.4 — one seed holder
+/// producing both halves of a "two-host" bundle is the exact attack the host field
+/// exists to stop, and a shared root makes the field prove nothing); and logs that
+/// share no frame at all.
+pub fn reconcile_two_host_bundles(
+    host_a: &AuditBundle,
+    key_a: &[u8; 32],
+    host_b: &AuditBundle,
+    key_b: &[u8; 32],
+) -> Result<TwoHostJoin, SealedExportError> {
+    if key_a == key_b {
+        return Err(SealedExportError::SharedAttesterRoot);
+    }
+    verify_bundle(host_a, key_a)?;
+    verify_bundle(host_b, key_b)?;
+
+    let a_host = host_a
+        .host
+        .as_deref()
+        .ok_or(SealedExportError::MissingHostClaim)?;
+    let b_host = host_b
+        .host
+        .as_deref()
+        .ok_or(SealedExportError::MissingHostClaim)?;
+    if a_host == b_host {
+        return Err(SealedExportError::DuplicateHostClaim(a_host.to_string()));
+    }
+
+    let a_ids: std::collections::BTreeSet<&str> = host_a
+        .entries
+        .iter()
+        .map(|e| e.frame_id_hex.as_str())
+        .collect();
+    let b_ids: std::collections::BTreeSet<&str> = host_b
+        .entries
+        .iter()
+        .map(|e| e.frame_id_hex.as_str())
+        .collect();
+    let shared_frame_ids: Vec<String> = a_ids.intersection(&b_ids).map(|s| s.to_string()).collect();
+    if shared_frame_ids.is_empty() {
+        return Err(SealedExportError::NoSharedFrames);
+    }
+
+    Ok(TwoHostJoin {
+        host_a: a_host.to_string(),
+        host_b: b_host.to_string(),
+        attester_a: hex::encode(key_a),
+        attester_b: hex::encode(key_b),
+        shared_frame_ids,
+        host_a_only: a_ids.difference(&b_ids).map(|s| s.to_string()).collect(),
+        host_b_only: b_ids.difference(&a_ids).map(|s| s.to_string()).collect(),
+    })
+}
+
+/// Canonical signing payload for a two-host receipt — every claimed field, length-
+/// delimited so no two distinct joins can collide.
+fn two_host_receipt_payload(
+    schema_version: &str,
+    host_a: &str,
+    host_b: &str,
+    attester_a: &str,
+    attester_b: &str,
+    shared_frame_ids: &[String],
+    timestamp_ns: u64,
+    claim_scope: &str,
+) -> Vec<u8> {
+    let mut payload = Vec::new();
+    payload.extend_from_slice(TWO_HOST_RECEIPT_DOMAIN);
+    for field in [
+        schema_version,
+        host_a,
+        host_b,
+        attester_a,
+        attester_b,
+        claim_scope,
+    ] {
+        payload.extend_from_slice(&(field.len() as u64).to_be_bytes());
+        payload.extend_from_slice(field.as_bytes());
+    }
+    payload.extend_from_slice(&(shared_frame_ids.len() as u64).to_be_bytes());
+    for id in shared_frame_ids {
+        payload.extend_from_slice(&(id.len() as u64).to_be_bytes());
+        payload.extend_from_slice(id.as_bytes());
+    }
+    payload.extend_from_slice(&timestamp_ns.to_be_bytes());
+    payload
+}
+
+/// Sign a [`TwoHostJoin`] with the operator/control-plane seed.
+pub fn build_two_host_receipt(
+    operator_seed: &[u8; 32],
+    join: &TwoHostJoin,
+    timestamp_ns: u64,
+) -> TwoHostRunReceipt {
+    let payload = two_host_receipt_payload(
+        TWO_HOST_RECEIPT_SCHEMA,
+        &join.host_a,
+        &join.host_b,
+        &join.attester_a,
+        &join.attester_b,
+        &join.shared_frame_ids,
+        timestamp_ns,
+        TWO_HOST_CLAIM_SCOPE,
+    );
+    let signature = SigningKey::from_bytes(operator_seed).sign(&payload);
+    TwoHostRunReceipt {
+        schema_version: TWO_HOST_RECEIPT_SCHEMA.to_string(),
+        host_a: join.host_a.clone(),
+        host_b: join.host_b.clone(),
+        attester_a: join.attester_a.clone(),
+        attester_b: join.attester_b.clone(),
+        shared_frame_ids: join.shared_frame_ids.clone(),
+        timestamp_ns,
+        claim_scope: TWO_HOST_CLAIM_SCOPE.to_string(),
+        signature: hex::encode(signature.to_bytes()),
+    }
+}
+
+/// Verify a two-host receipt against the operator's published public key.
+pub fn verify_two_host_receipt(
+    receipt: &TwoHostRunReceipt,
+    operator_pubkey: &[u8; 32],
+) -> Result<(), SealedExportError> {
+    let verifying_key = VerifyingKey::from_bytes(operator_pubkey)
+        .map_err(|e| SealedExportError::InvalidPubkey(format!("{e}")))?;
+    let payload = two_host_receipt_payload(
+        &receipt.schema_version,
+        &receipt.host_a,
+        &receipt.host_b,
+        &receipt.attester_a,
+        &receipt.attester_b,
+        &receipt.shared_frame_ids,
+        receipt.timestamp_ns,
+        &receipt.claim_scope,
+    );
+    let sig_bytes: [u8; 64] = hex::decode(&receipt.signature)
+        .map_err(|e| SealedExportError::InvalidSignature(format!("signature hex: {e}")))?
+        .try_into()
+        .map_err(|v: Vec<u8>| {
+            SealedExportError::InvalidSignature(format!(
+                "signature must be 64 bytes, got {}",
+                v.len()
+            ))
+        })?;
+    verifying_key
+        .verify(&payload, &ed25519_dalek::Signature::from_bytes(&sig_bytes))
         .map_err(|_| SealedExportError::VerificationFailed)
 }
 

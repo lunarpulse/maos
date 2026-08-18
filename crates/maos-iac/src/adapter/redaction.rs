@@ -329,6 +329,94 @@ fn contains_hex_token(haystack: &[u8]) -> bool {
     false
 }
 
+// ─── j1-crosshost-2c AC4.1 — the READ-path scan ────────────────────────────
+//
+// Every one of the redaction filter's call sites is PRE-WRITE. Nothing anywhere
+// in the workspace scanned rows that were ALREADY STORED, so a redaction escape
+// could only ever be caught in the instant it happened and never afterwards.
+// This is that scan, and it lives beside `RULES` on purpose: a scan that
+// re-derives the rules is a second source of truth waiting to drift.
+
+/// Which class of secret shape a stored row matched.
+///
+/// The two are reported **distinctly** (ratified 2026-08-17) because they fail
+/// differently. A prefix hit is what [`detect_credential`] already reports. A
+/// hex-run hit is the class the write-path filter handles **silently**: `redact`
+/// scrubs runs of at least `TOKEN_HEX_MIN_LEN` hex bytes, and
+/// [`detect_credential`] deliberately does not report them.
+///
+/// A correctly-redacted stored row can contain **neither**: the write path scrubs
+/// both. So a hit on either is a redaction escape — and asserting only the prefix
+/// half would leave the scan blind to exactly the class whose miss would never
+/// have been logged in the first place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CredentialShape {
+    /// Matched one of the provider prefixes in [`RULES`]; carries its class.
+    Prefix(&'static str),
+    /// Matched the hex-run heuristic; carries the observed run length.
+    HexRun { len: usize },
+}
+
+impl CredentialShape {
+    /// Stable token for reports and assertions.
+    pub fn class(&self) -> &'static str {
+        match self {
+            CredentialShape::Prefix(class) => class,
+            CredentialShape::HexRun { .. } => "hex_run",
+        }
+    }
+
+    /// Is this the class `detect_credential` reports? The other class is the one
+    /// the write path scrubs without reporting.
+    pub fn is_prefix(&self) -> bool {
+        matches!(self, CredentialShape::Prefix(_))
+    }
+}
+
+/// Scan a payload that was **already written** to a Transparency Log for
+/// credential shapes, returning every distinct prefix class matched plus the
+/// longest qualifying hex run.
+///
+/// Empty result ⇒ this stored row carries no secret shape the write path knows
+/// about. Non-empty ⇒ a redaction escape, classified.
+pub fn scan_stored_payload(bytes: &[u8]) -> Vec<CredentialShape> {
+    // Deduped BY CLASS, not by rule: several `RULES` entries share one class
+    // (e.g. two Anthropic prefixes), and "three findings" for one credential would
+    // overstate the escape count an operator has to triage.
+    let mut findings: Vec<CredentialShape> = Vec::new();
+    for rule in RULES {
+        if contains_prefix(bytes, rule.prefix)
+            && !findings
+                .iter()
+                .any(|f| matches!(f, CredentialShape::Prefix(c) if *c == rule.class))
+        {
+            findings.push(CredentialShape::Prefix(rule.class));
+        }
+    }
+    let longest = longest_hex_run(bytes);
+    if longest >= TOKEN_HEX_MIN_LEN {
+        findings.push(CredentialShape::HexRun { len: longest });
+    }
+    findings
+}
+
+/// The longest run of consecutive hex bytes anywhere in `bytes`.
+fn longest_hex_run(bytes: &[u8]) -> usize {
+    let mut best = 0;
+    let mut run = 0;
+    for &b in bytes {
+        if is_hex_byte(b) {
+            run += 1;
+            if run > best {
+                best = run;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    best
+}
+
 /// Count consecutive hex bytes starting at `start`.
 fn count_hex_run(bytes: &[u8], start: usize) -> usize {
     let mut count = 0;

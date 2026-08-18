@@ -1743,6 +1743,14 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-dev-record-completeness
         run: cargo run -p xtask -- check-dev-record-completeness --json
+      # D19 (14-0, option (a)), resolved by j1-crosshost-2c — the seven story-file
+      # walkers now derive their subject set from sprint-status.yaml instead of a
+      # leading-digit filename filter, which had made the entire `j1-*` lane
+      # invisible to all seven at once. THE PLANTED RED lives here: a `j1-*` story
+      # with a missing dev record must red a Blocking gate. Without this step the
+      # shared helper is a refactor, not a control.
+      - name: Run the D19 story-file governance vectors (14-0 option (a))
+        run: cargo test -p xtask --test d19_story_file_governance -- --test-threads=1
 
   # Story 7.1.5 — assert ZERO bare `_No review findings._` placeholders remain
   check-bare-review-findings:
@@ -1883,6 +1891,50 @@ jobs:
         run: |
           grep -q 'fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag' crates/maos-bin/tests/smoke_cli_wrapper_8_12.rs
           cargo test -p maos-bin --test smoke_cli_wrapper_8_12 ci_local_split_refuses_a_granted_real_agent_without_the_live_flag -- --exact
+
+  # j1-crosshost-2c AC5.1/AC5.2 — the two-host signed-run judge. ONE always-Blocking
+  # hermetic job. Deliberately NO `services:` block: the substrate-drift gate rejects
+  # an unregistered service-bearing gate job, and this gate needs no substrate — the
+  # paid run's evidence is a capture artifact it validates when present and refuses to
+  # let anything claim when absent.
+  #
+  # The `--test` names below ARE the control. The gate's `two-host-vectors-enrolled`
+  # leg DERIVES the required set from `crates/*/tests/*_2c.rs`, so a new `_2c.rs` file
+  # that is not named here reds the gate by construction rather than by remembering.
+  # `-p maos-bin` is not enrolled here: it is red under default parallel flags (D16)
+  # and this story adds no `maos-bin` test target.
+  check-j1-two-host-signed-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-j1-two-host-signed-run
+        run: cargo run -p xtask -- check-j1-two-host-signed-run --json
+      - name: Run j1-crosshost-2c proven-red vectors (AC5.1)
+        run: cargo test -p xtask --test j1_crosshost_2c_proven_red -- --test-threads=1
+      - name: Run the signing-identity + two-host reconciliation controls (AC1, AC2)
+        run: |
+          cargo test -p maos-cli --test signing_identity_2c -- --test-threads=1
+          cargo test -p maos-cli --test two_host_reconcile_2c -- --test-threads=1
+          cargo test -p maos-audit --test two_host_bundle_2c -- --test-threads=1
+      - name: Run the fault-semantics controls (AC3)
+        run: |
+          cargo test -p maos-a2a-core --test fault_typing_2c -- --test-threads=1
+          cargo test -p maos-a2a-core --test digest_reply_durability_2c -- --test-threads=1
+          cargo test -p maos-a2a-tcp --test t_2c_fault_windows -- --test-threads=1
+          cargo test -p maos-a2a-tcp --test t_2c_pin_journal -- --test-threads=1
+          cargo test -p maos-cohort --lib a_failed_commit_leaves_the_digest_reply_retryable_never_duplicate
+      - name: Run the stored-row scan + credential-posture controls (AC4)
+        run: cargo test -p maos-cli --test credential_posture_2c -- --test-threads=1
+      # The census this story moved from 10 typed codes to 12 is machine-checked
+      # here, not in a comment. `-p maos-bin` needs `--test-threads=1` (D16).
+      - name: Run the NACK-code census (AC3.2)
+        run: cargo test -p maos-bin --test bounded_postures_2b -- --test-threads=1
 
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
   check-kernel-baseline:
@@ -3239,6 +3291,7 @@ jobs:
       - check-rotation-real-timing
       - check-j4-latency
       - check-j1-loopback-delegation
+      - check-j1-two-host-signed-run
       - check-mobile-push-on-halt
       - check-ff-j6
       - check-skill-conformance

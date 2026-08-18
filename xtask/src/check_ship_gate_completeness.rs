@@ -54,6 +54,10 @@ const EXPECTED_GATES: &[&str] = &[
     // it lands: its proven-red leg catches a "route locally anyway" regression that
     // otherwise ships with the founder loop still exiting 0.
     "check-j1-loopback-delegation",
+    // j1-crosshost-2c AC5.1 — the two-host signed-run judge. ONE always-Blocking
+    // hermetic gate; the paid run's evidence is a validated capture, not a
+    // substrate-gated job that could never fire in CI.
+    "check-j1-two-host-signed-run",
     // Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
     "check-skill-conformance",
     // Story 11.2a (AC5, D10) — cross-region convergent replication gate (ADR-049).

@@ -269,6 +269,187 @@ Edit `_bmad-output/test-artifacts/release-gate-8-12-tier-2-cli-wrapper.md`:
 3. Read the capture doc: real codex identity, host-managed grant, resolving digest→TL citations, `egress: declared-not-enforced`, redaction verified, named human signer.
 
 ---
+## Phase 7 — The TWO-HOST run (`j1-crosshost-2c`)
+
+Everything above is **one host**, codex only. This phase extends it to two hosts and
+a heterogeneous worker. It is a different claim with different failure modes, and it
+has **two steps no protocol performs for you**.
+
+> ⚠ **`claude` appears zero times in Phases 0–6.** Host B runs the non-Codex adapter.
+> `ClaudeCli` is proven viable end to end (`j1-crosshost-2` preflight: a live `claude`
+> worker through `maos run` with a manifest + `MAOS_HOST_GRANTS`, zero repo changes),
+> but nothing before this phase ever pointed a runbook at it.
+
+### 7.0 — Rehearse the manual pairing on a RELEASE build FIRST
+
+**This is the only pairing path a release build has, and until this rehearsal nothing
+had ever executed it.** In a release build `main.rs` gates the `MAOS_TEST_BOOT_NONCE`
+override behind `cfg!(debug_assertions)`, so the nonce is **always random**. `2b`'s
+own two-daemon harness uses the debug shortcut, so the documented operator path was
+never exercised by any test.
+
+```bash
+# Build RELEASE. A debug build silently gives you the test shortcut and proves nothing.
+cargo build --release -p maos-bin
+
+# Start host A. Read its boot nonce from its OWN `cohort:daemon-started` TL row —
+# not from a log line, not from an env var you set.
+MAOS_HOME=$HOST_A_HOME ./target/release/maos …   # host A daemon
+maosctl audit query --frame-kind TelemetryEvent --intent cohort:daemon-started
+#   → the nonce host A actually booted with
+
+# Hand-transcribe that nonce into host B's STATIC peer-pin config.
+# There is no automated channel. RELEASE-HOLDS row 9 records this as a boundary.
+$EDITOR $HOST_B_HOME/a2a-peers.toml     # [[peer]] boot_nonce = <transcribed>
+```
+
+**If the transcription is wrong the dial fails closed** — and after `2c` it fails
+*legibly*: both sides journal a `PeerIdentityUnverified` `ConsentRupture`, so
+`maosctl audit query --frame-kind ConsentRupture` shows which side refused. Before
+`2c` the listen side left **zero trace**.
+
+### 7.1 — Give the two hosts INDEPENDENT audit roots
+
+**Do not derive host B's key from host A's.** The region→team derivation template
+exists to make keys derivable from ONE base seed — the exact property a two-host
+claim must disprove. A welded per-host key would let one seed holder legitimately
+sign **both halves**: valid signatures, host field inside them, a perfect "two-host"
+bundle produced by one machine.
+
+```bash
+maosctl audit keygen --output $HOST_A_HOME/audit-signing.key   # publish FPR_A
+maosctl audit keygen --output $HOST_B_HOME/audit-signing.key   # publish FPR_B
+test "$(cat $HOST_A_HOME/audit-signing.key)" != "$(cat $HOST_B_HOME/audit-signing.key)" \
+  || { echo "ABORT: one root cannot attest two identities"; exit 1; }
+```
+
+> `2b`'s two-process-one-box shape defaults to **one HOME and therefore one key
+> file**. The mechanism proof and the signed proof want *opposite* setups; this step
+> is what separates them.
+
+### 7.2 — Run the crossing, then export ONE half per host
+
+```bash
+# Host A delegates; host B's claude worker executes. Both TLs record the SAME
+# sixteen frame_id bytes (deterministic `seq ‖ run_nonce`) — that is the join key.
+
+MAOS_HOME=$HOST_A_HOME maosctl audit sealed-export --range 1d \
+  --audit-key $HOST_A_HOME/audit-signing.key --host host-a --output host-a-bundle.json
+MAOS_HOME=$HOST_B_HOME maosctl audit sealed-export --range 1d \
+  --audit-key $HOST_B_HOME/audit-signing.key --host host-b --output host-b-bundle.json
+```
+
+`--host` is **not a label**. Both halves carry the same `frame_id`s and are otherwise
+indistinguishable: `region` cannot separate two hosts in one jurisdiction (same
+derived key), `boot_nonce` is per-boot and one `--range 1d` export swept eight, and
+`attester_pubkey` is bundle-supplied so R-RG1 forbids trusting it. **Without `--host`
+one host can produce both halves.** It is covered by the signature, so altering it
+post-signing fails verification.
+
+### 7.3 — Reconcile, from a THIRD home
+
+```bash
+maosctl audit reconcile-hosts \
+  --bundle-a host-a-bundle.json --pubkey-a $FPR_A \
+  --bundle-b host-b-bundle.json --pubkey-b $FPR_B \
+  --receipt-out two-host-receipt.json --receipt-key $OPERATOR_KEY
+#   → OK (hosts host-a + host-b, N shared frame_ids, …)
+#   → claim scope: two keyed identities signed; not two machines, two processes,
+#                  or two operators
+```
+
+Each half is verified against **the key supplied for that half** — use `--seed-a` /
+`--seed-b` to derive from each half's *claimed* region instead. Never read
+`attester_pubkey` out of the artifact. Two halves attested by ONE root are **refused**.
+
+### 7.4 — The stranger's check (NOT optional)
+
+Our own `verify-bundle` is a self-check. The premise of this artifact is a claim a
+**stranger** can check, and no stranger has ever checked one.
+
+```bash
+python3 tools/verify-audit-bundle/verify.py host-a-bundle.json $FPR_A
+python3 tools/verify-audit-bundle/verify.py host-b-bundle.json $FPR_B
+```
+
+The Python twin is field-agnostic: it drops `signature_block` and sorts the rest, so
+the `host` field flows through untouched. Its output goes in the capture verbatim.
+
+### 7.5 — Scan what was STORED, not what was sent
+
+```bash
+for H in $HOST_A_HOME $HOST_B_HOME; do MAOS_HOME=$H maosctl audit scan-credentials; done
+#   → "<N> rows scanned, 0 prefix escapes, 0 hex-run escapes"; non-zero exits 1
+```
+
+Every redaction call site is **pre-write**; this walks rows already on disk. Both
+classes are reported distinctly, because the write path scrubs long hex runs
+*silently* — a miss in that class would never have been logged in the first place.
+
+### 7.6 — Capture the bounded claim
+
+Add these to the Phase-4 capture JSON. The overclaim direction of each is **refused**
+by `record-capture`, so a dishonest capture cannot be journaled and then signed:
+
+```json
+"two_host_shape": "two-processes-one-box",
+"two_host_trust_anchor": "out-of-band-human-operator",
+"two_host_host_b_audit_key": "hand-provisioned-separately",
+"two_host_stranger_verification": "verify.py: signature OK (both halves)"
+```
+
+- `two_host_shape` — say which it was. `2b`'s mechanism proof is two real OS
+  processes on one box; a reader hears "two machines". Free prose is refused.
+- `two_host_trust_anchor` — `"protocol-negotiated"` is refused. A reader told *"these
+  two hosts authenticated"* will not guess *"these two hosts were introduced."*
+- `two_host_host_b_audit_key` — `"derived-from-shared-root"` is refused; that is the
+  property that collapses "two hosts" into "two identities".
+
+### 7.7 — `two-host-capture.json`: copy the published template, do not invent it
+
+The four `two_host_*` fields above belong to the **Phase-4 `CaptureDoc`** (`record-capture`).
+`two-host-capture.json` is a **different artifact** with its own seven required fields, and leg 9
+of `check-j1-two-host-signed-run` compares `claim_scope` **byte for byte**.
+
+**Do not author it from scratch — an invented capture is rejected after the agent is billed.**
+
+```bash
+cd _bmad-output/test-artifacts/j1-two-host-evidence
+cp two-host-capture.example.json two-host-capture.json
+# fill in host_a / host_b only; claim_scope ships already correct and must not be paraphrased
+```
+
+The full contract — all four artifacts, the seven fields, the verbatim `claim_scope`, the overclaim
+tripwires, and the two manual operator steps — is published at
+`_bmad-output/test-artifacts/j1-two-host-evidence/README.md`. The template's admissibility is proven
+executably by `published_capture_template_is_admissible_by_the_real_gate` in
+`xtask/tests/j1_crosshost_2c_proven_red.rs`, so the template cannot drift from the validator.
+
+Place the artifacts where the gate looks, then run the judge:
+
+```bash
+mkdir -p _bmad-output/test-artifacts/j1-two-host-evidence
+cp two-host-capture.json host-a-bundle.json host-b-bundle.json \
+   _bmad-output/test-artifacts/j1-two-host-evidence/
+cargo run -p xtask -- check-j1-two-host-signed-run --json | jq .
+```
+
+The gate **validates the capture when present** and **refuses to let anything claim it
+when absent**. Absent is the honest CI state — not a failure.
+
+### Phase-7 abort conditions — ANY of these → the two-host claim stays OPEN
+
+- The two hosts share a key file or key material (→ "two identities", never "two hosts").
+- The pairing was done on a **debug** build (the nonce shortcut proves nothing).
+- `reconcile-hosts` refuses for any reason: shared root, missing host claim,
+  duplicate host claim, or disjoint logs.
+- `verify.py` rejects either half, or was not run at all.
+- `scan-credentials` reports any escape on either host.
+- The capture claims two machines, two operators, an automated pairing, or a
+  shared-root key.
+
+---
+
 
 ## 실행 요약 (한국어)
 

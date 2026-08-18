@@ -28,6 +28,7 @@
 //! v0.5-α implementation: line-based parsing of YAML frontmatter + markdown
 //! sections. Same simplicity as `check_review_findings_resolved`.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -237,16 +238,15 @@ fn owner_tokens(window: &str) -> Vec<String> {
         .collect()
 }
 
-fn story_key_from_filename(path: &Path) -> Option<String> {
+/// D19 — a story key is governed iff the project's own `development_status` list
+/// declares it. The prior test was a leading ASCII digit, which made every
+/// non-numeric key (the whole `j1-*` lane) invisible to this gate.
+fn story_key_from_filename(keys: &BTreeSet<String>, path: &Path) -> Option<String> {
     let name = path.file_stem()?.to_str()?;
     if name.contains("retro") || name.starts_with("epic-") || name == "index" {
         return None;
     }
-    let first = name.chars().next()?;
-    if !first.is_ascii_digit() {
-        return None;
-    }
-    Some(name.to_string())
+    keys.contains(name).then(|| name.to_string())
 }
 
 /// Extract a matching markdown section through the next `##`/`###` heading.
@@ -365,8 +365,8 @@ fn file_list_paths_on_line(trimmed: &str) -> Vec<String> {
         .collect()
 }
 
-fn parse_dev_record(path: &Path) -> Option<DevRecord> {
-    let story_key = story_key_from_filename(path)?;
+fn parse_dev_record(keys: &BTreeSet<String>, path: &Path) -> Option<DevRecord> {
+    let story_key = story_key_from_filename(keys, path)?;
     let content = fs::read_to_string(path).ok()?;
     let lines: Vec<&str> = content.lines().collect();
 
@@ -459,13 +459,16 @@ pub fn run(
         return Err(format!("stories_dir not found: {stories_dir}"));
     }
 
+    // D19 — fails closed: a governed set that comes back empty would silently
+    // reduce this gate to a no-op.
+    let governed = crate::gate_common::governed_story_keys(dir)?;
     let mut records = Vec::new();
     let entries = fs::read_dir(dir).map_err(|e| format!("read_dir {stories_dir}: {e}"))?;
     for entry in entries {
         let entry = entry.map_err(|e| format!("dir entry: {e}"))?;
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
-            if let Some(r) = parse_dev_record(&path) {
+            if let Some(r) = parse_dev_record(&governed, &path) {
                 records.push(r);
             }
         }
@@ -614,6 +617,7 @@ mod tests {
     use std::io::Write;
 
     fn write(dir: &Path, name: &str, content: &str) -> PathBuf {
+        crate::gate_common::register_fixture_story(dir, name);
         let deferred_path = dir.join("deferred-work.md");
         if name != "deferred-work.md" && !deferred_path.exists() {
             fs::write(

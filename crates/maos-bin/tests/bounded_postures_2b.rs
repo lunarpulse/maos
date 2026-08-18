@@ -169,10 +169,19 @@ fn restart_nack_is_a_pin_failure_never_a_transport_failure() {
 
 #[test]
 fn response_code_census_records_the_post_repair_scope_wall() {
-    // Before this story added the restart arm, the census was 9 typed codes and
-    // 7 fall-throughs. It is now 10 typed codes and these six fall-throughs
-    // because this story moved that arm; the six are not newly reachable here
-    // and belong to a later story rather than a frozen-crate refactor.
+    // Before `j1-crosshost-2b` added the restart arm the census was 9 typed codes
+    // and 7 fall-throughs; 2b's arm made it 10 and 6.
+    //
+    // `j1-crosshost-2c` AC3.2 typed the two that 2b filed against it in-source:
+    // `CODE_INTERNAL` (which 2b itself newly emits at `router.rs:1371` and
+    // `:1549`) and `CODE_TIMEOUT` (which 2c's own bounded write path produces).
+    // Both used to fall through to `TransportFailed`, making a dropped-receiver
+    // internal NACK byte-identical at the sender to a genuine wire partition —
+    // so AC3's fault windows could not tell apart the faults they inject.
+    //
+    // The census is therefore **12 typed, 4 fall-through**. The remaining four
+    // are not reachable from anything 2b or 2c emits, and a nine-arm refactor
+    // inside a frozen crate remains a different story.
     const ALL_CODES: [&str; 16] = [
         "CODE_PARSE_ERROR",
         "CODE_INVALID_REQUEST",
@@ -191,7 +200,7 @@ fn response_code_census_records_the_post_repair_scope_wall() {
         "CODE_CROSS_TEAM_CROSSING_REFUSED",
         "CODE_INTERNAL",
     ];
-    const TYPED_CODES: [&str; 10] = [
+    const TYPED_CODES: [&str; 12] = [
         "CODE_INTENT_DENIED",
         "CODE_PIN_MISMATCH_NOT_PINNED",
         "CODE_CONSENT_EXPIRED",
@@ -202,14 +211,15 @@ fn response_code_census_records_the_post_repair_scope_wall() {
         "CODE_TEAM_IDENTITY_MISMATCH",
         "CODE_CROSSING_SOURCE_TEAM_UNBOUND",
         "CODE_CROSS_TEAM_CROSSING_REFUSED",
+        // j1-crosshost-2c AC3.2
+        "CODE_INTERNAL",
+        "CODE_TIMEOUT",
     ];
-    const FALL_THROUGHS: [&str; 6] = [
+    const FALL_THROUGHS: [&str; 4] = [
         "CODE_PARSE_ERROR",
         "CODE_INVALID_REQUEST",
         "CODE_METHOD_NOT_FOUND",
-        "CODE_TIMEOUT",
         "CODE_FRAME_TOO_LARGE",
-        "CODE_INTERNAL",
     ];
 
     let definitions = JSON_RPC_SOURCE
@@ -228,7 +238,7 @@ fn response_code_census_records_the_post_repair_scope_wall() {
         );
     }
 
-    let response_mapping = code_window_after(ROUTER_SOURCE, "pub fn interpret_response(", 205);
+    let response_mapping = code_window_after(ROUTER_SOURCE, "pub fn interpret_response(", 230);
     let mapped_arms = response_mapping
         .lines()
         .filter(|line| line.trim_start().starts_with("CODE_") && line.contains("=>"))
@@ -236,7 +246,7 @@ fn response_code_census_records_the_post_repair_scope_wall() {
     assert_eq!(
         mapped_arms.len(),
         TYPED_CODES.len(),
-        "interpret_response must type exactly 10 of the 16 protocol codes"
+        "interpret_response must type exactly 12 of the 16 protocol codes"
     );
     for code in TYPED_CODES {
         assert!(

@@ -53,6 +53,77 @@ the substance — that is the named owner's call at preflight.
 | **D18** | **`map_a2a_error_to_iac_bus` flattens the A2A deny vocabulary above the router** (`crates/maos-a2a-core/src/router.rs:1671-1783`). Both `IntentDenied{Send}` (`:1673-1683`) and `IntentDeniedAtPeer` (`:1684-1690`) collapse to the same `IacBusError::CrossHostIntentDenied`, and **both** `ConsentUnclassified` variants collapse to a stringly `IacBusError::CrossHostRouteFailure` (`:1773-1782`); `DelegationLeg::delegate` (`crates/maos-bin/src/delegation.rs:149-171`) then stringifies even that. **Consequence:** a cross-host operator cannot distinguish `-32001` (policy refused you) from `-32009` (policy could not classify you) — one is the system working, the other is the system blind — and the unclassified *reason* (`Absent`/`NonCanonical`/`Oversized`) is unrecoverable. The non-conflation invariant is real and pinned at the router seam (`fail_closed_8_8.rs:216-240`); it is destroyed one layer up. Found by the `j1-crosshost-1b` preflight, which proves the refusals at the router seam **because it cannot prove them anywhere else**. | **Decide the typed cross-host deny outcome an operator sees.** `j1-crosshost-1b` correctly does NOT fix it: `maos-a2a-core` is at ZERO kloc headroom and **D10** forbids a third unscoped grant, so widening this is a scoped decision, not a side effect. Same shape as **D7** (`CrossWallRecallRefusal` collapsing six variants into `refused`) — consider deciding them together. **Deadline is deliberately BEFORE rung 2 writes code, not before it closes:** `j1-crosshost-2` builds the first real cross-host operator surface, and if it is built on the flattened error the defect becomes load-bearing. NOTE: this was NOT filed 'against `j1-crosshost-2`' — that story has a sprint-status row and (at filing time) no story file; a deferral into a document that does not exist is not a deferral. | **14-4** (v2.0 operational-surface sweep, already owns D7) | Before `j1-crosshost-2` writes its first line | John + Vex | **RESOLVED 2026-08-15 (Lunarpulse) — the 'precondition with no budget' paradox was built on an UNMEASURED premise and does not survive measurement.** Three corrections: (1) **The `-32001` pair is ALREADY distinguishable.** `IntentDenied{direction}` (`router.rs:1673-1683`) and `IntentDeniedAtPeer` (`:1684-1690`) both produce `CrossHostIntentDenied`, but with `direction: Send` vs `direction: Accept` — a consumer CAN tell the send seam from the accept seam today. The residual defect there is narrower and semantic: `IntentDeniedAtPeer` stuffs the NACK **message** into a field named `intent`, while the sibling arm puts a real intent string in it. The field lies about itself; it does not erase the distinction. (2) **The real loss is the UNCLASSIFIED pair.** `ConsentUnclassified` and `ConsentUnclassifiedAtPeer` (`:1773-1782`) both collapse into stringly `CrossHostRouteFailure(String)`, discarding the typed `UnclassifiedReason` (`Absent`/`NonCanonical`/`Oversized`) and the direction. That — not the deny pair — is D18's core. (3) **MEASURED COST: `maos-a2a-core` ≈ ZERO net lines.** The two arms are 5-line `format!` constructions; replacing each with a 5-line typed struct construction is net ~0. The new variant lands in `maos-domain::iac_bus_types` (`:14-40`) at ~+6 lines. **So D10's ZERO-headroom wall was never in the way, and no maos-a2a-core grant is required.** The `maos-domain` +6 rides with **D14**, whose owner (14-7) is already required to make an explicit AC expansion for that crate — fold it there rather than opening a second vehicle. **DEADLINE RE-PINNED: 'before `j1-crosshost-2b` writes its first line'** (was: before `j1-crosshost-2`). This is not a weakening — it is the same rule applied to the correct vehicle now that rung 2 is split (ratified 2026-08-15): `2a` is one-host worker hardening and **cannot surface a cross-host deny at all**, so it is unblocked immediately; `2b` is where host B first makes this error operator-visible. **Fallback if the typed variant is refused at 14-4:** preserve the reason in the existing string field and record the typed outcome as still-open alongside **D7** — but that is a worse answer and the measurement says it is not necessary. |
 | **D19** | **Seven blocking CI gates cannot see a bridge-lane story file, so story-file discipline is unenforced for the entire J1 series.** Five walk `_bmad-output/implementation-artifacts/` behind a digit-prefix filter and skip any name that does not start with a number: `check_bare_review_findings.rs:35`, `check_dev_model_tier.rs:103`, `check_dev_model_used_populated.rs:136`, `check_dev_record_completeness.rs:245-247`, `check_review_findings_resolved.rs:57-60`. Two more skip by a different mechanism: `check_epic_close_coherence.rs:215-217` (`head.parse().ok()?`, its comment naming `j1-crosshost-1` explicitly) and `check_epic_6_bridge.rs:820-828` (hardcoded `"6-2"`/`"6-3"` prefixes). **CORRECTED 2026-08-16 (`j1-crosshost-2b`/`2c` preflight): the shared-filter defect is SEVEN walkers, not five.** `check_epic_6_bridge.rs` is blind by TWO mechanisms — besides the hardcoded prefix, it carries two more digit-prefix directory walkers of its own at **`:2563`** (`check_7_1_5_bare_rf_count`) and **`:2608`** (`check_7_1_5_dmu_missing_count`), both `name.ends_with(".md") && name.starts_with(|c| c.is_ascii_digit())`. A fix scoped to the five originally listed would leave two walkers behind and the single-source claim would be false at birth. All five original directory-walkers are BLOCKING jobs (`discipline.yml:1720, 1734, 1748, 1762, 1778`). **Net effect: a `j1-*` story can ship with no dev record, no `dev_model_used`, no §A6 marker and no review-findings closure, and zero gates notice — a green CI does not mean the review net ran.** Filed by the `j1-crosshost-2a` preflight round-table (2026-08-16). The hole has been open across `1a` (done), `1b`, `j1-demo-one-command-scene` (done) and now `2a`; each disclosed it in prose and none of them closed it, which is why disclosure is no longer an acceptable disposition. | **Decide the filename contract, not a patch to one gate.** Either (a) replace the digit-prefix filter with the sprint-status key set — every gate then governs exactly the stories the tracker knows about, including epic-orphaned lanes; or (b) ratify that bridge-lane story files are outside story-file discipline and state the boundary in `RELEASE-HOLDS.md` §Claim boundaries, per binding rule 4. **Do not fix one gate**: five walkers sharing one filter is the single-source defect this project has already paid for twice (gate-binding decay, Epic-13 tracking). If (a), the walkers should share one helper so the next filter change is one edit. `j1-crosshost-2a` continues to DISCLOSE in its Dev Agent Record; disclosure is the interim state, not the resolution. | **14-0** decomposes into a named story (no existing Epic-14 vehicle's ACs cover story-file gate scope) | Before the next `j1-*` story leaves `ready-for-dev` | Mary + John |
 
+### D19 — RESOLVED 2026-08-17: option (a), implemented by `j1-crosshost-2c`
+
+**Decision:** option **(a)**, chosen unanimously at the 2026-08-17 round-table under
+vehicle **14-0** (Mary + John), per spec + long-term correctness. **Option (b) was
+refused on grounds:** it would ratify that a *category* of story is exempt from
+dev-record, model-tier and review-findings discipline — converting a defect into a
+policy just as the defect was about to expire — and the lane it would exempt is the
+one running cross-host mTLS, signed artifacts and a paid agent, i.e. where review
+discipline matters most.
+
+**The deadline was self-voiding and was called out as such.** *"Before the next
+`j1-*` story leaves ready-for-dev"* — but `2c` is the closer of the lane and there is
+no next `j1-*` story (verified: the lane holds `1a`/`1b`/`2a`/`2b`/`2c` and the demo).
+Either it bound here or it never bound. It bound here.
+
+**Implemented, one helper, seven walkers:**
+
+- `xtask/src/gate_common.rs` — `governed_story_keys()` + `is_governed_story_file()`.
+  The governed set is derived from `sprint-status.yaml`'s `development_status` keys,
+  which is the project's own authoritative story list, so it cannot drift the way a
+  filename convention did: adding a story to the sprint makes it governed, with
+  nothing to remember. It reuses the already single-sourced
+  `sprint_status::load_sprint_status` rather than adding a second parser — `xtask`'s
+  `lib.rs` now exposes that module so the helper resolves in both compilations.
+- **Fails closed.** An unreadable `sprint-status.yaml`, or a `development_status`
+  block yielding zero keys, is an `Err` — never an empty set. A gate that governs
+  nothing passes for the wrong reason, and `findings.is_empty()` is blind to it.
+- Converted, all seven walk sites named in the corrected row above:
+  `check_bare_review_findings.rs`, `check_dev_model_tier.rs`,
+  `check_dev_model_used_populated.rs`, `check_dev_record_completeness.rs`,
+  `check_review_findings_resolved.rs`, and `check_epic_6_bridge.rs` **×2**
+  (`check_7_1_5_bare_rf_count`, `check_7_1_5_dmu_missing_count`).
+- `check_dev_model_tier.rs` needed one extra repair the filter swap alone would not
+  have delivered: its `ENFORCE_FROM_EPIC` scoping skipped any story with no epic
+  number, so `j1-*` would still have been exempt after becoming visible. A governed
+  story with no epic is now enforced. "No epic number" was never a reason to exempt
+  a story from recording which model developed it.
+
+**ACCEPTANCE — the planted red, not the helper.**
+`xtask/tests/d19_story_file_governance.rs` (10 vectors), CI-enrolled on the Blocking
+`check-dev-record-completeness` job. A `j1-*` story file with a missing dev record
+REDS a Blocking gate; the same defect under a numeric key also reds, so each vector
+is about the DEFECT and not the filename; a complete fixture is GREEN so the reds are
+not vacuous; an ungoverned `.md` carrying every defect reds nothing; a missing or
+empty story list REDS rather than governing nothing; `epic-*` roll-ups and
+retrospectives stay out.
+
+**Newly governed as a result — the whole J1 lane, six files:**
+`j1-crosshost-1a-frame-borne-delegation`, `j1-crosshost-1b-consent-proofs-and-gate`,
+`j1-crosshost-2a-signable-heterogeneous-worker`,
+`j1-crosshost-2b-cross-host-delegation-mechanism`,
+`j1-crosshost-2c-two-host-signed-run`, `j1-demo-one-command-scene`.
+All five converted gates are **GREEN** against them, so the lane's records genuinely
+satisfy the discipline that had never been applied to them. Also verified green:
+`check-dev-model-tier`, `check-epic-6-bridge`, `check-epic-close-coherence`.
+
+**Out of scope, deliberately.** The row names two OTHER blindness mechanisms:
+`check_epic_close_coherence.rs:215` (`head.parse().ok()?`) and
+`check_epic_6_bridge.rs:820-828`'s hardcoded `"6-2"`/`"6-3"` prefixes. Neither is a
+story-file *walker*: the first is epic roll-up scoping, and a story belonging to no
+epic correctly does not appear in an epic's roll-up; the second is an
+Epic-6-specific bridge assertion. Option (a) is about which story files a
+story-file gate governs, and those two are not that.
+
+**One pre-existing RED closed in passing, reported not hidden.**
+`check-dev-record-completeness` was already RED at HEAD `7aa07ee3` on
+`deferred-work.md:817` and `:820` — both `j1-crosshost-2b` review text asserting an
+owner ("owned by j1-crosshost-2c", "owner: worker-grant hardening lane") that
+resolves to no sprint-status key. Restated in the gate's own `ownerless and open`
+vocabulary. The deferred items themselves are unchanged and still open.
+
 ## Evidence filed against open rows
 
 Evidence is **not** closure. A row below stays open at its stated deadline with its stated owner;

@@ -20,6 +20,8 @@ serde_json = "1.0"
 async-trait = "0.1"
 tokio = { version = "1", features = ["net", "rt", "rt-multi-thread", "macros", "sync", "time", "io-util"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+# j1-crosshost-2c AC3.6 — recording rupture sink whose lock is immediately used.
+parking_lot = "0.12"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 # Implementation-necessity utility deps (beyond AC-A2's first-party/transport

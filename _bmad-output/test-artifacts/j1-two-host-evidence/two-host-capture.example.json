@@ -1,0 +1,10 @@
+{
+  "_comment": "TEMPLATE — copy to two-host-capture.json and fill in. This file is deliberately NOT named two-host-capture.json: leg 9 of check-j1-two-host-signed-run validates that exact filename, and an example sitting at the real path would make the gate treat a template as a completed paid run.",
+  "host_a": "<host A's HostId, exactly as it appears in that host's bundle `host` field>",
+  "host_b": "<host B's HostId — MUST differ from host_a; identical claims are rejected as one host>",
+  "shape": "two real OS processes on one box",
+  "claim_scope": "two keyed identities signed; not two machines, two processes, or two operators",
+  "trust_anchor_established_out_of_band": true,
+  "host_b_audit_key_provisioned_separately": true,
+  "stranger_verification": "tools/verify-audit-bundle/verify.py OK"
+}

@@ -5,8 +5,100 @@
 //! validation and workflow-command emission across all gate modules.
 
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
+
+// ---------------------------------------------------------------------------
+// D19 (decision register `epic-14-preflight-decisions.md`; resolved under
+// vehicle 14-0, option (a), unanimously at the 2026-08-17 round-table).
+//
+// SEVEN story-file walkers selected their subjects with
+//     name.starts_with(|c: char| c.is_ascii_digit())
+// — a filename CONVENTION masquerading as a rule. Every story whose key does not
+// begin with a digit was invisible to all seven at once, and that is the entire
+// `j1-*` lane: the one running cross-host mTLS, signed artifacts and a paid
+// agent, i.e. exactly where dev-record, model-tier and review-findings discipline
+// matters most.
+//
+// The hole stayed open across `1a`, `1b`, `j1-demo-one-command-scene`, `2a` and
+// `2b`. Each disclosed it in prose; none closed it — which is why disclosure
+// stopped being an acceptable disposition.
+//
+// Option (b) — ratifying bridge-lane story files as EXEMPT from story-file
+// discipline — was refused on grounds: it would convert a defect into a policy
+// just as the defect was about to expire, and the lane it exempted is the one
+// where review discipline matters most.
+//
+// ONE helper, not seven edits: five walkers sharing one copied filter is the
+// single-source defect this project has already paid for twice.
+// ---------------------------------------------------------------------------
+
+/// The directory every story-file gate walks.
+pub const STORY_DIR: &str = "_bmad-output/implementation-artifacts";
+
+/// The project's own authoritative story list, which lives inside [`STORY_DIR`].
+pub const SPRINT_STATUS_FILE: &str = "sprint-status.yaml";
+
+/// The set of story keys this project declares, derived from `sprint-status.yaml`'s
+/// `development_status` block.
+///
+/// A set derived from the project's own list cannot drift the way a filename
+/// pattern did: adding a story to the sprint makes it governed, with nothing to
+/// remember. `epic-*` roll-ups and retrospectives are excluded because no walker
+/// ever treated them as stories.
+///
+/// **Fails closed.** An unreadable file, or a `development_status` block that
+/// yields ZERO keys, is an `Err` — never an empty set. A gate that governs nothing
+/// is precisely the vacuous-green failure this change exists to end, and it is
+/// invisible to `findings.is_empty()`.
+pub fn governed_story_keys(stories_dir: &Path) -> Result<BTreeSet<String>, String> {
+    let path = stories_dir.join(SPRINT_STATUS_FILE);
+    let keys: BTreeSet<String> = crate::sprint_status::load_sprint_status(&path.to_string_lossy())
+        .into_keys()
+        .filter(|key| !key.starts_with("epic-") && !key.contains("retro"))
+        .collect();
+    if keys.is_empty() {
+        return Err(format!(
+            "{} yielded ZERO development_status story keys, so the governed story set \
+             cannot be derived. Refusing to walk an empty set: a gate that governs \
+             nothing passes for the wrong reason (D19)",
+            path.display()
+        ));
+    }
+    Ok(keys)
+}
+
+/// Test-only — declare `file_name` as a governed story in `dir`'s
+/// `sprint-status.yaml`, appending to the `development_status` block.
+///
+/// D19 derives the governed set from the project's own story list, so a fixture
+/// directory holding only `.md` files governs NOTHING — correctly, and fail-closed.
+/// Every converted gate's fixture helper calls this, so a fixture story is declared
+/// exactly the way a real story is instead of relying on its filename shape.
+#[cfg(test)]
+pub(crate) fn register_fixture_story(dir: &Path, file_name: &str) {
+    let Some(key) = file_name.strip_suffix(".md") else {
+        return;
+    };
+    let path = dir.join(SPRINT_STATUS_FILE);
+    let mut text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|_| "last_updated: 'fixture'\ndevelopment_status:\n".to_string());
+    if !text.contains(&format!("  {key}:")) {
+        text.push_str(&format!("  {key}: done\n"));
+    }
+    std::fs::write(path, text).expect("write fixture sprint status");
+}
+
+/// Is `file_name` a story file this project governs?
+///
+/// Membership is by KEY, not by shape: `13-6-reza-cortex.md` and
+/// `j1-crosshost-2c-two-host-signed-run.md` are equally governed, and a design
+/// note that is not a sprint key is equally ignored.
+pub fn is_governed_story_file(keys: &BTreeSet<String>, file_name: &str) -> bool {
+    file_name
+        .strip_suffix(".md")
+        .is_some_and(|stem| keys.contains(stem))
+}
 
 // ---------------------------------------------------------------------------
 // Option C — leg-level gate binding (Epic 12 retro B1, 2026-07-13).

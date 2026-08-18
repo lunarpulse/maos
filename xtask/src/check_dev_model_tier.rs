@@ -98,13 +98,22 @@ fn run_with_dir_and_status(
     let mut checked = 0u32;
     let mut skipped_pre_dev = 0u32;
 
+    // D19 — governed by the project's own story list, not a filename convention.
+    let keys = crate::gate_common::governed_story_keys(std::path::Path::new(stories_dir))?;
+
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if !name.ends_with(".md") || !name.starts_with(|c: char| c.is_ascii_digit()) {
+        if !crate::gate_common::is_governed_story_file(&keys, &name) {
             continue;
         }
+        // Epic roll-up scoping stays: `ENFORCE_FROM_EPIC` is a phase decision, not
+        // a naming one. A governed story with NO epic (`j1-*`, `v25-*`) is enforced
+        // rather than skipped — under the digit filter it never reached this point
+        // at all, and "no epic number" was never a reason to exempt a story from
+        // recording which model developed it (D19).
         match epic_of(&name) {
             Some(e) if e >= ENFORCE_FROM_EPIC => {}
+            None => {}
             _ => continue,
         }
         // A story that has not been developed yet has no dev model to record.
@@ -200,6 +209,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn story(dir: &TempDir, name: &str, body: &str) {
+        crate::gate_common::register_fixture_story(dir.path(), name);
         let mut f = std::fs::File::create(dir.path().join(name)).unwrap();
         write!(f, "{body}").unwrap();
     }
@@ -321,7 +331,15 @@ mod tests {
         assert_eq!(m.get("13-5e-y").map(String::as_str), Some("ready-for-dev"));
     }
 
-    /// Fail-closed is preserved: an unknown or missing status is still checked.
+    /// Fail-closed is preserved: a DECLARED story whose status the gate does not
+    /// recognise as pre-development is still checked.
+    ///
+    /// D19 changed what "unknown" can mean. It used to conflate two cases —
+    /// "declared with a status we do not recognise" and "not declared at all" —
+    /// because governance came from the filename. Now membership comes from
+    /// `development_status`, so an UNDECLARED file is not a story and is correctly
+    /// ignored, while a declared story with any non-pre-dev status is checked. This
+    /// leg holds the second case, which is the one the gate is for.
     #[test]
     fn unknown_status_is_still_checked() {
         let d = TempDir::new().unwrap();
@@ -330,7 +348,23 @@ mod tests {
             "13-9-orphan.md",
             "---\nepic: 13\n---\n### Agent Model Used\n\nModel: legacy-gpt-4o\n\n§A6\n",
         );
-        let ss = sprint_status(&d, "  13-other: done\n");
+        let ss = sprint_status(&d, "  13-9-orphan: mystery-status\n  13-other: done\n");
         assert!(run_with_dir_and_status(false, d.path().to_str().unwrap(), &ss).is_err());
+    }
+
+    /// The other half of the same distinction: an UNDECLARED `.md` is not a story.
+    /// A design note dropped in the story directory must not red a Blocking gate.
+    #[test]
+    fn an_undeclared_md_file_is_not_a_story() {
+        let d = TempDir::new().unwrap();
+        story(
+            &d,
+            "13-9-orphan.md",
+            "---\nepic: 13\n---\n### Agent Model Used\n\nModel: legacy-gpt-4o\n\n§A6\n",
+        );
+        // Declare a DIFFERENT story, so the governed set is non-empty (the helper
+        // fails closed on an empty one) but does not include the fixture above.
+        let ss = sprint_status(&d, "  13-other: done\n");
+        assert!(run_with_dir_and_status(false, d.path().to_str().unwrap(), &ss).is_ok());
     }
 }

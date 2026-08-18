@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://maos.dev/schemas/audit-bundle.v1.json",
   "title": "maos.audit-bundle.v1",
-  "description": "Sealed export bundle for the MAOS audit trail. Canonical byte serialization for signing uses JSON with sorted keys and no insignificant whitespace (serde_json sorted_keys serializer). The Ed25519 signature covers sha256(canonical_bundle_bytes) where canonical_bundle_bytes is the sorted-key, no-whitespace JSON encoding of all fields except signature_block.",
+  "description": "Sealed export bundle for the MAOS audit trail. Canonical byte serialization for signing uses JSON with sorted keys and no insignificant whitespace (serde_json sorted_keys serializer). The Ed25519 signature covers sha256(canonical_bundle_bytes) where canonical_bundle_bytes is the sorted-key, no-whitespace JSON encoding of all fields except signature_block. ENFORCED by the `check-j1-two-host-signed-run` gate (j1-crosshost-2c AC2.6): before that this file was a FALSE SPECIFICATION -- `additionalProperties: false` while omitting three fields the struct emitted, read by no machine. Every optional field below is `skip_serializing_if` in `crates/maos-audit/src/sealed_export.rs`, so a bundle that omits it stays byte-identical to the pre-9.4b surface.",
   "type": "object",
   "required": ["schema_version", "entries", "i12_digest_refs", "i11_distilled_content", "freshness", "signature_block"],
   "properties": {
@@ -21,7 +21,21 @@
           "boot_nonce": { "type": "integer" },
           "capability_token": { "type": ["string", "null"] },
           "kind": { "type": "string" },
-          "intent": { "type": "string" }
+          "intent": { "type": "string" },
+          "payload": {
+            "type": "string",
+            "description": "stored payload_redacted bytes decoded as UTF-8; omitted when empty"
+          },
+          "redaction": {
+            "type": "object",
+            "required": ["class", "original_len_bucket"],
+            "properties": {
+              "class": { "type": "string" },
+              "original_len_bucket": { "type": "integer" }
+            },
+            "additionalProperties": false,
+            "description": "populated ONLY by query_with_redaction(); omitted otherwise"
+          }
         },
         "additionalProperties": false
       }
@@ -62,6 +76,22 @@
         "export_seq": { "type": "integer" }
       },
       "additionalProperties": false
+    },
+    "applied_redaction": {
+      "type": "boolean",
+      "description": "Story 9.2b -- omitted when false"
+    },
+    "redaction_policy": {
+      "type": "string",
+      "description": "Story 9.2b -- omitted when empty"
+    },
+    "region": {
+      "type": "string",
+      "description": "Story 9.4b AC-5 -- canonical (ascii-v1) jurisdiction tag. When present the signing key is HKDF-derived from it, so tampering it breaks verification (R-RG4'). Omitted for pre-region bundles."
+    },
+    "host": {
+      "type": "string",
+      "description": "j1-crosshost-2c AC2.1 -- host discriminator, covered by the signature. An ANTI-FORGERY control, not a label: both halves of a two-host run carry the same frame_ids and are otherwise indistinguishable. It proves TWO KEYED IDENTITIES SIGNED -- not two machines, two processes, or two operators. Omitted for single-host bundles, which therefore stay byte-identical."
     },
     "signature_block": {
       "type": "object",

@@ -42,6 +42,33 @@ pub trait ConsentRuptureSink: Send + Sync {
     fn append(&self, frame: &IacFrame) -> Result<(), String>;
 }
 
+/// `j1-crosshost-2c` AC3.6/AC3.7 — which side of the mTLS handshake observed a
+/// peer-identity refusal.
+///
+/// The two are NOT equally strong and the journal must say which one spoke: the
+/// dial side scopes its verifier to the peer it intends to reach, while the
+/// listen side accepts ANY active pin. Under TLS 1.3 the dialer may not even see
+/// a listen-side rejection — the server can close after the dialer's
+/// `connect()` resolves — so a listen-side negative must assert on the SERVER's
+/// journal, never on the dialer's error class. This discriminator is what makes
+/// that assertion possible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PeerRefusalDirection {
+    /// This host dialed out and refused the server's leaf.
+    Dial,
+    /// This host accepted a connection and refused the client's leaf.
+    Listen,
+}
+
+impl PeerRefusalDirection {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PeerRefusalDirection::Dial => "dial",
+            PeerRefusalDirection::Listen => "listen",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CohortConsentSeam {
     Send,
@@ -350,10 +377,39 @@ pub trait DigestReadPort: Send + Sync {
     /// Reader side — atomically validate, durably audit, consume, and record a
     /// correlated reply. Combining authorization with observation prevents two
     /// concurrent replays from both passing a check-then-act window.
+    ///
+    /// The default delegates to [`Self::observe_reply_guarded`] with no guard.
     fn observe_reply(
         &self,
         peer: &HostId,
         frame: &IacFrame,
+    ) -> Result<DigestReplyObservation, String> {
+        self.observe_reply_guarded(peer, frame, &mut || Ok(()))
+    }
+
+    /// As [`Self::observe_reply`], but runs `before_commit` after every
+    /// authorization check passes and **before** the dedup record is published.
+    ///
+    /// `j1-crosshost-2c` AC3.5 / `deferred-work.md:819`. The invariant is
+    /// **nothing is `Duplicate` until something is durable.** The reply path used
+    /// to record the dedup and only then hand the frame to the intake sink, so a
+    /// sender that retried after a dropped-receiver NACK was answered
+    /// `Duplicate` — an ACK with `delivered: true` — while the frame was still
+    /// gone. That is the same durability lie `j1-crosshost-2b` fixed one layer
+    /// over (*"an ACK here is a lie about durability, and the sender has no other
+    /// way to learn the frame is gone"*), reached through a different door.
+    ///
+    /// Implementations MUST run `before_commit` only after malformed /
+    /// authorization / conflict checks pass, and MUST publish **no** dedup state
+    /// when it returns `Err` — the same contract
+    /// [`Self::note_admitted_request_guarded`] already carries for the request
+    /// side. A guard error therefore leaves the reply RETRYABLE, which is the
+    /// whole point.
+    fn observe_reply_guarded(
+        &self,
+        peer: &HostId,
+        frame: &IacFrame,
+        before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<DigestReplyObservation, String>;
 }
 
@@ -378,10 +434,11 @@ impl DigestReadPort for LegacyDigestReadPort {
     fn authorize_reply_send(&self, _peer: &HostId, _request_id: &str) -> bool {
         false
     }
-    fn observe_reply(
+    fn observe_reply_guarded(
         &self,
         _peer: &HostId,
         _frame: &IacFrame,
+        _before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<DigestReplyObservation, String> {
         Ok(DigestReplyObservation::Unauthorized)
     }

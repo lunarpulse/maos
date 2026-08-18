@@ -281,6 +281,9 @@ pub fn run(
         }
     }
 
+    // j1-crosshost-2c AC5.3 — the executed-leg flip, before published ledgers so a
+    // real ledger still outranks it.
+    apply_two_host_signed_run(&mut beats);
     apply_published_ledgers(&mut beats);
 
     section("Claim table (execution order)");
@@ -904,7 +907,7 @@ fn unlanded_beats() -> Vec<Beat> {
         Beat::absent(
             "two-host-signed-run",
             "two real hosts over mTLS/TOFU, heterogeneous worker, one reconciled signed bundle",
-            "j1-crosshost-2c",
+            "j1-crosshost-2d-paid-two-host-run",
         ),
         Beat::absent(
             "halt-resume-referential-identity",
@@ -912,6 +915,61 @@ fn unlanded_beats() -> Vec<Beat> {
             "FOLLOWUP-J1-RESUME-SEAM",
         ),
     ]
+}
+
+/// `j1-crosshost-2c` AC5.3 — flip `two-host-signed-run` by an **EXECUTED LEG**.
+///
+/// The published-ledger route is structurally dead twice: `apply_published_ledgers`
+/// filters `l.gate == DELEGATION_GATE` and that gate writes no ledger file, and
+/// `ledger_gates()` is the four Postgres substrate gates. So this mirrors the
+/// in-process Tier-2 flip: run the judge, read what it observed.
+///
+/// The owner string is NOT re-fixed here — `unlanded_beats` already names
+/// `j1-crosshost-2c`, verified rather than edited (the literal `"j1-crosshost-2"`
+/// has zero hits repo-wide).
+///
+/// Three outcomes, and only one of them claims anything:
+///   * no capture → the beat stays ABSENT. `Beat::absent` sets `executed: false`,
+///     so an unlanded beat can never fail a run — which is the honest model for a
+///     claim whose substrate is an operator, two hosts and a funded key.
+///   * capture present, judge RED or unsigned → `INDETERMINATE`. CI holds no
+///     operator key by ratified design, so this is CI's normal state once a
+///     capture exists; it is not a failure and it is not a claim.
+///   * capture present, judge GREEN, signature verified → `PROVEN_LIVE_SIGNED`.
+fn apply_two_host_signed_run(beats: &mut [Beat]) {
+    let judgement = crate::check_j1_two_host_signed_run::judge(Path::new("."));
+    if !judgement.capture_present {
+        return;
+    }
+    let (state, detail) = if !judgement.findings.is_empty() {
+        (
+            EvidenceState::Indeterminate,
+            format!(
+                "capture present but the judge found {} finding(s) — the claim is refused",
+                judgement.findings.len()
+            ),
+        )
+    } else {
+        match crate::check_j1_two_host_signed_run::verify_capture_signature(Path::new(".")) {
+            Ok(test) => (
+                EvidenceState::ProvenLiveSigned,
+                format!(
+                    "two-host capture verified under `{test}` — {}",
+                    crate::check_j1_two_host_signed_run::CLAIM_SCOPE
+                ),
+            ),
+            Err(why) => (
+                EvidenceState::Indeterminate,
+                format!("capture validated but NOT signed: {why}"),
+            ),
+        }
+    };
+    if let Some(beat) = beats.iter_mut().find(|b| b.name == "two-host-signed-run") {
+        beat.state = state;
+        beat.detail = detail;
+        beat.executed = true;
+        beat.owner = None;
+    }
 }
 
 /// A published ledger outranks anything this runner narrates. Read them through

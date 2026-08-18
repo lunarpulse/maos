@@ -407,6 +407,12 @@ pub enum AuditQuery {
         /// Explicit path to audit signing key file.
         #[arg(long)]
         audit_key: Option<std::path::PathBuf>,
+        /// `j1-crosshost-2c` AC2.1 — stamp this host's discriminator into the
+        /// bundle. Additive and covered by the signature. Required to reconcile a
+        /// two-host run: without it the two halves are indistinguishable and one
+        /// host could produce both.
+        #[arg(long)]
+        host: Option<String>,
     },
     /// Generate an Ed25519 audit signing key.
     Keygen {
@@ -437,12 +443,79 @@ pub enum AuditQuery {
         boot: Option<u64>,
     },
     /// Verify a sealed-export bundle.
+    ///
+    /// Exactly one key source is required. `--pubkey` must already BE the key
+    /// that signed: for a region-pinned bundle that is the region-derived key,
+    /// not the operator's base audit key. `--seed` takes the base seed and
+    /// DERIVES the expected key from the bundle's *claimed* region, which is the
+    /// rule a third-party verifier should follow — never trust the
+    /// `attester_pubkey` the artifact carries (R-RG1).
+    #[command(group(
+        clap::ArgGroup::new("verify_key").required(true).args(["pubkey", "seed"])
+    ))]
     VerifyBundle {
         /// Path to bundle JSON file.
         bundle: std::path::PathBuf,
-        /// Hex-encoded Ed25519 public key, or path to a .hex file.
+        /// Hex-encoded Ed25519 public key, or path to a .hex file. For a
+        /// region-pinned bundle this MUST be the region-derived key.
         #[arg(long)]
-        pubkey: String,
+        pubkey: Option<String>,
+        /// Path to the base audit signing key/seed. The verify key is derived
+        /// from it and the bundle's claimed region.
+        #[arg(long)]
+        seed: Option<std::path::PathBuf>,
+    },
+    /// `j1-crosshost-2c` AC2.2 — reconcile two independently-signed halves of one
+    /// cross-host run and, optionally, emit a signed two-host receipt.
+    ///
+    /// The halves join on `frame_id`: both Transparency Logs carry the same
+    /// sixteen bytes. Each half is verified against the key supplied for THAT
+    /// half — never the `attester_pubkey` the artifact carries (R-RG1). Two
+    /// halves attested by one root are refused: one seed holder signing both is
+    /// exactly the forgery the host field exists to stop.
+    ReconcileHosts {
+        /// Host A's signed bundle JSON.
+        #[arg(long)]
+        bundle_a: std::path::PathBuf,
+        /// Host A's published key (already region-derived if region-pinned).
+        #[arg(long, group = "key_a")]
+        pubkey_a: Option<String>,
+        /// Host A's base seed; the verify key is derived from A's claimed region.
+        #[arg(long, group = "key_a")]
+        seed_a: Option<std::path::PathBuf>,
+        /// Host B's signed bundle JSON.
+        #[arg(long)]
+        bundle_b: std::path::PathBuf,
+        /// Host B's published key (already region-derived if region-pinned).
+        #[arg(long, group = "key_b")]
+        pubkey_b: Option<String>,
+        /// Host B's base seed; the verify key is derived from B's claimed region.
+        #[arg(long, group = "key_b")]
+        seed_b: Option<std::path::PathBuf>,
+        /// Write the signed two-host receipt here.
+        #[arg(long)]
+        receipt_out: Option<std::path::PathBuf>,
+        /// Operator key that signs the receipt (default: MAOS_AUDIT_KEY precedence).
+        #[arg(long)]
+        receipt_key: Option<std::path::PathBuf>,
+    },
+    /// `j1-crosshost-2c` AC4.1 — scan what was **stored**, not what was sent.
+    ///
+    /// Every redaction call site is pre-write, so a redaction escape could only
+    /// ever be caught in the instant it happened. This walks Transparency-Log rows
+    /// that are already on disk and reports credential shapes in them.
+    ///
+    /// Both classes are reported, distinctly: provider prefixes (what
+    /// `detect_credential` reports) and long hex runs (what the write-path filter
+    /// scrubs *silently*). A correctly-redacted row carries neither, so a hit on
+    /// either is an escape. Exit 1 when anything is found.
+    ScanCredentials {
+        /// Filter by Spirit name.
+        #[arg(long)]
+        spirit: Option<String>,
+        /// Time range filter (e.g. "30d", "7d", "1h").
+        #[arg(long)]
+        range: Option<String>,
     },
     /// FR42 — subject-access query: retrieve all principal_index rows for a
     /// given principal, enriched with provenance and spirit-name resolution.
