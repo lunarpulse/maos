@@ -34,3 +34,9 @@ drill_date = "2026-08-16"
 rto_seconds = 3
 drill_success = true
 notes = "integrity=true,rpo=true,frames=10000"
+
+[[evidence]]
+drill_date = "2026-08-23"
+rto_seconds = 3
+drill_success = true
+notes = "integrity=true,rpo=true,frames=10000"
