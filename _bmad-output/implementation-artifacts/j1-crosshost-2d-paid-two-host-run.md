@@ -10,7 +10,7 @@ review: "§A6 full-layer net (Blind + Edge + Acceptance + Test-Infra + runtime) 
 
 # j1-crosshost-2d — the paid two-host run
 
-Status: **review** — **ALL EIGHT ACs COMPLETE.** AC1-AC7 dev pass 2026-08-22
+Status: **done** (2026-08-25) — **ALL EIGHT ACs COMPLETE; §A6 CLOSED.** AC1-AC7 dev pass 2026-08-22
 (`anthropic/claude-opus-5`, baseline `dd4cf959`); **AC8 — the paid two-host run — PERFORMED
 2026-08-25** at `c549bbc0` after `j1-crosshost-2e` closed the six code blockers. Total spend
 **$0.0168** against an operator cap of $3. The capture, both signed bundles and the reconciled
