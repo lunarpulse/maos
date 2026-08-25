@@ -465,6 +465,14 @@ fn run_host_a(config: &Path, audit_db: &Path) -> std::process::Output {
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
+        // §A6 review D1 — MAOS_DELEGATED_GOAL is required on every cross-host
+        // arm. This fixture asserts the delegation MECHANISM (the same frame_id
+        // bytes in both logs), never the goal's content, so a dummy goal is
+        // exactly right here.
+        .env(
+            "MAOS_DELEGATED_GOAL",
+            "hermetic mechanism probe — the delegation recording is the assertion, not this goal",
+        )
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

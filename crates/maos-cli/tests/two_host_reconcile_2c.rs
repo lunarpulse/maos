@@ -544,6 +544,69 @@ fn the_python_twin_verifies_a_host_stamped_bundle() {
     );
 }
 
+/// `j1-crosshost-2e` AC1.3 (F5) — the canonicalization parity the ASCII twin above
+/// could never have caught.
+///
+/// `verify.py` serialized with Python's default `ensure_ascii=True`, escaping
+/// non-ASCII to `\uXXXX`, while Rust's `canonicalize_value`
+/// (`crates/maos-audit/src/sealed_export.rs:632-639`) emits raw UTF-8. Identical
+/// document, different bytes, so EVERY bundle containing a single non-ASCII byte
+/// failed verification despite a valid signature.
+///
+/// The fixture is the **committed T6 artifact**, deliberately — not a synthetic
+/// one. It is the only signed run this project has performed, it carries 12
+/// non-ASCII bytes (curly apostrophes and an em dash in operator-authored
+/// fields), and it was UNVERIFIABLE by its own published stranger's path from the
+/// day it was signed until this test landed. A synthetic fixture would prove the
+/// same property about bytes we chose; this one proves it about the artifact we shipped.
+///
+/// Runbook Phase 7.4 makes this verification a MANDATORY ABORT, so before the fix
+/// the paid two-host run died here — after both agents were billed.
+#[test]
+fn the_python_twin_verifies_the_committed_non_ascii_tier2_bundle() {
+    const T6_PUBKEY: &str = "61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766";
+
+    let root = repo_root();
+    let verify_py = root.join("tools/verify-audit-bundle/verify.py");
+    let bundle = root.join("_bmad-output/test-artifacts/j1-tier2-evidence/j1-tier2-bundle.json");
+    assert!(
+        verify_py.exists() && bundle.exists(),
+        "the stranger's verifier and the committed T6 bundle must both exist ({} / {})",
+        verify_py.display(),
+        bundle.display()
+    );
+
+    // The property under test must actually be present in the fixture, or this
+    // vector silently degrades into a duplicate of the ASCII twin above.
+    let raw = std::fs::read(&bundle).expect("read the committed T6 bundle");
+    let non_ascii = raw.iter().filter(|b| **b > 127).count();
+    assert!(
+        non_ascii > 0,
+        "the T6 fixture must still carry non-ASCII bytes, else this test proves nothing \
+         (found {non_ascii})"
+    );
+
+    let out = Command::new("python3")
+        .arg(&verify_py)
+        .arg(&bundle)
+        .arg(T6_PUBKEY)
+        .output()
+        .expect("run verify.py");
+    let text = combined(&out);
+    if text.to_lowercase().contains("no ed25519 library found") {
+        panic!(
+            "the stranger's path requires a Python Ed25519 backend — pip install \
+             cryptography (verify.py said: {})",
+            text.trim()
+        );
+    }
+    assert!(
+        out.status.success(),
+        "verify.py must accept the committed T6 bundle ({non_ascii} non-ASCII bytes) under its \
+         published pubkey; a failure here means Python/Rust canonicalization has diverged again: {text}"
+    );
+}
+
 /// `CARGO_MANIFEST_DIR` is `crates/maos-cli`; the repo root is two levels up.
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

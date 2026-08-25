@@ -2485,6 +2485,144 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => None,
         };
+    // `j1-crosshost-2e` AC4 (F7) — the router is moved into the delegation leg
+    // below, so capture whether the CROSS-HOST arm was taken while we still can.
+    // This is the paid path, and it is the only place where an absent
+    // `MAOS_DELEGATED_GOAL` must fail closed rather than fall back.
+    let cross_host_arm_active = cross_host_delegation_router.is_some();
+    // ── j1-crosshost-2e AC5 (F4) — THE PAIRING RENDEZVOUS ────────────────────
+    //
+    // The documented procedure was not merely undocumented, it was TOPOLOGICALLY
+    // WRONG. It told the operator to read host A's boot nonce from a
+    // `cohort:daemon-started` Transparency-Log row — but that row is written only
+    // by `run_cohort_a2a_daemon`, and host A is `maos run --once`, which reaches
+    // this arm *precisely because* `MAOS_ONE_SHOT != "cohort-a2a-daemon"`. Host A
+    // is the SENDER; that row is a RECEIVER's. It never emitted it, so the
+    // procedure read a row that could not exist.
+    //
+    // Two things are therefore required, and publishing without holding is not
+    // enough:
+    //   (a) publish the nonce from the sender, under its OWN intent — after the
+    //       bind succeeds and before the dial; and
+    //   (b) HOLD, because `--once` binds, dials and exits with no pause, and
+    //       there is no retry window to hide in: a refused connect returns `Io`
+    //       immediately (`is_retryable` admits only BadCertificate/CertExpired),
+    //       so the `[100,300,1000]ms` schedule is a cert-class budget, not a
+    //       startup grace period.
+    //
+    // The nonce is NOT made stable, derived or operator-chosen. It stays the same
+    // random per-process value throughout, so NFR-Rel-6 restart detection keeps
+    // working exactly as before — a pairing path that silently disabled restart
+    // detection would trade one broken control for another.
+    if cross_host_arm_active {
+        // §A6 review 2026-08-24, P2/P3/P4/P5 — resolve and validate the whole
+        // rendezvous contract BEFORE the nonce is published:
+        //   P3 — `var_os`, so a non-UTF-8 path is a REQUESTED hold (previously
+        //        `var()`'s `NotUnicode` folded into "unset" and silently disabled
+        //        the hold the operator asked for). Only `None` (or an empty
+        //        value, refused below rather than stalled on) skips the hold.
+        //   P2 — a ready path that already exists is refused BEFORE publication:
+        //        a stale file from a prior run (or a directory) proves nothing
+        //        about THIS run and must not silently release the barrier.
+        //   P4 — the timeout must parse as an integer in 1..=86400; a garbage or
+        //        out-of-range bound is refused (previously it silently defaulted
+        //        or could overflow `Instant + Duration` into a panic).
+        let ready_hold = match std::env::var_os("MAOS_CROSSHOST_PAIRING_READY_FILE") {
+            None => None,
+            Some(value) if value.is_empty() => {
+                return Err(
+                    "maos run: MAOS_CROSSHOST_PAIRING_READY_FILE is set but empty. An empty \
+                     path cannot be host B's readiness signal; unset the variable to disable \
+                     the hold or point it at a real path."
+                        .to_string()
+                        .into(),
+                );
+            }
+            Some(value) => Some(std::path::PathBuf::from(value)),
+        };
+        if let Some(ready) = ready_hold.as_ref() {
+            if ready.exists() {
+                return Err(format!(
+                    "maos run: pairing rendezvous ready-file {} already exists. A pre-existing \
+                     file (stale from a prior run, or a directory) cannot prove host B signalled \
+                     THIS run. Remove it, then start again: it may only be created by the \
+                     operator AFTER host A publishes its nonce.",
+                    ready.display()
+                )
+                .into());
+            }
+        }
+        let timeout_secs = match std::env::var("MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS") {
+            Err(std::env::VarError::NotPresent) => 300u64,
+            Err(std::env::VarError::NotUnicode(raw)) => {
+                return Err(format!(
+                    "maos run: MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS is not valid UTF-8 \
+                     ({raw:?}); refusing rather than guessing a hold bound."
+                )
+                .into());
+            }
+            Ok(raw) => match raw.parse::<u64>() {
+                Ok(secs) if (1..=86400).contains(&secs) => secs,
+                _ => {
+                    return Err(format!(
+                        "maos run: MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS must be an integer in \
+                         1..=86400 seconds, got {raw:?}; refusing rather than holding on a \
+                         garbage bound."
+                    )
+                    .into());
+                }
+            },
+        };
+        let _logged = transparency_log.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+            0,
+            None,
+            // Deliberately NOT `cohort:daemon-started`: this host is not a daemon,
+            // and reusing that intent would make the receiver-only row ambiguous.
+            "cohort:crosshost-started",
+            br#"{"event":"crosshost_sender_started","role":"sender"}"#,
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
+        eprintln!(
+            "maos: cross-host sender ready — boot_nonce {boot_nonce} (decimal). Transcribe it \
+             into host B's [[tcp.peer_pins]] boot_nonce. Read it back with `maosctl audit query \
+             --frame-kind TelemetryEvent --intent-contains cohort:crosshost-started --format \
+             ndjson`; NEVER `--format plain`, which renders it as {:016x} under a column header \
+             named `boot_nonce` and would be parsed as decimal.",
+            boot_nonce
+        );
+        // The hold is OPT-IN and bounded: unset ⇒ no wait at all, so the loopback
+        // rehearsal and `demo-j1` are unaffected. Set ⇒ wait for the operator to
+        // signal that host B is up, and FAIL CLOSED on expiry rather than dialling
+        // into a host that is not listening and burning the only connect attempt.
+        // P5 — the deadline is tested BEFORE the ready signal on every poll, so a
+        // signal arriving after the bound has expired cannot be accepted.
+        if let Some(ready) = ready_hold.as_ref() {
+            eprintln!(
+                "maos: pairing rendezvous — holding up to {timeout_secs}s for {} \
+                 (create it once host B is listening with the nonce above pinned)",
+                ready.display()
+            );
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+            loop {
+                if std::time::Instant::now() >= deadline {
+                    return Err(format!(
+                        "maos run: pairing rendezvous timed out after {timeout_secs}s waiting \
+                         for {}. Host A is refusing to dial rather than spending its single \
+                         non-retryable connect attempt on a host B that is not listening. \
+                         Boot host B with boot_nonce {boot_nonce} pinned, then create the file.",
+                        ready.display()
+                    )
+                    .into());
+                }
+                if ready.exists() {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+            eprintln!("maos: pairing rendezvous — host B signalled ready, dialling");
+        }
+    }
     let mut delegation_leg = maos_bin::delegation::DelegationLeg::install_with_router(
         Arc::clone(&mailbox),
         &maos_domain::invariants::i8::A2AIntent::new(orchestrator::DELEGATION_CONSENT_INTENT),
@@ -3244,11 +3382,72 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let intent = maos_domain::invariants::i8::A2AIntent::new(
                                 orchestrator::DELEGATION_CONSENT_INTENT,
                             );
-                            let payload = delegation_emitter.build_task_assign(
-                                format!(
+                            // `j1-crosshost-2e` AC4 (F7) — the delegated goal is
+                            // operator-supplied. Read HERE, at frame construction,
+                            // and nowhere else: the frame stays the single source
+                            // of the worker's task (`j1-crosshost-1a` deleted
+                            // `MAOS_WORKER_TASK` because a remote worker cannot
+                            // inherit local env).
+                            //
+                            // Two tiers, and the discriminator is the CROSS-HOST ARM
+                            // ALONE (§A6 review 2026-08-24, D1). The first cut keyed
+                            // fail-closed on `cross_host_arm_active &&
+                            // var("MAOS_LIVE_AGENT").is_ok()` — but that flag is
+                            // SENDER-LOCAL, while the worker is spawned by the
+                            // receiving host under ITS env (`worker_spawn.rs`):
+                            // with the flag set only on host B (the runbook's trap 7
+                            // says B is "the host that actually spawns"), host A
+                            // silently sent the rehearsal goal and host B billed a
+                            // real agent for it — F7's defect class surviving via an
+                            // env topology the runbook itself half-invites. A sender
+                            // cannot infer safety from its own environment, so the
+                            // arm alone fails closed. The hermetic
+                            // `two_host_delegation_2b` fixture now sets a dummy
+                            // goal (it asserts the delegation MECHANISM — the same
+                            // sixteen frame_id bytes in both logs — never the
+                            // goal's content), so requiring it there costs the test
+                            // one `.env(...)` line. `MAOS_LIVE_AGENT` is no longer
+                            // read here at all, which also removes the empty-string
+                            // and non-UTF-8 disagreements with the spawn gate's
+                            // `var_os(...).is_some_and(|v| !v.is_empty())` (P1).
+                            //
+                            //   * cross-host arm → goal REQUIRED. This is the path
+                            //     that can spend money, and codex's oracle needs
+                            //     EFFECT evidence; the old constant produced none,
+                            //     so the run errored `NoEffectEvidence` AFTER
+                            //     billing. Fail before the frame is emitted and
+                            //     before any spawn.
+                            //   * loopback arm → fall back to the rehearsal string.
+                            //     The loopback rehearsal and `demo-j1` set no goal
+                            //     and must stay green; they assert mechanism, not
+                            //     effect.
+                            let operator_goal = std::env::var("MAOS_DELEGATED_GOAL")
+                                .ok()
+                                .filter(|goal| !goal.trim().is_empty());
+                            let goal = match (operator_goal, cross_host_arm_active) {
+                                (Some(goal), _) => goal,
+                                (None, true) => {
+                                    return Err(
+                                        "maos run: MAOS_DELEGATED_GOAL is required for any \
+                                         cross-host delegation and is unset or blank. The \
+                                         receiving host — not this one — decides whether a real \
+                                         agent is spawned, so the sender cannot infer safety \
+                                         from its own environment; and the built-in rehearsal \
+                                         goal states no task, so a live adapter's completion \
+                                         oracle finds no effect evidence and the run fails \
+                                         AFTER the agent is billed. Set it to the concrete, \
+                                         bounded task the remote worker must perform."
+                                            .to_string()
+                                            .into(),
+                                    );
+                                }
+                                (None, false) => format!(
                                     "founder-loop: execute the delegated assignment from {}",
                                     maos_bin::delegation::FROM_HOST
                                 ),
+                            };
+                            let payload = delegation_emitter.build_task_assign(
+                                goal,
                                 "the worker reports completion through its adapter's \
                                  parse_completion oracle",
                                 None,

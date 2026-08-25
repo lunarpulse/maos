@@ -1098,3 +1098,36 @@ fn a_missing_governed_file_is_a_finding_not_a_skip() {
         assert_red(&verdict, &format!("cannot read {rel}"), rel);
     }
 }
+
+/// §A6 review P9 (AC3.5) — the missing PRESENT-capture green vector. The
+/// baseline vector asserts `paid_run_capture_present: false`; nothing asserted
+/// the gate's honesty in the state that actually lands once a paid run ships:
+/// capture PRESENT, gate green, and the claim STILL refused —
+/// `two_host_signed_run_claimed` must read `false` beside a `true` capture
+/// presence, or the F2 re-scope has no committed pin at all.
+#[test]
+fn a_present_capture_still_claims_nothing() {
+    let verdict = run_gate(|root| {
+        write_file(root, CAPTURE, &good_capture().to_string());
+        write_file(root, BUNDLE_A, &good_bundle("host-a").to_string());
+        write_file(root, BUNDLE_B, &good_bundle("host-b").to_string());
+    });
+    assert!(
+        verdict.passed && verdict.success,
+        "a well-formed present capture is the operator lane's honest green state\nstdout:\n{}",
+        verdict.stdout
+    );
+    assert!(
+        verdict.stdout.contains("\"paid_run_capture_present\":true"),
+        "the capture IS present and the gate must say so\nstdout:\n{}",
+        verdict.stdout
+    );
+    assert!(
+        verdict
+            .stdout
+            .contains("\"two_host_signed_run_claimed\":false"),
+        "a present capture must NOT become a claimed run — verify.py and \
+         reconcile-hosts are operator-performed, never gate-checked (F2/R1)\nstdout:\n{}",
+        verdict.stdout
+    );
+}

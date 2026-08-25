@@ -84,13 +84,25 @@ def _sort_value(value):
 
 def _canonicalize(bundle: dict) -> bytes:
     """
-    Deterministic canonical serialization: sorted keys, no whitespace.
+    Deterministic canonical serialization: sorted keys, no whitespace, raw UTF-8.
     Excludes the `signature_block` field.
+
+    `ensure_ascii=False` is LOAD-BEARING, not style. Rust's `canonicalize_value`
+    (`crates/maos-audit/src/sealed_export.rs:632-639`) ends in
+    `serde_json::to_string`, which emits non-ASCII as raw UTF-8. Python's
+    `json.dumps` defaults to `ensure_ascii=True` and would escape the same
+    characters to `\\uXXXX`, producing different bytes for an identical document
+    — so every bundle containing a single non-ASCII byte failed verification
+    here despite carrying a valid signature (`j1-crosshost-2e` F5, reproduced
+    against the real T6 artifact). Key ordering was never the defect: both sides
+    already sort. Do not "also" add `sort_keys=True` elsewhere to compensate.
     """
     # Build unsigned bundle (everything except signature_block)
     unsigned = {k: v for k, v in bundle.items() if k != "signature_block"}
     sorted_bundle = _sort_value(unsigned)
-    return json.dumps(sorted_bundle, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return json.dumps(
+        sorted_bundle, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
 
 
 # ─── Main ───────────────────────────────────────────────────────────────────

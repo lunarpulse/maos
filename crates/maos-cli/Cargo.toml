@@ -34,6 +34,13 @@ hex = "0.4"       # Story 9.1 FR44 — pubkey hex encoding in verify-bundle
 maos-loom-lite = { path = "../maos-loom-lite" }  # Story 10.4a — SQLite→Postgres migration CLI
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }  # Story 10.4a — async runtime for migration engine
 tokio-postgres = "0.7"  # Story 10.4a — Postgres client for migration target
+# `j1-crosshost-2e` AC2 (F1) — `maosctl cohort sign`. `maos-cohort` owns the
+# canonical manifest form (`to_canonical_bytes`) and `signed_with`; `ed25519-dalek`
+# is DIRECT because `signed_with` takes an `ed25519_dalek::SigningKey` and
+# `maos-cohort` re-exports the manifest types but not `SigningKey`, so the
+# transitive dependency is not importable.
+maos-cohort = { path = "../maos-cohort" }
+ed25519-dalek = { version = "2", features = ["std"] }
 [dev-dependencies]
 # Story 1b.5b — accessibility ANSI test. Both crates are already in the
 # workspace via `maos-audit`, so `Cargo.lock` may grow by maos-iac's transitive deps.

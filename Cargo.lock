@@ -2519,8 +2519,10 @@ version = "0.1.0-alpha"
 dependencies = [
  "chrono",
  "clap",
+ "ed25519-dalek",
  "hex",
  "maos-audit",
+ "maos-cohort",
  "maos-compliance",
  "maos-domain",
  "maos-iac",

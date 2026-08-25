@@ -581,3 +581,82 @@ fn the_signable_allowlist_admits_both_real_adapters_and_refuses_the_fixture() {
     assert!(!SIGNABLE_WORKER_CLIS.contains(&"worker-cli-fixture"));
     assert_eq!(SIGNABLE_WORKER_CLIS.len(), 2);
 }
+
+// ── §A6 review P9 (AC3.5) — the F3 fix gets committed regressions ──────────
+
+/// The F3 contract, pinned on the pure seam with an INJECTED present capture:
+/// at HEAD the capture is absent, so only injection can make this vector able
+/// to fail (Trap 17). A present-but-unproven capture must render as a visible
+/// non-claim — `--` mark, INDETERMINATE, owner retained — and must not fail.
+#[test]
+fn two_host_beat_with_present_capture_renders_indeterminate_not_fail() {
+    let mut beats = unlanded_beats();
+    let judgement = crate::check_j1_two_host_signed_run::Judgement {
+        findings: vec![],
+        audits: vec![],
+        capture_present: true,
+        enrolled: vec![],
+    };
+    apply_capture_judgement(&mut beats, &judgement);
+    let beat = beats
+        .iter()
+        .find(|b| b.name == "two-host-signed-run")
+        .expect("the beat is declared by `unlanded_beats`");
+    assert_eq!(beat.state.as_str(), "INDETERMINATE");
+    assert!(
+        !beat.executed,
+        "F3: a present-but-unproven capture must NOT mark the beat executed"
+    );
+    assert!(!beat.failed(), "the beat must not fail the scene");
+    assert_eq!(
+        beat.owner,
+        Some("j1-crosshost-2d-paid-two-host-run"),
+        "the owner is retained — the rung still belongs to 2d"
+    );
+    let row = render_beat_row(beat);
+    assert!(
+        row.contains("two-host-signed-run"),
+        "the rendered row names the beat: {row}"
+    );
+    assert!(
+        row.contains("INDETERMINATE"),
+        "the rendered row carries the honest state: {row}"
+    );
+    assert!(
+        !row.contains("FAIL"),
+        "a present-but-unproven capture is not a failure: {row}"
+    );
+    assert!(
+        row.starts_with("  --"),
+        "the rendered row uses the non-claim mark: {row}"
+    );
+}
+
+/// The judge-refused direction of the same seam: findings present changes the
+/// detail text, never the shape — refused is still not failed.
+#[test]
+fn two_host_beat_with_refused_capture_still_renders_indeterminate_not_fail() {
+    let mut beats = unlanded_beats();
+    let judgement = crate::check_j1_two_host_signed_run::Judgement {
+        findings: vec![crate::check_j1_two_host_signed_run::Finding {
+            check: "paid-run-capture",
+            detail: "synthetic refusal for the §A6 P9 vector".to_string(),
+        }],
+        audits: vec![],
+        capture_present: true,
+        enrolled: vec![],
+    };
+    apply_capture_judgement(&mut beats, &judgement);
+    let beat = beats
+        .iter()
+        .find(|b| b.name == "two-host-signed-run")
+        .expect("the beat is declared");
+    assert_eq!(beat.state.as_str(), "INDETERMINATE");
+    assert!(!beat.executed && !beat.failed());
+    let row = render_beat_row(beat);
+    assert!(row.contains("INDETERMINATE") && !row.contains("FAIL"), "row: {row}");
+    assert!(
+        row.contains("the claim is refused"),
+        "the refused direction names the refusal: {row}"
+    );
+}

@@ -1918,6 +1918,20 @@ jobs:
       # backend; the Blocking lane's substrate must be guaranteed, not hoped for.
       - name: Ensure the stranger's Python Ed25519 backend (AC2.1)
         run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
+      # `j1-crosshost-2e` AC1.4 (F5). Installing the backend above and never
+      # EXECUTING the script is how a one-argument canonicalization defect
+      # survived to be found by hand: `verify.py` escaped non-ASCII to \uXXXX
+      # while Rust emits raw UTF-8, so every bundle with one non-ASCII byte
+      # failed despite a valid signature — and runbook Phase 7.4 makes this
+      # verification a MANDATORY ABORT, i.e. the paid two-host run died here
+      # AFTER both agents were billed. The fixture is the committed T6 bundle
+      # (12 non-ASCII bytes) under its published pubkey; it is the only signed
+      # run this project has performed.
+      - name: Execute the stranger's path against the committed T6 bundle (2e AC1.4)
+        run: |
+          python3 tools/verify-audit-bundle/verify.py \
+            _bmad-output/test-artifacts/j1-tier2-evidence/j1-tier2-bundle.json \
+            61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766
       - name: Run check-j1-two-host-signed-run
         run: cargo run -p xtask -- check-j1-two-host-signed-run --json
       - name: Run j1-crosshost-2c proven-red vectors (AC5.1)

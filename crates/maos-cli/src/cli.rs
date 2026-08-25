@@ -122,6 +122,15 @@ pub enum Subcommand {
     /// oracle, row count). The source MUST be quiesced (no active writers)
     /// before invoking — the migration engine does not take a write lock.
     Migrate(MigrateArgs),
+    /// `j1-crosshost-2e` AC2 (F1) — cohort-manifest operator surface.
+    ///
+    /// `sign` is the ONLY thing in the workspace that can produce a signed
+    /// cohort manifest. Before it existed, `CohortManifest::signed_with` had
+    /// zero non-test callers, so the cohort daemon — which refuses to boot
+    /// without a manifest verified against its pinned authority keys — could
+    /// never be started by an operator. Host B of a two-host run was
+    /// unreachable by construction.
+    Cohort(CohortArgs),
 }
 
 /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.
@@ -147,6 +156,47 @@ pub enum MigrateOp {
         /// table is dropped and the command exits non-zero.
         #[arg(long, default_value_t = true)]
         rollback_on_failure: bool,
+    },
+}
+
+/// `j1-crosshost-2e` AC2 — `maosctl cohort sign`.
+#[derive(clap::Args, Debug)]
+pub struct CohortArgs {
+    #[command(subcommand)]
+    pub op: CohortOp,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum CohortOp {
+    /// Sign a cohort manifest with an authority key so a cohort daemon will boot.
+    ///
+    /// The manifest body is canonicalized by `CohortManifest::to_canonical_bytes`
+    /// — a per-schema domain tag, big-endian scalars, length-prefixed fields,
+    /// lowercased-and-sorted authority keys, declaration-order members, sorted
+    /// teams and cross-team grants, plus an additive V4 tail. That canonical form
+    /// has exactly ONE implementation and this subcommand uses it, deliberately:
+    /// a second (e.g. out-of-process) signer would have to stay byte-symmetric
+    /// with it across four schema versions, which is the defect class that made
+    /// `tools/verify-audit-bundle/verify.py` reject every non-ASCII bundle for
+    /// months over one missing keyword argument.
+    Sign {
+        /// Path to the unsigned (or re-signed) cohort manifest TOML.
+        #[arg(long)]
+        manifest: std::path::PathBuf,
+
+        /// Path to the 32-byte Ed25519 authority seed.
+        ///
+        /// REQUIRED, with no environment fallback and no default. A cohort
+        /// authority root is NOT an audit root: silently reaching for
+        /// `MAOS_AUDIT_KEY` here would weld the two trust roots together, which
+        /// is precisely the collapse `reconcile_two_host_bundles` refuses when it
+        /// sees one key attesting both halves of a two-host run.
+        #[arg(long)]
+        authority_key: std::path::PathBuf,
+
+        /// Write the signed manifest here. Omitted ⇒ TOML on stdout.
+        #[arg(long)]
+        output: Option<std::path::PathBuf>,
     },
 }
 

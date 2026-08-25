@@ -1,0 +1,888 @@
+diff --git a/.github/workflows/discipline.yml b/.github/workflows/discipline.yml
+index 7df19e58..7dcc9127 100644
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -1918,6 +1918,20 @@ jobs:
+       # backend; the Blocking lane's substrate must be guaranteed, not hoped for.
+       - name: Ensure the stranger's Python Ed25519 backend (AC2.1)
+         run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
++      # `j1-crosshost-2e` AC1.4 (F5). Installing the backend above and never
++      # EXECUTING the script is how a one-argument canonicalization defect
++      # survived to be found by hand: `verify.py` escaped non-ASCII to \uXXXX
++      # while Rust emits raw UTF-8, so every bundle with one non-ASCII byte
++      # failed despite a valid signature — and runbook Phase 7.4 makes this
++      # verification a MANDATORY ABORT, i.e. the paid two-host run died here
++      # AFTER both agents were billed. The fixture is the committed T6 bundle
++      # (12 non-ASCII bytes) under its published pubkey; it is the only signed
++      # run this project has performed.
++      - name: Execute the stranger's path against the committed T6 bundle (2e AC1.4)
++        run: |
++          python3 tools/verify-audit-bundle/verify.py \
++            _bmad-output/test-artifacts/j1-tier2-evidence/j1-tier2-bundle.json \
++            61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766
+       - name: Run check-j1-two-host-signed-run
+         run: cargo run -p xtask -- check-j1-two-host-signed-run --json
+       - name: Run j1-crosshost-2c proven-red vectors (AC5.1)
+diff --git a/Cargo.lock b/Cargo.lock
+index 1b742441..fd2330a5 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2519,8 +2519,10 @@ version = "0.1.0-alpha"
+ dependencies = [
+  "chrono",
+  "clap",
++ "ed25519-dalek",
+  "hex",
+  "maos-audit",
++ "maos-cohort",
+  "maos-compliance",
+  "maos-domain",
+  "maos-iac",
+diff --git a/crates/maos-bin/src/env_contract.rs b/crates/maos-bin/src/env_contract.rs
+index bd80cb2a..cc353768 100644
+--- a/crates/maos-bin/src/env_contract.rs
++++ b/crates/maos-bin/src/env_contract.rs
+@@ -16,6 +16,46 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+         purpose: "Legacy one-shot smoke-arm dispatch key",
+         stability: EnvStability::HarnessOnly,
+     },
++    EnvVar {
++        // `j1-crosshost-2e` AC4 (F7). The delegated goal was a hardcoded constant
++        // ("founder-loop: execute the delegated assignment from <host>") with no
++        // override, and codex's completion oracle requires EFFECT evidence — an
++        // applied `file_change`. A worker told to "execute the delegated
++        // assignment" with no assignment writes nothing, so the oracle returned
++        // NoEffectEvidence and the run errored AFTER the agent was billed.
++        //
++        // Read ONLY at frame construction in the composition root. It is NEVER
++        // read at the spawn site: `j1-crosshost-1a` deleted MAOS_WORKER_TASK
++        // because a remote worker cannot inherit local env, so the task must be
++        // frame-borne, and check-j1-loopback-delegation reds any such read as a
++        // "decorative-frame shortcut".
++        name: "MAOS_DELEGATED_GOAL",
++        purpose: "Operator-supplied goal for the delegated worker task (frame-borne; \
++                  REQUIRED on the cross-host arm, falls back to the founder-loop \
++                  rehearsal string on loopback)",
++        stability: EnvStability::UserFacing,
++    },
++    EnvVar {
++        // `j1-crosshost-2e` AC5 (F4). `--once` binds, dials and exits with no
++        // pause, and a refused connect returns `Io` immediately, so there is no
++        // window in which an operator can transcribe host A's boot nonce into
++        // host B's peer pins. Setting this makes host A publish its nonce and
++        // then WAIT for this file before dialling. Unset ⇒ no hold at all, so
++        // the loopback rehearsal and `demo-j1` are unaffected.
++        name: "MAOS_CROSSHOST_PAIRING_READY_FILE",
++        purpose: "Path host A waits for before dialling, so an operator can pair \
++                  boot nonces; unset disables the hold entirely",
++        stability: EnvStability::UserFacing,
++    },
++    EnvVar {
++        // Bounded, and it FAILS CLOSED: on timeout host A refuses to dial rather
++        // than spending its single non-retryable connect attempt on a host B
++        // that is not listening.
++        name: "MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS",
++        purpose: "Bound on the cross-host pairing hold in seconds (default 300); \
++                  expiry fails the run closed rather than dialling blind",
++        stability: EnvStability::UserFacing,
++    },
+     EnvVar {
+         name: "MAOS_NOTIFY_DISABLE",
+         purpose: "Disable mobile-push notification dispatch",
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index e90de88d..623d5780 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -2485,6 +2485,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+             }
+             _ => None,
+         };
++    // `j1-crosshost-2e` AC4 (F7) — the router is moved into the delegation leg
++    // below, so capture whether the CROSS-HOST arm was taken while we still can.
++    // This is the paid path, and it is the only place where an absent
++    // `MAOS_DELEGATED_GOAL` must fail closed rather than fall back.
++    let cross_host_arm_active = cross_host_delegation_router.is_some();
++    // ── j1-crosshost-2e AC5 (F4) — THE PAIRING RENDEZVOUS ────────────────────
++    //
++    // The documented procedure was not merely undocumented, it was TOPOLOGICALLY
++    // WRONG. It told the operator to read host A's boot nonce from a
++    // `cohort:daemon-started` Transparency-Log row — but that row is written only
++    // by `run_cohort_a2a_daemon`, and host A is `maos run --once`, which reaches
++    // this arm *precisely because* `MAOS_ONE_SHOT != "cohort-a2a-daemon"`. Host A
++    // is the SENDER; that row is a RECEIVER's. It never emitted it, so the
++    // procedure read a row that could not exist.
++    //
++    // Two things are therefore required, and publishing without holding is not
++    // enough:
++    //   (a) publish the nonce from the sender, under its OWN intent — after the
++    //       bind succeeds and before the dial; and
++    //   (b) HOLD, because `--once` binds, dials and exits with no pause, and
++    //       there is no retry window to hide in: a refused connect returns `Io`
++    //       immediately (`is_retryable` admits only BadCertificate/CertExpired),
++    //       so the `[100,300,1000]ms` schedule is a cert-class budget, not a
++    //       startup grace period.
++    //
++    // The nonce is NOT made stable, derived or operator-chosen. It stays the same
++    // random per-process value throughout, so NFR-Rel-6 restart detection keeps
++    // working exactly as before — a pairing path that silently disabled restart
++    // detection would trade one broken control for another.
++    if cross_host_arm_active {
++        let _logged = transparency_log.insert_frame_event(
++            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
++            0,
++            None,
++            // Deliberately NOT `cohort:daemon-started`: this host is not a daemon,
++            // and reusing that intent would make the receiver-only row ambiguous.
++            "cohort:crosshost-started",
++            br#"{"event":"crosshost_sender_started","role":"sender"}"#,
++            maos_domain::invariants::i3::FrameOrigin::Kernel,
++        );
++        eprintln!(
++            "maos: cross-host sender ready — boot_nonce {boot_nonce} (decimal). Transcribe it \
++             into host B's [[tcp.peer_pins]] boot_nonce. Read it back with `maosctl audit query \
++             --frame-kind TelemetryEvent --intent-contains cohort:crosshost-started --format \
++             ndjson`; NEVER `--format plain`, which renders it as {:016x} under a column header \
++             named `boot_nonce` and would be parsed as decimal.",
++            boot_nonce
++        );
++        // The hold is OPT-IN and bounded. Unset ⇒ no wait at all, so the loopback
++        // rehearsal, `demo-j1` and `two_host_delegation_2b` are byte-for-byte
++        // unaffected. Set ⇒ wait for the operator to signal that host B is up,
++        // and FAIL CLOSED on timeout rather than dialling into a host that is not
++        // listening and burning the only connect attempt.
++        if let Ok(ready_file) = std::env::var("MAOS_CROSSHOST_PAIRING_READY_FILE") {
++            let timeout_secs = std::env::var("MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS")
++                .ok()
++                .and_then(|raw| raw.parse::<u64>().ok())
++                .unwrap_or(300);
++            let ready = std::path::PathBuf::from(&ready_file);
++            eprintln!(
++                "maos: pairing rendezvous — holding up to {timeout_secs}s for {ready_file} \
++                 (create it once host B is listening with the nonce above pinned)"
++            );
++            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
++            while !ready.exists() {
++                if std::time::Instant::now() >= deadline {
++                    return Err(format!(
++                        "maos run: pairing rendezvous timed out after {timeout_secs}s waiting \
++                         for {ready_file}. Host A is refusing to dial rather than spending its \
++                         single non-retryable connect attempt on a host B that is not listening. \
++                         Boot host B with boot_nonce {boot_nonce} pinned, then create the file."
++                    )
++                    .into());
++                }
++                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
++            }
++            eprintln!("maos: pairing rendezvous — host B signalled ready, dialling");
++        }
++    }
+     let mut delegation_leg = maos_bin::delegation::DelegationLeg::install_with_router(
+         Arc::clone(&mailbox),
+         &maos_domain::invariants::i8::A2AIntent::new(orchestrator::DELEGATION_CONSENT_INTENT),
+@@ -3244,11 +3323,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                             let intent = maos_domain::invariants::i8::A2AIntent::new(
+                                 orchestrator::DELEGATION_CONSENT_INTENT,
+                             );
+-                            let payload = delegation_emitter.build_task_assign(
+-                                format!(
++                            // `j1-crosshost-2e` AC4 (F7) — the delegated goal is
++                            // operator-supplied. Read HERE, at frame construction,
++                            // and nowhere else: the frame stays the single source
++                            // of the worker's task (`j1-crosshost-1a` deleted
++                            // `MAOS_WORKER_TASK` because a remote worker cannot
++                            // inherit local env).
++                            //
++                            // Two tiers, and the discriminator is the PAID path —
++                            // not merely the cross-host arm. `two_host_delegation_2b`
++                            // runs two real daemons over the cross-host arm with the
++                            // hermetic FIXTURE worker; it asserts the delegation
++                            // MECHANISM (same sixteen frame_id bytes in both logs)
++                            // and has no interest in the goal's content. Keying
++                            // fail-closed on the arm alone reds it — measured, not
++                            // guessed.
++                            //
++                            // `MAOS_LIVE_AGENT` is the existing, purpose-built
++                            // signal that a REAL agent CLI may be spawned
++                            // (`worker_cli::live_agent_gate`): CI never sets it, so
++                            // CI physically cannot reach the strict arm.
++                            //   * cross-host AND live agent → REQUIRED. This is the
++                            //     path that spends money, and codex's oracle needs
++                            //     EFFECT evidence; the old constant produced none,
++                            //     so the run errored `NoEffectEvidence` AFTER
++                            //     billing. Fail before the frame is emitted and
++                            //     before any spawn.
++                            //   * anything else → fall back to the rehearsal
++                            //     string. The loopback rehearsal, `demo-j1` and
++                            //     `two_host_delegation_2b` set no goal and must all
++                            //     stay green; they assert mechanism, not effect.
++                            let operator_goal = std::env::var("MAOS_DELEGATED_GOAL")
++                                .ok()
++                                .filter(|goal| !goal.trim().is_empty());
++                            let paid_delegation =
++                                cross_host_arm_active && std::env::var("MAOS_LIVE_AGENT").is_ok();
++                            let goal = match (operator_goal, paid_delegation) {
++                                (Some(goal), _) => goal,
++                                (None, true) => {
++                                    return Err(
++                                        "maos run: MAOS_DELEGATED_GOAL is required for a live \
++                                         cross-host delegation (MAOS_LIVE_AGENT is set) and is \
++                                         unset or blank. The built-in rehearsal goal states no \
++                                         task, so a live adapter's completion oracle finds no \
++                                         effect evidence and the run fails AFTER the agent is \
++                                         billed. Set it to the concrete, bounded task the remote \
++                                         worker must perform."
++                                            .to_string()
++                                            .into(),
++                                    );
++                                }
++                                (None, false) => format!(
+                                     "founder-loop: execute the delegated assignment from {}",
+                                     maos_bin::delegation::FROM_HOST
+                                 ),
++                            };
++                            let payload = delegation_emitter.build_task_assign(
++                                goal,
+                                 "the worker reports completion through its adapter's \
+                                  parse_completion oracle",
+                                 None,
+diff --git a/crates/maos-cli/Cargo.toml b/crates/maos-cli/Cargo.toml
+index 90857c4c..628feac5 100644
+--- a/crates/maos-cli/Cargo.toml
++++ b/crates/maos-cli/Cargo.toml
+@@ -34,6 +34,13 @@ hex = "0.4"       # Story 9.1 FR44 — pubkey hex encoding in verify-bundle
+ maos-loom-lite = { path = "../maos-loom-lite" }  # Story 10.4a — SQLite→Postgres migration CLI
+ tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }  # Story 10.4a — async runtime for migration engine
+ tokio-postgres = "0.7"  # Story 10.4a — Postgres client for migration target
++# `j1-crosshost-2e` AC2 (F1) — `maosctl cohort sign`. `maos-cohort` owns the
++# canonical manifest form (`to_canonical_bytes`) and `signed_with`; `ed25519-dalek`
++# is DIRECT because `signed_with` takes an `ed25519_dalek::SigningKey` and
++# `maos-cohort` re-exports the manifest types but not `SigningKey`, so the
++# transitive dependency is not importable.
++maos-cohort = { path = "../maos-cohort" }
++ed25519-dalek = { version = "2", features = ["std"] }
+ [dev-dependencies]
+ # Story 1b.5b — accessibility ANSI test. Both crates are already in the
+ # workspace via `maos-audit`, so `Cargo.lock` may grow by maos-iac's transitive deps.
+diff --git a/crates/maos-cli/src/cli.rs b/crates/maos-cli/src/cli.rs
+index 38cc7e98..264635ac 100644
+--- a/crates/maos-cli/src/cli.rs
++++ b/crates/maos-cli/src/cli.rs
+@@ -122,6 +122,15 @@ pub enum Subcommand {
+     /// oracle, row count). The source MUST be quiesced (no active writers)
+     /// before invoking — the migration engine does not take a write lock.
+     Migrate(MigrateArgs),
++    /// `j1-crosshost-2e` AC2 (F1) — cohort-manifest operator surface.
++    ///
++    /// `sign` is the ONLY thing in the workspace that can produce a signed
++    /// cohort manifest. Before it existed, `CohortManifest::signed_with` had
++    /// zero non-test callers, so the cohort daemon — which refuses to boot
++    /// without a manifest verified against its pinned authority keys — could
++    /// never be started by an operator. Host B of a two-host run was
++    /// unreachable by construction.
++    Cohort(CohortArgs),
+ }
+ 
+ /// Story 10.4a — `maosctl migrate sqlite-to-postgres`.
+@@ -150,6 +159,47 @@ pub enum MigrateOp {
+     },
+ }
+ 
++/// `j1-crosshost-2e` AC2 — `maosctl cohort sign`.
++#[derive(clap::Args, Debug)]
++pub struct CohortArgs {
++    #[command(subcommand)]
++    pub op: CohortOp,
++}
++
++#[derive(clap::Subcommand, Debug)]
++pub enum CohortOp {
++    /// Sign a cohort manifest with an authority key so a cohort daemon will boot.
++    ///
++    /// The manifest body is canonicalized by `CohortManifest::to_canonical_bytes`
++    /// — a per-schema domain tag, big-endian scalars, length-prefixed fields,
++    /// lowercased-and-sorted authority keys, declaration-order members, sorted
++    /// teams and cross-team grants, plus an additive V4 tail. That canonical form
++    /// has exactly ONE implementation and this subcommand uses it, deliberately:
++    /// a second (e.g. out-of-process) signer would have to stay byte-symmetric
++    /// with it across four schema versions, which is the defect class that made
++    /// `tools/verify-audit-bundle/verify.py` reject every non-ASCII bundle for
++    /// months over one missing keyword argument.
++    Sign {
++        /// Path to the unsigned (or re-signed) cohort manifest TOML.
++        #[arg(long)]
++        manifest: std::path::PathBuf,
++
++        /// Path to the 32-byte Ed25519 authority seed.
++        ///
++        /// REQUIRED, with no environment fallback and no default. A cohort
++        /// authority root is NOT an audit root: silently reaching for
++        /// `MAOS_AUDIT_KEY` here would weld the two trust roots together, which
++        /// is precisely the collapse `reconcile_two_host_bundles` refuses when it
++        /// sees one key attesting both halves of a two-host run.
++        #[arg(long)]
++        authority_key: std::path::PathBuf,
++
++        /// Write the signed manifest here. Omitted ⇒ TOML on stdout.
++        #[arg(long)]
++        output: Option<std::path::PathBuf>,
++    },
++}
++
+ /// Story 9.4 — `maosctl backup <create|verify|restore>`.
+ #[derive(clap::Args, Debug)]
+ pub struct BackupArgs {
+diff --git a/crates/maos-cli/src/subcommands.rs b/crates/maos-cli/src/subcommands.rs
+index 0bfaf705..fc0fc781 100644
+--- a/crates/maos-cli/src/subcommands.rs
++++ b/crates/maos-cli/src/subcommands.rs
+@@ -46,9 +46,177 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
+         Subcommand::Governance(args) => dispatch_governance(args, color),
+         Subcommand::Backup(args) => dispatch_backup(args, color),
+         Subcommand::Migrate(args) => dispatch_migrate(args, color),
++        Subcommand::Cohort(args) => dispatch_cohort(args, color),
+     }
+ }
+ 
++/// `j1-crosshost-2e` AC2 (F1) — `maosctl cohort <sign>`.
++fn dispatch_cohort(args: &crate::cli::CohortArgs, _color: ColorChoice) -> ExitCode {
++    match &args.op {
++        crate::cli::CohortOp::Sign {
++            manifest,
++            authority_key,
++            output,
++        } => cohort_sign(manifest, authority_key, output.as_deref()),
++    }
++}
++
++/// Sign a cohort manifest so a cohort daemon will boot.
++///
++/// Before this existed, `CohortManifest::signed_with` had ZERO non-test callers
++/// (`crates/maos-cohort/src/manifest.rs:546`), while the daemon refuses to boot
++/// without a manifest that verifies against its pinned authority keys. Host B of
++/// a two-host run was therefore unreachable: a well-formed manifest with a
++/// validly pinned key still died with
++/// `EInvalidSignature("expected 64 bytes (128 hex chars), got 0 bytes")`.
++///
++/// Three refusals are deliberate and each closes a way of producing a manifest
++/// that looks signed but is not trustworthy:
++/// 1. `--authority-key` is explicit, so a cohort root can never silently become
++///    the operator's audit root.
++/// 2. The manifest must `parse_and_validate` against the authority keys IT
++///    declares, so a structurally invalid manifest is refused before signing
++///    rather than at a remote host's boot.
++/// 3. The signer must actually BE a declared authority. `signed_with` does not
++///    check this; without the check, this command would happily sign a manifest
++///    naming somebody else as the authority — a forgery tool.
++fn cohort_sign(
++    manifest_path: &std::path::Path,
++    authority_key_path: &std::path::Path,
++    output: Option<&std::path::Path>,
++) -> ExitCode {
++    use ed25519_dalek::SigningKey;
++    use maos_cohort::{CohortManifest, PinnedAuthorityKeys};
++
++    macro_rules! fail {
++        ($($arg:tt)*) => {{
++            eprintln!("maosctl: cohort sign — {}", format!($($arg)*));
++            return ExitCode::from(2);
++        }};
++    }
++
++    // EXPLICIT path only. Passing `&None` here would honour MAOS_AUDIT_KEY and
++    // the default audit root (`maos_domain::audit_key::load_audit_key_seed`),
++    // welding the cohort trust root to the audit trust root.
++    let seed = match maos_domain::audit_key::load_audit_key_seed(&Some(
++        authority_key_path.to_path_buf(),
++    )) {
++        Ok(seed) => seed,
++        Err(e) => fail!(
++            "cannot load authority key {}: {e}",
++            authority_key_path.display()
++        ),
++    };
++    let signing_key = SigningKey::from_bytes(&seed);
++    let signer_hex = hex::encode(signing_key.verifying_key().to_bytes());
++
++    let text = match std::fs::read_to_string(manifest_path) {
++        Ok(text) => text,
++        Err(e) => fail!("cannot read manifest {}: {e}", manifest_path.display()),
++    };
++
++    // `signature` has no serde default, so an unsigned manifest cannot
++    // deserialize as written. Supply an empty signature purely so the BODY can be
++    // parsed and validated; the value is replaced by `signed_with` below and is
++    // never trusted.
++    let parsed: CohortManifest = {
++        let mut doc: toml::Value = match toml::from_str(&text) {
++            Ok(doc) => doc,
++            Err(e) => fail!(
++                "manifest {} does not parse as TOML: {e}",
++                manifest_path.display()
++            ),
++        };
++        if let Some(table) = doc.as_table_mut() {
++            table.insert(
++                "signature".to_string(),
++                toml::Value::Table(toml::map::Map::from_iter([(
++                    "sig".to_string(),
++                    toml::Value::String(String::new()),
++                )])),
++            );
++        }
++        let normalized = match toml::to_string(&doc) {
++            Ok(normalized) => normalized,
++            Err(e) => fail!("cannot normalize manifest for validation: {e}"),
++        };
++        match toml::from_str(&normalized) {
++            Ok(parsed) => parsed,
++            Err(e) => fail!(
++                "manifest {} is not a cohort manifest: {e}",
++                manifest_path.display()
++            ),
++        }
++    };
++
++    // Validate the body against the authority set the manifest itself declares.
++    let pinned = match PinnedAuthorityKeys::from_hex(&parsed.authority.keys) {
++        Ok(pinned) => pinned,
++        Err(e) => fail!("manifest declares an unusable authority key set: {e}"),
++    };
++
++    // The signer must be one of the declared authorities. `signed_with` will sign
++    // anything; a tool that signs a manifest naming another authority is a
++    // forgery tool, not a signer.
++    if !parsed
++        .authority
++        .keys
++        .iter()
++        .any(|declared| declared.eq_ignore_ascii_case(&signer_hex))
++    {
++        fail!(
++            "refusing to sign: the supplied key ({}…) is not among the manifest's declared \
++             authority.keys. Signing a manifest that names a DIFFERENT authority would produce \
++             an artifact whose signature and whose claimed signer disagree",
++            &signer_hex[..16]
++        );
++    }
++
++    let signed = parsed.signed_with(&signing_key);
++
++    // Prove the artifact we are about to emit actually verifies, rather than
++    // trusting that it will. A signer that cannot verify its own output is how
++    // an operator discovers a problem at a remote host's boot instead of here.
++    let serialized = match toml::to_string(&signed) {
++        Ok(serialized) => serialized,
++        Err(e) => fail!("cannot serialize the signed manifest: {e}"),
++    };
++    if let Err(e) = CohortManifest::parse_and_validate(&serialized, &pinned) {
++        fail!("the signed manifest does not verify against its own declared authority: {e}");
++    }
++
++    match output {
++        Some(path) => {
++            if let Err(e) = std::fs::write(path, &serialized) {
++                fail!("cannot write {}: {e}", path.display());
++            }
++            eprintln!(
++                "maosctl: cohort sign — signed {} (cohort `{}` v{}, {} member(s)) under authority {} \
++                 → {}",
++                manifest_path.display(),
++                signed.cohort_id,
++                signed.version,
++                signed.members.len(),
++                signer_hex,
++                path.display()
++            );
++        }
++        None => {
++            print!("{serialized}");
++            eprintln!(
++                "maosctl: cohort sign — signed {} (cohort `{}` v{}, {} member(s)) under authority {} \
++                 → stdout",
++                manifest_path.display(),
++                signed.cohort_id,
++                signed.version,
++                signed.members.len(),
++                signer_hex
++            );
++        }
++    }
++    ExitCode::SUCCESS
++}
++
+ /// Story 9.4 AC-3 — `maosctl backup <create|verify|restore>`.
+ fn dispatch_backup(args: &BackupArgs, _color: ColorChoice) -> ExitCode {
+     match &args.op {
+diff --git a/crates/maos-cli/tests/two_host_reconcile_2c.rs b/crates/maos-cli/tests/two_host_reconcile_2c.rs
+index 45146ce5..4fce938f 100644
+--- a/crates/maos-cli/tests/two_host_reconcile_2c.rs
++++ b/crates/maos-cli/tests/two_host_reconcile_2c.rs
+@@ -544,6 +544,69 @@ fn the_python_twin_verifies_a_host_stamped_bundle() {
+     );
+ }
+ 
++/// `j1-crosshost-2e` AC1.3 (F5) — the canonicalization parity the ASCII twin above
++/// could never have caught.
++///
++/// `verify.py` serialized with Python's default `ensure_ascii=True`, escaping
++/// non-ASCII to `\uXXXX`, while Rust's `canonicalize_value`
++/// (`crates/maos-audit/src/sealed_export.rs:632-639`) emits raw UTF-8. Identical
++/// document, different bytes, so EVERY bundle containing a single non-ASCII byte
++/// failed verification despite a valid signature.
++///
++/// The fixture is the **committed T6 artifact**, deliberately — not a synthetic
++/// one. It is the only signed run this project has performed, it carries 12
++/// non-ASCII bytes (curly apostrophes and an em dash in operator-authored
++/// fields), and it was UNVERIFIABLE by its own published stranger's path from the
++/// day it was signed until this test landed. A synthetic fixture would prove the
++/// same property about bytes we chose; this one proves it about the artifact we shipped.
++///
++/// Runbook Phase 7.4 makes this verification a MANDATORY ABORT, so before the fix
++/// the paid two-host run died here — after both agents were billed.
++#[test]
++fn the_python_twin_verifies_the_committed_non_ascii_tier2_bundle() {
++    const T6_PUBKEY: &str = "61f4f495dba703e74aff7d42b4286a1a914a89b592a98bf76ed3656c81107766";
++
++    let root = repo_root();
++    let verify_py = root.join("tools/verify-audit-bundle/verify.py");
++    let bundle = root.join("_bmad-output/test-artifacts/j1-tier2-evidence/j1-tier2-bundle.json");
++    assert!(
++        verify_py.exists() && bundle.exists(),
++        "the stranger's verifier and the committed T6 bundle must both exist ({} / {})",
++        verify_py.display(),
++        bundle.display()
++    );
++
++    // The property under test must actually be present in the fixture, or this
++    // vector silently degrades into a duplicate of the ASCII twin above.
++    let raw = std::fs::read(&bundle).expect("read the committed T6 bundle");
++    let non_ascii = raw.iter().filter(|b| **b > 127).count();
++    assert!(
++        non_ascii > 0,
++        "the T6 fixture must still carry non-ASCII bytes, else this test proves nothing \
++         (found {non_ascii})"
++    );
++
++    let out = Command::new("python3")
++        .arg(&verify_py)
++        .arg(&bundle)
++        .arg(T6_PUBKEY)
++        .output()
++        .expect("run verify.py");
++    let text = combined(&out);
++    if text.to_lowercase().contains("no ed25519 library found") {
++        panic!(
++            "the stranger's path requires a Python Ed25519 backend — pip install \
++             cryptography (verify.py said: {})",
++            text.trim()
++        );
++    }
++    assert!(
++        out.status.success(),
++        "verify.py must accept the committed T6 bundle ({non_ascii} non-ASCII bytes) under its \
++         published pubkey; a failure here means Python/Rust canonicalization has diverged again: {text}"
++    );
++}
++
+ /// `CARGO_MANIFEST_DIR` is `crates/maos-cli`; the repo root is two levels up.
+ fn repo_root() -> PathBuf {
+     Path::new(env!("CARGO_MANIFEST_DIR"))
+diff --git a/tools/verify-audit-bundle/verify.py b/tools/verify-audit-bundle/verify.py
+index 6f800e4f..9d5b19e2 100755
+--- a/tools/verify-audit-bundle/verify.py
++++ b/tools/verify-audit-bundle/verify.py
+@@ -84,13 +84,25 @@ def _sort_value(value):
+ 
+ def _canonicalize(bundle: dict) -> bytes:
+     """
+-    Deterministic canonical serialization: sorted keys, no whitespace.
++    Deterministic canonical serialization: sorted keys, no whitespace, raw UTF-8.
+     Excludes the `signature_block` field.
++
++    `ensure_ascii=False` is LOAD-BEARING, not style. Rust's `canonicalize_value`
++    (`crates/maos-audit/src/sealed_export.rs:632-639`) ends in
++    `serde_json::to_string`, which emits non-ASCII as raw UTF-8. Python's
++    `json.dumps` defaults to `ensure_ascii=True` and would escape the same
++    characters to `\\uXXXX`, producing different bytes for an identical document
++    — so every bundle containing a single non-ASCII byte failed verification
++    here despite carrying a valid signature (`j1-crosshost-2e` F5, reproduced
++    against the real T6 artifact). Key ordering was never the defect: both sides
++    already sort. Do not "also" add `sort_keys=True` elsewhere to compensate.
+     """
+     # Build unsigned bundle (everything except signature_block)
+     unsigned = {k: v for k, v in bundle.items() if k != "signature_block"}
+     sorted_bundle = _sort_value(unsigned)
+-    return json.dumps(sorted_bundle, separators=(",", ":"), sort_keys=True).encode("utf-8")
++    return json.dumps(
++        sorted_bundle, ensure_ascii=False, separators=(",", ":"), sort_keys=True
++    ).encode("utf-8")
+ 
+ 
+ # ─── Main ───────────────────────────────────────────────────────────────────
+diff --git a/xtask/kloc.toml b/xtask/kloc.toml
+index 850c4a0f..baba352e 100644
+--- a/xtask/kloc.toml
++++ b/xtask/kloc.toml
+@@ -200,7 +200,7 @@ maos-wire = 2000
+ maos-journal = 2000
+ maos-spirit-abi = 3000
+ maos-spirit-sdk = 3000
+-xtask = 39960   # j1-crosshost-2c AC5.1/AC5.2 + D19 measured grant (code existed and was FORMATTED-measured 39808 BEFORE the ask — `cargo fmt --all` first, since the fmt gate is what CI measures): 38742->39808, EXACT MEASURED +1066, ZERO headroom, same kloc.toml:60-65 discipline. This is NOT a correctness repair, so it does not lean on kloc.toml:87 and needs its own argument: **the gate is the story's deliverable.** AC5 is "the judge" — 2c's whole job is to decide what a signed two-host artifact may assert, and a gate is the only artifact that can bind that after the story closes. Drivers: (a) `check_j1_two_host_signed_run.rs` — ONE always-`Blocking` hermetic gate, 10 legs, every leg `LegAudit`ed so a leg that read nothing hard-FAILs. The rejected alternative was CHEAPER in lines and worthless in effect: a second `AdvisorySubstrate` job for the paid run, whose substrate (an operator, two hosts, a funded API key) CI has never had and never will, so it would take the ABSENT branch on every run for its entire lifetime. A gate whose substrate cannot exist is a monument, not a control. Includes a dependency-free `additionalProperties`/`required` validator so AC2.6's schema is ENFORCED rather than declared — before this the schema was a FALSE SPECIFICATION read by zero machines and three fields behind the struct. (b) `demo_j1.rs::apply_two_host_signed_run` — the executed-leg beat flip; the published-ledger route is structurally dead twice. (c) `verify_capture_signature` — Reza-posture `PROVEN_LIVE_SIGNED` reusing `EvidenceVerifier`/`BuildBinding`/`verify_release_signature` rather than reimplementing them, so the vocabulary is the real one (`MAOS_AUDIT_KEY` is a PATH; `MAOS_AUDIT_KEY_SEED` does not exist and would not compile). (d) **D19 option (a)**, resolved under vehicle 14-0: `gate_common::governed_story_keys`/`is_governed_story_file`, ONE shared helper replacing the digit-prefix filter at all SEVEN walk sites, which had made the entire `j1-*` lane invisible to five Blocking gates at once. It reuses the already single-sourced sprint-status parser rather than adding a second one, and fails CLOSED so a gate can never govern an empty set. **All `xtask/tests/` weight is FREE** (kloc_check.rs:167-193): the 33-vector proven-red and the 10-vector D19 acceptance suite cost zero. What is NOT free is the in-`src` `#[cfg(test)]` weight D11(b) already flagged as budget-charged-but-CI-executed-here: `register_fixture_story` plus one call in each converted gate's fixture helper (+29), needed because D19's fail-closed rule means a fixture directory of bare `.md` files correctly governs nothing, so every existing gate unit test had to DECLARE its fixture stories the way real stories are declared. ZERO kernel-core Δ @24472. | prior: j1-crosshost-2b AC4.2 measured grant (code existed and was measured 38742 BEFORE the ask — never an estimate): 38655->38742, EXACT MEASURED, ZERO headroom, same D15 discipline as the 1b and 2a grants. NET +87 after taking the mandated free reduction FIRST (deleted the compiler-confirmed-dead CODEX_ORACLE/CLAUDE_ORACLE consts, -4). Drivers, all in xtask/src/: (a) the SEVENTH gate leg `cross-host-identity-proof` — the split half of the boundary fact, which publishes the cross-host wire-identity claim ONLY because the two-daemon proof is written, registered and CI-enrolled, plus the `[leg1..leg7]` reconciliation, the seventh published leg name and the new `cross_host_identity_proven` JSON boolean; (b) the `two-host-delegation` demo beat split (Q4, ratified) with its `--skip-gate` ABSENT counterpart and the seventh leg's narration; (c) reading the composition-root PAIR in check_enterprise_identity's issuance-bypass leg, because the governed mint wrapper relocated under the library and counting main.rs alone would score 0 on a pure relocation while a SECOND mint in the relocated file stayed invisible. Every vector, fixture and proven-red harness lives in xtask/tests/ (kloc-free): 6 new j1_crosshost_2b_proven_red vectors + the three synchronized lay_green trees. NOTE the standing decision D11 (growth rate, owner 14.6) is NOT re-ratified here; capacity is granted for the instrument work only. | prior: j1-crosshost-1b §A6 review measured grant (kloc.toml:87 correctness-repair valve; code existed and was measured 38655 BEFORE the ask): 38609->38655, EXACT MEASURED, ZERO headroom. Driver: the 13 review patches that closed the silent-green escapes in the consent gate — test-registration count + 4 new needles in leg_consent_refusal_proofs, production-scoping the boundary leg's router scan, token-bounded executable-run enrollment matching, the !loopback_composed flip guard, the named consent_refusal_proofs JSON boolean, and the --skip-gate refusal beat. All vectors/fixtures live in xtask/tests/ (kloc-free). | §A6 review measured grant (2026-08-18): +152 for leg-9 value checks + signature-gated claim, per-field overclaim scoping, leg-10 derived directories + line-scoped enrollment, leg-2 all-declarations check, gate_common missing-member fail-closed, demo_j1 record corrections.
++xtask = 39960   # ⚠ j1-crosshost-2e TOOK NO GRANT HERE, AND THE BREACH IS RETIRED, NOT ABSORBED. R7 (2026-08-21 round-table) routed 2c's UNDISCLOSED `+6` (ceiling 39960, tree measured 39966) to this story on the grounds that a grant needs a measured delta and 2e has one. Measured at close, 2e's xtask delta is **-48**: AC3's F2 re-scope DELETED the structurally-unreachable `verify_capture_signature`, the `CAPTURE_TRANSCRIPT` const and the two `capture_signature_*` JSON fields, against AC3's F3 adding ~3 lines. **39966 -> 39918, i.e. 42 lines UNDER the untouched ceiling.** So no grant was taken and the ceiling is unchanged: taking capacity this story does not need would be D17's violation in the other direction, and 'slack is operating capacity, NOT authorization' (kloc.toml:60-65). The `+6` is now historical. | PRIOR GRANT: j1-crosshost-2c AC5.1/AC5.2 + D19 measured grant (code existed and was FORMATTED-measured 39808 BEFORE the ask — `cargo fmt --all` first, since the fmt gate is what CI measures): 38742->39808, EXACT MEASURED +1066, ZERO headroom, same kloc.toml:60-65 discipline. This is NOT a correctness repair, so it does not lean on kloc.toml:87 and needs its own argument: **the gate is the story's deliverable.** AC5 is "the judge" — 2c's whole job is to decide what a signed two-host artifact may assert, and a gate is the only artifact that can bind that after the story closes. Drivers: (a) `check_j1_two_host_signed_run.rs` — ONE always-`Blocking` hermetic gate, 10 legs, every leg `LegAudit`ed so a leg that read nothing hard-FAILs. The rejected alternative was CHEAPER in lines and worthless in effect: a second `AdvisorySubstrate` job for the paid run, whose substrate (an operator, two hosts, a funded API key) CI has never had and never will, so it would take the ABSENT branch on every run for its entire lifetime. A gate whose substrate cannot exist is a monument, not a control. Includes a dependency-free `additionalProperties`/`required` validator so AC2.6's schema is ENFORCED rather than declared — before this the schema was a FALSE SPECIFICATION read by zero machines and three fields behind the struct. (b) `demo_j1.rs::apply_two_host_signed_run` — the executed-leg beat flip; the published-ledger route is structurally dead twice. (c) `verify_capture_signature` — Reza-posture `PROVEN_LIVE_SIGNED` reusing `EvidenceVerifier`/`BuildBinding`/`verify_release_signature` rather than reimplementing them, so the vocabulary is the real one (`MAOS_AUDIT_KEY` is a PATH; `MAOS_AUDIT_KEY_SEED` does not exist and would not compile). (d) **D19 option (a)**, resolved under vehicle 14-0: `gate_common::governed_story_keys`/`is_governed_story_file`, ONE shared helper replacing the digit-prefix filter at all SEVEN walk sites, which had made the entire `j1-*` lane invisible to five Blocking gates at once. It reuses the already single-sourced sprint-status parser rather than adding a second one, and fails CLOSED so a gate can never govern an empty set. **All `xtask/tests/` weight is FREE** (kloc_check.rs:167-193): the 33-vector proven-red and the 10-vector D19 acceptance suite cost zero. What is NOT free is the in-`src` `#[cfg(test)]` weight D11(b) already flagged as budget-charged-but-CI-executed-here: `register_fixture_story` plus one call in each converted gate's fixture helper (+29), needed because D19's fail-closed rule means a fixture directory of bare `.md` files correctly governs nothing, so every existing gate unit test had to DECLARE its fixture stories the way real stories are declared. ZERO kernel-core Δ @24472. | prior: j1-crosshost-2b AC4.2 measured grant (code existed and was measured 38742 BEFORE the ask — never an estimate): 38655->38742, EXACT MEASURED, ZERO headroom, same D15 discipline as the 1b and 2a grants. NET +87 after taking the mandated free reduction FIRST (deleted the compiler-confirmed-dead CODEX_ORACLE/CLAUDE_ORACLE consts, -4). Drivers, all in xtask/src/: (a) the SEVENTH gate leg `cross-host-identity-proof` — the split half of the boundary fact, which publishes the cross-host wire-identity claim ONLY because the two-daemon proof is written, registered and CI-enrolled, plus the `[leg1..leg7]` reconciliation, the seventh published leg name and the new `cross_host_identity_proven` JSON boolean; (b) the `two-host-delegation` demo beat split (Q4, ratified) with its `--skip-gate` ABSENT counterpart and the seventh leg's narration; (c) reading the composition-root PAIR in check_enterprise_identity's issuance-bypass leg, because the governed mint wrapper relocated under the library and counting main.rs alone would score 0 on a pure relocation while a SECOND mint in the relocated file stayed invisible. Every vector, fixture and proven-red harness lives in xtask/tests/ (kloc-free): 6 new j1_crosshost_2b_proven_red vectors + the three synchronized lay_green trees. NOTE the standing decision D11 (growth rate, owner 14.6) is NOT re-ratified here; capacity is granted for the instrument work only. | prior: j1-crosshost-1b §A6 review measured grant (kloc.toml:87 correctness-repair valve; code existed and was measured 38655 BEFORE the ask): 38609->38655, EXACT MEASURED, ZERO headroom. Driver: the 13 review patches that closed the silent-green escapes in the consent gate — test-registration count + 4 new needles in leg_consent_refusal_proofs, production-scoping the boundary leg's router scan, token-bounded executable-run enrollment matching, the !loopback_composed flip guard, the named consent_refusal_proofs JSON boolean, and the --skip-gate refusal beat. All vectors/fixtures live in xtask/tests/ (kloc-free). | §A6 review measured grant (2026-08-18): +152 for leg-9 value checks + signature-gated claim, per-field overclaim scoping, leg-10 derived directories + line-scoped enrollment, leg-2 all-declarations check, gate_common missing-member fail-closed, demo_j1 record corrections.
+ #   2026-08-11 Epic-13 retrospective re-base (Lunarpulse authorized AFTER measurement): 36839->37287
+ #   (formatted measured 36555 + ceil(2%)=732). Driver: Epic 14 gate machinery — retro C1's epic-close
+ #   single-source leg, C3's Family-B EvidenceState extension across eight gates, and the D1-D12
+@@ -260,8 +260,8 @@ maos-persistence = 2000
+ maos-secrets = 1000
+ maos-compliance = 2117   # 2026-07-25 founder policy re-base (Winston 2%): 2050->2117 (measured 2017, reserve 100) | prior: Story 13.4 re-baseline 2026-07-23: 2000→2050 (measured 2_017 — NEW vetting module: mod+attestation+keyring+terminal, FR37 4 verbs)
+ maos-control = 1500
+-maos-cli = 5095   # j1-crosshost-2c measured grant, ONE ask covering AC1 + AC2.2 + AC4.1 + AC5.5 (code existed and was measured 5035 BEFORE the ask, never on an estimate — kloc.toml:60-65): 4642->5035, EXACT MEASURED +393, ZERO headroom, mirroring D15's treatment of `maos-bin`. **Attribution by AC, measured separately as the story's blocking condition 2 required** — AC2.2's CLI cost was an UNCOSTED item the preflight caught, and it was measured up front rather than discovered at T3: **AC1 +52** (4642->4694), **AC2.2 +150** (4694->4844), **AC4.1 + AC5.5 +191** (4844->5035). Drivers: (AC1) the P12 signing-identity repair at BOTH `sealed-export` sites — a region-pinned bundle printed `derive_pubkey(&seed)` while `sign_bundle` signed with the region-welded seed, and `demo-j1` scrapes that printed key straight into `verify-bundle`, so the existing Tier-2 leg failed AFTER the agent was billed. Plus the `--output`-less arm (which printed no key AT ALL, an unverifiable artifact producible by accident) and `verify-bundle --seed`, which DERIVES from the bundle's CLAIMED region under an `ArgGroup` so exactly one key source is required and the refusal names both. (AC2.2) `audit reconcile-hosts` — `verify_bundle` takes ONE bundle and ONE pubkey, so two independent per-host roots cannot be expressed by the existing surface; `resolve_verify_key` is shared by `verify-bundle` and BOTH halves rather than triplicated. (AC4.1) `audit scan-credentials`, the operator surface for the read-path stored-row scan. (AC5.5) the two-host capture posture: four fields whose OVERCLAIM direction is refused (`protocol-negotiated` trust anchor, `derived-from-shared-root` key, free-prose shape, missing stranger verification), in the exact `egress`/`fs_jail` shape 2a established. ZERO kernel-core Δ @24472. | prior: Measured grant, story `j1-crosshost-2a-signable-heterogeneous-worker` AC4.2 (Lunarpulse ratified 2026-08-16 AFTER measurement, never on an estimate): 4626->4642. **EXACT MEASURED. ZERO HEADROOM — deliberate**, mirroring D15's treatment of `maos-bin`. Attribution: baseline 4601 (+25 headroom) -> 4642 (+41), all of it in `subcommands.rs`'s J1 Tier-2 capture surface — the `fs_jail`/`fs_jail_followup` fields, the exact-match posture validation with its fail-closed operator diagnostic, and the two overclaim negatives. The posture mirrors the `egress` precedent: a capture may not claim MAOS enforced the FS jail, because MAOS does not (bare `Command::new`, no namespace/rlimit/process group; adapter chosen by basename with no realpath/hash/signature check). The diagnostic was NOT compressed to fit the ceiling — it is the operator's only explanation of why the claim is refused. | prior: 2026-07-25 founder policy re-base (Winston 2%): 4550->4626 (measured 4526, reserve 100); Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200; Story 13.5b: unchanged ceiling, measured 4_526 (maosctl legal-hold list/release subcommands) | §A6 review measured grant (2026-08-18): +60 — one-base-seed cross-root refusal in reconcile-hosts + scan-credentials --boot (P4/P20).
+-maos-bin = 16739   # j1-crosshost-2c AC3.5 measured grant (measured 16739 BEFORE the ask): 16738->16739, EXACT MEASURED **+1**, ZERO headroom. One line, and it is a forwarding line: `EnterpriseGovernedDigestReadPort` must forward `observe_reply_guarded` to its inner port, or the enterprise composition silently keeps the pre-2c ordering and the `Duplicate`-before-durable lie survives in exactly the deployment that has governance wired. A trait default that preserved the broken order would have been a fake fix. | prior: §A6 REVIEW measured grant (2026-08-17, code existed and was measured 16738 BEFORE the ask): 16640->16738, EXACT MEASURED +98, ZERO headroom, kloc.toml:60-65 discipline. Drivers, all security/correctness repairs from the adversarial review: (P16/D1) typed `GovernedMintError` + remote-path fail-closed on PDP/SSO denial in `worker_spawn.rs`; (P3) high-bit outcome-id namespace reservation + checked `journal_inbound_outcome` verdict in `delegation.rs`; (P11) addressed-recipient guard pre-journal; (P13) `biased;` shutdown race; (P17/D2) bounded host-B intake channel (64) with capacity rationale; (P1) 13_5a dispatch-window repair in `main.rs`. Other review crates landed FREE: maos-a2a-core 4669 unchanged (type-only + comments), maos-iac 6888 unchanged (line-neutral moves + doc-only), maos-a2a-tcp 1137/1500 (+16 nonce rejection, in existing headroom), maos-cohort 4813/4900 (+5 rupture fail-loud, in existing headroom), xtask 38742 unchanged (needle re-keying is line-neutral).
++maos-cli = 5235   # j1-crosshost-2e AC2 (F1) measured grant (code existed and was FORMATTED-measured 5235 BEFORE the ask — `cargo fmt --all` first, since the fmt gate is what CI measures): 5095->5235, EXACT MEASURED +140, ZERO headroom, same kloc.toml:60-65 discipline. Driver: `maosctl cohort sign` — the ONLY thing in this workspace that can produce a signed cohort manifest. `CohortManifest::signed_with` had ZERO non-test callers, while the cohort daemon refuses to boot without a manifest verified against its pinned authority keys, so host B of a two-host run was unreachable BY CONSTRUCTION: measured at dd4cf959, a well-formed schema-v4 manifest with a validly pinned Ed25519 key died `EInvalidSignature("expected 64 bytes (128 hex chars), got 0 bytes")`. This is a CORRECTNESS repair on a blocked operator path, so it also leans on kloc.toml:84-87. **The rejected cheaper alternative is recorded because it was genuinely tempting:** an out-of-process (Python) signer would have cost ZERO Rust lines. It was refused — `to_canonical_bytes` is a per-schema domain tag + big-endian scalars + length-prefixed fields + lowercased-and-sorted authority keys + declaration-order members + sorted teams + sorted cross-team grants + an additive V4 tail, and a second implementation must stay byte-symmetric with it across FOUR schema versions. That is precisely the defect class this same story fixed in F5, where `verify.py` drifted from `canonicalize_value` by ONE missing keyword argument and silently rejected every non-ASCII bundle for months. Paying 131 lines to keep ONE canonicalizer is the cheaper option measured over time. Cost also includes three deliberate refusals the naive signer would omit: an explicit `--authority-key` with no env fallback (passing `&None` to `load_audit_key_seed` would honour `MAOS_AUDIT_KEY` and weld the cohort trust root to the audit root), a `parse_and_validate` of the body before signing, and a refusal to sign when the signer is not among the manifest's own declared `authority.keys` (`signed_with` does not check this — without it, this is a forgery tool). | PRIOR: j1-crosshost-2c measured grant, ONE ask covering AC1 + AC2.2 + AC4.1 + AC5.5 (code existed and was measured 5035 BEFORE the ask, never on an estimate — kloc.toml:60-65): 4642->5035, EXACT MEASURED +393, ZERO headroom, mirroring D15's treatment of `maos-bin`. **Attribution by AC, measured separately as the story's blocking condition 2 required** — AC2.2's CLI cost was an UNCOSTED item the preflight caught, and it was measured up front rather than discovered at T3: **AC1 +52** (4642->4694), **AC2.2 +150** (4694->4844), **AC4.1 + AC5.5 +191** (4844->5035). Drivers: (AC1) the P12 signing-identity repair at BOTH `sealed-export` sites — a region-pinned bundle printed `derive_pubkey(&seed)` while `sign_bundle` signed with the region-welded seed, and `demo-j1` scrapes that printed key straight into `verify-bundle`, so the existing Tier-2 leg failed AFTER the agent was billed. Plus the `--output`-less arm (which printed no key AT ALL, an unverifiable artifact producible by accident) and `verify-bundle --seed`, which DERIVES from the bundle's CLAIMED region under an `ArgGroup` so exactly one key source is required and the refusal names both. (AC2.2) `audit reconcile-hosts` — `verify_bundle` takes ONE bundle and ONE pubkey, so two independent per-host roots cannot be expressed by the existing surface; `resolve_verify_key` is shared by `verify-bundle` and BOTH halves rather than triplicated. (AC4.1) `audit scan-credentials`, the operator surface for the read-path stored-row scan. (AC5.5) the two-host capture posture: four fields whose OVERCLAIM direction is refused (`protocol-negotiated` trust anchor, `derived-from-shared-root` key, free-prose shape, missing stranger verification), in the exact `egress`/`fs_jail` shape 2a established. ZERO kernel-core Δ @24472. | prior: Measured grant, story `j1-crosshost-2a-signable-heterogeneous-worker` AC4.2 (Lunarpulse ratified 2026-08-16 AFTER measurement, never on an estimate): 4626->4642. **EXACT MEASURED. ZERO HEADROOM — deliberate**, mirroring D15's treatment of `maos-bin`. Attribution: baseline 4601 (+25 headroom) -> 4642 (+41), all of it in `subcommands.rs`'s J1 Tier-2 capture surface — the `fs_jail`/`fs_jail_followup` fields, the exact-match posture validation with its fail-closed operator diagnostic, and the two overclaim negatives. The posture mirrors the `egress` precedent: a capture may not claim MAOS enforced the FS jail, because MAOS does not (bare `Command::new`, no namespace/rlimit/process group; adapter chosen by basename with no realpath/hash/signature check). The diagnostic was NOT compressed to fit the ceiling — it is the operator's only explanation of why the claim is refused. | prior: 2026-07-25 founder policy re-base (Winston 2%): 4550->4626 (measured 4526, reserve 100); Story 13.5e re-baseline 2026-07-24: 4300→4550 (measured 4_489 — tenant-scoped backup/export subcommands); 13.4: 4200→4300 (`vet` subcommand); Epic-13 retro 2026-07-22: 3750→4200; Story 13.5b: unchanged ceiling, measured 4_526 (maosctl legal-hold list/release subcommands) | §A6 review measured grant (2026-08-18): +60 — one-base-seed cross-root refusal in reconcile-hosts + scan-credentials --boot (P4/P20).
++maos-bin = 16824   # j1-crosshost-2e AC4+AC5 (F7+F4) measured grant (code existed and was FORMATTED-measured 16824 BEFORE the ask — `cargo fmt --all` first, since the fmt gate is what CI measures): 16739->16824, EXACT MEASURED +85, ZERO headroom. TWO drivers, both correctness repairs on a blocked operator path (kloc.toml:84-87). **F4 (AC5) — the pairing rendezvous.** The documented boot-nonce procedure was TOPOLOGICALLY wrong: it told the operator to read host A's nonce from a `cohort:daemon-started` row, but that row is written only by `run_cohort_a2a_daemon` and host A is `maos run --once`, which reaches the cross-host arm PRECISELY BECAUSE `MAOS_ONE_SHOT != cohort-a2a-daemon`. Host A is the SENDER; that row is a RECEIVER's. So host A now publishes its nonce under its own `cohort:crosshost-started` intent after the bind and before the dial, and HOLDS on a bounded, opt-in operator-ready barrier that FAILS CLOSED on timeout — publishing without holding is useless because `--once` binds, dials and exits with no pause, and there is no retry window to hide in (a refused connect returns `Io` immediately; `is_retryable` admits only BadCertificate/CertExpired, so the [100,300,1000]ms schedule is a cert-class budget, not a startup grace period). The nonce stays the same random per-process value, so NFR-Rel-6 restart detection is untouched — a stable or reused nonce would have traded one broken control for another. Driver: the delegated goal was a hardcoded constant with no override (`"founder-loop: execute the delegated assignment from <host>"`), OBSERVED on the wire at dd4cf959 via a fake adapter that dumped its argv. codex's completion oracle requires EFFECT evidence — an applied `file_change` — so a worker told to "execute the delegated assignment" with no assignment writes nothing, returns `NoEffectEvidence`, and the run errors AFTER THE AGENT IS BILLED. `MAOS_DELEGATED_GOAL` is read ONLY at frame construction in the composition root, never at the spawn site: `j1-crosshost-1a` deleted `MAOS_WORKER_TASK` because a remote worker cannot inherit local env, and `check_j1_loopback_delegation.rs:276-284` reds such a read as a decorative-frame shortcut. Registered in `MAOS_ENV_REGISTRY` (gate-enforced by `check_env_contract.rs:102-159`). The +30 includes the two-tier default and the `cross_host_arm_active` capture: fail-closed applies ONLY on the PAID path (cross-host arm AND `MAOS_LIVE_AGENT` set) because `two_host_delegation_2b` runs two real daemons over the cross-host arm with the hermetic fixture worker and asserts the delegation MECHANISM, not the goal's content — keying fail-closed on the arm alone RED IT, measured, not guessed. | PRIOR: j1-crosshost-2c AC3.5 measured grant (measured 16739 BEFORE the ask): 16738->16739, EXACT MEASURED **+1**, ZERO headroom. One line, and it is a forwarding line: `EnterpriseGovernedDigestReadPort` must forward `observe_reply_guarded` to its inner port, or the enterprise composition silently keeps the pre-2c ordering and the `Duplicate`-before-durable lie survives in exactly the deployment that has governance wired. A trait default that preserved the broken order would have been a fake fix. | prior: §A6 REVIEW measured grant (2026-08-17, code existed and was measured 16738 BEFORE the ask): 16640->16738, EXACT MEASURED +98, ZERO headroom, kloc.toml:60-65 discipline. Drivers, all security/correctness repairs from the adversarial review: (P16/D1) typed `GovernedMintError` + remote-path fail-closed on PDP/SSO denial in `worker_spawn.rs`; (P3) high-bit outcome-id namespace reservation + checked `journal_inbound_outcome` verdict in `delegation.rs`; (P11) addressed-recipient guard pre-journal; (P13) `biased;` shutdown race; (P17/D2) bounded host-B intake channel (64) with capacity rationale; (P1) 13_5a dispatch-window repair in `main.rs`. Other review crates landed FREE: maos-a2a-core 4669 unchanged (type-only + comments), maos-iac 6888 unchanged (line-neutral moves + doc-only), maos-a2a-tcp 1137/1500 (+16 nonce rejection, in existing headroom), maos-cohort 4813/4900 (+5 rupture fail-loud, in existing headroom), xtask 38742 unchanged (needle re-keying is line-neutral).
+ maos-bench = 1631   # 2026-07-25 founder policy re-base (Winston 2%): 1550->1631 (measured 1531, reserve 100) | prior: Epic-10 retro 2026-06-26: 1500→1550 (J4/J6 harness rebuild; measured 1,512)
+ 
+ # -----------------------------------------------------------------------------
+diff --git a/xtask/src/check_j1_two_host_signed_run.rs b/xtask/src/check_j1_two_host_signed_run.rs
+index 1a25ab32..68ee8e3c 100644
+--- a/xtask/src/check_j1_two_host_signed_run.rs
++++ b/xtask/src/check_j1_two_host_signed_run.rs
+@@ -90,9 +90,11 @@ const STORY_TEST_PREFIX: &str = "t_2c_";
+ 
+ /// The paid run's capture artifact — validated when present, unclaimed when absent.
+ const CAPTURE: &str = "_bmad-output/test-artifacts/j1-two-host-evidence/two-host-capture.json";
+-/// The operator-signed `MAOS-EVIDENCE-V1` transcript for the paid run.
+-const CAPTURE_TRANSCRIPT: &str =
+-    "_bmad-output/test-artifacts/j1-two-host-evidence/two-host-evidence.txt";
++// `CAPTURE_TRANSCRIPT` (`two-host-evidence.txt`) is DELETED by `j1-crosshost-2e`
++// (F2 / R1). No leg ever read it, and the only value it fed —
++// `capture_signature_verified` — was unreachable by construction. The evidence of
++// a two-host run is the two bundle signatures plus an executed `reconcile-hosts`,
++// both operator-performed. Do not re-add a path here expecting a gate to verify it.
+ /// The signed bundle halves the capture attests, if the paid run produced them.
+ const CAPTURE_BUNDLE_A: &str =
+     "_bmad-output/test-artifacts/j1-two-host-evidence/host-a-bundle.json";
+@@ -1227,51 +1229,35 @@ pub fn judge(root: &Path) -> Judgement {
+ /// The gate name evidence records must be bound to.
+ pub const GATE: &str = "check-j1-two-host-signed-run";
+ 
+-/// `j1-crosshost-2c` AC5.4 — `PROVEN_LIVE_SIGNED` under Reza's posture, in the
+-/// real vocabulary.
+-///
+-/// The key is `MAOS_AUDIT_KEY` — a **filesystem path**, resolved by
+-/// `maos_domain::audit_key::load_audit_key_seed`. There is no
+-/// `MAOS_AUDIT_KEY_SEED`: its only occurrence in this workspace is an error
+-/// string, and code written against it would not compile.
+-///
+-/// The evidence is a `MAOS-EVIDENCE-V1` record bound to this build's commit and
+-/// nonce, verified through `verify_release_signature`. `outcome == "PASSED"`, the
+-/// commit and the nonce are all checked by [`crate::evidence_ledger`]'s verifier;
+-/// this function only supplies the transcript.
+-///
+-/// **CI holds no operator key by ratified design**, with a written reason and no
+-/// dev-key fallback. So in CI this leg is `INDETERMINATE` — not failed, and NOT
+-/// "no leg has ever reached this state": 27 legs have, on the operator lane. The
+-/// operator lane is what produces the signed claim.
+-pub fn verify_capture_signature(root: &Path) -> Result<String, String> {
+-    let transcript = fs::read_to_string(root.join(CAPTURE_TRANSCRIPT))
+-        .map_err(|e| format!("no signed evidence transcript at {CAPTURE_TRANSCRIPT}: {e}"))?;
+-    let binding = crate::evidence_ledger::BuildBinding::for_run(GATE)?;
+-    let verifier = crate::evidence_ledger::EvidenceVerifier::load(binding)?;
+-    if !verifier.key_available() {
+-        return Err(verifier.key_reason().to_string());
+-    }
+-    let records: Vec<_> = crate::evidence_ledger::parse_records(&transcript)
+-        .into_iter()
+-        .filter(|r| r.payload.gate == GATE)
+-        .collect();
+-    // §A6 review 2026-08-18 (P6): `records.first()` verified ONE record and
+-    // ignored any others — including contradictory ones for the same gate.
+-    // Every record bound to this gate must verify or the transcript is refused.
+-    if records.is_empty() {
+-        return Err(format!(
+-            "{CAPTURE_TRANSCRIPT} carries no MAOS-EVIDENCE-V1 record for {GATE}"
+-        ));
+-    }
+-    let mut verified_test = String::new();
+-    for record in &records {
+-        verifier.verify(record)?;
+-        verified_test = record.payload.test.clone();
+-    }
+-    Ok(verified_test)
+-}
+-
++// ─────────────────────────────────────────────────────────────────────────────
++// F2 / R1 — `verify_capture_signature` DELETED here by `j1-crosshost-2e`.
++//
++// It was structurally unreachable and therefore a claim term that could never be
++// satisfied. `two_host_signed_run_claimed` required a `MAOS-EVIDENCE-V1` record
++// whose `nonce` is recomputed AT GATE-RUN TIME —
++// `format!("{gate}.{:x}.{nanos:x}", std::process::id())` — fresh per process and
++// per nanosecond, so no file written beforehand could carry it. The binding's
++// `commit` is `local_worktree_commit()`, a hash over HEAD plus every untracked
++// file's bytes, so writing the transcript changed the value the transcript had to
++// contain. And nothing produced the file: the sole signer emits only for gates in
++// `ledger_gates()`, and J1 is not one of them. The four sibling ledger gates
++// produce their transcript IN THE SAME PROCESS; this one was specified to read a
++// static file.
++//
++// R1 (2026-08-21 round-table) re-scoped this lane's evidence to **the two bundle
++// signatures**, verified by the third-party `tools/verify-audit-bundle/verify.py`,
++// plus a `reconcile-hosts` that actually executes — exactly how T6, the only
++// signed run this project has performed, was evidenced. T6 predates
++// `MAOS-EVIDENCE-V1` entirely: the target was MIS-SPECIFIED, not merely unbuilt.
++//
++// There is deliberately NO replacement term computed here, and this gate still
++// contains ZERO `Command::new`. Adding an `operator_evidence_verified` boolean
++// would re-create the F6 defect this lane already documented — a self-report
++// standing in for a control. The conjunction
++// `verify.py(A) && verify.py(B) && reconcile-hosts(exit 0)` is operator-performed
++// and lives in the runbook. `two_host_signed_run_claimed` is still emitted, always
++// `false`, and published as a TRUE FACT rather than hidden.
++// ─────────────────────────────────────────────────────────────────────────────
+ pub fn run(json: bool) -> Result<(), String> {
+     run_with_root(json, Path::new("."))
+ }
+@@ -1280,19 +1266,9 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
+     let judgement = judge(root);
+     let findings = &judgement.findings;
+     let oracle_green = findings.is_empty();
+-    // §A6 review 2026-08-18 (P6): a present capture cannot mint the claim on
+-    // shape alone. Verify the transcript's signature when the substrate allows
+-    // it; when it does not, the claim is REFUSED (see the JSON fields below) —
+-    // never silently assumed. On CI the capture is absent, so this stays false
+-    // and the hermetic legs are unaffected.
+-    let (capture_signature_verified, signature_reason) = if judgement.capture_present {
+-        match verify_capture_signature(root) {
+-            Ok(_) => (true, String::new()),
+-            Err(reason) => (false, reason),
+-        }
+-    } else {
+-        (false, String::new())
+-    };
++    // F2 / R1 (`j1-crosshost-2e`): the signature term is GONE, not defaulted.
++    // It required a nonce recomputed at gate-run time, so it could never be
++    // satisfied by a pre-written transcript. See the block above the `GATE` const.
+     // ONE binding class for the whole gate. Hermetic: a RED oracle hard-fails at
+     // HEAD regardless of CURRENT_PHASE. The paid run is a validated capture, never
+     // a substrate-gated leg — see the module docs.
+@@ -1312,18 +1288,17 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
+                 // API key by ratified design. The control is that nothing may CLAIM
+                 // the run while this is false — never a binding class that cannot fire.
+                 "paid_run_capture_present": judgement.capture_present,
+-                // §A6 review 2026-08-18 (P6): the claim now REQUIRES the
+-                // capture transcript's signature to have verified this run.
+-                // An unverifiable signature (no key, no binding, bad
+-                // signature) does not RED the hermetic legs — it refuses the
+-                // CLAIM, which is the only thing this gate is trusted to mint.
+-                // The demo lane mints `PROVEN_LIVE_SIGNED` and already calls
+-                // the same verifier.
+-                "capture_signature_verified": capture_signature_verified,
+-                "capture_signature_reason": signature_reason,
+-                "two_host_signed_run_claimed": judgement.capture_present
+-                    && oracle_green
+-                    && capture_signature_verified,
++                // F2 / R1: `capture_signature_verified` and
++                // `capture_signature_reason` are DELETED — they reported on a
++                // verifier that could not run. `two_host_signed_run_claimed`
++                // remains, is always `false`, and is PUBLISHED AS A TRUE FACT:
++                // `PROVEN_LIVE_SIGNED` is unreachable FOR THIS GATE (narrowly —
++                // 27 legs reach it on the operator lane). The evidence of a
++                // two-host run is the two bundle signatures verified by
++                // `verify.py` plus a `reconcile-hosts` that executes, all
++                // OPERATOR-performed. Do not add a boolean here that says an
++                // operator swore it: that is the F6 self-report trap.
++                "two_host_signed_run_claimed": false,
+                 "claim_scope": CLAIM_SCOPE,
+                 "enrolled_vectors": judgement.enrolled,
+                 "findings": findings.iter().map(|f| serde_json::json!({
+diff --git a/xtask/src/demo_j1.rs b/xtask/src/demo_j1.rs
+index 010fd453..342444e8 100755
+--- a/xtask/src/demo_j1.rs
++++ b/xtask/src/demo_j1.rs
+@@ -928,48 +928,56 @@ fn unlanded_beats() -> Vec<Beat> {
+ /// The owner string was re-pointed to `j1-crosshost-2d-paid-two-host-run` by
+ /// RF-0 (§A6 round-table, 2026-08-18): `2c` owns the judge, `2d` owns the run.
+ /// `unlanded_beats` above carries it; leg 9 of the judge enforces it.
+-///
+-/// Three outcomes, and only one of them claims anything:
++/// Three outcomes, and **none of them claims a signed run** — that is the R1
++/// re-scope, ratified at the 2026-08-21 round-table and implemented by
++/// `j1-crosshost-2e` (F2/F3):
+ ///   * no capture → the beat stays ABSENT. `Beat::absent` sets `executed: false`,
+ ///     so an unlanded beat can never fail a run — which is the honest model for a
+ ///     claim whose substrate is an operator, two hosts and a funded key.
+-///   * capture present, judge RED or unsigned → `INDETERMINATE`. CI holds no
+-///     operator key by ratified design, so this is CI's normal state once a
+-///     capture exists; it is not a failure and it is not a claim.
+-///   * capture present, judge GREEN, signature verified → `PROVEN_LIVE_SIGNED`.
++///   * capture present, judge RED → `INDETERMINATE`, and the claim is refused.
++///   * capture present, judge GREEN → `INDETERMINATE` still. The gate has no way
++///     to verify the operator's evidence and does not pretend to: `PROVEN_LIVE_SIGNED`
++///     was structurally unreachable here (F2 — the `MAOS-EVIDENCE-V1` nonce is
++///     recomputed at gate-run time, so no pre-written transcript can carry it, and
++///     nothing in the workspace produced the file). The evidence of a two-host run
++///     is the TWO BUNDLE SIGNATURES verified by the third-party `verify.py` plus a
++///     `reconcile-hosts` that executes — all operator-performed, none of it
++///     checkable from inside a hermetic gate.
++///
++/// **`executed` stays FALSE on both present-capture branches, and that is the F3
++/// fix.** `Beat::failed()` is `executed && !state.is_proven()`, and `is_proven()`
++/// admits only `ProvenBlocking | ProvenLiveSigned`, so marking an `Indeterminate`
++/// beat `executed` made `demo-j1` exit NONZERO and render `FAIL` the moment a
++/// capture landed — contradicting this very doc comment, which has always said
++/// `INDETERMINATE` "is not a failure". The beat now renders as a visible `--`
++/// non-claim carrying its owner, which is what an un-earned claim should look like.
++///
++/// ⚠ Do NOT "fix" this by widening `is_proven()`: it is consumed for
++/// `product_claim` and artifact refs in `evidence_ledger.rs`, so widening it would
++/// make OTHER gates over-claim in order to correct a demo exit code.
+ fn apply_two_host_signed_run(beats: &mut [Beat]) {
+     let judgement = crate::check_j1_two_host_signed_run::judge(Path::new("."));
+     if !judgement.capture_present {
+         return;
+     }
+-    let (state, detail) = if !judgement.findings.is_empty() {
+-        (
+-            EvidenceState::Indeterminate,
+-            format!(
+-                "capture present but the judge found {} finding(s) — the claim is refused",
+-                judgement.findings.len()
+-            ),
++    let detail = if judgement.findings.is_empty() {
++        format!(
++            "capture present and validated; the run is NOT claimed — {} (the two bundle \
++             signatures and `reconcile-hosts` are operator-verified, not gate-verified)",
++            crate::check_j1_two_host_signed_run::CLAIM_SCOPE
+         )
+     } else {
+-        match crate::check_j1_two_host_signed_run::verify_capture_signature(Path::new(".")) {
+-            Ok(test) => (
+-                EvidenceState::ProvenLiveSigned,
+-                format!(
+-                    "two-host capture verified under `{test}` — {}",
+-                    crate::check_j1_two_host_signed_run::CLAIM_SCOPE
+-                ),
+-            ),
+-            Err(why) => (
+-                EvidenceState::Indeterminate,
+-                format!("capture validated but NOT signed: {why}"),
+-            ),
+-        }
++        format!(
++            "capture present but the judge found {} finding(s) — the claim is refused",
++            judgement.findings.len()
++        )
+     };
+     if let Some(beat) = beats.iter_mut().find(|b| b.name == "two-host-signed-run") {
+-        beat.state = state;
++        beat.state = EvidenceState::Indeterminate;
+         beat.detail = detail;
+-        beat.executed = true;
+-        beat.owner = None;
++        // `executed` deliberately left FALSE and the owner deliberately retained:
++        // this beat is not a thing that ran and failed, it is a thing nobody has
++        // earned yet. See the doc comment above (F3).
+     }
+ }
+ 

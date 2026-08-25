@@ -90,9 +90,11 @@ const STORY_TEST_PREFIX: &str = "t_2c_";
 
 /// The paid run's capture artifact — validated when present, unclaimed when absent.
 const CAPTURE: &str = "_bmad-output/test-artifacts/j1-two-host-evidence/two-host-capture.json";
-/// The operator-signed `MAOS-EVIDENCE-V1` transcript for the paid run.
-const CAPTURE_TRANSCRIPT: &str =
-    "_bmad-output/test-artifacts/j1-two-host-evidence/two-host-evidence.txt";
+// `CAPTURE_TRANSCRIPT` (`two-host-evidence.txt`) is DELETED by `j1-crosshost-2e`
+// (F2 / R1). No leg ever read it, and the only value it fed —
+// `capture_signature_verified` — was unreachable by construction. The evidence of
+// a two-host run is the two bundle signatures plus an executed `reconcile-hosts`,
+// both operator-performed. Do not re-add a path here expecting a gate to verify it.
 /// The signed bundle halves the capture attests, if the paid run produced them.
 const CAPTURE_BUNDLE_A: &str =
     "_bmad-output/test-artifacts/j1-two-host-evidence/host-a-bundle.json";
@@ -1227,51 +1229,35 @@ pub fn judge(root: &Path) -> Judgement {
 /// The gate name evidence records must be bound to.
 pub const GATE: &str = "check-j1-two-host-signed-run";
 
-/// `j1-crosshost-2c` AC5.4 — `PROVEN_LIVE_SIGNED` under Reza's posture, in the
-/// real vocabulary.
-///
-/// The key is `MAOS_AUDIT_KEY` — a **filesystem path**, resolved by
-/// `maos_domain::audit_key::load_audit_key_seed`. There is no
-/// `MAOS_AUDIT_KEY_SEED`: its only occurrence in this workspace is an error
-/// string, and code written against it would not compile.
-///
-/// The evidence is a `MAOS-EVIDENCE-V1` record bound to this build's commit and
-/// nonce, verified through `verify_release_signature`. `outcome == "PASSED"`, the
-/// commit and the nonce are all checked by [`crate::evidence_ledger`]'s verifier;
-/// this function only supplies the transcript.
-///
-/// **CI holds no operator key by ratified design**, with a written reason and no
-/// dev-key fallback. So in CI this leg is `INDETERMINATE` — not failed, and NOT
-/// "no leg has ever reached this state": 27 legs have, on the operator lane. The
-/// operator lane is what produces the signed claim.
-pub fn verify_capture_signature(root: &Path) -> Result<String, String> {
-    let transcript = fs::read_to_string(root.join(CAPTURE_TRANSCRIPT))
-        .map_err(|e| format!("no signed evidence transcript at {CAPTURE_TRANSCRIPT}: {e}"))?;
-    let binding = crate::evidence_ledger::BuildBinding::for_run(GATE)?;
-    let verifier = crate::evidence_ledger::EvidenceVerifier::load(binding)?;
-    if !verifier.key_available() {
-        return Err(verifier.key_reason().to_string());
-    }
-    let records: Vec<_> = crate::evidence_ledger::parse_records(&transcript)
-        .into_iter()
-        .filter(|r| r.payload.gate == GATE)
-        .collect();
-    // §A6 review 2026-08-18 (P6): `records.first()` verified ONE record and
-    // ignored any others — including contradictory ones for the same gate.
-    // Every record bound to this gate must verify or the transcript is refused.
-    if records.is_empty() {
-        return Err(format!(
-            "{CAPTURE_TRANSCRIPT} carries no MAOS-EVIDENCE-V1 record for {GATE}"
-        ));
-    }
-    let mut verified_test = String::new();
-    for record in &records {
-        verifier.verify(record)?;
-        verified_test = record.payload.test.clone();
-    }
-    Ok(verified_test)
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+// F2 / R1 — `verify_capture_signature` DELETED here by `j1-crosshost-2e`.
+//
+// It was structurally unreachable and therefore a claim term that could never be
+// satisfied. `two_host_signed_run_claimed` required a `MAOS-EVIDENCE-V1` record
+// whose `nonce` is recomputed AT GATE-RUN TIME —
+// `format!("{gate}.{:x}.{nanos:x}", std::process::id())` — fresh per process and
+// per nanosecond, so no file written beforehand could carry it. The binding's
+// `commit` is `local_worktree_commit()`, a hash over HEAD plus every untracked
+// file's bytes, so writing the transcript changed the value the transcript had to
+// contain. And nothing produced the file: the sole signer emits only for gates in
+// `ledger_gates()`, and J1 is not one of them. The four sibling ledger gates
+// produce their transcript IN THE SAME PROCESS; this one was specified to read a
+// static file.
+//
+// R1 (2026-08-21 round-table) re-scoped this lane's evidence to **the two bundle
+// signatures**, verified by the third-party `tools/verify-audit-bundle/verify.py`,
+// plus a `reconcile-hosts` that actually executes — exactly how T6, the only
+// signed run this project has performed, was evidenced. T6 predates
+// `MAOS-EVIDENCE-V1` entirely: the target was MIS-SPECIFIED, not merely unbuilt.
+//
+// There is deliberately NO replacement term computed here, and this gate still
+// contains ZERO `Command::new`. Adding an `operator_evidence_verified` boolean
+// would re-create the F6 defect this lane already documented — a self-report
+// standing in for a control. The conjunction
+// `verify.py(A) && verify.py(B) && reconcile-hosts(exit 0)` is operator-performed
+// and lives in the runbook. `two_host_signed_run_claimed` is still emitted, always
+// `false`, and published as a TRUE FACT rather than hidden.
+// ─────────────────────────────────────────────────────────────────────────────
 pub fn run(json: bool) -> Result<(), String> {
     run_with_root(json, Path::new("."))
 }
@@ -1280,19 +1266,9 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
     let judgement = judge(root);
     let findings = &judgement.findings;
     let oracle_green = findings.is_empty();
-    // §A6 review 2026-08-18 (P6): a present capture cannot mint the claim on
-    // shape alone. Verify the transcript's signature when the substrate allows
-    // it; when it does not, the claim is REFUSED (see the JSON fields below) —
-    // never silently assumed. On CI the capture is absent, so this stays false
-    // and the hermetic legs are unaffected.
-    let (capture_signature_verified, signature_reason) = if judgement.capture_present {
-        match verify_capture_signature(root) {
-            Ok(_) => (true, String::new()),
-            Err(reason) => (false, reason),
-        }
-    } else {
-        (false, String::new())
-    };
+    // F2 / R1 (`j1-crosshost-2e`): the signature term is GONE, not defaulted.
+    // It required a nonce recomputed at gate-run time, so it could never be
+    // satisfied by a pre-written transcript. See the block above the `GATE` const.
     // ONE binding class for the whole gate. Hermetic: a RED oracle hard-fails at
     // HEAD regardless of CURRENT_PHASE. The paid run is a validated capture, never
     // a substrate-gated leg — see the module docs.
@@ -1312,18 +1288,17 @@ pub fn run_with_root(json: bool, root: &Path) -> Result<(), String> {
                 // API key by ratified design. The control is that nothing may CLAIM
                 // the run while this is false — never a binding class that cannot fire.
                 "paid_run_capture_present": judgement.capture_present,
-                // §A6 review 2026-08-18 (P6): the claim now REQUIRES the
-                // capture transcript's signature to have verified this run.
-                // An unverifiable signature (no key, no binding, bad
-                // signature) does not RED the hermetic legs — it refuses the
-                // CLAIM, which is the only thing this gate is trusted to mint.
-                // The demo lane mints `PROVEN_LIVE_SIGNED` and already calls
-                // the same verifier.
-                "capture_signature_verified": capture_signature_verified,
-                "capture_signature_reason": signature_reason,
-                "two_host_signed_run_claimed": judgement.capture_present
-                    && oracle_green
-                    && capture_signature_verified,
+                // F2 / R1: `capture_signature_verified` and
+                // `capture_signature_reason` are DELETED — they reported on a
+                // verifier that could not run. `two_host_signed_run_claimed`
+                // remains, is always `false`, and is PUBLISHED AS A TRUE FACT:
+                // `PROVEN_LIVE_SIGNED` is unreachable FOR THIS GATE (narrowly —
+                // 27 legs reach it on the operator lane). The evidence of a
+                // two-host run is the two bundle signatures verified by
+                // `verify.py` plus a `reconcile-hosts` that executes, all
+                // OPERATOR-performed. Do not add a boolean here that says an
+                // operator swore it: that is the F6 self-report trap.
+                "two_host_signed_run_claimed": false,
                 "claim_scope": CLAIM_SCOPE,
                 "enrolled_vectors": judgement.enrolled,
                 "findings": findings.iter().map(|f| serde_json::json!({

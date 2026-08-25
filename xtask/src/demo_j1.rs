@@ -289,22 +289,9 @@ pub fn run(
 
     section("Claim table (execution order)");
     for beat in &beats {
-        let mark = if !beat.executed {
-            "--  "
-        } else if beat.state.is_proven() {
-            "ok  "
-        } else {
-            "FAIL"
-        };
-        println!(
-            "  {mark} {:<38} {:<19} {}",
-            beat.name,
-            beat.state.as_str(),
-            beat.detail
-        );
+        println!("{}", render_beat_row(beat));
         println!("       {:<38} {}", "", beat.narration);
     }
-
     section("What this run does NOT claim");
     println!("  rung             v0.8 — loopback rehearsal. `developer-remote` is a peer id on");
     println!("                   THIS host; no packet left the machine. This demo does not");
@@ -928,49 +915,90 @@ fn unlanded_beats() -> Vec<Beat> {
 /// The owner string was re-pointed to `j1-crosshost-2d-paid-two-host-run` by
 /// RF-0 (§A6 round-table, 2026-08-18): `2c` owns the judge, `2d` owns the run.
 /// `unlanded_beats` above carries it; leg 9 of the judge enforces it.
-///
-/// Three outcomes, and only one of them claims anything:
+/// Three outcomes, and **none of them claims a signed run** — that is the R1
+/// re-scope, ratified at the 2026-08-21 round-table and implemented by
+/// `j1-crosshost-2e` (F2/F3):
 ///   * no capture → the beat stays ABSENT. `Beat::absent` sets `executed: false`,
 ///     so an unlanded beat can never fail a run — which is the honest model for a
 ///     claim whose substrate is an operator, two hosts and a funded key.
-///   * capture present, judge RED or unsigned → `INDETERMINATE`. CI holds no
-///     operator key by ratified design, so this is CI's normal state once a
-///     capture exists; it is not a failure and it is not a claim.
-///   * capture present, judge GREEN, signature verified → `PROVEN_LIVE_SIGNED`.
+///   * capture present, judge RED → `INDETERMINATE`, and the claim is refused.
+///   * capture present, judge GREEN → `INDETERMINATE` still. The gate has no way
+///     to verify the operator's evidence and does not pretend to: `PROVEN_LIVE_SIGNED`
+///     was structurally unreachable here (F2 — the `MAOS-EVIDENCE-V1` nonce is
+///     recomputed at gate-run time, so no pre-written transcript can carry it, and
+///     nothing in the workspace produced the file). The evidence of a two-host run
+///     is the TWO BUNDLE SIGNATURES verified by the third-party `verify.py` plus a
+///     `reconcile-hosts` that executes — all operator-performed, none of it
+///     checkable from inside a hermetic gate.
+///
+/// **`executed` stays FALSE on both present-capture branches, and that is the F3
+/// fix.** `Beat::failed()` is `executed && !state.is_proven()`, and `is_proven()`
+/// admits only `ProvenBlocking | ProvenLiveSigned`, so marking an `Indeterminate`
+/// beat `executed` made `demo-j1` exit NONZERO and render `FAIL` the moment a
+/// capture landed — contradicting this very doc comment, which has always said
+/// `INDETERMINATE` "is not a failure". The beat now renders as a visible `--`
+/// non-claim carrying its owner, which is what an un-earned claim should look like.
+///
+/// ⚠ Do NOT "fix" this by widening `is_proven()`: it is consumed for
+/// `product_claim` and artifact refs in `evidence_ledger.rs`, so widening it would
+/// make OTHER gates over-claim in order to correct a demo exit code.
 fn apply_two_host_signed_run(beats: &mut [Beat]) {
     let judgement = crate::check_j1_two_host_signed_run::judge(Path::new("."));
+    apply_capture_judgement(beats, &judgement);
+}
+
+/// §A6 review P9 (AC3.5) — the PURE state-application seam. It takes the judge's
+/// verdict instead of a root so a vector can INJECT a present-unsigned capture:
+/// at HEAD the capture is absent, so a test that only calls `apply` against `.`
+/// cannot fail — "a vector that cannot fail is the thing this lane keeps
+/// finding" (Trap 17). Every rule of the doc comment above is enforced here and
+/// pinned by `demo_j1_tests::two_host_beat_with_present_capture_renders_*`.
+fn apply_capture_judgement(
+    beats: &mut [Beat],
+    judgement: &crate::check_j1_two_host_signed_run::Judgement,
+) {
     if !judgement.capture_present {
         return;
     }
-    let (state, detail) = if !judgement.findings.is_empty() {
-        (
-            EvidenceState::Indeterminate,
-            format!(
-                "capture present but the judge found {} finding(s) — the claim is refused",
-                judgement.findings.len()
-            ),
+    let detail = if judgement.findings.is_empty() {
+        format!(
+            "capture present and validated; the run is NOT claimed — {} (the two bundle \
+             signatures and `reconcile-hosts` are operator-verified, not gate-verified)",
+            crate::check_j1_two_host_signed_run::CLAIM_SCOPE
         )
     } else {
-        match crate::check_j1_two_host_signed_run::verify_capture_signature(Path::new(".")) {
-            Ok(test) => (
-                EvidenceState::ProvenLiveSigned,
-                format!(
-                    "two-host capture verified under `{test}` — {}",
-                    crate::check_j1_two_host_signed_run::CLAIM_SCOPE
-                ),
-            ),
-            Err(why) => (
-                EvidenceState::Indeterminate,
-                format!("capture validated but NOT signed: {why}"),
-            ),
-        }
+        format!(
+            "capture present but the judge found {} finding(s) — the claim is refused",
+            judgement.findings.len()
+        )
     };
     if let Some(beat) = beats.iter_mut().find(|b| b.name == "two-host-signed-run") {
-        beat.state = state;
+        beat.state = EvidenceState::Indeterminate;
         beat.detail = detail;
-        beat.executed = true;
-        beat.owner = None;
+        // `executed` deliberately left FALSE and the owner deliberately retained:
+        // this beat is not a thing that ran and failed, it is a thing nobody has
+        // earned yet. See the doc comment above (F3).
     }
+}
+/// §A6 review P9 (AC3.5) — the ONE place a claim-table row is rendered, extracted
+/// so the tests assert the ACTUAL rendered line instead of the static declaration
+/// (previously `demo_j1_tests` read `unlanded_beats()` while claiming to test the
+/// render). The mark vocabulary is the demo's honesty contract: `--` is a visible
+/// non-claim, `ok` is proven, `FAIL` is an executed beat that did not hold.
+fn render_beat_row(beat: &Beat) -> String {
+    let mark = if !beat.executed {
+        "--  "
+    } else if beat.state.is_proven() {
+        "ok  "
+    } else {
+        "FAIL"
+    };
+    format!(
+        "  {mark} {:<38} {:<19} {}",
+        beat.name,
+        beat.state.as_str(),
+        beat.detail
+    )
 }
 
 /// A published ledger outranks anything this runner narrates. Read them through
@@ -981,6 +1009,7 @@ fn apply_published_ledgers(beats: &mut [Beat]) {
         Ok(ledgers) => ledgers,
         Err(problems) => {
             section("Published ledgers");
+
             println!(
                 "  {} report(s) did not validate; every beat keeps its observed state:",
                 problems.len()

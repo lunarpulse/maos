@@ -17,6 +17,46 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::HarnessOnly,
     },
     EnvVar {
+        // `j1-crosshost-2e` AC4 (F7). The delegated goal was a hardcoded constant
+        // ("founder-loop: execute the delegated assignment from <host>") with no
+        // override, and codex's completion oracle requires EFFECT evidence — an
+        // applied `file_change`. A worker told to "execute the delegated
+        // assignment" with no assignment writes nothing, so the oracle returned
+        // NoEffectEvidence and the run errored AFTER the agent was billed.
+        //
+        // Read ONLY at frame construction in the composition root. It is NEVER
+        // read at the spawn site: `j1-crosshost-1a` deleted MAOS_WORKER_TASK
+        // because a remote worker cannot inherit local env, so the task must be
+        // frame-borne, and check-j1-loopback-delegation reds any such read as a
+        // "decorative-frame shortcut".
+        name: "MAOS_DELEGATED_GOAL",
+        purpose: "Operator-supplied goal for the delegated worker task (frame-borne; \
+                  REQUIRED on the cross-host arm, falls back to the founder-loop \
+                  rehearsal string on loopback)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        // `j1-crosshost-2e` AC5 (F4). `--once` binds, dials and exits with no
+        // pause, and a refused connect returns `Io` immediately, so there is no
+        // window in which an operator can transcribe host A's boot nonce into
+        // host B's peer pins. Setting this makes host A publish its nonce and
+        // then WAIT for this file before dialling. Unset ⇒ no hold at all, so
+        // the loopback rehearsal and `demo-j1` are unaffected.
+        name: "MAOS_CROSSHOST_PAIRING_READY_FILE",
+        purpose: "Path host A waits for before dialling, so an operator can pair \
+                  boot nonces; unset disables the hold entirely",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        // Bounded, and it FAILS CLOSED: on timeout host A refuses to dial rather
+        // than spending its single non-retryable connect attempt on a host B
+        // that is not listening.
+        name: "MAOS_CROSSHOST_PAIRING_TIMEOUT_SECS",
+        purpose: "Bound on the cross-host pairing hold in seconds (default 300); \
+                  expiry fails the run closed rather than dialling blind",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_NOTIFY_DISABLE",
         purpose: "Disable mobile-push notification dispatch",
         stability: EnvStability::UserFacing,

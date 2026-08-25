@@ -204,3 +204,37 @@ fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag() {
         "the refusal must name the local opt-in (CI runs the fixture only, never a paid agent); stderr:\n{stderr}"
     );
 }
+
+/// §A6 review P10 (AC4.5 / F7) — the delegated goal reaches the frame VERBATIM,
+/// including non-ASCII. Before 2e the goal was a hardcoded constant with no
+/// override (`founder-loop: execute the delegated assignment from <host>`); the
+/// dev's evidence for the override was a manual argv dump, never a committed
+/// vector. The `delegation_routed` event is emitted at the frame itself, so the
+/// exact `"goal":"<sentinel>"` string is the assertion — and the rehearsal
+/// constant must NOT appear, proving override rather than append.
+#[test]
+fn delegated_goal_reaches_the_frame_verbatim_with_non_ascii() {
+    let home = isolated_data_home("goal");
+    let sentinel = "write a haiku to ./h.txt about a café — sentinel ✓ 2e-F7 §A6-P10";
+    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+        .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_DELEGATED_GOAL", sentinel)
+        .current_dir(workspace_root())
+        .output()
+        .expect("failed to execute maos-bin");
+    assert!(
+        output.status.success(),
+        "the founder-loop topology must exit 0 with a goal set; stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(&format!("\"goal\":\"{sentinel}\"")),
+        "the frame must carry the operator's goal byte-for-byte, non-ASCII intact:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("founder-loop: execute the delegated assignment"),
+        "the rehearsal constant must be OVERRIDDEN, not appended:\n{stdout}"
+    );
+}

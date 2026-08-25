@@ -46,7 +46,237 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Governance(args) => dispatch_governance(args, color),
         Subcommand::Backup(args) => dispatch_backup(args, color),
         Subcommand::Migrate(args) => dispatch_migrate(args, color),
+        Subcommand::Cohort(args) => dispatch_cohort(args, color),
     }
+}
+
+/// `j1-crosshost-2e` AC2 (F1) — `maosctl cohort <sign>`.
+fn dispatch_cohort(args: &crate::cli::CohortArgs, _color: ColorChoice) -> ExitCode {
+    match &args.op {
+        crate::cli::CohortOp::Sign {
+            manifest,
+            authority_key,
+            output,
+        } => cohort_sign(manifest, authority_key, output.as_deref()),
+    }
+}
+
+/// Sign a cohort manifest so a cohort daemon will boot.
+///
+/// Before this existed, `CohortManifest::signed_with` had ZERO non-test callers
+/// (`crates/maos-cohort/src/manifest.rs:546`), while the daemon refuses to boot
+/// without a manifest that verifies against its pinned authority keys. Host B of
+/// a two-host run was therefore unreachable: a well-formed manifest with a
+/// validly pinned key still died with
+/// `EInvalidSignature("expected 64 bytes (128 hex chars), got 0 bytes")`.
+///
+/// Three refusals are deliberate and each closes a way of producing a manifest
+/// that looks signed but is not trustworthy:
+/// 1. `--authority-key` is explicit, so a cohort root can never silently become
+///    the operator's audit root.
+/// 2. The manifest must `parse_and_validate` against the authority keys IT
+///    declares, so a structurally invalid manifest is refused before signing
+///    rather than at a remote host's boot.
+/// 3. The signer must actually BE a declared authority. `signed_with` does not
+///    check this; without the check, this command would happily sign a manifest
+///    naming somebody else as the authority — a forgery tool.
+fn cohort_sign(
+    manifest_path: &std::path::Path,
+    authority_key_path: &std::path::Path,
+    output: Option<&std::path::Path>,
+) -> ExitCode {
+    use ed25519_dalek::SigningKey;
+    use maos_cohort::{CohortManifest, PinnedAuthorityKeys};
+
+    macro_rules! fail {
+        ($($arg:tt)*) => {{
+            eprintln!("maosctl: cohort sign — {}", format!($($arg)*));
+            return ExitCode::from(2);
+        }};
+    }
+
+    // EXPLICIT path only. Passing `&None` here would honour MAOS_AUDIT_KEY and
+    // the default audit root (`maos_domain::audit_key::load_audit_key_seed`),
+    // welding the cohort trust root to the audit trust root.
+    let seed = match maos_domain::audit_key::load_audit_key_seed(&Some(
+        authority_key_path.to_path_buf(),
+    )) {
+        Ok(seed) => seed,
+        Err(e) => fail!(
+            "cannot load authority key {}: {e}",
+            authority_key_path.display()
+        ),
+    };
+    let signing_key = SigningKey::from_bytes(&seed);
+    let signer_hex = hex::encode(signing_key.verifying_key().to_bytes());
+
+    let text = match std::fs::read_to_string(manifest_path) {
+        Ok(text) => text,
+        Err(e) => fail!("cannot read manifest {}: {e}", manifest_path.display()),
+    };
+
+    // `signature` has no serde default, so an unsigned manifest cannot
+    // deserialize as written. Supply an empty signature purely so the BODY can be
+    // parsed and validated; the value is replaced by `signed_with` below and is
+    // never trusted.
+    let (parsed, normalized_for_body): (CohortManifest, String) = {
+        let mut doc: toml::Value = match toml::from_str(&text) {
+            Ok(doc) => doc,
+            Err(e) => fail!(
+                "manifest {} does not parse as TOML: {e}",
+                manifest_path.display()
+            ),
+        };
+        if let Some(table) = doc.as_table_mut() {
+            table.insert(
+                "signature".to_string(),
+                toml::Value::Table(toml::map::Map::from_iter([(
+                    "sig".to_string(),
+                    toml::Value::String(String::new()),
+                )])),
+            );
+        }
+        let normalized = match toml::to_string(&doc) {
+            Ok(normalized) => normalized,
+            Err(e) => fail!("cannot normalize manifest for validation: {e}"),
+        };
+        match toml::from_str(&normalized) {
+            Ok(parsed) => (parsed, normalized),
+            Err(e) => fail!(
+                "manifest {} is not a cohort manifest: {e}",
+                manifest_path.display()
+            ),
+        }
+    };
+
+    // Validate the body against the authority set the manifest itself declares.
+    let pinned = match PinnedAuthorityKeys::from_hex(&parsed.authority.keys) {
+        Ok(pinned) => pinned,
+        Err(e) => fail!("manifest declares an unusable authority key set: {e}"),
+    };
+
+    // The signer must be one of the declared authorities. `signed_with` will sign
+    // anything; a tool that signs a manifest naming another authority is a
+    // forgery tool, not a signer.
+    if !parsed
+        .authority
+        .keys
+        .iter()
+        .any(|declared| declared.eq_ignore_ascii_case(&signer_hex))
+    {
+        fail!(
+            "refusing to sign: the supplied key ({}…) is not among the manifest's declared \
+             authority.keys. Signing a manifest that names a DIFFERENT authority would produce \
+             an artifact whose signature and whose claimed signer disagree",
+            &signer_hex[..16]
+        );
+    }
+
+    // §A6 review P6 — validate the BODY before signing, per AC2.3's letter.
+    // Previously this ran only on the signed artifact after `signed_with`;
+    // the safety net was equivalent but the ordering deviated from the spec.
+    if let Err(e) = CohortManifest::parse_and_validate(&normalized_for_body, &pinned) {
+        fail!(
+            "manifest {} does not validate: {e}",
+            manifest_path.display()
+        );
+    }
+
+    let signed = parsed.signed_with(&signing_key);
+
+    // Prove the artifact we are about to emit actually verifies — STRUCTURALLY
+    // (`parse_and_validate`) AND CRYPTOGRAPHICALLY (`verify_signature`).
+    // §A6 review P6: the first version called only `parse_and_validate`, which
+    // is structural by its own doc (`manifest.rs:355-356`); the signature's
+    // round-trip through `toml::to_string` was never proven here. The daemon
+    // verifies at boot, but a signer that discovers its own defect at a remote
+    // host's boot instead of at the signing site is exactly what AC2 forbids.
+    let serialized = match toml::to_string(&signed) {
+        Ok(serialized) => serialized,
+        Err(e) => fail!("cannot serialize the signed manifest: {e}"),
+    };
+    match CohortManifest::parse_and_validate(&serialized, &pinned) {
+        Ok(reparsed) => {
+            if let Err(e) = reparsed.verify_signature(&pinned) {
+                fail!(
+                    "the signed manifest's signature does not verify against its own declared \
+                     authority: {e}"
+                );
+            }
+        }
+        Err(e) => {
+            fail!("the signed manifest does not validate against its own declared authority: {e}")
+        }
+    }
+
+    // §A6 review P7 — refuse an --output that aliases the authority key. The key
+    // is already loaded by this point, so the write below would otherwise
+    // silently replace the seed with manifest TOML and report success — a
+    // deterministic destruction of a PUBLISHED cohort trust root (recovery
+    // regenerates the root and invalidates PUBLISHED-FINGERPRINTS.md). Compare
+    // by file identity, not string equality, so symlinks and hard links are
+    // caught too.
+    if let Some(path) = output {
+        if same_file(path, authority_key_path) {
+            fail!(
+                "refusing to write: --output {} would overwrite --authority-key {}. The seed is \
+                 loaded already, so this write would silently destroy the cohort trust root and \
+                 report success. Write the signed manifest elsewhere.",
+                path.display(),
+                authority_key_path.display()
+            );
+        }
+        if let Err(e) = std::fs::write(path, &serialized) {
+            fail!("cannot write {}: {e}", path.display());
+        }
+        eprintln!(
+            "maosctl: cohort sign — signed {} (cohort `{}` v{}, {} member(s)) under authority {} \
+             → {}",
+            manifest_path.display(),
+            signed.cohort_id,
+            signed.version,
+            signed.members.len(),
+            signer_hex,
+            path.display()
+        );
+    } else {
+        print!("{serialized}");
+        eprintln!(
+            "maosctl: cohort sign — signed {} (cohort `{}` v{}, {} member(s)) under authority {} \
+             → stdout",
+            manifest_path.display(),
+            signed.cohort_id,
+            signed.version,
+            signed.members.len(),
+            signer_hex
+        );
+    }
+    ExitCode::SUCCESS
+}
+
+/// §A6 review P7 — same-file check for `cohort sign`'s `--output` vs
+/// `--authority-key`. Two paths denote the same file when they canonicalize to
+/// the same path, or when one does not exist yet but its parent canonicalizes
+/// identically and the file names match (covers `./k` vs `k` for a not-yet-born
+/// output). Existing symlinks/hard links are caught by `same_file`-style dev+ino
+/// comparison; a symlink whose TARGET does not exist yet falls back to the
+/// canonical-parent comparison. Not a general-purpose utility: callers pass one
+/// existing path (the key) and one possibly-absent path (the output).
+fn same_file(output: &std::path::Path, key: &std::path::Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let meta = |p: &std::path::Path| std::fs::metadata(p).ok();
+    if let (Some(a), Some(b)) = (meta(output), meta(key)) {
+        // Symlinks are followed by `metadata`; hard links share dev+ino.
+        return a.dev() == b.dev() && a.ino() == b.ino();
+    }
+    // Output does not exist yet (the normal case): compare the canonical parent
+    // plus the final component, so `dir/../key`, `./key` and `key` all alias.
+    let canon = |p: &std::path::Path| {
+        let parent = p.parent()?;
+        let canonical_parent = std::fs::canonicalize(parent).ok()?;
+        Some(canonical_parent.join(p.file_name()?))
+    };
+    canon(output) == canon(key)
 }
 
 /// Story 9.4 AC-3 — `maosctl backup <create|verify|restore>`.
