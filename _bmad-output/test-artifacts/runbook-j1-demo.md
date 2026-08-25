@@ -28,8 +28,11 @@ and prints the claim table.
 | `--live-codex` | The paid Tier-2 take — see below. |
 | `--codex-topology <PATH>` | The operator-authored codex topology for `--live-codex`. |
 
-**Expected shape** (2026-08-14, post-`j1-crosshost-1a`): 14 events, exit 0, founder
-loop ≈**0.19s**, eight executed beats `PROVEN_BLOCKING`, four `ABSENT`.
+**Expected shape** (re-measured 2026-08-22 at `dd4cf959`, `j1-crosshost-2d` AC3.13):
+exit 0, founder loop ≈**0.18s**, **22 beats — 19 `PROVEN_BLOCKING`, 3 `ABSENT`**.
+The previous line here read *"eight executed beats `PROVEN_BLOCKING`, four `ABSENT`"*,
+a count taken on 2026-08-14 and never re-measured across `j1-crosshost-1b`, `2a`, `2b`
+and `2c`. **Read the table below, not a remembered count.**
 
 ---
 
@@ -40,14 +43,24 @@ loop ≈**0.19s**, eight executed beats `PROVEN_BLOCKING`, four `ABSENT`.
 | `topology-spirits-loaded` | PROVEN_BLOCKING | orchestrator + architect + reviewer came up from the topology. |
 | `delegation-frame-crosses-loopback` | PROVEN_BLOCKING | a real `task.assign` carried an ADR-012 consent envelope to `developer-remote`. **v0.8 rung — loopback rehearsal.** |
 | `worker-admitted-under-host-grant` | PROVEN_BLOCKING | host-managed grant, T3, real `child_pid`. Admission by grant, not by trust. |
-| `worker-completed-by-adapter-oracle` | PROVEN_BLOCKING | completion came from `parse_completion` + a worker TL ref — never from an exit code. |
+| `worker-completed-by-adapter-oracle` | PROVEN_BLOCKING | completion came from the adapter's own structured output + a worker TL ref — never from an exit code. |
 | `delegation-closed-at-safe-point` | PROVEN_BLOCKING | `TaskComplete` journaled, no frame left in flight. |
+| `worker-exited-and-loop-went-idle` | PROVEN_BLOCKING | the child reaped and the serving loop returned to idle — no orphan, no spin. |
 | `state-home-clean` | PROVEN_BLOCKING | zero `journal:` warnings in a fresh home. |
+| `lifecycle-stages-in-order` | PROVEN_BLOCKING | 5 stages, each exactly once, in sequence. |
 | `audit-drain-clean` | PROVEN_BLOCKING | every queued audit row reached SQLite before exit. |
+| `sealed-export-covers-the-run` | PROVEN_BLOCKING | what an independent reader sees in the window is what the signer sealed (19 rows queried, 19 covered). |
 | `frame-borne-route-intact` | PROVEN_BLOCKING | `check-j1-loopback-delegation` (hermetic, Blocking) agrees. |
-| `disallowed-intent-refused-blocking` | **ABSENT** | owned by `j1-crosshost-1b`. |
-| `tier2-live-agent-signed` | **ABSENT** | earned only by `--live-codex`. |
-| `two-host-signed-run` | **ABSENT** | owned by `j1-crosshost-2` (v1.0). |
+| `loopback-from-host-unverified` | PROVEN_BLOCKING | the wire-identity boundary is exactly where rung 1 says it is. |
+| `completion-oracle-per-adapter` | PROVEN_BLOCKING | each adapter reads its OWN structured output; codex and claude are not interchangeable. |
+| `worker-cli-under-library` | PROVEN_BLOCKING | the adapter seam stays nameable by its vectors. |
+| `completion-vectors-enrolled` | PROVEN_BLOCKING | every J1 test target is actually invoked by CI. |
+| `consent-refusal-proofs` | PROVEN_BLOCKING | `-32001` / `-32009` / `-32003` stay distinct and asserted. |
+| `cross-host-identity-proof` | PROVEN_BLOCKING | the crossing is proven in two logs under a verified wire identity. |
+| `disallowed-intent-refused-blocking` | PROVEN_BLOCKING | a disallowed intent is REFUSED (`-32001`, distinct from `-32009`). **Landed by `j1-crosshost-1b`; this row read `ABSENT` until 2026-08-22.** |
+| `two-host-delegation` | PROVEN_BLOCKING | two real hosts over mTLS/TOFU, a frame crossed, a worker ran on the far side, both logs carry the same sixteen bytes. |
+| `tier2-live-agent-signed` | **ABSENT** | earned only by `--live-codex` (operator-local, never CI). |
+| `two-host-signed-run` | **ABSENT** | owned by **`j1-crosshost-2d-paid-two-host-run`**. *(This row named `j1-crosshost-2` until 2026-08-22; that key was split into 2a/2b/2c on 2026-08-15 and no longer exists. `xtask/src/demo_j1.rs:911` has always held the correct owner, and `check_j1_two_host_signed_run.rs:879-889` is a Blocking leg that REDs if it stops doing so — the runbook, not the machine, was stale.)* |
 | `halt-resume-referential-identity` | **ABSENT** | owned by `FOLLOWUP-J1-RESUME-SEAM`. |
 
 `ABSENT` never becomes green and never fails the run — it is a visible placeholder,
@@ -81,9 +94,15 @@ This automates Phases 3–5 of
 [`runbook-j1-tier-2-signed-live-run.md`](runbook-j1-tier-2-signed-live-run.md).
 Read that first for the abort conditions; they still bind.
 
-**You must supply the codex profile.** The repo ships only the fixture worker
-manifest, so author the codex topology + manifest per that runbook's Phase 1.5
-(pin the exact argv first), then pass it:
+**The codex profile now SHIPS — author nothing.** All three files exist at HEAD and
+are the ones the flag expects (verified 2026-08-22): the topology
+`spirits/topologies/j1-founder-loop-codex.toml`, the worker manifest
+`spirits/worker/manifest-codex.toml`, and its claude sibling
+`spirits/worker/manifest-claude.toml`. This paragraph previously told the operator to
+author all three per Phase 1.5 — work that `j1-crosshost-2a` had already landed.
+You still **must** pin the exact argv standalone before a signed run, because
+`argv_prefix` is TOCTOU-hashed into the cap-token; that part of the instruction stands.
+Pass the shipped topology:
 
 ```
 export CODEX_API_KEY="$OPENAI_API_KEY"      # codex IGNORES OPENAI_API_KEY for auth
