@@ -1,0 +1,120 @@
+{
+  "schema_version": "maos.audit-bundle.v1",
+  "entries": [
+    {
+      "frame_id": "01a03908691fc80f27d38b1dd131c4d6",
+      "timestamp_ns": 1787663247647028971,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "telemetry.event",
+      "intent": "cohort:daemon-started",
+      "payload": "{\"event\":\"daemon_started\"}"
+    },
+    {
+      "frame_id": "0100000000000000e09eb3b406c54f4e",
+      "timestamp_ns": 1787663248666799594,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "task.assign",
+      "intent": "standard",
+      "payload": "{\"TaskAssign\":{\"goal\":\"create a file named DELEGATED-PROOF.md in the current directory containing a one-paragraph summary of what MAOS cross-host delegation does\",\"scope\":[],\"success_criteria\":\"the worker reports completion through its adapter's parse_completion oracle\",\"posture_preferences\":{\"preferred_posture\":null,\"halt_policy_overrides\":[]},\"prior_distillate_ref\":null}}"
+    },
+    {
+      "frame_id": "01a03908714a7371f0082d83c2f23328",
+      "timestamp_ns": 1787663249738837448,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "cli.subprocess.output",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/claude\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":1,\"child_pid\":362808,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "01a03908714ce6b441332bd26c9297fc",
+      "timestamp_ns": 1787663249740236182,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "cli.subprocess.output",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/claude\",\"stream\":\"stderr\",\"line\":\"⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: socat not installed · install missing tools (e.g. apt install bubblewrap socat) or see https://code.claude.com/docs/en/sandboxing\",\"line_no\":2,\"child_pid\":362808,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "01a03908714dcc482c6973a38ba8ca9f",
+      "timestamp_ns": 1787663249741414193,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "cli.subprocess.output",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/claude\",\"stream\":\"stderr\",\"line\":\"  Commands will run WITHOUT sandboxing. Network and filesystem restrictions will NOT be enforced.\",\"line_no\":3,\"child_pid\":362808,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "01a03908714eaf57f6909875f41b2314",
+      "timestamp_ns": 1787663249742609988,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "cli.subprocess.output",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/claude\",\"stream\":\"stderr\",\"line\":\"\",\"line_no\":4,\"child_pid\":362808,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "01a039089aa7900202ddaf3316ff9924",
+      "timestamp_ns": 1787663260327889369,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "cli.subprocess.output",
+      "intent": "cli.subprocess.output",
+      "payload": "{\"cli\":\"/home/lunarpulse/.local/bin/claude\",\"stream\":\"stdout\",\"line\":\"{\\\"is_error\\\":false,\\\"duration_api_ms\\\":11711,\\\"num_turns\\\":4,\\\"stop_reason\\\":\\\"end_turn\\\",\\\"session_id\\\":\\\"ea2bfb11-a34d-40ab-9ecd-607dd0fdb8c4\\\",\\\"total_cost_usd\\\":0.014644,\\\"usage\\\":{\\\"input_tokens\\\":9035,\\\"cache_creation_input_tokens\\\":0,\\\"cache_read_input_tokens\\\":0,\\\"output_tokens\\\":920,\\\"output_tokens_details\\\":{\\\"thinking_tokens\\\":321},\\\"server_tool_use\\\":{\\\"web_search_requests\\\":0,\\\"web_fetch_requests\\\":0},\\\"service_tier\\\":\\\"standard\\\",\\\"cache_creation\\\":{\\\"ephemeral_1h_input_tokens\\\":0,\\\"ephemeral_5m_input_tokens\\\":0},\\\"inference_geo\\\":\\\"not_available\\\",\\\"iterations\\\":[{\\\"input_tokens\\\":2903,\\\"output_tokens\\\":195,\\\"cache_read_input_tokens\\\":0,\\\"cache_creation_input_tokens\\\":0,\\\"cache_creation\\\":{\\\"ephemeral_5m_input_tokens\\\":0,\\\"ephemeral_1h_input_tokens\\\":0},\\\"type\\\":\\\"message\\\"}],\\\"speed\\\":\\\"standard\\\"},\\\"modelUsage\\\":{\\\"claude-haiku-4-5-20251001\\\":{\\\"inputTokens\\\":9959,\\\"outputTokens\\\":937,\\\"cacheReadInputTokens\\\":0,\\\"cacheCreationInputTokens\\\":0,\\\"webSearchRequests\\\":0,\\\"costUSD\\\":0.014644,\\\"contextWindow\\\":200000,\\\"maxOutputTokens\\\":32000,\\\"canonicalModel\\\":\\\"claude-haiku-4-5\\\",\\\"provider\\\":\\\"firstParty\\\"}},\\\"permission_denials\\\":[{\\\"tool_name\\\":\\\"Bash\\\",\\\"tool_use_id\\\":\\\"toolu_01HUG2z7gpxcML65hPbgquhn\\\",\\\"tool_input\\\":{\\\"command\\\":\\\"find /home/lunarpulse/.maos -type f -name \\\\\\\"*.md\\\\\\\" | head -20\\\"}}],\\\"terminal_reason\\\":\\\"completed\\\",\\\"fast_mode_state\\\":\\\"off\\\",\\\"fast_mode_disabled_reason\\\":\\\"sdk_opt_in_required\\\",\\\"subagent_stats\\\":{\\\"spawned\\\":0,\\\"requested\\\":{\\\"background\\\":0,\\\"foreground\\\":0,\\\"unset\\\":0},\\\"started_in_background\\\":0,\\\"max_depth\\\":0,\\\"spawned_by_subagents\\\":0,\\\"completed\\\":0,\\\"failed\\\":0,\\\"killed\\\":{\\\"parent\\\":0,\\\"user\\\":0,\\\"system\\\":0},\\\"refused\\\":{\\\"depth_limit\\\":0,\\\"concurrency_limit\\\":0,\\\"budget\\\":0},\\\"by_type\\\":{}},\\\"subtype\\\":\\\"success\\\",\\\"api_error_status\\\":null,\\\"result\\\":\\\"Done! I've created the `DELEGATED-PROOF.md` file in the current directory. The file contains a comprehensive one-paragraph summary explaining that MAOS cross-host delegation is a distributed computing mechanism that:\\\\n\\\\n- Enables intelligent task distribution across multiple connected hosts/machines\\\\n- Allows agents to delegate computational tasks based on resource availability, location, latency, capacity, and specialized capabilities\\\\n- Maintains transparent communication and state synchronization across the network\\\\n- Provides benefits like workload balancing, fault tolerance, scalability, and access to specialized resources\\\\n- Shields applications from distributed infrastructure complexity through a unified programming model\\\\n\\\\nThe file is now ready in your current working directory.\\\",\\\"ttft_ms\\\":2677,\\\"ttft_stream_ms\\\":1026,\\\"time_to_request_ms\\\":22,\\\"type\\\":\\\"result\\\",\\\"duration_ms\\\":10572,\\\"uuid\\\":\\\"30de2b78-99f4-4b8c-b6de-58a8dfbb16ce\\\",\\\"queued_turn_count\\\":0}\",\"line_no\":1,\"child_pid\":362808,\"intent_lineage\":[\"cli-wrapper-run\"]}"
+    },
+    {
+      "frame_id": "01a039089f43cd262391d57489d3bce8",
+      "timestamp_ns": 1787663261507925679,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "capability.invocation",
+      "intent": "cli.subprocess.exit",
+      "payload": "{\"event\":\"cli_subprocess_exit\",\"cli_child_pid\":362808,\"exit_cause\":\"exited(code=0)\",\"is_crash\":false}"
+    },
+    {
+      "frame_id": "01a039089f4dae9423ec7e63bc2c6477",
+      "timestamp_ns": 1787663261517229497,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "telemetry.event",
+      "intent": "worker.completion-verdict",
+      "payload": "{\"event\":\"worker_completion_verdict\",\"worker_cli\":\"claude\",\"verdict\":\"not_completed:permission_denied\",\"completed\":false,\"last_stdout_tl_ref_is_not_a_completion_witness\":true,\"last_stdout_tl_ref\":\"<REDACTED:type=capability_token,len=32,hash=f1d3>\"}"
+    },
+    {
+      "frame_id": "0100000000000080e09eb3b406c54f4e",
+      "timestamp_ns": 1787663261532827157,
+      "spirit_pid": 0,
+      "boot_nonce": 7228989958584256360,
+      "kind": "task.complete",
+      "intent": "standard",
+      "payload": "{\"TaskComplete\":{\"result\":\"not_completed:permission_denied\"}}"
+    },
+    {
+      "frame_id": "1eefbc53014493b06c158b1566f64fcd",
+      "timestamp_ns": 1787663579098199207,
+      "spirit_pid": 0,
+      "boot_nonce": 0,
+      "kind": "run.capture",
+      "intent": "run.capture",
+      "payload": "{\"signer\":\"Myoungki Jung (Lunarpulse), operator, 2026-08-25\",\"live_agent_identity\":\"claude 2.1.243 (Claude Code) on host B; model claude-haiku-4-5-20251001 as reported by the run's own modelUsage; codex 0.144.4 present on PATH but not spawned\",\"command_metadata\":\"claude --print --output-format json --bare --permission-mode acceptEdits --settings {\\\"sandbox\\\":{\\\"enabled\\\":true},\\\"permissions\\\":{\\\"deny\\\":[\\\"Read(./.git/**)\\\",\\\"Read(**/.env*)\\\",\\\"Write(./.git/**)\\\"]}} <frame-borne goal>; ANTHROPIC_API_KEY supplied via environment and REDACTED here; ANTHROPIC_MODEL=claude-haiku-4-5-20251001; maos release sha256 d4ae436c694327030e153601f69b7fabf6db30cf16faaba7d9193822589f3ca3\",\"host_grant_disposition\":\"exact-match grant admitted: attested_image=claude, signing_key_id=Anthropic, granted_tier=SandboxTier(3), permitted_egress=[api.anthropic.com]\",\"audit_refs\":[\"0100000000000000e09eb3b406c54f4e\",\"01a039089aa7900202ddaf3316ff9924\"],\"egress\":\"declared-not-enforced\",\"egress_followup\":\"FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT\",\"fs_jail\":\"adapter-enforced-maos-declared\",\"fs_jail_followup\":\"FOLLOWUP-EPIC14-V2.0-MAOS-ENFORCED-WORKER-ISOLATION\",\"redaction_result\":\"verified\",\"outcome\":\"Cross-host delegation crossed on real TCP mTLS and both halves journaled the identical frame_id 0100000000000000e09eb3b406c54f4e. The remote worker executed as a real child process and DID produce its effect: DELEGATED-PROOF.md, 1111 bytes, written into the disposable host-B working directory. The adapter nonetheless scored the run not_completed:permission_denied, because the model additionally attempted one unrelated Bash call (a find over the operator home) which the acceptEdits posture correctly denied, and the claude oracle treats any non-empty permission_denials as non-completion. The effect is real and the verdict is negative; both facts are recorded here rather than reconciled. No secret persisted: the metered key was not found in either Transparency Log or either host log by direct scan.\",\"two_host_shape\":\"two-processes-one-box\",\"two_host_trust_anchor\":\"out-of-band-human-operator\",\"two_host_host_b_audit_key\":\"hand-provisioned-separately\",\"two_host_stranger_verification\":\"python3 tools/verify-audit-bundle/verify.py was executed by the operator against each half independently, checking each bundle against the fingerprint committed in PUBLISHED-FINGERPRINTS.md at dd4cf959 BEFORE this run existed, not against the attester_pubkey carried inside the artifact.\"}"
+    }
+  ],
+  "i12_digest_refs": [],
+  "i11_distilled_content": [],
+  "freshness": {
+    "export_timestamp_ns": 1787663595229889500,
+    "covered_window": {
+      "since_ns": 1787663247647028971,
+      "until_ns": 1787663579098199207
+    },
+    "export_seq": 1787663595229889500
+  },
+  "host": "host-b",
+  "signature_block": {
+    "algorithm": "Ed25519",
+    "attester_pubkey": "843dc5a83dbbebcf3c5c5fbe79a45bdba405f61879f77eb932a741708e7296f3",
+    "signature": "b1c35849faf0fe01343c6806e8905f88aeb8bc757fbad80891f1829f7de2b403143b358ff41110eb079f5bf27a353a1be2ff3a873cc348691a417f409371f305"
+  }
+}

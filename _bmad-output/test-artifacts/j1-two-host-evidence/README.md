@@ -6,8 +6,19 @@
 > was executed on 2026-08-22 (fake-`claude` fixture) through a green `reconcile-hosts`.
 
 This directory is what `check-j1-two-host-signed-run` leg 9 (`paid-run-capture`) reads.
-It is **empty of real artifacts until the paid run happens** (`j1-crosshost-2d-paid-two-host-run`),
-and that is the honest state: with no capture present the gate is GREEN and the
+
+> ⚠ **UPDATED 2026-08-25 — THE PAID RUN HAPPENED.** Until that date this paragraph read *"It is empty of
+> real artifacts until the paid run happens"*, and that was true. It is no longer: `two-host-capture.json`,
+> `host-a-bundle.json` and `host-b-bundle.json` are **real evidence from a real run** (`j1-crosshost-2d`
+> AC8, 2026-08-25, `claude-haiku-4-5-20251001`, $0.014644). `paid_run_capture_present` is now `true` and the
+> `two-host-signed-run` demo beat renders **INDETERMINATE**, not ABSENT. Corrected by the §A6 Acceptance
+> Auditor, which caught this file still describing its own directory as empty while holding three artifacts.
+> **Do not delete or overwrite those three files** — reproducing them costs money and re-signing them under
+> different keys would break the `PUBLISHED-FINGERPRINTS.md` commitment. `two-host-capture.example.json` is
+> the template and is deliberately NOT the validated filename.
+
+The pre-run state, retained because it is the state a reader will find in git history and because it is what
+the gate does when nothing is there: with no capture present the gate is GREEN and the
 `two-host-signed-run` demo beat stays **ABSENT**. The gate refuses the *claim*, not the absence.
 
 > **Why this file exists.** The capture contract used to live only inside the validator source and a
@@ -98,7 +109,14 @@ two keyed identities signed; not two machines, two processes, or two operators
 Every **top-level** string field is scanned (case-insensitive, with `-` and `_` normalized to spaces)
 for `two machines`, `two operators` and `fully automated pairing`. An occurrence is excused only when
 the word `not` **immediately** precedes it in the same field (`preceded_by_not`, `:1039-1045`); a
-negation elsewhere in the capture disarms nothing. The verbatim `claim_scope` field is pinned
+negation elsewhere in the capture disarms nothing.
+
+**`not` must be its own word** (added 2026-08-25, proven by execution by the §A6 Edge Case Hunter). The
+check requires a word boundary before `not`, so `"cannot two machines"` REDs — the `not` is fused into
+`cannot` and does not count. `"definitely not two machines"` is fine (what precedes `not` is irrelevant),
+and `"not-two-machines"` is fine (hyphens normalize to spaces before the scan, so the negation still
+binds). Each occurrence is scanned independently: `"not two machines, but it really was two machines"`
+REDs on the second one. The behaviour is fail-closed and correct; it was simply never written down. The verbatim `claim_scope` field is pinned
 byte-for-byte and is the one field never scanned (`:978-980`).
 
 **Top-level strings only.** The scan iterates `capture.as_object()` and skips every non-string value

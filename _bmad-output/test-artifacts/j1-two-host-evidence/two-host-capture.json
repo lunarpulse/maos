@@ -1,0 +1,9 @@
+{
+  "host_a": "host-a",
+  "host_b": "host-b",
+  "shape": "two real OS processes on one box",
+  "claim_scope": "two keyed identities signed; not two machines, two processes, or two operators",
+  "trust_anchor_established_out_of_band": true,
+  "host_b_audit_key_provisioned_separately": true,
+  "stranger_verification": "verify.py run by the operator against each half separately, checked against the fingerprints committed in PUBLISHED-FINGERPRINTS.md before the run existed; OK on both halves."
+}

@@ -1,0 +1,156 @@
+{
+  "schema_version": "maos.audit-bundle.v1",
+  "entries": [
+    {
+      "frame_id": "01a0390865228941d74b931e1967bf74",
+      "timestamp_ns": 1787663246626540577,
+      "spirit_pid": 0,
+      "boot_nonce": 5642945490710666976,
+      "kind": "telemetry.event",
+      "intent": "cohort:crosshost-started",
+      "payload": "{\"event\":\"crosshost_sender_started\",\"role\":\"sender\"}"
+    },
+    {
+      "frame_id": "01a039086d05e4acac11964ae8b77807",
+      "timestamp_ns": 1787663248645736109,
+      "spirit_pid": 1,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"orchestrator\"}"
+    },
+    {
+      "frame_id": "01a039086d06f62f72f32e6428f8c968",
+      "timestamp_ns": 1787663248646969003,
+      "spirit_pid": 1,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"orchestrator\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "01a039086d09f98b3bc889ca2362e9b9",
+      "timestamp_ns": 1787663248649090938,
+      "spirit_pid": 0,
+      "boot_nonce": 5642945490710666976,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1787663248649083114,\"effective_at_ns\":1787663248649083114,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"orchestrator\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "01a039086d0bf3810e8fe0b5860add2d",
+      "timestamp_ns": 1787663248651260834,
+      "spirit_pid": 1,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"
+    },
+    {
+      "frame_id": "01a039086d0cd66996fb98db9fab4943",
+      "timestamp_ns": 1787663248652604114,
+      "spirit_pid": 2,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"architect\"}"
+    },
+    {
+      "frame_id": "01a039086d0d97b4227ebec04f2122f8",
+      "timestamp_ns": 1787663248653763792,
+      "spirit_pid": 2,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"architect\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "01a039086d0ecbe0d5bacc3ee838146e",
+      "timestamp_ns": 1787663248654894795,
+      "spirit_pid": 0,
+      "boot_nonce": 5642945490710666976,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1787663248654890748,\"effective_at_ns\":1787663248654890748,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"architect\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "01a039086d0f056977bd3c0a5d56b905",
+      "timestamp_ns": 1787663248655991465,
+      "spirit_pid": 2,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":2}"
+    },
+    {
+      "frame_id": "01a039086d122f16affdcf0df39f3170",
+      "timestamp_ns": 1787663248658228576,
+      "spirit_pid": 3,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.admit",
+      "payload": "{\"spirit_id\":\"reviewer\"}"
+    },
+    {
+      "frame_id": "01a039086d13dbc13fd08f07f043c97c",
+      "timestamp_ns": 1787663248659365260,
+      "spirit_pid": 3,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.load",
+      "payload": "{\"lifecycle_event\":\"Load\",\"spirit_id\":\"reviewer\",\"spirit_pid\":3}"
+    },
+    {
+      "frame_id": "01a039086d1487d52650f20328eed805",
+      "timestamp_ns": 1787663248660502585,
+      "spirit_pid": 0,
+      "boot_nonce": 5642945490710666976,
+      "kind": "governance.event",
+      "intent": "governance:vetter-key-admission",
+      "payload": "{\"recorded_at_ns\":1787663248660498057,\"effective_at_ns\":1787663248660498057,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"reviewer\",\"version\":\"0.8.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"maos run: topology admission granted\"}}"
+    },
+    {
+      "frame_id": "01a039086d151688950fa99e5808435d",
+      "timestamp_ns": 1787663248661696777,
+      "spirit_pid": 3,
+      "boot_nonce": 5642945490710666976,
+      "kind": "capability.invocation",
+      "intent": "lifecycle.start",
+      "payload": "{\"lifecycle_event\":\"Start\",\"spirit_pid\":3}"
+    },
+    {
+      "frame_id": "0100000000000000e09eb3b406c54f4e",
+      "timestamp_ns": 1787663248663883283,
+      "spirit_pid": 0,
+      "boot_nonce": 5642945490710666976,
+      "kind": "task.assign",
+      "intent": "standard",
+      "payload": "{\"TaskAssign\":{\"goal\":\"create a file named DELEGATED-PROOF.md in the current directory containing a one-paragraph summary of what MAOS cross-host delegation does\",\"scope\":[],\"success_criteria\":\"the worker reports completion through its adapter's parse_completion oracle\",\"posture_preferences\":{\"preferred_posture\":null,\"halt_policy_overrides\":[]},\"prior_distillate_ref\":null}}"
+    },
+    {
+      "frame_id": "8d6cc8dd766b0658d6d40387b0874c69",
+      "timestamp_ns": 1787663579087556185,
+      "spirit_pid": 0,
+      "boot_nonce": 0,
+      "kind": "run.capture",
+      "intent": "run.capture",
+      "payload": "{\"signer\":\"Myoungki Jung (Lunarpulse), operator, 2026-08-25\",\"live_agent_identity\":\"claude 2.1.243 (Claude Code) on host B; model claude-haiku-4-5-20251001 as reported by the run's own modelUsage; codex 0.144.4 present on PATH but not spawned\",\"command_metadata\":\"claude --print --output-format json --bare --permission-mode acceptEdits --settings {\\\"sandbox\\\":{\\\"enabled\\\":true},\\\"permissions\\\":{\\\"deny\\\":[\\\"Read(./.git/**)\\\",\\\"Read(**/.env*)\\\",\\\"Write(./.git/**)\\\"]}} <frame-borne goal>; ANTHROPIC_API_KEY supplied via environment and REDACTED here; ANTHROPIC_MODEL=claude-haiku-4-5-20251001; maos release sha256 d4ae436c694327030e153601f69b7fabf6db30cf16faaba7d9193822589f3ca3\",\"host_grant_disposition\":\"exact-match grant admitted: attested_image=claude, signing_key_id=Anthropic, granted_tier=SandboxTier(3), permitted_egress=[api.anthropic.com]\",\"audit_refs\":[\"0100000000000000e09eb3b406c54f4e\",\"01a039089aa7900202ddaf3316ff9924\"],\"egress\":\"declared-not-enforced\",\"egress_followup\":\"FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT\",\"fs_jail\":\"adapter-enforced-maos-declared\",\"fs_jail_followup\":\"FOLLOWUP-EPIC14-V2.0-MAOS-ENFORCED-WORKER-ISOLATION\",\"redaction_result\":\"verified\",\"outcome\":\"Cross-host delegation crossed on real TCP mTLS and both halves journaled the identical frame_id 0100000000000000e09eb3b406c54f4e. The remote worker executed as a real child process and DID produce its effect: DELEGATED-PROOF.md, 1111 bytes, written into the disposable host-B working directory. The adapter nonetheless scored the run not_completed:permission_denied, because the model additionally attempted one unrelated Bash call (a find over the operator home) which the acceptEdits posture correctly denied, and the claude oracle treats any non-empty permission_denials as non-completion. The effect is real and the verdict is negative; both facts are recorded here rather than reconciled. No secret persisted: the metered key was not found in either Transparency Log or either host log by direct scan.\",\"two_host_shape\":\"two-processes-one-box\",\"two_host_trust_anchor\":\"out-of-band-human-operator\",\"two_host_host_b_audit_key\":\"hand-provisioned-separately\",\"two_host_stranger_verification\":\"python3 tools/verify-audit-bundle/verify.py was executed by the operator against each half independently, checking each bundle against the fingerprint committed in PUBLISHED-FINGERPRINTS.md at dd4cf959 BEFORE this run existed, not against the attester_pubkey carried inside the artifact.\"}"
+    }
+  ],
+  "i12_digest_refs": [],
+  "i11_distilled_content": [],
+  "freshness": {
+    "export_timestamp_ns": 1787663595227802030,
+    "covered_window": {
+      "since_ns": 1787663246626540577,
+      "until_ns": 1787663579087556185
+    },
+    "export_seq": 1787663595227802030
+  },
+  "host": "host-a",
+  "signature_block": {
+    "algorithm": "Ed25519",
+    "attester_pubkey": "4bbc1187ddf5908d9e96eecdbef6bb9fdfbc42a7977bc886c5d41046220be344",
+    "signature": "317519a0a96960ab4c6bb619f516dc26a9537957d8fbca3d83baf2b9c6b0eb9a51b91b3466775104acc9bf8778186221b63b7d5f50b42b6b5aad616145cf2500"
+  }
+}
