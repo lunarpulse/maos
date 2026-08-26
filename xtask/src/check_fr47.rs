@@ -2,8 +2,6 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use crate::fs_walk;
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Violation {
     pub crate_name: String,

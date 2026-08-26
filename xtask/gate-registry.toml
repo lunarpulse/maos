@@ -149,6 +149,11 @@ gates = [
     # Story 13.6c — three-team/three-region CI substrate drift controls
     # (env-consistency + service-block). Structural; blocks at every phase.
     "check-loom-substrate-drift",
+    # Story 14-0 AC1 — the Epic-14 preflight decision register's reader:
+    # targets must resolve to `development_status` keys, an OPEN row past its
+    # mechanical deadline reds, a non-mechanical deadline must declare itself,
+    # and an unreadable/empty register is an error rather than a green.
+    "check-decision-register",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -391,6 +396,14 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = 
 # Structural (no Postgres); a substrate-config drift blocks at every phase.
 [[ship_gate]]
 name = "check-loom-substrate-drift"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 14-0 AC1 — the decision register's reader. Blocking at every phase and
+# deliberately so: every finding it raises is a governance control that has
+# stopped working, and the register's own failure mode was a row reading green
+# to every human while its deadline had passed four stories earlier.
+[[ship_gate]]
+name = "check-decision-register"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 

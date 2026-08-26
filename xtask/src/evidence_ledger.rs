@@ -957,23 +957,39 @@ fn sink_path(gate: &str, leg: &str) -> PathBuf {
     ))
 }
 
-/// Run one `--exact` leg and project the result. Shared by the two Family-A
-/// gates, whose runners were byte-identical twins before this story.
+fn transcript_passed_test(transcript: &str, expected: &str) -> bool {
+    transcript.match_indices(expected).any(|(index, _)| {
+        transcript[..index].ends_with("test ")
+            && transcript[index + expected.len()..].starts_with(" ... ok")
+    })
+}
+
+fn source_defines_test(source: &str, expected: &str) -> bool {
+    source.lines().any(|line| {
+        line.trim_start()
+            .strip_prefix("fn ")
+            .and_then(|line| line.strip_prefix(expected))
+            .is_some_and(|tail| tail.starts_with('('))
+    })
+}
+
+/// Run an exact test or an unfiltered suite and project the result.
 pub fn run_exact_test_leg(
     spec: &TestLeg,
+    suite_tests: Option<(&str, &[&str])>,
     substrate_present: bool,
     gate: &str,
     verifier: &EvidenceVerifier,
 ) -> EvidenceLeg {
-    let binding = verifier.binding().clone();
-    let expected_test = spec
+    let exact_test = spec
         .args
         .iter()
         .position(|arg| *arg == "--")
         .and_then(|separator| separator.checked_sub(1))
         .and_then(|index| spec.args.get(index))
         .copied();
-    let expected_tests: Vec<&str> = expected_test.into_iter().collect();
+    let expected_tests = suite_tests.map_or(exact_test.as_slice(), |(_, tests)| tests);
+    let binding = verifier.binding().clone();
     if spec.class == BindingClass::AdvisorySubstrate && !substrate_present {
         return EvidenceLeg::observe(
             LegObservation {
@@ -987,7 +1003,7 @@ pub fn run_exact_test_leg(
                      MAOS_TEST_POSTGRES* contract is not satisfied on this machine"
                 ),
                 signature: SignatureCheck::rejected(
-                    &expected_tests,
+                    expected_tests,
                     Vec::new(),
                     "live substrate absent — harness did not run",
                 ),
@@ -1016,7 +1032,7 @@ pub fn run_exact_test_leg(
                     green: false,
                     detail: format!("could not start cargo: {error}"),
                     signature: SignatureCheck::rejected(
-                        &expected_tests,
+                        expected_tests,
                         Vec::new(),
                         "cargo test did not start",
                     ),
@@ -1033,12 +1049,23 @@ pub fn run_exact_test_leg(
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    let non_vacuous = transcript.contains("running 1 test") && transcript.contains("1 passed");
+    let non_vacuous = !expected_tests.is_empty()
+        && suite_tests.map_or_else(
+            || transcript.contains("running 1 test") && transcript.contains("1 passed"),
+            |(source_path, tests)| {
+                std::fs::read_to_string(source_path).is_ok_and(|source| {
+                    tests.iter().all(|test| {
+                        source_defines_test(&source, test)
+                            && transcript_passed_test(&transcript, test)
+                    })
+                })
+            },
+        );
     let green = output.status.success() && non_vacuous;
     let signature = leg_signature(
         verifier,
         gate,
-        &expected_tests,
+        expected_tests,
         &transcript,
         &sink,
         spec.class,
@@ -1055,7 +1082,9 @@ pub fn run_exact_test_leg(
             detail: if !output.status.success() {
                 transcript
             } else if !non_vacuous {
-                format!("vacuous: expected exactly one attempted passing test\n{transcript}")
+                format!("vacuous: required tests did not all pass\n{transcript}")
+            } else if suite_tests.is_some() {
+                format!("required suite tests passed: {}", expected_tests.join(", "))
             } else {
                 "running 1 test; 1 passed".to_string()
             },

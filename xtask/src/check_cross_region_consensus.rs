@@ -196,7 +196,7 @@ pub fn run(json: bool) -> Result<(), String> {
     let live_present = live_substrate_present();
     let mut legs: Vec<EvidenceLeg> = LIVE_LEGS
         .iter()
-        .map(|spec| run_exact_test_leg(spec, live_present, GATE_NAME, &verifier))
+        .map(|spec| run_exact_test_leg(spec, None, live_present, GATE_NAME, &verifier))
         .collect();
 
     // 3. Kernel-ABI baseline leg (always attempted; no Postgres dependency).

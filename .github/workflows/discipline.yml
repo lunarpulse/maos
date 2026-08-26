@@ -361,6 +361,35 @@ jobs:
       - name: Run check-env-contract
         run: cargo run -p xtask -- check-env-contract --json
 
+  # Story 14-0 AC1 — the Epic-14 preflight decision register's reader.
+  #
+  # Blocking, and hermetic: it reads two committed files
+  # (`_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md` and
+  # `_bmad-output/implementation-artifacts/sprint-status.yaml`) and nothing else,
+  # so it can never take an ABSENT branch and can never be substrate-gated.
+  #
+  # The register declared as binding rule 2 that its deadlines were "a query, not
+  # a judgement". No machine read the file, so every deadline in it WAS a
+  # judgement, and eight of nineteen rows were wrong at HEAD — including one
+  # marked RESOLVED with its substance unimplemented and its deadline four
+  # stories in the past. The proven-red vectors run in the same job as the gate
+  # deliberately: a gate whose reds are never executed is the failure mode this
+  # story exists to close.
+  check-decision-register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-decision-register
+        run: cargo run -p xtask -- check-decision-register --json
+      - name: Run the 14-0 AC1.5 proven-red vectors
+        run: cargo test -p xtask --test decision_register_gate
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -1378,6 +1407,37 @@ jobs:
       - name: Run iac-routing-budget bench
         run: cargo bench -p maos-bench --bench iac_routing_budget --features kernel_measurement -- --quick
 
+  # D12 (Story 14-0 AC3.3) — `audit_query_latency` had been BROKEN SINCE 9.1 and
+  # had run ZERO times. It filtered on `"capability.invoke"`, which is not a
+  # frame kind, so `query` returned `UnknownKind` and the bench panicked. Nothing
+  # noticed, because the bench was declared in `crates/maos-bench/Cargo.toml` and
+  # appeared in NO workflow and NO xtask.
+  #
+  # The story's ruling is REPAIR, not retire: this measures the audit-query
+  # read-path floor NFR-Aud-13 rests on, and deleting it removes a real control.
+  # But repairing the string alone would leave a bench that still never runs —
+  # a D11(b) instance in its own right, and explicitly NOT a closure. This job
+  # is the execution path.
+  #
+  # NOT `continue-on-error`, unlike the nfr-perf-* benches beside it: `-- --test`
+  # is criterion's single-iteration correctness mode, so it is deterministic and
+  # hermetic rather than wall-clock-sensitive. It asserts the kind filter matches
+  # a non-empty set BEFORE timing anything — a valid-but-wrong kind would
+  # otherwise time an empty scan and report it as a latency measurement.
+  bench-audit-query-latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run audit-query-latency in correctness mode (D12)
+        run: cargo bench -p maos-bench --bench audit_query_latency -- --test
+
   # Story 10.4c AC3 / Task-3.1 (review D3) — J4 §13.1 latency regression track
   # (Gate 2a decay/regression). Mirrors the NFR-Perf-* bench idiom: reuses the
   # real run_j4_measurement, reports the J4 P95 for trendable regression
@@ -1751,6 +1811,13 @@ jobs:
       # shared helper is a refactor, not a control.
       - name: Run the D19 story-file governance vectors (14-0 option (a))
         run: cargo test -p xtask --test d19_story_file_governance -- --test-threads=1
+      # Story 14-0 AC2.4 — the owner sweep's planted red. This gate is the one
+      # the Epic-14 decision register cites as its own verification, and until
+      # 14-0 it bucketed `Owner: epic-14` as OK — because `epic-14: backlog` IS
+      # a real `development_status` key. It was structurally blind to the
+      # register's founding defect, six live rows deep.
+      - name: Run the 14-0 AC2.4 owner-assertion vectors
+        run: cargo test -p xtask --test owner_assertion_epic_key_rejected
 
   # Story 7.1.5 — assert ZERO bare `_No review findings._` placeholders remain
   check-bare-review-findings:
@@ -3330,6 +3397,7 @@ jobs:
       - check-env-contract
       - check-vetting-attestation
       - check-loom-substrate-drift
+      - check-decision-register
     if: always()
     steps:
       - name: Ship gate results summary

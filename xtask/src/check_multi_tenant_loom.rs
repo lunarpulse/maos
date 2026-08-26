@@ -199,7 +199,7 @@ fn journey_successor(live_present: bool, verifier: &EvidenceVerifier) -> Evidenc
             GATE_NAME,
         );
     }
-    let observed = run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier);
+    let observed = run_exact_test_leg(&ORACLE, None, true, GATE_NAME, verifier);
     if observed.green && observed.state() != crate::gate_common::EvidenceState::ProvenLiveSigned {
         return absent_successor(
             JOURNEY_LEG,
@@ -234,7 +234,7 @@ fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
         ],
     };
     match kernel_distinguishes_collective_causes() {
-        Ok(true) => run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier),
+        Ok(true) => run_exact_test_leg(&ORACLE, None, true, GATE_NAME, verifier),
         Ok(false) => EvidenceLeg::observe(
             LegObservation {
                 name: KERNEL_SUCCESSOR_LEG,
@@ -264,6 +264,13 @@ fn kernel_collective_cause_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
         Err(error) => kernel_probe_error(error, verifier),
     }
 }
+const PARALLEL_ISOLATION_SOURCE: &str = "crates/maos-bin/tests/cross_team_consent_13_3.rs";
+const PARALLEL_ISOLATION_TESTS: &[&str] = &[
+    "cross_wall_recall_live_path_uses_verified_state_and_home_team",
+    "cross_wall_traceback_refuses_without_cohort_preconditions",
+    "maos_home_parallel_tests_hold_live_lock",
+];
+
 const SPECS: &[TestLeg] = &[
         TestLeg {
             name: "team-guard-chokepoint",
@@ -1827,6 +1834,33 @@ const SPECS: &[TestLeg] = &[
                 "--exact",
             ],
         },
+        // ── D16 (Story 14-0 AC3.2) — the leg that makes per-file `LIVE_LOCK`
+        // discipline an EXECUTED assertion instead of prose. ─────────────────
+        //
+        // Every other `-p maos-bin` leg above runs ONE test by `--exact` name,
+        // so libtest never has a second test in the process and a
+        // `std::env::set_var("MAOS_HOME", …)` race is STRUCTURALLY UNREACHABLE
+        // by the only thing watching it. Nothing else in CI runs the package
+        // whole: every `cargo test -p maos-bin` in `discipline.yml` names a
+        // `--test` target, and `--workspace` appears only under `cargo build`.
+        //
+        // MEASURED at `9c5ae2db`, twenty runs of the compiled binary each way,
+        // because this is a race and single readings disagreed (three earlier
+        // observers got 3/20, 6/20 and 5/5-pass, the last of them reading a
+        // tree that already carried the fix):
+        //   without the `:497` lock — 4 PASS / 16 FAIL of 20
+        //   with it                 — 20 PASS / 0 FAIL of 20
+        // and whole-package: 38 binaries, 259 tests, 0 failures.
+        //
+        // NO `--exact`, NO test-name filter, NO `--test-threads=1`. Default
+        // parallel flags are the whole point: the defect only exists when two
+        // tests share one process. Ship the lock without this leg and CI stays
+        // exactly as green as it was while broken.
+        TestLeg {
+            name: "maos-bin-whole-package-parallel-isolation",
+            class: BindingClass::Blocking,
+            args: &["test", "-p", "maos-bin"],
+        },
     ];
 
 pub fn run(json: bool) -> Result<(), String> {
@@ -1846,7 +1880,9 @@ pub fn run(json: bool) -> Result<(), String> {
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
-            run_exact_test_leg(spec, substrate, GATE_NAME, &verifier)
+            let suite_tests = (spec.name == "maos-bin-whole-package-parallel-isolation")
+                .then_some((PARALLEL_ISOLATION_SOURCE, PARALLEL_ISOLATION_TESTS));
+            run_exact_test_leg(spec, suite_tests, substrate, GATE_NAME, &verifier)
         })
         .collect();
 

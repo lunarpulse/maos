@@ -575,44 +575,6 @@ fn check_a1() -> Result<CheckResult, std::io::Error> {
     }
 }
 
-fn check_a2() -> Result<CheckResult, std::io::Error> {
-    let id = "A2".to_string();
-    let stories = ["5-1", "5-2", "5-4", "5-5a", "5-5b"];
-    let mut failures = Vec::new();
-
-    for prefix in &stories {
-        match find_story_file(prefix) {
-            None => failures.push(format!("{}: file not found", prefix)),
-            Some(path) => {
-                let content = fs::read_to_string(&path)?;
-                if !content.contains("### Review Findings") {
-                    failures.push(format!("{}: missing ### Review Findings section", prefix));
-                } else if content.contains("_No review findings._") {
-                    // This is the literal placeholder — per spec, this is a failure
-                    failures.push(format!(
-                        "{}: contains '_No review findings._' placeholder",
-                        prefix
-                    ));
-                }
-            }
-        }
-    }
-
-    if failures.is_empty() {
-        Ok(CheckResult {
-            id,
-            passed: true,
-            message: "All 5 stories have populated Review Findings tables".into(),
-        })
-    } else {
-        Ok(CheckResult {
-            id,
-            passed: false,
-            message: format!("Review Findings debt: {}", failures.join("; ")),
-        })
-    }
-}
-
 fn check_a3() -> CheckResult {
     let id = "A3".to_string();
     let xtask_exists = Path::new("xtask/src/check_serde_error_handling.rs").exists();
@@ -635,58 +597,6 @@ fn check_a3() -> CheckResult {
             id,
             passed: false,
             message: "discipline.yml missing check-serde-error-handling job".into(),
-        }
-    }
-}
-
-fn check_a5() -> CheckResult {
-    let id = "A5".to_string();
-    let xtask_exists = Path::new("xtask/src/check_review_findings_resolved.rs").exists();
-    let discipline_has_job = discipline_yml_has_step("check-review-findings-resolved");
-
-    if xtask_exists && discipline_has_job {
-        CheckResult {
-            id,
-            passed: true,
-            message: "check-review-findings-resolved.rs exists and wired in discipline.yml".into(),
-        }
-    } else if !xtask_exists {
-        CheckResult {
-            id,
-            passed: false,
-            message: "xtask/src/check_review_findings_resolved.rs not found".into(),
-        }
-    } else {
-        CheckResult {
-            id,
-            passed: false,
-            message: "discipline.yml missing check-review-findings-resolved job".into(),
-        }
-    }
-}
-
-fn check_a6() -> CheckResult {
-    let id = "A6".to_string();
-    let xtask_exists = Path::new("xtask/src/check_dev_record_completeness.rs").exists();
-    let discipline_has_job = discipline_yml_has_step("check-dev-record-completeness");
-
-    if xtask_exists && discipline_has_job {
-        CheckResult {
-            id,
-            passed: true,
-            message: "check-dev-record-completeness.rs exists and wired in discipline.yml".into(),
-        }
-    } else if !xtask_exists {
-        CheckResult {
-            id,
-            passed: false,
-            message: "xtask/src/check_dev_record_completeness.rs not found".into(),
-        }
-    } else {
-        CheckResult {
-            id,
-            passed: false,
-            message: "discipline.yml missing check-dev-record-completeness job".into(),
         }
     }
 }

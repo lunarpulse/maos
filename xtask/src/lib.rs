@@ -1,4 +1,9 @@
 pub mod abi_diff;
+// Story 14-0 AC1 — the Epic-14 decision register's reader. Exposed so
+// `xtask/tests/` can drive the REAL audit over planted registers; a proven-red
+// vector that exercises a parallel copy of the logic proves nothing about the
+// gate CI runs.
+pub mod check_decision_register;
 pub mod check_fkcs;
 pub mod check_host_surface;
 pub mod check_kernel_baseline;

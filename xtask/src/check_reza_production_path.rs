@@ -89,7 +89,7 @@ fn escape_wiring_successor(verifier: &EvidenceVerifier) -> EvidenceLeg {
         .map_err(|error| format!("cannot inspect `{ESCAPE_WIRING_SOURCE_DISPLAY}`: {error}"))
         .and_then(|source| source_calls_function(&source, "report_escape_anomalies"));
     match present {
-        Ok(true) => run_exact_test_leg(&ORACLE, true, GATE_NAME, verifier),
+        Ok(true) => run_exact_test_leg(&ORACLE, None, true, GATE_NAME, verifier),
         Ok(false) => absent_successor(
             ESCAPE_WIRING_LEG,
             format!(
@@ -1099,7 +1099,7 @@ pub fn run(json: bool) -> Result<(), String> {
         .iter()
         .map(|spec| {
             let substrate = spec.class == BindingClass::Blocking || live_present;
-            run_exact_test_leg(spec, substrate, GATE_NAME, &verifier)
+            run_exact_test_leg(spec, None, substrate, GATE_NAME, &verifier)
         })
         .collect();
     // AC5 ownership records. These disappear only when their own source probe

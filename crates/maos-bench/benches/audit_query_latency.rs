@@ -229,12 +229,41 @@ fn bench_kind_filtered_query(c: &mut Criterion) {
     group.sample_size(20);
 
     // Filter to only CapabilityInvocation frames (kind 7) for one spirit.
+    //
+    // D12 (Story 14-0 AC3.3) — REPAIRED, NOT RETIRED. This read
+    // `"capability.invoke"`, which is not a frame kind: `kind_from_string`
+    // (`maos-audit/src/lib.rs:716`) accepts `"capability.invocation"` /
+    // `"CapabilityInvocation"` and nothing else, so `query` returned
+    // `AuditError::UnknownKind` and the `.expect` below panicked. Broken since
+    // Epic 9.1 and run ZERO times, because the bench was declared in
+    // `maos-bench/Cargo.toml` and appeared in no workflow and no xtask — a
+    // D11(b) instance in its own right. Repairing the string without giving it
+    // an execution path would have left it exactly as unrun, so `discipline.yml`
+    // now executes it in criterion `--test` mode on every push.
+    //
+    // NOT a defect, contrary to the filed row: `INTENTS[0]` at `:24` is also
+    // `"capability.invoke"`, but that is the free-text `intent` COLUMN, not a
+    // frame kind. It is left alone.
+    let filter = AuditFilter {
+        spirit_pid: Some(SPIRIT_PIDS[0]),
+        kind: Some("capability.invocation".to_owned()),
+        ..Default::default()
+    };
+
+    // FAIL LOUDLY BEFORE TIMING ANYTHING. `UnknownKind` already panics, but a
+    // kind that is VALID and simply wrong would return zero rows and this bench
+    // would happily report the latency of matching nothing. The fixture seeds
+    // kind 7 for every fifth row across five spirits, so a correct filter cannot
+    // be empty. Benchmarking a degenerate query is the same defect one turn on:
+    // a number that looks like evidence and measures nothing.
+    let seeded = query(&db_path, filter.clone()).expect("kind-filtered query must resolve");
+    assert!(
+        !seeded.is_empty(),
+        "audit_query_latency: the kind filter matched ZERO of {ROW_COUNT} seeded rows — \
+         the bench would time an empty scan and report it as a latency measurement"
+    );
+
     group.bench_function("capability_invocation_single_spirit", |b| {
-        let filter = AuditFilter {
-            spirit_pid: Some(SPIRIT_PIDS[0]),
-            kind: Some("capability.invoke".to_owned()),
-            ..Default::default()
-        };
         b.iter(|| {
             let entries = query(&db_path, filter.clone()).expect("query");
             black_box(entries);

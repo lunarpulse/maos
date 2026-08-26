@@ -16,6 +16,7 @@ mod gate_common;
 // journey-relevant gates). Depends on gate_common's projection.
 mod evidence_ledger;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
+mod check_decision_register;
 mod check_dependency_closure;
 // Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port).
 mod check_host_surface;
@@ -552,6 +553,16 @@ enum Commands {
     /// allowlisted dev model + a §A6 review artifact (Blocking; closes E11-A1).
     #[command(name = "check-dev-model-tier")]
     CheckDevModelTier {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 14-0 AC1 — the Epic-14 preflight decision register gets a READER.
+    /// Every row's target must resolve to a `development_status` key (`epic-*`
+    /// keys and retro actions are not vehicles); an OPEN row whose mechanical
+    /// deadline has passed REDS; a non-mechanical deadline must declare itself
+    /// UNQUERYABLE. Fails closed on an unreadable/unparseable/empty register.
+    #[command(name = "check-decision-register")]
+    CheckDecisionRegister {
         #[arg(long)]
         json: bool,
     },
@@ -1233,6 +1244,7 @@ fn main() {
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
         Commands::CheckDevModelUsedPopulated { json } => check_dev_model_used_populated::run(json),
         Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
+        Commands::CheckDecisionRegister { json } => check_decision_register::run(json),
         Commands::CheckJ1LoopbackDelegation { json } => check_j1_loopback_delegation::run(json),
         Commands::CheckJ1TwoHostSignedRun { json } => check_j1_two_host_signed_run::run(json),
         Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),

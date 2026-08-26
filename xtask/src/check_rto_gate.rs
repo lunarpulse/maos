@@ -11,7 +11,6 @@
 //! the weekly drill.  If the latest drill's `rto_seconds` exceeds the
 //! threshold, the gate fails.
 
-use crate::gate_common;
 use std::path::Path;
 
 /// 4 hours in seconds.

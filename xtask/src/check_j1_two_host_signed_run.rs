@@ -197,14 +197,7 @@ pub struct Judgement {
     pub enrolled: Vec<String>,
 }
 
-impl Judgement {
-    pub fn leg_green(&self, leg: &str) -> Option<bool> {
-        self.audits
-            .iter()
-            .find(|a| a.leg() == leg)
-            .map(|a| !a.is_vacuous() && !self.findings.iter().any(|f| f.check == leg))
-    }
-}
+impl Judgement {}
 
 // ── Leg 1 — AC1 ────────────────────────────────────────────────────────────
 
@@ -1227,7 +1220,6 @@ pub fn judge(root: &Path) -> Judgement {
 }
 
 /// The gate name evidence records must be bound to.
-pub const GATE: &str = "check-j1-two-host-signed-run";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // F2 / R1 — `verify_capture_signature` DELETED here by `j1-crosshost-2e`.

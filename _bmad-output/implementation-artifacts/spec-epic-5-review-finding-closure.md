@@ -78,3 +78,24 @@ Operator HTTP binds loopback by default, requires a bearer token on daemon and C
 - `cargo test -p maos-manifest && cargo test -p maos-eval && cargo test -p maos-cli && cargo test -p maos-bin --all-features` -- corpora, HTTP/CLI, and smokes pass.
 - `cargo test --workspace --all-features && cargo fmt --all --check` -- workspace completes without skipped coverage or formatting diff.
 - `./target/debug/xtask check-review-findings-resolved --json && ./target/debug/xtask check-dev-record-completeness --json && ./target/debug/xtask check-epic-close-coherence --json && ./target/debug/xtask check-epic-close-green --json` -- every gate reports `passed: true`.
+- `./target/debug/xtask kloc-check --json` -- **ADDED 2026-08-26 by Story `14-0` AC3.1; this is D13's own prescription and it had never been carried out** (`grep -in kloc` on this file returned ZERO hits at `9c5ae2db`). It is the hole that let the two kernel-core instruments disagree for thirteen days: this spec's `af788c3e` took the **FLAG-Winston PIN** grant (`xtask/kernel-core-baseline.toml:465`, anti-DRIFT, physical lines in every `.rs`) and never the paired **CEILING** grant (`xtask/kloc.toml`, anti-GROWTH, tokei CODE with tests/benches/examples/fuzz excluded). The pin read green the whole time while the ceiling sat **685 over**, and no command on this list could see it. D13(a) is now discharged by a founder grant (`kloc.toml:195`, `18248 -> 18933`, exact measured / zero headroom), but taking the grant does not add the gate that would have caught it — this line does.
+
+> ### Provenance gap, recorded rather than fabricated (Story `14-0` AC3.1)
+>
+> This spec became a `development_status` key on 2026-08-26 so that D13(a)'s deadline
+> — *"before `spec-epic-5-review-finding-closure` reaches `done`"* — could be a query
+> instead of a judgement. A status no tracker records cannot transition, so that
+> deadline was unsatisfiable from the day it was written.
+>
+> Being tracked also makes this file visible to the five converted story-file gates
+> for the first time, and two of them are RIGHT to object: it carries **no
+> `dev_model_used`** and **no §A6 review artifact**. That is a real gap and it is
+> stated here rather than papered over — `14-0` will not write a `§A6` marker for a
+> review that did not happen, and will not name a model it cannot evidence (the
+> commit body of `af788c3e` records none, and this file was created by that commit).
+>
+> The status is therefore `blocked`, which is accurate on its own terms: every Task
+> above is unchecked, and the command list now includes `kloc-check`, which is RED at
+> HEAD on `maos-domain` (D14) and `_aggregate_hardfail` (D17) — neither of them this
+> spec's debt. It cannot reach `done` until those clear. Whoever unblocks it owes the
+> two missing records at that point.

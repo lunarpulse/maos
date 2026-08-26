@@ -88,6 +88,11 @@ const EXPECTED_GATES: &[&str] = &[
     "check-env-contract",
     // Story 13.4 (FR37 / ADR-056) — vetting-attestation gate (7 hermetic legs).
     "check-vetting-attestation",
+    // Story 14-0 AC1 — the Epic-14 preflight decision register's reader. Binding
+    // rule 2 of that register promised its deadlines were a query rather than a
+    // judgement; until this gate landed there was no queryer, and eight of
+    // nineteen rows were already wrong at HEAD.
+    "check-decision-register",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

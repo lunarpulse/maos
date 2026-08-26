@@ -266,8 +266,17 @@ const HELD_ADVISORY_ADMISSION_REASON: &str =
      re-pinning `admission_baseline.sha256` in xtask/fkcs-baseline.toml; hidden \
      until Story 13.6e closed this gate's blocking_now/dev_blocks divergence. \
      Re-pinning is a frozen-kernel-conformance judgement on 13.4's change, not \
-     a 13.6e drive-by. OWNER: Epic-13 retrospective (with Story 11.5 FKCS). \
-     TRACKING: deferred-work.md, Story 13.6e section.";
+     a 13.6e drive-by. \
+     OWNER: 14-3-ecosystem-readiness-verification-v2-5-graduation-ledger \
+     (decision D8; deadline: before that story leaves `backlog`). \
+     RE-HOMED 2026-08-26 by Story 14-0 AC5.3 — this string printed \
+     `OWNER: Epic-13 retrospective` for months after the decision register had \
+     already moved D8 to 14-3, and nobody told the gate. \"Owned by a \
+     retrospective is not an owner\" is that register's own epigraph, and an \
+     epic-level roll-up has no story file, no ACs and nobody the tracker can \
+     page. \
+     TRACKING: deferred-work.md, Story 13.6e section; \
+     _bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md (D8).";
 
 fn known_admission_hold(expected: &str, computed: &str) -> Option<&'static str> {
     (expected == HELD_ADVISORY_ADMISSION_BASELINE_SHA256
@@ -924,23 +933,6 @@ fn admission_path_observed_hash(baseline: &FkcsBaseline) -> Result<String, Strin
         return Err("admission baseline declares no files".into());
     }
     admission_content_hash(files)
-}
-
-/// Verify the working-tree admission source files hash to the pinned SHA-256.
-/// Content semantics (literal AC3) — never mere file existence.
-pub fn admission_path_matches_baseline(baseline: &FkcsBaseline) -> Result<(), String> {
-    let computed = admission_path_observed_hash(baseline)?;
-    if computed != baseline.admission_baseline.sha256 {
-        return Err(format!(
-            "admission path content hash mismatch: baseline pins {}, working tree computes {} \
-             over {} file(s); a deliberate admission-path change must re-pin \
-             `admission_baseline.sha256` in fkcs-baseline.toml",
-            baseline.admission_baseline.sha256,
-            computed,
-            baseline.admission_baseline.files.len(),
-        ));
-    }
-    Ok(())
 }
 
 /// SHA-256 over the path-stamped concatenation of the declared admission files.

@@ -72,9 +72,16 @@ fn complete_story(key: &str) -> String {
 
 /// The minimal `deferred-work.md` the dev-record gate requires: at least one open
 /// owner assertion, or its own sweep reports itself vacuous.
+///
+/// The row CITES its disposition. Story `14-0` AC2.3 split the Ownerless bucket:
+/// a row that says "ownerless" with no recorded disposition is now a violation,
+/// because nobody has even decided that nobody owns it. This fixture exists only
+/// to keep the sweep non-vacuous for the D19 vectors, so it carries the same
+/// citation `deferred-work.md`'s real rows carry and stays out of that finding.
 const DEFERRED_WORK: &str = "# Deferred Work\n\n\
     ## Deferred from: something\n\n\
-    - A real deferred item. Ownerless and open: no story successor exists.\n";
+    - A real deferred item. Ownerless and open: no story successor exists. \
+    *Dispositioned by Story 13.6 / AC5, 2026-08-08 (mechanical stale-owner sweep).*\n";
 
 struct Fixture {
     dir: tempfile::TempDir,

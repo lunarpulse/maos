@@ -51,8 +51,25 @@ struct DevRecord {
 enum OwnerBucket {
     Ok,
     Stale,
+    /// Declares itself ownerless AND carries a recorded disposition citation.
+    /// Reported, never blocking: `deferred-work.md`'s *"Ownerless and open —
+    /// Dispositioned by Story 13.6 / AC5"* rows are a DELIBERATE recorded state,
+    /// not an undetected defect, and a gate that reds on a deliberate
+    /// disposition is disabled within a week.
+    OwnerlessDispositioned,
+    /// Declares itself ownerless with NO disposition citation — nobody has even
+    /// decided that nobody owns it. This is the blocking half of AC2.3.
     Ownerless,
     OwnedButDeferred,
+    /// Story `14-0` AC2.1 — the owner names something that is not a VEHICLE.
+    /// An `epic-*` key resolves in `sprint_status` (it really is a
+    /// `development_status` key), so the backtick fallback below used to
+    /// green-light it as `Ok`. That made THIS GATE — the one the Epic-14
+    /// decision register cites as its own verification — structurally blind to
+    /// the register's founding defect: twelve residuals pointing at `epic-14`,
+    /// an epic key, not a vehicle. `story_key_from_filename` already rejects
+    /// `epic-*` filenames; this is the same rule, one field over.
+    NotAVehicle,
 }
 
 #[derive(Debug)]
@@ -87,6 +104,33 @@ fn heading_is_closed(heading: &str) -> bool {
     heading.contains("~~") || has_closed_word || lower.contains("fixed in this round")
 }
 
+/// Citations that turn "ownerless" from an undecided state into a recorded one.
+const DISPOSITION_CITED: &[&str] = &["dispositioned by", "routed ", "recorded as adr-"];
+
+fn has_affirmative_disposition(line: &str) -> bool {
+    DISPOSITION_CITED.iter().any(|marker| {
+        line.match_indices(marker).any(|(index, _)| {
+            let prefix = line[..index].rsplit(['.', ';', '—']).next().unwrap_or("");
+            let authority = line[index + marker.len()..].trim();
+            let first = authority
+                .split(|c: char| c.is_whitespace() || matches!(c, '*' | '`' | ':' | '.' | ','))
+                .find(|word| !word.is_empty())
+                .unwrap_or("");
+            let prefix_negated = prefix
+                .split(|c: char| !c.is_ascii_alphabetic())
+                .any(|word| matches!(word, "no" | "not" | "never" | "without"));
+            let prefix_valid = !prefix.chars().any(char::is_alphabetic)
+                || (prefix.contains("ownerless") && !prefix_negated);
+            prefix_valid
+                && !authority.is_empty()
+                && !matches!(
+                    first,
+                    "no" | "none" | "nobody" | "nothing" | "nowhere" | "not" | "never"
+                )
+        })
+    })
+}
+
 /// Classify deferred-work owner assertions; unpageable owners are STALE.
 ///
 /// Two cue classes, because precision is the whole product here:
@@ -111,6 +155,8 @@ fn classify_owner_assertions(
         "owner:",
     ];
     const REFERENTIAL: &[&str] = &["owner ", "names "];
+    // Story 13.6 / AC5 uses "Dispositioned by …"; the 2026-08-18
+    // round-table uses "ROUTED …"; one row cites an ADR decision.
     let mut sweep = OwnerSweep::default();
     let mut in_closed_section = false;
     for (index, line) in text.lines().enumerate() {
@@ -128,11 +174,32 @@ fn classify_owner_assertions(
         if let Some(ownerless_start) = lower.find("ownerless") {
             if cue.map_or(true, |cue_start| ownerless_start < cue_start) {
                 sweep.assertions += 1;
+                // AC2.3 — "ownerless" is two different states and the gate must
+                // not conflate them. `deferred-work.md` records a DISPOSITION
+                // vocabulary (Story 13.6 / AC5's 2026-08-08 mechanical sweep,
+                // the 2026-08-18 `ROUTED` round-table, ADR citations): those
+                // rows say "we looked, and nobody owns this yet, and that is
+                // recorded". A row that says "ownerless" with NO such citation
+                // says only that a writer typed the word — nobody has even
+                // decided that nobody owns it, and THAT is the invisible state.
+                let (bucket, reason) = if has_affirmative_disposition(&lower) {
+                    (
+                        OwnerBucket::OwnerlessDispositioned,
+                        "ownerless and open, with a recorded disposition",
+                    )
+                } else {
+                    (
+                        OwnerBucket::Ownerless,
+                        "declares itself ownerless with NO recorded disposition — \
+                         give it a `development_status` owner, or cite the \
+                         disposition that decided it has none",
+                    )
+                };
                 sweep.rows.push(OwnerRow {
                     line: index + 1,
                     token: "ownerless".to_string(),
-                    bucket: OwnerBucket::Ownerless,
-                    reason: "ownerless and open",
+                    bucket,
+                    reason,
                 });
                 continue;
             }
@@ -169,6 +236,22 @@ fn classify_owner_assertions(
             continue;
         }
         for token in tokens {
+            // AC2.1 — reject `epic-*` BEFORE the key map is consulted. The key
+            // map is exactly what made this pass: `epic-14: backlog` is a real
+            // entry, so "owned by an epic" resolved and bucketed `Ok`.
+            // `epic-N-retrospective` keeps its existing `OwnedButDeferred`
+            // treatment below — "owned by a retrospective" is already reported
+            // as deferred, and re-classifying it here would drop that signal.
+            if token.starts_with("epic-") && !token.contains("retro") {
+                sweep.rows.push(OwnerRow {
+                    line: index + 1,
+                    token,
+                    bucket: OwnerBucket::NotAVehicle,
+                    reason: "an `epic-*` key is an EPIC, not a vehicle — it has no \
+                             story file, no ACs and no owner the tracker can page",
+                });
+                continue;
+            }
             let key = sprint_status.get_key_value(&token).or_else(|| {
                 sprint_status.iter().find(|(key, _)| {
                     key.strip_prefix(&token)
@@ -554,6 +637,56 @@ pub fn run(
         ));
     }
 
+    // AC2.1 — an `epic-*` owner is a finding, and it must be re-homed rather
+    // than suppressed.
+    for row in owner_sweep
+        .rows
+        .iter()
+        .filter(|row| row.bucket == OwnerBucket::NotAVehicle)
+    {
+        violations.push(format!(
+            "deferred-work.md:{}: owner `{}` is NOT A VEHICLE — {}",
+            row.line, row.token, row.reason
+        ));
+    }
+
+    // AC2.3 — the Ownerless bucket is EMITTED. It was computed and then reported
+    // NOWHERE: the rows existed in `OwnerSweep::rows` and no consumer ever read
+    // them, so "we looked and there is no vehicle" was recorded in a value that
+    // fell on the floor. Both halves are now printed and carried in the JSON.
+    //
+    // MEASURED at `9c5ae2db`, and this is why the split exists rather than one
+    // blanket rule: twelve rows declare themselves ownerless-and-open, and
+    // ELEVEN of them cite the disposition that decided it — Story 13.6 / AC5's
+    // 2026-08-08 mechanical sweep, the 2026-08-18 `ROUTED` round-table, or an
+    // ADR decision. Those are a recorded state, and a gate that reds on a
+    // deliberate disposition is disabled within a week. The twelfth cited
+    // nothing. That one is the finding, and it is D5.4.
+    //
+    // Also measured, and recorded rather than acted on: **81** open rows carry
+    // no owner cue of any kind, so they reach neither bucket. That is a wider
+    // hole than this story can close without inventing owners for work it does
+    // not understand — which is the move `14-0`'s own blocking condition 3
+    // forbids. Stated as a boundary here, not left silent.
+    let ownerless_dispositioned: Vec<String> = owner_sweep
+        .rows
+        .iter()
+        .filter(|row| row.bucket == OwnerBucket::OwnerlessDispositioned)
+        .map(|row| format!("deferred-work.md:{}: {}", row.line, row.reason))
+        .collect();
+    for row in &ownerless_dispositioned {
+        eprintln!("dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) {row}");
+    }
+    let ownerless: Vec<String> = owner_sweep
+        .rows
+        .iter()
+        .filter(|row| row.bucket == OwnerBucket::Ownerless)
+        .map(|row| format!("deferred-work.md:{}: {}", row.line, row.reason))
+        .collect();
+    for row in &ownerless {
+        violations.push(format!("deferred-work.md OWNERLESS-UNDISPOSITIONED {row}"));
+    }
+
     let owned_but_deferred: Vec<String> = owner_sweep
         .rows
         .iter()
@@ -578,6 +711,14 @@ pub fn run(
             "done_stories_checked": done_count,
             "deferred_owner_assertions": owner_sweep.assertions,
             "owned_but_deferred": owned_but_deferred,
+            "not_a_vehicle": owner_sweep
+                .rows
+                .iter()
+                .filter(|row| row.bucket == OwnerBucket::NotAVehicle)
+                .map(|row| format!("deferred-work.md:{}: `{}`", row.line, row.token))
+                .collect::<Vec<_>>(),
+            "ownerless_undispositioned": ownerless,
+            "ownerless_dispositioned": ownerless_dispositioned,
             "total_stories_scanned": records.len(),
         });
         println!("{}", payload);
@@ -1003,8 +1144,26 @@ mod tests {
     }
     #[test]
     fn unresolved_heading_keeps_open_ownerless_rows_visible() {
+        // Story 14-0 AC2.3 split this bucket in two. The row below CITES its
+        // disposition, so it stays visible and reported but does not block —
+        // `deferred-work.md`'s "Ownerless and open — Dispositioned by Story
+        // 13.6 / AC5" rows are a decided state, and a gate that reds on a
+        // deliberate disposition is disabled within a week.
         let sweep = classify_owner_assertions(
             "## Unresolved work\n- **Gap.** Ownerless and open. Dispositioned by Story 13.6.\n",
+            &std::collections::HashMap::new(),
+        );
+        assert_eq!(sweep.assertions, 1);
+        assert_eq!(sweep.rows[0].bucket, OwnerBucket::OwnerlessDispositioned);
+    }
+
+    #[test]
+    fn an_ownerless_row_citing_no_disposition_is_the_blocking_half() {
+        // The same row with the citation removed. Nobody has even decided that
+        // nobody owns it, and before 14-0 the bucket was computed and reported
+        // nowhere, so this state was invisible rather than merely unowned.
+        let sweep = classify_owner_assertions(
+            "## Unresolved work\n- **Gap.** Ownerless and open.\n",
             &std::collections::HashMap::new(),
         );
         assert_eq!(sweep.assertions, 1);

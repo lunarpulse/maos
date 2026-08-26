@@ -6,12 +6,14 @@ kernel_grant: "NONE and none needed. `check-kernel-baseline` GREEN at **24472 ==
 kloc_grant: "⚠ **`xtask` IS THE BINDING CONSTRAINT AND NO GRANT IS REQUESTED ON AN ESTIMATE.** Measured at `5bcc3c76`: `xtask 39927 / 39960` = **33 lines of headroom**. AC1's register reader is a new `check_*.rs` and will not fit. `kloc.toml:60-65` forbids a grant on an estimate, so the lawful moves are (a) FUND BY RECLAIM — `cargo build -p xtask` emits **39 dead-code warnings** at HEAD, the D11-E1 class, and the `j1-crosshost-1a` precedent (delete `example_spirit_regen.rs`, 133 lines, remove the `mod` line FIRST so the compiler proves it) is directly on point; or (b) come back with a MEASURED grant once the gate is written. Do NOT open with a grant ask. NOTE: `xtask/tests/` is NOT charged (`kloc_check.rs:167-190` excludes `*/tests/*`), so every proven-red vector in AC1–AC3 is free; only `xtask/src/` costs. ⚠ `kloc-check` is **BLOCKING and RED at HEAD** on two keys — `maos-domain 8695 > 8644` (D14, owner 14-7) and `_aggregate_hardfail 151391 > 147057` (D17). Neither is this story's, and this story must NOT absorb either: D17's own ruling is that a grant requires a measured delta to justify it. **`all gates green` is therefore NOT available as a done criterion** — see AC5.4."
 model: "frontier-class allowlist {opus-4-8, gpt-5.5, gpt-5.6, glm-5.1, glm-5.2, opus-5, equiv}. The literal token `allowlist {` is deliberate: `check_dev_model_used_populated.rs:302` uses it as the boilerplate guard, and without it `:337-344` would extract a model from this POLICY LIST and satisfy `check-dev-model-tier` VACUOUSLY with no dev ever recording what actually ran."
 review: "§A6 full-layer net (Blind + Edge Case + Acceptance + Test-Infra + runtime) — **NON-DEGRADABLE**. Rationale specific to this row: every AC here is a CONTROL over other controls, and the failure mode this story exists to close is *a control that reports green over nothing*. A review that reads the diff and not the executed gate output would reproduce that exact defect. The Test-Infra Auditor layer is the load-bearing one and may not be dropped."
+dev_model_used: anthropic/claude-opus-5
 ---
 
 # 14-0 — Epic 14 preflight decisions
 
-Status: **ready-for-dev** (2026-08-26). Opens Epic 14. Preflight complete: six parallel scouts,
+Status: **done** (2026-08-26). Opens Epic 14. Preflight complete: six parallel scouts,
 one round-table, **one founder ruling already discharged and landed** (D13(a), commit `5bcc3c76`).
+Dev pass complete 2026-08-26 against baseline `9c5ae2db`; see Dev Agent Record.
 
 > ### This story did not survive its own charter, and that is the finding
 >
@@ -419,3 +421,179 @@ absorbing another row's debt. A standing red with named debtors is an honest sta
 | D17 | **FALSIFIED — withdraw or re-derive** (AC5.2). +4334, not +492. |
 | D18 | **REOPEN or bound** (AC5.1). Substance unimplemented; deadline blew four stories ago. |
 | D19 | Resolved and verified green — the best row in the file. Its contract was still not followed (shipped inside `2c`), which is why AC1 exists. |
+
+---
+
+## Tasks / Subtasks
+
+- [x] **AC1 — the register gets a reader.**
+  - [x] `xtask/src/check_decision_register.rs` — parses the register's decision table, resolves every
+        `Target story` cell against `gate_common::governed_story_keys()`, resolves each deadline
+        against `sprint-status.yaml`, and reports declared-UNQUERYABLE deadlines in their own bucket.
+  - [x] AC1.3 fails closed at three points: no findable table, zero parsed rows, zero resolved
+        targets. Also emits `unparsable-row` so a table row can never be silently dropped.
+  - [x] Enrolled on all five surfaces: `main.rs`, `lib.rs`, `gate-registry.toml` (list +
+        `[[ship_gate]]`), `EXPECTED_GATES`, `discipline.yml` (job + ship-aggregate `needs:`).
+  - [x] AC1.5 — `xtask/tests/decision_register_gate.rs`, 30 vectors, all passing.
+- [x] **AC2 — `epic-*` rejected as an owner.**
+  - [x] AC2.1 `OwnerBucket::NotAVehicle` rejects `epic-*` BEFORE the key-map lookup that green-lit it.
+  - [x] AC2.3 Ownerless bucket emitted, split into cited / uncited; uncited blocks.
+  - [x] AC2.2 all six `Owner: epic-14` rows re-homed, not suppressed; D5's two invisible rows owned.
+  - [x] AC2.4 — `xtask/tests/owner_assertion_epic_key_rejected.rs`, 9 vectors, all passing.
+- [x] **AC3 — the one-line repairs, each with its control.**
+  - [x] AC3.1 `spec-epic-5-review-finding-closure` is a `development_status` key; `kloc-check` added
+        to its closure list.
+  - [x] AC3.2 `LIVE_LOCK` at `cross_team_consent_13_3.rs:524`, AND the whole-package
+        `maos-bin-whole-package-parallel-isolation` leg on `check-multi-tenant-loom`.
+  - [x] AC3.3 D12 bench REPAIRED (not retired) + given a CI execution path + a non-empty assertion.
+- [x] **AC4 — the rulings.** D3, D5, D6, D1, D2, D4 (split a/b/c) and the D5/D6/D16 re-anchoring, all
+      recorded in the register against their IDs with named evidence.
+- [x] **AC5 — reopen what was falsely closed.** D18 REOPENED, D17 withdrawn and re-derived, D10
+      ratified-and-bounded, D8's gate owner string re-homed, honest opening posture stated.
+- [x] **Funding.** Reclaim first (108 tokei lines, compiler-proved), then a MEASURED grant.
+
+### Review Findings
+
+- [x] [Review][Patch] Enforce exact decision-ID grammar [`xtask/src/check_decision_register.rs:257`]
+- [x] [Review][Patch] Reject duplicate decision IDs [`xtask/src/check_decision_register.rs:470`]
+- [x] [Review][Patch] Validate every formatted target token [`xtask/src/check_decision_register.rs:359`]
+- [x] [Review][Patch] Require UNQUERYABLE per deadline clause [`xtask/src/check_decision_register.rs:584`]
+- [x] [Review][Patch] Parse affirmative ownerless disposition citations [`xtask/src/check_dev_record_completeness.rs:110`]
+- [x] [Review][Patch] Use suite-aware validation for the whole-package isolation leg [`xtask/src/evidence_ledger.rs:1052`]
+- [x] [Review][Patch] Reject contradictory decision statuses [`xtask/src/check_decision_register.rs:272`]
+- [x] [Review][Patch] Bind deadline anchors to transition grammar [`xtask/src/check_decision_register.rs:367`]
+- [x] [Review][Patch] Validate every non-empty deadline clause [`xtask/src/check_decision_register.rs:396`]
+- [x] [Review][Patch] Reject malformed non-pipe decision rows [`xtask/src/check_decision_register.rs:218`]
+- [x] [Review][Patch] Validate malformed formatted target tokens [`xtask/src/check_decision_register.rs:286`]
+- [x] [Review][Patch] Require an affirmative ownerless disposition authority [`xtask/src/check_dev_record_completeness.rs:110`]
+- [x] [Review][Patch] Prove both isolation tests share one harness [`xtask/src/evidence_ledger.rs:1052`]
+- [x] [Review][Patch] Make the isolation regression control deterministic [`crates/maos-bin/tests/cross_team_consent_13_3.rs:562`]
+- [x] [Review][Patch] Close the repaired D12 deferred-work row [`_bmad-output/implementation-artifacts/deferred-work.md:796`]
+- [x] [Review][Patch] Reconcile the final xtask measurement [`xtask/kloc.toml:203`]
+
+## Dev Agent Record
+
+### Agent Model Used
+
+anthropic/claude-opus-5 (harness: omp, 2026-08-26). Frontier-class allowlist member.
+
+### Debug Log References
+
+- Baseline `9c5ae2db` (the story-file commit on top of `5bcc3c76`); every preflight measurement
+  re-verified before use, and the ones that did not reproduce are corrected below.
+- `check-decision-register` first run against the real register: **29 findings across 18 rows** —
+  every one true. Final run: **23 rows, 16 open, 0 findings, 4 declared UNQUERYABLE.**
+- D16 race, twenty runs each way on the compiled binary: **4 PASS / 16 FAIL** without the lock,
+  **20 PASS / 0 FAIL** with it. `cargo test -p maos-bin` whole-package: **38 binaries, 259 tests, 0
+  failures.**
+- Revert-to-red seals executed, not asserted: D16 leg `green:false` + gate exit 1 with the lock
+  removed; D12 bench exit **101** with `"capability.invoke"` restored, exit 0 repaired.
+
+### Completion Notes
+
+**Seven of this story's own inherited claims did not reproduce, and each is corrected in place
+rather than quietly worked around.** That is the story's thesis applied to the story:
+
+1. **The gate initially dropped D13 entirely.** `cells()` fell back to the pre-strip string when a row
+   had no trailing pipe — and D13 has none. A parser that silently drops a row is the vacuous green
+   this gate exists to end, one level down. Fixed, plus an `unparsable-row` finding so it cannot recur.
+2. **D16's rate is 4/20, not 5/5-pass and not 3/20.** Measured twenty times each way. The binary holds
+   **9 tests + 1 ignored**, not the filed 25.
+3. **D12's `:24` is NOT a defect.** `INTENTS[0]` is the free-text `intent` column, not a frame kind.
+   Only `:235` was wrong. The bench also did not fail silently — it panicked on `UnknownKind`, which
+   is why it had run zero times. A non-empty assertion was added so a *valid-but-wrong* kind cannot
+   quietly time an empty scan.
+4. **AC2.3's "five structurally invisible rows" is 81.** Measured: 81 open rows carry no owner cue of
+   any kind. Twelve declare themselves ownerless, and **eleven of those cite a disposition**. Blocking
+   all twelve would have required inventing ten owners — the move blocking condition 3 forbids. So the
+   bucket is split: cited → reported, uncited → blocks. Exactly one row was uncited (D5.4); it now has
+   a key. The 81-row hole is stated as a boundary in the gate's own source, not left silent.
+5. **AC3.1 could not be landed as written.** Registering the spec key un-blinded `check-dev-model-tier`
+   and `check-dev-model-used-populated`, which correctly objected: the file has no `dev_model_used` and
+   no §A6 artifact. **Neither was fabricated** — writing a `§A6` marker for a review that never happened
+   is the defect this project punishes. It is one of five `spec-*.md` `bmad-quick-dev` specs, created by
+   its own commit `af788c3e`, whose body records no model. Its true state is `blocked`: every Task is
+   unchecked and its closure list now includes `kloc-check`, which is red on D14/D17 — neither its debt.
+   The provenance gap is recorded in the spec file for whoever unblocks it.
+6. **ADR-059 #9's mechanism is inverted at HEAD.** `forget_principal_unix` (`private.rs:827`) snapshots
+   under a READ lock (`:830-845`), walks the filesystem (`:847-908`), and removes from the map LAST
+   (`:910-919`). An `Err` therefore leaves RAM intact — the opposite of what the row claimed. The
+   non-atomicity survives; the RAM-loss consequence is withdrawn.
+7. **`RELEASE-HOLDS.md` row 9 is about two-host signatures, not `MAOS_REGION_HOME` directly** — but its
+   *"None … not debt"* residual is false precisely because the row rests on `region` being a shared
+   derived key. Corrected to state the boundary, claiming no fix.
+
+**Deliberate deviations, stated rather than hidden.**
+- **Minimal diff over restructure.** The register's prose columns were left untouched; only the ID,
+  Target and Deadline cells were rewritten, plus four new rows (D4a/D4b/D4c/D20). Verified lossless
+  cell-by-cell before writing.
+- **`OPEN` means the obligation stands, including for a RULED row whose implementation is outstanding.**
+  A two-value vocabulary that closed on "decision recorded" would have made D1, D3, D5, D6 and D17
+  invisible the moment they were ruled — the founding defect wearing a new hat.
+- **D3 and D17 keep pure `UNQUERYABLE` deadlines** (their anchors genuinely have no mechanical
+  successor). **D18 carries a mechanical `RE-ANCHORED:` clause after its declaration**, so it is both
+  visible as unqueryable AND enforceable — AC1.4 and AC5.1 together.
+
+**Standing reds at close, all pre-existing, none introduced here.** Verified against a pristine
+worktree at `9c5ae2db`:
+- `kloc-check` — RED on `maos-domain` 8695/8644 (D14 → 14-7) and `_aggregate_hardfail` 151962/147057
+  (D17). `xtask` is GREEN at 40578/40613 after the measured review-closure grant.
+- `check-service-boundary` — RED at `9c5ae2db` in a clean worktree (kernel-core symbol classes).
+- `check-env-contract` — RED at HEAD (two unregistered `maos-bin/src` reads).
+
+**"All gates green" is not claimed and is not available**, exactly as AC5.4 requires.
+
+## File List
+
+**New**
+- `xtask/src/check_decision_register.rs`
+- `xtask/tests/decision_register_gate.rs`
+- `xtask/tests/owner_assertion_epic_key_rejected.rs`
+
+**Modified**
+- `.github/workflows/discipline.yml`
+- `RELEASE-HOLDS.md`
+- `_bmad-output/implementation-artifacts/14-0-epic-14-preflight-decisions.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/epic-13-retro-2026-08-11.md`
+- `_bmad-output/implementation-artifacts/spec-epic-5-review-finding-closure.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md`
+- `_bmad-output/planning-artifacts/epics/index.md`
+- `crates/maos-bench/benches/audit_query_latency.rs`
+- `crates/maos-bin/tests/cross_team_consent_13_3.rs`
+- `docs/adr/ADR-047-trust-anchor-framing-carry-forward.md`
+- `docs/adr/ADR-059-operator-authority-collective-erasure.md`
+- `xtask/gate-registry.toml`
+- `xtask/kloc.toml`
+- `xtask/src/check_cross_region_consensus.rs`
+- `xtask/src/check_dev_record_completeness.rs`
+- `xtask/src/evidence_ledger.rs`
+- `xtask/src/check_epic_6_bridge.rs`
+- `xtask/src/check_fkcs.rs`
+- `xtask/src/check_fr47.rs`
+- `xtask/src/check_j1_two_host_signed_run.rs`
+- `xtask/src/check_multi_tenant_loom.rs`
+- `xtask/src/check_reza_production_path.rs`
+- `xtask/src/check_rto_gate.rs`
+- `xtask/src/check_ship_gate_completeness.rs`
+- `xtask/src/lib.rs`
+- `xtask/src/main.rs`
+- `xtask/tests/d19_story_file_governance.rs`
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-08-26 | **AC1** — `check-decision-register` shipped: the register's first reader. Blocking, hermetic, fails closed on an unreadable/tableless/empty/ungoverned register. 21 proven-red vectors; enrolled on all five surfaces; `EXPECTED_GATES` 38 → 39. |
+| 2026-08-26 | **AC1** — register made machine-readable: `· OPEN`/`· CLOSED` on every ID cell, every Target cell resolved to an exact `development_status` key, every deadline in the mechanical grammar or declared UNQUERYABLE. 23 rows, 0 findings. |
+| 2026-08-26 | **AC2** — `epic-*` rejected as a deferred-row owner (`OwnerBucket::NotAVehicle`); Ownerless bucket emitted and split cited/uncited; 6 `epic-14` rows re-homed and D5's two invisible rows owned; 7 proven-red vectors. |
+| 2026-08-26 | **AC3.1** — `spec-epic-5-review-finding-closure` registered as a story key (status `blocked`, reasoned); `kloc-check` added to its closure list, D13's own undone prescription. |
+| 2026-08-26 | **AC3.2** — D16 `LIVE_LOCK` landed with the whole-package `-p maos-bin` control leg. Measured 4/20 → 20/20; revert-to-red seal executed. |
+| 2026-08-26 | **AC3.3** — D12 bench REPAIRED (`capability.invocation`), given a non-empty assertion and a CI execution path; revert-to-red seal exit 101. |
+| 2026-08-26 | **AC4** — D3/D5/D6/D1/D2/D4 ruled and recorded against their IDs; D4 split a/b/c; six new vehicles minted; D5/D6/D16 re-anchored to `14-1` per AC4.7. |
+| 2026-08-26 | **AC5** — D18 REOPENED, D17's arithmetic withdrawn and re-derived (+4334, not +492), D10 ratified-and-bounded, D8's gate owner re-homed off the retrospective, D20 filed for E12-B1 at six of eight. |
+| 2026-08-26 | **Corrections** — ADR-059 #9 inverted mechanism corrected, #4/#7 owned; ADR-047:51's wrong seed variable corrected; `RELEASE-HOLDS.md` row 9 residual corrected; D4's false rationale corrected in the register and in the Epic-13 retro it propagated from. |
+| 2026-08-26 | **Funding** — 108 tokei lines reclaimed from compiler-proved dead code, THEN a measured `xtask` grant 39960 → 40538 (measured 40498 + 40). `_aggregate_hardfail` deliberately untouched. |
+| 2026-08-26 | **First code review closure** — six false-green paths patched: exact/unique decision IDs, formatted targets, per-clause UNQUERYABLE declarations, affirmative ownerless dispositions, and named isolation tests. Focused vectors 33/33; the first-review tree measured 40538/40538 before re-review. |
+| 2026-08-26 | **Re-review closure** — ten further findings patched: strict status/row/target/deadline parsing; affirmative disposition authorities; same-source three-test isolation evidence with a deterministic lock-presence tripwire; D12 deferred record closed. Focused vectors 39/39; decision/owner gates pass; multi-tenant loom records all three tests; final formatted `xtask` measurement 40578/40613 (35 spare). |

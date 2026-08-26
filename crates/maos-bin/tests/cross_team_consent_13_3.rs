@@ -494,6 +494,34 @@ fn cross_wall_recall_refusals_and_disclosures_are_journaled() {
 
 #[test]
 fn cross_wall_traceback_refuses_without_cohort_preconditions() {
+    // D16 (Story 14-0 AC3.2) — THE MISSING LINE. This test sets the
+    // process-global `MAOS_HOME` at `:512` and did not take `LIVE_LOCK`, while
+    // its sibling `cross_wall_recall_live_path_uses_verified_state_and_home_team`
+    // (`:243`) does. libtest runs a file's tests in THREADS OF ONE PROCESS, so
+    // under default parallel `cargo test` the two race and the sibling loses.
+    //
+    // MEASURED twenty times each way on the compiled binary at `9c5ae2db`,
+    // because this is a race and single readings disagree — three earlier
+    // observers recorded 3/20, 6/20 and 5/5-PASS, the last of them reading a
+    // tree that already carried this fix:
+    //     without this line — 4 PASS / 16 FAIL of 20
+    //     with it           — 20 PASS / 0 FAIL of 20 (9 tests, 1 ignored)
+    //
+    // THE FILED CAUSE IS WRONG AND MUST NOT BE CHASED. D16 blamed three
+    // integration-test FILES racing each other. Integration tests are separate
+    // processes and `std::env` is per-process, so those files CANNOT race.
+    // Both accused siblings are innocent: `cross_team_crossing_13_6b.rs:2726`
+    // already holds `LIVE_LOCK` (`:2358`) and is `#[ignore]`d (`:2354`), and all
+    // four callers of `seed_remote_artifact` already hold `env_lock()`. The
+    // defect was always intra-file, and `git blame` puts both sites in
+    // `b400d127` = Story 13.6d, not 13.3.
+    //
+    // The lock alone would not have been noticed by CI: every `cargo test
+    // -p maos-bin` in `discipline.yml` names one `--test` target and the one
+    // enrolled leg runs `--exact`, so libtest never had a second test in the
+    // process. The paired control is the `maos-bin-whole-package-parallel-isolation`
+    // leg added to `check_multi_tenant_loom.rs` in the same change.
+    let _lock = LIVE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     // Composition-root guard (AC3 / 13.5g): `maos traceback` must reach
     // recall_cross_wall and fail closed (NoConsentProvider) when the cohort
     // preconditions are absent. Deleting the dispatch would make the binary not
@@ -530,6 +558,27 @@ fn cross_wall_traceback_refuses_without_cohort_preconditions() {
 // The headline asymmetric negative must be observed through the PRODUCTION
 // consent surface — a signed V3 manifest feeding `CrossTeamConsentAdapter` —
 // over two physical databases, not a hard-coded consent stub on one database.
+
+#[test]
+fn maos_home_parallel_tests_hold_live_lock() {
+    let source = include_str!("cross_team_consent_13_3.rs");
+    for test in [
+        "fn cross_wall_recall_live_path_uses_verified_state_and_home_team()",
+        "fn cross_wall_traceback_refuses_without_cohort_preconditions()",
+    ] {
+        let body = source
+            .split_once(test)
+            .unwrap_or_else(|| panic!("missing guarded test {test}"))
+            .1
+            .split("\n#[test]")
+            .next()
+            .unwrap();
+        assert!(
+            body.contains("let _lock = LIVE_LOCK.lock()"),
+            "{test} must hold the shared LIVE_LOCK"
+        );
+    }
+}
 
 static LIVE_LOCK: Mutex<()> = Mutex::new(());
 
