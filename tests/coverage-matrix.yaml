@@ -1396,19 +1396,49 @@ coverage:
   NFR-Rel-7:
     gates: [check-scale-churn]
     corpora: []
-    phase: v2.0+
+    phase: v2.2
     valid_until: '2027-05-12'
     notes: |
       Story 11.3 — PRIMARY row (D10 traceability: this NFR's literal
       detection ≤1h / blast ≤5 / recovery ≤24h floors). The `check-scale-churn`
-      gate (`xtask/src/check_scale_churn.rs`) derives these from a real N=30
-      (floor ≥25) host mTLS mesh drill (`maos-a2a-tcp/tests/t_11_3_scale_churn.rs`),
-      replacing the deleted `chaos::churn::run_scaffold` canned-constant
-      scaffold. Detection is two-surface (handshake `TcpTransportError` +
-      router NACK — F-new). `max_blast_radius`/`recovery_secs` are BINDING at
-      v2.0; the derived `rto_secs` axis is REPORTED/advisory only (F3-ledger),
-      cross-listed under NFR-Scale-2 (the scale/phase anchor — cite BOTH rows,
-      "and/or" traces to nothing).
+      gate (`xtask/src/check_scale_churn.rs`) derives these from real host mTLS
+      mesh drills (`maos-a2a-tcp/tests/t_11_3_scale_churn.rs`), replacing the
+      deleted `chaos::churn::run_scaffold` canned-constant scaffold. Detection
+      is two-surface (handshake `TcpTransportError` + router NACK — F-new).
+      `recovery_secs` is BINDING; the derived `rto_secs` axis is
+      REPORTED/advisory only (F3-ledger), cross-listed under
+      NFR-Scale-2 (the scale/phase anchor — cite BOTH rows, "and/or" traces to
+      nothing). Story 14.1 (2026-08-27) scales the envelope to N=100: the
+      three adversary classes are planted INTO the 100-host mesh, the blast
+      floor becomes a race (adversary offered the full derived peer set;
+      offered == reached REDS), and the gate requires measurement markers
+      carrying the derived host count. Phase updated v2.0+ → v2.2 (14.1 ships
+      the v2.2 half of this NFR).
+      BLAST AXIS — instrument corrected 2026-08-28 (Story 14-1 code review,
+      party-mode UNANIMOUS; PRD amended, see `[DELTA-2026-08-28]` on
+      NFR-Rel-7 in `prd/non-functional-requirements.md:26`). The ratified race
+      MEASURED the absolute `≤5 peers` floor BREACHED at both scales — 6–8 at
+      N=100, 7 at N=30, scale-independent — because the floor was written with
+      no adversary concurrency model and is unsatisfiable alongside the
+      ratified propagation envelope (NFR-Rel-9 ≤ 5 s p99 capability-token
+      revocation; cert-rotation chaos p50 ≤30s / p99 ≤90s per
+      `t_10_4b_rotation_real_timing.rs:338`) [attribution corrected
+      2026-08-28, 14-1 round-2 review: the 30s/90s floors were first
+      misattributed to NFR-Rel-9 here].
+      What BINDS on this substrate is therefore *detection interrupts
+      propagation*, via TWO conjuncts: (i) reach `≤ 4W` (W = `RACE_IN_FLIGHT`
+      = 6) — a CONSTANT that cannot grow with N, sized four in-flight
+      generations so it catches a STRUCTURAL failure to interrupt and not a
+      merely slow detector (slowness binds on the detection-latency axis);
+      and (ii) `reach × 2 < offered`, derived from the run itself. The absolute
+      `max_blast_radius` stays DERIVED + REPORTED on every run and its breach
+      is published as an NFR-Rel-7 RESULT in `RELEASE-HOLDS.md` row 18, never
+      as a met floor. `≤5` is retained unchanged as the serial-adversary floor
+      and promotes with real geo-distribution. Falsifiability preserved and
+      proven live: the `SweepOnly` no-detection leg reds BOTH conjuncts
+      (99 > 24 and 99 × 2 ≥ 99) and the over-reach leg reds the absolute
+      predicate. Measured clean reach: 6–8 isolated, 10 under load, against
+      the 24 constant.
   NFR-Rel-8:
     gates:
       - journal_append_p99_measurement
@@ -1441,15 +1471,20 @@ coverage:
   NFR-Scale-2:
     gates: [check-scale-churn]
     corpora: []
-    phase: v2.0+
+    phase: v2.2
     valid_until: '2027-05-12'
     notes: |
-      Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0,
-      100→30 cost-compression target). `check-scale-churn` runs the real
-      drill at N=30 (floor ≥25 distinct-identity-reconciled hosts), a
-      compressed churn schedule (10-20% turnover/wk x 4wk, modeled as 12-24
-      real join/leave events on a co-located loopback mesh). PRIMARY
-      floor-tracing row is NFR-Rel-7 (cite BOTH rows).
+      Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0
+      compressed scope; the 100-host target below). `check-scale-churn` runs
+      the real drill at N=30 (floor ≥25 distinct-identity-reconciled hosts)
+      AND, since Story 14.1 (2026-08-27), at N=100: identity reconcile, the
+      duplicate-identity negative control (100 clones are not 100 hosts), the
+      ratio-derived churn schedule (10-20% of non-hub slots per round x 4
+      rounds — the absolute 12-24 band was retired), and planted adversaries
+      at both scales. The historical "100→30 cost-compression target" is
+      RETIRED: the 100-host leg landed Binding (measured: 502 fds hub-and-
+      spoke, ~3.3s wall for the five N=100 legs). PRIMARY floor-tracing row
+      is NFR-Rel-7 (cite BOTH rows).
   NFR-Scale-3:
     gates: []
     corpora: []

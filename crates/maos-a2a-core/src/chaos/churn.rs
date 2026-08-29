@@ -18,6 +18,22 @@
 //! breach observable. `rto_secs` is `None` iff the harness cannot construct
 //! BOTH independent falsifiers (isolation-blind / re-pin-blind) — cut by
 //! construction rather than shipped un-falsifiable (D5).
+//!
+//! # Story 14.1 disclosures (AC3.4.a / AC4.4)
+//!
+//! * **Percentile honesty:** `detection_latency_p99_secs` is fed 3 samples
+//!   (three adversaries), and nearest-rank p99 of fewer than 101 samples IS
+//!   the maximum. The field name is the JSON contract and is deliberately
+//!   NOT renamed; instead every published percentile carries its sample
+//!   count (`p99 = 4.1ms (n=3)`) — in `report_to_markdown`, in the test's
+//!   drill report and in the gate summary — so a reader cannot mistake a
+//!   max-of-three for a characterised tail.
+//! * **Failure-branch sentinels:** when isolation was never confirmed the
+//!   harness writes `rto_secs = RTO_UNMET_NS` (5h); when the fleet never
+//!   reconverged, `recovery_secs = RECOVERY_UNMET_NS` (25h). On those RED
+//!   branches the VALUE is the named sentinel and only the BRANCH (a real
+//!   still-succeeding dial / a real failed legit sweep) is evidence — the
+//!   magnitude is not a measurement.
 
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -263,9 +279,12 @@ pub fn report_to_markdown(report: &ChurnDrillReport) -> Result<String, serde_jso
                   isolation-blind + re-pin-blind falsifiers (F3, decide-by-construction)\n"
             .to_string(),
     };
+    // AC3.4.a — publish the sample count beside the percentiles (the field
+    // name is a JSON contract; the count is what keeps it honest).
+    #[rustfmt::skip]
+    let n = report.per_adversary.iter().filter(|d| d.first_rejection_ns.is_some()).count();
     Ok(format!(
-        "\n## Churn drill {}\n\n_Real N≥25 (target 30) mesh, compressed-loopback regression \
-         floors — NOT geo/production figures (L5)._\n{rto_line}\n```json\n{json}\n```\n",
+        "\n## Churn drill {}\n\n_Real N≥25 (target 30) mesh, compressed-loopback regression floors — NOT geo/production figures (L5). detection percentiles carry n={n} samples (for n < 101 the p99 IS the maximum — AC3.4.a). On a falsifier run the rto/recovery VALUE is the RTO_UNMET_NS / RECOVERY_UNMET_NS sentinel (5h/25h) and only the BRANCH is evidence (AC4.4)._\n{rto_line}\n```json\n{json}\n```\n",
         report.drill_id
     ))
 }

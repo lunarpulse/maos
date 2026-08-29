@@ -68,8 +68,8 @@ pass. A gate that governs nothing passes for the wrong reason, and
 | **D4a** · OPEN | **D4a — enforcement (runtime).** `MAOS_REGION_HOME` is never reconciled against the signed `TeamEntry.region` at daemon boot. | Reconcile at boot. Constructible and cheaper than feared: `main.rs:9855` `reconcile_transport_identity_with_manifest` already reconciles four env-vs-signed axes including `team_id` — region is the OMITTED FIELD of an existing check, ~20 lines mirroring `cross_team_crossing.rs:892-916`. Must state that a daemon-boot leg does NOT cover `maosctl`. | `14-d4a-region-home-boot-reconciliation` | Before `14-8-register-classify-full-workspace-env-surface` leaves `backlog` | Winston + John |
 | **D4b** · OPEN | **D4b — registration.** `MAOS_REGION_HOME` is absent from `env_contract.rs`'s 67 entries, and the gate cannot even see it: `check_env_contract.rs:119` scans only `crates/maos-bin/src` while both primitive reads live in `maos-kernel-core` and `maos-domain`. | Register and classify the variable once the workspace-wide registry exists. Stays where D4 put it, correctly sequenced behind 14-7. | `14-8-register-classify-full-workspace-env-surface` | Before `14-8-register-classify-full-workspace-env-surface` leaves `backlog` | Winston + John |
 | **D4c** · OPEN | **D4c — classification + crypto, and there is no slot for it.** `sealed_export.rs:303-315` derives the signing key by HKDF over the region tag and `derive_team_signing_seed` welds the per-team key over that seed, so an unregistered env var SILENTLY SELECTS WHICH Ed25519 KEY SIGNS YOUR AUDIT BUNDLE. It is undetectable at every verifier: `resolve_verify_key` derives the expected key from *the bundle's own claimed region*, so a wrong-but-self-consistent region verifies GREEN and `key_a == key_b` never fires. | `EnvStability::Secret` is the WRONG slot — the value is not secret and must stay echoable (`operator_config.rs:227` prints it), and classifying it Secret would red an existing correct `eprintln!` under 14-9's own gate. Decide whether a slot for "non-secret value, key-derivation input, integrity-critical" is added, or state the boundary. | `14-9-secret-var-governance-provider-keys` | Before `14-9-secret-var-governance-provider-keys` leaves `backlog` | Winston + Vex |
-| **D5** · OPEN | Legal-hold check-then-act race; revocation failure signed as zero; decommission receipt claims completion; mutation-to-audit crash gap. | Scope into **distinct controls**. These are four lifecycle/atomicity questions and must not be folded into the already-proven collective erase. | `14-e1-erasure-attestation-honesty`, `14-e2-legal-hold-erase-serialization`, `v25-erasure-crash-reconciliation` | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` (RE-ANCHORED from 14-4 by AC4.7) | Winston + Murat |
-| **D6** · OPEN | Private-tier residue, erase races, directory-iteration hazards. | Kernel filesystem/atomicity design, or retain the recorded security limits until separately scoped. | `v25-private-tier-erase-atomicity` — the three NAMED defects are closed on measurement; this is the general non-atomicity D6 never mentioned. | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` (RE-ANCHORED from 14-4 by AC4.7) | Winston |
+| **D5** · OPEN | Legal-hold check-then-act race; revocation failure signed as zero; decommission receipt claims completion; mutation-to-audit crash gap. | Scope into **distinct controls**. These are four lifecycle/atomicity questions and must not be folded into the already-proven collective erase. | `14-e1-erasure-attestation-honesty`, `14-e2-legal-hold-erase-serialization`, `v25-erasure-crash-reconciliation` | Before `v25-erasure-crash-reconciliation` leaves `backlog` (RE-ANCHORED TWICE: from 14-4 by 14-0 AC4.7, then off 14-1 onto this row's own last vehicle by the 14-1 preflight, 2026-08-27 — see the ruling below) | Winston + Murat |
+| **D6** · CLOSED | Private-tier residue, erase races, directory-iteration hazards. | Kernel filesystem/atomicity design, or retain the recorded security limits until separately scoped. | `v25-private-tier-erase-atomicity` — the three NAMED defects are closed on measurement; this is the general non-atomicity D6 never mentioned. | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` (RE-ANCHORED from 14-4 by AC4.7) | Winston |
 | **D7** · OPEN | `CrossWallRecallRefusal` collapses six variants into the token `refused`. | A shipped CLI operator surface preserving cause only in free text is insufficient for a machine-readable operator outcome. Decide the typed outcome shape. | `14-4-v2-0-sweep-operational-surfaces` | Before `14-4-v2-0-sweep-operational-surfaces` leaves `backlog` | John + Amelia |
 | **D8** · OPEN | `check-fkcs` `admission-path-unmodified` is RED, held advisory. | Frozen-kernel-conformant re-pin, or retain the exact bounded hold. Admission sources genuinely changed in 13.4; re-pinning without review would re-can an unreviewed floor. | `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger` | Before `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger` leaves `backlog` | Winston + Murat |
 | **D9** · OPEN | A vetting lapse cannot refuse a crossing. | The only demonstrable vetting boundary is upgrade/promotion, not crossing. Accept that boundary explicitly, or scope a crossing mechanism — **no invented mechanism**. | `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger` | Before `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger` leaves `backlog` | Murat |
@@ -352,6 +352,62 @@ deliberately, so every further kernel-core line still costs its own measured FLA
 HISTORY row. **"All gates green" is NOT an available done criterion for Epic 14's opening**, and no
 story may manufacture one by absorbing another row's debt. A standing red with named debtors is an
 honest state.
+
+## Rulings recorded by Story `14-1` (2026-08-27, at `38c52811`)
+
+Ratified by Lunarpulse at the `14-1` preflight round-table. Both rows were re-anchored to
+*"before `14-1` leaves `backlog`"* by `14-0` AC4.7; both are disposed here, against their IDs, with
+named evidence, **before** the transition rather than after it. Binding rule 1 is honoured in both
+directions: nothing closes by implication, and nothing stays open by omission.
+
+### D6 — CLOSED. The row was the last document still saying otherwise.
+
+`14-0` ruled this row closed and recorded the evidence, then left the status token reading `OPEN`.
+**Three documents already said CLOSED** and only the table row disagreed: this file's own ruling
+section (*"D6 — CLOSED by decision, on measurement. The fork it poses is moot."*), the `14-0` AC4
+disposition table (*"CLOSE by decision on measurement (AC4.3)"*), and `deferred-work.md:561`
+(*"**D6 CLOSES here by decision** (Story `14-0` AC4.3)"*). The substance is unchanged and is not
+re-litigated here: all three named defects were repaired **2026-08-02 by `608facde`** (the Vec-collect
+fix at `private.rs:281-294`; `io_lock` spanning all four entry points `:639`/`:687`/`:746`/`:813`;
+`statat(SYMLINK_NOFOLLOW)` + descriptor-anchored `open_dir_component` + `unlinkat`), and its first
+item (`deferred-work.md:553`) had already been closed by 13.5i.
+
+**Closing it does not close what it never mentioned.** The surviving general non-atomicity of
+private-tier erase remains live under its own paged key, `v25-private-tier-erase-atomicity`, which
+has its own `sprint-status.yaml` row and its own `deferred-work.md` home. A closed decision row and
+an open engineering obligation are different objects; keeping D6 open to represent the latter made
+this register a second, weaker tracker of a fact the tracker already holds — and it would have red a
+Blocking gate on the first Epic-14 transition for a decision made 24 days earlier.
+
+### D5 — STAYS OPEN, deadline re-anchored to its own last vehicle.
+
+D5's *decision required* was **"scope into distinct controls."** That decision is made and recorded
+(`14-0` AC4.2): `14-e1-erasure-attestation-honesty` (D5.2 + D5.3), `14-e2-legal-hold-erase-serialization`
+(D5.1, riding D3's ZERO-Δ ruling), `v25-erasure-crash-reconciliation` (D5.4). All three are real
+`development_status` keys. Nothing substantive is owed and none is re-opened here.
+
+**What was wrong was the anchor, and it was unsatisfiable by construction.** The `Status` semantics
+cell holds that `OPEN` includes *"rows whose decision is ruled but whose implementation is not yet
+landed."* D5 therefore cannot close until **all three** vehicles land — and one of them,
+`v25-erasure-crash-reconciliation`, is an explicit **v2.5 deferral**. So *"OPEN until implementation
+lands"* and *"before `14-1` leaves `backlog`"* could never both be satisfied: `14-0` AC4.7 moved the
+anchor off `14-4` for enforceability and, in the same move, minted a red that had to fire the instant
+Epic 14's first story opened. **A row that must red is a calendar tripwire, not a control.**
+
+The anchor now names `v25-erasure-crash-reconciliation` — the last and largest of D5's own three
+vehicles (≥4 crates, a persisted intent record, a startup reader). AC4.7's standing objection to
+distant anchors (*"if it is never picked up, they never bind at all"*) is answered rather than
+dodged: a v2.5-deferred obligation binding at v2.5 is the anchor being **correct**, not lenient, and
+the two v2.2 halves stay independently paged on their own keys with their own `deferred-work.md`
+rows. Binding rule 5 is satisfied — the target is a key the tracker can page, and
+`check-decision-register` resolves it.
+
+**Mechanical note for whoever edits a deadline next:** `deadline_clauses`
+(`check_decision_register.rs:396-409`) splits on `;` and evaluates **every** clause independently, so
+an appended `RE-ANCHORED:` clause does **not** retire the clause above it —
+`xtask/tests/decision_register_gate.rs:240-259` asserts exactly that. The `14-1` clause was
+**replaced**, not supplemented.
+
 
 ## Evidence filed against open rows
 
