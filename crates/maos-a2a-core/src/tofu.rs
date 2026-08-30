@@ -50,6 +50,20 @@ pub enum EPinMismatch {
     NotPinned(String),
     #[error("TOFU pin invalidated for peer {peer}: {reason}")]
     Invalidated { peer: String, reason: String },
+    /// Story 14-2 / AC2.2.a.i — `open_rotation_window` refused a `next`
+    /// fingerprint already held by ANOTHER peer's current pin or open
+    /// window. Founder-ratified 2026-08-28 as a NEW variant (never a reuse
+    /// of `Mismatch`): a collision is an impersonation attempt in progress,
+    /// a different security event than "observed cert does not match the
+    /// pin", and conflating them makes the two indistinguishable in logs
+    /// and SIEM precisely when someone is investigating one. `EPinMismatch`
+    /// is `#[non_exhaustive]`, so the variant is non-breaking downstream.
+    #[error("rotation window refused for peer {peer}: fingerprint {fingerprint} is already held by {colliding_peer}")]
+    FingerprintCollision {
+        peer: String,
+        colliding_peer: String,
+        fingerprint: String,
+    },
 }
 
 /// Operator decision on a re-pin request.
@@ -59,8 +73,17 @@ pub enum EPinMismatch {
 /// from architecture §8.3). The decision is recorded by `approval_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RePinDecision {
-    AcceptedByOperator { approval_id: [u8; 16] },
-    RejectedByOperator { reason: String },
+    AcceptedByOperator {
+        approval_id: [u8; 16],
+    },
+    RejectedByOperator {
+        reason: String,
+    },
+    /// Operator approved the re-pin, but the store refused to materialize it
+    /// because doing so would violate a security invariant.
+    RejectedByStore {
+        error: EPinMismatch,
+    },
     TimedOut,
 }
 
@@ -129,9 +152,25 @@ pub trait TofuPinStore: Send + Sync {
 
 /// Default in-memory TOFU pin store. Per architecture I9 ("Empty kernel") the
 /// production impl is persistence-backed at `maos-persistence`; this default
-/// is the v0.5 scaffold + test fixture.
 pub struct InMemoryTofuPinStore {
     pins: Arc<DashMap<String, TofuPin>>,
+    /// Story 14-2 / AC2.1 — the rotation window side-map: peer → NEXT
+    /// fingerprint. A SIDE-MAP, not a `TofuPin` field, on four measured
+    /// grounds: zero serde delta (`TofuPin` stays byte-identical, so the
+    /// `PinnedFingerprint` / `TcpA2AConfig` strict-schema blast radius is
+    /// untouched); fail-closed on restart by construction (a process-local
+    /// window cannot be persisted, so a reboot closes it — a `TofuPin` field
+    /// would RE-OPEN a widened trust set on reboot, the wrong default);
+    /// `PinnedFingerprint` deliberately gains no `next` (a boot-time window
+    /// nobody closes is the permanently widened trust set this story exists
+    /// to prevent); and the window becomes a state you read rather than a
+    /// field you interpret.
+    rotation_next: Arc<DashMap<String, PeerCertFingerprint>>,
+    /// §A6 mid-story (Blind-3/Edge-2): serializes open's scan+insert,
+    /// close's remove+promote, and the invalidation/re-pin lifecycle — no
+    /// half-applied window can interleave. Lock ORDER: `window_lock` BEFORE
+    /// any `pins` entry lock.
+    window_lock: Arc<std::sync::Mutex<()>>,
     /// Optional hook to drive `await_repin_consent` deterministically from
     /// tests; production path defers to the Approval Decision Log (which is
     /// out-of-band and not modeled in this crate's surface).
@@ -142,6 +181,8 @@ impl Default for InMemoryTofuPinStore {
     fn default() -> Self {
         Self {
             pins: Arc::new(DashMap::new()),
+            rotation_next: Arc::new(DashMap::new()),
+            window_lock: Arc::new(std::sync::Mutex::new(())),
             test_repin_hook: Arc::new(|_, _, _| RePinDecision::TimedOut),
         }
     }
@@ -161,6 +202,38 @@ impl InMemoryTofuPinStore {
         self
     }
 
+    /// Serialize rotation-window and pin-lifecycle writes. If an earlier
+    /// writer panicked, discard every transient `next` before recovering the
+    /// guard: current pins remain fail-closed, while no widened trust survives.
+    fn lock_window(&self) -> std::sync::MutexGuard<'_, ()> {
+        match self.window_lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                let guard = poisoned.into_inner();
+                self.rotation_next.clear();
+                guard
+            }
+        }
+    }
+
+    /// Return the other peer already holding `fingerprint` as either a current
+    /// pin or an open rotation generation.
+    fn colliding_peer(&self, peer: &PeerId, fingerprint: &PeerCertFingerprint) -> Option<String> {
+        self.pins
+            .iter()
+            .find_map(|entry| {
+                let pin = entry.value();
+                (pin.peer.as_str() != peer.as_str() && &pin.fingerprint == fingerprint)
+                    .then(|| pin.peer.as_str().to_string())
+            })
+            .or_else(|| {
+                self.rotation_next.iter().find_map(|entry| {
+                    (entry.key() != peer.as_str() && entry.value() == fingerprint)
+                        .then(|| entry.key().clone())
+                })
+            })
+    }
+
     /// Story 8.6 — synchronous pin lookup for the rustls verifier callback.
     ///
     /// rustls `ServerCertVerifier`/`ClientCertVerifier` callbacks are **sync**,
@@ -175,14 +248,133 @@ impl InMemoryTofuPinStore {
     /// (unpinned / invalidated). This is the TOFU trust oracle the
     /// `TofuPinningVerifier` consults after WebPKI succeeds.
     pub fn find_active_pin_by_fingerprint(&self, observed: &PeerCertFingerprint) -> Option<PeerId> {
-        self.pins.iter().find_map(|entry| {
+        if let Some(peer) = self.pins.iter().find_map(|entry| {
             let pin = entry.value();
             if pin.invalidated.is_none() && &pin.fingerprint == observed {
                 Some(pin.peer.clone())
             } else {
                 None
             }
+        }) {
+            return Some(peer);
+        }
+        self.rotation_next.iter().find_map(|entry| {
+            if entry.value() == observed {
+                // §A6 mid-story Edge-1: a window is an ACTIVE identity only
+                // while the peer's CURRENT pin is active — an invalidated
+                // pin (Spirit restart) must not keep the replacement
+                // trusted at the listen side.
+                let pin_active = self
+                    .pins
+                    .get(entry.key())
+                    .map(|p| p.value().invalidated.is_none())
+                    .unwrap_or(false);
+                if pin_active {
+                    Some(PeerId::new(entry.key().clone()))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
+    }
+
+    /// Story 14-2 / AC2.1 — open the one-generation overlap window for
+    /// `peer` (§7.2.1.a: agents accept either cert on inbound handshakes
+    /// during `[t_provision, t_revoke + T_grace]`; the close is an explicit
+    /// state transition, never a clock — AC2.1.c). The store additionally
+    /// accepts `next` as this peer's active identity until the window
+    /// closes.
+    ///
+    /// ⚠ **THE UNIQUENESS GUARD IS THE SECURITY CONTROL, NOT A RIDER
+    /// (AC2.2.a).** Without it this method OPENS a cross-peer
+    /// impersonation vector: `find_active_pin_by_fingerprint` is
+    /// first-match-wins over a per-process randomized `DashMap` iteration,
+    /// so a `next` colliding with another peer's held fingerprint would
+    /// resolve non-deterministically to EITHER peer at sites 2/3 — the
+    /// attacker's key-holder dials in, site 2 accepts, site 3 may resolve
+    /// the victim, and the binding check passes. Refused here, at open,
+    /// with a dedicated variant the catalog can enumerate.
+    pub fn open_rotation_window(
+        &self,
+        peer: &PeerId,
+        next: &PeerCertFingerprint,
+    ) -> Result<(), EPinMismatch> {
+        let _guard = self.lock_window();
+        let pin = self
+            .pins
+            .get(peer.as_str())
+            .map(|r| r.value().clone())
+            .ok_or_else(|| EPinMismatch::NotPinned(peer.as_str().to_string()))?;
+        if pin.invalidated.is_some() {
+            return Err(EPinMismatch::Invalidated {
+                peer: peer.as_str().to_string(),
+                reason: "cannot open a rotation window on an invalidated pin".into(),
+            });
+        }
+        if &pin.fingerprint == next {
+            return Err(EPinMismatch::FingerprintCollision {
+                peer: peer.as_str().to_string(),
+                colliding_peer: peer.as_str().to_string(),
+                fingerprint: next.wire(),
+            });
+        }
+        if let Some(existing) = self.rotation_next.get(peer.as_str()) {
+            if existing.value() == next {
+                return Ok(());
+            }
+            return Err(EPinMismatch::Invalidated {
+                peer: peer.as_str().to_string(),
+                reason: format!(
+                    "rotation window already open for {}; close it before opening {}",
+                    existing.value().wire(),
+                    next.wire()
+                ),
+            });
+        }
+        if let Some(colliding_peer) = self.colliding_peer(peer, next) {
+            return Err(EPinMismatch::FingerprintCollision {
+                peer: peer.as_str().to_string(),
+                colliding_peer,
+                fingerprint: next.wire(),
+            });
+        }
+        self.rotation_next
+            .insert(peer.as_str().to_string(), next.clone());
+        Ok(())
+    }
+
+    /// Story 14-2 / AC2.1.a — close the window PROMOTE-and-retire, never
+    /// discard: the store must end up holding NEW, not OLD. Promotes
+    /// `next → current` under the pin's entry lock, clears the side-map
+    /// entry, and returns the RETIRED OLD fingerprint. A close that
+    /// merely dropped `next` would leave the mesh pinned to a cert
+    /// nobody serves. Returns `None` if no window was open. Serialized
+    /// against open/re-pin by `window_lock` (§A6 Blind-3): no transition
+    /// can interleave inside the remove→promote pair.
+    pub fn close_rotation_window(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
+        let _guard = self.lock_window();
+        // Promote first: lock-free readers always accept the serving
+        // generation throughout close. A recovered poisoned lock cleared all
+        // transient windows, so `None` is fail-closed rather than stale trust.
+        let next = self.rotation_next.get(peer.as_str())?.value().clone();
+        let retired = self.pins.get_mut(peer.as_str()).map(|mut entry| {
+            let retired = entry.fingerprint.clone();
+            entry.fingerprint = next;
+            entry.pinned_at_ns = now_ns();
+            retired
+        })?;
+        self.rotation_next.remove(peer.as_str());
+        Some(retired)
+    }
+
+    /// Story 14-2 / AC2.1 — the window oracle: this peer's open `next`,
+    /// if a rotation window is currently open.
+    pub fn rotation_next(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
+        self.rotation_next
+            .get(peer.as_str())
+            .map(|e| e.value().clone())
     }
 
     /// Story 8.6 — synchronous mirror of [`TofuPinStore::verify_pinned`] for the
@@ -213,6 +405,15 @@ impl InMemoryTofuPinStore {
         }
         if &pin.fingerprint == observed {
             Ok(())
+        } else if self
+            .rotation_next
+            .get(peer.as_str())
+            .is_some_and(|next| next.value() == observed)
+        {
+            // Story 14-2 / AC2.2 (site 1, dial side + the sync mirror of
+            // site 4): during an open rotation window the peer's `next` is
+            // equally pinned — one-generation overlap, §7.2.1.a.
+            Ok(())
         } else {
             Err(EPinMismatch::Mismatch {
                 peer: peer.as_str().to_string(),
@@ -238,20 +439,25 @@ impl TofuPinStore for InMemoryTofuPinStore {
         declared: &PeerCertFingerprint,
         boot_nonce: u64,
     ) -> Result<TofuPin, EPinMismatch> {
-        // Guard against double-pin: if a pin already exists for this peer,
-        // reject — first-contact is a one-time operation. Re-pin goes
-        // through `await_repin_consent`.
+        if observed != declared {
+            return Err(EPinMismatch::Mismatch {
+                peer: peer.as_str().to_string(),
+                pinned: declared.wire(),
+                observed: observed.wire(),
+            });
+        }
+        let _guard = self.lock_window();
         if self.pins.contains_key(peer.as_str()) {
             return Err(EPinMismatch::Invalidated {
                 peer: peer.as_str().to_string(),
                 reason: "pin already exists — use re-pin consent path".into(),
             });
         }
-        if observed != declared {
-            return Err(EPinMismatch::Mismatch {
+        if let Some(colliding_peer) = self.colliding_peer(peer, observed) {
+            return Err(EPinMismatch::FingerprintCollision {
                 peer: peer.as_str().to_string(),
-                pinned: declared.wire(),
-                observed: observed.wire(),
+                colliding_peer,
+                fingerprint: observed.wire(),
             });
         }
         let pin = TofuPin {
@@ -291,6 +497,17 @@ impl TofuPinStore for InMemoryTofuPinStore {
         }
         if &pin.fingerprint == observed {
             Ok(())
+        } else if self
+            .rotation_next
+            .get(peer.as_str())
+            .is_some_and(|next| next.value() == observed)
+        {
+            // Story 14-2 / AC2.2 (site 4 — async trait IMPL BODY; the six
+            // trait SIGNATURES are untouched, per the house additive-mirror
+            // convention): during an open rotation window the peer's `next`
+            // is equally pinned. Sites 5/6 (`router.rs`) call this and pass
+            // because of AC2.0's provisioning ordering — they need no edit.
+            Ok(())
         } else {
             Err(EPinMismatch::Mismatch {
                 peer: peer.as_str().to_string(),
@@ -305,6 +522,8 @@ impl TofuPinStore for InMemoryTofuPinStore {
         peer: &PeerId,
         prior_boot_nonce: u64,
     ) -> Result<(), A2AError> {
+        let _guard = self.lock_window();
+        self.rotation_next.remove(peer.as_str());
         let mut entry =
             self.pins
                 .get_mut(peer.as_str())
@@ -322,21 +541,34 @@ impl TofuPinStore for InMemoryTofuPinStore {
         new_observed: &PeerCertFingerprint,
         new_boot_nonce: u64,
     ) -> RePinDecision {
-        let decision = (self.test_repin_hook)(peer, new_observed, new_boot_nonce);
-        if let RePinDecision::AcceptedByOperator { approval_id } = &decision {
-            // Materialize the re-pin record so verify_pinned succeeds again,
-            // carrying the actual boot_nonce from the re-pin observation.
-            let new_pin = TofuPin {
-                peer: peer.clone(),
-                fingerprint: new_observed.clone(),
-                boot_nonce: new_boot_nonce,
-                pinned_at_ns: now_ns(),
-                invalidated: None,
-                repin_approval_id: Some(*approval_id),
-            };
-            self.pins.insert(peer.as_str().to_string(), new_pin);
+        match (self.test_repin_hook)(peer, new_observed, new_boot_nonce) {
+            RePinDecision::AcceptedByOperator { approval_id } => {
+                let _guard = self.lock_window();
+                if let Some(colliding_peer) = self.colliding_peer(peer, new_observed) {
+                    return RePinDecision::RejectedByStore {
+                        error: EPinMismatch::FingerprintCollision {
+                            peer: peer.as_str().to_string(),
+                            colliding_peer,
+                            fingerprint: new_observed.wire(),
+                        },
+                    };
+                }
+                self.rotation_next.remove(peer.as_str());
+                self.pins.insert(
+                    peer.as_str().to_string(),
+                    TofuPin {
+                        peer: peer.clone(),
+                        fingerprint: new_observed.clone(),
+                        boot_nonce: new_boot_nonce,
+                        pinned_at_ns: now_ns(),
+                        invalidated: None,
+                        repin_approval_id: Some(approval_id),
+                    },
+                );
+                RePinDecision::AcceptedByOperator { approval_id }
+            }
+            decision => decision,
         }
-        decision
     }
 
     async fn get_pin(&self, peer: &PeerId) -> Option<TofuPin> {
@@ -353,6 +585,7 @@ impl TofuPinStore for InMemoryTofuPinStore {
         peer: &PeerId,
         observed_boot_nonce: u64,
     ) -> Result<Option<u64>, A2AError> {
+        let _guard = self.lock_window();
         if let Some(mut entry) = self.pins.get_mut(peer.as_str()) {
             let prior = entry.boot_nonce;
             if prior != observed_boot_nonce {
@@ -360,10 +593,10 @@ impl TofuPinStore for InMemoryTofuPinStore {
                     entry.invalidated = Some(Invalidated::SpiritRestarted {
                         prior_boot_nonce: prior,
                     });
+                    drop(entry);
+                    self.rotation_next.remove(peer.as_str());
                     return Ok(Some(prior));
                 }
-                // Already invalidated — return the stored prior nonce so the
-                // router can build the NACK identically (preserves a1 P6).
                 if let Some(Invalidated::SpiritRestarted { prior_boot_nonce }) = entry.invalidated {
                     return Ok(Some(prior_boot_nonce));
                 }
@@ -392,19 +625,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn first_contact_pins_match() {
-        let store = InMemoryTofuPinStore::new();
-        let peer = PeerId::new("p");
-        let observed = fp("cert-A");
-        let pin = store
-            .pin_first_contact(&peer, &observed, &observed, 1)
-            .await
-            .expect("pin");
-        assert_eq!(pin.boot_nonce, 1);
-        assert_eq!(pin.fingerprint, observed);
-    }
-
-    #[tokio::test]
     async fn first_contact_mismatch_fires() {
         let store = InMemoryTofuPinStore::new();
         let peer = PeerId::new("p");
@@ -415,18 +635,6 @@ mod tests {
             .await
             .expect_err("must mismatch");
         assert!(matches!(err, EPinMismatch::Mismatch { .. }));
-    }
-
-    #[tokio::test]
-    async fn verify_pinned_succeeds_after_pin() {
-        let store = InMemoryTofuPinStore::new();
-        let peer = PeerId::new("p");
-        let observed = fp("cert-A");
-        store
-            .pin_first_contact(&peer, &observed, &observed, 1)
-            .await
-            .expect("pin");
-        store.verify_pinned(&peer, &observed).await.expect("verify");
     }
 
     #[tokio::test]

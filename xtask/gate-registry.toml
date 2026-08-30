@@ -85,9 +85,9 @@ gates = [
     # (`check-rto-gate`) reads the evidence and gates on the threshold.
     "rto-drill",
     "check-rto-gate",
-    # Story 10.4b — live bilateral A2A consent (NFR-Sec-13), rotation real-timing
-    # (NFR-Rel-9), mobile-push-on-halt (operator-facing halt wire), and the J4
-    # §13.1 Mira-Nash colocation-latency gate (Story 10.4c — real in-kernel
+    # Story 10.4b — live bilateral A2A consent (NFR-Sec-13), rotation
+    # real-timing (NFR-Sec-13), mobile-push-on-halt (operator-facing halt
+    # wire), and the J4
     # scalar.tap measurement, replacing the 10.4b proven-RED placeholder).
     "check-live-bilateral-consent",
     "check-rotation-real-timing",
@@ -267,11 +267,15 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 name = "check-live-bilateral-consent"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
-# Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
-# Advisory at v1.0; blocking at v1.5.
+# Story 10.4b / 14-2 — rotation real-timing gate. (Mislabel corrected by
+# 14-2: the 30s/90s propagation floors are NFR-Sec-13's rotation-chaos
+# scope; NFR-Rel-9 is the ≤5s p99 token-validation axis.)
+# Advisory at v1.0; blocking from v1.5 onward. Story 14-2 (AC6.3) ADDED
+# explicit v2_0/v2_2 rungs without downgrading the inherited v1_5 blocking
+# posture. The gate hard-errors if any blocking rung is relaxed.
 [[ship_gate]]
 name = "check-rotation-real-timing"
-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
 # scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1

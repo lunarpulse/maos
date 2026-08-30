@@ -1,3 +1,11 @@
+<!-- SUPERSEDED by Story 14-2 (AC6.1/AC6.5, 2026-08-29): this calibration-era
+report was written by the SYNTHETIC harness (harness_3_host.rs, now DELETED),
+which seeded t_0/t_1/t_2 from DrillConfig constants and asserted its own
+floors green. The live evidence surface is the real-socket drill + the
+check-rotation-real-timing gate — runnable by pointer:
+`cargo run -p xtask -- check-rotation-real-timing --json`. Retained for
+provenance; nothing below is a measurement of a real mesh. -->
+
 ---
 dev_model_used: claude-opus-4-7
 ---

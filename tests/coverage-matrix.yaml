@@ -1451,18 +1451,23 @@ coverage:
       Story 1b.1 ships the criterion bench for ring-buffer flush P99 < 1ms.
       Raw file + sync_data chosen over SQLite WAL for deterministic latency.
   NFR-Rel-9:
-    gates: [check-rotation-real-timing]
+    gates: []
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
     notes: |
-      Revocation-propagation latency under mTLS cert-rotation churn. The
-      `check-rotation-real-timing` gate (Story 10.4b) asserts the
-      `RotationDrillReport` revocation-propagation floors by name (p50 ≤30s /
-      p99 ≤90s) over REAL `AgentRotationTimestamps` from the live 3-host
-      rotation chaos drill — the falsifiable enforcement of this NFR. The same
-      gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
-      produces the revocation events.
+      [RE-BASED by Story 14-2, 2026-08-29 — the pre-14-2 notes conflated this
+      row with NFR-Sec-13's rotation-propagation scope.] The PRD's NFR-Rel-9
+      is `≤ 5s p99 under 10⁴ concurrent capability-token validations`
+      (`non-functional-requirements.md:28`) — the capability-token
+      validation-latency axis, NOT cert-rotation propagation. The 30s/90s
+      propagation floors belong to the NFR-Sec-13 rotation-chaos scope
+      (asserted by `check-rotation-real-timing` via `passes_v15_floors`, which
+      inherits the stricter ratified v0.7/v1.0 floors rather than the looser
+      NFR-Sec-13 literals). No current gate measures the named workload.
+      `check-rotation-real-timing` is mapped only to NFR-Sec-13; NFR-Rel-9
+      remains explicitly uncovered until a dedicated capability-token load
+      leg lands.
   NFR-Scale-1:
     gates: [check-cross-region-consensus, check-multi-region-slo]
     corpora: []
@@ -1522,15 +1527,45 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Sec-12:
-    gates: []
+    gates: [check-rotation-real-timing]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: |
+      Story 14-2's `overlap-pin-closure` leg enforces NFR-Sec-12 at the
+      production pin-store boundary: outsiders remain blocked during the
+      widened window, fingerprint collisions are refused, close retires the
+      old generation, and the promoted generation remains accepted.
   NFR-Sec-13:
     gates: [check-live-bilateral-consent, check-rotation-real-timing]
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: |
+      [Notes added by Story 14-2, 2026-08-29 — this row never carried any.]
+      PHASE DECISION: the PRD (`:223`) scopes the 10-host half at v2.0; the
+      gate preserves its v1.5 blocking posture at both explicit v2.0 and v2.2
+      rungs. The epic ships the evidence in the v2.2 wave without weakening
+      the earlier ship phase.
+      THE DROP DEFINITION (14-2 AC1.1, complete, verbatim): "A
+      conversation drop is a frame issued before `t_0` that never received
+      a verdict — neither an ACK nor any typed NACK — by `t_2`. It is not a
+      retried dial (retries are internal and a retried-then-succeeded dial
+      returns `Ok`, visible only as `last_dial_attempts()`). It is not an
+      `IntentDeniedAtPeer` (`router.rs:1045`) — that is a completed
+      conversation answered 'no'. It is not a post-rotation reachability
+      failure; that is the existing Phase-2 assertion, already proven-red."
+      SAMPLE-COUNT DISCLOSURE (14-2
+      AC4.2): every percentile publishes `n=` beside it on three surfaces —
+      test stderr, `report_to_markdown`, and the gate's leg JSON — computed
+      from the percentile engine's own filter (per-agent `t_1_ns.is_some()`
+      et al.), never `.len()`; at n ≤ 100 the p99 IS the worst of n.
+      Rotation floors asserted via `passes_v15_floors` (== the ratified
+      v0.7/v1.0 floors; NFR-Sec-13's literal median ≤60s / p99 ≤5min are
+      looser on every axis and are never adopted). The enforcement is the
+      leg-structured `check-rotation-real-timing` gate (14-2 AC5): a
+      10-host test that early-returns emits no `ROTATION_HOSTS_ROTATED`
+      marker and REDS.
   NFR-Sec-14:
     gates: [isolation-framework-tests]
     corpora: []

@@ -73,6 +73,32 @@
    external publication (or that path stays flag-gated at GA).
 3. Only then cut the GA tag. Update this ledger's Status to reflect the tag.
 
+## Story 14-2 — mTLS rotation honesty clauses (2026-08-29)
+
+Not GA holds — **claim boundaries**, recorded so Epic 14's rotation evidence
+can never imply more than it measured (mirrors row 18's hand-off):
+
+- **(a) Revocation is NOT measured.** No OCSP/CRL exists — ADR-047 §3/§4
+  forbid it under NFR-Ops-12 (zero outbound network calls). `t_1` is the
+  new-pin-observably-active proxy.
+- **(b) The mesh is in-process.** Real sockets, real rustls, real mTLS, one
+  process, one runtime, loopback (11.3's F1 disclosure, re-stated at N=10).
+- **(c) Rotation ASSUMES provisioning already declared the replacement**
+  (AC2.0): the operator moves `A2APeerConfig.cert_fingerprint` at
+  `t_provision`; there is no live peer-config reload path and 14-2 does not
+  build one — an inherited ordering, written as ASSUMES, not "requires".
+  Named owner: `14-2a-production-mtls-rotation-trigger` (backlog). That story
+  owns the live peer-config reload and operator trigger; until it lands,
+  `swap_serving_cert` / `open_rotation_window` remain test callers only.
+- **(d) Timings are compressed-loopback regression floors, not geo
+  figures.** §15.6 keeps the 30-day soak and absolute geo-SLO as
+  release-gate artifacts, never CI-claimed.
+
+Runnable evidence (pointer, never a hand-copied transcript):
+`cargo run -p xtask -- check-rotation-real-timing --json` — the leg JSON
+carries the drills' own percentile disclosures with `n=` beside every
+percentile.
+
 ## References
 
 - E12 retro action B2 (retro doc `epic-12-retro-2026-07-13.md`).

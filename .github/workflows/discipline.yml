@@ -2650,7 +2650,9 @@ jobs:
       - name: Run check-live-bilateral-consent
         run: cargo test -p maos-a2a-tcp --test t_10_4b_live_bilateral -- --test-threads=1
 
-  # Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
+  # Story 10.4b / 14-2 (NFR-Sec-13 rotation chaos; NFR-Rel-9 mislabel corrected
+  # by 14-2 — the 30s/90s propagation floors are NFR-Sec-13's chaos scope, not
+  # NFR-Rel-9's token-validation axis) — rotation real-timing gate.
   check-rotation-real-timing:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -2662,8 +2664,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      # Story 14-2 (AC5.2/AC5.5.a): the bare `cargo test` step became the
+      # leg-structured gate in the SAME change that #[ignore]-gated the
+      # drill's tests — one without the other would make this hard-failing
+      # job run ZERO tests and pass vacuously.
       - name: Run check-rotation-real-timing
-        run: cargo test -p maos-a2a-tcp --test t_10_4b_rotation_real_timing -- --test-threads=1
+        run: cargo run -p xtask -- check-rotation-real-timing --json
 
   # Story 10.4c — J4 §13.1 Mira-Nash Observer colocation-latency gate.
   # Real in-kernel scalar.tap measurement via `kernel_measurement` feature.

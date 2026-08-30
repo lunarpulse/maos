@@ -485,7 +485,50 @@ pub async fn build_mesh_n(
     retry: HandshakeRetryPolicy,
 ) -> Vec<MeshNode> {
     let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
-    build_mesh_inner(clock, ca, names, serving, expected, retry, &gates, &[]).await
+    build_mesh_inner(
+        clock,
+        ca,
+        names,
+        serving,
+        expected,
+        retry,
+        &gates,
+        &[],
+        None,
+    )
+    .await
+}
+
+/// Story 14-2 / AC2.0.a — the PROVISIONED mesh: `serving`/`expected` stay the
+/// OLD generation while every `A2APeerConfig` DECLARES the replacement
+/// (`declared`), modelling the operator's `t_provision` act —
+/// `A2APeerConfig.cert_fingerprint` moves to NEW at provision time, before
+/// the wire does (AC2.0's ordering: provision → swap → close). A thin
+/// options-wrapper over the ONE mesh primitive (`build_mesh_inner`), NOT a
+/// second builder — extending the single primitive is explicitly carved out
+/// of AC3.1's prohibition and is the shape 14-1 refactored toward.
+pub async fn build_mesh_n_provisioned(
+    clock: &Clock,
+    ca: &Ca,
+    names: &[String],
+    serving: &[&Leaf],
+    expected: &[&Leaf],
+    declared: &[&Leaf],
+    retry: HandshakeRetryPolicy,
+) -> Vec<MeshNode> {
+    let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
+    build_mesh_inner(
+        clock,
+        ca,
+        names,
+        serving,
+        expected,
+        retry,
+        &gates,
+        &[],
+        Some(declared),
+    )
+    .await
 }
 
 /// Gate-wiring variant of [`build_mesh_n`]: per-node cohort manifest gates
@@ -500,7 +543,7 @@ pub async fn build_mesh_n_with_gates(
     retry: HandshakeRetryPolicy,
     gates: &[Option<Arc<dyn CohortManifestGate>>],
 ) -> Vec<MeshNode> {
-    build_mesh_inner(clock, ca, names, serving, expected, retry, gates, &[]).await
+    build_mesh_inner(clock, ca, names, serving, expected, retry, gates, &[], None).await
 }
 
 /// The ONE node-construction loop behind every mesh builder (AC2.1: the 11.3
@@ -525,11 +568,19 @@ async fn build_mesh_inner(
     retry: HandshakeRetryPolicy,
     gates: &[Option<Arc<dyn CohortManifestGate>>],
     plants: &[Plant],
+    // Story 14-2 / AC2.0.a — `Some(leaves)` makes every peer_cfg DECLARE
+    // `leaves[j]`'s fingerprint (the provisioned state: operator config
+    // names the replacement while pins/serving stay on the old generation);
+    // `None` ⇒ today's behaviour (`expected`).
+    declared: Option<&[&Leaf]>,
 ) -> Vec<MeshNode> {
     let n = names.len();
     assert_eq!(serving.len(), n, "serving leaves must match host count");
     assert_eq!(expected.len(), n, "expected leaves must match host count");
     assert_eq!(gates.len(), n, "cohort gates must match host count");
+    if let Some(declared) = declared {
+        assert_eq!(declared.len(), n, "declared leaves must match host count");
+    }
     assert!(
         plants.iter().all(|(i, _)| *i < n),
         "plant index out of mesh range"
@@ -556,13 +607,15 @@ async fn build_mesh_inner(
         let peer_cfgs: Vec<_> = peers
             .iter()
             .map(|(j, leaf)| {
-                peer_cfg(
-                    &names[*j],
-                    "tls://127.0.0.1:0",
-                    &leaf.fingerprint,
-                    send,
-                    accept,
-                )
+                // Story 14-2 / AC2.0.a — the DECLARED fingerprint is what
+                // the operator's A2APeerConfig.cert_fingerprint carries
+                // (sites 5/6 compare the store pin against THIS). Under
+                // provision, cfg declares NEW while the store still pins
+                // OLD and the wire still serves OLD.
+                let declared_fp = declared
+                    .map(|leaves| &leaves[*j].fingerprint)
+                    .unwrap_or(&leaf.fingerprint);
+                peer_cfg(&names[*j], "tls://127.0.0.1:0", declared_fp, send, accept)
             })
             .collect();
         let pems = write_pem(serving[i], Some(ca));
@@ -862,7 +915,10 @@ pub async fn build_mesh_with_planted(
     retry: HandshakeRetryPolicy,
 ) -> Vec<MeshNode> {
     let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
-    build_mesh_inner(clock, ca, names, serving, expected, retry, &gates, plants).await
+    build_mesh_inner(
+        clock, ca, names, serving, expected, retry, &gates, plants, None,
+    )
+    .await
 }
 
 /// The real outcome of one mesh-level eviction (AC1.2): the beats a caller

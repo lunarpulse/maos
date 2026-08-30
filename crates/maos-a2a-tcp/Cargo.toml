@@ -68,3 +68,11 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 # `cargo tree --release` absence SHIP-BLOCKER. Mirrors `slo-fault-inject`
 # (`maos-bench/Cargo.toml`).
 churn-fault-inject = []
+# Story 14-2 (AC5.5b) — rotation fault-injection for the
+# check-rotation-real-timing falsifier surface. Blinds the HARNESS
+# observation seam only (the test-side drop/verdict accounting) — NEVER
+# `verifier.rs`, never the router (subsystem-gating is the 11.2b P2 sin).
+# MUST NOT appear in release builds — guarded by the test file's release
+# `compile_error!`; `check-rotation-real-timing` proves the guard fires with
+# `cargo check --release --tests --features rotation-fault-inject`.
+rotation-fault-inject = []

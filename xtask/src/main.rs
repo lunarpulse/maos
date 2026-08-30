@@ -37,6 +37,7 @@ mod check_multi_region_slo;
 // Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate (per-leg
 // independence). MUST NOT append legs to check-rotation-real-timing or
 // check-multi-region-slo (F7).
+mod check_rotation_real_timing;
 mod check_scale_churn;
 // Story 12.1 — signed cohort manifest and full-pairwise mesh gate.
 mod check_cohort_mesh;
@@ -844,6 +845,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 14-2 — 10-host mTLS rotation real-timing gate (per-leg independence).
+    #[command(name = "check-rotation-real-timing")]
+    CheckRotationRealTiming {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.3 — scale-envelope 25/30-host churn gate (per-leg independence).
     #[command(name = "check-scale-churn")]
     CheckScaleChurn {
@@ -1347,6 +1354,7 @@ fn main() {
         Commands::CheckSkillConformance { json } => check_skill_conformance::run(json),
         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
+        Commands::CheckRotationRealTiming { json } => check_rotation_real_timing::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
         Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),
