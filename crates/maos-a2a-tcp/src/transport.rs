@@ -15,7 +15,7 @@ use crate::config::{clone_key, TcpA2AConfig};
 use crate::error::TcpTransportError;
 use crate::verifier::{TofuPinningVerifier, TrustPosture, VerifyDirection};
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{FutureExt, SinkExt, StreamExt};
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
 use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
@@ -28,6 +28,7 @@ use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
 use rustls::{ClientConfig, ServerConfig};
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -138,6 +139,12 @@ pub struct TcpA2ATransport {
     /// `(boot_nonce, lamport)` — `route_outbound` discards the ACK, so AC-T1's
     /// wire round-trip oracles read this instead.
     last_intake: Arc<Mutex<Option<(u64, u64)>>>,
+    /// Story 14-2a review — the supervised-boundary policy for a panic
+    /// escaping a per-connection task (fail-stop in production; the Observe
+    /// seam exists so tests never abort the shared test runner). Read per
+    /// connection at accept time, so `install_connection_panic_policy`
+    /// governs connections accepted after it.
+    panic_policy: Arc<Mutex<ConnectionPanicPolicy>>,
     _serve_guard: Arc<ServeGuard>,
 }
 
@@ -444,6 +451,7 @@ impl TcpA2ATransport {
         let active_connections = Arc::new(AtomicUsize::new(0));
         let last_intake: Arc<Mutex<Option<(u64, u64)>>> = Arc::new(Mutex::new(None));
         let conns: Arc<Mutex<Vec<JoinHandle<()>>>> = Arc::new(Mutex::new(Vec::new()));
+        let panic_policy = Arc::new(Mutex::new(ConnectionPanicPolicy::FailStop));
 
         let accept = tokio::spawn(accept_loop(
             listener,
@@ -455,6 +463,7 @@ impl TcpA2ATransport {
             active_connections.clone(),
             last_intake.clone(),
             conns.clone(),
+            panic_policy.clone(),
         ));
 
         Ok(Self {
@@ -477,8 +486,22 @@ impl TcpA2ATransport {
             active_connections,
             last_dial_attempts: Arc::new(AtomicUsize::new(0)),
             last_intake,
+            panic_policy,
             _serve_guard: Arc::new(ServeGuard { accept, conns }),
         })
+    }
+
+    /// Story 14-2a review — replace the connection-task panic policy. `bind`
+    /// defaults to [`ConnectionPanicPolicy::FailStop`] (a panicking
+    /// connection task terminates the daemon process); tests and embedders
+    /// install [`ConnectionPanicPolicy::Observe`] instead so the supervised
+    /// boundary is exercisable without aborting the host process. The policy
+    /// is read per connection at accept time, so connections accepted after
+    /// this call are governed by it.
+    pub fn install_connection_panic_policy(&self, policy: ConnectionPanicPolicy) {
+        if let Ok(mut guard) = self.panic_policy.lock() {
+            *guard = policy;
+        }
     }
 
     /// The shared engine. Tests drive intake through it directly, and the J1
@@ -775,8 +798,10 @@ impl TcpA2ATransport {
     }
 }
 
-/// The accept loop — one per-connection `tokio::spawn` with its `JoinHandle`
-/// held in the drop-guard registry (H6).
+/// The accept loop — one supervised per-connection `tokio::spawn` with its
+/// `JoinHandle` held in the drop-guard registry (H6). The supervision seam
+/// wraps every connection future so a task panic can no longer be silently
+/// discarded by that registry (Story 14-2a review).
 #[allow(clippy::too_many_arguments)]
 async fn accept_loop(
     listener: TcpListener,
@@ -788,6 +813,7 @@ async fn accept_loop(
     active_connections: Arc<AtomicUsize>,
     last_intake: Arc<Mutex<Option<(u64, u64)>>>,
     conns: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    panic_policy: Arc<Mutex<ConnectionPanicPolicy>>,
 ) {
     loop {
         let (tcp, _peer) = match listener.accept().await {
@@ -808,15 +834,33 @@ async fn accept_loop(
         let active_connections = active_connections.clone();
         let last_intake = last_intake.clone();
 
-        let handle = tokio::spawn(serve_connection(
-            tcp,
-            acceptor,
-            core,
-            pins,
-            timeouts,
-            intake_entered,
-            active_connections,
-            last_intake,
+        // Story 14-2a review — the supervised boundary. The peer hint is
+        // captured BEFORE `tcp` moves into the connection task; it is the
+        // only label available once the task is gone.
+        let peer_addr_hint = tcp
+            .peer_addr()
+            .map(|a| a.to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+        // Read per connection (not once at bind) so a policy installed after
+        // `bind` governs connections accepted from then on; a poisoned lock
+        // fails CLOSED to the production default.
+        let policy = match panic_policy.lock() {
+            Ok(guard) => guard.clone(),
+            Err(_) => ConnectionPanicPolicy::FailStop,
+        };
+        let handle = tokio::spawn(supervise_connection(
+            policy,
+            peer_addr_hint,
+            serve_connection(
+                tcp,
+                acceptor,
+                core,
+                pins,
+                timeouts,
+                intake_entered,
+                active_connections,
+                last_intake,
+            ),
         ));
         if let Ok(mut guard) = conns.lock() {
             guard.retain(|h| !h.is_finished());
@@ -830,6 +874,96 @@ struct ConnGauge(Arc<AtomicUsize>);
 impl Drop for ConnGauge {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Story 14-2a review — what the supervised connection boundary does when a
+/// per-connection task PANICS (e.g. the production I2 audit-write panic
+/// reached by a signed-manifest reissue, or any future bug in the read loop).
+///
+/// Before this seam the per-connection `JoinHandle`s in the drop-guard
+/// registry were never awaited, so a panicking connection task was silently
+/// discarded: the daemon kept serving with a piece of itself dead, and the
+/// audit-write panic policy — fail-stop at DAEMON-PROCESS scope — had no
+/// enforcement point. The boundary below is that enforcement point.
+#[derive(Clone)]
+pub enum ConnectionPanicPolicy {
+    /// Production default: log, then `std::process::abort()` the daemon
+    /// process. Abort (not exit) is deliberate — no destructors, no flushes,
+    /// no further state mutation racing a dying daemon: a panicking
+    /// connection can never leave the daemon serving.
+    FailStop,
+    /// Test/embedding seam: hand the observation to `hook` and keep serving,
+    /// so the boundary is exercisable without aborting the host process
+    /// (e.g. the shared `cargo test` runner). Never install outside tests.
+    Observe(Arc<dyn Fn(&ConnectionPanic) + Send + Sync>),
+}
+
+/// What the supervised boundary reports about one panicking connection task.
+#[derive(Debug, Clone)]
+pub struct ConnectionPanic {
+    /// Best-effort socket label of the connection whose task panicked
+    /// (`"unknown"` when the socket was already gone).
+    pub peer_addr: String,
+    /// Display form of the panic payload. Diagnostics ONLY — the boundary's
+    /// decision is the typed `catch_unwind` boundary itself; nothing parses
+    /// this text.
+    pub message: String,
+}
+
+/// Story 14-2a review — the explicit supervised task boundary around one
+/// per-connection task. `serve_connection` stays panic-transparent; this
+/// wrapper is the ONLY place a connection panic is observed, and the selected
+/// [`ConnectionPanicPolicy`] — and nothing else — decides what it means. A
+/// drop-guard `abort()` is NOT a panic: cancellation never reaches
+/// `catch_unwind`, so the H6 shutdown path is untouched.
+async fn supervise_connection<F>(policy: ConnectionPanicPolicy, peer_addr: String, fut: F)
+where
+    F: Future<Output = ()>,
+{
+    match std::panic::AssertUnwindSafe(fut).catch_unwind().await {
+        Ok(()) => {}
+        Err(payload) => enforce_connection_panic_policy(policy, peer_addr, payload),
+    }
+}
+
+/// Enforce [`ConnectionPanicPolicy`] for one observed connection-task panic.
+fn enforce_connection_panic_policy(
+    policy: ConnectionPanicPolicy,
+    peer_addr: String,
+    payload: Box<dyn std::any::Any + Send>,
+) {
+    let message = panic_payload_message(payload.as_ref());
+    tracing::error!(
+        peer = %peer_addr,
+        panic = %message,
+        "a per-connection task PANICKED — the supervised boundary is enforcing the \
+         connection-panic policy"
+    );
+    match policy {
+        ConnectionPanicPolicy::FailStop => {
+            // stderr as well as tracing: `abort()` must never be the FIRST
+            // someone hears of this, whatever subscriber the daemon runs.
+            eprintln!(
+                "FATAL (fail-stop): connection task to {peer_addr} panicked: {message}; \
+                 aborting the daemon process"
+            );
+            std::process::abort();
+        }
+        ConnectionPanicPolicy::Observe(hook) => hook(&ConnectionPanic { peer_addr, message }),
+    }
+}
+
+/// Best-effort DISPLAY of a panic payload for the log/observation only. This
+/// is the standard `&'static str`/`String` payload downcast, not parsing:
+/// control flow never keys on the text.
+fn panic_payload_message(payload: &dyn std::any::Any) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "<non-string panic payload>".to_string()
     }
 }
 
@@ -869,7 +1003,43 @@ async fn serve_connection(
         Ok(Ok(s)) => s,
         Ok(Err(e)) => {
             let classified = TcpTransportError::classify_handshake(&e.to_string());
-            if classified.is_tofu_mismatch() {
+            // Story 14-2a / AC4.4 — §7.2.1.a requires, verbatim, that the
+            // post-grace rejection be *"logged as `cert_post_grace_reject`"*.
+            // Until this arm it was the ONE failure mode this whole rotation
+            // mechanism exists to produce and the ONLY one that left NO trace at
+            // all: a validity rejection fell through the `is_tofu_mismatch()`
+            // arm and returned bare, so an auditor asking "did anyone keep using
+            // the old certificate?" had nothing to read.
+            //
+            // ⚠ WHICH ARM IS THE POST-GRACE ONE — MEASURED, AND IT IS NOT THE
+            // OBVIOUS ONE. A retired leaf is normally still WITHIN its validity
+            // window (a rotation is not an expiry), so after promotion the
+            // verifier refuses it as `PIN_MISMATCH`, not `CERT_EXPIRED`. The
+            // sentinel therefore rides the MISMATCH arm, and the validity arm
+            // gets its own accurate label instead of being mislabelled a
+            // post-grace refusal — an expired CURRENT certificate is a different
+            // operator problem and must not be filed as a rotation event.
+            //
+            // ⚠ AND THE SENTINEL IS NON-EXCLUSIVE, BY CONSTRUCTION. The store
+            // keeps NO retired-generation history (`TofuPin` has no previous
+            // field and `close_rotation_window` returns the retired value to a
+            // caller that drops it), and a failed handshake surfaces no observed
+            // fingerprint here at all — so "retired leaf after the grace" and
+            // "unknown leaf, i.e. an impersonation attempt" are ONE observable
+            // at this seam. The row says so rather than claiming to know which.
+            // The join an auditor actually uses is the rotation timeline: a
+            // `cert_rotation_window_closed` row for the peer, then this refusal.
+            let refusal = if classified.is_tofu_mismatch() {
+                Some(format!(
+                    "cert_post_grace_reject candidate (or unknown-leaf refusal — this seam \
+                     cannot distinguish them: no retired-generation history exists): {classified}"
+                ))
+            } else if classified.is_cert_validity() {
+                Some(format!("cert_validity_reject: {classified}"))
+            } else {
+                None
+            };
+            if let Some(detail) = refusal {
                 // Best-effort: a journaling failure must not become a way to keep
                 // the listener from refusing — but it must not be SILENT either
                 // (§A6 review 2026-08-18): the Err contract on
@@ -879,14 +1049,14 @@ async fn serve_connection(
                     .journal_peer_identity_refusal(
                         PeerRefusalDirection::Listen,
                         peer_addr_hint.as_str(),
-                        &classified.to_string(),
+                        detail.as_str(),
                     )
                     .await
                 {
                     tracing::error!(
                         "peer-identity refusal was NOT journaled ({}): {}",
                         journal_err,
-                        classified
+                        detail
                     );
                 }
             }

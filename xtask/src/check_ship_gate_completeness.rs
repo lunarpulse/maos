@@ -93,6 +93,12 @@ const EXPECTED_GATES: &[&str] = &[
     // judgement; until this gate landed there was no queryer, and eight of
     // nineteen rows were already wrong at HEAD.
     "check-decision-register",
+    // Story 14-2a AC6 — the production peer-certificate rotation trigger's gate.
+    // Its control is a RUNTIME leg (a live daemon rotating on a signed reissue),
+    // because the repo's only production-caller probe visits `visit_expr_call`
+    // only and every call this story makes is a method call — a copied probe
+    // would have been green from birth.
+    "check-cert-rotation-trigger",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

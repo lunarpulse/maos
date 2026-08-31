@@ -1,5 +1,10 @@
 #![forbid(unsafe_code)]
 
+/// Story 14-2a — the production peer-certificate rotation trigger's wiring: the
+/// real `T_grace` deadline and the operator read seam. In the library, not
+/// `main.rs`, so the runtime gate leg can drive the production types.
+#[cfg(feature = "network")]
+pub mod cert_rotation;
 #[cfg(feature = "network")]
 pub mod cross_team_consent;
 #[cfg(feature = "network")]

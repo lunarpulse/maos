@@ -2658,10 +2658,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
 
-    // Story 5.5a — the operator endpoint is an adapter over this exact
-    // scheduler Arc. It binds loopback by default when an operator bearer is
-    // configured and never manufactures a one-shot report fallback.
-    let _operator_http_server = match (
+    // Story 5.5a — the operator endpoint is an adapter over this exact scheduler
+    // Arc. ⚠ Story 14-2a: the CONFIG is validated HERE, where it always was, so
+    // a misconfiguration still fails fast with zero side effects and its error
+    // is not masked by the journal-open that follows; the BIND itself moved
+    // below `Arc::get_mut(&mut scheduler)`, which requires `strong_count == 1`
+    // and therefore PANICKED for every process that actually configured this
+    // surface (measured at `a22f0c01`: the daemon never reached its listener).
+    let operator_http_config = match (
         std::env::var("MAOS_OPERATOR_BEARER_TOKEN"),
         std::env::var("MAOS_OPERATOR_HTTP_BIND"),
     ) {
@@ -2673,16 +2677,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 bind.parse()
             }
             .map_err(|error| format!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}"))?;
-            Some(
-                maos_control::OperatorHttpServer::bind(
-                    maos_control::OperatorHttpConfig {
-                        bind,
-                        bearer_token: token,
-                    },
-                    Arc::clone(&scheduler),
-                )
-                .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?,
-            )
+            Some(maos_control::OperatorHttpConfig {
+                bind,
+                bearer_token: token,
+            })
         }
         (Err(_), Ok(_)) => {
             return Err(
@@ -2732,6 +2730,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("scheduler Arc strong_count == 1 at composition root")
         .set_crash_detector(Arc::clone(&crash_detector));
     eprintln!("maos: CrashDetector wired (Story 5.3)");
+
+    // ⚠ Story 14-2a — THE OPERATOR HTTP SURFACE MOVED HERE, AND IT HAD TO.
+    //
+    // It used to bind ~90 lines above, immediately after the scheduler was
+    // constructed and immediately BEFORE `Arc::get_mut(&mut scheduler)`
+    // (`:2697`), which `expect`s `strong_count == 1`. `OperatorHttpServer::bind`
+    // RETAINS its `Arc<SpiritSchedulerAdapter>` clone for the server's
+    // lifetime, so any process that actually configured
+    // `MAOS_OPERATOR_BEARER_TOKEN` panicked at that `expect` a few lines later:
+    // `scheduler Arc strong_count == 1 at composition root`. Measured at
+    // `a22f0c01` by booting the daemon with the surface enabled — it never
+    // reached the listener. The whole Story 5.5a endpoint, and therefore
+    // `maosctl spirit inspect --sandbox` (the ONE `maosctl` verb that reaches a
+    // running daemon), was unreachable in every process that also wires the
+    // CrashDetector, which is every real boot. Binding AFTER the exclusive
+    // mutation is the minimal repair: nothing between the two sites uses the
+    // server, and the surface is now actually reachable — which is what makes
+    // AC1.5's rotation-window route verifiable rather than merely present.
+    // Story 14-2a / AC1.5 — the READ half of the rotation seam. `cohort_daemon`
+    // was loaded at `:2038`; its `Arc<CohortManifestState>` is the same one the
+    // daemon dispatch installs the rotation control into ~7,000 lines below, so
+    // the GET and the signed WRITE are one seam with two consumers. The source
+    // reports INSTALLATION state, so a process that reads a cohort config but
+    // never installs the control answers 404 rather than an empty list.
+    #[cfg(feature = "network")]
+    let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> =
+        cohort_daemon.as_ref().map(|bootstrap| {
+            Arc::new(maos_bin::cert_rotation::CohortRotationWindows::new(
+                Arc::clone(&bootstrap.state),
+            )) as Arc<dyn maos_control::RotationWindowSource>
+        });
+    #[cfg(not(feature = "network"))]
+    let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> = None;
+    let _operator_http_server = match operator_http_config {
+        Some(config) => {
+            let server = maos_control::OperatorHttpServer::bind(
+                config,
+                Arc::clone(&scheduler),
+                rotation_windows,
+            )
+            .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?;
+            // The bound address is announced because it can be ephemeral
+            // (`MAOS_OPERATOR_HTTP_BIND=127.0.0.1:0`), and an operator surface
+            // nobody can find is an operator surface nobody uses.
+            eprintln!("maos: operator HTTP listening on {}", server.local_addr());
+            Some(server)
+        }
+        None => None,
+    };
 
     // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
     // Story 6.5 — trait-based decoupling: ScbTracker wraps the SCB map.
@@ -9710,6 +9757,12 @@ async fn run_cohort_a2a_daemon(
         None => None,
     };
     let intake_sink = host_b.as_ref().map(|(tx, _, _)| tx.clone());
+    // Story 14-2a / AC1.2 — the rotation control's trust planes are captured
+    // BEFORE `bootstrap` is moved into the builder, and installed AFTER it
+    // returns. Cloning the `Arc` here is not a convenience: this is the ONE
+    // handle the operator read surface already holds (`:2661`), so both
+    // consumers observe the same set-once control.
+    let rotation_state = Arc::clone(&bootstrap.state);
     let runtime = build_cohort_a2a_daemon_runtime(
         Arc::clone(&transparency_log),
         boot_nonce,
@@ -9720,6 +9773,32 @@ async fn run_cohort_a2a_daemon(
         intake_sink,
     )
     .await?;
+    // ── Story 14-2a / AC1.1+AC1.2 — THE PRODUCTION ROTATION TRIGGER ─────────
+    //
+    // This is the story's deliverable, and it is exactly here for measured
+    // reasons. `MAOS_ONE_SHOT=cohort-a2a-daemon` is the ONLY arm where the
+    // concrete `Arc<TcpA2ATransport>` survives: the `maos run` cross-host arm
+    // (`:2457`) coerces its transport to `Arc<dyn A2ARouter>` in the same
+    // expression at `:2484`, and that trait has one method (`route_outbound`)
+    // and is not `Any`-downcastable, so `pins()` and `core()` are
+    // IRRECOVERABLE there. Daemon-only is a declared boundary, not an
+    // oversight — and widening the frozen `maos_domain` port to smuggle the
+    // methods through would be a `maos-domain` delta against a ceiling that is
+    // already over.
+    //
+    // `pins()` and `core()` return clones of the SAME `Arc`s the accept loop,
+    // both verifiers and the router core hold (`transport.rs:492`, `:503`), so
+    // the signed reissue path now reaches the running mesh's trust planes and
+    // not a copy of them. Delete this call and the daemon still serves, still
+    // accepts signed reissues, and silently stops rotating — which is why the
+    // gate's control leg is a RUNTIME observation of the pin set changing and
+    // its proven-red vector is removing this install.
+    rotation_state.install_cert_rotation(
+        runtime.transport.pins(),
+        runtime.transport.core(),
+        Arc::new(maos_bin::cert_rotation::TokioGraceTimer),
+        maos_cohort::cold_deployment_t_grace(),
+    )?;
     // Spawned AFTER the bind so the sink is installed before the listener exists,
     // and BEFORE the readiness line below, so a peer that connects the instant the
     // daemon announces itself finds a live consumer rather than a full queue with

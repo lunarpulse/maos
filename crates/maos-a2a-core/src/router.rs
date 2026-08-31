@@ -585,6 +585,31 @@ impl A2ARouterCore {
         }
     }
 
+    /// Story 14-2a / AC2.2 — move plane A's §7.2 trust pin for `host_id` and
+    /// return the fingerprint it replaced (`None` when plane A never declared
+    /// the peer; this never INSERTS one, because a peer the operator never
+    /// declared has no allowlists, no profile and no endpoint, and inventing
+    /// them here would widen the mesh from a config reload).
+    ///
+    /// This is the second half of the two-plane reload. Plane B's rotation
+    /// window MUST already be open on `fingerprint` when this is called, so
+    /// the value written here is always inside the accepted set
+    /// `{pins[p].fingerprint, rotation_next[p]}` that sites 5/6 check — that
+    /// ORDER is what makes the reload observably atomic without a new lock
+    /// (`tofu.rs` documents the writer order: `window_lock` BEFORE any `pins`
+    /// entry lock; plane A is written after both are released).
+    ///
+    /// Additive; changes no frozen signature (epic AC-A6).
+    pub fn set_peer_cert_fingerprint(
+        &self,
+        host_id: &HostId,
+        fingerprint: PeerCertFingerprint,
+    ) -> Option<PeerCertFingerprint> {
+        self.peers
+            .get_mut(host_id.as_str())
+            .map(|mut entry| std::mem::replace(&mut entry.cert_fingerprint, fingerprint))
+    }
+
     pub fn lookup_peer(&self, host_id: &HostId) -> Result<A2APeerConfig, A2AError> {
         self.peers
             .get(host_id.as_str())

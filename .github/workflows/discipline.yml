@@ -390,6 +390,31 @@ jobs:
       - name: Run the 14-0 AC1.5 proven-red vectors
         run: cargo test -p xtask --test decision_register_gate
 
+  # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
+  # gate's CONTROL leg boots a real `maos` daemon in
+  # `MAOS_ONE_SHOT=cohort-a2a-daemon` mode, delivers a real signed
+  # `cohort:manifest-reissue` over real mTLS, and observes the pin-set change
+  # through the production operator HTTP surface — so removing the set-once
+  # install in `main.rs` reds this job while the daemon still boots and still
+  # ACKs the reissue. The gate's own unit tests run in the same job: they are
+  # what keep the method-aware AST probe from silently reverting to the
+  # `visit_expr_call`-only shape that made the obvious probe a null control.
+  check-cert-rotation-trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-cert-rotation-trigger
+        run: cargo run -p xtask -- check-cert-rotation-trigger --json
+      - name: Run the gate's own oracle unit tests
+        run: cargo test -p xtask check_cert_rotation_trigger
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -3404,6 +3429,7 @@ jobs:
       - check-vetting-attestation
       - check-loom-substrate-drift
       - check-decision-register
+      - check-cert-rotation-trigger
     if: always()
     steps:
       - name: Ship gate results summary

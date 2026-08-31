@@ -501,11 +501,36 @@ coverage:
       `warning` and coverage_matrix.rs only hard-fails on "hard", so a misspelled
       gate name in this row reds nothing.
   FR23b:
-    gates: [check-cohort-mesh]
+    gates: [check-cohort-mesh, check-cert-rotation-trigger]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: >-
+      Story 14-2a (2026-08-30). ⚠ THIS ROW COVERS THE ROTATION THIRD OF FR23b AND
+      NOTHING ELSE. "Operator-managed PKI" is issuance + rotation + revocation:
+      * ROTATION — served, and only its PEER-TRUST half. `check-cert-rotation-trigger`
+        proves a live daemon re-derives its peer trust set from a signed
+        `cohort:manifest-reissue` and moves both runtime declaration surfaces with a
+        one-generation overlap. Its control leg is a RUNTIME observation (a real
+        `maos` daemon, a real signed reissue over real mTLS, the pin-set change read
+        back through the production operator HTTP surface), proven-red by unwiring
+        the set-once install. Rotating THIS host's own leaf is NOT served:
+        `swap_serving_cert` still has no production caller, because a signed manifest
+        carries a fingerprint and never a private key (owner
+        `14-2b-self-identity-rotation`).
+      * REVOCATION — ARCHITECTURALLY OUT. ADR-047 §3/§4 forbid OCSP/CRL under
+        NFR-Ops-12's zero-outbound-network mandate. There is no revocation check to
+        gate and there will not be one; the post-grace refusal of a retired
+        generation is the closest shipped behaviour.
+      * ISSUANCE — ENTIRELY OUT OF BAND. The operator mints certificates with
+        machinery this system never sees; the daemon only ever holds fingerprints and
+        on-disk PEM paths it was told about.
+      Cite those two exclusions with their reasons whenever this row is read: a bare
+      `gates:` list here would let the next reader conclude the whole requirement is
+      served, which is the failure 14-2 found on NFR-Rel-9. ⚠ And note this file
+      CANNOT FAIL — `mode: warning` at :3 and `coverage_matrix.rs` hard-fails only on
+      "hard" — so this row is DOCUMENTATION. The control is the gate named above.
   FR24:
     gates: []
     corpora: []

@@ -29,6 +29,10 @@ mod check_composition_root_completeness;
 mod check_corpus;
 mod check_coverage_matrix_completeness;
 mod check_cross_form_equiv;
+// Story 14-2a (AC6) — the production peer-certificate rotation trigger's gate.
+// Its CONTROL is a runtime leg (a live daemon rotating on a signed reissue); the
+// method-aware AST probe is the cheap second opinion, never the proof.
+mod check_cert_rotation_trigger;
 // Story 11.2a — cross-region convergent replication gate (ADR-049).
 mod check_cross_region_consensus;
 // Story 11.2b — multi-region SLO gate (3-region pilot + cross-region round-trip
@@ -851,6 +855,13 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 14-2a — the production peer-certificate rotation trigger gate
+    /// (runtime control leg + method-aware AST second opinion).
+    #[command(name = "check-cert-rotation-trigger")]
+    CheckCertRotationTrigger {
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 11.3 — scale-envelope 25/30-host churn gate (per-leg independence).
     #[command(name = "check-scale-churn")]
     CheckScaleChurn {
@@ -1355,6 +1366,7 @@ fn main() {
         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
         Commands::CheckRotationRealTiming { json } => check_rotation_real_timing::run(json),
+        Commands::CheckCertRotationTrigger { json } => check_cert_rotation_trigger::run(json),
         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
         Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),

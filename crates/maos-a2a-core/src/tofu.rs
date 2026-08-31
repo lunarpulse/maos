@@ -364,9 +364,83 @@ impl InMemoryTofuPinStore {
             entry.fingerprint = next;
             entry.pinned_at_ns = now_ns();
             retired
-        })?;
+        });
+        // The window is cleared even when the pin has vanished (an invalidation
+        // or a re-pin removed it between the two map reads). Leaving it would
+        // ORPHAN a widened trust set that no later close can reach and that the
+        // operator read surface would keep reporting — narrower is the only
+        // fail-closed answer when the promotion target is gone.
         self.rotation_next.remove(peer.as_str());
-        Some(retired)
+        retired
+    }
+
+    /// Story 14-2a / AC5.1 — ABORT the window: DISCARD `next` without
+    /// promoting, leaving `pins[peer]` exactly as it was. Returns the
+    /// discarded generation so the caller can audit what it refused.
+    ///
+    /// This is a DIFFERENT transition from [`Self::close_rotation_window`],
+    /// not a variant of it: close is promote-and-retire (14-2 AC2.1.a, which
+    /// this does not reopen), abort is discard-and-keep. Two mechanisms
+    /// wearing one name was 14-2's whole pathology, so they are two methods
+    /// with two names.
+    ///
+    /// It is the ONLY reversible half of a rotation: before promotion the
+    /// retiring fingerprint is still the serving pin, so a reload that fails
+    /// part-way can put the mesh back exactly as it found it. After promotion
+    /// there is no revert — a "rollback" is a NEW rotation back to the old
+    /// fingerprint, subject to the same window, grace and uniqueness guard.
+    ///
+    /// ⚠ Callers restoring a torn reload MUST move plane A
+    /// (`A2ARouterCore.peers[p].cert_fingerprint`) back to the serving pin
+    /// BEFORE calling this: aborting first leaves plane A holding a
+    /// fingerprint plane B no longer accepts, which sites 5/6 report as a
+    /// `PinMismatch` on every frame in both directions.
+    pub fn abort_rotation_window(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
+        let _guard = self.lock_window();
+        self.rotation_next
+            .remove(peer.as_str())
+            .map(|(_, next)| next)
+    }
+
+    /// Story 14-2a — promote-and-retire ONLY IF the open window is still the
+    /// generation the caller opened. Returns the retired fingerprint, or
+    /// `None` when no window is open, the open one is a DIFFERENT generation,
+    /// or the pin entry has vanished — in which case the window is still
+    /// CLEARED (fail-closed, mirror of [`Self::close_rotation_window`]) and
+    /// nothing was promoted.
+    ///
+    /// ⚠ **A grace closer that closes by peer alone promotes the wrong
+    /// generation.** A window can be cancelled underneath its own timer —
+    /// `invalidate_if_boot_nonce_differs` and `lock_window` poison recovery
+    /// both clear `rotation_next` — and a later reissue can then open a NEW
+    /// window before the old timer fires. An unconditional close would promote
+    /// that newer generation EARLY, before its own grace elapsed, and journal
+    /// the terminal row against the wrong fingerprint. The comparison and the
+    /// promotion happen under one `window_lock` acquisition, so nothing can
+    /// interleave between them.
+    pub fn close_rotation_window_if(
+        &self,
+        peer: &PeerId,
+        expected: &PeerCertFingerprint,
+    ) -> Option<PeerCertFingerprint> {
+        let _guard = self.lock_window();
+        let next = self.rotation_next.get(peer.as_str())?.value().clone();
+        if &next != expected {
+            return None;
+        }
+        // Once the expected generation matches, this closer owns that exact
+        // window instance and must close it even when the promotion target
+        // has vanished — the same fail-closed clear as close_rotation_window.
+        // An early `?` here would ORPHAN a widened trust set no later close
+        // could reach; narrower is the only fail-closed answer.
+        let retired = self.pins.get_mut(peer.as_str()).map(|mut entry| {
+            let retired = entry.fingerprint.clone();
+            entry.fingerprint = next;
+            entry.pinned_at_ns = now_ns();
+            retired
+        });
+        self.rotation_next.remove(peer.as_str());
+        retired
     }
 
     /// Story 14-2 / AC2.1 — the window oracle: this peer's open `next`,
@@ -769,5 +843,54 @@ mod tests {
         } else {
             panic!("invalidation must be SpiritRestarted");
         }
+    }
+
+    /// §A6 close pass (F6) — the fail-closed half. The "window open, pin
+    /// entry gone" state is unreachable through the public API (`open_rotation_window`
+    /// requires a live pin; no public mutator removes a pin), so this unit
+    /// test reaches it through the module-private maps — NOT through a public
+    /// test-only API — and pins the contract: once the expected generation
+    /// matches, the closer owns that window instance and must clear it even
+    /// when it cannot promote. Leaving it would orphan a widened trust set no
+    /// later close could reach.
+    #[tokio::test]
+    async fn close_rotation_window_if_clears_the_window_even_when_the_pin_has_vanished() {
+        let store = InMemoryTofuPinStore::new();
+        let peer = PeerId::new("p");
+        let old = fp("cert-A");
+        let next = fp("cert-B");
+        store
+            .pin_first_contact(&peer, &old, &old, 1)
+            .await
+            .expect("pin");
+        store
+            .open_rotation_window(&peer, &next)
+            .expect("window opens");
+
+        // Manufacture the promotion-target-gone state directly.
+        store.pins.remove(peer.as_str());
+        assert!(store.pins.get(peer.as_str()).is_none());
+
+        let retired = store.close_rotation_window_if(&peer, &next);
+        assert!(retired.is_none(), "nothing to promote, nothing retired");
+        assert!(
+            store.rotation_next(&peer).is_none(),
+            "no window may survive a close whose promotion target is gone"
+        );
+        assert!(
+            store.verify_pinned(&peer, &next).await.is_err(),
+            "the incoming generation is not accepted by a store that never promoted it"
+        );
+
+        // Symmetry check: the identical manufactured state through the
+        // UNCONDITIONAL close must produce the same fail-closed outcome.
+        store
+            .rotation_next
+            .insert(peer.as_str().to_string(), next.clone());
+        assert!(
+            store.close_rotation_window(&peer).is_none(),
+            "the unconditional close also retires nothing when the pin is gone"
+        );
+        assert_eq!(store.rotation_next(&peer), None);
     }
 }

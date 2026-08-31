@@ -83,13 +83,84 @@ can never imply more than it measured (mirrors row 18's hand-off):
   new-pin-observably-active proxy.
 - **(b) The mesh is in-process.** Real sockets, real rustls, real mTLS, one
   process, one runtime, loopback (11.3's F1 disclosure, re-stated at N=10).
-- **(c) Rotation ASSUMES provisioning already declared the replacement**
-  (AC2.0): the operator moves `A2APeerConfig.cert_fingerprint` at
-  `t_provision`; there is no live peer-config reload path and 14-2 does not
-  build one — an inherited ordering, written as ASSUMES, not "requires".
-  Named owner: `14-2a-production-mtls-rotation-trigger` (backlog). That story
-  owns the live peer-config reload and operator trigger; until it lands,
-  `swap_serving_cert` / `open_rotation_window` remain test callers only.
+- **(c) Rotation of a peer's DECLARED certificate is now LIVE; the local leaf is
+  not.** Story `14-2a-production-mtls-rotation-trigger` (2026-08-30) built the
+  production trigger: a signed, version-monotonic, cohort-id-pinned
+  `cohort:manifest-reissue` re-derives the peer set through
+  `CohortManifest::peer_configs_for` and moves BOTH runtime declaration
+  surfaces — `A2ARouterCore.peers[p].cert_fingerprint` and the
+  `InMemoryTofuPinStore` pin/`rotation_next` pair — for every member whose
+  signed fingerprint changed, with a one-generation overlap that closes on a
+  real `T_grace` deadline. `open_rotation_window` therefore HAS a production
+  caller. Six boundaries, all measured, none of them implied away:
+  - **(c.1) SIGNED COHORT MEMBERS ONLY.** Bilateral non-member peers (the J1
+    pair) are deliberately outside the manifest and keep the restart-to-rotate
+    posture. A member the manifest ADDS is refused with a named audit row, not
+    inserted: membership addition is not rotation.
+  - **(c.2) `swap_serving_cert` STILL HAS NO PRODUCTION CALLER.** A signed
+    manifest carries `members[].fingerprint` — a HASH — and must never carry a
+    private key, and `TcpA2AConfig`'s `own_cert_chain` / `own_private_key` paths
+    are consumed by value at bind and dropped. So this mechanism provably cannot
+    rotate THIS host's own leaf. Named owner: `14-2b-self-identity-rotation`
+    (backlog). Anyone reading clause (c) as "certificate rotation is live" is
+    reading half of it.
+  - **(c.3) `T_grace` IS ON §7.2.1.a's COLD-DEPLOYMENT BRANCH, and that is a
+    disclosure, not a default.** The steady-state branch needs the trailing
+    30-day p99 of `iac_handshake_duration_us`, a metric with NO PRODUCER
+    anywhere in the workspace (its only in-code occurrence is a doc comment).
+    Zero days of history exist, so the shipped call is `compute_t_grace(500, 0)`
+    — the spec's own cold floor — which resolves to the §7.2.1.a hard floor of
+    **5 s**, the narrowest window either branch permits. It is DERIVED through
+    the shipped formula at one call site, never restated as a literal, and
+    deliberately NOT an operator knob (§7.2.1.a defines `T_grace` as derived,
+    not chosen). When the metric ships, the real p99 goes in at that call site
+    and nothing else changes.
+  - **(c.4) AFTER PROMOTION THERE IS NO REVERT, AND A RESTART IS AN UNLOGGED
+    ONE.** Rollback exists only BEFORE promotion (`abort_rotation_window`
+    discards the incoming generation; the reload restores the router declaration
+    first and narrows the window second). A post-promotion "rollback" is a NEW
+    rotation back to the old fingerprint, subject to the same window, the same
+    grace and the same uniqueness guard. And pins live in memory only — there is
+    still no persistence-backed `TofuPinStore` — so **a process restart silently
+    reverts every node to whatever the operator TOML declares, which after a
+    rotation is the RETIRED fingerprint.** For signed cohort members the boot
+    reconciler (`main.rs:9855`) then refuses to boot on the disagreement,
+    converting a silent revert into a loud failure; **non-member bilateral peers
+    do not get that mitigation.**
+  - **(c.5) THE COHORT AUTHORITY KEY NOW CONTROLS LIVE TLS TRUST — a
+    threat-model delta, in plain words.** Before this story a signed
+    `cohort:manifest-reissue` changed WHO IS IN THE COHORT. It now changes WHICH
+    CERTIFICATES EVERY NODE ACCEPTS ON A LIVE HANDSHAKE, MID-SESSION, WITH NO
+    RESTART. The blast radius of a compromised cohort authority key grows from
+    membership to live transport identity. 14-2's collision guard stops an
+    attacker STEALING an existing peer's fingerprint; it does NOT stop one being
+    ADDED. Mitigations, all shipped: the only way in is the same signed,
+    version-monotonic, cohort-id-pinned, fail-closed path (no bypass, no `force`
+    flag, no unsigned test hatch); every transition and every refusal is
+    journaled under ONE stable greppable intent `a2a:cert-rotation`; and an
+    operator can SEE the open-window set and any manifest-vs-plane divergence at
+    `GET /v1/a2a/rotation-windows` on the authenticated loopback operator
+    surface — READ-ONLY, because a mutating verb there would be a second trust
+    path for certificate identity, which `main.rs:9844-9853` warns against by
+    name.
+  - **(c.6) The §7.2.1.a `cert_post_grace_reject` LABEL is partial.** Both
+    handshake refusal classes now leave a queryable `ConsentRupture` row (before
+    this story the certificate-validity class left NO trace at all). But the row
+    cannot carry the spec's token as machine-readable evidence: the frame
+    `journal_peer_identity_refusal` builds has no detail field, and the seam
+    cannot distinguish "retired generation after the grace" from "unknown leaf",
+    because the store keeps no retired-generation history by design. The join an
+    auditor uses is the rotation timeline: a `cert_rotation_window_closed` row
+    for the peer, then the refusal. Owner for a machine-readable token:
+    `14-2b-self-identity-rotation`, which already touches this seam.
+- **(c.7) PROVISION BEFORE REISSUE.** The operator MUST deploy the peer's next
+  certificate before signing/reissuing `cohort:manifest-reissue`. Promotion
+  checks elapsed `T_grace` and the local declaration, but cannot prove that the
+  peer serves the new leaf. A signature is therefore not certificate
+  provisioning; signing first can promote trust in a leaf the peer does not
+  yet serve. This sequencing boundary belongs to
+  `14-2a-production-mtls-rotation-trigger`; self-identity rotation remains
+  `14-2b-self-identity-rotation`.
 - **(d) Timings are compressed-loopback regression floors, not geo
   figures.** §15.6 keeps the 30-day soak and absolute geo-SLO as
   release-gate artifacts, never CI-claimed.

@@ -860,7 +860,7 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 16] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 17] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -916,6 +916,12 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // worker-spawn path receives a host-granted tier and a cap-token and must
         // never seed the manifest-derived policy table.
         ("worker_spawn.rs", include_str!("../src/worker_spawn.rs")),
+        // Story 14-2a — the production peer-certificate rotation trigger's
+        // wiring (the real `T_grace` deadline + the operator read seam). Listed
+        // so the 13.5d negative covers it: the rotation control receives its
+        // trust planes from the running transport and must never seed the
+        // manifest-derived policy table.
+        ("cert_rotation.rs", include_str!("../src/cert_rotation.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

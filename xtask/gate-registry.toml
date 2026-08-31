@@ -154,6 +154,11 @@ gates = [
     # mechanical deadline reds, a non-mechanical deadline must declare itself,
     # and an unreadable/empty register is an error rather than a green.
     "check-decision-register",
+    # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
+    # CONTROL is a runtime leg: a live daemon's pin set changes on a signed
+    # manifest reissue, proven-red by unwiring the set-once install. The
+    # method-aware AST probe is the fast second opinion, never the proof.
+    "check-cert-rotation-trigger",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -275,6 +280,15 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 # posture. The gate hard-errors if any blocking rung is relaxed.
 [[ship_gate]]
 name = "check-rotation-real-timing"
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 14-2a AC6.3 — the rotation TRIGGER gate (distinct from
+# `check-rotation-real-timing`, which measures 14-2's floors: this one proves
+# the trigger has a PRODUCTION CALLER at all). Blocking from the day it lands,
+# because a green-from-birth production-caller probe is the exact failure this
+# story was created to repair.
+[[ship_gate]]
+name = "check-cert-rotation-trigger"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel

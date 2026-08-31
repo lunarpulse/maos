@@ -20,6 +20,7 @@ use crate::error::{CohortError, CohortManifestForkReason};
 use crate::halt_receipt::{AbsenceKind, HaltReceiptControl};
 use crate::manifest::CohortManifest;
 use crate::pin::PinnedAuthorityKeys;
+use crate::rotation::{PeerCertRotation, RotationGraceTimer, RotationWindow};
 
 pub trait CohortClock: Send + Sync {
     fn now_secs(&self) -> u64;
@@ -115,6 +116,26 @@ pub struct CohortManifestState {
     pending_digest_replies: Mutex<Vec<(String, String, String)>>,
     /// Reader-side immutable summaries keyed by `(member, request_id)`.
     received_digest_summaries: Mutex<HashMap<(String, String), DigestSummary>>,
+    /// Story 14-2a / AC1.2 — the SET-ONCE production rotation seam.
+    ///
+    /// This closes an ORDERING INVERSION, and it is the same shape and the same
+    /// reason as `Mailbox::install_a2a_router`
+    /// (`crates/maos-iac/src/adapter/mailbox.rs:131`), whose doc says it exists
+    /// *"because the production composition root wraps the mailbox in an `Arc`
+    /// before the router's peer configs and TOFU store exist"* and whose
+    /// set-once refusal is *"a security property, not an ergonomic."* Here the
+    /// inversion is: this state is loaded at `main.rs:2038`, the only concrete
+    /// `Arc<TcpA2ATransport>` in the workspace is created ~7,900 lines later at
+    /// `main.rs:10000`, and the pin store and router core that the reload must
+    /// move live inside it.
+    ///
+    /// Set-once is load-bearing for the same reason it is on the mailbox: a
+    /// SECOND install would point the signed-manifest trigger at a different
+    /// mesh's trust planes, which is a trust-set redirection dressed as a
+    /// configuration call. `None` until installed means "no rotation trigger in
+    /// this process" — every non-daemon `MAOS_ONE_SHOT` arm, byte-for-byte
+    /// unchanged.
+    cert_rotation: std::sync::OnceLock<Arc<PeerCertRotation>>,
 }
 
 impl CohortManifestState {
@@ -162,8 +183,115 @@ impl CohortManifestState {
             admitted_digest_reads: Mutex::new(HashMap::new()),
             pending_digest_replies: Mutex::new(Vec::new()),
             received_digest_summaries: Mutex::new(HashMap::new()),
+            cert_rotation: std::sync::OnceLock::new(),
             clock,
         })
+    }
+
+    /// Story 14-2a / AC1.1+AC1.2 — install the live trust planes this state's
+    /// signed reissues must move. SET-ONCE: a second call is REFUSED.
+    ///
+    /// `pins` and `core` MUST be the running mesh's own handles
+    /// (`TcpA2ATransport::pins()` / `::core()`, which return clones of the SAME
+    /// `Arc`s the accept loop, both verifiers and the router core hold), or the
+    /// reload silently reloads a copy — which is precisely the failure mode of
+    /// the `MAOS_ONE_SHOT` design this story measured out: a fresh process
+    /// mutating its own in-memory store, passing its own test, and changing
+    /// nothing in the live daemon.
+    ///
+    /// The audit sink is NOT a parameter: the rotation rows are written through
+    /// the SAME `Arc<dyn CohortAuditSink>` this state already journals reissue
+    /// acceptance and rejection through, so the rotation timeline and the
+    /// manifest timeline can never land in different logs.
+    pub fn install_cert_rotation(
+        &self,
+        pins: Arc<maos_a2a_core::InMemoryTofuPinStore>,
+        core: Arc<maos_a2a_core::A2ARouterCore>,
+        timer: Arc<dyn RotationGraceTimer>,
+        grace: std::time::Duration,
+    ) -> Result<(), CohortError> {
+        self.cert_rotation
+            .set(Arc::new(PeerCertRotation::new(
+                pins,
+                core,
+                Arc::clone(&self.audit),
+                timer,
+                grace,
+            )))
+            .map_err(|_| {
+                CohortError::EAuditAppendFailed(
+                    "cohort cert-rotation control is already installed; a second install would \
+                     redirect the signed-manifest trigger at a different mesh's trust planes"
+                        .into(),
+                )
+            })?;
+        // ⚠ RECONCILE IMMEDIATELY, and this is not belt-and-braces.
+        //
+        // The transport's accept loop and the manifest pull service are BOTH
+        // live before this install runs (`bind_with_intake_sink` starts the
+        // listener; `build_cohort_a2a_daemon_runtime` spawns the pull service;
+        // the install happens after the builder returns). A signed push or a
+        // pull response landing in that interval would advance the cached
+        // manifest with `cert_rotation` still unset — and redelivery at the SAME
+        // version returns `Confirmed`, which does no work, so the divergence
+        // would persist silently until some LATER version arrived.
+        //
+        // Reconciling the CURRENT cached manifest against the live planes closes
+        // that interval whenever it opened, and costs nothing when it did not:
+        // an unchanged fingerprint takes no action at all, so on the ordinary
+        // boot path this is a diff that finds nothing.
+        let cached = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        let Some(rotation) = self.cert_rotation.get() else {
+            return Ok(());
+        };
+        match cached.manifest.peer_configs_for(self.local_host.as_str()) {
+            Ok(peers) => {
+                rotation.reload(&peers, cached.manifest.version, self.clock.now_secs(), None)?;
+            }
+            // The SAME named row the reissue path writes for the identical
+            // failure. Silently skipping here would make "this node cannot
+            // derive a peer set for itself" observable on one path and invisible
+            // on the other.
+            Err(error) => {
+                self.audit.append(&CohortAuditEvent::CertRotationRefused {
+                    peer: self.local_host.as_str().to_string(),
+                    reason: error.to_string(),
+                    version: cached.manifest.version,
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Story 14-2a / AC1.5 — the rotation status an operator can read, or
+    /// `None` when NO rotation control is installed in this process.
+    ///
+    /// `None` and `Some(vec![])` are DIFFERENT facts and an operator acts
+    /// differently on each: "this process does not rotate at all" versus "this
+    /// process rotates and nothing is in flight". Every `MAOS_ONE_SHOT` arm
+    /// except `cohort-a2a-daemon` reads a cohort config without ever installing
+    /// the control (the `maos run` cross-host arm type-erases its transport, so
+    /// the planes are unreachable there by construction), so collapsing the two
+    /// would tell an operator who pushed a signed reissue at such a process
+    /// that the rotation completed cleanly.
+    ///
+    /// This is the READ half of the one seam [`Self::install_cert_rotation`]
+    /// builds; the reissue path is the WRITE half. A verb and a noun, never two
+    /// mechanisms.
+    pub fn rotation_status(&self) -> Result<Option<Vec<RotationWindow>>, CohortError> {
+        let Some(rotation) = self.cert_rotation.get() else {
+            return Ok(None);
+        };
+        let peers = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?
+            .manifest
+            .peer_configs_for(self.local_host.as_str())?;
+        Ok(Some(rotation.status(&peers)))
     }
 
     pub fn manifest(&self) -> Result<CohortManifest, CohortError> {
@@ -329,12 +457,64 @@ impl CohortManifestState {
             });
         }
 
-        self.audit
-            .append(&CohortAuditEvent::MemberReissueAccepted {
-                cohort_id: candidate.cohort_id.clone(),
-                version: candidate.version,
-                canonical_hash: candidate_hash,
-            })?;
+        // ── Story 14-2a / AC2.1 — THE RUNTIME HALF OF `main.rs:9855` ────────
+        //
+        // `reconcile_transport_identity_with_manifest` enforces
+        // config-vs-manifest certificate agreement exactly ONCE, at boot,
+        // before the transport binds. This line is where that agreement is
+        // re-established when the signed truth moves underneath it.
+        //
+        // Placement is load-bearing on three counts:
+        //   * AFTER every authentication, cohort-id, schema and monotonicity
+        //     check — an unsigned, forked or regressed manifest can never reach
+        //     the trust planes;
+        //   * BEFORE `*cached` is replaced, while the accepted row is appended
+        //     only after every peer transition succeeds. A failed transition
+        //     therefore rolls back without leaving an accepted row for a
+        //     manifest this process never committed;
+        //   * INSIDE the `cached` guard — two concurrent reissues cannot
+        //     interleave a projection with a commit. `RotationGraceTimer`
+        //     implementations therefore MUST NOT call back into this state.
+        //
+        // The projection is 12.1's `peer_configs_for`, which validates every
+        // fingerprint through `PeerCertFingerprint::parse` (AC2.4). Nothing
+        // here accepts a fingerprint from any other source.
+        let accepted_event = CohortAuditEvent::MemberReissueAccepted {
+            cohort_id: candidate.cohort_id.clone(),
+            version: candidate.version,
+            canonical_hash: candidate_hash,
+        };
+        let accepted_by_rotation = if let Some(rotation) = self.cert_rotation.get() {
+            match candidate.peer_configs_for(self.local_host.as_str()) {
+                Ok(peers) => {
+                    rotation.reload(
+                        &peers,
+                        candidate.version,
+                        self.clock.now_secs(),
+                        Some(&accepted_event),
+                    )?;
+                    true
+                }
+                // A reissue that REMOVES this host has no position from which
+                // to project edges. Refusing the manifest would let a removed
+                // member ignore its own removal, so the manifest applies and
+                // the roster gate refuses the traffic — but the operator gets a
+                // named row rather than a silent no-op.
+                Err(error) => {
+                    self.audit.append(&CohortAuditEvent::CertRotationRefused {
+                        peer: self.local_host.as_str().to_string(),
+                        reason: error.to_string(),
+                        version: candidate.version,
+                    })?;
+                    false
+                }
+            }
+        } else {
+            false
+        };
+        if !accepted_by_rotation {
+            self.audit.append(&accepted_event)?;
+        }
         let version = candidate.version;
         *cached = CachedManifest {
             manifest: candidate,

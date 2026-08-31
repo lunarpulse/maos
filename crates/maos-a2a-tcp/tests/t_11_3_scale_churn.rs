@@ -379,51 +379,141 @@ async fn mesh_identity_reconcile_drill(n: usize, label: &str) {
     print_scale_marker(report.distinct_host_count());
 }
 
-/// AC2.2 — topology-fraud negative control, scaled: index 6 serves the SAME
-/// leaf as index 5 (same DER → same cert fingerprint) while binding at a
-/// DISTINCT real `SocketAddr`. Proves "N hosts" is not fakeable by a single
-/// stand-in at ANY N: **100 clones are not 100 hosts** — the reconcile MUST
-/// collapse to n−1 and the clean-path contract must hard-fail.
+/// AC2.2 — topology-fraud negative control, scaled. **RE-SITED by Story
+/// 14-2a (AC6.5) — NOT re-pointed.** Story 14-2's bind-time uniqueness guard
+/// now refuses the old fixture (`serving[6] = &leaves[5]`: two hosts, one
+/// fingerprint) at BIND (`support/mod.rs` `bind mesh endpoint` →
+/// `rotation window refused ... already held by host_05`), so a duplicate can
+/// no longer exist on a live mesh. Expecting that refusal here would delete
+/// the claim this leg exists to prove and substitute a different one: the
+/// bind-time refusal is a *config validator* claim; NFR-Rel-7's leg is the
+/// **reconcile derivation** rejecting a collapsed identity set. So the
+/// control stands the mesh up on DISTINCT pins (bind succeeds; the guard has
+/// its own coverage and stays idle), then applies the fraud AFTER mesh-up at
+/// the only seam left — the DERIVED identity witness the reconcile stage
+/// reads: host_06's witness carries host_05's fingerprint (same DER) at
+/// host_06's own distinct socket. The collapsed set must (a) derive to n−1
+/// reconciled hosts — the AC5.1 marker carries 99 at N=100: **100 clones are
+/// NOT 100 hosts** — and (b) HARD-FAIL the only error-returning reconcile,
+/// `ChurnDrillReport::reconcile_detections`' identity clause ("identity
+/// reconcile: 2 detections collapse to 1 distinct fingerprints (expected
+/// 2)"). `distinct_host_count()` is a count with no error path, so the
+/// hard-fail assertion lives on the error-returning reconcile — asserted on
+/// the returned `Err` with its message content, never a bare count.
 async fn duplicate_identity_control(n: usize) {
     assert_fd_headroom(fd_headroom_for(n));
     let _envelope = RunnerEnvelope::open(format!("duplicate-identity-n{n}"));
+    let base = Instant::now();
     let clock = Clock::capture();
     let ca = mk_ca(&clock, "ca-14-1-dup-identity");
     let names: Vec<String> = (0..n).map(host_name).collect();
+    // DISTINCT pins: every host its own leaf, so the 14-2 uniqueness guard
+    // stays idle and bind succeeds. This is the control's positive half — the
+    // collapse asserted below is attributable to the fraud applied at the
+    // derivation seam, not to a fixture that could not bind.
     let leaves: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
-    let mut serving: Vec<&Leaf> = leaves.iter().collect();
-    serving[6] = &leaves[5]; // index 6 clones index 5's identity — distinct socket, same fingerprint
-    let expected = serving.clone();
-    let mesh = build_mesh_n(&clock, &ca, &names, &serving, &expected, no_retry()).await;
+    let mesh = build_round_mesh(&clock, &ca, &names, &leaves).await;
 
-    let host_fingerprints: BTreeSet<String> = mesh.iter().map(|m| m.fingerprint.wire()).collect();
     let host_addrs: BTreeSet<SocketAddr> = mesh.iter().map(|m| m.addr).collect();
     assert_eq!(host_addrs.len(), n, "{n} distinct real sockets bound");
+    let clean_fingerprints: BTreeSet<String> = mesh.iter().map(|m| m.fingerprint.wire()).collect();
     assert_eq!(
-        host_fingerprints.len(),
+        clean_fingerprints.len(),
+        n,
+        "distinct pins must reconcile to {n} distinct fingerprints before the fraud is applied"
+    );
+
+    // The fraud, applied AFTER mesh-up at the derivation seam (the only seam
+    // a post-14-2 mesh leaves): index 6's identity witness carries index 5's
+    // fingerprint — same DER, the clone — while keeping its own bound socket.
+    const CLONE: usize = 6;
+    const SOURCE: usize = 5;
+    let clone_fingerprint = mesh[SOURCE].fingerprint.wire();
+    assert_ne!(
+        mesh[CLONE].fingerprint.wire(),
+        clone_fingerprint,
+        "fixture must start from genuinely distinct identities"
+    );
+    let fraud_fingerprints: BTreeSet<String> = mesh
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            if i == CLONE {
+                clone_fingerprint.clone()
+            } else {
+                m.fingerprint.wire()
+            }
+        })
+        .collect();
+    assert_eq!(
+        fraud_fingerprints.len(),
         n - 1,
-        "the clone collapses to {} distinct fingerprints",
+        "the clone collapses the derived fingerprint set to {}",
         n - 1
     );
 
+    // The two identity witnesses the reconcile stage reads, carrying the same
+    // fraud: two planted identities (host_05, host_06) on ONE fingerprint.
+    // They are IDENTITY records for this negative control, not latency
+    // samples — `reconcile_detections` checks count → miss → identity in
+    // order, so `first_rejection_ns` must be `Some` to REACH the identity
+    // clause this control asserts. The stamps are the harness's own monotonic
+    // readings (real binds; the reading at which the fraud is applied);
+    // AC4.4's discipline governs: in THIS control only the Err branch is
+    // evidence, and no latency claim is derived from them.
+    let applied_ns = mono_ns(&base);
+    let witnesses = vec![
+        AdversarialDetection {
+            adversary_id: names[SOURCE].clone(),
+            adversary_fingerprint: mesh[SOURCE].fingerprint.wire(),
+            attack_class: AdversarialAttempt::TofuPinSpoofing,
+            join_ns: join_ns_of(&base, &mesh[SOURCE]),
+            first_rejection_ns: Some(applied_ns),
+            blast_peers: BTreeSet::new(),
+        },
+        AdversarialDetection {
+            adversary_id: names[CLONE].clone(),
+            // The clone's TRUE fingerprint — same DER as host_05's leaf,
+            // exactly what `serving[6] = &leaves[5]` produced pre-14-2.
+            adversary_fingerprint: clone_fingerprint,
+            attack_class: AdversarialAttempt::TofuPinSpoofing,
+            join_ns: join_ns_of(&base, &mesh[CLONE]),
+            first_rejection_ns: Some(applied_ns),
+            blast_peers: BTreeSet::new(),
+        },
+    ];
+
     let report = ChurnDrillReport::from_real_events(
         "dup-identity-negative-control",
-        host_fingerprints,
+        fraud_fingerprints,
         host_addrs,
-        vec![],
+        witnesses,
         0,
         None,
     );
-    assert!(
-        report.distinct_host_count() < n,
-        "a duplicate-fingerprint fixture MUST make the distinct-identity reconcile hard-fail \
-         ({n} claimed hosts must not reconcile to {n} when one is a clone — 100 clones are \
-         not 100 hosts)"
+    assert_eq!(
+        report.distinct_host_count(),
+        n - 1,
+        "a duplicate-fingerprint witness MUST collapse the derive-and-reconcile count to {} \
+         ({n} claimed hosts with one clone — 100 clones are not 100 hosts)",
+        n - 1
     );
-    assert_eq!(report.distinct_host_count(), n - 1);
     // The DERIVED reconciled count is 99 at N=100 — the marker carries the
-    // derived number, never the claimed one (AC5.1/AC2.2).
+    // derived number, never the claimed one (AC5.1/AC2.2); the gate pins the
+    // N=100 line to exactly `SCALE_CHURN_HOSTS_RECONCILED=99`.
     print_scale_marker(report.distinct_host_count());
+
+    // Hard-fail half: the reconcile derivation must REJECT the collapsed
+    // identity set. `reconcile_detections(2)` gets past the count and miss
+    // clauses and must fail in the IDENTITY clause.
+    let verdict = report.reconcile_detections(2);
+    assert!(
+        matches!(&verdict, Err(msg)
+            if msg.contains("identity reconcile")
+                && msg.contains("collapse to 1 distinct fingerprints (expected 2)")),
+        "the reconcile derivation must HARD-FAIL a collapsed identity set (two planted \
+         identities, one fingerprint — 100 clones are not 100 hosts): {verdict:?}"
+    );
 }
 
 /// AC1/AC2.3 — compressed churn schedule at scale n: `CHURN_ROUNDS` rounds ×
