@@ -3059,7 +3059,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Ok(provider) = AnthropicProvider::new(
         Arc::clone(&io_arc),
         "https://api.anthropic.com".into(),
-        "claude-3-haiku-20240307".into(),
+        "claude-haiku-4-5-20251001".into(),
     ) {
         providers_map.insert("anthropic".into(), Arc::new(provider));
         default_id.get_or_insert_with(|| "anthropic".into());
