@@ -76,4 +76,7 @@ pub use rotation::{
     cold_deployment_t_grace, PeerCertRotation, RotationGraceTimer, RotationOutcome,
     RotationRefusal, RotationWindow, COLD_DEPLOYMENT_DAYS_OF_HISTORY, COLD_DEPLOYMENT_HANDSHAKE_MS,
 };
-pub use state::{CohortClock, CohortManifestState, ReissueOutcome};
+pub use state::{
+    CohortClock, CohortManifestState, PeerConvergence, ReissueOutcome, CONVERGENCE_OBSERVED,
+    CONVERGENCE_RESTARTED, CONVERGENCE_STALE,
+};

@@ -365,6 +365,34 @@ impl PeerCertRotation {
         }
     }
 
+    /// Story 14-2b / AC2a — the peer's CURRENT pin generation, or `None` when
+    /// this process holds no ACTIVE pin for it.
+    ///
+    /// This is the shipped restart signal read at evaluation time, and it is
+    /// the only one reachable from the cohort state: the peer's
+    /// `A2AJsonRpcRequest.boot_nonce` is compared by
+    /// `invalidate_if_boot_nonce_differs` inside the router
+    /// (`crates/maos-a2a-core/src/router.rs:1344-1380`) BEFORE the reissue seam,
+    /// and `CohortManifestGate::apply_reissue(&self, verified_peer, frame)`
+    /// carries neither the nonce nor a session id — `IacFrame` has no such field
+    /// (`crates/maos-domain/src/frame.rs:26-48`). Threading it through would be
+    /// a `maos-a2a-core` trait delta, which this story is forbidden.
+    ///
+    /// ⚠ An INVALIDATED pin reads as `None`, and that is the load-bearing half.
+    /// A restart is observable in two successive shapes: first the router marks
+    /// the pin `Invalidated::SpiritRestarted` and NACKs the peer's frames, then
+    /// an operator-consented re-pin writes a NEW `boot_nonce`
+    /// (`tofu.rs:613-641`). Collapsing invalidated to `None` makes a version
+    /// record taken under the old generation fail its equality check in BOTH
+    /// shapes, so the window between invalidation and re-pin is covered rather
+    /// than being the one interval in which the table still over-reports.
+    pub fn pin_generation(&self, peer: &str) -> Option<u64> {
+        self.pins
+            .get_pin_sync(&PeerId::new(peer))
+            .filter(|pin| pin.invalidated.is_none())
+            .map(|pin| pin.boot_nonce)
+    }
+
     /// The rotation status an operator can read: every window this process still
     /// holds open, INTERSECTED with plane B's `rotation_next`, PLUS every peer
     /// whose committed manifest fingerprint the live planes do not implement.

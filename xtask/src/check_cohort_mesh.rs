@@ -138,6 +138,44 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // Story 14-2b convergence-observability legs. Enrolled HERE and not in
+        // a new gate because 14-2a's `check_cert_rotation_trigger.rs` cost 945
+        // raw lines against this story's +35 xtask headroom, and NOT in
+        // `check-cert-rotation-trigger` because its `derive_rotation_tests_in`
+        // hard-fails on any derived test its fixed `TEST_FILES` list does not
+        // name as a leg.
+        //
+        // Both legs are real three-host mTLS sweeps whose assertions an EMPTY
+        // table cannot satisfy: one tells two peers at different versions
+        // apart, the other invalidates exactly one of two live records.
+        Leg {
+            name: "convergence-versions-told-apart",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2b_cohort_convergence",
+                "t_14_2b_peers_at_different_versions_are_told_apart",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        Leg {
+            name: "convergence-record-invalidation",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2b_cohort_convergence",
+                "t_14_2b_a_restarted_peer_is_not_a_convergence_claim",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
         // Story 12.2 consent legs — each hard-fails independently (loop below).
         // §A7 role-identity reflex: the admitted acting role is the manifest-
         // bound-to-peer AND frame-carried role; a relabel reds via the real NACK.

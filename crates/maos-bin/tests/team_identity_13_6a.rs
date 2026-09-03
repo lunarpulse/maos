@@ -692,9 +692,10 @@ impl CohortManifestGate for RecordingGate {
     fn apply_reissue(
         &self,
         verified_peer: &HostId,
+        peer_boot_nonce: u64,
         frame: &IacFrame,
     ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
-        CohortManifestGate::apply_reissue(&*self.inner, verified_peer, frame)
+        CohortManifestGate::apply_reissue(&*self.inner, verified_peer, peer_boot_nonce, frame)
     }
 
     fn consent_and_team(

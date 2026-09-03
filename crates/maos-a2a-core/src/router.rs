@@ -1665,10 +1665,11 @@ impl A2ARouterCore {
         }
         if cohort_intent.eq_ignore_ascii_case(RESERVED_INTENT_REISSUE) {
             let verified_peer = HostId(peer_cfg.peer_id.as_str().to_string());
-            return match self
-                .cohort_manifest_gate
-                .apply_reissue(&verified_peer, frame)
-            {
+            return match self.cohort_manifest_gate.apply_reissue(
+                &verified_peer,
+                request.boot_nonce,
+                frame,
+            ) {
                 Ok(_) => A2AJsonRpcResponse::ack(
                     request.id,
                     AckBody {
@@ -2107,6 +2108,7 @@ mod tests {
         fn apply_reissue(
             &self,
             _verified_peer: &HostId,
+            _peer_boot_nonce: u64,
             _frame: &IacFrame,
         ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
             Ok(CohortReissueDisposition::PullRequested)

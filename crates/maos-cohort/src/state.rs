@@ -8,7 +8,7 @@ use maos_a2a_core::{
 };
 use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -86,6 +86,61 @@ mod schema_floor_tests {
     }
 }
 
+/// Story 14-2b / AC1 — a convergence observation that is still trustworthy.
+pub const CONVERGENCE_OBSERVED: &str = "observed";
+/// Story 14-2b / AC2a — the peer's pin generation changed or was invalidated
+/// after the observation, so the recorded version predates a restart and is no
+/// longer a claim about anything.
+pub const CONVERGENCE_RESTARTED: &str = "restarted";
+/// Story 14-2b / AC2b — the observation is older than the derived bound.
+pub const CONVERGENCE_STALE: &str = "stale";
+
+/// One cohort peer's last SELF-DECLARED manifest version, as an operator reads
+/// it.
+///
+/// ⚠ **Authenticated as coming from that peer, NEVER verified as true.** Every
+/// field but [`Self::state`] is a value the peer put on the wire in its own
+/// `Pull`; the TLS peer binding (`router.rs:1755-1777`) makes the attribution
+/// trustworthy and says nothing about the content. A peer lying HIGH is bounded
+/// by the fact that this host only ever displays it; a peer lying LOW is the
+/// exposure `14-2d` inherits and must rule on, because that is the story whose
+/// swap deadline is evaluated against this table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeerConvergence {
+    /// The TLS-verified peer the declaration came from.
+    pub peer: String,
+    /// The version that peer declared it holds.
+    pub declared_version: u64,
+    /// The canonical hash it declared at that version, hex-encoded exactly as
+    /// `CohortDistributor::pull_from` sends it (`distribution.rs:67`).
+    pub declared_hash: String,
+    /// [`CohortClock`] seconds at which the declaration was received — never
+    /// `SystemTime::now()`, so a test clock moves it and the staleness bound is
+    /// deterministic.
+    pub observed_at_secs: u64,
+    /// Exact signed-manifest lease deadline captured with this observation.
+    /// Later reissues cannot extend or revive an already-expired declaration.
+    pub expires_at_secs: u64,
+    /// The boot nonce authenticated for this exact request. A zero nonce is
+    /// never retained because it cannot support restart invalidation.
+    pub pin_generation: u64,
+    /// [`CONVERGENCE_OBSERVED`], [`CONVERGENCE_RESTARTED`] or
+    /// [`CONVERGENCE_STALE`]. Derived on every read, never stored, so it cannot
+    /// go stale the way a cached disposition would.
+    pub state: &'static str,
+}
+
+impl PeerConvergence {
+    /// Whether this record is currently a convergence claim at all (AC2).
+    ///
+    /// The predicate lives HERE and not in the read surface because `14-2d`
+    /// evaluates its swap deadline against this table: two copies of "valid"
+    /// would let the operator's view and the rotation gate's view disagree.
+    pub fn is_valid(&self) -> bool {
+        self.state == CONVERGENCE_OBSERVED
+    }
+}
+
 /// The verified, local authority for a cohort manifest cache.
 ///
 /// All state transitions verify a candidate under the operator-pinned genesis
@@ -116,6 +171,16 @@ pub struct CohortManifestState {
     pending_digest_replies: Mutex<Vec<(String, String, String)>>,
     /// Reader-side immutable summaries keyed by `(member, request_id)`.
     received_digest_summaries: Mutex<HashMap<(String, String), DigestSummary>>,
+    /// Story 14-2b / AC1 — per-peer last-declared manifest version, keyed by
+    /// the TLS-verified peer. Interior-mutable like `pull_requests`, and
+    /// written from the SAME receive arm: the `Pull` this host already queues a
+    /// push for is the frame that carries the value, so retention adds no wire
+    /// field, no intent and no second code path.
+    ///
+    /// A `BTreeMap` and not a `HashMap` on purpose: the read surface is an
+    /// operator-facing list, so peer order must be stable across reads without
+    /// a sort at every call.
+    peer_convergence: Mutex<BTreeMap<String, PeerConvergence>>,
     /// Story 14-2a / AC1.2 — the SET-ONCE production rotation seam.
     ///
     /// This closes an ORDERING INVERSION, and it is the same shape and the same
@@ -183,6 +248,7 @@ impl CohortManifestState {
             admitted_digest_reads: Mutex::new(HashMap::new()),
             pending_digest_replies: Mutex::new(Vec::new()),
             received_digest_summaries: Mutex::new(HashMap::new()),
+            peer_convergence: Mutex::new(BTreeMap::new()),
             cert_rotation: std::sync::OnceLock::new(),
             clock,
         })
@@ -382,6 +448,111 @@ impl CohortManifestState {
         Ok(std::mem::take(&mut *requests))
     }
 
+    /// Story 14-2b / AC1 — retain what an authenticated peer declared on its
+    /// own `Pull`.
+    ///
+    /// Last-write-wins per peer, deliberately NOT a high-water mark: a
+    /// `max()`-style record would survive the peer reverting to its on-disk
+    /// manifest after a restart (`apply_reissue` writes only the in-memory
+    /// cache — `state.rs:585-590` — while boot re-reads `file.manifest_path`),
+    /// which is precisely the false convergence claim this story exists to
+    /// prevent.
+    fn record_peer_convergence(
+        &self,
+        peer: &HostId,
+        peer_boot_nonce: u64,
+        declared_version: u64,
+        declared_hash: String,
+    ) {
+        // A zero nonce is the wire's legacy "generation unavailable" sentinel.
+        // Such a declaration cannot meet AC2's restart-invalidatable contract.
+        if peer_boot_nonce == 0 {
+            return;
+        }
+        let observed_at_secs = self.clock.now_secs();
+        let cached = match self.cached.lock() {
+            Ok(cached) => cached,
+            Err(_) => return,
+        };
+        // `peer_configs` are boot-static, so the reserved Pull path may still
+        // admit a host removed by a hot reissue. Only current signed members
+        // may refresh this current-cohort observation table.
+        if !cached
+            .manifest
+            .members
+            .iter()
+            .any(|member| member.host_id == peer.as_str())
+        {
+            return;
+        }
+        let record = PeerConvergence {
+            peer: peer.as_str().to_string(),
+            declared_version,
+            declared_hash,
+            observed_at_secs,
+            expires_at_secs: observed_at_secs.saturating_add(cached.manifest.t_stale_secs),
+            pin_generation: peer_boot_nonce,
+            state: CONVERGENCE_OBSERVED,
+        };
+        // Hold the manifest guard through insertion. A concurrent reissue
+        // therefore either sees this old-member row and removes it, or wins
+        // first and makes the membership check above reject it.
+        if let Ok(mut table) = self.peer_convergence.lock() {
+            table.insert(record.peer.clone(), record);
+        }
+        drop(cached);
+    }
+
+    /// Story 14-2b / AC3 — every retained declaration with its CURRENT validity
+    /// (AC2) derived on read.
+    ///
+    /// ⚠ An empty vector is NOT agreement. It means no peer has ever declared a
+    /// version to this host — the same distinction
+    /// [`Self::rotation_status`]'s `Some(Healthy(vec![]))` draws, and the read
+    /// surface must preserve it.
+    pub fn peer_convergence(&self) -> Result<Vec<PeerConvergence>, CohortError> {
+        let now = self.clock.now_secs();
+        let table = self
+            .peer_convergence
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        Ok(table
+            .values()
+            .map(|record| {
+                let restarted = self.pin_generation(&record.peer) != record.pin_generation;
+                let state = if restarted {
+                    CONVERGENCE_RESTARTED
+                } else if now > record.expires_at_secs {
+                    CONVERGENCE_STALE
+                } else {
+                    CONVERGENCE_OBSERVED
+                };
+                PeerConvergence {
+                    state,
+                    ..record.clone()
+                }
+            })
+            .collect())
+    }
+
+    /// Whether the live daemon installed the pin source needed to evaluate
+    /// restart validity. A loaded manifest alone is not a live observer.
+    pub fn convergence_observer_ready(&self) -> bool {
+        self.cert_rotation.get().is_some()
+    }
+
+    /// The peer's active pin generation, or `0` when no rotation control is
+    /// installed in this process or no active pin exists for that peer.
+    ///
+    /// `0` mirrors the wire sentinel (`router.rs:1344`): an unavailable
+    /// generation cannot be compared, so it is never reported as a restart.
+    fn pin_generation(&self, peer: &str) -> u64 {
+        self.cert_rotation
+            .get()
+            .and_then(|rotation| rotation.pin_generation(peer))
+            .unwrap_or(0)
+    }
+
     /// Applies a signed reissue. A same-version, same-body manifest is an
     /// idempotent confirmation. A lower verified version or a divergent verified
     /// body at the same version is rejected with a specific fork discriminant.
@@ -522,6 +693,17 @@ impl CohortManifestState {
             signed_toml: manifest_toml.to_string(),
             confirmed_at_secs: self.clock.now_secs(),
         };
+        // The observation surface represents the CURRENT signed cohort. The
+        // cached-manifest guard serializes this purge with record insertion.
+        if let Ok(mut table) = self.peer_convergence.lock() {
+            table.retain(|peer, _| {
+                cached
+                    .manifest
+                    .members
+                    .iter()
+                    .any(|member| member.host_id == peer.as_str())
+            });
+        }
         // Correlation capabilities are grants under one signed manifest
         // snapshot. A reissue invalidates every in-flight exemption; callers
         // must mint a fresh request under the new matrix.
@@ -867,6 +1049,7 @@ impl CohortManifestGate for CohortManifestState {
     fn apply_reissue(
         &self,
         verified_peer: &HostId,
+        peer_boot_nonce: u64,
         frame: &maos_domain::frame::IacFrame,
     ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
         match CohortManifestControl::from_frame(frame) {
@@ -881,7 +1064,23 @@ impl CohortManifestGate for CohortManifestState {
                     }
                 })
                 .map_err(|error| self.control_rejection(error)),
-            Ok(CohortManifestControl::Pull { .. }) => {
+            Ok(CohortManifestControl::Pull {
+                known_version,
+                known_hash,
+            }) => {
+                // Story 14-2b / AC1 — the ONLY receive site for these two
+                // values, and until this line the only one that discarded them.
+                // `verified_peer` is the TLS-authenticated identity
+                // (`router.rs:1755-1777` refuses the frame unless
+                // `frame.from.host_id` equals the verified peer), so the
+                // attribution is trustworthy even though the content is a
+                // self-report.
+                self.record_peer_convergence(
+                    verified_peer,
+                    peer_boot_nonce,
+                    known_version,
+                    known_hash,
+                );
                 self.pull_requests
                     .lock()
                     .map_err(|_| CohortReissueRejection {

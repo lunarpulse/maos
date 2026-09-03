@@ -2763,12 +2763,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     #[cfg(not(feature = "network"))]
     let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> = None;
+    // Story 14-2b / AC3 — the peer-convergence read source, wired from the SAME
+    // `bootstrap.state` the `Pull` receive arm records into. `None` off the
+    // cohort-daemon arm for the same reason as the rotation source: an absent
+    // cohort state must answer 404, never an empty list that reads as "no peer
+    // has diverged".
+    #[cfg(feature = "network")]
+    let peer_versions: Option<Arc<dyn maos_control::CohortConvergenceSource>> =
+        cohort_daemon.as_ref().map(|bootstrap| {
+            Arc::new(maos_bin::cert_rotation::CohortPeerVersions::new(
+                Arc::clone(&bootstrap.state),
+            )) as Arc<dyn maos_control::CohortConvergenceSource>
+        });
+    #[cfg(not(feature = "network"))]
+    let peer_versions: Option<Arc<dyn maos_control::CohortConvergenceSource>> = None;
     let _operator_http_server = match operator_http_config {
         Some(config) => {
             let server = maos_control::OperatorHttpServer::bind(
                 config,
                 Arc::clone(&scheduler),
                 rotation_windows,
+                peer_versions,
             )
             .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?;
             // The bound address is announced because it can be ephemeral

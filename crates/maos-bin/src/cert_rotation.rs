@@ -27,7 +27,10 @@ use std::time::Duration;
 
 use maos_cohort::rotation::RotationGraceTimer;
 use maos_cohort::CohortManifestState;
-use maos_control::{RotationWindowRow, RotationWindowSource, RotationWindowStatus};
+use maos_control::{
+    CohortConvergenceSource, PeerVersionRow, PeerVersionStatus, RotationWindowRow,
+    RotationWindowSource, RotationWindowStatus,
+};
 
 /// The real `T_grace` deadline: a spawned task that sleeps and then performs
 /// the terminal transition.
@@ -95,6 +98,56 @@ impl RotationWindowSource for CohortRotationWindows {
                     .collect(),
             )),
             Err(error) => Some(RotationWindowStatus::Unhealthy {
+                detail: error.to_string(),
+            }),
+        }
+    }
+}
+
+/// Story 14-2b / AC3 — the operator READ seam over retained peer manifest
+/// versions.
+///
+/// Holds the SAME `Arc<CohortManifestState>` the `Pull` receive arm writes
+/// through, for the same reason [`CohortRotationWindows`] does: one seam with
+/// two consumers, never two mechanisms. It lives in the LIBRARY and not in
+/// `main.rs` so the gate leg can drive the real type.
+///
+/// It carries NO cohort type across the `maos-control` boundary: the mapping
+/// from `PeerConvergence` to [`PeerVersionRow`] happens HERE, in the crate that
+/// already depends on both.
+pub struct CohortPeerVersions {
+    state: Arc<CohortManifestState>,
+}
+
+impl CohortPeerVersions {
+    pub fn new(state: Arc<CohortManifestState>) -> Self {
+        Self { state }
+    }
+}
+
+impl CohortConvergenceSource for CohortPeerVersions {
+    fn peer_manifest_versions(&self) -> Option<PeerVersionStatus> {
+        if !self.state.convergence_observer_ready() {
+            return None;
+        }
+        // NEVER `unwrap_or_default()` here. A poisoned or unreadable state
+        // would then render as an empty list, and an empty list is exactly the
+        // shape an operator must be able to trust means "nothing declared".
+        match self.state.peer_convergence() {
+            Ok(records) => Some(PeerVersionStatus::Healthy(
+                records
+                    .into_iter()
+                    .map(|record| PeerVersionRow {
+                        valid: record.is_valid(),
+                        peer: record.peer,
+                        declared_version: record.declared_version,
+                        declared_hash: record.declared_hash,
+                        observed_at_secs: record.observed_at_secs,
+                        state: record.state.to_string(),
+                    })
+                    .collect(),
+            )),
+            Err(error) => Some(PeerVersionStatus::Unhealthy {
                 detail: error.to_string(),
             }),
         }

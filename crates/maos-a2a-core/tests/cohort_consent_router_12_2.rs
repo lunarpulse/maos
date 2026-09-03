@@ -43,6 +43,7 @@ impl CohortManifestGate for FixedGate {
     fn apply_reissue(
         &self,
         _verified_peer: &HostId,
+        _peer_boot_nonce: u64,
         _frame: &IacFrame,
     ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
         Err(CohortReissueRejection {
