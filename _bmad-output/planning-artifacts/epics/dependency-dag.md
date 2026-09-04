@@ -202,20 +202,22 @@ flowchart TD
 ```
 
 
-## Epics 15–20 — Product-Spine Recovery Lane (correct-course 2026-09-04) — DAG
+## Epics 15–21 — Product-Spine Recovery Lane (correct-course R2 2026-09-04, Fork C) — DAG
 
-Spine (strict): **15 → 16 → 17 → 18 → 19 → 20** — each epic makes one roadmap phase true and closes on its exit command.
+Spine (strict): **15 → 16 → 17 → 18 → 19 → 20 → 21**; each epic's hermetic exit is its first CI job (red until green).
 
 | Edge | Why |
 |---|---|
-| hotfix lane (model-pin gate/sweep, model env overrides, error surfacing) ∥ 15 | approved 2026-09-01; runs inside Epic 15's window, keys unchanged |
-| 15-1 → 15-3 | a tag is cut only on a green aggregate |
-| 16-1 → 16-5 | the J0 scene needs a verb that reaches the running daemon |
-| 16-2 → 18-2 | real agent-CLI Workers must run under the applied sandbox |
-| 16-4 → 20-5 | the keyring path is the default source the secret classification assumes |
-| 17-1/17-2 → 18-1 | Orchestrator decomposition reuses the Inference-Port patterns |
-| 17-4 → 20-2 | J3's digest read needs `log.recall` over the wire |
-| 19-4 → 20-2 | the nightly must red on absent evidence before journeys are enrolled in it |
-| 19-2 → 20-* | multi-host runbooks install from packages, not `cargo build` |
+| hotfix lane ∥ 15 | approved 2026-09-01; keys unchanged (W0-3) |
+| 15-2 → every 16–21 story | the one-time ceiling re-base is what lets a line land |
+| 15-5 → 16-1 (ADR-062), 17-1 (ADR-061), 17-3b (ADR-060), 21-3 (ADR-063) | one decision per fork, before the epic opens |
+| 15-6 → 18-*, 19-*, 20-4, 21-1 | every "live" story replays in CI through the seam |
+| 16-1 → 16-2, 19-2 | the halt resolve and the enqueue door travel over the POST surface |
+| 17-1 → 19-3 | real agent CLIs run only under the egress profile |
+| 17-3a → 17-3b → 20-1, 21-2 | spike, then the WASM form; the registry admits it; J3 recall over the WASM wire |
+| 18-1 → 18-2, 18-4 · 18-1/18-3 → 19-1 | seams before numbers; seams before the Orchestrator loop |
+| 20-3 → 21-2 | the nightly must red on absent evidence before journeys are enrolled |
+| 20-2 → 21-* | multi-host runbooks install from packages |
+| `ops-*` rows | run in parallel; never gate an engineering exit |
 
-Kernel-Δ: **16 is the only authorized non-zero delta** (measured at landing); 20-4 is expected negative; all others ZERO @24472.
+Kernel-Δ: **16-5, 17-1, 17-2 FLAG-Winston (+), 21-5 optional (−)**; all else ZERO @24472.

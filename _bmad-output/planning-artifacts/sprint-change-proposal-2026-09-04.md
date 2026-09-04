@@ -196,14 +196,14 @@ Comments are not parsed by any of them. The `development_status` block today car
 
 | Row today | Verdict | Why | Becomes |
 |---|---|---|---|
-| `spec-epic-5-review-finding-closure: blocked` | **Rename + merge** | A spec, not a story; blocked only on gate greenness, which W0-1 / W4-4 own. Named by the register and two J1 stories. | folded into `19-4-gate-honesty-pass`; register cell → `19-4` |
+| `spec-epic-5-review-finding-closure: blocked` | **Rename + merge** | A spec, not a story; blocked only on gate greenness, which W0-1 / W4-4 own. Named by the register and two J1 stories. | folded into `20-3-gate-honesty-pass`; register cell → `19-4` |
 | `14-0`, `14-1`, `14-2`, `14-2a`, `14-2b`, `14-2c` (done) | **Keep** | Delivered. | Epic 14's six stories |
-| `14-2d-self-identity-rotation: blocked` | **Merge** | Same seam as `20-3`; two rows for one fix. Story file stays as the design record. | `20-3-durable-tofu-and-self-leaf-rotation` |
+| `14-2d-self-identity-rotation: blocked` | **Merge** | Same seam as `20-3`; two rows for one fix. Story file stays as the design record. | `21-3-durable-tofu-and-self-leaf-rotation` |
 | `14-3-…-v2-5-graduation-ledger` | **Merge** | Contradicts the operator rule that v2.5 is non-gating and never scheduled; its only engineering content is ledger honesty. | `19-4` |
 | `14-4-…-operational-surfaces` | **Split** | Installers are W4; canary auto-rollback (NFR-Rel-5) and native push have no journey dependency. | installers → `19-2`; canary + push → v2.5 parking row |
-| `14-5-…-backends-multi-provider` | **Rename** | Real FR3 gap, but after Spirits reason. | `19-5-backends-and-multi-provider` |
-| `14-6-…-constitutional-ceiling` | **Merge, premise corrected** | Cites a ≤25K `kernel-crate-set.toml` / ADR-057 ceiling that exists in no ADR and no file; the row's premise is false. D11/D13 targets updated. | `20-4-kernel-hygiene-one-instrument` |
-| `14-7`, `14-8`, `14-9` env-contract rows | **Merge into one** | Three rows for one registry; W0-1 registers only the two vars that red the gate today. D4b/D4c/D14 targets updated. | `20-5-env-contract-registry-and-secrets` |
+| `14-5-…-backends-multi-provider` | **Rename** | Real FR3 gap, but after Spirits reason. | `20-4-gemini-driver-and-endpoint-pin` |
+| `14-6-…-constitutional-ceiling` | **Merge, premise corrected** | Cites a ≤25K `kernel-crate-set.toml` / ADR-057 ceiling that exists in no ADR and no file; the row's premise is false. D11/D13 targets updated. | `21-4-one-instrument-and-env-registry` |
+| `14-7`, `14-8`, `14-9` env-contract rows | **Merge into one** | Three rows for one registry; W0-1 registers only the two vars that red the gate today. D4b/D4c/D14 targets updated. | `21-4-one-instrument-and-env-registry` |
 | `model-pin-…`, `provider-model-env-overrides`, `provider-error-surfacing` | **Keep** | Approved 2026-09-01; they are W0-3. | unchanged (hotfix lane) |
 | `14-d3-audit-drop-and-legal-hold-serialization` | **Rename** | Not governance: `record_invocation` can drop an audit event and return `Ok` (I2). Keep as a defect in W1's debt slot. D3/D5 targets updated. | `16-6-audit-drop-and-legal-hold-serialization` |
 | `14-d4a-region-home-boot-reconciliation` | **Merge** | Multi-region only; same env/secrets seam. D4a target updated. | `20-5` |

@@ -225,47 +225,64 @@ development_status:
   provider-error-surfacing: backlog  # OD4 SEPARATE STORY (scope text only until authored): unmask real HTTP status (401/404/429) … → tracker-notes-archive-2026-09-04.md#provider-error-surfacing
   # === Story 14-0 (AC4) — the vehicles the preflight rulings NAME. ===  (notes → tracker-notes-archive-2026-09-04.md#lane-story-14-0-ac4-the-vehicles-the-preflight-rulings-name)
   epic-14-retrospective: done  # 2026-09-04 epic-14-retro-2026-09-04.md — closed by re-scope; re-homing table copied verbatim (D17 anchor)
-  # === PRODUCT-SPINE RECOVERY LANE = EPICS 15–20 (correct-course 2026-09-04, sprint-change-proposal-2026-09-04.md; Lunarpulse-ratified) ===
-  # Review at HEAD 4657cace (planning-artifacts/review-2026-09-04/): 22/66 FRs live; 0 release tags; 1/11 Spirits calls the Inference Port. One epic per wave;
-  # each story's AC1 is a command the operator runs. Keys NN-M-slug (was recovery-wN-M). Governance rides inside epics at <=20%. Hotfix lane above = Epic 15's W0-3.
-  epic-15: backlog  # W0 · green at HEAD, one phase, first signed tag (1 wk) — epic-15-*.md; exit command in the epic file
-  15-1-green-at-head: backlog  # Fix 4 red aggregate gates (empty-kernel I9 rows, service-boundary 9 'other' symbols, kloc … → tracker-notes-archive-2026-09-04.md#15-1-green-at-head
-  15-2-single-phase-source: backlog  # ONE CURRENT_PHASE (gate_common.rs:166) read by every gate; delete private copy … → tracker-notes-archive-2026-09-04.md#15-2-single-phase-source
-  15-3-first-signed-tag: backlog  # Tag v0.1.0-alpha.1; release.yml runs for the first time; verify Ed25519-signed SHA256SUMS on the GitHub release. Tag at the end of every wave thereafter.
+  # === PRODUCT-SPINE RECOVERY LANE = EPICS 15–21 (correct-course R2 2026-09-04, sprint-change-proposal-2026-09-04-round2.md; Lunarpulse-ratified; FORK C) ===
+  # Preflight epic-15-20-preflight-2026-09-04.md re-planned under the 8 confidence rules: verb-first (check-exit-commands) · hermetic exit + operator lane
+  # · foundations first · cite-or-cut · spike before build · size from measurement · one decision per fork · inventory from the tree. ◆ = §A6 non-degradable.
+  # Keys NN-M-slug; AC1 = command. Kernel-Δ ZERO @24472 except 16-5, 17-1, 17-2 (FLAG-Winston) and 21-5 (negative). Measured lane 28–40 wk.
+  epic-15: backlog  # Foundations (W0, 2–3 wk) — epic-15-foundations-w0.md; hermetic exit in the epic file
+  15-1-green-at-head: backlog  # 4 red gates + trace race; I9 attribute move (+2 lines or ADR-037 whitelist); 16 other-class symbols + surface baseline regen; env vars; D17
+  15-2-kloc-ceiling-rebase: backlog  # ◆ one-time operator-ratified re-base of kloc.toml (measured + per-crate allowance); amend kloc.toml:501 retro-only rule
+  15-3-single-phase-source-and-exit-command-check: backlog  # 8 CURRENT_PHASE consts → 1; phase-config generated; NEW check-exit-commands (Blocking) / check-cna-registration retired
+  15-4-release-repair-and-first-signed-tag: backlog  # download-artifact merge fix; maosctl artifact; aarch64 leg; publish needs aggregate; 0.1.0-alpha.1; STABILITY regen
+  15-5-decision-adrs-and-provisioning-checklist: backlog  # ◆ ADR-060 forms by trust tier (Fork C) / 061 Worker egress+credential / 062 mutating operator surface / 063 revocation; provisioning checklist runbook
+  15-6-inference-replay-seam: backlog  # MAOS_INFERENCE_MODE=live|replay|record at InferencePortAdapter for every Spirit; nightly --live nextest flag fixed
   epic-15-retrospective: optional
-  epic-16: backlog  # W1 · one daemon, one door — J0 for real (2–3 wk; ONLY authorized kernel-Δ, measured at landing) — epic-16-*.md; exit command in the epic file
-  16-1-daemon-rpc-control-plane: backlog  # S1. maosctl -> running daemon over the operator socket (maos-control server … → tracker-notes-archive-2026-09-04.md#16-1-daemon-rpc-control-plane
-  16-2-apply-sandbox-and-resource-caps: backlog  # S2. Wire spawn_sandboxed (T2 landlock+seccomp) + apply_resource_ceiling … → tracker-notes-archive-2026-09-04.md#16-2-apply-sandbox-and-resource-caps
-  16-3-subprocess-crash-to-handle-crash: backlog  # Route subprocess exit into handle_crash; nfr-rel-1/2 jobs assert the … → tracker-notes-archive-2026-09-04.md#16-3-subprocess-crash-to-handle-crash
-  16-4-kernel-uninstall-and-keyring-secrets: backlog  # Real `maos uninstall` (binary, MAOS_HOME, sockets; log retained by … → tracker-notes-archive-2026-09-04.md#16-4-kernel-uninstall-and-keyring-secrets
-  16-5-j0-halt-on-ambiguity-scene: backlog  # hello-spirit halts on task.acceptance_criterion.ambiguous; run-maos.md … → tracker-notes-archive-2026-09-04.md#16-5-j0-halt-on-ambiguity-scene
-  16-6-audit-drop-legal-hold-and-a2a-deny-vocabulary: backlog  # W1 debt slot. Defects, not governance: record_invocation … → tracker-notes-archive-2026-09-04.md#16-6-audit-drop-legal-hold-and-a2a-deny-vocabulary
+  epic-16: backlog  # One daemon, one door — J0 (W1, 4–5 wk; 16-5 FLAG-Winston) — epic-16-one-daemon-one-door-j0-w1.md; hermetic exit in the epic file
+  16-1-daemon-post-surface-and-verb-retarget: backlog  # S1. POST+bearer on maos-control loopback; maos init mints token; 19 verbs re-targeted; synthetic-halt seeding deleted; 13 test sites; 0 kernel-Δ
+  16-2-shell-halt-registry-and-j0-scene: backlog  # hello Ambiguous → HaltRegistry + EpistemicHalt frame; maosctl halt resolve; journey_j0 asserts halt+audit; ≤5 min clean VM
+  16-3-subprocess-crash-to-handle-crash: backlog  # wait_and_finalize → CrashDetector; 100-kill/50-hang corpora; nfr-rel-1/2 assert numbers
+  16-4-maos-uninstall-and-keyring: backlog  # NEW `maos uninstall` (MAOS_HOME + XDG, --keep-log); keyring backend in maos-secrets; FIXME(secrets) retired
+  16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary: backlog  # ◆ FLAG-Winston +5–25 kernel lines: record_invocation Err on sink failure (D3/D5); legal-hold serialization; IacBusError deny variants (D7/D18)
   epic-16-retrospective: optional
-  epic-17: backlog  # W2 · Spirits that think — v0.3/v0.5 for real (3–4 wk) — epic-17-*.md; exit command in the epic file
-  17-1-butler-through-inference-port: backlog  # S3. on_idle reasons via Inference Port over one LIVE MCP driver (Calendar … → tracker-notes-archive-2026-09-04.md#17-1-butler-through-inference-port
-  17-2-researcher-live-by-default-real-five-metric: backlog  # Live default, `--deterministic` explicit, no silent fallback … → tracker-notes-archive-2026-09-04.md#17-2-researcher-live-by-default-real-five-metric
-  17-3-observer-launchable-live-telemetry: backlog  # Add observer to LoadedSpiritKind (main.rs:447-454); subscribe to live Telemetry Stream; missed-event rate measured.
-  17-4-three-more-hooks-and-wire-log-recall: backlog  # Implement on_schedule/on_telemetry_event/on_consolidate in reference … → tracker-notes-archive-2026-09-04.md#17-4-three-more-hooks-and-wire-log-recall
+  epic-17: backlog  # Workers and the third-party form — Fork C (W2, 4–6 wk; 17-1/17-2 FLAG-Winston, 17-3b ABI extension) — epic-17-workers-and-third-party-form-w2.md; hermetic exit in the epic file
+  17-1-worker-egress-allowlist-and-scoped-credential: backlog  # ◆ FLAG-Winston: T3 egress allowlist from manifest; env_clear + kernel-minted credential; /proc environ test; one Worker spawn path
+  17-2-worker-cgroups-applied: backlog  # ◆ FLAG-Winston: one cgroup layout + pids.max; apply_resource_ceiling wired; typed downgrade without delegation
+  17-3a-wasm-recall-and-componentize-spike: backlog  # ≤3-day spike: componentize-js viability; additive WIT recall op; frame_bridge carries intent/consent/lineage/scope; go/no-go written
+  17-3b-wasm-third-party-form-with-log-recall: backlog  # WIT maos:spirit@1.1 log.recall/fetch; TS Spirit runs under wasm host and recalls; registry admits wasm, refuses rust-inproc (ADR-060)
+  17-4-hooks-observer-and-activity-corpus: backlog  # Observer in LoadedSpiritKind; telemetry pump → fire_on_telemetry_event; on_consolidate caller; 20-scenario activity corpus
   epic-17-retrospective: optional
-  epic-18: backlog  # W3 · the founder loop end to end — v0.8 (3–4 wk) — epic-18-*.md; exit command in the epic file
-  18-1-orchestrator-decomposes-via-inference-port: backlog  # Epic -> stories through the Inference Port; MAOS_WORKER_TASK env retired.
-  18-2-real-worker-default-with-effect-oracle: backlog  # Default Worker = real agent CLI under the sandboxed CliWrapper … → tracker-notes-archive-2026-09-04.md#18-2-real-worker-default-with-effect-oracle
-  18-3-j1-halt-and-overnight-digest-beats: backlog  # Halt on AC ambiguity + overnight digest as real beats; FR20 buffering … → tracker-notes-archive-2026-09-04.md#18-3-j1-halt-and-overnight-digest-beats
+  epic-18: backlog  # Spirits that think (W3, 4–6 wk) — epic-18-spirits-that-think-w3.md; hermetic exit in the epic file
+  18-1-butler-inference-seam-and-conformant-mcp: backlog  # Butler with_deferred_inference_port; MCP client initialize/session/bearer vs fixture calendar server; FR17 digest on live path
+  18-2-eval-halt-verb-and-corpus-numbers: backlog  # NEW `maos eval halt --class <c>` over the 30-row corpus via cassettes; recall/precision published (NFR-Test-4)
+  18-3-researcher-replay-live-and-judged-five-metric: backlog  # --replay/--deterministic flags; no silent fallback; judge harness replaces fixture-label five-metric; time_cap 5400 + injected clock
+  18-4-self-tuning-halt-with-injectable-clock: backlog  # Butler::with_clock; acceptance ledger in principal ns; compressed 21d scene; journey_butler.rs:285 un-ignored
   epic-18-retrospective: optional
-  epic-19: backlog  # W4 · ship it — v1.0 (4–6 wk) — epic-19-*.md; exit command in the epic file
-  19-1-real-registry-publish-install: backlog  # Self-hosted MCP-Streamable-HTTP registry that `maos-spirit publish` … → tracker-notes-archive-2026-09-04.md#19-1-real-registry-publish-install
-  19-2-packaging-from-release-workflow: backlog  # Homebrew tap/AUR/deb produced by release.yml (replace … → tracker-notes-archive-2026-09-04.md#19-2-packaging-from-release-workflow
-  19-3-external-author-cohort-and-pen-test-scheduling: backlog  # Run a real external cohort (>=3 authors) against the … → tracker-notes-archive-2026-09-04.md#19-3-external-author-cohort-and-pen-test-scheduling
-  19-4-gate-honesty-pass: backlog  # S4. Evidence-file gates red on absent evidence (all 12); fix nfr-rel-1/2 names … → tracker-notes-archive-2026-09-04.md#19-4-gate-honesty-pass
-  19-5-backends-and-multi-provider: backlog  # FR3 gap after Spirits reason: Vault/cloud-KMS behind maos-secrets trait … → tracker-notes-archive-2026-09-04.md#19-5-backends-and-multi-provider
+  epic-19: backlog  # The founder loop — J1 (W4, 4–6 wk) — epic-19-founder-loop-w4.md; hermetic exit in the epic file
+  19-1-orchestrator-dispatch-loop-and-epic-input: backlog  # dispatch loop + --epic input + Orchestrator inference port; MAOS_DELEGATED_GOAL removed on loopback arm; FR21 distillate rows in prod
+  19-2-fr20-enqueue-door-and-safe-point: backlog  # daemon-side dequeue_at_safe_point caller; enqueue via 16-1 surface; Ctx ABI unchanged
+  19-3-real-worker-default-with-effect-oracle: backlog  # worktree-diff effect oracle (maos-bin, explicit cwd); real CLI default under 17-1 profile (live = operator lane); RELEASE-HOLDS row 16
+  19-4-j1-beats-and-demo-replay: backlog  # NEW `demo-j1 --replay`; ambiguity halt emitter (story.acceptance_criterion.ambiguous); digest with source refs; ABSENT={two-host-signed-run}
   epic-19-retrospective: optional
-  epic-20: backlog  # W5 · multi-host on live substrate — v1.5→v2.2 reality (4–6 wk) — epic-20-*.md; exit command in the epic file
-  20-1-j4-corpus-to-mira-live: backlog  # 50-scenario corpus fed to Mira with a real model; consent-rupture oracle un-ignored.
-  20-2-j3-mesh-and-reza-in-nightly: backlog  # N=8 digest-read test + Reza 3-team journey run nightly against Postgres … → tracker-notes-archive-2026-09-04.md#20-2-j3-mesh-and-reza-in-nightly
-  20-3-durable-tofu-and-self-leaf-rotation: backlog  # Durable TofuPinStore (only InMemory today, tofu.rs:508); own-leaf … → tracker-notes-archive-2026-09-04.md#20-3-durable-tofu-and-self-leaf-rotation
-  20-4-kernel-hygiene-one-instrument: backlog  # Move kernel-core orchestrator/ out; delete maos-persistence + 3 phantom … → tracker-notes-archive-2026-09-04.md#20-4-kernel-hygiene-one-instrument
-  20-5-env-contract-registry-and-secrets: backlog  # One registry for the 63 unregistered MAOS_* reads (was 14-7/14-8/14-9) … → tracker-notes-archive-2026-09-04.md#20-5-env-contract-registry-and-secrets
+  epic-20: backlog  # Ship it — v1.0-rc (W5, 5–7 wk) — epic-20-ship-it-w5.md; hermetic exit in the epic file
+  20-1-registry-client-install-verb-vetter-and-yank: backlog  # publish reaches real server; NEW `maosctl spirit install <name>@<ver>`; `maos-spirit vet issue|revoke`; yank policy
+  20-2-deb-airgap-docker-and-formula-corrections: backlog  # .deb via dpkg-deb; air-gap matrix leg; Docker ARG FEATURES; check-air-gap enrolled; formula/PKGBUILD corrected (publication = ops row)
+  20-3-gate-honesty-pass: backlog  # ◆ 23 absent-pass gates → EvidenceState; honest-N trial mode; ledger branches; chained fuzz; generated coverage matrix; 14-e1; e12-b1; ≥10 retirements
+  20-4-gemini-driver-and-endpoint-pin: backlog  # Gemini driver (cassette in CI); provider_endpoint_pin enforced in adapter; model-currency governs IDs
+  20-5-v1-0-rc-tag-and-lts-rule: backlog  # v1.0.0-rc.1 signed incl. deb + air-gap; LTS clock starts at v1.0.0 after Holds 1–2 (ops-ga-tag-after-holds)
   epic-20-retrospective: optional
+  epic-21: backlog  # Multi-host on live substrate (W6, 5–7 wk; 21-5 optional negative FLAG-Winston) — epic-21-multi-host-on-live-substrate-w6.md; hermetic exit in the epic file
+  21-1-j4-incident-fixture-and-live-mira-nash: backlog  # 50-incident fixture + prompt→AnomalySignal adapter + Mira/Nash inference seams + compressed clock; deny-path intake; κ corpus separate
+  21-2-nightly-postgres-and-ignored-journeys: backlog  # provision-loom-substrate in nightly; run ignored 13_6b + t_12_4a with --run-ignored; capture test un-ignored; reza leg Blocking
+  21-3-durable-tofu-and-self-leaf-rotation: backlog  # durable TofuPinStore in maos-persistence (kept); sync verify path; own-leaf caller; T_grace cold+I with both 14-2a legs re-derived (14-2d record); typed post-grace token
+  21-4-one-instrument-and-env-registry: backlog  # tokei-code instrument; valid baseline TOML; kernel-crate-set.toml authored or citation retired; workspace env scan; registry → maos-domain; Secret class; REGION_HOME boot reconciliation (D4a/b/c, D11, D13, D14)
+  21-5-orchestrator-port-and-move: backlog  # ◆ optional FLAG-Winston negative: orchestrator/ (1028 LOC) behind a maos-domain port; pin re-pinned negative
+  epic-21-retrospective: optional
+  # === OPERATOR LANE (humans, money, external accounts, wall-clock; never inside an engineering exit) ===
+  ops-provisioning-secrets-and-accounts: backlog  # RELEASE_SIGNING_KEY + MAOS_RELEASE_PUBKEY, homebrew-maos repo + token, AUR account, fuzz-/rto-ledger branch permissions, self-hosted runner decision; reports against docs/runbooks/provisioning-checklist.md (15-5)
+  ops-external-cohort-and-pen-test: backlog  # ≥3 external authors on the 30-min gate recorded honestly (20-3 honest-N mode); pen-test firm + dates (Hold 1); was 19-3
+  ops-brew-tap-and-aur-publication: backlog  # publish the corrected formula/PKGBUILD (20-2) to the tap repo and AUR
+  ops-ga-tag-after-holds: backlog  # cut v1.0.0 + start the LTS clock only after RELEASE-HOLDS Holds 1–2 clear
+  later-bedrock-vertex-and-kms-backends: backlog  # post-v1.0: Bedrock (SigV4, no aws crate in lock) + Vertex (OAuth JWT) drivers; Vault/cloud-KMS behind KeyManagementPort; was half of 19-5
   # === v2.5 PARKING (non-gating by operator rule 2026-07-06; measured, never scheduled) ===
   v25-erasure-crash-reconciliation: backlog  # D5.4 alone (14-0 AC4.2), DEFERRED WITH A NAMED KEY rather than to a phase label. … → tracker-notes-archive-2026-09-04.md#v25-erasure-crash-reconciliation
   v25-private-tier-erase-atomicity: backlog  # The live private-tier residual D6 never mentioned (14-0 AC4.3). D6's three NAMED … → tracker-notes-archive-2026-09-04.md#v25-private-tier-erase-atomicity

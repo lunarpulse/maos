@@ -627,77 +627,77 @@ register row ever points anywhere else again.
 
 ## merged-14-2d-self-identity-rotation
 
-Row `14-2d-self-identity-rotation: blocked` merged 2026-09-04 → `20-3-durable-tofu-and-self-leaf-rotation` (same seam; story file kept as design record).
+Row `14-2d-self-identity-rotation: blocked` merged 2026-09-04 → `21-3-durable-tofu-and-self-leaf-rotation` (same seam; story file kept as design record).
 
 Original comment:
 *** PREFLIGHT COMPLETE 2026-09-02 (4 read-only scouts + 1 validator). STATUS IS `blocked`, NOT `ready-for-dev`, DELIBERATELY: the swap rule is evaluated against 14-2b's convergence table (IN FLIGHT, uncommitted in this working tree) and acts on 14-2c's detector+getter (NOT STARTED), so its own citations are stale at birth. The design work the row demanded BEFORE dev -- the port, both security hazards, the G co-edit -- IS DONE and is in the story. UNBLOCK: 14-2b and 14-2c both done+committed, then re-derive every maos-cohort/maos-control citation and re-measure. *** ALL CITATIONS ARE HEAD-RELATIVE (git show HEAD:), because the tree mutated mid-preflight: ~256 uncommitted insertions landed in maos-cohort/{lib,rotation,state}.rs + maos-control/lib.rs while scouts ran, and one scout watched self.grace move :982->:1010 between two of its own greps. state.rs drift HEAD->tree: +0 below 89, +55 to 118, +65 to 185, +66 to 384, +146 above. *** THE CONSTRAINT: A can serve exactly ONE cert (SwappableServingCert is RwLock<Arc<CertifiedKey>>, resolve returns that one Arc), so unlike every peer it gets NO one-generation overlap and must switch at a single instant inside the intersection of all peers' windows. It learns P applied only one interval late (R_P = T_P + I), so G >= skew + I -- and the falsifier is `spread > G - I`; `spread > G` is FALSE BY CONSTRUCTION (spread(R_P)=spread(T_P)=skew), the null control that split this story. NO RECOVERY if the instant is missed, verified 3 ways: invalidate_if_boot_nonce_differs is reachable only AFTER a successful handshake (router.rs:1358), invalidation only MARKS a pin, and await_repin_consent has ZERO prod callers with a test_repin_hook as its only decision source. *** G RAISE IS FORCED AND NO EDIT LEAVES BOTH TESTS GREEN: raising the installed grace reds cert_rotation_trigger_14_2a.rs:720-732 (it RECOMPUTES the 5s floor and budgets 50s vs a ~125s close; TEST_FILES[0]); editing cold_deployment_t_grace() reds cert_rotation_14_2a.rs:723-742's equality assertion (TEST_FILES[1], leg reload-atomicity). RULING: compose G at main.rs:9796-9801, co-edit the trigger test. MEASURED cost: the test IS 5.22s today (the 5.22s is the grace) -> ~125.4s; gate 25s -> ~145s; discipline.yml:404 timeout-minutes 20 -> raise. One flake it FIXES: drive_a_signed_rotation polls <=30s to catch an OPEN 5s window. *** NEW HOLE NOBODY HAD NAMED: G is BOOT-FROZEN (moved by value, read at ONE site) while t_stale_secs is in the SIGNED bytes (manifest.rs:246), replaced per reissue (state.rs:514), and the pull loop re-reads confirmation_interval() LIVE (main.rs:10146-10147). So a reissue can raise I past a frozen G and silently break G>=skew+I. Range is [35s, 3605s], i.e. the ratified posture legally permits a ONE-HOUR accept-both window for a retired cert. AC3 adds a production feasibility check that refuses; that also disposes of the range. *** BOTH HAZARDS REAL AND RULED. H1 (reachable-from-absence) is settled by the codebase's OWN words -- state.rs:813-815 `absence is never a trust decision` -- plus ratified 12.3 P2; and halt_absence is INSERT-ONLY (4 sites, no removal/TTL/timestamp) so one dropped frame latches it for the process lifetime. RULING: AC3 needs no reachability at all. *** BUT THE REFUSAL RULING ITSELF WAS INVERTED AND VALIDATION CAUGHT IT: each peer's window close is UNCONDITIONAL (schedule_close -> close_rotation_window after grace, promote-and-RETIRE, regardless of what this host did), so REFUSING DOES NOT PRESERVE THE STATUS QUO -- it GUARANTEES the partition, while swapping with a straggler outstanding breaks ONE peer and SELF-HEALS when that peer applies. AC3 is now a DEADLINE (swap at min(T_P)+G-eps, confirmations swap EARLY but never withhold), refusing only for correctness reasons. That also DISSOLVES the H2 veto: a lying peer has nothing to withhold. Feasibility check corrected to max(I_prev, I_now) -- I_now alone fires only on GROWTH while peers sleep on the PREVIOUS interval. AC4's `atomically` was UNACHIEVABLE (two locks, two crates, no shared lock) -> MANDATED ORDER swap-then-planeC, because serve-new/declare-old is loud and local while declare-new/serve-old is 14-2c's undetectable lie. AC2 must fire on Confirmed AND Applied AND the boot reconcile -- at apply time ZERO peers can have confirmed N, so a one-shot is a PERMANENT NO-OP; re-entry is ReissueOutcome::Confirmed flowing through the outer gate every interval. AC5 gains a RESTART-AFTER-SWAP leg: this story MAKES the host un-restartable (disk leaf F_new vs disk manifest F_old -> arm (c) hard-fails boot), promoting a latent hazard to a mandatory one. *** G RE-RATIFIED 2026-09-02 (Lunarpulse: `ratify the cheaper G >= skew + RTT design before anyone builds the expensive version`) -- ADOPTED AS `G = cold_deployment_t_grace() + confirmation_interval()` (~65s), SUPERSEDING `cold + 2*I` (~125s). *** THE VALIDATOR'S ARITHMETIC BEHIND THE PROPOSAL WAS WRONG AND IS CORRECTED IN THE STORY: the inequality is G >= skew + C; the push round collapses C (I -> RTT) but CANNOT collapse skew, because every host pulls EVERY peer each tick (main.rs:10119-10126, :10137-10148) so skew <= I is set by the poll cadence, and a push only accelerates laggards while early appliers already have running windows. So G >= I + RTT, NOT G >= RTT. THREE RELAYED CLAIMS ARE FALSE: cold_deployment_t_grace() does NOT stay 5s; both tests do NOT stay green (the trigger test's budget is 50s, a ~65s close still reds it -- THE CO-EDIT STANDS IN FULL); and the frozen-grace/live-cadence hole does NOT vanish, because skew still tracks the live I, so AC3's feasibility check stays load-bearing. WHAT IT DOES BUY, measured: G roughly HALVES 125s -> ~65s, the CI step drops +120s -> ~+60s, and confirmation stops depending on a SELF-REPORTED version and becomes cryptographically version-authenticated (a security improvement, not just a cost one). NEW WIRING REQUIRED: proactive push-with-ACK; push_to has no prod caller outside service_pending_pulls, and the ACK is real (router.rs:1666-1680 ACKs on accept / NACKs on reject, push_to maps a NACK to EDistributionFailed). SUPERSEDED PROPOSAL AS ORIGINALLY FILED: `I` is a poll cadence, not a constant, and this host can drive its own confirmation round -- pull_from makes the peer push_to back its EXACT signed_toml (distribution.rs:46-57, `Send the exact signed artifact previously verified by this member`), which is BOTH this-host-cadence AND cryptographically version-authenticated (strictly stronger than the self-reported Pull.known_version). That gives G >= skew + RTT, which is EXACTLY what sec-7.2.1.a's max(2*p99_handshake_rtt, 5s) is for: cold_deployment_t_grace() stays 5s, BOTH tests stay green, the +120s CI cost and the timeout raise vanish, AND the frozen-grace/live-cadence hole vanishes because I drops out. Cost: push_to has no prod caller outside service_pending_pulls. Also: the `no edit leaves both green` claim is FIXTURE-DEPENDENT (any G <~45s is fine; it reds only because the fixture pins t_stale_secs:120). The 12.3 probe (classify_presence) stays unwired and its PRESENT allowlist is STALE (j1-crosshost-2c's CODE_INTERNAL/CODE_TIMEOUT now fall to Indeterminate) = filed, needs an owner. H2 (self-reported version): lying HIGH is cryptographically bounded (the pull forces a signed_toml push), lying LOW is UNDETECTABLE IN PRINCIPLE -- no nonce, no freshness challenge, no signed I-applied-N, no Merkle accumulator, and CachedManifest holds exactly one manifest so there is no history oracle. RULING: veto ACCEPTED, DECLARED, AUDITED; consequence is a refused swap, never an unsafe one. *** PORT RATIFIED: fn reconcile_local_identity(&self, declared: &PeerCertFingerprint) -> LocalIdentityOutcome, 5th param on install_cert_rotation (SAFE: the gate pins method NAMES only and its own unit test feeds the probe a ONE-arg call -- no arity assertion in 945 lines), invoked OUTSIDE the cached guard. Bytes REJECTED (maos-cohort holds zero cert material and cannot name CertificateDer -- no rustls, no pub use rustls in maos-a2a-core); &str REJECTED (bypasses PeerCertFingerprint::parse, which lowercases); Result REJECTED (a local refusal must not reject a manifest every other member accepted). Actuator in maos-bin/src/cert_rotation.rs -- constructible, it is #[cfg(feature=network)] and maos-a2a-tcp is on the SAME feature = no new edge. *** swap_serving_cert VALIDATES ALMOST NOTHING (chain-non-empty + key-matches-leaf only -- no authz, no expiry, no chain-to-root, no manifest fingerprint), and NOTHING upstream does either: the only local-leaf-vs-manifest check is boot-only arm (c), which FAILS OPEN on absence and reads DISK not the live transport. EVERY authorization control on this path is authored here = the A6 security anchor. signed_fingerprint is a LOCAL CLOSURE with THREE consumers -> extract to a free fn, never copy. *** TWO CO-EDITS NOBODY LISTED: rotation.rs:129-138 is the ratified lock order `in one place` and says swap_lock is NOT in it `because this story never takes it: the local leaf is 14-2b's` -- this story falsifies BOTH halves, and it is the NINTH dangling reference to the deleted key and the ONLY one in SOURCE (short form, so the exact-key grep missed it). Also NO accessor exists for the installed grace, and the cheap workaround (test re-derives it) is a SECOND SOURCE = the exact defect the equality test forbids -> add the accessor, justified because AC3's feasibility check needs it in production. *** MIXED MESH BRICKS ASYMMETRICALLY: a `maos run` peer never pulls, can never receive the manifest (LegacyCohortManifestGate refuses), refuses this host after the swap while this host can still reach it, and its CODE_INTERNAL NACK classifies Indeterminate. Cohort-daemon arm only, both ends. *** 6 ACs, 9 blocking conditions. ZERO kernel-delta. Expect measured grants on maos-cohort (contended: 14-2c needs 55-70 of the same +35, and 14-2b is spending it now) and maos-bin (+30). Story: `_bmad-output/implementation-artifacts/14-2d-self-identity-rotation.md`. Depends: 14-2b, 14-2c. Closes RELEASE-HOLDS (c.2).
 
 ## merged-14-3-ecosystem-readiness-verification-v2-5-graduation-ledger
 
-Row `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger: backlog` merged 2026-09-04 → `19-4-gate-honesty-pass` (v2.5 is non-gating by operator rule; ledger honesty only).
+Row `14-3-ecosystem-readiness-verification-v2-5-graduation-ledger: backlog` merged 2026-09-04 → `20-3-gate-honesty-pass` (v2.5 is non-gating by operator rule; ledger honesty only).
 
 Original comment:
 FKCS-infra (11.5) + trial-infra (11.7) proven green at the v2.2 gate via Chinese-wall proxy; v2.5 graduation ledger. Depends: 13.4.
 
 ## merged-14-4-v2-0-sweep-operational-surfaces
 
-Row `14-4-v2-0-sweep-operational-surfaces: backlog` merged 2026-09-04 → `19-2-packaging-from-release-workflow` (installers → w4-2; canary+push → v25-canary-rollback-and-native-push).
+Row `14-4-v2-0-sweep-operational-surfaces: backlog` merged 2026-09-04 → `20-2-deb-airgap-docker-and-formula-corrections` (installers → w4-2; canary+push → v25-canary-rollback-and-native-push).
 
 Original comment:
 sentinel canary auto-rollback + native mobile push + distro installers (clean-host verified). Keep external WASM publication flag-gated (G5).
 
 ## merged-14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition
 
-Row `14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition: backlog` merged 2026-09-04 → `20-4-kernel-hygiene-one-instrument` (premise corrected: the ≤25K kernel-crate-set ceiling exists in no ADR/file).
+Row `14-6-v2-0-sweep-constitutional-ceiling-formal-methods-disposition: backlog` merged 2026-09-04 → `21-4-one-instrument-and-env-registry` (premise corrected: the ≤25K kernel-crate-set ceiling exists in no ADR/file).
 
 Original comment:
 ADR-057 kernel-crate-set ≤25K instrument (advisory→binding at v2.2-wave close) + NFR-Maint-1 amendment + formal-methods disposition. G2: decide ADR-041 decomposition scope at preflight.
 
 ## merged-14-7-workspace-env-contract-shared-registry-static-scan-gate
 
-Row `14-7-workspace-env-contract-shared-registry-static-scan-gate: backlog` merged 2026-09-04 → `20-5-env-contract-registry-and-secrets` (one registry, one row).
+Row `14-7-workspace-env-contract-shared-registry-static-scan-gate: backlog` merged 2026-09-04 → `21-4-one-instrument-and-env-registry` (one registry, one row).
 
 Original comment:
 Promoted from 12-7 preflight (correct-course 2026-07-13, sprint-change-proposal-2026-07-13.md). Extract EnvVar/EnvStability/registry to a shared home (maos-domain rec'd -- avoids new kernel-crate-set member, the 14.6 interaction); migrate maos-bin's 12.6 registry(67)+check-env-contract onto it; generalize gate to scan ALL crates (rename->workspace-true) preserving read-shape detection + per-crate proven-red; advisory-first. ZERO kernel-Δ (static scan, no kernel source edit). Depends: 12.6 (landed).
 
 ## merged-14-8-register-classify-full-workspace-env-surface
 
-Row `14-8-register-classify-full-workspace-env-surface: backlog` merged 2026-09-04 → `20-5-env-contract-registry-and-secrets` (one registry, one row).
+Row `14-8-register-classify-full-workspace-env-surface: backlog` merged 2026-09-04 → `21-4-one-instrument-and-env-registry` (one registry, one row).
 
 Original comment:
 Register ~43 non-secret MAOS_* reads across 15 crates incl maos-kernel-core's ~18 via the shared registry (NO kernel source edit); classify HarnessOnly vs UserFacing; flag *_FAST/_TEST reads in production src/ (e.g. MAOS_AUTO_REVERT_FAST in post_swap_monitor.rs) as documented smell; flip workspace gate to BLOCKING + wire into ship aggregate; per-crate proven-red. ZERO kernel-Δ. Depends: 14.7.
 
 ## merged-14-9-secret-var-governance-provider-keys
 
-Row `14-9-secret-var-governance-provider-keys: backlog` merged 2026-09-04 → `20-5-env-contract-registry-and-secrets` (one registry, one row).
+Row `14-9-secret-var-governance-provider-keys: backlog` merged 2026-09-04 → `21-4-one-instrument-and-env-registry` (one registry, one row).
 
 Original comment:
 §A6 security-sensitive. Add EnvStability::Secret; classify real secrets (MAOS_ANTHROPIC_API_KEY, MAOS_OPENAI_API_KEY, MAOS_AUDIT_KEY, MAOS_TRIAL_PRODUCER_SEED), keep *_PUBKEY NON-secret (naive KEY-substring banned -- misclassifies both ways); registry stores name+purpose NEVER value; gate: Secret vars never logged/echoed/serialized (proven-red on planted leak). ZERO kernel-Δ. Depends: 14.7.
 
 ## merged-14-d4a-region-home-boot-reconciliation
 
-Row `14-d4a-region-home-boot-reconciliation: backlog` merged 2026-09-04 → `20-5-env-contract-registry-and-secrets` (same env/secrets seam).
+Row `14-d4a-region-home-boot-reconciliation: backlog` merged 2026-09-04 → `21-4-one-instrument-and-env-registry` (same env/secrets seam).
 
 Original comment:
 D4a (14-0 AC4.4): the ENFORCEMENT half of `MAOS_REGION_HOME`, which neither named vehicle could host — 14-7 and 14-8 are both static-scan stories and cannot host a runtime boot check, so D4's own target AND its stated fallback were both wrong. Constructible and cheaper than feared: `main.rs:9855` `reconcile_transport_identity_with_manifest` already reconciles four env-vs-signed axes including `team_id`; region is the OMITTED FIELD of an existing check, ~20 lines mirroring `cross_team_crossing.rs:892-916`. MUST state that a daemon-boot leg does NOT cover `maosctl`. ZERO kernel-Δ.
 
 ## merged-14-e1-erasure-attestation-honesty
 
-Row `14-e1-erasure-attestation-honesty: backlog` merged 2026-09-04 → `19-4-gate-honesty-pass` (named AC: a control may not assert what it did not observe).
+Row `14-e1-erasure-attestation-honesty: backlog` merged 2026-09-04 → `20-3-gate-honesty-pass` (named AC: a control may not assert what it did not observe).
 
 Original comment:
 D5.2 + D5.3 folded under ONE control (14-0 AC4.2): no signed erasure attestation may assert a completion it did not observe. Covers `deferred-work.md:545` (revocation failure signed as zero) and `:546` (`decommission_region_key` hardcodes `completed: true`). ZERO kernel-Δ. `CategoryStatus::CoverageGap` ALREADY EXISTS (`erasure/proof.rs:22-27`), so D5's claim that this "reopens the AC1 vocabulary decision" is FALSE. Crates `maos-bin` + `maos-audit`, both at ZERO headroom -> ONE measured grant under `kloc.toml:87`.
 
 ## merged-e12-b1-gate-binding-decay-residual
 
-Row `e12-b1-gate-binding-decay-residual: backlog` merged 2026-09-04 → `19-4-gate-honesty-pass` (governance residual, D20).
+Row `e12-b1-gate-binding-decay-residual: backlog` merged 2026-09-04 → `20-3-gate-honesty-pass` (governance residual, D20).
 
 Original comment:
 D20, filed by 14-0 AC4.6. E12-B1's ratified text was "decouple blocking-disposition from CURRENT_PHASE" and it is recorded `done` at 6 of 8. Eight gates still carry a private `const CURRENT_PHASE`; six also adopted `BindingClass`, so theirs is vestigial. TWO ADOPTED NOTHING: `check_escape_detector.rs` (`CURRENT_PHASE` :62, private `is_blocking_at` :94) and `check_cohort_mesh.rs`. OBSERVED, NOT DERIVED: `cargo run -p xtask -- check-escape-detector` exits 0 while printing `::warning::Escape-detector oracle RED — would block ship at v2.0`, and reports `"passed": true` (:691). Its own vacuity guard cannot catch it: on a seccomp-blocked host the legs return `failed=1, green=false`, so `passed==0 && failed==0` is false and the advisory tail converts RED into `passed: true`. THE FIX FOR GATE-BINDING DECAY DECAYED THE SAME WAY. Epic 13's retro recorded B1-B6 as 6/6 done, noting its tracking had erred PESSIMISTIC; here it erred OPTIMISTIC, which is the direction that hurts.
 
 ## merged-spec-epic-5-review-finding-closure
 
-Row `spec-epic-5-review-finding-closure: blocked` merged 2026-09-04 → `19-4-gate-honesty-pass` (a spec blocked only on gate greenness).
+Row `spec-epic-5-review-finding-closure: blocked` merged 2026-09-04 → `20-3-gate-honesty-pass` (a spec blocked only on gate greenness).
 
 Original comment:
 STATUS IS `blocked`, AND THAT IS THE HONEST WORD, NOT A CONVENIENCE. Its own Verification list (`spec-epic-5-review-finding-closure.md:79-80`) requires every named gate to report `passed: true`, and 14-0 AC3.1 adds `kloc-check` to that list per D13's own prescription. `kloc-check` is RED at HEAD on `maos-domain` (D14 -> 14-7) and `_aggregate_hardfail` (D17 -> 14-6) — NEITHER of which is this spec's debt — so it cannot reach `done` until those clear, and every one of its Tasks is still unchecked. It was never `in-progress` in any sense a tracker could act on; it was untracked. D13(a) IS DISCHARGED regardless: `xtask/kloc.toml:195` `maos-kernel-core 18248 -> 18933`, exact measured / zero headroom, founder grant. ⚠ PROVENANCE GAP, RECORDED NOT FABRICATED: this is a `bmad-quick-dev` SPEC (one of five `spec-*.md`, and the only one now tracked), created by its own commit `af788c3e` (2026-08-13). No `dev_model_used` and no §A6 review artifact was ever captured for it, and 14-0 will not invent either — writing a `§A6` marker for a review that did not happen is the precise defect this project punishes. Recorded as a finding in the spec file itself.
@@ -718,15 +718,15 @@ W3. MAOS_ANTHROPIC_MODEL / MAOS_OPENAI_MODEL / MAOS_OLLAMA_MODEL / MAOS_DEFAULT_
 
 Fix 4 red aggregate gates (empty-kernel I9 rows, service-boundary 9 'other' symbols, kloc maos-domain +51/aggregate D17, env-contract main.rs:2669-2670) + t_14_2a_post_grace_journal.rs:362 tracing race. Exit: aggregate green on tree content.
 
-## 15-2-single-phase-source
+## 15-3-single-phase-source-and-exit-command-check
 
 ONE CURRENT_PHASE (gate_common.rs:166) read by every gate; delete private copy check_escape_detector.rs:62; tests/phase-config.toml derived or removed; coverage_matrix.rs reads the same source.
 
-## 16-1-daemon-rpc-control-plane
+## 16-1-daemon-post-surface-and-verb-retarget
 
 S1. maosctl -> running daemon over the operator socket (maos-control server exists); re-target all 20 MAOS_ONE_SHOT verbs; one-shot kept only for init/backup/import. Exit: `maosctl pause hello-spirit` stops a running Spirit. Kernel-Δ authorized, measured at landing.
 
-## 16-2-apply-sandbox-and-resource-caps
+## 17-1-worker-egress-allowlist-and-scoped-credential
 
 S2. Wire spawn_sandboxed (T2 landlock+seccomp) + apply_resource_ceiling into the CliWrapper/subprocess spawn path; no raw provider keys in child env (scoped credential or explicit out-of-port TL record). Exit: Spirit opening ~/.ssh gets EACCES + logged denial.
 
@@ -734,84 +734,84 @@ S2. Wire spawn_sandboxed (T2 landlock+seccomp) + apply_resource_ceiling into the
 
 Route subprocess exit into handle_crash; nfr-rel-1/2 jobs assert the 2s/60s numbers over a 100-kill/50-hang corpus. Exit: kill -9 on a Worker -> task.orphaned <=2s.
 
-## 16-4-kernel-uninstall-and-keyring-secrets
+## 16-4-maos-uninstall-and-keyring
 
 Real `maos uninstall` (binary, MAOS_HOME, sockets; log retained by choice); keyring backend in maos-secrets as its Cargo.toml already promises; retire FIXME(secrets) main.rs:3079.
 
-## 16-5-j0-halt-on-ambiguity-scene
+## 16-2-shell-halt-registry-and-j0-scene
 
 hello-spirit halts on task.acceptance_criterion.ambiguous; run-maos.md documents the key. Exit (J0): install -> shell -> halt -> resolve -> audit -> uninstall on a clean machine.
 
-## 16-6-audit-drop-legal-hold-and-a2a-deny-vocabulary
+## 16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary
 
 W1 debt slot. Defects, not governance: record_invocation can drop an audit event and return Ok (I2, D3/D5); legal-hold serialization; map_a2a_error_to_iac_bus flattens the deny vocabulary (D18). Was 14-d3.
 
-## 17-1-butler-through-inference-port
+## 18-1-butler-inference-seam-and-conformant-mcp
 
 S3. on_idle reasons via Inference Port over one LIVE MCP driver (Calendar read); FR17 morning digest on the live path; halt-recall/precision measured on the 30-scenario corpus with a real model and published per class. Retire retired model pin.
 
-## 17-2-researcher-live-by-default-real-five-metric
+## 18-3-researcher-replay-live-and-judged-five-metric
 
 Live default, `--deterministic` explicit, no silent fallback (lib.rs:925); Aud-7 five-metric gate computed from real outputs (replaces the fixture-label tautology).
 
-## 17-4-three-more-hooks-and-wire-log-recall
+## 17-3b-wasm-third-party-form-with-log-recall
 
 Implement on_schedule/on_telemetry_event/on_consolidate in reference Spirits + wire their kernel firers; ship a TS Spirit using log.recall over the subprocess wire (forces the recall op into the protocol); retire rust-inproc from every manifest.
 
-## 18-2-real-worker-default-with-effect-oracle
+## 19-3-real-worker-default-with-effect-oracle
 
 Default Worker = real agent CLI under the sandboxed CliWrapper; claude adapter gets a worktree-diff effect oracle (closes RELEASE-HOLDS row 16); 3 concurrent Workers; nfr-perf-8 promoted to blocking at the measured floor.
 
-## 18-3-j1-halt-and-overnight-digest-beats
+## 19-4-j1-beats-and-demo-replay
 
 Halt on AC ambiguity + overnight digest as real beats; FR20 buffering against the W1 daemon. Exit: `xtask demo-j1 --live` with zero ABSENT beats, digest cites source refs for every completion.
 
-## 19-1-real-registry-publish-install
+## 20-1-registry-client-install-verb-vetter-and-yank
 
 Self-hosted MCP-Streamable-HTTP registry that `maos-spirit publish` reaches; `maosctl install <name>` pulls with the verification now under `import`; Python template; vetter CLI around issue_attestation (zero non-test callers today).
 
-## 19-2-packaging-from-release-workflow
+## 20-2-deb-airgap-docker-and-formula-corrections
 
 Homebrew tap/AUR/deb produced by release.yml (replace SCAFFOLD/PLACEHOLDER_SHA256); air-gap variant as a release artifact; Docker built from it. Absorbs 14-4 installers (canary/push → v25 parking).
 
-## 19-3-external-author-cohort-and-pen-test-scheduling
+## ops-external-cohort-and-pen-test
 
 Run a real external cohort (>=3 authors) against the 30-minute gate with recorded participants/dates; schedule the NFR-Sec-7 engagement (Hold 1). First non-Lunarpulse Spirit in the registry.
 
-## 19-4-gate-honesty-pass
+## 20-3-gate-honesty-pass
 
 S4. Evidence-file gates red on absent evidence (all 12); fix nfr-rel-1/2 names; fuzz+rto ledger branches + one 24h fuzz; coverage-matrix generated from gate-registry + #[maos_covers]; ~40 gates. Absorbs 14-3, 14-e1 (named AC), e12-b1 (D20), spec-epic-5.
 
-## 19-5-backends-and-multi-provider
+## 20-4-gemini-driver-and-endpoint-pin
 
 FR3 gap after Spirits reason: Vault/cloud-KMS behind maos-secrets trait; Bedrock/Vertex/Gemini drivers; consumes xtask/model-currency.toml. §A6 non-degradable. Was 14-5.
 
-## 20-2-j3-mesh-and-reza-in-nightly
+## 21-2-nightly-postgres-and-ignored-journeys
 
 N=8 digest-read test + Reza 3-team journey run nightly against Postgres services; check-reza-production-path reds on absence; J3 scene consumes the mesh not j3-digest-inputs.json.
 
-## 20-3-durable-tofu-and-self-leaf-rotation
+## 21-3-durable-tofu-and-self-leaf-rotation
 
 Durable TofuPinStore (only InMemory today, tofu.rs:508); own-leaf rotation absorbs 14-2d (its story file = design record); ADR: CRL, or revocation IS manifest reissue.
 
-## 20-4-kernel-hygiene-one-instrument
+## 21-4-one-instrument-and-env-registry
 
 Move kernel-core orchestrator/ out; delete maos-persistence + 3 phantom kloc budgets; consolidate 19 canonical_* + 10 SigningKey helpers; pin → tokei code; author or retire the ≤25K ceiling. Absorbs 14-6 (D11/D13).
 
-## 20-5-env-contract-registry-and-secrets
+## 21-4-one-instrument-and-env-registry
 
 One registry for the 63 unregistered MAOS_* reads (was 14-7/14-8/14-9); EnvStability::Secret + provider keys (D4c); MAOS_REGION_HOME boot reconciliation (D4a, was 14-d4a); D4b/D14.
 
 ## renamed-14-5-v2-0-sweep-backends-multi-provider
 
-Row `14-5-v2-0-sweep-backends-multi-provider: backlog` renamed 2026-09-04 → `19-5-backends-and-multi-provider`.
+Row `14-5-v2-0-sweep-backends-multi-provider: backlog` renamed 2026-09-04 → `20-4-gemini-driver-and-endpoint-pin`.
 
 Original comment:
 §A6 non-degradable (security-sensitive: secret backends). Added 2026-08-11 per Epic-13 retro C6 — this row was the one of C6's three named boundaries (14.2/14.5/14.9) that carried NO §A6 marker, so the full-layer net would have degraded silently on the Vault/cloud-KMS story. Vault/cloud-KMS secret backends + Bedrock/Vertex/local multi-provider (ADR-005) behind traits; no vendor SDK in kernel.
 
 ## renamed-14-d3-audit-drop-and-legal-hold-serialization
 
-Row `14-d3-audit-drop-and-legal-hold-serialization: backlog` renamed 2026-09-04 → `16-6-audit-drop-legal-hold-and-a2a-deny-vocabulary`.
+Row `14-d3-audit-drop-and-legal-hold-serialization: backlog` renamed 2026-09-04 → `16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary`.
 
 Original comment:
 D3 ruling (14-0 AC4.1): ZERO kernel-core Δ, repaired OUT of the kernel and CLASS-WIDE. `record_drop()` lives in `maos-capability` (954 lines headroom, outside check-kernel-baseline's scope and outside kernel-crates.toml), so making the drop observable there costs zero kernel-core lines, zero re-pin, and repairs ALL SEVEN drop sites instead of the one D3 names — EIGHT with `cap_tokens/mod.rs:280-282`, the same defect UNCOUNTED on the operator revoke path (an Epic-1b reviewer patched `issue()` and `revoke_all()` for precisely this and missed `revoke()`). In-repo precedent for a gate reading a drop counter: `maos-telemetry`'s `OtelSink::drop_count()` at `otel_gates.rs:818`. MUST rule in the same breath on `cap_audit_backpressure.rs:121-124`, which asserts `drops > 0` — a "never drop" repair reds a shipped test. NOTE `audit_drop_count()` has FOUR references repo-wide and ZERO production readers, so "at least it is counted" is a claim standing in for a control. | *** MERGED 2026-08-30 (Lunarpulse approved): absorbs former key `14-e2-legal-hold-erase-serialization` (D5.1). The merge is that row's OWN argument, quoted: "routed through D3's ruling rather than a SECOND escalation -- same crate, same ZERO-delta fence, same moment. Two rulings on one crate in one afternoon is the single-source defect this project has paid for three times." Both defects are `maos-kernel-core` fallible/atomicity seams discharged OUT of the kernel under ONE ZERO-delta fence, so one vehicle is the correct shape and two was the defect. Key RENAMED (not just re-scoped) because `-audit-drop-observability` would have under-described a vehicle that also owns a legal-hold check-then-act race -- a name that lies is the thing this project files as a finding. The `14-d3` token is preserved so any prefix expansion still resolves. ABSORBED D5.1 SCOPE VERBATIM: D5.1 alone (14-0 AC4.2): the legal-hold check-then-act race. KERNEL-TOUCHING, and routed through D3's ruling (`14-d3-audit-drop-observability`) rather than a SECOND escalation — same crate, same ZERO-Δ fence, same moment. Two rulings on one crate in one afternoon is the single-source defect this project has paid for three times. Register updated in the same commit: D3 Target + deadline re-pointed, D5 Target list re-pointed, prose at :193/:196/:212/:385 corrected. Offsets the 14-2a/14-2b split: epic-14 count returns 16 -> 15.

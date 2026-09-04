@@ -148,19 +148,22 @@
   - [Epic 14: v2.2 Hardening + Closers — 100-Host Churn, 10-Host Rotation, Ecosystem-Readiness, v2.0 Sweep, ADR-057 Ceiling](./epic-14-scale-closers-ecosystem-readiness-v2-2.md) — 6 stories, `done` (closed by re-scope 2026-09-04; 11 rows re-homed to the recovery lane, sprint-change-proposal-2026-09-04.md §7)
     - Stories: 14.0 **preflight decision register** (Epic-13 retro C2; blocks 14.1) · 14.1 100-host churn · 14.2 10-host rotation chaos · 14.3 ecosystem-readiness + v2.5 ledger · 14.4 operational sweep · 14.5 backend/provider sweep · 14.6 ADR-057 ceiling · 14.7 shared env registry · 14.8 workspace env classification · 14.9 secret-var governance · **14.2a production rotation trigger** (from 14-2's review) · **14.2b cohort convergence observability** · **14.2c plane-C local leaf declaration** · **14.2d self-identity rotation** (three-way split 2026-09-02)
     - Minted by 14.0's rulings (2026-08-26), because a decision whose target is not a story key is not a decision: 14-d3 audit-drop **and legal-hold serialization** (D3 + D5.1, ZERO kernel-Δ, class of eight; merged 2026-08-30 — one crate, one fence, one moment) · 14-d4a `MAOS_REGION_HOME` boot reconciliation (D4a; neither 14.7 nor 14.8 can host a runtime check) · 14-e1 erasure-attestation honesty (D5.2+D5.3) (D5.1 merged into 14-d3, 2026-08-30). Three further vehicles sit outside this epic: `e12-b1-gate-binding-decay-residual` (D20), `v25-erasure-crash-reconciliation` (D5.4), `v25-private-tier-erase-atomicity` (D6's surviving residual).
-  - **—— Product-Spine Recovery Lane (correct-course 2026-09-04, Lunarpulse-ratified; Epics 15–20 = waves W0–W5, 26 stories; each epic closes on one operator command) ——**
-  - [Epic 15: W0 — Green at HEAD, One Phase, First Signed Tag](./epic-15-w0-green-at-head-one-phase-first-signed-tag.md) — 3 stories, `backlog`
-    - Stories: 15.1 green at HEAD (4 red gates + tracing race) · 15.2 single phase source · 15.3 first signed tag (+ the approved model-pin hotfix lane in parallel)
-  - [Epic 16: W1 — One Daemon, One Door (J0 for real)](./epic-16-w1-one-daemon-one-door-j0.md) — 6 stories, `backlog`
-    - Stories: 16.1 daemon RPC control plane · 16.2 apply sandbox + cgroups · 16.3 subprocess crash → handle_crash · 16.4 kernel uninstall + keyring · 16.5 **J0 scene** · 16.6 debt slot (audit drop, legal hold, A2A deny vocabulary)
-  - [Epic 17: W2 — Spirits That Think (v0.3 / v0.5 for real)](./epic-17-w2-spirits-that-think-v03-v05.md) — 4 stories, `backlog`
-    - Stories: 17.1 Butler through the Inference Port · 17.2 Researcher live by default + real five-metric gate · 17.3 Observer launchable · 17.4 three more hooks + log.recall over the wire
-  - [Epic 18: W3 — The Founder Loop, End to End (v0.8)](./epic-18-w3-founder-loop-end-to-end-v08.md) — 3 stories, `backlog`
-    - Stories: 18.1 Orchestrator decomposes via Inference Port · 18.2 real Worker default + effect oracle · 18.3 **J1 halt + overnight-digest beats**
-  - [Epic 19: W4 — Ship It (v1.0)](./epic-19-w4-ship-it-v10.md) — 5 stories, `backlog`
-    - Stories: 19.1 real registry publish/install · 19.2 packaging from release.yml · 19.3 external-author cohort + pen-test scheduling · 19.4 gate honesty pass · 19.5 backends + multi-provider
-  - [Epic 20: W5 — Multi-Host on Live Substrate (v1.5 → v2.2 reality)](./epic-20-w5-multi-host-on-live-substrate-v15-v22.md) — 5 stories, `backlog`
-    - Stories: 20.1 J4 corpus to Mira live · 20.2 J3 mesh + Reza in the nightly · 20.3 durable TOFU + self-leaf rotation · 20.4 kernel hygiene, one instrument · 20.5 env-contract registry + secrets
+  - **—— Product-Spine Recovery Lane (correct-course R2 2026-09-04, Lunarpulse-ratified, Fork C; Epics 15–21, 34 stories + operator lane; each epic closes on a hermetic exit command) ——**
+  - [Epic 15: Foundations (W0)](./epic-15-foundations-w0.md) — 6 stories, `backlog`
+    - Stories: 15.1 green at HEAD · 15.2 **kloc ceiling re-base** · 15.3 single phase source + `check-exit-commands` · 15.4 release repair + first signed tag · 15.5 ADR-060..063 + provisioning checklist · 15.6 inference record/replay seam
+  - [Epic 16: One Daemon, One Door — J0 (W1)](./epic-16-one-daemon-one-door-j0-w1.md) — 5 stories, `backlog`
+    - Stories: 16.1 daemon POST surface + verb re-target · 16.2 shell halt registry + **J0 scene** · 16.3 subprocess crash → handle_crash · 16.4 `maos uninstall` + keyring · 16.5 debt (audit drop, legal hold, deny vocabulary; FLAG-Winston)
+  - [Epic 17: Workers and the Third-Party Form — Fork C (W2)](./epic-17-workers-and-third-party-form-w2.md) — 5 stories, `backlog`
+    - Stories: 17.1 Worker egress allowlist + scoped credential · 17.2 Worker cgroups · 17.3a WASM recall/componentize spike · 17.3b WASM third-party form with `log.recall` · 17.4 hooks + Observer + activity corpus
+  - [Epic 18: Spirits That Think (W3)](./epic-18-spirits-that-think-w3.md) — 4 stories, `backlog`
+    - Stories: 18.1 Butler inference seam + conformant MCP · 18.2 `maos eval halt` + per-class numbers · 18.3 Researcher replay/live + judged five-metric · 18.4 self-tuning halt with injectable clock
+  - [Epic 19: The Founder Loop (W4)](./epic-19-founder-loop-w4.md) — 4 stories, `backlog`
+    - Stories: 19.1 Orchestrator dispatch loop + `--epic` · 19.2 FR20 enqueue door · 19.3 real Worker default + effect oracle · 19.4 **J1 beats** + `demo-j1 --replay`
+  - [Epic 20: Ship It (W5)](./epic-20-ship-it-w5.md) — 5 stories, `backlog`
+    - Stories: 20.1 registry client + `spirit install` + vetter CLI + yank policy · 20.2 deb/air-gap/Docker/formulas · 20.3 gate honesty pass · 20.4 Gemini + endpoint pin · 20.5 `v1.0.0-rc.1` + LTS rule
+  - [Epic 21: Multi-Host on Live Substrate (W6)](./epic-21-multi-host-on-live-substrate-w6.md) — 5 stories, `backlog`
+    - Stories: 21.1 J4 incident fixture + live Mira/Nash · 21.2 nightly Postgres + ignored journeys · 21.3 durable TOFU + self-leaf rotation · 21.4 one instrument + env registry · 21.5 optional orchestrator port + move (negative FLAG-Winston)
+  - [Preflight — Epics 15–20 (2026-09-04, superseded by R2)](./epic-15-20-preflight-2026-09-04.md)
   - [Dependency Verification (12-Epic Ordering)](./dependency-verification-12-epic-ordering.md)
   - [Open Items for Story Creation (Step 3)](./open-items-for-story-creation-step-3.md)
   - [Open Items Carried Forward to Implementation](./open-items-carried-forward-to-implementation.md)
