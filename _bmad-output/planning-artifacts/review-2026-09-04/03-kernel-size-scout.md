@@ -1,0 +1,13 @@
+# Kernel size / code shape scout (HEAD 4657cace)
+- Gate-style LOC (tokei code, gate args): xtask 41,939 (ceiling 41,939, 0 headroom); kernel-core 18,933 (0 headroom); maos-bin 17,107 (0); maos-domain 8,695 vs 8,644 RED; iac 6,960 (0); audit 6,847 (0); cohort 5,841 (0); cli 5,270 (0); a2a-core 4,856 (0). 8 crates at exactly zero headroom.
+- Aggregate 155,311 vs _aggregate_hardfail 147,057 => RED +8,254 (kloc.toml:484, D17). _aggregate_alarm=16000 permanently tripped ~10x.
+- Kernel pin 24,472 = PHYSICAL lines incl tests/comments (check_kernel_baseline.rs:109). Tokei code 19,005; non-test ~18.3-18.9K. NFR-Maint-1 (<=20K excl tests) true by letter; pinned instrument 22% over 20K. Growth 15,505 (8.4) -> 24,472 = +58%; 28 commits, 31 FLAG-Winston re-pins.
+- kernel-crates.toml = ["maos-kernel-core"] only. The <=25K/23.5K kernel-crate-set ceiling is NOT in ADR-057 (which is about daemon posture); kernel-crate-set.toml does not exist; only in sprint-change-proposal-2026-07-13.md:35. kernel-core-baseline.toml is not valid TOML (line 29).
+- maos-bin main.rs 14,120 / 21,508 lines (66%), 178 fns, TWO fn main (:1319 sync air-gap dispatcher init|run|backup|audit|install; :1645 async). Daemon vs one-shot chosen by env MAOS_ONE_SHOT (main.rs:2083, 2455), not subcommand. 20 flags.
+- Env: 147 distinct MAOS_* env::var reads workspace-wide; env_contract.rs registers 87 => 63 unregistered (43%). 67 reads in main.rs alone.
+- Tiny crates: maos-persistence = 1 line, 0 dependents, still budgeted 2000; maos-attrs 20 lines (i9_exempt no-op marker); maos-host 39 lines types; maos-control 615 real; maos-director-surface 784 (kernel-core depends on a UI-surface crate). kloc.toml budgets 3 phantom crates (maos-cap-registry, maos-wire, maos-journal). 55 workspace members vs 17 promised (3.2x).
+- Cognitive leakage: none real. But kernel has orchestrator/ module (86 hits; OrchestratorBuffer, WorkingMemoryOrchestrator, UpgradeOrchestrator) — naming collides with §4.0.7.
+- Duplication: 19 canonical_* fns in 9 crates; no fn canonical_kv_leaf exists; Merkle in 2 crates; SigningKey in 10 crates' src; 17 redact fns in 4 crates; HKDF single-sourced (audit).
+- Governance vs product src: 52,652 vs 46,314 = 1.14:1; with tests 2.85:1. xtask = 2.3x kernel.
+- ADRs: 42 files, highest ADR-059; 25 binding, 5 accepted, 4 ratified, 0 superseded, 8 no Status line; ADR-002 amended-inline yet binding.
+- Spirits: researcher 1,180 tokei but only 160 non-test physical => 90% tests. 10 spirits total 5,052 code.

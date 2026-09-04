@@ -19,7 +19,8 @@ is green with 4 legs and 39 derived, exact test invocations.
 
 > **SPLIT, ratified 2026-08-30 (round-table, criterion *long-term correctness*).** This story is
 > **peer-trust rotation**. **Self-identity rotation — the local leaf, and therefore
-> `swap_serving_cert`'s production caller — moved to `14-2b-self-identity-rotation`.** The split is
+> `swap_serving_cert`'s production caller — moved to `14-2d-self-identity-rotation`
+> (re-pointed 2026-09-04 by 14-2c's AC6(c) sweep from the deleted split key).** The split is
 > not a size judgement: the two halves have different threat models and only the second touches the
 > local TLS serving path, so bundling them puts one §A6 net over a trust-set widening *and* a
 > serving-path swap — the exact bundling 14-2 had to run two passes to undo (its AC2.6). ⚠ **Read
@@ -506,7 +507,8 @@ exist.
 surfaces — `open_rotation_window` **and** `swap_serving_cert` — as "test callers only". This story
 gives the first a production caller and **leaves the second exactly as it found it** (design-fork
 boundary (ii)). The clause is therefore **rewritten, not deleted**: peer-trust rotation is live;
-local-leaf rotation is owned by `14-2b-self-identity-rotation` with the ratified repair recorded.
+local-leaf rotation is owned by `14-2d-self-identity-rotation` (re-pointed 2026-09-04 by
+14-2c's AC6(c) sweep from the deleted split key) with the ratified repair recorded.
 A dev who closes the whole clause here has written down a capability that does not exist — which is
 the failure this story was created to repair in 14-2, reproduced one story later.
 
@@ -1067,7 +1069,8 @@ when the wiring is removed.
   restart revert are written into `RELEASE-HOLDS.md` (c.4).
 - **AC5.5 — what this story does NOT close.** `swap_serving_cert` still has no
   production caller. Clause (c) was REWRITTEN, not deleted, into six measured
-  boundaries with `14-2b-self-identity-rotation` named as owner of the half that
+  boundaries with `14-2d-self-identity-rotation` (re-pointed 2026-09-04 by 14-2c's AC6(c)
+sweep from the deleted split key) named as owner of the half that
   provably cannot be built from a signed hash.
 - **AC6 — the gate.** `check-cert-rotation-trigger`, four independently red-able
   legs, derived enrollment that errors on an empty derivation, a vacuous-leg

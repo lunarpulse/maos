@@ -176,6 +176,38 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--exact",
             ],
         },
+        // Story 14-2c: a local-leaf reissue must remain diagnosable through the
+        // authenticated operator HTTP body after the mesh path is severed.
+        Leg {
+            name: "local-leaf-declaration-diagnosis",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2c_local_leaf_declaration",
+                "t_14_2c_local_leaf_reissue_is_diagnosable",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // Story 14-2c review: the agree verdict and the pull-health carrier
+        // must be proven on live pulls through the operator HTTP body.
+        Leg {
+            name: "self-identity-agreement-pull-health",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2c_local_leaf_declaration",
+                "t_14_2c_self_identity_agreement_and_pull_health",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
         // Story 12.2 consent legs — each hard-fails independently (loop below).
         // §A7 role-identity reflex: the admitted acting role is the manifest-
         // bound-to-peer AND frame-carried role; a relabel reds via the real NACK.

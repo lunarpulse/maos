@@ -518,7 +518,7 @@ coverage:
         the set-once install. Rotating THIS host's own leaf is NOT served:
         `swap_serving_cert` still has no production caller, because a signed manifest
         carries a fingerprint and never a private key (owner
-        `14-2b-self-identity-rotation`).
+        `14-2d-self-identity-rotation`).
       * REVOCATION — ARCHITECTURALLY OUT. ADR-047 §3/§4 forbid OCSP/CRL under
         NFR-Ops-12's zero-outbound-network mandate. There is no revocation check to
         gate and there will not be one; the post-grace refusal of a retired

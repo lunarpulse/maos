@@ -1,0 +1,10 @@
+# NFR gate-evidence scout (HEAD 4657cace)
+- Perf-1: bench asserts P95<=1ms n=200 (not P50/P99); continue-on-error. Perf-2 unmeasured. Perf-3 assertion test never executed by any workflow. Perf-7 bench asserts is_ok only. Perf-8 measured (quick mode), advisory; 1h soak never scheduled. Success-criteria µs budgets in no gate.
+- Rel-1/Rel-2: single smoke asserting >=1 frame; job names claim 2s/60s; no corpus, no timing assert. Rel-3 HSIS: scripted precheck oracle w/ pre-labeled outcomes. Rel-7: floor <=5 measured BREACHED (6-8 @N=100, 7 @N=30) -> RE-WORDED [DELTA-2026-08-28]. Rel-9 met (10^4 validators, blocking) but matrix says uncovered. Rel-11 met.
+- Sec-4: redaction filter exists; 10^4 corpus only in generator self-tests; determinism-tests continue-on-error "until filter ships". Sec-5: fuzz-ledger.json empty, no ledger branch; floor never accrued. Sec-10: red-team results only schema; blocking-when-present -> absent passes. Sec-13 met (stricter, loopback). Sec-14 met (fixture).
+- Aud-7 TAUTOLOGY: five-metric gate averages fixture's own expected_* labels (distillate_five_metrics_floor.rs:53-81). Aud-9 CCAC N=640 met (best row). Aud-10 met structural replay (Postgres job).
+- Test-2 met via hand-maintained allowlist (40 entries). Test-4: N=62 synthetic, all class "hello-spirit", predicate simulated inside test, no registered gate. Test-8/Onb-1: no cohort ever; "in-house Chinese-wall proxy" label; Butler corpus "STAND-IN FIXTURE".
+- Maint-1 re-scoped: kernel-core 18933 zero headroom; "trusted core" crates ceiling-sum ~45,384; aggregate RED (D17).
+- Scale-3 unmeasured. Ops-9: rto drill code real but no rto-ledger branch -> never recorded. Cost-1: static price-book; ADR-046 re-scopes to non-CI runbook; no bill read.
+- coverage-matrix.yaml: 198 entries (67 FR/120 NFR); gates:[] 123; both empty 116; advisory 63; mode: warning; current_phase v0.1-alpha. Stale both directions (Rel-9, Rel-11, Sec-14, Aud-10, Ops-9 mis-mapped).
+- Gates: 75 flat/38 ship; v1_5: 24 blocking (3 blocking-when-present absent->pass), 14 advisory; 12 evidence-file gates; of 72 check_*.rs, 60 read a file, ~17 execute.

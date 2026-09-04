@@ -92,7 +92,7 @@ can never imply more than it measured (mirrors row 18's hand-off):
   `InMemoryTofuPinStore` pin/`rotation_next` pair — for every member whose
   signed fingerprint changed, with a one-generation overlap that closes on a
   real `T_grace` deadline. `open_rotation_window` therefore HAS a production
-  caller. Six boundaries, all measured, none of them implied away:
+  caller. Eight boundaries, all measured, none of them implied away:
   - **(c.1) SIGNED COHORT MEMBERS ONLY.** Bilateral non-member peers (the J1
     pair) are deliberately outside the manifest and keep the restart-to-rotate
     posture. A member the manifest ADDS is refused with a named audit row, not
@@ -101,9 +101,9 @@ can never imply more than it measured (mirrors row 18's hand-off):
     manifest carries `members[].fingerprint` — a HASH — and must never carry a
     private key, and `TcpA2AConfig`'s `own_cert_chain` / `own_private_key` paths
     are consumed by value at bind and dropped. So this mechanism provably cannot
-    rotate THIS host's own leaf. Named owner: `14-2b-self-identity-rotation`
-    (backlog). Anyone reading clause (c) as "certificate rotation is live" is
-    reading half of it.
+    rotate THIS host's own leaf. Named owner:
+    `14-2d-self-identity-rotation` (backlog). Anyone reading clause (c) as
+    "certificate rotation is live" is reading half of it.
   - **(c.3) `T_grace` IS ON §7.2.1.a's COLD-DEPLOYMENT BRANCH, and that is a
     disclosure, not a default.** The steady-state branch needs the trailing
     30-day p99 of `iac_handshake_duration_us`, a metric with NO PRODUCER
@@ -143,24 +143,48 @@ can never imply more than it measured (mirrors row 18's hand-off):
     surface — READ-ONLY, because a mutating verb there would be a second trust
     path for certificate identity, which `main.rs:9844-9853` warns against by
     name.
-  - **(c.6) The §7.2.1.a `cert_post_grace_reject` LABEL is partial.** Both
-    handshake refusal classes now leave a queryable `ConsentRupture` row (before
-    this story the certificate-validity class left NO trace at all). But the row
-    cannot carry the spec's token as machine-readable evidence: the frame
-    `journal_peer_identity_refusal` builds has no detail field, and the seam
-    cannot distinguish "retired generation after the grace" from "unknown leaf",
-    because the store keeps no retired-generation history by design. The join an
-    auditor uses is the rotation timeline: a `cert_rotation_window_closed` row
-    for the peer, then the refusal. Owner for a machine-readable token:
-    `14-2b-self-identity-rotation`, which already touches this seam.
-- **(c.7) PROVISION BEFORE REISSUE.** The operator MUST deploy the peer's next
-  certificate before signing/reissuing `cohort:manifest-reissue`. Promotion
-  checks elapsed `T_grace` and the local declaration, but cannot prove that the
-  peer serves the new leaf. A signature is therefore not certificate
-  provisioning; signing first can promote trust in a leaf the peer does not
-  yet serve. This sequencing boundary belongs to
-  `14-2a-production-mtls-rotation-trigger`; self-identity rotation remains
-  `14-2b-self-identity-rotation`.
+  - **(c.6) The §7.2.1.a `cert_post_grace_reject` LABEL is partial and this
+    boundary remains OPEN.** Both handshake refusal classes now leave a
+    queryable `ConsentRupture` row (before Story 14-2a the
+    certificate-validity class left NO trace at all). But
+    `journal_peer_identity_refusal` has no detail field, and the seam cannot
+    distinguish "retired generation after the grace" from "unknown leaf":
+    the store deliberately keeps no retired-generation history. A new reason
+    token would therefore assert a distinction the system cannot make. The
+    available audit join remains the rotation timeline — a
+    `cert_rotation_window_closed` row for the peer, then the refusal. Story
+    `14-2c-plane-c-local-leaf-declaration` corrected this record; it did not
+    close it.
+- **(c.7) PROVISION BEFORE REISSUE IS PEER-SCOPED.** The operator MUST deploy
+  the peer's next certificate before signing/reissuing
+  `cohort:manifest-reissue`. Promotion checks elapsed `T_grace` and the local
+  declaration, but cannot prove that the peer serves the new leaf. A signature
+  is therefore not certificate provisioning; signing first can promote trust
+  in a leaf the peer does not yet serve. This peer boundary belongs to
+  `14-2a-production-mtls-rotation-trigger`; local self-identity recovery is the
+  separate boundary below.
+- **(c.8) LOCAL SELF-IDENTITY RECOVERY REQUIRES N+1 ARTIFACTS AND AN OUTAGE.**
+  Story `14-2c-plane-c-local-leaf-declaration` observes plane C; it does not
+  write it. Writing `F_new` into the local declaration without swapping the
+  served certificate would make the host advertise a fingerprint its own TLS
+  channel cannot present — a harder-to-diagnose partition, not recovery. The
+  one working recovery order is: write the `F_new` PEM on this host **without
+  restarting**; distribute the new signed manifest TOML to **every** member;
+  update **every** member's static transport configuration entries that name
+  this host (`tcp.peer_pins` AND `file.peers`) to `F_new` — the boot
+  reconciler's arms (a)/(b) make any member restart a boot-error while those
+  still say `F_old`; restart **one** non-target member, which loads the new
+  TOML at boot and becomes the seed that serves v2 over the polling pulls
+  (an on-disk TOML is applied ONLY at boot, so without a seed restart nothing
+  propagates); let the reissue propagate to the still-running members through
+  their pulls; accept the partition window; then restart this host last. Only
+  that final restart makes the on-disk PEM and manifest agree at `F_new`.
+  The outage is unavoidable with the current mechanism. Restarting after
+  deploying the PEM but before the manifest is a **boot-brick** (`F_new` PEM
+  versus `F_old` manifest). Restarting after deploying neither is
+  **boot-green but permanently partitioned** (`F_old` agrees locally while
+  every peer pins `F_new`). Production self-rotation and eventual closure of
+  this boundary belong to `14-2d-self-identity-rotation`.
 - **(d) Timings are compressed-loopback regression floors, not geo
   figures.** §15.6 keeps the 30-day soak and absolute geo-SLO as
   release-gate artifacts, never CI-claimed.

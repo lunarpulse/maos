@@ -534,6 +534,7 @@ async fn t_14_2b_peers_at_different_versions_are_told_apart() {
         Arc::new(NoSandbox),
         None,
         Some(Arc::new(CohortPeerVersions::new(cohort.state_a.clone()))),
+        None,
     )
     .expect("bind production convergence reader");
     let response = operator_get(&server, "correct-token");

@@ -610,6 +610,11 @@ impl A2ARouterCore {
             .map(|mut entry| std::mem::replace(&mut entry.cert_fingerprint, fingerprint))
     }
 
+    /// The TLS leaf fingerprint this process is currently configured to serve.
+    pub fn local_leaf_fingerprint(&self) -> Option<PeerCertFingerprint> {
+        self.local_leaf_fingerprint.clone()
+    }
+
     pub fn lookup_peer(&self, host_id: &HostId) -> Result<A2APeerConfig, A2AError> {
         self.peers
             .get(host_id.as_str())

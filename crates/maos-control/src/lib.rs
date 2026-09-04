@@ -140,6 +140,31 @@ pub trait CohortConvergenceSource: Send + Sync + 'static {
     fn peer_manifest_versions(&self) -> Option<PeerVersionStatus>;
 }
 
+/// Story 14-2c — this host's signed and serving certificate identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelfIdentityRow {
+    pub declared: Option<String>,
+    pub serving: Option<String>,
+    /// `"agree"`, `"diverged"`, or `"unconfirmable"`.
+    pub verdict: String,
+    pub peers_observed: usize,
+    pub peers_total: usize,
+    /// Each peer's most recent failed pull, absent after its next success.
+    pub last_pull_errors: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelfIdentityStatus {
+    Healthy(SelfIdentityRow),
+    Unhealthy { detail: String },
+}
+
+/// Read-only self-identity diagnostics for a process holding cohort state.
+pub trait CohortSelfIdentitySource: Send + Sync + 'static {
+    /// `None` only when this process holds no cohort state.
+    fn self_identity(&self) -> Option<SelfIdentityStatus>;
+}
+
 /// Configuration for the authenticated operator endpoint.
 #[derive(Debug, Clone)]
 pub struct OperatorHttpConfig {
@@ -177,6 +202,7 @@ impl OperatorHttpServer {
         source: Arc<S>,
         rotation: Option<Arc<dyn RotationWindowSource>>,
         convergence: Option<Arc<dyn CohortConvergenceSource>>,
+        self_identity: Option<Arc<dyn CohortSelfIdentitySource>>,
     ) -> Result<Self, std::io::Error> {
         if config.bearer_token.is_empty() {
             return Err(std::io::Error::new(
@@ -204,6 +230,7 @@ impl OperatorHttpServer {
                             source.as_ref(),
                             rotation.as_deref(),
                             convergence.as_deref(),
+                            self_identity.as_deref(),
                             config.bearer_token.as_bytes(),
                         );
                     }
@@ -240,6 +267,7 @@ fn handle_connection<S: SandboxReportSource>(
     source: &S,
     rotation: Option<&dyn RotationWindowSource>,
     convergence: Option<&dyn CohortConvergenceSource>,
+    self_identity: Option<&dyn CohortSelfIdentitySource>,
     expected_token: &[u8],
 ) -> Result<(), std::io::Error> {
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
@@ -361,6 +389,41 @@ fn handle_connection<S: SandboxReportSource>(
             .map_err(std::io::Error::other)?;
         return respond(&mut stream, 200, "application/json", &body);
     }
+    if request_line == "GET /v1/cohort/self-identity HTTP/1.1"
+        || request_line == "GET /v1/cohort/self-identity HTTP/1.0"
+    {
+        let Some(status) = self_identity.and_then(|source| source.self_identity()) else {
+            return respond(
+                &mut stream,
+                404,
+                "application/json",
+                br#"{"error":"not_found"}"#,
+            );
+        };
+        let identity = match status {
+            SelfIdentityStatus::Healthy(identity) => identity,
+            SelfIdentityStatus::Unhealthy { detail } => {
+                let body = serde_json::to_vec(&serde_json::json!({
+                    "error": "self_identity_unhealthy",
+                    "detail": detail,
+                }))
+                .map_err(std::io::Error::other)?;
+                return respond(&mut stream, 503, "application/json", &body);
+            }
+        };
+        let body = serde_json::to_vec(&serde_json::json!({
+            "self_identity": {
+                "declared": identity.declared,
+                "serving": identity.serving,
+                "verdict": identity.verdict,
+                "peers_observed": identity.peers_observed,
+                "peers_total": identity.peers_total,
+                "last_pull_errors": identity.last_pull_errors,
+            }
+        }))
+        .map_err(std::io::Error::other)?;
+        return respond(&mut stream, 200, "application/json", &body);
+    }
     let Some(spirit_id) = request_line
         .strip_prefix("GET /v1/spirits/")
         .and_then(|path| {
@@ -456,6 +519,7 @@ mod tests {
             Arc::new(Source),
             None,
             None,
+            None,
         )
         .unwrap();
         assert!(request(&server, "wrong-token", "live").starts_with("HTTP/1.1 401"));
@@ -521,6 +585,7 @@ mod tests {
             Arc::new(Source),
             Some(Arc::new(Windows)),
             None,
+            None,
         )
         .unwrap();
 
@@ -557,6 +622,7 @@ mod tests {
             Arc::new(Source),
             None,
             None,
+            None,
         )
         .unwrap();
         assert!(
@@ -568,6 +634,7 @@ mod tests {
             OperatorHttpConfig::loopback("correct-token".into()),
             Arc::new(Source),
             Some(Arc::new(NoWindows)),
+            None,
             None,
         )
         .unwrap();
@@ -585,6 +652,7 @@ mod tests {
             OperatorHttpConfig::loopback("correct-token".into()),
             Arc::new(Source),
             Some(Arc::new(UnhealthyWindows)),
+            None,
             None,
         )
         .unwrap();
@@ -606,6 +674,7 @@ mod tests {
         let server = OperatorHttpServer::bind(
             OperatorHttpConfig::loopback("correct-token".into()),
             Arc::new(Source),
+            None,
             None,
             None,
         )
@@ -680,6 +749,7 @@ mod tests {
             Arc::new(Source),
             None,
             Some(Arc::new(Declarations)),
+            None,
         )
         .unwrap();
 
@@ -732,6 +802,7 @@ mod tests {
             Arc::new(Source),
             None,
             None,
+            None,
         )
         .unwrap();
         let response = get(&absent, "correct-token", "GET /v1/cohort/peer-versions");
@@ -747,6 +818,7 @@ mod tests {
             Arc::new(Source),
             None,
             Some(Arc::new(NoDeclarations)),
+            None,
         )
         .unwrap();
         let response = get(&present, "correct-token", "GET /v1/cohort/peer-versions");
@@ -764,6 +836,7 @@ mod tests {
             Arc::new(Source),
             None,
             Some(Arc::new(UnhealthyDeclarations)),
+            None,
         )
         .unwrap();
         let response = get(&server, "correct-token", "GET /v1/cohort/peer-versions");
@@ -775,6 +848,139 @@ mod tests {
             response.contains(r#""error":"peer_versions_unhealthy""#)
                 && response.contains("cohort manifest state lock poisoned"),
             "an unreadable state must never launder into an empty set: {response}"
+        );
+    }
+    struct SelfIdentity;
+
+    impl CohortSelfIdentitySource for SelfIdentity {
+        fn self_identity(&self) -> Option<SelfIdentityStatus> {
+            Some(SelfIdentityStatus::Healthy(SelfIdentityRow {
+                declared: Some("a1a1a1a1".into()),
+                serving: Some("a2a2a2a2".into()),
+                verdict: "diverged".into(),
+                peers_observed: 0,
+                peers_total: 2,
+                last_pull_errors: std::collections::BTreeMap::from([(
+                    "host_b".into(),
+                    "PIN_MISMATCH".into(),
+                )]),
+            }))
+        }
+    }
+
+    struct UnconfirmableSelfIdentity;
+
+    impl CohortSelfIdentitySource for UnconfirmableSelfIdentity {
+        fn self_identity(&self) -> Option<SelfIdentityStatus> {
+            Some(SelfIdentityStatus::Healthy(SelfIdentityRow {
+                declared: Some("a1a1a1a1".into()),
+                serving: None,
+                verdict: "unconfirmable".into(),
+                peers_observed: 0,
+                peers_total: 2,
+                last_pull_errors: std::collections::BTreeMap::new(),
+            }))
+        }
+    }
+
+    struct UnhealthySelfIdentity;
+
+    impl CohortSelfIdentitySource for UnhealthySelfIdentity {
+        fn self_identity(&self) -> Option<SelfIdentityStatus> {
+            Some(SelfIdentityStatus::Unhealthy {
+                detail: "cohort manifest state lock poisoned".into(),
+            })
+        }
+    }
+
+    #[test]
+    fn self_identity_route_is_authenticated_read_only_and_reports_divergence() {
+        let server = OperatorHttpServer::bind(
+            OperatorHttpConfig::loopback("correct-token".into()),
+            Arc::new(Source),
+            None,
+            None,
+            Some(Arc::new(SelfIdentity)),
+        )
+        .unwrap();
+
+        assert!(
+            get(&server, "wrong-token", "GET /v1/cohort/self-identity").starts_with("HTTP/1.1 401")
+        );
+        let response = get(&server, "correct-token", "GET /v1/cohort/self-identity");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let body: serde_json::Value = serde_json::from_str(
+            response
+                .split("\r\n\r\n")
+                .nth(1)
+                .expect("a body follows the headers"),
+        )
+        .expect("body is JSON");
+        let identity = &body["self_identity"];
+        assert_eq!(identity["declared"], "a1a1a1a1");
+        assert_eq!(identity["serving"], "a2a2a2a2");
+        assert_eq!(identity["verdict"], "diverged");
+        assert_eq!(identity["peers_observed"], 0);
+        assert_eq!(identity["peers_total"], 2);
+        assert_eq!(identity["last_pull_errors"]["host_b"], "PIN_MISMATCH");
+        assert!(
+            get(&server, "correct-token", "POST /v1/cohort/self-identity")
+                .starts_with("HTTP/1.1 404"),
+            "the surface is read-only"
+        );
+    }
+
+    #[test]
+    fn self_identity_route_distinguishes_absent_state_from_unconfirmable() {
+        let absent = OperatorHttpServer::bind(
+            OperatorHttpConfig::loopback("correct-token".into()),
+            Arc::new(Source),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(
+            get(&absent, "correct-token", "GET /v1/cohort/self-identity")
+                .starts_with("HTTP/1.1 404")
+        );
+
+        let present = OperatorHttpServer::bind(
+            OperatorHttpConfig::loopback("correct-token".into()),
+            Arc::new(Source),
+            None,
+            None,
+            Some(Arc::new(UnconfirmableSelfIdentity)),
+        )
+        .unwrap();
+        let response = get(&present, "correct-token", "GET /v1/cohort/self-identity");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(
+            response.contains(r#""verdict":"unconfirmable""#),
+            "{response}"
+        );
+        assert!(response.contains(r#""serving":null"#), "{response}");
+    }
+
+    #[test]
+    fn self_identity_route_reports_an_unhealthy_source_as_503() {
+        let server = OperatorHttpServer::bind(
+            OperatorHttpConfig::loopback("correct-token".into()),
+            Arc::new(Source),
+            None,
+            None,
+            Some(Arc::new(UnhealthySelfIdentity)),
+        )
+        .unwrap();
+        let response = get(&server, "correct-token", "GET /v1/cohort/self-identity");
+        assert!(
+            response.starts_with("HTTP/1.1 503 Service Unavailable"),
+            "{response}"
+        );
+        assert!(
+            response.contains(r#""error":"self_identity_unhealthy""#)
+                && response.contains("cohort manifest state lock poisoned"),
+            "{response}"
         );
     }
 }

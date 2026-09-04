@@ -847,6 +847,7 @@ fn every_rotation_row_carries_one_stable_greppable_intent() {
         "CertRotationWindowClosed",
         "CertRotationRefused",
         "CertRotationDeclarationMoved",
+        "LocalLeafDeclarationMoved",
     ];
     assert_eq!(
         arms,

@@ -1,0 +1,15 @@
+# Process/planning scout (HEAD 4657cace, 2026-09-04)
+- Git: 319 commits main, 122 days (2026-05-04..09-03), 2.6/day. Tags: 1 (frozen-kernel-v2.0), 0 release tags. Version 0.1.0-alpha. main 5 ahead of origin. All epic branches merged.
+- Impl artifacts: 192 entries, 185 md, 1,503,660 words (avg 8,128/file). 148 story files; 66 split children from 23 parents (45%). 16 retros. Epic groups 17 vs plan 12. Per-epic: 8:19, 13:20, 9:14, 11:10, 5:9, 7:9, j1:8, 14:7.
+- Plan 12 epics x 3-5 = 36-60 stories -> 148 actual = 2.5-4.1x.
+- sprint-status rows 201: 179 done, 17 backlog, 2 blocked, 1 review, 1 in-progress.
+- Planning artifacts 257,202 words / 89 files. 7 sprint-change proposals. epic-14-preflight-decisions: 23 D-rows, 15 OPEN / 8 CLOSED. deferred-work.md: 75 sections, 309 items, 18,958 words.
+- RELEASE-HOLDS: 18 numbered claim-boundary rows + 3 lettered. "may NOT claim" x53. "null control" 121 occurrences/25 files, max #28.
+- Epic 14: 24 rows. FEATURE 11 / NFR-PROOF harness 4 / GOVERNANCE 9. Of 7 rows worked: 1 feature done (14-2a), 1 blocked (14-2d), 5 governance/harness.
+- Process words: preflight 983, §A6 895, dev_model_used 410, falsifier 408, party-mode 400, vacuous 396, FLAG-Winston 370, canned 346, scout 267.
+- ~13 distinct dev models used.
+- xtask: 65,116 LOC, 72 check_*.rs, 24 toml configs. CI YAML 5,049 lines / 11 workflows.
+- docs/: 100 md, 83,021 words, 7 runbooks, 46 ADR files. docs-site 13MB (707MB w/ node_modules).
+- Product Rust: 43 crates, 771 .rs, 236,590 LOC (src 150,569 / tests 84,658), 4,185 #[test].
+- Ratios: prose:code words 2.15:1; xtask = 43% of crate src LOC.
+- Retro self-quotes: "A status field nobody re-derives is not a status field"; "claim standing in for a control" (55x); "A control that closes can re-open"; register: "eight of nineteen rows were already wrong at HEAD".

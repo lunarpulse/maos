@@ -132,8 +132,8 @@
 //! entry → a plane-A `peers` entry → [`PeerCertRotation::ledger`]. The first two
 //! are the only real locks and the tree already documents the second
 //! (`tofu.rs:171-172`). `TcpA2ATransport::swap_lock` is NOT in this order
-//! because this story never takes it: the local leaf is `14-2b`'s
-//! (`swap_serving_cert` still has no production caller after this story).
+//! because peer-trust rotation never takes it. Local-leaf rotation belongs to
+//! Story 14-2d (`swap_serving_cert` still has no production caller here).
 //! ⚠ Implementations of [`RotationGraceTimer`] MUST NOT call back into
 //! `CohortManifestState`: the manifest lock is held across [`PeerCertRotation::reload`].
 
@@ -393,6 +393,11 @@ impl PeerCertRotation {
             .map(|pin| pin.boot_nonce)
     }
 
+    /// Read plane C from the live router rather than snapshotting it at install.
+    pub fn local_leaf_fingerprint(&self) -> Option<PeerCertFingerprint> {
+        self.core.local_leaf_fingerprint()
+    }
+
     /// The rotation status an operator can read: every window this process still
     /// holds open, INTERSECTED with plane B's `rotation_next`, PLUS every peer
     /// whose committed manifest fingerprint the live planes do not implement.
@@ -504,6 +509,7 @@ impl PeerCertRotation {
         manifest_version: u64,
         now_secs: u64,
         commit_event: Option<&CohortAuditEvent>,
+        local_leaf_event: Option<&CohortAuditEvent>,
     ) -> Result<RotationOutcome, CohortError> {
         let _transition = match self.transition_lock.lock() {
             Ok(guard) => guard,
@@ -572,7 +578,14 @@ impl PeerCertRotation {
                 return Err(error);
             }
         }
-        if let Some(event) = commit_event {
+        // Both journal rows are part of the same commit boundary: a failed
+        // append rolls back every plane this call moved, so the caller that
+        // refuses to commit the manifest is left with a coherent mesh. The
+        // local-leaf row is appended here (not by the caller) because state.rs
+        // holds the `cached` guard across this call — an append outside this
+        // boundary could fail after the planes moved but before the cached
+        // manifest is replaced, tearing the two apart (14-2c review finding).
+        for event in [commit_event, local_leaf_event].into_iter().flatten() {
             if let Err(error) = self.audit.append(event) {
                 self.rollback(&applied, manifest_version);
                 return Err(error);

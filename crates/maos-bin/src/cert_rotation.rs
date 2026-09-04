@@ -22,14 +22,16 @@
 //! That is why the WRITE path here is a signed cohort-manifest reissue over the
 //! live A2A wire, and why the only thing this operator surface adds is a GET.
 
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use maos_cohort::rotation::RotationGraceTimer;
 use maos_cohort::CohortManifestState;
 use maos_control::{
-    CohortConvergenceSource, PeerVersionRow, PeerVersionStatus, RotationWindowRow,
-    RotationWindowSource, RotationWindowStatus,
+    CohortConvergenceSource, CohortSelfIdentitySource, PeerVersionRow, PeerVersionStatus,
+    RotationWindowRow, RotationWindowSource, RotationWindowStatus, SelfIdentityRow,
+    SelfIdentityStatus,
 };
 
 /// The real `T_grace` deadline: a spawned task that sleeps and then performs
@@ -151,5 +153,85 @@ impl CohortConvergenceSource for CohortPeerVersions {
                 detail: error.to_string(),
             }),
         }
+    }
+}
+
+/// Story 14-2c — live local certificate identity plus mesh reachability.
+pub struct CohortSelfIdentity {
+    state: Arc<CohortManifestState>,
+    pull_health: Arc<Mutex<BTreeMap<String, String>>>,
+}
+
+impl CohortSelfIdentity {
+    pub fn new(
+        state: Arc<CohortManifestState>,
+        pull_health: Arc<Mutex<BTreeMap<String, String>>>,
+    ) -> Self {
+        Self { state, pull_health }
+    }
+}
+
+impl CohortSelfIdentitySource for CohortSelfIdentity {
+    fn self_identity(&self) -> Option<SelfIdentityStatus> {
+        let manifest = match self.state.manifest() {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                return Some(SelfIdentityStatus::Unhealthy {
+                    detail: error.to_string(),
+                });
+            }
+        };
+        let convergence = match self.state.peer_convergence() {
+            Ok(convergence) => convergence,
+            Err(error) => {
+                return Some(SelfIdentityStatus::Unhealthy {
+                    detail: error.to_string(),
+                });
+            }
+        };
+        let last_pull_errors = match self.pull_health.lock() {
+            Ok(errors) => errors.clone(),
+            Err(_) => {
+                return Some(SelfIdentityStatus::Unhealthy {
+                    detail: "cohort pull-health lock poisoned".into(),
+                });
+            }
+        };
+        let local_host = self.state.local_host().as_str();
+        let declared = manifest
+            .members
+            .iter()
+            .find(|member| member.host_id == local_host)
+            .and_then(|member| maos_a2a_core::PeerCertFingerprint::parse(&member.fingerprint));
+        let serving = self.state.local_leaf_fingerprint();
+        let peers_observed = convergence
+            .into_iter()
+            .filter(|record| record.is_valid())
+            .count();
+        let peers_total = manifest
+            .members
+            .iter()
+            .filter(|member| member.host_id != local_host)
+            .count();
+        let verdict = match (&declared, &serving) {
+            (Some(declared), Some(serving)) if declared != serving => "diverged",
+            // Agreement additionally requires no CURRENT pull failure: a
+            // convergence record stays valid until its signed lease expires,
+            // so during a partition the table can still read "fully observed"
+            // while every renewal pull fails. "agree" must not be claimable
+            // from stale observations (14-2c review finding).
+            (Some(_), Some(_)) if peers_observed == peers_total && last_pull_errors.is_empty() => {
+                "agree"
+            }
+            _ => "unconfirmable",
+        };
+        Some(SelfIdentityStatus::Healthy(SelfIdentityRow {
+            declared: declared.map(|fingerprint| fingerprint.short()),
+            serving: serving.map(|fingerprint| fingerprint.short()),
+            verdict: verdict.into(),
+            peers_observed,
+            peers_total,
+            last_pull_errors,
+        }))
     }
 }

@@ -2777,6 +2777,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     #[cfg(not(feature = "network"))]
     let peer_versions: Option<Arc<dyn maos_control::CohortConvergenceSource>> = None;
+    #[cfg(feature = "network")]
+    let self_identity: Option<Arc<dyn maos_control::CohortSelfIdentitySource>> =
+        cohort_daemon.as_ref().map(|bootstrap| {
+            Arc::new(maos_bin::cert_rotation::CohortSelfIdentity::new(
+                Arc::clone(&bootstrap.state),
+                Arc::clone(&bootstrap.pull_health),
+            )) as Arc<dyn maos_control::CohortSelfIdentitySource>
+        });
+    #[cfg(not(feature = "network"))]
+    let self_identity: Option<Arc<dyn maos_control::CohortSelfIdentitySource>> = None;
     let _operator_http_server = match operator_http_config {
         Some(config) => {
             let server = maos_control::OperatorHttpServer::bind(
@@ -2784,6 +2794,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Arc::clone(&scheduler),
                 rotation_windows,
                 peer_versions,
+                self_identity,
             )
             .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?;
             // The bound address is announced because it can be ephemeral
@@ -9144,6 +9155,7 @@ struct CohortDaemonFileConfig {
 #[cfg(feature = "network")]
 struct CohortDaemonBootstrap {
     state: std::sync::Arc<maos_cohort::CohortManifestState>,
+    pull_health: std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<String, String>>>,
     tcp: maos_a2a_tcp::TcpA2AConfig,
     peers: Vec<maos_a2a_core::A2APeerConfig>,
     local_host: maos_spirit_abi::identity::HostId,
@@ -9212,6 +9224,7 @@ fn load_cohort_daemon_bootstrap(
     )?);
     Ok(CohortDaemonBootstrap {
         state,
+        pull_health: std::sync::Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new())),
         tcp: file.tcp,
         peers: file.peers,
         local_host,
@@ -10036,6 +10049,25 @@ fn reconcile_transport_identity_with_manifest(
 }
 
 #[cfg(feature = "network")]
+fn update_cohort_pull_health(
+    health: &std::sync::Mutex<std::collections::BTreeMap<String, String>>,
+    peer: &maos_spirit_abi::identity::HostId,
+    error: Option<String>,
+) {
+    let Ok(mut errors) = health.lock() else {
+        return;
+    };
+    match error {
+        Some(error) => {
+            errors.insert(peer.as_str().to_string(), error);
+        }
+        None => {
+            errors.remove(peer.as_str());
+        }
+    }
+}
+
+#[cfg(feature = "network")]
 async fn build_cohort_a2a_daemon_runtime(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
     boot_nonce: u64,
@@ -10055,6 +10087,7 @@ async fn build_cohort_a2a_daemon_runtime(
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     let CohortDaemonBootstrap {
         state,
+        pull_health,
         tcp: tcp_config,
         peers: peer_configs,
         local_host,
@@ -10128,15 +10161,20 @@ async fn build_cohort_a2a_daemon_runtime(
     let cancel = tokio_util::sync::CancellationToken::new();
     let service_cancel = cancel.child_token();
     let refresh_state = state.clone();
+    let service_pull_health = std::sync::Arc::clone(&pull_health);
     let service = tokio::spawn(async move {
         // Pull-on-connect fallback: each configured bilateral peer is contacted
         // through the reserved control path once the local listener is live.
         for peer in &pull_peers {
-            if let Err(error) = distributor.pull_from(peer).await {
-                eprintln!(
-                    "cohort manifest initial pull from {} failed: {error}",
-                    peer.as_str()
-                );
+            match distributor.pull_from(peer).await {
+                Ok(()) => update_cohort_pull_health(&service_pull_health, peer, None),
+                Err(error) => {
+                    update_cohort_pull_health(&service_pull_health, peer, Some(error.to_string()));
+                    eprintln!(
+                        "cohort manifest initial pull from {} failed: {error}",
+                        peer.as_str()
+                    );
+                }
             }
         }
         let mut tick = tokio::time::interval(std::time::Duration::from_millis(10));
@@ -10151,11 +10189,23 @@ async fn build_cohort_a2a_daemon_runtime(
                 }
                 _ = tokio::time::sleep_until(next_confirmation) => {
                     for peer in &pull_peers {
-                        if let Err(error) = distributor.pull_from(peer).await {
-                            eprintln!(
-                                "cohort manifest renewal pull from {} failed: {error}",
-                                peer.as_str()
-                            );
+                        match distributor.pull_from(peer).await {
+                            Ok(()) => update_cohort_pull_health(
+                                &service_pull_health,
+                                peer,
+                                None,
+                            ),
+                            Err(error) => {
+                                update_cohort_pull_health(
+                                    &service_pull_health,
+                                    peer,
+                                    Some(error.to_string()),
+                                );
+                                eprintln!(
+                                    "cohort manifest renewal pull from {} failed: {error}",
+                                    peer.as_str()
+                                );
+                            }
                         }
                     }
                     next_confirmation =

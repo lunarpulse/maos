@@ -315,7 +315,14 @@ impl CohortManifestState {
         };
         match cached.manifest.peer_configs_for(self.local_host.as_str()) {
             Ok(peers) => {
-                rotation.reload(&peers, cached.manifest.version, self.clock.now_secs(), None)?;
+                rotation.reload(
+                    &peers,
+                    cached.manifest.version,
+                    self.clock.now_secs(),
+                    None,
+                    self.local_leaf_declaration_event(&cached.manifest, None)
+                        .as_ref(),
+                )?;
             }
             // The SAME named row the reissue path writes for the identical
             // failure. Silently skipping here would make "this node cannot
@@ -541,6 +548,44 @@ impl CohortManifestState {
         self.cert_rotation.get().is_some()
     }
 
+    /// The TLS leaf fingerprint configured on the live router, if rotation is installed.
+    pub fn local_leaf_fingerprint(&self) -> Option<PeerCertFingerprint> {
+        self.cert_rotation
+            .get()
+            .and_then(|rotation| rotation.local_leaf_fingerprint())
+    }
+
+    fn local_declared_fingerprint(&self, manifest: &CohortManifest) -> Option<PeerCertFingerprint> {
+        manifest
+            .members
+            .iter()
+            .find(|member| member.host_id == self.local_host.as_str())
+            .and_then(|member| PeerCertFingerprint::parse(&member.fingerprint))
+    }
+
+    /// Story 14-2c — `Some` only when this manifest MOVES the local host's
+    /// declared fingerprint off the identity the transport still serves, and
+    /// the local row actually changed against the manifest being replaced
+    /// (`previous` is `None` at the install site, which has no predecessor).
+    /// Re-firing on every later reissue while a divergence persists would
+    /// date the move to versions that never touched the local row.
+    fn local_leaf_declaration_event(
+        &self,
+        manifest: &CohortManifest,
+        previous: Option<&PeerCertFingerprint>,
+    ) -> Option<CohortAuditEvent> {
+        let serving = self.local_leaf_fingerprint()?;
+        let declared = self.local_declared_fingerprint(manifest)?;
+        (serving != declared && previous != Some(&declared)).then(|| {
+            CohortAuditEvent::LocalLeafDeclarationMoved {
+                host: self.local_host.as_str().to_string(),
+                serving: serving.wire(),
+                declared: declared.wire(),
+                version: manifest.version,
+            }
+        })
+    }
+
     /// The peer's active pin generation, or `0` when no rotation control is
     /// installed in this process or no active pin exists for that peer.
     ///
@@ -658,11 +703,16 @@ impl CohortManifestState {
         let accepted_by_rotation = if let Some(rotation) = self.cert_rotation.get() {
             match candidate.peer_configs_for(self.local_host.as_str()) {
                 Ok(peers) => {
+                    let local_leaf_event = self.local_leaf_declaration_event(
+                        &candidate,
+                        self.local_declared_fingerprint(&cached.manifest).as_ref(),
+                    );
                     rotation.reload(
                         &peers,
                         candidate.version,
                         self.clock.now_secs(),
                         Some(&accepted_event),
+                        local_leaf_event.as_ref(),
                     )?;
                     true
                 }

@@ -128,6 +128,14 @@ pub enum CohortAuditEvent {
         declared: String,
         version: u64,
     },
+    /// Story 14-2c — the signed manifest moved this host's own declaration
+    /// away from the TLS leaf the running transport still serves.
+    LocalLeafDeclarationMoved {
+        host: String,
+        serving: String,
+        declared: String,
+        version: u64,
+    },
 }
 
 /// Deterministic in-memory implementation for focused state tests. Production
@@ -280,6 +288,20 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                 format!(
                     "{{\"event\":\"cert_rotation_declaration_moved\",\"peer\":{peer:?},\"previous\":{previous:?},\"previous_short\":{:?},\"declared\":{declared:?},\"declared_short\":{:?},\"version\":{version}}}",
                     fingerprint_short(previous),
+                    fingerprint_short(declared)
+                ),
+                None,
+            ),
+            CohortAuditEvent::LocalLeafDeclarationMoved {
+                host,
+                serving,
+                declared,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"local_leaf_declaration_moved\",\"host\":{host:?},\"serving_short\":{:?},\"declared_short\":{:?},\"version\":{version}}}",
+                    fingerprint_short(serving),
                     fingerprint_short(declared)
                 ),
                 None,
