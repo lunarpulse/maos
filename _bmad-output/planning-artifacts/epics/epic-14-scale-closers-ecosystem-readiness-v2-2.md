@@ -1,5 +1,8 @@
 # Epic 14 — v2.2 Hardening + Closers (Scale · Rotation · Ecosystem-Readiness · v2.0 Sweep)
 
+> **CLOSED BY RE-SCOPE 2026-09-04** (`sprint-change-proposal-2026-09-04.md` §6/§7, operator-ratified). Delivered: 14-0, 14-1, 14-2, 14-2a, 14-2b, 14-2c. The remaining eleven rows were re-homed to the product-spine recovery lane (`Epics 15–20`) or parked at v2.5; the mapping is in the proposal §7.2 and in `epic-14-retro-2026-09-04.md`. Nothing below this line was edited; it is the record of what was planned.
+
+
 **Status:** `in-progress` — created 2026-07-10; opened 2026-08-26 by `14-0` (preflight decision register) and entered dev 2026-08-27 with `14-1` at `ready-for-dev` (Step 3 of the full-PRD planning plan). Built on the **RATIFIED** full architecture §15 (§15.5 ADR-057 ceiling + §15.6 scale-closer/remainder dispositions) + the ratified PRD delta. **Third and final epic of the v2.2 functional-completeness phase** — **absorbs the former Epic-15 v2.0 remainder sweep** (folded 2026-07-10; the gap-map's "Epic 15 may fold into 12–14"). v2.2 = **3 epics**: 12 (J3 journey) · 13 (Reza journey) · 14 (this — hardening/closers).
 
 **Scope note (supersession):** the v2.2 PRD delta **re-targeted 100-host churn (NFR-Scale-2 / NFR-Rel-7) and NFR-Scale-5 from v2.5 → v2.2** — the Epic-11 plan's "100-host → v2.5" is superseded by the functional-completeness phase. (NFR-Scale-5 14-institution envelope lives in Epic 13.6; this epic carries the host-count closers.)

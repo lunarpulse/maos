@@ -2,6 +2,9 @@
 
 Seven phases (v0.1, v0.3, v0.5, v0.7, v0.9, v1.0, v1.5), each with one observable validation milestone. **Extended 2026-07-06 (Step-2 full-spectrum pass):** the roadmap no longer stops at v1.5 — v2.0 (shipped by Epic 11), v2.2 (functional completeness, operator-ratified), and v2.5 (adoption, non-gating) rows follow the original seven. One observable validation milestone per phase remains the rule.
 
+> **2026-09-04 (correct-course, Lunarpulse-ratified):** the phase rows below are unchanged; their *execution* is re-sequenced as Epics 15–20 (`epics/epic-15-…` through `epic-20-…`), one per wave, each closing on an operator-runnable exit command. Kernel posture: ZERO-Δ @24472 for every recovery epic except **Epic 16** (daemon RPC + applied sandbox + crash routing), whose grant is measured at landing under FLAG-Winston. No ADR changes.
+
+
 **Phase numbering convention.** Phase numbers are spaced at 0.2 intervals through v0.7 / v0.9 as nominal labels (v0.2, v0.4, v0.6, v0.9 are reserved for unplanned interim releases and not currently scheduled); the v0.1 → v0.3 → v0.5 → v0.7 → v0.9 progression preserves consistent 0.2 spacing through the maturity-gates phase. v1.0 and v1.5 follow the major-release semver convention. Phase numbers are nominal milestone labels, not arithmetic intervals — adoption order is fixed by the dependency arrows in the table below, not by the numeric distance between adjacent labels.
 
 | Phase | Scope | Validation milestone |

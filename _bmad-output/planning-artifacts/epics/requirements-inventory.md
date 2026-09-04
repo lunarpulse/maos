@@ -529,3 +529,55 @@ ADR-054 cohort mesh (E12) · ADR-055 multi-tenant Loom + per-team HKDF weld (E13
 - **External holds (GA ledger, non-gating for v2.2 dev):** external pen-test (NFR-Sec-7), export counsel (NFR-Comp-1).
 
 **v2.2 coverage:** every residual FR/NFR is mapped to a story or explicitly re-deferred with a reason. **FR37 now has a functional home (E13.4) — zero FRs unserved.**
+
+
+## Recovery Coverage Map (added 2026-09-04 — correct-course; Epics 15–20)
+
+Source: the 2026-09-04 review (`review-2026-09-04/05-fr1-20-scout.md`, `08-fr21-65-scout.md`, `07-nfr-scout.md`). Each FR the review classified below LIVE is homed at the story that makes it live from a product binary. FRs already LIVE (22) are unchanged.
+
+| Requirement (review class) | Home |
+|---|---|
+| FR1 install via package manager / signed release (PARTIAL) | 19-2 |
+| FR2 clean kernel uninstall (PARTIAL) | 16-4 |
+| FR3 six provider drivers + endpoint lock (PARTIAL: 3 of 6) | 19-5 |
+| FR4 100% mediation incl. Worker subprocess (PARTIAL) | 16-2 |
+| FR5 sandbox enforcement (PARTIAL: computed, never applied) | 16-2 |
+| FR6 cgroups v2 caps (TEST-ONLY) | 16-2 |
+| FR7 telemetry opt-in (ABSENT: no emitter) | 20-5 (registered as an explicit non-goal until an emitter exists) |
+| FR9 lifecycle verbs on a running Spirit (CANNED) | 16-1 |
+| FR10/FR11/FR49 hot-swap and migration reachability (PARTIAL: `NotLoaded` on one-shot) | 16-1 |
+| FR12/FR50 subprocess crash detection and disposition (PARTIAL) | 16-3 |
+| FR13 CRL applied to running Spirits (PARTIAL) | 16-1 |
+| FR14/FR19 task.assign from product emitters, halt-policy CLI (PARTIAL) | 18-1 |
+| FR15/FR58 halt resolution on the live path, J0 (PARTIAL) | 16-5 |
+| FR16/FR24/FR51 posture shift, pause, revoke reaching the daemon (PARTIAL) | 16-1 |
+| FR17 morning digest on the live path (PARTIAL) | 17-1, 18-3 |
+| FR20 Orchestrator buffering against the daemon (PARTIAL) | 16-1, 18-1 |
+| FR21/FR25/FR52 real Workers, 50-concurrent floor (PARTIAL) | 18-2 |
+| FR23b clock skew, partition 10 s, revocation (PARTIAL) | 20-3 |
+| FR28 kernel quota enforcement (PARTIAL) | 20-4 |
+| FR29 `log.recall` over the wire (PARTIAL: in-proc only) | 17-4 |
+| FR33 Python template (PARTIAL: Rust + TS) | 19-1 |
+| FR35/FR36 publish to a real registry, verified install (PARTIAL) | 19-1 |
+| FR37 vetter-side issuance (PARTIAL: zero callers) | 19-1 |
+| FR39/FR57 skill.author.self and revision proposals at runtime (CANNED) | 17-4 (hooks) → follow-on story at Epic 17 preflight |
+| FR45 re-distillation trigger (PARTIAL) | 20-4 |
+| FR47 Worker inference outside the port (PARTIAL) | 16-2 |
+| FR48 operator-selectable crypto provider (PARTIAL) | 19-5 |
+| FR54 gateway connectors (CANNED: Echo fixture) | parked — v2.5 unless a journey needs one |
+| FR55 `on_consolidate`/`on_telemetry_event` firers (PARTIAL) | 17-3, 17-4 |
+| FR59 yank policy (PARTIAL) | 19-1 |
+| FR61 GPG key (PARTIAL: explicitly none, ADR-047) | unchanged — documented deviation |
+| FR62 (b) ABI-extension emitter (PARTIAL) | 19-4 |
+| FR64 CPU/storage/per-task cost dimensions (PARTIAL) | 19-5 |
+| FR65 pending halts + lineage in erasure proof (PARTIAL) | 16-4 |
+| NFR-Test-4 per-class halt-recall (UNMEASURED) | 17-1, 20-1 |
+| NFR-Aud-7 five-metric gate (TAUTOLOGY) | 17-2 |
+| NFR-Rel-1/2 floors (UNMEASURED) | 16-3 |
+| NFR-Sec-5 24 h fuzz ledger, NFR-Ops-9 RTO ledger (EMPTY) | 19-4 |
+| NFR-Onb-1/Test-8 external cohort (NEVER RUN) | 19-3 (honest N) |
+| NFR-Sec-13 own-leaf rotation, NFR-Rel-6 durable pins | 20-3 |
+| NFR-Maint-1 one instrument | 20-4 |
+| NFR-Ops-12 air-gap artifact | 19-2 |
+
+**Journeys:** J0 → 16-5 · J-Butler → 17-1 · J-Researcher → 17-2 · J1 → 18-3 · J3 → 20-2 · J4 → 20-1 · Reza → 20-2 · J6 (Diego) → 19-3.

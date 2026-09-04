@@ -200,3 +200,22 @@ flowchart TD
     classDef backlog fill:#37474f,stroke:#90a4ae,stroke-width:2px,color:#ffffff
     class S141,S142,S143,S144,S145,S146,S147,S148,S149 backlog
 ```
+
+
+## Epics 15–20 — Product-Spine Recovery Lane (correct-course 2026-09-04) — DAG
+
+Spine (strict): **15 → 16 → 17 → 18 → 19 → 20** — each epic makes one roadmap phase true and closes on its exit command.
+
+| Edge | Why |
+|---|---|
+| hotfix lane (model-pin gate/sweep, model env overrides, error surfacing) ∥ 15 | approved 2026-09-01; runs inside Epic 15's window, keys unchanged |
+| 15-1 → 15-3 | a tag is cut only on a green aggregate |
+| 16-1 → 16-5 | the J0 scene needs a verb that reaches the running daemon |
+| 16-2 → 18-2 | real agent-CLI Workers must run under the applied sandbox |
+| 16-4 → 20-5 | the keyring path is the default source the secret classification assumes |
+| 17-1/17-2 → 18-1 | Orchestrator decomposition reuses the Inference-Port patterns |
+| 17-4 → 20-2 | J3's digest read needs `log.recall` over the wire |
+| 19-4 → 20-2 | the nightly must red on absent evidence before journeys are enrolled in it |
+| 19-2 → 20-* | multi-host runbooks install from packages, not `cargo build` |
+
+Kernel-Δ: **16 is the only authorized non-zero delta** (measured at landing); 20-4 is expected negative; all others ZERO @24472.
