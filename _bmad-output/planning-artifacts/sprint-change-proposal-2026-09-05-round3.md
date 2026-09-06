@@ -118,3 +118,16 @@ Recorded, deliberately not applied in this round; each is a `bmad-create-story`-
 - **Route:** Product Owner / Developer (Moderate). The recovery lane opens with `bmad-create-story 15-2-kloc-ceiling-rebase` (maos-bin has zero headroom; nothing lands before the grant), then `15-3-single-phase-source-and-exit-command-check` (the `maos --help` verb table is the lever that makes rule 1 a control), then `15-1-green-at-head`. `bmad-create-story` may tighten but not add uncited ACs.
 - **Success criteria:** every exit block in Epics 15–21 dry-parses at HEAD with a provenance line per command; `check-epic-close-coherence`, `check-decision-register`, `check-dev-record-completeness` green; the re-scout finds no FALSE citation in the edited sections.
 - **Checklist:** §1 trigger ✔ · §2 epic impact ✔ · §3 artifact conflicts (PRD/arch deltas) ✔ · §4 path = Direct Adjustment ✔ · §5 proposal ✔ · §6 handoff ✔.
+
+## 8. Standing operator directive — refinement sessions in retrospectives (2026-09-06)
+
+Lunarpulse will convene **more refinement sessions, held inside the retrospectives**, to maximise delivery confidence. Recorded here because this round is the evidence for it: the lane's confidence moved 8–35 → 38–55 → 52–66 across three refinement rounds, and each round's gain came from measuring the plan against the tree rather than from re-reading it.
+
+**What the directive binds:**
+
+- Each epic's retrospective is a **refinement session, not a write-up**. Its deliverable is the next epic re-preflighted against that day's HEAD — citations re-checked, exit block dry-parsed, foundations verified, budget re-measured — and the OLD→NEW edits filed **before** that epic's first story is created.
+- A refinement round may also be convened **mid-epic** whenever a story disproves a premise the epic file states. The MAOS record says premises are disproved at a rate of roughly one in three, so this is expected, not exceptional.
+- `epic-N-retrospective` rows for Epics 15–21 are therefore **`backlog`, not `optional`** (`sprint-status.yaml`), and confidence rule **9 ("refine in the retro")** is added to all seven epic files.
+- The convening artifact is the retro document itself (`_bmad-output/implementation-artifacts/epic-N-retro-<date>.md`), which must name: the epic it refined, the HEAD it measured, the count of claims audited and disproved, and the edits filed.
+
+**Why it is written mechanically and not as a promise:** the project's own evidence (Epic 4 §A6/§A7, the gate-binding decay finding, and the four "already-true AC" defects this round) is that discipline promised in prose decays within an epic, while discipline expressed as a row or a rule survives. This directive is expressed as seven tracker rows and seven rule lines for that reason.

@@ -236,47 +236,47 @@ development_status:
   15-4-release-repair-and-first-signed-tag: backlog  # download-artifact merge fix; maosctl artifact; aarch64 leg; publish needs aggregate; 0.1.0-alpha.1; STABILITY regen
   15-5-decision-adrs-and-provisioning-checklist: backlog  # ◆ ADR-060 forms by trust tier (Fork C) / 061 Worker egress+credential / 062 mutating operator surface / 063 revocation; provisioning checklist runbook
   15-6-inference-replay-seam: backlog  # MAOS_INFERENCE_MODE=live|replay|record at InferencePortAdapter for every Spirit; nightly --live nextest flag fixed
-  epic-15-retrospective: optional
+  epic-15-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 16 against that day's HEAD and files its OLD→NEW edits before epic 16's first story is created
   epic-16: backlog  # One daemon, one door — J0 (W1, 4–5 wk; 16-5 FLAG-Winston) — epic-16-one-daemon-one-door-j0-w1.md; hermetic exit in the epic file
   16-1-daemon-post-surface-and-verb-retarget: backlog  # S1. POST+bearer on maos-control loopback; maos init mints token; 19 verbs re-targeted; synthetic-halt seeding deleted; 13 test sites; 0 kernel-Δ
   16-2-shell-halt-registry-and-j0-scene: backlog  # hello Ambiguous → HaltRegistry + EpistemicHalt frame; maosctl halt resolve; journey_j0 asserts halt+audit; ≤5 min clean VM
   16-3-subprocess-crash-to-handle-crash: backlog  # wait_and_finalize → CrashDetector; 100-kill/50-hang corpora; nfr-rel-1/2 assert numbers
   16-4-maos-uninstall-and-keyring: backlog  # NEW `maos uninstall` (MAOS_HOME + XDG, --keep-log); keyring backend in maos-secrets; FIXME(secrets) retired
   16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary: backlog  # ◆ FLAG-Winston +5–25 kernel lines: record_invocation Err on sink failure (D3/D5); legal-hold serialization; IacBusError deny variants (D7/D18)
-  epic-16-retrospective: optional
+  epic-16-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 17 against that day's HEAD and files its OLD→NEW edits before epic 17's first story is created
   epic-17: backlog  # Workers and the third-party form — Fork C (W2, 4–6 wk; 17-1/17-2 FLAG-Winston, 17-3b ABI extension) — epic-17-workers-and-third-party-form-w2.md; hermetic exit in the epic file
   17-1-worker-egress-allowlist-and-scoped-credential: backlog  # ◆ FLAG-Winston: T3 egress allowlist from manifest; env_clear + kernel-minted credential; /proc environ test; one Worker spawn path
   17-2-worker-cgroups-applied: backlog  # ◆ FLAG-Winston: one cgroup layout + pids.max; apply_resource_ceiling wired; typed downgrade without delegation
   17-3a-wasm-recall-and-componentize-spike: backlog  # ≤3-day spike: componentize-js viability; additive WIT recall op; frame_bridge carries intent/consent/lineage/scope; go/no-go written
   17-3b-wasm-third-party-form-with-log-recall: backlog  # WIT maos:spirit@1.1 log.recall/fetch; TS Spirit runs under wasm host and recalls; registry admits wasm, refuses rust-inproc (ADR-060)
   17-4-hooks-observer-and-activity-corpus: backlog  # Observer in LoadedSpiritKind; telemetry pump → fire_on_telemetry_event; on_consolidate caller; 20-scenario activity corpus
-  epic-17-retrospective: optional
+  epic-17-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 18 against that day's HEAD and files its OLD→NEW edits before epic 18's first story is created
   epic-18: backlog  # Spirits that think (W3, 4–6 wk) — epic-18-spirits-that-think-w3.md; hermetic exit in the epic file
   18-1-butler-inference-seam-and-conformant-mcp: backlog  # Butler with_deferred_inference_port; MCP client initialize/session/bearer vs fixture calendar server; FR17 digest on live path
   18-2-eval-halt-verb-and-corpus-numbers: backlog  # NEW `maos eval halt --class <c>` over the 30-row corpus via cassettes; recall/precision published (NFR-Test-4)
   18-3-researcher-replay-live-and-judged-five-metric: backlog  # --replay/--deterministic flags; no silent fallback; judge harness replaces fixture-label five-metric; time_cap 5400 + injected clock
   18-4-self-tuning-halt-with-injectable-clock: backlog  # Butler::with_clock; acceptance ledger in principal ns; compressed 21d scene; journey_butler.rs:285 un-ignored
-  epic-18-retrospective: optional
+  epic-18-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 19 against that day's HEAD and files its OLD→NEW edits before epic 19's first story is created
   epic-19: backlog  # The founder loop — J1 (W4, 4–6 wk) — epic-19-founder-loop-w4.md; hermetic exit in the epic file
   19-1-orchestrator-dispatch-loop-and-epic-input: backlog  # dispatch loop + --epic input + Orchestrator inference port; MAOS_DELEGATED_GOAL removed on loopback arm; FR21 distillate rows in prod
   19-2-fr20-enqueue-door-and-safe-point: backlog  # daemon-side dequeue_at_safe_point caller; enqueue via 16-1 surface; Ctx ABI unchanged
   19-3-real-worker-default-with-effect-oracle: backlog  # worktree-diff effect oracle (maos-bin, explicit cwd); real CLI default under 17-1 profile (live = operator lane); RELEASE-HOLDS row 16
   19-4-j1-beats-and-demo-replay: backlog  # NEW `demo-j1 --replay`; ambiguity halt emitter (story.acceptance_criterion.ambiguous); digest with source refs; ABSENT={two-host-signed-run}
-  epic-19-retrospective: optional
+  epic-19-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 20 against that day's HEAD and files its OLD→NEW edits before epic 20's first story is created
   epic-20: backlog  # Ship it — v1.0-rc (W5, 5–7 wk) — epic-20-ship-it-w5.md; hermetic exit in the epic file
   20-1-registry-client-install-verb-vetter-and-yank: backlog  # publish reaches real server; NEW `maosctl spirit install <name>@<ver>`; `maos-spirit vet issue|revoke`; yank policy
   20-2-deb-airgap-docker-and-formula-corrections: backlog  # .deb via dpkg-deb; air-gap matrix leg; Docker ARG FEATURES; check-air-gap enrolled; formula/PKGBUILD corrected (publication = ops row)
   20-3-gate-honesty-pass: backlog  # ◆ 23 absent-pass gates → EvidenceState; honest-N trial mode; ledger branches; chained fuzz; generated coverage matrix; 14-e1; e12-b1; ≥10 retirements
   20-4-gemini-driver-and-endpoint-pin: backlog  # Gemini driver (cassette in CI); provider_endpoint_pin enforced in adapter; model-currency governs IDs
   20-5-v1-0-rc-tag-and-lts-rule: backlog  # v1.0.0-rc.1 signed incl. deb + air-gap; LTS clock starts at v1.0.0 after Holds 1–2 (ops-ga-tag-after-holds)
-  epic-20-retrospective: optional
+  epic-20-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 21 against that day's HEAD and files its OLD→NEW edits before epic 21's first story is created
   epic-21: backlog  # Multi-host on live substrate (W6, 5–7 wk; 21-5 optional negative FLAG-Winston) — epic-21-multi-host-on-live-substrate-w6.md; hermetic exit in the epic file
   21-1-j4-incident-fixture-and-live-mira-nash: backlog  # 50-incident fixture + prompt→AnomalySignal adapter + Mira/Nash inference seams + compressed clock; deny-path intake; κ corpus separate
   21-2-nightly-postgres-and-ignored-journeys: backlog  # provision-loom-substrate in nightly; run ignored 13_6b + t_12_4a with --run-ignored; capture test un-ignored; reza leg Blocking
   21-3-durable-tofu-and-self-leaf-rotation: backlog  # durable TofuPinStore in maos-persistence (kept); sync verify path; own-leaf caller; T_grace cold+I with both 14-2a legs re-derived (14-2d record); typed post-grace token
   21-4-one-instrument-and-env-registry: backlog  # tokei-code instrument; valid baseline TOML; kernel-crate-set.toml authored or citation retired; workspace env scan; registry → maos-domain; Secret class; REGION_HOME boot reconciliation (D4a/b/c, D11, D13, D14)
   21-5-orchestrator-port-and-move: backlog  # ◆ optional FLAG-Winston negative: orchestrator/ (1028 LOC) behind a maos-domain port; pin re-pinned negative
-  epic-21-retrospective: optional
+  epic-21-retrospective: backlog  # NOT optional (operator directive 2026-09-06): convened as a REFINEMENT session — re-preflights epic 22 against that day's HEAD and files its OLD→NEW edits before epic 22's first story is created; epic 21 closes the lane, so its retro refines the v1.0 ledger and whatever epic follows
   # === OPERATOR LANE (humans, money, external accounts, wall-clock; never inside an engineering exit) ===
   ops-provisioning-secrets-and-accounts: backlog  # RELEASE_SIGNING_KEY + MAOS_RELEASE_PUBKEY, homebrew-maos repo + token, AUR account, fuzz-/rto-ledger branch permissions, self-hosted runner decision, DOCKERHUB_* + cosign (20-2 push leg); reports against docs/runbooks/provisioning-checklist.md (15-5)
   ops-external-cohort-and-pen-test: backlog  # ≥3 external authors on the 30-min gate recorded honestly (20-3 honest-N mode); pen-test firm + dates (Hold 1); was 19-3
