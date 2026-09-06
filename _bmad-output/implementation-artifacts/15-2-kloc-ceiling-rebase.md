@@ -12,7 +12,7 @@ review: "§A6 full-layer net (Blind + Edge Case + Acceptance + Test-Infra + non-
 
 # 15-2 — One-time kloc ceiling re-base and CEILING RULE amendment
 
-Status: **ready-for-dev.**
+Status: **done.**
 
 > **The capability:** *Epics 16–21 can write the line their measured stories need without
 > convening a governance event first — because the ceilings were re-based once, in the open,
@@ -166,11 +166,18 @@ it is a claim standing in for a control.
 ceiling is LOWERED by the same amount when 21-5 lands, **ADR-038**"*. `docs/adr/ADR-038-per-service-kloc-ceiling.md`
 is 15 lines and says **nothing** about lowering, extraction, or lines moving out of a crate; `:17`
 governs *raising* via the ADR-037 process. The clause that does authorise it is architecture
-`:99` 2(a) (*"downward at any time"*; *"New crates minted by extraction get initial ceiling =
-measured LOC at extraction"*) — and `kloc.toml:67-71` (MIGRATION RULE) says the **opposite**:
+clause 2 (**ADV-055-2**), whose sub-clause (a) governs downward movement and whose extraction
+sentence sets a new crate's initial ceiling from measured LOC at extraction — and `kloc.toml`'s
+MIGRATION RULE says the **opposite**:
 *"this pass only ever RAISES … Lowering a ceiling is an architectural decision for a
 retrospective, never a side effect."* Three sources, two of them contradictory, one of them not
 about the subject at all. AC4 resolves it to one.
+⚠ **Cited by clause, not by quote or line — deliberately.** AC4(b) rewrites clause 2 in this same
+commit, so the round-1 draft's quote-form citations (*"downward at any time"* and *"New crates
+minted by extraction get initial ceiling = measured LOC at extraction"*) were **invalidated by the
+edit that this section argues for** — the F2/R6 hazard committed in the act of closing it
+(review R-P9). The post-amendment text is in the architecture file; this section names the
+sub-clause and stops.
 
 ---
 
@@ -311,8 +318,8 @@ come and argue for a bigger daemon instead of simply growing one.
 | **F1b** | The 20043 of ungranted headroom | **7000 of it belongs to three crates that DO NOT EXIST** (`maos-cap-registry` 3000, `maos-wire` 2000, `maos-journal` 2000). **Zeroed — not deleted.** A deleted key is the silent-pass hole of §2; a zero is a tripwire that makes line 1 of a crate that gets built cost a grant. | leaving 7000 lines of ownerless authorization inside the aggregate for six epics |
 | **F1c** | Rule 6, *"size from measurement (+30%)"* — the epic's own binding rule | **15 of 20 measurement-sized rows violated it**; the table applied *"from measurement"* and dropped *"+30%"*, granting `maos-eval` 900 against a 900 estimate, `maos-manifest` 200/200, `maos-egress` 600/600. Grants re-derived at **⌈Σupper × 1.3⌉**. | shipping zero margin over numbers that are ranges in a scout note |
 | **F1d** | Does +30% apply to everything? | **No — rule 6 covers ESTIMATES.** `maos-orchestrator-buffer` is 817 **measured** lines being *moved*; there is no estimation uncertainty in a move, so the CEILING RULE formula governs and **917 stands**. `maos-bin`/`xtask` are **policy ceilings** (below), also exempt. | applying +30% mechanically and inventing risk that does not exist |
-| **F2** | Where lines go | **SPLIT.** The `:512` trap stands verbatim — a row after `[in_progress_decomposition]` is silently inert. The *citation* arm is **RETIRED**: all four line-number citations into `kloc.toml` are converted to **quote-form**, which costs **ZERO** tokei lines because comments are not `code` — so the amendment goes where it belongs in the rule block instead of where four line numbers forced it. (R6, `14-2c`: cite the symbol, not the line.) | bending the document's structure around preserving `router.rs:1250`/`:1271` |
-| **F3** | `maos-cohort` | real **+350** grant on its own measurement; T8 clause struck | reserving against the non-existent 14-2d T8 grant |
+| **F2** | Where lines go | **SPLIT.** The `:512` trap stands verbatim — a row after `[in_progress_decomposition]` is silently inert (and AC6's R-P7 patch now NAMES such a row instead of swallowing it). The *citation* arm is **RETIRED**: every line-number citation into `kloc.toml` is converted to **quote-form**, which costs **ZERO** tokei lines because comments are not `code` — so the amendment goes where it belongs in the rule block instead of where line numbers forced it. (R6, `14-2c`: cite the symbol, not the line.) ⚠ **Round-1 said "all four"; the review sweep found ELEVEN, five of them made stale by this story's own edit** — see AC2's corrected note. | bending the document's structure around preserving `router.rs:1250`/`:1271` |
+| **F3** | `maos-cohort` | real **+390** grant on its own measurement (`⌈300 × 1.3⌉` under rule 6, F1c); T8 clause struck. *(The round-1 figure was `+350`, superseded by F1c's re-derivation before AC1 was written; corrected here at review — a stale number inside the register that ratifies it is §6's own failure mode.)* | reserving against the non-existent 14-2d T8 grant |
 | **F4** | The 13 short rows | raise to **Σupper of the corrected asks** — ⚠ **SUPERSEDED by F1c**, which takes the same rows to `⌈Σupper × 1.3⌉` under the epic's own rule 6. `maos-bin`/`xtask` stay **declared ceilings** (F12); `maos-kernel-core` becomes a **permission with zero capacity** (§8). | granting the epic's figures and shipping AC1's promise false |
 | **F13** | Where the ask ledger lives after landing | **In `kloc.toml` row comments** — one ledger line per re-based row: what was granted, what is booked against it, by which story, in the shape the `| prior:` chain already uses. AC1's table becomes the *derivation*; the file becomes the *record*. | leaving the only thing that stops the next story double-booking inside a story file that is archived and unread by March |
 | **F14** | Operator directive 2026-09-06: *"try not to defer; if it is about some more effort, we pay it early — deferring drifts"* | **Every deferral re-classified EFFORT vs SCOPE.** Pulled back IN (effort): AC4(d)'s four stale-citation fixes · the unbudgeted-crate silent pass (ADR-055:183) · the lying ❌ column · the `unwrap_or` aggregate defaults · the quoted/negative budget silent drop · un-ignoring a test ignored since Epic 5. **Tests are free** — `xtask/src/tests/` is measured at 2697 code lines and is UNCHARGED, so no budget argument survived. Kept OUT (scope, with the reason named): the `kernel-crate-set` successor instrument; a gate that checks a cited grant exists — **impossible until grants are machine-readable, which is 21-4's instrument unification, not effort**; the `>=`/`>` asymmetry, which is a *decision* (changing it loosens the aggregate by one line for no benefit) and is now documented rather than deferred. | filing effort as scope, which is how the four `rescout-r3` fixes came to be filed-and-unapplied in the first place |
@@ -418,14 +425,24 @@ RE-BASE 2026-09-xx (operator-authorized; measured at 03ee0ad8 with tokei 14.0.0,
 OLD -> NEW (+Δ). Grant = <n>. Σupper of the Epics 16–21 asks = <m>. ZERO kernel-Δ @24472.`
 🔴 **The citation arm of F2 is RETIRED, at zero cost.** The round-1 draft bent this file's structure
 around preserving `kloc.toml:87` for `router.rs:1250`/`:1271`. **tokei does not count comments**
-(`kloc_check.rs:28,:213`), so converting all four line-number citations — the two in production source
-and `kloc.toml:212`'s `:86-87` and `:195`'s `:61` — to **quote-form costs ZERO lines**, including in
+(`kloc_check.rs:28,:213`), so converting every line-number citation into `kloc.toml` — to
+**quote-form costs ZERO lines**, including in
 `maos-a2a-core`, which is the crate that can least afford anything. Do that instead of routing around
 them (R6, `14-2c`: *a correction to a stale citation is itself a citation and goes stale the same way*).
 `kloc.toml:195`'s own `kloc.toml:407` self-citation is **already stale by 94 lines** — proof the hazard
 is live, not theoretical. 🔒 It is also an integrity matter: those two comments are the audit trail for
 why unbudgeted code landed on a TLS path, and a justification that can silently re-point at different
 text is not a justification.
+⚠ **CORRECTED AT REVIEW (R-P5): there were ELEVEN, not four, and this story's own edit invalidated
+five of them.** The four named above are the ones the round-tables enumerated; a sweep found seven
+more inside `kloc.toml` itself. Worse, they were **accurate at HEAD and stale after this commit**:
+AC4(a) inserted two lines into the rule block, so the `:60-65` range cited three times no longer
+contains the *"never silently re-run to fit"* sentence it was pointing at, and the correctness-repair
+clause moved from `:84-87` to `:86-89`, so the two citations that are the audit trail for the 14-2c
+grants — **the same clause `router.rs:1250`/`:1271` were converted for** — went stale in the act of
+converting the other two. All eleven are now quote-form. The remaining pre-existing offenders live in
+`xtask/src` (`check_decision_register.rs:12` → `kloc.toml:208`, already wrong at HEAD) and are
+deferred to `21-4` with the reason recorded in `deferred-work.md`.
 🔴 **F13 — the ask ledger moves into the file (Sally).** AC1's "Asks by epic" column is the only thing
 that stops the next story double-booking a row, and in a story file it is archived and unread by March.
 **One ledger line per re-based row, in the row's own comment**: what was granted, what is booked
@@ -539,8 +556,13 @@ UNCHARGED** — measured: `tokei` on that directory is **2697 code lines** and `
 control (frontmatter `review`) and an unfalsifiable edit to the instrument — inside the story that
 re-bases the instrument's data — is the exact defect class this story exists to close. (f) is itself
 the proof that the ceilings are now honestly meetable.
-Cost: `xtask` **≈+32 lines**, measured in the commit and drawn from this story's own `+400` row
-(15-3 takes +34 at its top, 19 takes +150 → 42169 against a 42353 ceiling). **ZERO** semantic change to
+Cost: `xtask` **+95 lines MEASURED** (41953 → 42048 after `cargo fmt --all`; the dev pass landed +48
+and the review patches added +47 for the honest failure headline, the injectable `tokei` seam, the
+threshold-inversion guard and the nested-row rejection), drawn from this story's own `+400` row —
+15-3 takes +34 at its top and 19 takes +150 → **42232 against a 42353 ceiling**. ⚠ The pre-dev
+estimate in this AC was `≈+32`; it was **50% low** even before review, and the measured figure is
+what `kloc.toml`'s `xtask` ledger records (review R-P12: an estimate left standing beside a
+measurement is the drift this story exists to stop). **ZERO** semantic change to
 what `passed` means for a crate that has a budget.
 ⚠ CI runs `--json` (`discipline.yml:189`) and never prints (a)'s strings; that audience is the operator
 running AC1 locally, which is exactly who ratifies this story.
@@ -651,62 +673,138 @@ described rather than shown).
 > **Funding is ratified (frontmatter).** The open question is no longer *may we* — it is *did the
 > numbers survive re-measurement*. T0 is therefore still first and still blocking.
 
-- [ ] **T0 — Re-measure before writing a single number.** `git log --oneline -1`; if HEAD moved off
+- [x] **T0 — Re-measure before writing a single number.** `git log --oneline -1`; if HEAD moved off
       `03ee0ad8`, `cargo fmt --all`, then `cargo run -p xtask -- kloc-check --json` and **re-derive the
       whole AC1 table**, every `⌈Σupper × 1.3⌉` and `_aggregate_hardfail` included. A grant is a global;
       the ratified table is a measurement, and measurements expire (§5, §8, `14-2c` R1).
-- [ ] T1 — **AC6(b) FIRST: the `tokei` version assertion + proven-red test.** Nothing below this line is
+- [x] T1 — **AC6(b) FIRST: the `tokei` version assertion + proven-red test.** Nothing below this line is
       trustworthy until the tool producing every number is pinned at the point of use.
-- [ ] T2 — AC6(c,d,e): the three remaining fail-open holes — unbudgeted crate, absent/non-integer
+- [x] T2 — AC6(c,d,e): the three remaining fail-open holes — unbudgeted crate, absent/non-integer
       aggregate key, quoted/negative budget. One proven-red test each. All tests land in
       `xtask/src/tests/`, which is **uncharged**.
-- [ ] T3 — AC2: the 20 existing rows to their AC1 ceilings, in their five blocks, house comment format,
+- [x] T3 — AC2: the 20 existing rows to their AC1 ceilings, in their five blocks, house comment format,
       **each carrying its F13 ledger line**. Grep every key first — duplicates hard-error.
-- [ ] T4 — AC1/AC4(c): zero `maos-cap-registry`, `maos-wire`, `maos-journal`. **Zero, never delete.**
-- [ ] T5 — AC2: add `maos-egress = 780` and `maos-orchestrator-buffer = 917` into the `:464-498`
+- [x] T4 — AC1/AC4(c): zero `maos-cap-registry`, `maos-wire`, `maos-journal`. **Zero, never delete.**
+- [x] T5 — AC2: add `maos-egress = 780` and `maos-orchestrator-buffer = 917` into the `:464-498`
       alphabetical block, **above `:512`**. Run both proven-red vectors (a row after `:512`; a quoted
       integer) — note T2(e) converts the second from a silent pass into a named failure, so record the
       before/after.
-- [ ] T6 — AC3: `_aggregate_hardfail = 170884`, `_aggregate_alarm = 158608`, derivations in their
+- [x] T6 — AC3: `_aggregate_hardfail = 170884`, `_aggregate_alarm = 158608`, derivations in their
       comments, the entire `| prior:` chain preserved verbatim.
-- [ ] T7 — **Gate green here, before any prose.** `kloc-check --json` → `over_budget: []`, exit 0. Save
+- [x] T7 — **Gate green here, before any prose.** `kloc-check --json` → `over_budget: []`, exit 0. Save
       the JSON. Prose edits move line numbers; measuring after them is unreadable.
-- [ ] T8 — **AC6(f): un-ignore `kloc_check_runs_on_workspace`** and delete its expired Epic-5 ignore
+- [x] T8 — **AC6(f): un-ignore `kloc_check_runs_on_workspace`** and delete its expired Epic-5 ignore
       reason. `cargo test -p xtask` green. This is the story's cheapest proof that the ceilings are now
       honestly meetable.
-- [ ] T9 — AC1 observables: plant `maos-iac` +100 → green; +101 → `over_budget: ["maos-iac 7061 > 7060"]`,
+- [x] T9 — AC1 observables: plant `maos-iac` +100 → green; +101 → `over_budget: ["maos-iac 7061 > 7060"]`,
       exit 1; revert both. **Paste both transcripts into the story.**
-- [ ] T10 — AC2/F2: convert all four `kloc.toml` line-number citations to quote-form — `router.rs:1250`,
+- [x] T10 — AC2/F2: convert all four `kloc.toml` line-number citations to quote-form — `router.rs:1250`,
       `:1271`, `kloc.toml:212`, `kloc.toml:195` — and repair `:195`'s stale `kloc.toml:407`. Comments are
       free; re-measure to prove the delta is zero.
-- [ ] T11 — AC4(a): the rule amendment **with its `21-4` expiry clause**, plus the lowering sanction in
+- [x] T11 — AC4(a): the rule amendment **with its `21-4` expiry clause**, plus the lowering sanction in
       both directions (lines moving out; a budget naming a crate that does not exist).
-- [ ] T12 — AC4(b): architecture §15.5 clause 2 + the stale clause-4 figures. AC4(c): the OLD→NEW against
+- [x] T12 — AC4(b): architecture §15.5 clause 2 + the stale clause-4 figures. AC4(c): the OLD→NEW against
       `epic-21…:82`, and `21-5 ≈ −1000` → `−817 tokei / −1028 physical`.
-- [ ] T13 — **AC4(d): fix all four Round-3 residuals** (`epic-15…:78`, `epic-15…:81`, `epic-18…:32`,
+- [x] T13 — **AC4(d): fix all four Round-3 residuals** (`epic-15…:78`, `epic-15…:81`, `epic-18…:32`,
       `epic-20…:47`) and correct Round 3 §5's *"all 11 were fixed"*. Filed-and-unapplied IS the drift.
-- [ ] T14 — AC6(a): the two message strings + proven-red test. `cargo fmt --all`, then measure the total
+- [x] T14 — AC6(a): the two message strings + proven-red test. `cargo fmt --all`, then measure the total
       `xtask` delta from T1+T2+T14 together (≈+32) and state it against this story's own row.
-- [ ] T15 — AC7: re-point and CLOSE D14 and D17; fix the `:91` re-homing map;
+- [x] T15 — AC7: re-point and CLOSE D14 and D17; fix the `:91` re-homing map;
       `check-decision-register` exits 0 with the open count down by two.
-- [ ] T16 — AC5: the pin-protocol restatement, the `21-4` expiry, the `15-1`
+- [x] T16 — AC5: the pin-protocol restatement, the `21-4` expiry, the `15-1`
       `check-epic-close-coherence` hand-off. **Assert `maos-kernel-core` is byte-unchanged in the diff.**
-- [ ] T17 — File with the reason named (F14, scope not effort): the `kernel-crate-set` successor and the
+- [x] T17 — File with the reason named (F14, scope not effort): the `kernel-crate-set` successor and the
       cited-grant-existence gate → `21-4`/D13(b), the latter noting it is impossible until grants are
       machine-readable.
-- [ ] T18 — Full sweep: `kloc-check`, `check-kernel-baseline`, `check-decision-register`,
+- [x] T18 — Full sweep: `kloc-check`, `check-kernel-baseline`, `check-decision-register`,
       `check-epic-close-coherence`, `cargo test -p xtask`. Record the ratification date in this file.
+
+### Review Findings
+
+> §A6 non-degradable net, run 2026-09-06 against the working tree at baseline `0773ec6e`
+> (branch `recovery-lane`, `git diff HEAD`, 12 files, +310/−93). Five layers: Blind Hunter ·
+> Edge Case Hunter · Acceptance Auditor · Test Infrastructure Auditor · non-author runtime.
+> **Runtime re-verified independently:** `kloc-check` exit 0 `over_budget: []` aggregate 155546 ·
+> `check-kernel-baseline` 24472 == 24472 · `check-decision-register` 23 rows / 13 open (−2) ·
+> `check-epic-close-coherence` 21 epics PASSED · `cargo test -p xtask` 823 passed, 1 ignored
+> (unrelated). T9 reproduced exactly: +100 → 7060/155646 green, +101 → `over_budget:
+> ["maos-iac 7061 > 7060"]` exit 1, clean revert. AC1/AC3 arithmetic re-derived from the shipped
+> file and reproduces to the digit: Σ per-crate ceilings **182113**, gap **11229**,
+> `_aggregate_hardfail` **170884**, `_aggregate_alarm` **158608**, Σ granted headroom **13572**,
+> Σ ungranted headroom **13043** (= 20043 − 7000 retired). AC1, AC2, AC3, AC5, AC7 verified met.
+
+> **Both `decision-needed` findings were resolved by round-table on 2026-09-06** (Winston · Amelia ·
+> Murat · Mary · Sally · Dana · Grumbal · Paige · John, with Boundary, Vex and Yui summoned),
+> under the operator's criterion *per spec and long-term correctness*. Both dissolved into patches:
+> neither was a genuine fork. Rulings recorded as R-D1 and R-D2 below.
+
+- [x] [Review][Patch] **R-D1 — the un-ignored test swears on `158608`, the integer F1 already disqualified** [xtask/src/tests/kloc_check_tests.rs:28-34] — `kloc_check_runs_on_workspace` asserts `report.passed && !report.alarm` against the live repo `kloc.toml`. F8 re-based `_aggregate_alarm` to 158608 *so that it fires* "when the workspace begins drawing on the Epic-15 allowance" (`kloc.toml:549`); measured is 155546, so the test is not *at risk* of failing — it is **scheduled** to fail after 3062 of the 13774 funded lines, i.e. **22%** of the authorized draw, in the `cargo test -p xtask` leg, with a name that says nothing about ceilings. `passed` is unaffected (`kloc_check.rs:288`: `passed = over_budget.is_empty()`), so `kloc-check` still exits 0 — the gate warns and the *unit test* blocks. **The collision the room could not un-see:** F1 killed 158608 as a hardfail for exactly this arithmetic ("spendable to only 25% of the grant … a table nobody can spend"), and AC6(f) re-adopted the same integer as a test oracle in the same file. **Ruling — serve both intents, trade neither:** keep `assert!(report.passed)` (which is what AC6(f) actually promises — "the cheapest proof that the ceilings are now honestly meetable", and what the deleted Epic-5 ignore reason was about), remove `!report.alarm`, and give the alarm its **first real control** in a deterministic temp fixture — one line under the configured alarm → `alarm` false, one line over → `alarm` true with `passed` still true. Not spec drift: AC6(f) states the assertion as a *derivation* of why the un-ignore is now possible ("`passed` is true and `alarm` is false, **so** `assert!(…)` holds"), never as the deliverable. Prerequisite finding: the alarm has **no** proven-red control anywhere today — `alarm_fires…` builds a `Report` by hand and asserts a field it set itself, so the parser never runs, and this workspace test had been standing in for that control on a timer.
+- [x] [Review][Patch] **R-D2 — clause 2(a) restores the permission; the two new cases become clarification, not substitution** [architecture-maos-minimal-opus/15-full-spectrum-v2-2.md:100] — AC4(a) authorized *adding* the epic-scoped allowance and *sanctioning* two lowerings the MIGRATION RULE forbade. The delivered edit also *replaced* the unconditional "(a) downward at any time" with a two-case conditional. **Decisive asymmetry:** F11's sunset attaches to **(d) only** — "by an operator-ratified epic re-base story until Story 21-4 lands, when this temporary allowance expires" — so the allowance that motivated the amendment is temporary while the narrowing it carried in is **permanent**. Lowering is monotone: it can only make the gate stricter, and no threat model exists for "someone lowered a ceiling for an unlisted reason", so the conditional buys nothing while the *unsafe* direction now has four sanctioned sources. A list of allowed reasons for a harmless operation also goes stale — the next legitimate lowering off the list would need an architecture amendment to do something free, which is the governance-event-per-story cost F11 says the lane cannot survive. **Ruling:** 2(a) reads *"downward at any time — including when measured lines physically move out of a crate, or when a budget names a crate that does not exist (both previously forbidden by the MIGRATION RULE)."* Both current citations still resolve (`epic-21…` 21-4 AC4 and 21-5). **Rider:** 2(b)'s change from *"the tight measured residual (+≤1% slack)"* to *"the CEILING RULE formula"* IS authorized (AC4(b) says amend *to match*; §4 named the ≤1%-vs-2% conflict), but it is a substantive loosening of a ratified constraint that the amended clause does not disclose — add the parenthetical *"(the ≤1% retro slack is superseded by the CEILING RULE's max(100, 2%))"*. Comments are uncharged.
+- [x] [Review][Patch] `run()` labels every failure a workspace-aggregate hard fail, so a per-crate-only breach prints a false comparison [xtask/src/kloc_check.rs:63-73] — reproduced: with `maos-iac` one line over, the gate prints `workspace aggregate KLOC hard fail: configured threshold=170884, current=155647` while the aggregate is 15237 lines *under* its threshold. AC6(a) exists to stop the instrument lying about the cause (§2d); the fix made the headline lie too, and more specifically than the string it replaced. Condition the aggregate label on `aggregate >= aggregate_hardfail`; emit a per-crate heading otherwise.
+- [x] [Review][Patch] AC6(a) has no proven-red control — the test calls the formatter, never `run()` [xtask/src/tests/kloc_check_tests.rs:83-92] — `aggregate_operator_message_uses_configured_threshold` invokes `format_aggregate_notice("hard fail", …, 11)` with a hand-written `current` and never captures `run()`'s stderr. Reverting either call site at `kloc_check.rs:58-61` / `:70-73` to the old hardcoded text, or wiring the alarm branch to `aggregate_hardfail`, leaves it green. `assert!(!message.contains("20 KLOC"))` is trivially true for any output of that function.
+- [x] [Review][Patch] AC6(b) has no proven-red control at the call site [xtask/src/tests/kloc_check_tests.rs:74-80] — `tokei_version_mismatch_is_named` exercises only `validate_tokei_version` with a supplied string. Deleting the whole subprocess probe at `kloc_check.rs:199-208` restores the unpinned behaviour with the suite still green, which is the regression F7b was filed to prevent. Cover it with a temp dir prepended to `PATH` holding a fake `tokei` that prints a mismatched version — no production seam needed.
+- [x] [Review][Patch] `_aggregate_hardfail` threshold validation has no proven-red control [xtask/src/tests/kloc_check_tests.rs:129-145] — both fixtures in `missing_or_non_integer_aggregate_threshold_is_named` keep `_aggregate_hardfail = 200` valid and vary only `_aggregate_alarm`. Restoring the old `unwrap_or(20000)` for the *blocking* key alone leaves the test green. Add the two mirrored fixtures.
+- [x] [Review][Patch] Five `kloc.toml` line-number citations were invalidated by this diff, and F2 claims there were only four [xtask/kloc.toml:222, :281, :363, :370, :504] — the "must never block a correctness or compliance repair" clause moved from `:84-87` to `:86-89`, so `:363` and `:504` (the audit trail for the two 14-2c correctness-repair grants — the *same* clause `router.rs:1250`/`:1271` were converted for) now cite different text. AC4(a) inserted two lines into the rule block, so the "never silently re-run to fit" sentence moved from `:65` to `:67` and now falls *outside* the `kloc.toml:60-65` range cited at `:222`, `:281` (`maos-iac`) and `:370` (`maos-bin`). The file holds eleven such citations, not four. Convert these five to quote-form — comments are not tokei `code`, so the cost is zero, which is F2's own argument.
+- [x] [Review][Patch] `_aggregate_alarm > _aggregate_hardfail` is accepted silently, so an alarm that can never fire passes [xtask/src/kloc_check.rs:158-160, :273] — verified: with `_aggregate_alarm = 999999` the gate exits 0 with `alarm=false, passed=true`. That is the dead-signal state F8 exists to end, reachable by a one-character typo. Reject the inversion where the two thresholds are read.
+- [x] [Review][Patch] Budget-shaped keys nested in a TOML table bypass the new integer and non-negative validation [xtask/src/kloc_check.rs:174-177] — `value.is_table()` skips `[in_progress_decomposition]` wholesale, so `maos-egress = "780"` or `= -1` appended after `:561` reaches neither check; for a crate that does not yet exist the AC6(c) measured-crate check has nothing to catch either, and the gate stays green with the budget absent. The table holds only `phase_N = { … }` inline tables, so rejecting integer/quoted-integer keys inside it is additive and does not disturb the text `check_epic_6_bridge.rs:1778-1786` greps.
+- [x] [Review][Patch] The `tokei --version` probe does not run from `workspace_root` while the measurement does [xtask/src/kloc_check.rs:199-202] — `:235` sets `.current_dir(workspace_root)` for the measuring call; the version probe has no `current_dir`, so a cwd-sensitive `PATH` entry can approve 14.0.0 from one binary and measure with another. The comment at `:196-197` already claims the probe runs from the workspace root. One-line fix.
+- [x] [Review][Patch] §4 and F6 cite architecture clause 2(a) by two quotes this same commit deleted [15-2-kloc-ceiling-rebase.md §4, F6] — both cite *"downward at any time"* and *"New crates minted by extraction get initial ceiling = measured LOC at extraction"*; neither phrase survives the AC4(b) amendment. Re-quote against the amended clause. This is the precise hazard F2/R6 was invoked to close, committed in the act of closing it.
+- [x] [Review][Patch] F3 states the `maos-cohort` grant as **+350**; §5, the AC1 table and the shipped row are **+390** [15-2-kloc-ceiling-rebase.md F3] — `⌈300 × 1.3⌉ = 390`, and `kloc.toml` ships 5857 → 6247. The ratified decision register carries a stale figure for the decision it ratifies, which is §6's own failure mode. Correct F3 to +390.
+- [x] [Review][Patch] Two claims this story disproved are still live in `epic-15-foundations-w0.md` [epic-15-foundations-w0.md:69, :71] — `:69` still records `maos-control` (697) and `maos-shell` (100) as "`no change` … not re-based", which §6 row 10 marks FALSE and which the epic's *own* refined table at `:106-107` contradicts ("**Was `no change` — FALSE**"), and `kloc.toml` re-bases both (1500→1791, 405→500). `:71` still asserts `check_epic_close_coherence.rs:38` "keeps `prior:` verbatim", which §1's table marks ❌ FALSE (a doc-comment analogy in a gate that never opens `kloc.toml`). AC4(d)'s four *named* residuals are genuinely fixed in `0773ec6e`; these two are adjacent text the amendment pass left behind.
+- [x] [Review][Patch] Dev-record baseline and AC6 cost figures do not match the tree [15-2-kloc-ceiling-rebase.md Debug Log, AC6] — the Debug Log records HEAD `03ee0ad8`, but `git log --oneline -1` is `0773ec6e`; `git diff --name-only 03ee0ad8..0773ec6e` is documentation-only so no arithmetic moves, yet T0 exists precisely to record the re-measurement HEAD. Separately AC6 states the instrument repair as "≈+32 lines … 42169 against a 42353 ceiling" while the measured cost is **+48** (41953 → 42001, independently reproduced) — 42185 at the top of the row's booked draws. `kloc.toml` already records +48 honestly; reconcile AC6 and the story's `xtask` row to it.
+- [x] [Review][Patch] The ❌-column path keeps the pre-repair lenient parsing that F14 booked as in-scope effort [xtask/src/kloc_check.rs:66, :334-338] — F14 lists "the lying ❌ column" among the six items pulled back IN, but no AC covers it and no edit landed: `get_budget(...).unwrap_or(0)` at `:66` and `as_integer().map(|v| v as u64)` at `:337` still bypass `required_nonnegative_integer`, and `get_budget` re-reads and re-parses `kloc.toml` once per crate. The lie is now *unreachable* — AC6(c) returns `Err` before `run()` can render a budget-less crate — so the residual is stale, inconsistent code, not a live defect. Route the column through the validated `budgets` map already carried in `Report`.
+- [x] [Review][Patch] `maos-manifest`'s ledger line states `Grant = 260` against its own `(+160)` with no reconciliation [xtask/kloc.toml] — every sibling row whose Δ differs from its grant carries the qualifier (`maos-bench`: "Grant = 260 over measured 1531"; `maos-mcp`: "Grant = 195 over measured 999"). The number is correct (260 over measured 4214); the phrasing is the one a future story copies forward wrong.
+- [x] [Review][Defer] Pre-existing stale citations into `kloc.toml`, not introduced by this diff [xtask/src/check_decision_register.rs:12, xtask/kloc.toml:232] — deferred, pre-existing. `check_decision_register.rs:12` cites `xtask/kloc.toml:208` as one of two `epic-14-preflight-decisions` mentions, but those sit at `:195`/`:251`/`:268` at HEAD (now `:199`/`:258`/`:275`) — the citation was already wrong before this story. `kloc.toml:232` cites `` `:551` ``, which did not exist when written (the file was 516 lines). Both are outside this story's declared four-citation scope; they belong with `21-4`'s instrument unification, which is where machine-readable grants land.
 
 
 ## Dev Agent Record
 
 ### Agent Model Used
-_(record the exact model id from the frontmatter allowlist — `equiv` is prose and reds a Blocking gate)_
+`openai-codex/gpt-5.6-sol`
 
 ### Debug Log References
+- 2026-09-06 baseline: **HEAD `0773ec6e`** ("15-2-kloc-ceiling-rebase: spec landed, and the epic amended to match"). ⚠ **CORRECTED AT REVIEW (R-P12): this line originally recorded `03ee0ad8`, which was HEAD when the story was authored, not when it was implemented.** `git diff --name-only 03ee0ad8..0773ec6e` is documentation-only (5 files, all under `_bmad-output/`), so every measured number reproduces byte-for-byte at either commit and no arithmetic moves — but T0 exists to record the re-measurement HEAD, and recording the wrong one is the defect T0 was written to prevent. tokei `14.0.0`; `kloc-check --json` reproduced aggregate 155498 and the pre-story breaches.
+- Fail-closed red/green vectors: version mismatch, missing budget, missing/non-integer aggregate thresholds, quoted/negative budgets, and configured operator-message threshold.
+- Placement vectors: a row after `[in_progress_decomposition]` remained invisible; a quoted budget failed by key after validation landed.
+- T9 `maos-iac` +100 transcript (relevant JSON fields, exit 0):
+  ```json
+  {"passed":true,"alarm":false,"aggregate":155646,"per_crate":{"maos-iac":7060},"over_budget":[]}
+  ```
+- T9 `maos-iac` +101 transcript (relevant JSON fields, exit 1), followed by probe removal:
+  ```json
+  {"passed":false,"alarm":false,"aggregate":155647,"per_crate":{"maos-iac":7061},"over_budget":["maos-iac 7061 > 7060"]}
+  ```
+- Operator smoke vector with `_aggregate_hardfail = 10`: `workspace aggregate KLOC hard fail: configured threshold=10, current=11`; exit 1.
+- Final sweep: KLOC aggregate 155546 PASS; kernel 24472 == 24472 PASS; decision register 23 rows / 13 open; epic coherence 21 epics PASS; `cargo test -p xtask` 823 passed, 1 ignored.
+
+**§A6 review closure — 2026-09-06 (non-author, five layers).** 16 patch findings applied, 1 deferred to `21-4`, 2 dismissed; both `decision-needed` items resolved by round-table under *spec fidelity + long-term correctness* (R-D1, R-D2). Independently re-verified after the patches:
+- `kloc-check --json` exit 0, `over_budget: []`, aggregate 155593, `xtask` 42048/42353.
+- T9 re-run by the reviewer, not copied: `+100` → `maos-iac` 7060, aggregate 155646, exit 0; `+101` → `over_budget: ["maos-iac 7061 > 7060"]`, aggregate 155647, exit 1; probe removed, tree clean.
+- **Every new control proven-red by reverting its fix and observing the named test fail:** R-P1 (aggregate-label condition), R-P2 (alarm names its own threshold), R-P3 (version pin at the call site), R-P4 (`_aggregate_hardfail` validation), R-P6 (inversion guard), R-P7 (nested budget row), R-D1 (alarm boundary). Seven for seven; none is a null control.
+- Residual fail-open vectors re-probed after patching: quoted budget → named; negative budget → named; deleted `_aggregate_hardfail` → named; `_aggregate_alarm` above `_aggregate_hardfail` → named (was silently accepted); budget row below `[in_progress_decomposition]` → named (was silently inert).
+- `check-kernel-baseline` 24472 == 24472 PASS; `check-decision-register` 23 rows / 13 open (−2 vs baseline 15); `check-epic-close-coherence` 21 epics PASS.
 
 ### Completion Notes List
+- Rebased 20 existing crate ceilings, retired three phantom budgets to zero, added two future crate rows, and re-derived aggregate alarm/hard-fail thresholds from measured funding.
+- Closed all six KLOC fail-open paths: pinned tokei version, required typed non-negative thresholds and budgets, missing-budget hard failure, configured operator messages, and the unignored workspace gate.
+- Converted shipped KLOC policy citations to stable quote form; amended CEILING RULE lowering/re-base authority with Story 21-4 expiry; aligned architecture and successor epics.
+- Closed D14 and D17 under Story 15-2; D13(b) retains the kernel-crate-set and machine-readable cited-grant successor work in 21-4.
+- `xtask` measured 41953 -> 42001 (+48) at the dev pass, then **-> 42048 (+95 total)** after the review patches, all after `cargo fmt --all`, within the 42353 ceiling. `maos-kernel-core/src` remained byte-unchanged.
+- Funding ratification date: 2026-09-06 (Lunarpulse).
 
 ### File List
+- `_bmad-output/implementation-artifacts/15-2-kloc-ceiling-rebase.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/15-full-spectrum-v2-2.md`
+- `_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md`
+- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md`
+- `_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md`
+- `_bmad-output/planning-artifacts/epics/epic-21-multi-host-on-live-substrate-w6.md`
+- `_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-05-round3.md`
+- `crates/maos-a2a-core/src/router.rs`
+- `xtask/kloc.toml`
+- `xtask/src/kloc_check.rs`
+- `xtask/src/tests/kloc_check_tests.rs`
 
 ### Change Log
+- 2026-09-06 — Implemented the operator-ratified Epic-15 KLOC re-base, fail-closed gate repairs, policy/source alignment, decision closures, and complete validation sweep.

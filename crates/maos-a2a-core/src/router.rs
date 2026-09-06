@@ -1246,8 +1246,8 @@ impl A2ARouterCore {
                 // restart detection IS pin invalidation, re-pin IS the designed
                 // recovery, and the variant already maps typed to
                 // `IacBusError::CrossHostPinMismatch`. Lands in `maos-a2a-core` at
-                // ZERO headroom as a correctness repair on a security path, which
-                // **`xtask/kloc.toml:87`** says a ceiling must never block.
+                // ZERO headroom as a correctness repair on a security path: the
+                // CEILING RULE says a ceiling "must never block a correctness or compliance repair."
                 //
                 // SCOPE WALL: this repairs ONLY the code this story makes reachable.
                 //
@@ -1268,8 +1268,8 @@ impl A2ARouterCore {
                 // `j1-crosshost-2c` AC3.2 — SHIP-BLOCKER for AC3's fault windows.
                 // Both of these used to land in the catch-all below, which made a
                 // dropped-receiver internal NACK and a genuine wire partition the
-                // SAME observable at the sender. Same `kloc.toml:87`
-                // correctness-repair grant, same binding scope wall as H13.
+                // SAME observable at the sender. Same CEILING RULE correctness-repair
+                // grant, same binding scope wall as H13.
                 CODE_INTERNAL => Err(A2AError::PeerInternalFailure {
                     peer: peer.as_str().to_string(),
                     message: n.error.message,
