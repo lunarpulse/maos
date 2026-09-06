@@ -278,10 +278,19 @@ development_status:
   21-5-orchestrator-port-and-move: backlog  # ◆ optional FLAG-Winston negative: orchestrator/ (1028 LOC) behind a maos-domain port; pin re-pinned negative
   epic-21-retrospective: optional
   # === OPERATOR LANE (humans, money, external accounts, wall-clock; never inside an engineering exit) ===
-  ops-provisioning-secrets-and-accounts: backlog  # RELEASE_SIGNING_KEY + MAOS_RELEASE_PUBKEY, homebrew-maos repo + token, AUR account, fuzz-/rto-ledger branch permissions, self-hosted runner decision; reports against docs/runbooks/provisioning-checklist.md (15-5)
+  ops-provisioning-secrets-and-accounts: backlog  # RELEASE_SIGNING_KEY + MAOS_RELEASE_PUBKEY, homebrew-maos repo + token, AUR account, fuzz-/rto-ledger branch permissions, self-hosted runner decision, DOCKERHUB_* + cosign (20-2 push leg); reports against docs/runbooks/provisioning-checklist.md (15-5)
   ops-external-cohort-and-pen-test: backlog  # ≥3 external authors on the 30-min gate recorded honestly (20-3 honest-N mode); pen-test firm + dates (Hold 1); was 19-3
   ops-brew-tap-and-aur-publication: backlog  # publish the corrected formula/PKGBUILD (20-2) to the tap repo and AUR
   ops-ga-tag-after-holds: backlog  # cut v1.0.0 + start the LTS clock only after RELEASE-HOLDS Holds 1–2 clear
+  ops-first-signed-tag: backlog  # git tag v0.1.0-alpha.1 + push after ops-provisioning records both secrets; acceptance: release.yml green on the tag (moved out of the Epic-15 exit block, R2 preflight rule 2)
+  ops-live-key-j0-leg: backlog  # runbook transcript of the Epic-16 exit lines 1–3 under MAOS_INFERENCE_MODE=live with a provider key; never in CI
+  ops-live-worker-under-17-1-profile: backlog  # live claude/codex Worker under the 17-1 egress-proxy profile: vendor key + signed T3 image (t3-image.lock + trust anchor); never in CI
+  ops-nightly-cassette-rerecord: backlog  # nightly MAOS_INFERENCE_MODE=record leg with a provider key refreshes the 15-6/18-x cassettes; provenance live-record; never gating
+  ops-google-calendar-oauth-mcp: backlog  # Google Calendar MCP with real OAuth for Butler (18-1); CI uses the conformant fixture server only
+  ops-j1-live-agent-signed-take: backlog  # demo-j1 --live-codex paid take that earns the tier2-live-agent-signed beat (19-4); PROVEN_LIVE_SIGNED stays operator-only
+  ops-j4-live-incident-recording: backlog  # paid recording of Mira/Nash model turns for the J4 incident corpus (21-1); the hermetic leg replays it
+  ops-rc-signed-tag: backlog  # tag v1.0.0-rc.1 after 20-5 lands and ops-provisioning records the secrets; acceptance: release.yml green with prerelease: true, .deb + air-gap variant attached (moved out of the Epic-20 exit block, rule 2)
+  ops-live-gemini-leg: backlog  # paid recording of the Gemini cassette for 20-4 with a real key; the hermetic exit replays it; never in CI
   later-bedrock-vertex-and-kms-backends: backlog  # post-v1.0: Bedrock (SigV4, no aws crate in lock) + Vertex (OAuth JWT) drivers; Vault/cloud-KMS behind KeyManagementPort; was half of 19-5
   # === v2.5 PARKING (non-gating by operator rule 2026-07-06; measured, never scheduled) ===
   v25-erasure-crash-reconciliation: backlog  # D5.4 alone (14-0 AC4.2), DEFERRED WITH A NAMED KEY rather than to a phase label. … → tracker-notes-archive-2026-09-04.md#v25-erasure-crash-reconciliation

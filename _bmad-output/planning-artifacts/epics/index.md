@@ -164,6 +164,7 @@
   - [Epic 21: Multi-Host on Live Substrate (W6)](./epic-21-multi-host-on-live-substrate-w6.md) — 5 stories, `backlog`
     - Stories: 21.1 J4 incident fixture + live Mira/Nash · 21.2 nightly Postgres + ignored journeys · 21.3 durable TOFU + self-leaf rotation · 21.4 one instrument + env registry · 21.5 optional orchestrator port + move (negative FLAG-Winston)
   - [Preflight — Epics 15–20 (2026-09-04, superseded by R2)](./epic-15-20-preflight-2026-09-04.md)
+  - **Preflight R2 (2026-09-05, @9f920180):** [epic-15-21-preflight-r2-2026-09-05.md](epic-15-21-preflight-r2-2026-09-05.md) — all seven `needs-rework`, none blocked; confidence 38–55 (from 8–35); 139 OLD→NEW edits and ten decisions (§4) queued for correct-course Round 3. Scout notes: `../review-2026-09-04/preflight-r2/epic-NN.md`. **Round 3 applied 2026-09-05/06** ([sprint-change-proposal-2026-09-05-round3.md](../sprint-change-proposal-2026-09-05-round3.md)): decisions D-A..D-J by default, 130 of 132 §K items folded into the seven epic files, every exit block dry-parsed at HEAD with provenance, nine `ops-*` rows; re-scout record `../review-2026-09-04/preflight-r2/rescout-r3.md`.
   - [Dependency Verification (12-Epic Ordering)](./dependency-verification-12-epic-ordering.md)
   - [Open Items for Story Creation (Step 3)](./open-items-for-story-creation-step-3.md)
   - [Open Items Carried Forward to Implementation](./open-items-carried-forward-to-implementation.md)
