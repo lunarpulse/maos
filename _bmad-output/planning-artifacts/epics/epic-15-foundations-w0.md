@@ -2,6 +2,8 @@
 
 **Status:** `backlog` — Round 2 correct-course 2026-09-04 (`sprint-change-proposal-2026-09-04-round2.md`, Lunarpulse-ratified; Fork C). Replaces the morning's Epic 15 file. `sprint-status.yaml` is authoritative for status.
 
+**Refinement round applied (2026-09-06, confidence rule 9 — mid-epic, because Story 15-2 disproved premises in its own section):** the 15-2 section's AC1/AC2/AC5 and its whole grant table are re-derived at HEAD `03ee0ad8`, and AC6/AC7 are added. Operator directive in force: **no drift in spec — the story and this file say the same thing, or this file is amended in the same commit.** Evidence and full derivation: `implementation-artifacts/15-2-kloc-ceiling-rebase.md`.
+
 **Round 3 applied (2026-09-05):** the R2 preflight's §K edits (18 of 18 applied) and the decisions D-D, D-F, D-H, D-I (with D-A, D-B, D-C, D-E folded into 15-5 as ADR content) are folded in; residuals listed in `sprint-change-proposal-2026-09-05-round3.md`.
 
 **Wave / duration:** 3–5 weeks (measured; 2.5–4.5 with 15-5 in parallel) · **Makes true:** the five blockers the preflight found, so Epics 16–21 can land a line and prove an exit
@@ -41,7 +43,7 @@ cargo run -p xtask -- release-dry-run                                        # m
 | Key | Story | Closes · Δ |
 |---|---|---|
 | `15-1-green-at-head` | Green at HEAD | S4 (part), D17, the fifth red gate · kernel-Δ +2 (re-pin 24472→24474) |
-| `15-2-kloc-ceiling-rebase` | One-time kloc ceiling re-base and CEILING RULE amendment ◆ | §2.2 of the preflight, D-F, D14 (+51) · kernel-Δ 0 |
+| `15-2-kloc-ceiling-rebase` | One-time kloc ceiling re-base and CEILING RULE amendment ◆ | §2.2 of the preflight, D-F, **D14 (+51) and D17 (−8441)** · kernel-Δ 0 · **7 ACs; refined 2026-09-06 by a mid-epic refinement round (rule 9) — this section was amended to match** |
 | `15-3-single-phase-source-and-exit-command-check` | Single phase source, `maos --help`, and the exit-command check | S4 · rule 1 mechanical · kernel-Δ 0 · maos-bin verb-table lines after 15-2 |
 | `15-4-release-repair-and-first-signed-tag` | Release repair and the secret-free release dry-run | S5 · kernel-Δ 0 (the signed tag itself = `ops-first-signed-tag`) |
 | `15-5-decision-adrs-and-provisioning-checklist` | Decision ADRs 060–064 and the provisioning checklist ◆ | rule 7, D-A..D-E · kernel-Δ 0 |
@@ -64,43 +66,61 @@ AC1 is always the command and what the operator observes; every AC cites the cod
 
 *Closes · Δ:* §2.2 of the preflight, D-F, D14 (+51) · kernel-Δ 0
 
-- **AC1 (command).** `cargo run -p xtask -- kloc-check` is green and every crate named in Epics 16–21 shows the headroom its measured stories need, per the consolidated table below (tokei `code` @9f920180 from the seven R2 notes' §E; instrument `xtask/src/kloc_check.rs:163-213`, `spirits/*` and `examples/*` excluded at `:180,:184`). Rows whose HEAD headroom already covers the ask (`maos-control` 697, `maos-secrets` 839, `maos-providers` 748, `maos-shell` 100) are recorded as `no change` in the table, not re-based. **D-F, in writing:** the Epic-13 retro's refusal to grant `maos-kernel-core` headroom (`kloc.toml:501` "stay tight because Epic 14 is declared ZERO kernel-Δ"; `:195` "Slack is operating capacity, NOT authorization") is overruled for the v2.2+ lane because three FLAG-Winston stories cannot land under 18933/18933; the allowance is **+250**, stated per story — 15-1 +2 · 16-5 +5–25 · 17-1 +65–130 · 17-2 net ≤+10 · 19-3 +3–5 · 21-5 ≈ −1000 (the ceiling is LOWERED by the same amount when 21-5 lands, ADR-038) — and each still re-pins `kernel-core-baseline.toml` in its own commit (AC4).
-- **AC2.** `xtask/kloc.toml` rows re-based to HEAD-measured values + allowance, each with a `MEASURED GRANT 2026-09-xx (operator-authorized)` comment in the existing format (inline `:212,:319,:343,:482`; comment-line `:203,:316,:334,:471`; whole-file precedent `2026-07-25 founder policy re-base` `:275,:278` and `2026-08-11 Epic-13 retrospective re-base` `:501`, commit `08ab6632`); `_aggregate_hardfail` re-derived by the formula at `kloc.toml:58-59` (`measured + max(100, ceil(0.02·measured))`, = 158608 at HEAD before grants; the post-grant figure is recorded in the story). The per-crate allowances in the table exceed that formula (`max(100, 2%)` → maos-bin 343); AC2 therefore also amends the CEILING RULE text (`kloc.toml:49-65`) to name the **epic-scoped operator allowance** as a third sanctioned source beside the retro and the per-story measured grant, and names 15-1 AC2 (+2) among the kernel-core FLAG deltas.
+- **AC1 (command).** `cargo run -p xtask -- kloc-check` is green and every crate named in Epics 16–21 shows the headroom its measured stories need, per the consolidated table below (tokei `code` @9f920180 from the seven R2 notes' §E; instrument `xtask/src/kloc_check.rs:163-213`, `spirits/*` and `examples/*` excluded at `:180,:184`). Rows whose HEAD headroom already covers the ask (`maos-control` 697, `maos-secrets` 839, `maos-providers` 748, `maos-shell` 100) are recorded as `no change` in the table, not re-based. **D-F, in writing — a PERMISSION, not capacity (REFINED 2026-09-06):** the Epic-13 retro's refusal to grant `maos-kernel-core` headroom (`kloc.toml:501` "stay tight because Epic 14 is declared ZERO kernel-Δ"; `:62` "Slack is operating capacity, NOT authorization") is overruled for the v2.2+ lane — Epic 14 is `done` and its ZERO-Δ declaration expired with it — because **five** (not three) FLAG-Winston stories cannot land under a blanket refusal. But the ceiling is **NOT pre-raised**: `maos-kernel-core` stays at **18933/18933, zero headroom**, because D13(a) bought that property deliberately over the formula's 19312 (`kloc.toml:195`), and pre-granting 250 lines to five stories that do not exist yet buys it back — a *reservation*, in the one crate where three epics of per-story FLAG-Winston discipline exist to prevent one. Each story raises **ceiling and pin together in its own commit**; the Σ forecast is **202**, funded in the aggregate and pre-granted nowhere, and at forecast close ≈19135 the crate is **865 under the NFR-Maint-1 20 KLOC letter**. Per story — 15-1 +2 (D-H) · 16-5 +5–25 · 17-1 +65–130 · 17-2 net ≤+10 · 19-3 +3–5, plus 18-3 AC3's conditional dispatcher `Clock` +15–30 = **Σ 202**; and `21-5` is **−817 tokei / −1028 physical** (CORRECTED 2026-09-06 — the earlier `≈ −1000` mixed the two instruments' units, and would over-lower the ceiling by ~183), the ceiling being LOWERED by the measured moved-line count when 21-5 lands. ⚠ The authority for lowering is **architecture `15-full-spectrum-v2-2.md:99` clause 2(a)** (*"downward at any time"*; *"New crates minted by extraction get initial ceiling = measured LOC at extraction"*), **NOT ADR-038**, which is 15 lines and says nothing about lowering, extraction, or lines moving out of a crate — `:17` governs *raising* via the ADR-037 process only. Each story still re-pins `kernel-core-baseline.toml` **and** its kloc row in its own commit (AC4).
+- **AC2.** `xtask/kloc.toml` rows re-based to HEAD-measured values + allowance, each with a `MEASURED GRANT 2026-09-xx (operator-authorized)` comment in the existing format (inline `:212,:319,:343,:482`; comment-line `:203,:316,:334,:471`; whole-file precedent `2026-07-25 founder policy re-base` `:275,:278` and `2026-08-11 Epic-13 retrospective re-base` `:501`, commit `08ab6632`); `_aggregate_hardfail` re-derived as **every line this re-base authorizes anyone to write** (REFINED 2026-09-06 — the bare formula at `kloc.toml:58-59` yields 158608, which is spendable to only 23% of the grant and would deliver a table nobody can spend): **`155498 measured + 13774 funded + 1512 no-change asks + 100 rule floor = 170884`**. The `+100` is the rule's own floor, not a fitted constant — the aggregate compares `>=` (`kloc_check.rs:225`) while per-crate compares `>` (`:231`). Sum-of-ceilings after the re-base is 182113, so **11229** of independent anti-distributed-growth signal survives (D17's stated purpose) as a *named* reserve. ⚠ **Sizing the aggregate to Σgrants alone was rejected**: 20043 lines of headroom sit on rows this story does not grant, so the grants would compete with untracked growth — the reservation this story's own thesis forbids. The per-crate allowances in the table exceed that formula (`max(100, 2%)` → maos-bin 343); **Rule 6 applies to this table (REFINED 2026-09-06):** grants are `⌈Σupper × 1.3⌉` for the 18 rows whose ask is an *estimate* — the original table applied "size from measurement" and dropped "(+30%)", leaving 15 of 20 rows at zero margin over scout-note ranges. Rule 6 does **not** apply to `maos-orchestrator-buffer` (817 lines being *moved*: a move carries no estimation uncertainty, so the CEILING RULE formula governs and 917 stands) nor to `maos-bin`/`xtask`, which are **policy ceilings**, not grants. **Also in this pass:** the three phantom budgets `maos-cap-registry` (3000), `maos-wire` (2000) and `maos-journal` (2000) — 7000 lines of authorization for crates that do not exist — are **zeroed, not deleted** (a deleted key escapes the gate entirely, `kloc_check.rs:229-235`; a zero makes line 1 cost a grant). This supersedes `epic-21…:82` (21-4 AC4), which says *delete*, six epics early. AC2 therefore also amends the CEILING RULE text (`kloc.toml:49-87`, and the amendment is appended below `:87` so the four live citations into that block keep resolving) to name the **epic-scoped operator allowance** as a third sanctioned source beside the retro and the per-story measured grant, and names 15-1 AC2 (+2) among the kernel-core FLAG deltas.
 - **AC3.** The rule at `kloc.toml:61-62` ("Recalculated ONLY at an epic retrospective, or under an explicitly authorized measured grant") and the aggregate comment at `:501` are amended together: the aggregate is re-derived at epic close **or** by an operator-ratified re-base story. (No xtask parses grant comments — `grep "MEASURED GRANT" xtask/src/*.rs` empty — the rule is prose; `check_epic_close_coherence.rs:38` keeps `prior:` verbatim.)
 - **AC4.** The kernel pin rule is unchanged (equality at `check_kernel_baseline.rs:7-8`, "Hard-fails on ANY drift"); each FLAG-Winston story re-pins in its own commit with its figure from AC1. Documented in the story.
-- **AC5.** Operator ratification recorded in the story file at landing (T0 precedent: a grant lands with the lines it authorizes; a grant is a global — whichever story measures first consumes it, so AC1's per-epic column is the reservation ledger).
+- **AC5.** ✅ **FUNDING RATIFIED 2026-09-06 (Lunarpulse)** — the grant increment approved *as the spec needs*, with the standing directive **"no drift in spec for this project; we do as per the spec — deferred ones are the last resort after all our effort first."** Recorded in the story file and in each `kloc.toml` row comment at landing (T0 precedent: a grant lands with the lines it authorizes; a grant is a global — whichever story measures first consumes it, so AC1's per-epic column is the reservation ledger).
+- **AC6 (added 2026-09-06 under the no-drift directive).** The gate **stops failing open** — six defects, one class, one commit, and all six were re-classified from *deferred* to *effort* because `xtask/src/tests/` is measured at 2697 tokei code lines and is **UNCHARGED**, so every test is free: (a) `kloc_check.rs:53/:65` print `16/20 KLOC` from hardcoded literals describing the `unwrap_or` defaults, and NFR-Maint-1 bounds the *kernel core*, not a 155k workspace aggregate; (b) `:165` `let tokei_path = "tokei";` is a bare PATH lookup with **no version assertion** against a CI pin of 14.0.0 (`discipline.yml:11`); (c) `:229-235` never checks a crate that has no `kloc.toml` key — the hole that let `maos-cohort` grow +302 unmeasured (`docs/adr/ADR-055-multi-tenant-loom.md:183`); (d) `:137/:141` silently substitute defaults for an absent or non-integer aggregate key; (e) `:148-150`/`:149` silently drop a quoted budget and wrap a negative one to `u64::MAX`; (f) `kloc_check_runs_on_workspace` (`tests/kloc_check_tests.rs:29-36`) has been `#[ignore]`d since Epic 5 for an expired reason and **this re-base is what finally makes it pass** (`alarm` = `155498 >= 158608` = false). Each of (a)–(e) ships a proven-red test — every existing test on this gate is a null control. `xtask` cost ≈+32, from 15-2's own row.
+- **AC7 (added 2026-09-06).** The decision register is re-pointed rather than left holding decisions this story discharges: **D14** (`epic-14-preflight-decisions.md:80`) targets `21-4` and **D17** (`:83`) targets `15-1`, but 15-2 does the work — both re-pointed to `15-2-kloc-ceiling-rebase` and CLOSED, with `check-decision-register` exiting 0 and the open count down by two, and the `:91` re-homing map corrected.
 
-**15-2 AC1 table (HEAD measured / ceiling / headroom @9f920180 → grant; asks from the R2 notes' §E):**
+**15-2 AC1 table — REFINED 2026-09-06 (mid-epic refinement round, confidence rule 9).** Grants are
+`⌈Σupper × 1.3⌉` (rule 6) except where noted. HEAD measured = tokei `code` @`03ee0ad8`, identical to
+`9f920180` (no code changed between them); instrument `xtask/src/kloc_check.rs:163-213`, exclusions at
+`:173-190` (⚠ `:180` is `examples`, `:184` is `spirits` — the earlier draft swapped the labels, and both
+are bare directory-name patterns matching at any depth, not globs). **Stated in FINAL CEILINGS**, because
+`measured + grant` destroys the existing headroom on nine rows and a `+N` column is ambiguous about it.
 
-| Crate | HEAD | Grant | Asks by epic (measured ranges) |
-|---|---|---|---|
-| maos-bin | 17109 / 17109 / 0 | **+3000** (band +2500–3000, compiled §5) | 15-1 AC5 ~10 · 15-6 +150–300 · 16 +480–820 · 17 +440–870 · 18 +300–680 (18-2 named +250) · 19 +500–1000 · 20 +100–200 · 21 +380–760 gross, −479 once 21-4 moves the registry to a data file (D-I) → gross sum ≈ +1.9k–4.2k; the story states the figure it grants and which epics' upper bounds it does NOT cover (over-subscribed ~2× at the top of the ranges — logic that can live in ungoverned `spirits/*` goes there) |
-| xtask | 41953 / 41953 / 0 | **+400** (named row) | 19 +150 (`demo-j1 --replay`) · 21-4 +150–350 · 15-3 and 20-3 must be **net ≤0** through retirements shown as arithmetic in their own commits: 15-3 gate +150–250 + phase consolidation −7 consts vs `check_cna_registration.rs` −260; 20-3 +1300–2500 before retirements against the absent-pass gate modules it converts (~2500 retirable lines) |
-| maos-kernel-core | 18933 / 18933 / 0 | **+250** (D-F, per story above) | 15-1 +2 · 16-5 +5–25 · 17-1 +65–130 · 17-2 ≤+10 · 19-3 +3–5 · 21-5 ≈ −1000 then ceiling lowered |
-| maos-domain | 8695 / 8644 / −51 | **+300** | 15-1 +51 (red at HEAD) · 16-4/16-5 +36–66 · 18 +50–100 · 21-3 +3–10 · 21-4 +15 (D-I: only `EnvVar`/`EnvStability` move) · 21-5 +30–60 → fits only under D-I |
-| maos-cli | 5270 / 5270 / 0 | **+1100 (16-1 HTTP client +400–700 **and** 20-1 `spirit install` +250–400; was +700 before the Epic-20 editor measured the collision, 2026-09-05)** (E16 note) | 16-1 HTTP client for 21 verbs +400–700 · 18 `maosctl eval` 0–120 · 20-1 `spirit install` +250–400 (20-1 draws beyond +700 need a second measured grant at Epic-20 open or a `maos-spirit-cli` home) |
-| maos-manifest | 4214 / 4314 / 100 | **+150** (new row) | 17 `[network]`, `pids_max`, `wasm-component` + validators +80–200 |
-| maos-mcp | 999 / 1100 / 101 | **+300** (new row) | 18-1 initialize/session/bearer +80–150 |
-| maos-journey-test | 493 / 593 / 100 | **+400** (new row) | 16-2 +50–120 · 18-1 fixture MCP server +150–300 · 21-2 0–50 |
-| maos-bench | 1531 / 1631 / 100 | **+200** (new row) | 19-3 real-spawn bench +80–200 |
-| maos-eval | 3661 / 3696 / 35 | +600 | 18 halt-eval driver + judge harness +450–900 |
-| maos-wasm-host | 1057 / 1129 / 72 | +400 | 17-3b +200–400 (+ runner relay) |
-|`maos-egress` (NEW leaf crate, 17-1: host-side egress proxy + scoped-credential broker)|0 / — / —|+300–600 (new row; Epic-17 editor 2026-09-05)|—|
-|`maos-orchestrator-buffer` (NEW leaf crate, 21-5: destination of the 817 orchestrator lines)|0 / — / —|= 917 (new row; kernel-core ceiling lowered by the same amount when 21-5 lands)|21-5 (optional, after 21-4)|
-| maos-registry | 3515 / 3615 / 100 | +300 | 17-4 form×tier +60–150 · 20-1 +50–120 |
-| maos-spirit-cli | 753 / 853 / 100 | +300 | 20-1 client wiring + `vet issue|revoke` +230–400 |
-| maos-a2a-core | 4856 / 4856 / 0 | +150 | 16-5 +20–40 · 21-3 +30–60 |
-| maos-a2a-tcp | 1439 / 1500 / 61 | +150 | 21-3 +50–140 |
-| maos-cohort | 5857 / 5857 / 0 | +100 (21-3 asks +150–300; the remainder is the 14-2d T8 measured grant, not a new row) | 21 (14-2d port) +150–300 — exceeds the row; 14-2d carries its own measured grant (T8) |
-| maos-iac | 6960 / 6960 / 0 | +100 | 17 caller-scoped recall +10–30 |
-| maos-audit | 6847 / 6847 / 0 | +100 | 20-3 AC5 (14-e1) +20–60 |
-| maos-control | 803 / 1500 / 697 | `no change` | 16-1 +400–600 · 19-2 +40–80 · 21-3 +40–80 |
-| maos-secrets | 161 / 1000 / 839 | `no change` | 16-4 +150–300 |
-| maos-providers | 1252 / 2000 / 748 | `no change` | 16-4 +30–60 · 20-4 gemini +300–400 |
-| maos-shell | 305 / 405 / 100 | `no change` | 16 +100–150 (16-1/16-2 measure before drawing) |
-| maos-compliance · maos-host · maos-persistence · maos-spirit-abi | 2032/2117/85 · 39/139/100 · 1/2000/1999 · 1038/3000/1962 | `no change` | 20-1 +30–80 · 17 +10–30 · 21-3 +300–600 · 17 +2 |
-| `_aggregate_hardfail` | 155498 measured / 147057 | re-derived (AC2) | 158608 at HEAD before grants; post-grant figure recorded |
+| Crate | HEAD | old ceiling | **NEW ceiling** | headroom | Σupper | Note |
+|---|---|---|---|---|---|---|
+| `maos-bin` | 17109 | 17109 | **20109** | 3000 | 4640 | **POLICY CEILING**, exempt from rule 6 — and it now exceeds `maos-kernel-core` by 1176. Uncovered at the top: Epics 17+19+21 combined (1.39× net). |
+| `xtask` | 41953 | 41953 | **42353** | 400 | 800 | **POLICY CEILING**, exempt from rule 6, and a transient: 20-3 nets −4476…−5176. Uncovered: 21-2+21-4 at the top iff 20-3 slips past them. |
+| `maos-kernel-core` | 18933 | 18933 | **18933** | 0 | 202 | **UNCHANGED — zero headroom.** D-F = standing permission (AC1). Σ forecast 202 funded in the aggregate, granted to nobody. |
+| `maos-domain` | 8695 | 8644 | **9192** | 497 | 382 | ⌈382×1.3⌉. Absorbs D14 (+51 RED). **Epic 17 (+25–50) and Epic 19 (0–30) were omitted by the original table.** |
+| `maos-cli` | 5270 | 5270 | **6856** | 1586 | 1220 | ⌈1220×1.3⌉. Σupper is 1220, not 1100 — the cell also books `18 maosctl eval` 0–120. |
+| `maos-manifest` | 4214 | 4314 | **4474** | 260 | 200 | ⌈200×1.3⌉ |
+| `maos-mcp` | 999 | 1100 | **1194** | 195 | 150 | ⌈150×1.3⌉ |
+| `maos-journey-test` | 493 | 593 | **1104** | 611 | 470 | ⌈470×1.3⌉ |
+| `maos-bench` | 1531 | 1631 | **1791** | 260 | 200 | ⌈200×1.3⌉ |
+| `maos-eval` | 3661 | 3696 | **4831** | 1170 | 900 | ⌈900×1.3⌉ |
+| `maos-wasm-host` | 1057 | 1129 | **1577** | 520 | 400 | ⌈400×1.3⌉ |
+| `maos-egress` | — | — | **780** | 780 | 600 | NEW leaf crate (17-1). ⌈600×1.3⌉. |
+| `maos-orchestrator-buffer` | — | — | **917** | 917 | 817 | **Measured move, NOT an estimate** — `917 = 817 tokei + max(100, ⌈2%⌉)`; rule 6 does not apply. |
+| `maos-registry` | 3515 | 3615 | **4282** | 767 | 590 | ⌈590×1.3⌉. 20-1 re-priced +230–440 by `epic-20…:47`; the original +50–120 is superseded. |
+| `maos-spirit-cli` | 753 | 853 | **1273** | 520 | 400 | ⌈400×1.3⌉ |
+| `maos-cohort` | 5857 | 5857 | **6247** | 390 | 300 | ⌈300×1.3⌉. **The "14-2d T8 measured grant" DOES NOT EXIST** (14-2d is `blocked`, T8 unchecked, no amount) — clause struck. |
+| `maos-a2a-core` | 4856 | 4856 | **4986** | 130 | 100 | ⌈100×1.3⌉ |
+| `maos-a2a-tcp` | 1439 | 1500 | **1621** | 182 | 140 | ⌈140×1.3⌉ |
+| `maos-iac` | 6960 | 6960 | **7060** | 100 | 30 | floor 100 (⌈30×1.3⌉=39 < the rule minimum). |
+| `maos-audit` | 6847 | 6847 | **6951** | 104 | 80 | ⌈80×1.3⌉ |
+| `maos-control` | 803 | 1500 | **1791** | 988 | 760 | ⌈760×1.3⌉. **Was `no change` — FALSE**: 480–760 vs 697. |
+| `maos-shell` | 305 | 405 | **500** | 195 | 150 | ⌈150×1.3⌉. **Was `no change` — FALSE**: 100–150 vs 100. |
+| `maos-cap-registry` · `maos-wire` · `maos-journal` | 0 · 0 · 0 | 3000 · 2000 · 2000 | **0 · 0 · 0** | −7000 | — | **RETIRED** — 7000 lines of authorization for crates that do not exist. Zeroed, **not deleted**. Supersedes `epic-21…:82` (21-4 AC4). |
+| `maos-compliance` · `maos-host` · `maos-persistence` · `maos-spirit-abi` · `maos-secrets` · `maos-providers` · `maos-spirit-hello` · `maos-spirit-sdk` | — | — | **`no change`** | 85 · 100 · 1999 · 1962 · 839 · 748 · 635 · 2161 | 0 · 30 · 600 · 2 · 300 · 460 · 20 · 100 | headroom ≥ Σupper for each; their Σ asks **1512** is authorization and is funded in the aggregate. |
+| `_aggregate_alarm` | — | 16000 | **158608** | — | — | the pre-grant formula figure; fires when the workspace begins drawing on the Epic-15 allowance (16000 has fired on every run since Epic 1). |
+| `_aggregate_hardfail` | 155498 | 147057 **(−8441 RED)** | **170884** | — | — | `155498 + 13774 + 1512 + 100` (AC2). |
 
+**Σ funded = 13774** (13572 per-crate grants + the 202 kernel-core forecast). **Σ per-crate ceilings after
+the re-base and the 7000-line phantom retirement = 182113**, i.e. **11229 above** the aggregate.
+
+> **Provenance.** This table replaces the 2026-09-05 R2/§E version, which was re-derived at the 15-2
+> preflight and a two-round refinement (2026-09-06) against HEAD `03ee0ad8`. What changed and why:
+> rule 6's `+30%` was restored (15 of 20 rows had zero margin); the R2 §E figures were reconciled against
+> the Round-3 epic-file re-prices that superseded them (`maos-registry`, `maos-domain`/17+19, `maos-audit`,
+> `maos-compliance`, Epic-19's `maos-bin`); the `maos-cohort` reservation against a non-existent 14-2d T8
+> grant was struck; two `no change` rows (`maos-control`, `maos-shell`) were shown not to cover their asks;
+> `maos-kernel-core` became a permission rather than +250; and the three phantom budgets were retired.
+> Full derivation and evidence: `implementation-artifacts/15-2-kloc-ceiling-rebase.md`.
 ### 15-3-single-phase-source-and-exit-command-check — Single phase source, `maos --help`, and the exit-command check
 
 *Closes · Δ:* S4 · rule 1 mechanical · kernel-Δ 0 · maos-bin verb-table lines after 15-2
