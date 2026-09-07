@@ -1,5 +1,5 @@
 schema_version: 1
-current_phase: v0.1-alpha
+delivered_phase: v0.1-alpha
 mode: warning
 phase_order:
 - v0.1-alpha
@@ -1274,13 +1274,15 @@ coverage:
   NFR-Ops-4:
     gates:
     - check-security-md
-    - check-cna-registration
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
-    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md; Story 10.3 adds
-      CNA registration evidence + check-cna-registration gate (blocking-when-present).
-      MITRE CNA application submitted 2026-06-22; docs/compliance/cna-registration.md.
+    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md, which since Story
+      15-3 (ADR-065) also carries the two content controls re-homed from the retired
+      check-cna-registration gate — no <TO-BE-PUBLISHED> GPG placeholder, and a real
+      1.0.x supported-versions table row. MITRE CNA application submitted 2026-06-22;
+      docs/compliance/cna-registration.md is KEPT as NFR-Ops-4 evidence and is no
+      longer gate-validated.
   NFR-Ops-5:
     gates: []
     corpora: []

@@ -99,7 +99,7 @@ fn check_staleness(
     for (id, row) in &coverage.coverage {
         if !crate::coverage_matrix::phase_le(
             &row.phase,
-            &coverage.current_phase,
+            &coverage.delivered_phase,
             &coverage.phase_order,
         ) {
             continue;

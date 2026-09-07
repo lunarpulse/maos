@@ -1,5 +1,5 @@
 schema_version: 1
-current_phase: "v0.1-alpha"
+delivered_phase: "v0.1-alpha"
 mode: "warning"
 phase_order:
   - "v0.1-alpha"

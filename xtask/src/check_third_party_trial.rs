@@ -66,7 +66,7 @@ fn validate_dates(start: &str, end: &str) -> Result<(), String> {
 }
 
 // #33: emit_command + validate_dates extracted to gate_common (shared across all gate modules).
-use crate::gate_common::{emit_command, validate_dates as validate_dates_shared};
+use crate::gate_common::{emit_command, validate_dates as validate_dates_shared, CURRENT_PHASE};
 
 /// Wilson score interval (95% CI, z = 1.96) for `successes` out of `n`.
 /// At N=12, successes=10 this returns approximately (0.552, 0.953).
@@ -88,14 +88,43 @@ fn wilson_ci(successes: i64, n: i64) -> (f64, f64) {
 }
 
 const RESULTS_PATH: &str = "docs/third-party-trial/results/trial-results.toml";
-fn current_phase() -> String {
-    std::env::var("MAOS_SHIP_PHASE").unwrap_or_else(|_| "v1_5".to_string())
-}
 
-fn is_v2_blocking_phase(phase: &str) -> bool {
-    // P14: tolerate surrounding whitespace + the dotted `v2.0` spelling so a
-    // casing/typo in the CI env var does not silently downgrade v2.0 to advisory.
-    phase.trim().eq_ignore_ascii_case("v2_0") || phase.trim().eq_ignore_ascii_case("v2.0")
+/// True at the v2.0 ship phase, where the consumer additionally requires a
+/// producer-SIGNED derived attestation per participant.
+///
+/// Tolerates the dotted `v2.0` spelling alongside the ladder's `v2_0`. Story
+/// 15-3 AC2(b) retired the ship-phase ENV source this used to read (the name is
+/// recorded in ADR-065, deliberately not repeated here — AC1's oracle counts
+/// FILES carrying the token, so naming it in a comment would defeat the check
+/// that it is gone). A GitHub *repository variable* could move this one gate's
+/// phase with no code change, and `check-env-contract` can never see it — it
+/// scans only the maos-bin src tree — which is how a third phase source
+/// survived eight epics. The phase is now `gate_common::CURRENT_PHASE`.
+fn is_v2_blocking_phase(phase: &str) -> Result<bool, String> {
+    let requested = phase.trim();
+    let canonical = if requested.eq_ignore_ascii_case("v2.0") {
+        "v2_0"
+    } else {
+        crate::gate_common::PHASE_ORDER
+            .iter()
+            .copied()
+            .find(|candidate| candidate.eq_ignore_ascii_case(requested))
+            .ok_or_else(|| {
+                format!(
+                    "check-third-party-trial: invalid ship phase `{requested}`; expected one of {}",
+                    crate::gate_common::PHASE_ORDER.join(", ")
+                )
+            })?
+    };
+    let current = crate::gate_common::PHASE_ORDER
+        .iter()
+        .position(|candidate| *candidate == canonical)
+        .expect("canonical phase came from PHASE_ORDER");
+    let v2 = crate::gate_common::PHASE_ORDER
+        .iter()
+        .position(|candidate| *candidate == "v2_0")
+        .expect("PHASE_ORDER contains v2_0");
+    Ok(current >= v2)
 }
 
 /// Resolve a repo-relative path against the workspace root (not the CWD), so the
@@ -168,7 +197,14 @@ fn load_signed_attestations(
     map
 }
 
-pub fn run(json: bool) -> Result<(), String> {
+/// `ship_phase` is supplied by the caller and defaults to the single shared
+/// `gate_common::CURRENT_PHASE` (see the `--ship-phase` argument in `main.rs`).
+/// It is an explicit ARGUMENT rather than an env read on purpose: story 15-3
+/// AC2(b) retired the ambient env source, because a GitHub repository variable
+/// could move this one gate's phase with no code change and no instrument
+/// could see it. An argument cannot be set without editing a reviewed file.
+pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
+    let require_derivation_provenance = is_v2_blocking_phase(ship_phase)?;
     let path = resolve_workspace_path(RESULTS_PATH)
         .unwrap_or_else(|| Path::new(RESULTS_PATH).to_path_buf());
 
@@ -221,8 +257,6 @@ pub fn run(json: bool) -> Result<(), String> {
     })?;
 
     let t = &results.trial;
-    let current_phase = current_phase();
-    let require_derivation_provenance = is_v2_blocking_phase(&current_phase);
     // D1: at v2.0 provenance is a producer-SIGNED per-participant derived
     // attestation (verified against the producer pubkey), never a pasteable
     // bare-string stamp and never a file-level stamp that launders all
@@ -511,7 +545,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "methodology_version": t.methodology_version,
                 "wilson_ci_lower": ci_lower,
                 "wilson_ci_upper": ci_upper,
-                "current_phase": current_phase,
+                "ship_phase": ship_phase,
                 "provenance_required": require_derivation_provenance,
                 "failures": failures,
             })

@@ -39,16 +39,10 @@
 //! Advisory at v1.0/v1.5 (a RED oracle emits a WOULD-HAVE-BLOCKED banner but
 //! does not fail the aggregate); blocking at v2.0 (F6/D6).
 
-use crate::gate_common::emit_command;
+use crate::gate_common::{emit_command, is_blocking_at, CURRENT_PHASE};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
-
-/// Phase graduation order — matches the `gate-registry.toml` `disposition` keys.
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
-
-/// Current release phase. Advisory at v1.0/v1.5; blocking at v2.0 (F6/D6).
-const CURRENT_PHASE: &str = "v1_5";
 
 /// Canonical gate name (matches the registry `[[ship_gate]]` row and the
 /// `Commands` variant's `#[command(name = ...)]`).
@@ -68,23 +62,6 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
         }
     }
     Err(format!("{GATE_NAME} not found in gate-registry.toml"))
-}
-
-fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
-}
-
-fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> bool {
-    matches!(
-        phase_disposition(disposition, phase),
-        Some("blocking") | Some("blocking-when-present")
-    )
 }
 
 fn write_step_summary(text: &str) {
@@ -520,7 +497,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "passed": true,
                     "oracle_green": true,
                     "blocking_now": blocking_now,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "legs": legs_json(&legs),
                 })
@@ -578,7 +555,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "oracle_green": false,
                 "advisory": true,
                 "blocking_now": false,
-                "current_phase": CURRENT_PHASE,
+                "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
                 "legs": legs_json(&legs),
             })

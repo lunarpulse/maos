@@ -415,6 +415,39 @@ jobs:
       - name: Run the gate's own oracle unit tests
         run: cargo test -p xtask check_cert_rotation_trigger
 
+  # Story 15-3 AC5 — confidence rule 1 made mechanical. Copies the 14-2a job
+  # shape deliberately, including `timeout-minutes`: the gate SHELLS
+  # `maos --help`, which at HEAD never returned, so an untimed job hung the
+  # runner. The gate's own proven-red vectors run in this same job because
+  # `discipline.yml`'s own comment above records the doctrine — a gate whose
+  # reds are never executed is the failure mode this story exists to close —
+  # and because no job runs `cargo test -p xtask` unscoped.
+  check-exit-commands:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Build every shipped binary surface the gate resolves
+        run: cargo build -p maos-bin --bin maos &&
+          cargo build -p maos-cli &&
+          cargo build -p maos-spirit-cli --bin maos-spirit &&
+          cargo build -p maos-registry --bin maos-registry-server &&
+          cargo build -p maos-wasm-host --bin maos-wasm-runner
+      - name: Run check-exit-commands
+        run: cargo run -p xtask -- check-exit-commands --json
+      - name: Run the 15-3 AC5 proven-red vectors
+        run: cargo test -p xtask --test check_exit_commands_gate
+      - name: Run the maos verb-table completeness control in both builds (AC4)
+        run: cargo build -p worker --bin worker-cli-fixture &&
+          cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1 &&
+          cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -515,6 +548,8 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-security-md
         run: cargo run -p xtask -- check-security-md --json
+      - name: Run check-security-md proven-red vectors
+        run: cargo test -p xtask check_security_md::tests -- --test-threads=1
 
   server-exit-drain:
     # Story 2.5 AC1 — verifies cap-audit drain on SIGTERM in both one-shot
@@ -2425,12 +2460,14 @@ jobs:
   # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
   check-third-party-trial:
     runs-on: ubuntu-latest
-    env:
-      # P14: the v2.0 default-deny (require producer-signed attestations) only
-      # fires when MAOS_SHIP_PHASE=v2_0. Default to v1_5 (advisory) until the repo
-      # flips this variable to v2_0 at the v2.0 ship gate — the flip is a config
-      # change, not a code change, and the proven-red tests exercise the v2_0 path.
-      MAOS_SHIP_PHASE: ${{ vars.MAOS_SHIP_PHASE || 'v1_5' }}
+    # Story 15-3 AC2(b): the ship-phase env block that stood here is retired.
+    # A GitHub *repository variable* could move this one gate's ship phase with
+    # no code change, and `check-env-contract` can never see it (it scans only
+    # the maos-bin src tree), so it was a third phase source no instrument could
+    # audit. The variable's name is recorded in ADR-065 rather than here: AC1's
+    # oracle counts FILES carrying the token, so repeating it would defeat the
+    # check that it is gone. The phase is now `gate_common::CURRENT_PHASE`, and
+    # advancing it at the v2.0 ship gate is a one-line code change under review.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2590,19 +2627,12 @@ jobs:
       - name: Run maos-host + maos-wasm-host test suites
         run: cargo test -p maos-host -p maos-wasm-host --locked
 
-  # Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate (blocking-when-present).
-  check-cna-registration:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Check CNA registration
-        run: cargo run -p xtask -- check-cna-registration --json
+  # RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
+  # job stood here (Story 10.3 AC-5, NFR-Ops-4). The gate ran its LIVE
+  # content-validating arm, not the absent-PASS arm, so its two `SECURITY.md`
+  # controls — no `<TO-BE-PUBLISHED>` GPG placeholder, and a real `1.0.x`
+  # supported-versions row — were re-homed into `check-security-md` with their
+  # own proven-red tests BEFORE the deletion. No control went dark.
 
   # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
   check-fuzz-targets:
@@ -3398,7 +3428,6 @@ jobs:
       - check-export-control
       - check-host-surface
       - check-dependency-closure
-      - check-cna-registration
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
@@ -3430,6 +3459,7 @@ jobs:
       - check-loom-substrate-drift
       - check-decision-register
       - check-cert-rotation-trigger
+      - check-exit-commands
     if: always()
     steps:
       - name: Ship gate results summary
@@ -3450,7 +3480,6 @@ jobs:
           echo "| check-export-control | ${{ needs.check-export-control.result }} | cargo run -p xtask -- check-export-control |"
           echo "| check-host-surface | ${{ needs.check-host-surface.result }} | cargo run -p xtask -- check-host-surface |"
           echo "| check-dependency-closure | ${{ needs.check-dependency-closure.result }} | cargo run -p xtask -- check-dependency-closure |"
-          echo "| check-cna-registration | ${{ needs.check-cna-registration.result }} | cargo run -p xtask -- check-cna-registration |"
           echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
@@ -3470,6 +3499,7 @@ jobs:
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
           echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
+          echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -3487,7 +3517,6 @@ jobs:
           echo "  check-cross-form-equiv: ${{ needs.check-cross-form-equiv.result }}"
           echo "  check-red-team-gate: ${{ needs.check-red-team-gate.result }}"
           echo "  check-export-control: ${{ needs.check-export-control.result }}"
-          echo "  check-cna-registration: ${{ needs.check-cna-registration.result }}"
           echo "  check-fuzz-targets: ${{ needs.check-fuzz-targets.result }}"
           echo "  fuzz-build: ${{ needs.fuzz-build.result }}"
           echo "  check-ko-coverage: ${{ needs.check-ko-coverage.result }}"
@@ -3505,6 +3534,7 @@ jobs:
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
           echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
+          echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
           exit 1
 
   aggregate:

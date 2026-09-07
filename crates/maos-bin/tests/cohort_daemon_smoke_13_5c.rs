@@ -860,7 +860,13 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 17] = [
+    // Story 15-3 (F13) — the verb table lands in its own `src/verbs.rs`, so
+    // the roster grows 17 → 18 DELIBERATELY: this assertion is a doorbell,
+    // not a wall, and the sanctioned move is to ring it. The negative below
+    // (no `manifest_scopes`) applies to `verbs.rs` like every other file: it
+    // is a pure argv table and must never seed the manifest-derived policy
+    // table.
+    const SCANNED_SOURCE_FILES: [(&str, &str); 18] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -922,6 +928,11 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // trust planes from the running transport and must never seed the
         // manifest-derived policy table.
         ("cert_rotation.rs", include_str!("../src/cert_rotation.rs")),
+        // Story 15-3 (F13) — the single verb table (`VERBS`,
+        // `MAOS_ONE_SHOT_MODES`, `verbs::dispatch`). Listed so the 13.5d
+        // negative covers it: the table resolves argv tokens only and must
+        // never seed the manifest-derived policy table.
+        ("verbs.rs", include_str!("../src/verbs.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

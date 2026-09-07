@@ -4,6 +4,11 @@ pub mod abi_diff;
 // vector that exercises a parallel copy of the logic proves nothing about the
 // gate CI runs.
 pub mod check_decision_register;
+// Story 15-3 AC5 — the exit-command gate's audit. Exposed for the same reason
+// `check_decision_register` is: `xtask/tests/` must drive the REAL `audit()`
+// over planted corpora, because a vector that exercised a parallel copy of the
+// tokeniser would prove nothing about the gate CI runs (F11).
+pub mod check_exit_commands;
 pub mod check_fkcs;
 pub mod check_host_surface;
 pub mod check_kernel_baseline;

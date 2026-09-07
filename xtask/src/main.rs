@@ -75,6 +75,7 @@ mod check_epic_close_coherence;
 mod check_epic_close_green;
 mod check_equiv_fixture_provenance;
 mod check_error_catalog;
+mod check_exit_commands;
 mod check_fr47;
 mod check_governance_categories;
 mod check_judge_config;
@@ -92,8 +93,9 @@ mod check_review_findings_resolved;
 mod check_security_md;
 mod check_ship_gate_completeness;
 mod check_third_party_trial;
-// Story 10.3 — v1.0 compliance ship-gates (export-control, CNA, fuzz-targets).
-mod check_cna_registration;
+// Story 10.3 — v1.0 compliance ship-gates (export-control, fuzz-targets).
+// `check_cna_registration` was RETIRED 2026-09-07 by Story 15-3 per ADR-065:
+// its two live `SECURITY.md` controls are re-homed into `check_security_md`.
 mod check_export_control;
 mod check_fuzz_floor;
 mod check_fuzz_targets;
@@ -405,6 +407,15 @@ enum Commands {
     /// disagrees, or when an OPEN epic cites a kernel pin that is not the baseline.
     #[command(name = "check-epic-close-coherence")]
     CheckEpicCloseCoherence {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 15-3 AC5 — confidence rule 1 made mechanical: every epic's
+    /// hermetic exit block is tokenised as shell and every `maos`/`maosctl`/
+    /// `xtask` verb must exist at HEAD or be owed by a named, open story that
+    /// actually claims it.
+    #[command(name = "check-exit-commands")]
+    CheckExitCommands {
         #[arg(long)]
         json: bool,
     },
@@ -814,6 +825,16 @@ enum Commands {
     CheckThirdPartyTrial {
         #[arg(long)]
         json: bool,
+        /// Ship phase to evaluate against; defaults to the single shared
+        /// `gate_common::CURRENT_PHASE`.
+        ///
+        /// Story 15-3 AC2(b) retired this gate's ambient env phase source — a
+        /// GitHub repository variable could move one gate's phase with no code
+        /// change, and `check-env-contract` can never see it. The v2.0 branch
+        /// stays reachable for its proven-red vectors through this EXPLICIT
+        /// argument, which cannot be set without editing a reviewed file.
+        #[arg(long, default_value = crate::gate_common::CURRENT_PHASE)]
+        ship_phase: String,
     },
     /// Story 11.7 — v2.0 third-party trial attestation producer gate.
     #[command(name = "check-trial-attestation")]
@@ -945,12 +966,6 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 10.3 AC-5 (NFR-Ops-4) — CNA registration gate: blocking-when-present.
-    #[command(name = "check-cna-registration")]
-    CheckCnaRegistration {
-        #[arg(long)]
-        json: bool,
-    },
     /// Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
     #[command(name = "check-fuzz-targets")]
     CheckFuzzTargets {
@@ -1074,6 +1089,7 @@ fn main() {
                     "passed": report.passed,
                     "present_sections": report.present_sections,
                     "missing_sections": report.missing_sections,
+                    "failures": report.failures,
                 });
                 println!("{}", payload);
             } else if report.passed {
@@ -1083,14 +1099,17 @@ fn main() {
                 );
             } else {
                 eprintln!(
-                    "check-security-md: FAIL — missing sections: {:?}",
-                    report.missing_sections
+                    "check-security-md: FAIL — missing sections: {:?}, \
+                     content violations: {:?}",
+                    report.missing_sections, report.failures
                 );
             }
             if report.passed {
                 Ok(())
             } else {
-                Err("SECURITY.md missing required sections".into())
+                Err("SECURITY.md missing required sections or carries \
+                     content-control violations"
+                    .into())
             }
         }
         Commands::KlocCheck { config, json } => kloc_check::run(&config, json),
@@ -1286,6 +1305,7 @@ fn main() {
         ),
         Commands::CheckEpicCloseGreen { json } => check_epic_close_green::run(json),
         Commands::CheckEpicCloseCoherence { json } => check_epic_close_coherence::run(json),
+        Commands::CheckExitCommands { json } => check_exit_commands::run(json),
         Commands::StabilityMatrix { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             stability_matrix::run(&workspace_root, check, json)
@@ -1351,13 +1371,14 @@ fn main() {
         Commands::CheckCoverageMatrixCompleteness { json } => {
             check_coverage_matrix_completeness::run(json)
         }
-        Commands::CheckThirdPartyTrial { json } => check_third_party_trial::run(json),
+        Commands::CheckThirdPartyTrial { json, ship_phase } => {
+            check_third_party_trial::run(json, &ship_phase)
+        }
         Commands::CheckCrossFormEquiv { json } => check_cross_form_equiv::run(json),
         Commands::CheckWasmFormEquiv { json } => check_wasm_form_equiv::run(json),
         Commands::CheckEquivFixtureProvenance { json } => check_equiv_fixture_provenance::run(json),
         Commands::CheckRedTeamGate { json } => check_red_team_gate::run(json),
         Commands::CheckExportControl { json } => check_export_control::run(json),
-        Commands::CheckCnaRegistration { json } => check_cna_registration::run(json),
         Commands::CheckFuzzTargets { json } => check_fuzz_targets::run(json),
         Commands::CheckFuzzFloor { json } => check_fuzz_floor::run(json),
         Commands::CheckMigrationMerkle { json } => check_migration_merkle::run(json),

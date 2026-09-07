@@ -2,11 +2,20 @@
 
 //! Story 12.1 — cohort manifest and full-pairwise mesh tripwire.
 
+use crate::gate_common::{dev_enforced_red_blocks, emit_command, BindingClass, CURRENT_PHASE};
 use std::process::Command;
 
 const GATE_NAME: &str = "check-cohort-mesh";
-const CURRENT_PHASE: &str = "v1_5";
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0", "v2_2"];
+
+/// Dev-time enforcement class for this gate's legs.
+///
+/// Story 12.1 hand-rolled a phase-independent hard-fail carve-out here because
+/// keying enforcement off the ship ladder made a RED leg advisory;
+/// `gate_common`'s [`BindingClass`] IS that carve-out, promoted to a shared
+/// home. Adopting it closes the `check-cohort-mesh` half of **D20** — the
+/// ship ladder now governs GA disposition only, and `CURRENT_PHASE` is read
+/// from exactly one place (`gate_common`).
+const BINDING: BindingClass = BindingClass::Blocking;
 
 struct Leg {
     name: &'static str,
@@ -51,13 +60,14 @@ fn build_journey_daemon() -> Result<(), String> {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
-    assert_eq!(
-        CURRENT_PHASE, "v1_5",
-        "Story 12.1 must not advance global phase"
-    );
-    assert!(PHASE_ORDER.contains(&"v2_2"));
-    // Every designated leg is phase-independent and hard-fails here, before
-    // any ship-phase disposition can classify the aggregate as advisory.
+    // Every designated leg is phase-independent and hard-fails under
+    // [`BINDING`], before any ship-phase disposition can classify the aggregate
+    // as advisory. Story 15-3 F4 deleted the two asserts that stood here: they
+    // compared a LOCAL const to its own literal (a tautology that proved
+    // nothing), and repointing them at the shared `CURRENT_PHASE` would have
+    // turned a sanctioned phase advance into a runtime panic — a tripwire
+    // against the operation it is meant to permit, in the very crate that
+    // consolidates the phase source.
     build_journey_daemon()?;
     let legs = [
         Leg {
@@ -669,14 +679,26 @@ pub fn run(json: bool) -> Result<(), String> {
         },
     ];
     for leg in &legs {
-        run_leg(leg)?;
+        if let Err(red) = run_leg(leg) {
+            if dev_enforced_red_blocks(BINDING, true) {
+                return Err(red);
+            }
+            // Unreachable while [`BINDING`] is `Blocking`, and deliberately not
+            // an `unreachable!()`: if the class is ever downgraded, a RED leg
+            // must still surface as a banner rather than a silent green.
+            emit_command(
+                json,
+                "warning",
+                &format!("{GATE_NAME}: WOULD-HAVE-BLOCKED — {red}"),
+            );
+        }
     }
     if !crate::check_kernel_baseline::check()?.passed {
         return Err(format!("{GATE_NAME}: kernel-abi-diff RED"));
     }
     if json {
         println!(
-            "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":true,\"current_phase\":\"{CURRENT_PHASE}\",\"legs\":{}}}",
+            "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":true,\"ship_phase\":\"{CURRENT_PHASE}\",\"legs\":{}}}",
             legs.len() + 1
         );
     } else {

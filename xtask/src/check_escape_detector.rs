@@ -50,16 +50,12 @@
 //! Advisory at v1.0/v1.5 (a RED oracle emits a WOULD-HAVE-BLOCKED banner but
 //! does not fail the aggregate); blocking at v2.0 (AC5 / F6).
 
-use crate::gate_common::emit_command;
+use crate::gate_common::{
+    dev_enforced_red_blocks, emit_command, is_blocking_at, BindingClass, CURRENT_PHASE,
+};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
-
-/// Phase graduation order — matches the `gate-registry.toml` `disposition` keys.
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
-
-/// Current release phase. Advisory at v1.0/v1.5; blocking at v2.0.
-const CURRENT_PHASE: &str = "v1_5";
 
 /// Canonical gate name (matches the registry `[[ship_gate]]` row and the
 /// `Commands` variant's `#[command(name = ...)]`).
@@ -81,21 +77,47 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
     Err(format!("{GATE_NAME} not found in gate-registry.toml"))
 }
 
-fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
+/// Does this host's kernel support seccomp *filtering*?
+///
+/// `/proc/sys/kernel/seccomp/actions_avail` is materialised only when the kernel
+/// carries `CONFIG_SECCOMP_FILTER` — the substrate legs 8 and 9 need. A file
+/// probe rather than a `prctl` because this module is `#![forbid(unsafe_code)]`.
+///
+/// This is a KERNEL-capability fact, and it is NOT sufficient on its own: a
+/// container can ship a filtering-capable kernel and still refuse `seccomp(2)`
+/// by policy. Measured on the 15-3 dev host: `actions_avail` lists eight
+/// actions and `/proc/self/status` reports `Seccomp_filters: 1`, yet a real
+/// sandboxed spawn fails `PermissionDenied`. So this probe is reported as
+/// CONTEXT (`seccomp_kernel_filtering`) and [`observed_substrate_skip`] decides.
+fn seccomp_kernel_filtering() -> bool {
+    Path::new("/proc/sys/kernel/seccomp/actions_avail").exists()
 }
 
-fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> bool {
-    matches!(
-        phase_disposition(disposition, phase),
-        Some("blocking") | Some("blocking-when-present")
-    )
+/// Did the harness observe that this host GENUINELY cannot sandbox?
+///
+/// `maos-escape-detector`'s `tests/common::skip_if_sandbox_unavailable` prints
+/// `SKIP <test>: sandbox unavailable on this host` or `SKIP <test>: sandbox
+/// spawn refused by host (…)` for `SandboxUnavailable` / `EPERM` / `ENOSYS`
+/// only; every other error panics. That line is therefore an authoritative
+/// substrate verdict backed by a REAL spawn attempt against the real kernel —
+/// the most real probe available, and strictly stronger than a config read.
+///
+/// Its own doc records why honouring it cannot mask a capable-host regression:
+/// a missing kill surfaces as no marker and a RED leg, never as a spawn
+/// refusal, so it never reaches that helper.
+///
+/// Separating this from `green` is the whole of F3. Before story 15-3
+/// [`invoke_cargo_test_marker`] collapsed "seccomp is unavailable here" and
+/// "the detector regressed" into a single `green=false` — which is D20's
+/// recorded defect: `passed==0 && failed==0` is false on a seccomp-blocked
+/// host, so the advisory tail converted a RED oracle into `passed: true`.
+fn observed_substrate_skip(output: &str) -> bool {
+    output.lines().any(|line| {
+        let trimmed = line.trim();
+        trimmed.starts_with("SKIP ")
+            && (trimmed.contains("sandbox unavailable")
+                || trimmed.contains("sandbox spawn refused"))
+    })
 }
 
 fn write_step_summary(text: &str) {
@@ -111,9 +133,17 @@ fn write_step_summary(text: &str) {
     }
 }
 
-/// One oracle leg's parsed result.
+/// One oracle leg's parsed result, carrying its dev-time enforcement class and
+/// whether the substrate that leg needs was actually available.
+///
+/// The two facts travel WITH the counts rather than being folded into `green`
+/// (F3; the shape is `check_multi_region_slo`'s `RawLeg`), because a RED leg on
+/// a host that cannot sandbox and a RED leg on a host that can are different
+/// events and only one of them is a regression.
 struct LegResult {
     label: &'static str,
+    class: BindingClass,
+    substrate_present: bool,
     passed: u32,
     failed: u32,
     ran: bool,
@@ -122,14 +152,61 @@ struct LegResult {
 }
 
 impl LegResult {
+    /// A hermetic leg: CI can run it on any host, so its RED is unconditional
+    /// ([`BindingClass::Blocking`]) and the substrate question does not arise.
+    fn hermetic(label: &'static str, passed: u32, failed: u32, ran: bool, green: bool) -> Self {
+        LegResult {
+            label,
+            class: BindingClass::Blocking,
+            substrate_present: true,
+            passed,
+            failed,
+            ran,
+            attempted: true,
+            green,
+        }
+    }
+
+    /// A hermetic leg whose oracle is a single boolean rather than a test count.
+    fn hermetic_bool(label: &'static str, green: bool) -> Self {
+        Self::hermetic(label, u32::from(green), u32::from(!green), true, green)
+    }
+
+    /// A leg that needs a seccomp-capable host: [`BindingClass::AdvisorySubstrate`],
+    /// so a RED blocks only when the substrate was actually there.
+    fn substrate(label: &'static str, run: &MarkerRun) -> Self {
+        LegResult {
+            label,
+            class: BindingClass::AdvisorySubstrate,
+            substrate_present: !run.substrate_skip,
+            passed: run.passed,
+            failed: run.failed,
+            ran: run.ran,
+            attempted: true,
+            green: run.green,
+        }
+    }
+
     fn status_word(&self) -> &'static str {
         if self.green {
             "green"
+        } else if !self.substrate_present {
+            "substrate-absent"
         } else if self.attempted {
             "red"
         } else {
             "skipped"
         }
+    }
+
+    /// Whether this leg's RED must hard-fail CI.
+    ///
+    /// The three-way split F3 requires: a green leg never blocks; a RED
+    /// `Blocking` leg always blocks; a RED `AdvisorySubstrate` leg blocks only
+    /// when its substrate was present — never silent-green, the caller emits a
+    /// WOULD-HAVE-BLOCKED banner for the absent case.
+    fn blocks(&self) -> bool {
+        !self.green && dev_enforced_red_blocks(self.class, self.substrate_present)
     }
 }
 
@@ -186,10 +263,43 @@ fn invoke_cargo_test(
     Ok((passed, failed, ran, green))
 }
 
+/// A marker-gated leg's raw observation.
+///
+/// `substrate_skip` is reported SEPARATELY from `green` so the caller can tell
+/// "this host cannot sandbox" from "the detector regressed" — the collapse F3
+/// names as the defect.
+struct MarkerRun {
+    passed: u32,
+    failed: u32,
+    ran: bool,
+    green: bool,
+    substrate_skip: bool,
+}
+
+impl MarkerRun {
+    /// The gate could not even invoke `cargo test`. That is a RED with the
+    /// substrate presumed PRESENT: a broken invocation must never be laundered
+    /// into an environment excuse.
+    fn invocation_failed() -> Self {
+        MarkerRun {
+            passed: 0,
+            failed: 1,
+            ran: true,
+            green: false,
+            substrate_skip: false,
+        }
+    }
+}
+
 /// Invoke a filtered `cargo test` and require a measurement marker in the
 /// output. GREEN requires the test to pass AND the marker to be present — a
 /// silent skip (e.g. seccomp unavailable on the host) emits no marker, so the
 /// leg cannot pass vacuously (the anti-canned discipline).
+///
+/// The absent-marker case is additionally classified: when the harness printed
+/// its genuine-unavailability `SKIP` line the substrate was absent, and the
+/// caller keeps the leg advisory instead of reding CI on a host that cannot
+/// run it (F3).
 fn invoke_cargo_test_marker(
     pkg: &str,
     test_file: &str,
@@ -197,7 +307,7 @@ fn invoke_cargo_test_marker(
     marker: &str,
     features: Option<&str>,
     ignored: bool,
-) -> Result<(u32, u32, bool, bool), String> {
+) -> Result<MarkerRun, String> {
     let mut cmd = Command::new("cargo");
     cmd.args(["test", "--locked", "-p", pkg, "--test", test_file]);
     if let Some(f) = features {
@@ -223,15 +333,25 @@ fn invoke_cargo_test_marker(
     let measured = combined.contains(marker);
     // GREEN requires a REAL measurement (the marker) — not a silent skip.
     let green = output.status.success() && ran && passed >= 1 && failed == 0 && measured;
+    let substrate_skip = !green && observed_substrate_skip(&combined);
     if !green {
         eprintln!(
             "{GATE_NAME}: {pkg}/{test_file} (filter={name_filter:?}) NOT green (passed={passed}, \
-             failed={failed}, ran={ran}, measured={measured}, exit={}). A silent seccomp-unavailable \
-             skip emits no `{marker}` marker — the leg cannot pass vacuously.",
+             failed={failed}, ran={ran}, measured={measured}, substrate_skip={substrate_skip}, \
+             kernel_seccomp_filtering={}, exit={}). A silent seccomp-unavailable skip emits no \
+             `{marker}` marker; when the harness reports genuine unavailability the leg is \
+             advisory, otherwise this is a real RED.",
+            seccomp_kernel_filtering(),
             output.status
         );
     }
-    Ok((passed, failed, ran, green))
+    Ok(MarkerRun {
+        passed,
+        failed,
+        ran,
+        green,
+        substrate_skip,
+    })
 }
 
 // ────────────────────────────── per-leg oracles ──────────────────────────────
@@ -246,14 +366,7 @@ fn run_no_verdict_invariant_leg() -> LegResult {
         false,
     )
     .unwrap_or((0, 1, true, false));
-    LegResult {
-        label: "no-verdict-invariant",
-        passed: p,
-        failed: f,
-        ran: r,
-        attempted: true,
-        green: g,
-    }
+    LegResult::hermetic("no-verdict-invariant", p, f, r, g)
 }
 
 /// Leg 2: out-of-kernel-boundary (AC1). The detector's NORMAL dependency
@@ -277,21 +390,14 @@ fn run_out_of_kernel_boundary_leg() -> LegResult {
             "{GATE_NAME}: out-of-kernel-boundary leg RED — maos-kernel-core present in the detector's normal closure"
         );
     }
-    LegResult {
-        label: "out-of-kernel-boundary",
-        passed: if green { 1 } else { 0 },
-        failed: if green { 0 } else { 1 },
-        ran: true,
-        attempted: true,
-        green,
-    }
+    LegResult::hermetic_bool("out-of-kernel-boundary", green)
 }
 
 /// Leg 3: detection-quality on the correlation decision (AC4). Runs the
 /// correlation test (real Kernel-origin rows + manifest correlation) — green at
 /// HEAD on every host (the correlation logic is host-independent).
 fn run_detection_quality_leg() -> LegResult {
-    let (p, f, r, g) = invoke_cargo_test_marker(
+    let run = invoke_cargo_test_marker(
         "maos-escape-detector",
         "detection_quality",
         "correlation_quality_on_structural_rows",
@@ -299,15 +405,16 @@ fn run_detection_quality_leg() -> LegResult {
         None,
         false,
     )
-    .unwrap_or((0, 1, true, false));
-    LegResult {
-        label: "detection-quality",
-        passed: p,
-        failed: f,
-        ran: r,
-        attempted: true,
-        green: g,
-    }
+    .unwrap_or_else(|_| MarkerRun::invocation_failed());
+    // Hermetic despite the marker gate: the correlation logic is
+    // host-independent, so this leg is green at HEAD on every host.
+    LegResult::hermetic(
+        "detection-quality",
+        run.passed,
+        run.failed,
+        run.ran,
+        run.green,
+    )
 }
 
 /// Leg 4: detection-quality falsifier (AC4 anti-canned). The `escape-fault-inject`
@@ -322,14 +429,7 @@ fn run_detection_quality_falsifier_leg() -> LegResult {
         true,
     )
     .unwrap_or((0, 1, true, false));
-    LegResult {
-        label: "detection-quality-falsifier",
-        passed: p,
-        failed: f,
-        ran: r,
-        attempted: true,
-        green: g,
-    }
+    LegResult::hermetic("detection-quality-falsifier", p, f, r, g)
 }
 
 /// Leg 5: escape-source-identity-blind + replay-dedup (AC4).
@@ -342,27 +442,13 @@ fn run_source_identity_blind_leg() -> LegResult {
         false,
     )
     .unwrap_or((0, 1, true, false));
-    LegResult {
-        label: "escape-source-identity-blind",
-        passed: p,
-        failed: f,
-        ran: r,
-        attempted: true,
-        green: g,
-    }
+    LegResult::hermetic("escape-source-identity-blind", p, f, r, g)
 }
 
 /// Leg 6: kernel-ABI baseline — ZERO kernel-core delta @ 23081 (CATCH-0).
 fn run_kernel_abi_leg() -> LegResult {
     let green = crate::check_kernel_baseline::run(false).is_ok();
-    LegResult {
-        label: "kernel-abi-diff",
-        passed: if green { 1 } else { 0 },
-        failed: if green { 0 } else { 1 },
-        ran: true,
-        attempted: true,
-        green,
-    }
+    LegResult::hermetic_bool("kernel-abi-diff", green)
 }
 
 /// Leg 7: release-graph-absence (ship-blocker). `escape-fault-inject` is a
@@ -399,14 +485,7 @@ fn run_release_graph_absence_leg() -> LegResult {
     } else {
         eprintln!("{GATE_NAME}: release-graph-absence leg RED — {note}");
     }
-    LegResult {
-        label: "release-graph-absence",
-        passed: if green { 1 } else { 0 },
-        failed: if green { 0 } else { 1 },
-        ran: true,
-        attempted: true,
-        green,
-    }
+    LegResult::hermetic_bool("release-graph-absence", green)
 }
 
 /// Leg 8: producer-wired-proven-red (AC3). The REAL launcher reap producing a
@@ -421,6 +500,11 @@ fn run_producer_wired_proven_red_leg() -> LegResult {
     let mut failed = 0u32;
     let mut ran = false;
     let mut green = true;
+    // Substrate absence is a leg-wide claim: BOTH independent sub-invocations
+    // must explicitly report genuine seccomp unavailability. One unavailable
+    // run cannot launder the other run's ordinary failure into an environment
+    // excuse. An invocation error likewise forces this false.
+    let mut substrate_skip = true;
     // Sub A — GREEN: a real seccomp kill produces a real SandboxBlock TL row.
     match invoke_cargo_test_marker(
         "maos-escape-detector",
@@ -430,17 +514,19 @@ fn run_producer_wired_proven_red_leg() -> LegResult {
         None,
         false,
     ) {
-        Ok((p, f, r, g)) => {
-            passed += p;
-            failed += f;
-            ran |= r;
-            green &= g;
+        Ok(run) => {
+            passed += run.passed;
+            failed += run.failed;
+            ran |= run.ran;
+            green &= run.green;
+            substrate_skip &= run.substrate_skip;
         }
         Err(e) => {
             eprintln!("{GATE_NAME}: producer-wired leg error (green producer): {e}");
             failed += 1;
             ran = true;
             green = false;
+            substrate_skip = false;
         }
     }
     // Sub B — RED direction (AC3 falsifier, §A7.3): `escape-fault-inject` severs
@@ -454,35 +540,39 @@ fn run_producer_wired_proven_red_leg() -> LegResult {
         Some("escape-fault-inject"),
         true,
     ) {
-        Ok((p, f, r, g)) => {
-            passed += p;
-            failed += f;
-            ran |= r;
-            green &= g;
+        Ok(run) => {
+            passed += run.passed;
+            failed += run.failed;
+            ran |= run.ran;
+            green &= run.green;
+            substrate_skip &= run.substrate_skip;
         }
         Err(e) => {
             eprintln!("{GATE_NAME}: producer-wired leg error (fault-inject falsifier): {e}");
             failed += 1;
             ran = true;
             green = false;
+            substrate_skip = false;
         }
     }
     if !green {
         eprintln!(
-            "{GATE_NAME}: producer-wired-proven-red leg not green — on hosts whose kernel \
-             blocks seccomp this leg is advisory (environment-unavailable); on seccomp-capable \
-             runners (CI ubuntu-latest) it is a real per-commit tripwire (real kill → real row; \
-             fault-inject sever → no row)"
+            "{GATE_NAME}: producer-wired-proven-red leg not green (substrate_skip={substrate_skip}) \
+             — on hosts that genuinely cannot sandbox this leg is advisory \
+             (environment-unavailable); on hosts that CAN it is a real per-commit tripwire \
+             (real kill → real row; fault-inject sever → no row) and it BLOCKS."
         );
     }
-    LegResult {
-        label: "producer-wired-proven-red",
-        passed,
-        failed,
-        ran,
-        attempted: true,
-        green,
-    }
+    LegResult::substrate(
+        "producer-wired-proven-red",
+        &MarkerRun {
+            passed,
+            failed,
+            ran,
+            green,
+            substrate_skip,
+        },
+    )
 }
 
 /// Leg 9: detection-quality-live (AC4). The detector's correlation-decision
@@ -491,7 +581,7 @@ fn run_producer_wired_proven_red_leg() -> LegResult {
 /// (leg 3). MARKER-gated: a silent seccomp-unavailable skip cannot pass
 /// vacuously. Advisory on seccomp-blocked hosts; real per-commit tripwire on CI.
 fn run_detection_quality_live_leg() -> LegResult {
-    let (p, f, r, g) = invoke_cargo_test_marker(
+    let run = invoke_cargo_test_marker(
         "maos-escape-detector",
         "detection_quality",
         "detection_quality_meets_floor_and_ceiling_on_real_seccomp",
@@ -499,15 +589,8 @@ fn run_detection_quality_live_leg() -> LegResult {
         None,
         false,
     )
-    .unwrap_or((0, 1, true, false));
-    LegResult {
-        label: "detection-quality-live",
-        passed: p,
-        failed: f,
-        ran: r,
-        attempted: true,
-        green: g,
-    }
+    .unwrap_or_else(|_| MarkerRun::invocation_failed());
+    LegResult::substrate("detection-quality-live", &run)
 }
 
 /// Sum `passed`/`failed` counts across every `test result:` line in `output`.
@@ -551,6 +634,12 @@ fn legs_json(legs: &[LegResult]) -> serde_json::Value {
             .map(|l| {
                 serde_json::json!({
                     "label": l.label,
+                    "class": match l.class {
+                        BindingClass::Blocking => "blocking",
+                        BindingClass::AdvisorySubstrate => "advisory-substrate",
+                    },
+                    "substrate_present": l.substrate_present,
+                    "blocks": l.blocks(),
                     "passed": l.passed,
                     "failed": l.failed,
                     "ran": l.ran,
@@ -616,7 +705,13 @@ pub fn run(json: bool) -> Result<(), String> {
 
     let oracle_green = legs.iter().all(|l| l.green);
 
-    // 4. Apply the phased disposition.
+    // 4. Dev-time enforcement is decided PER LEG by its binding class (F3),
+    //    never by the ship ladder. `blocking_now` is the GA disposition and is
+    //    retained for reporting only — keying enforcement off it is exactly the
+    //    decay D20 records: on a seccomp-blocked host the live legs returned
+    //    `green=false` and the advisory tail converted RED into `passed: true`.
+    let blocking_legs: Vec<&LegResult> = legs.iter().filter(|leg| leg.blocks()).collect();
+
     if oracle_green {
         if json {
             println!(
@@ -626,7 +721,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "passed": true,
                     "oracle_green": true,
                     "blocking_now": blocking_now,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "legs": legs_json(&legs),
                 })
@@ -642,45 +737,74 @@ pub fn run(json: bool) -> Result<(), String> {
         return Ok(());
     }
 
-    // Oracle RED — phased verdict.
+    // Oracle RED — the verdict is the legs' binding classes, not the phase.
     let mut detail = String::new();
     for leg in &legs {
         detail.push_str(&format!(
-            "- {} leg: {} passed, {} failed (ran={}, attempted={}, green={}, status={})\n",
+            "- {} leg: {} passed, {} failed (ran={}, attempted={}, green={}, \
+             substrate_present={}, blocks={}, status={})\n",
             leg.label,
             leg.passed,
             leg.failed,
             leg.ran,
             leg.attempted,
             leg.green,
+            leg.substrate_present,
+            leg.blocks(),
             leg.status_word(),
         ));
     }
-    if blocking_now {
-        let msg =
-            format!("{GATE_NAME}: BLOCKING — oracle RED at {CURRENT_PHASE} (binding):\n{detail}");
+
+    if !blocking_legs.is_empty() {
+        let labels: Vec<&str> = blocking_legs.iter().map(|leg| leg.label).collect();
+        let msg = format!(
+            "{GATE_NAME}: BLOCKING — {} RED leg(s) enforce at HEAD ({}):\n{detail}",
+            blocking_legs.len(),
+            labels.join(", ")
+        );
         emit_command(json, "error", &msg);
-        if !json {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "gate": GATE_NAME,
+                    "passed": false,
+                    "oracle_green": false,
+                    "advisory": false,
+                    "blocking_now": blocking_now,
+                    "blocking_legs": labels,
+                    "seccomp_kernel_filtering": seccomp_kernel_filtering(),
+                    "ship_phase": CURRENT_PHASE,
+                    "disposition": disposition,
+                    "legs": legs_json(&legs),
+                })
+            );
+        } else {
             eprintln!("{msg}");
         }
         return Err(format!(
-            "{GATE_NAME}: BLOCKING — oracle RED at {CURRENT_PHASE}"
+            "{GATE_NAME}: BLOCKING — {} RED leg(s) enforce at HEAD ({})",
+            blocking_legs.len(),
+            labels.join(", ")
         ));
     }
 
-    // v1.0/v1.5 advisory: WOULD-HAVE-BLOCKED banner, non-failing.
+    // Every RED leg is `AdvisorySubstrate` with its substrate genuinely ABSENT:
+    // WOULD-HAVE-BLOCKED banner, non-failing — never silent-green.
     let banner = format!(
-        "## ⚠️ Escape-Detector Gate: WOULD HAVE BLOCKED SHIP (v2.0)\n\
+        "## ⚠️ Escape-Detector Gate: WOULD HAVE BLOCKED (substrate absent)\n\
          {detail}\
-         - The escape-detector oracle is RED. This gate is advisory at {CURRENT_PHASE}; \
-           it WILL block at v2.0. The `producer-wired-proven-red` + `detection-quality-live` legs are advisory on hosts \
-           whose kernel blocks seccomp (environment-unavailable, not a regression); on \
-           seccomp-capable runners (CI ubuntu-latest) it is a real per-commit tripwire.\n"
+         - Every RED leg needs a seccomp-capable host and this host reported \
+           genuine unavailability, so the RED is environment-unavailable rather \
+           than a regression. On a host that CAN sandbox these legs BLOCK at \
+           HEAD — dev-time enforcement is the binding class, not the ship phase \
+           (kernel seccomp filtering present: {}).\n",
+        seccomp_kernel_filtering()
     );
     emit_command(
         json,
         "warning",
-        "Escape-detector oracle RED — would block ship at v2.0",
+        "Escape-detector oracle RED with substrate absent — would block on a seccomp-capable host",
     );
     write_step_summary(&banner);
     if json {
@@ -692,14 +816,17 @@ pub fn run(json: bool) -> Result<(), String> {
                 "oracle_green": false,
                 "advisory": true,
                 "blocking_now": false,
-                "current_phase": CURRENT_PHASE,
+                "substrate_absent": true,
+                "seccomp_kernel_filtering": seccomp_kernel_filtering(),
+                "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
                 "legs": legs_json(&legs),
             })
         );
     } else {
         eprintln!(
-            "{GATE_NAME}: PASS (advisory — oracle RED, would block at v2.0); {}",
+            "{GATE_NAME}: PASS (advisory — RED legs' substrate absent, would block on a \
+             seccomp-capable host); {}",
             legs.iter()
                 .map(|l| format!("{}={}", l.label, l.status_word()))
                 .collect::<Vec<_>>()

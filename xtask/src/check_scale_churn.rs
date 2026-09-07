@@ -548,7 +548,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "oracle_green": true,
                     "blocking_now": blocking_now,
                     "dev_blocks": dev_blocks,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "enrolled_churn_tests": derived.len(),
                     "legs": legs_json(&legs),
