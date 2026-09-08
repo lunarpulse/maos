@@ -1041,6 +1041,25 @@ fn red_team_gate_fails_on_malformed_toml() {
     assert!(!out.status.success(), "gate should fail on malformed TOML");
 }
 
+/// A documented optional field remains type-checked when present.
+#[test]
+fn red_team_gate_rejects_non_string_optional_notes() {
+    let classes = all_classes();
+    let malformed = make_red_team(&classes, 80, 0).replacen("notes = \"test\"", "notes = 42", 1);
+    let out = run_in_tempdir("check-red-team-gate", |root| {
+        write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &malformed,
+        );
+    });
+    assert!(
+        !out.status.success(),
+        "a non-string optional notes value must fail typed schema validation"
+    );
+}
+
 /// #1 pin: trial gate with empty participant array + successes=12 → hard-fail (derive-from-detail).
 #[test]
 fn trial_gate_fails_on_empty_participants_with_fabricated_successes() {

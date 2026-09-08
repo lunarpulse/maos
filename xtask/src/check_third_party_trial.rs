@@ -15,8 +15,6 @@ use std::path::Path;
 pub struct TrialResults {
     pub trial: TrialSection,
     pub participant: Vec<Participant>,
-    #[serde(default)]
-    pub derivation_provenance: Option<DerivationProvenance>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,11 +32,6 @@ pub struct TrialSection {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DerivationProvenance {
-    pub stamp: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct Participant {
     pub id: String,
     pub stratum: Vec<String>,
@@ -48,8 +41,6 @@ pub struct Participant {
     pub halt_recall: f64,
     pub sbom_verified: bool,
     pub signing_chain_verified: bool,
-    #[serde(default)]
-    pub derivation_provenance: Option<String>,
 }
 
 /// Reject negative counts — these indicate malformed input, not a failed assertion.
@@ -66,7 +57,7 @@ fn validate_dates(start: &str, end: &str) -> Result<(), String> {
 }
 
 // #33: emit_command + validate_dates extracted to gate_common (shared across all gate modules).
-use crate::gate_common::{emit_command, validate_dates as validate_dates_shared, CURRENT_PHASE};
+use crate::gate_common::{emit_command, validate_dates as validate_dates_shared};
 
 /// Wilson score interval (95% CI, z = 1.96) for `successes` out of `n`.
 /// At N=12, successes=10 this returns approximately (0.552, 0.953).

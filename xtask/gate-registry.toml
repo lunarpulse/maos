@@ -166,6 +166,11 @@ gates = [
     # open story that actually claims it. Before this gate nothing read the
     # exit blocks at all.
     "check-exit-commands",
+    # Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Before
+    # this, no CI job ran `cargo test --workspace` unscoped: every invocation
+    # was `-p`/`--test`-scoped, so the exit line's final clause was performed
+    # by hand on a developer's box and nowhere else (a gap, not a demotion).
+    "workspace-test-suite",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -309,6 +314,19 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "check-exit-commands"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 15-1 AC7 / D-3 — the full workspace test suite as a Blocking control.
+# At HEAD before this story NO CI job ran `cargo test --workspace` unscoped
+# (every `cargo test` in discipline.yml was `-p`/`--test`-scoped; both
+# `cargo nextest run` legs in journey-nightly.yml were `-p maos-journey-test`),
+# so the hermetic exit line's final clause was machine-checked by nobody.
+# Cost ruling R-13: one full workspace test run per CI cycle (measured
+# locally: 497 binaries, 4174 tests, ~3 min wall-clock on 32 cores; CI
+# timeout set to 45). Enrolled Blocking-at-every-phase like the other
+# foundation gates — there is no phase at which a red suite should pass.
+[[ship_gate]]
+name = "workspace-test-suite"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
 # scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1

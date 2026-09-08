@@ -541,3 +541,32 @@ control channel, the reader-thread `Vec<JoinHandle<()>>`, the bounded `Receiver`
 and an `Arc<AtomicU64>` drop-counter. `Drop` kills+reaps the child and joins the
 readers so no orphaned process or thread survives. This is process-bound resource
 ownership scoped to a single invocation, not cached kernel domain state per I9.
+
+### `ScbRuntimeSnapshot` — `crates/maos-kernel-core/src/scheduler/control_block.rs`
+
+**Reason:** the mutable execution cell held inside the stable `SpiritControlBlock`
+allocation. Swapped wholesale at hot-swap boundaries under the scheduler supervisor
+(§4.0.8); carries the admitted manifest bundle, the `Arc<dyn AnySpiritObj>` handle,
+priority weight, lifecycle actions, and sandbox tier. Bounded by Spirit lifetime,
+keyed by the SCB's stable identity — structural-state per I9, no pattern learning,
+no persistence across restarts. The denylisted `Arc<dyn AnySpiritObj>` field is the
+Spirit object handle itself, deliberately outside the identity atomics that survive
+hot swaps.
+
+### `VerifiedImageLock` — `crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs`
+
+**Reason:** a T3 image lock that has already passed trust-anchor, signature, and
+placeholder validation (Story 5.5a). `attestations: Vec<T3ImageAttestation>` is
+immutable after verification — constructed only by `load_and_verify_lock`, never
+deserializable from caller input — so the `Vec` is a frozen admission artifact, not
+mutable runtime state. Bounded by the operator-supplied lock file; no cross-Spirit
+aggregation; structural-state caching per I9.
+
+### `ValidatedRevocationRules` — `crates/maos-kernel-core/src/revocation/rules.rs`
+
+**Reason:** shared validated CRL state (Story 5.4). The `admission_gate` tokio
+`Mutex` serializes CRL installation against scheduler map insertion so a rule is
+visible before a concurrent load can commit; the `RwLock<BTreeMap<CrlId, Vec<RevocationEntry>>>`
+holds operator-supplied revocation rules, bounded by CRL input, never learned state.
+Parallel to the capability-token ledger shape: keyed, bounded, no persistence across
+restarts — structural-state per I9.

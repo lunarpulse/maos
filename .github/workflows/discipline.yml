@@ -3410,6 +3410,34 @@ jobs:
           cargo run -p xtask -- check-escape-detector --json 2>&1 | tee /tmp/escape-detector-gate.json
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
+  # Story 15-1 AC7 / D-3 — the exit line's final clause becomes machine-checked.
+  # No CI job ran `cargo test --workspace` before this one: every `cargo test`
+  # in this file was `-p`/`--test`-scoped, so a red workspace suite was
+  # invisible to the aggregate (a GAP, not a demotion — the clause was never
+  # built; re-framed by the 15-1 round-table R-3). Blocking via
+  # v1-0-ship-gate.needs, the 15-3-established home for a registry-enrolled
+  # gate, which the aggregate already depends on transitively. The
+  # worker-cli-fixture pre-build mirrors journey-hermetic-tier-1: maos-bin
+  # tests spawn that binary and it is a `[[bin]]` of the separate `worker`
+  # package (the j1-crosshost-2a P1 shape; the systemic fix is 20-3's).
+  workspace-test-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install nightly toolchain for cargo-public-api integration tests
+        run: rustup toolchain install nightly --profile minimal
+      - name: Install cargo-public-api for workspace integration tests
+        run: cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Build worker-cli-fixture (maos-bin tests spawn it)
+        run: cargo build --locked -p worker --bin worker-cli-fixture
+      - name: Run the full workspace test suite
+        run: cargo test --workspace --locked --no-fail-fast
+
   # explicit result checks to prevent skip-propagation false positives.
   v1-0-ship-gate:
     runs-on: ubuntu-latest
@@ -3460,6 +3488,7 @@ jobs:
       - check-decision-register
       - check-cert-rotation-trigger
       - check-exit-commands
+      - workspace-test-suite
     if: always()
     steps:
       - name: Ship gate results summary
@@ -3500,6 +3529,7 @@ jobs:
           echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
           echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
+          echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo test --workspace --locked --no-fail-fast |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -3535,6 +3565,7 @@ jobs:
           echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
+          echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
           exit 1
 
   aggregate:
@@ -3663,6 +3694,7 @@ jobs:
       - check-cross-form-equiv
       - check-red-team-gate
       - check-migration-merkle
+      - workspace-test-suite
     if: always()
     permissions:
       pull-requests: write

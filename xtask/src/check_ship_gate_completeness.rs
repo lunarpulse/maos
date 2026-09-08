@@ -108,6 +108,12 @@ const EXPECTED_GATES: &[&str] = &[
     // missing: adding the name before the job and the registry row exist would
     // red this gate rather than the new one.
     "check-exit-commands",
+    // Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Enrolled
+    // LAST of the three self-policing sites for the same reason as
+    // check-exit-commands above: the discipline job and the registry rows
+    // landed first, so this const's expansion can only make the gate red on
+    // a real absence, never on an ordering artifact.
+    "workspace-test-suite",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

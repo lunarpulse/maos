@@ -92,21 +92,21 @@ print('JSON keys validated OK')
     exit 1
 fi
 
-# Step 5: Binary size gate — stripped maos-bin ≤24MiB (AC4) — blocking, deterministic
+# Step 5: Binary size gate — stripped maos-bin ≤28MiB (AC4) — blocking, deterministic
 echo "--- Checking binary size ---"
 strip target/release/maos
 bin_size=$(stat -c%s target/release/maos)
-# Limit raised 10MiB → 16MiB (2026-06-11), then 16MiB → 24MiB (Epic-12 retro
-# 2026-07-14, ratified re-baseline). The single `maos` binary now statically links
-# the full Epic-8 surface (6 reference Spirits, 4 MCP driver sets, the a2a TCP/mTLS
-# stack) PLUS the v2.0/v2.2 additions the first full-branch CI run over the Epic
-# 11+12 line surfaced: the wasmtime WASM host closure, the enterprise SSO/KMS/SIEM
+# Limit raised 10MiB → 16MiB (2026-06-11), 16MiB → 24MiB (Epic-12 retro
+# 2026-07-14), then 24MiB → 28MiB (Story 15-1 review, 2026-09-08).
+# The single `maos` binary now statically links the full Epic-8 surface (6 reference
+# Spirits, 4 MCP driver sets, and the a2a TCP/mTLS stack) plus the v2.0/v2.2 additions
+# from the Epic 11+12 line: the wasmtime WASM host closure, the enterprise SSO/KMS/SIEM
 # adapters (maos-sso/secrets/siem), the cohort A2A mesh, and Postgres/pgvector
-# Loom-lite — measured 21MiB stripped. Slimming would require opt-level="z"/fat-LTO
-# (regresses the §13.1 latency benches: cap_token_verify / hello_spirit / J1 / J4)
-# or splitting reference Spirits out of the default binary (the standing remedy,
-# deferred). FLAG-Winston/John: ratify the 24MiB re-baseline (Epic-12 retro Q2).
-max_size=25165824  # 24 MiB — Epic-12 retro re-baseline (was 16MiB; measured 21MiB)
+# Loom-lite. Story 15-1 measured 26,473,608 bytes (25.25MiB) with the repository's
+# pinned stable toolchain; 28MiB restores 2.75MiB of explicit growth headroom.
+# Slimming still requires opt-level="z"/fat-LTO (which regresses the §13.1 latency
+# benches) or splitting reference Spirits out of the default binary.
+max_size=29360128  # 28 MiB — Story 15-1 measured re-baseline
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then
     echo "ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit"

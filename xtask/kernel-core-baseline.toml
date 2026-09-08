@@ -469,4 +469,13 @@
 #          and false proofs, preserves ABI discriminants and the single-SCB
 #          ownership invariant, adds typed fail-closed errors and executable
 #          negative controls, and removes no public symbols.
-src_lines = 24472
+# HISTORY: Story 15-1 AC2 (2026-09-08): 24472 -> 24474 physical lines (+2).
+#          The I9 repair: the `af788c3e` misattachment moved (net 0, doc +
+#          attribute returned from T3ImageVerificationConfig to their owner
+#          SecurityManagerAdapter) plus two single-line `#[i9_exempt]`
+#          attributes on ScbRuntimeSnapshot (scheduler/control_block.rs) and
+#          VerifiedImageLock (security/sandbox/t3/image_lock.rs), each with
+#          reason <= 63 chars so check-fmt keeps the line at one. D-F standing
+#          permission ("15-1 +2"); the paired kloc row moves 18933 -> 18935 in
+#          the same commit or the two instruments disagree again.
+src_lines = 24474

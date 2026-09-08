@@ -174,7 +174,7 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
 
     if violations.is_empty() {
         eprintln!(
-            "check-env-contract: PASS ({} maos-bin/src MAOS_* vars registered, 0 violations; workspace coverage tracked in Story 12.7)",
+            "check-env-contract: PASS ({} maos-bin/src MAOS_* vars registered, 0 violations; workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)",
             registered.len()
         );
         Ok(())
@@ -183,7 +183,7 @@ pub fn run(maos_bin_dir: &str, json: bool) -> Result<(), String> {
             eprintln!("  VIOLATION: {v}");
         }
         Err(format!(
-            "check-env-contract: FAIL — {} unregistered maos-bin/src MAOS_* env reads (workspace coverage tracked in Story 12.7)",
+            "check-env-contract: FAIL — {} unregistered maos-bin/src MAOS_* env reads (workspace-wide env surface is Story 21-4 / xtask env-contract.toml — D-I)",
             violations.len()
         ))
     }

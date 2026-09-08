@@ -466,6 +466,16 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         purpose: "Path to an operator TOML file of host-managed CliWrapper grants ([[grant]] attested_image/signing_key_id/permitted_tier/permitted_egress_destinations); replaces the v0.9 self-grant. Absent → built-in fixture grant only, real agent CLIs fail closed (j1-tier2-live-agent-signed-bridge)",
         stability: EnvStability::UserFacing,
     },
+    EnvVar {
+        name: "MAOS_OPERATOR_BEARER_TOKEN",
+        purpose: "Bearer token for the loopback operator HTTP surface; enables the surface when set (read at the main.rs composition root, validated against MAOS_OPERATOR_HTTP_BIND) (Story 15-1 AC5)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_OPERATOR_HTTP_BIND",
+        purpose: "Bind address for the loopback operator HTTP surface (default 127.0.0.1:8787); setting it without the bearer token is a typed refusal (Story 15-1 AC5)",
+        stability: EnvStability::UserFacing,
+    },
 ];
 
 pub fn lookup(name: &str) -> Option<&'static EnvVar> {

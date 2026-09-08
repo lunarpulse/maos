@@ -584,3 +584,16 @@
 "maos_kernel_core::memory::read_entry_point::enforce_region"             = "data-movement"
 # Erasure-class lineage id set: data-movement (governance payload/registry lookup)
 "maos_kernel_core::memory::ERASURE_CLASS_LINEAGE_IDS"                    = "data-movement"
+
+# Story 15-1 AC3 — the 8 genuinely-new paths surfaced by the af788c3e->2fd492c0
+# drift (18 signature refreshes baselined separately in
+# docs/ci-baselines/kernel-surface-v0.1-beta.json, 370->369; see ADR-066).
+# One line each, grounded in what the symbol does:
+"maos_kernel_core::hot_swap::state_codec::validate_logical_envelope"   = "data-movement"    # schema-guards + structurally validates the hot-swap state-envelope payload; no lifecycle control
+"maos_kernel_core::scheduler::control_block::ScbRuntimeSnapshot"       = "supervision"      # the scheduler supervisor's mutable SCB execution cell, swapped under supervisor control
+"maos_kernel_core::lifecycle::upgrade::SuccessorSpiritFactory"         = "supervision"      # constructs the successor Spirit during upgrade; lifecycle upgrade family (all supervision)
+"maos_kernel_core::security::sandbox::t3::image_lock::VerifiedImageLock"        = "supervision"  # sandbox-family admission type; same class as SandboxSpec/SandboxedChild/SpawnError
+"maos_kernel_core::security::sandbox::t3::image_lock::VerifiedImageAttestation" = "supervision"  # frozen verified admission artifact selected out of VerifiedImageLock
+"maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock_at"  = "supervision"  # trust-anchor + signature admission path; sandbox family
+"maos_kernel_core::security::sandbox::t3::image_verify::normalize_repository"   = "data-movement" # pure string transform on an image URI (digest/tag stripping); no numeric-compare surface
+"maos_kernel_core::security::sandbox::t3::spawn::commit_spawn_report"           = "supervision"  # writes the kernel-managed spawn audit report (taxonomy: audit-log read/write)

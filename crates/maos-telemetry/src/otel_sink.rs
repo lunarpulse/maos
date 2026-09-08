@@ -100,6 +100,7 @@ impl BoundedExportState {
 #[derive(Clone)]
 pub struct BoundedExportProbe {
     shared: Arc<BoundedExportState>,
+    tx: tokio::sync::mpsc::Sender<QueueMessage>,
 }
 
 impl BoundedExportProbe {
@@ -116,7 +117,30 @@ impl BoundedExportProbe {
     }
 
     pub fn pause_consumer(&self) {
-        *self.shared.paused.lock().unwrap_or_else(|p| p.into_inner()) = true;
+        if *self.shared.paused.lock().unwrap_or_else(|p| p.into_inner()) {
+            return;
+        }
+
+        let (reply_tx, reply_rx) = std::sync::mpsc::sync_channel(0);
+        let mut message = QueueMessage::Pause(reply_tx);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            match self.tx.try_send(message) {
+                Ok(()) => break,
+                Err(tokio::sync::mpsc::error::TrySendError::Full(returned)) => {
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "OTel export worker did not accept pause before timeout"
+                    );
+                    message = returned;
+                    std::thread::yield_now();
+                }
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => return,
+            }
+        }
+        reply_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("OTel export worker did not acknowledge pause");
     }
 
     pub fn resume_consumer(&self) {
@@ -157,6 +181,7 @@ impl std::fmt::Debug for BoundedExportProbe {
 
 enum QueueMessage {
     Batch(Vec<SpanData>),
+    Pause(std::sync::mpsc::SyncSender<()>),
     Flush(std::sync::mpsc::SyncSender<OTelSdkResult>),
     Shutdown {
         timeout: Duration,
@@ -171,6 +196,7 @@ impl std::fmt::Debug for QueueMessage {
                 .debug_tuple("Batch")
                 .field(&format_args!("{} spans", batch.len()))
                 .finish(),
+            Self::Pause(_) => f.write_str("Pause(..)"),
             Self::Flush(_) => f.write_str("Flush(..)"),
             Self::Shutdown { timeout, .. } => f
                 .debug_struct("Shutdown")
@@ -294,6 +320,13 @@ fn spawn_export_worker<E: SpanExporter + 'static>(
                         let result = runtime.block_on(exporter.export(batch));
                         thread_shared.record_export_result(exported, result);
                     }
+                    QueueMessage::Pause(reply) => {
+                        *thread_shared
+                            .paused
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner()) = true;
+                        let _ = reply.send(());
+                    }
                     QueueMessage::Flush(reply) => {
                         let _ = reply.send(exporter.force_flush());
                     }
@@ -352,7 +385,10 @@ impl OtelTraceSink {
         let shared = Arc::new(BoundedExportState::new());
         let (tx, rx) = tokio::sync::mpsc::channel(capacity.max(1));
         spawn_export_worker(exporter, rx, Arc::clone(&shared));
-        let probe = BoundedExportProbe { shared };
+        let probe = BoundedExportProbe {
+            shared,
+            tx: tx.clone(),
+        };
         let provider = SdkTracerProvider::builder()
             .with_simple_exporter(QueueingSpanExporter {
                 tx,
