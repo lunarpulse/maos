@@ -111,4 +111,16 @@ This is an engineering classification, not legal export advice; it is **pending
 export-compliance counsel review before v1.0 enterprise distribution**.
 Operators and distributors must confirm applicability with their own counsel
 and the jurisdiction of distribution.
+
+The WASM host remains outside the shipped default closure while export Hold 2
+is open. `crates/maos-bin/Cargo.toml` defines `default = ["network"]`; the
+`wasm-host` feature is opt-in and is the engineering precondition for the
+unresolved **5D002.c.1** classification. Measured with `cargo tree -p maos-bin
+--edges all`, the default closure contains zero `wasmtime` packages; `--features
+wasm-host` opts into the engine family (wasmtime/cranelift/pulley/wiggle), whose
+coordinated 46.0.2 → 46.0.3 security upgrade moved 39 lockfile entries. Consequently,
+the wasmtime 46.0.2 RustSec advisories addressed by Story 15-5 did not reach a
+published default binary. Self-builders who opt in must follow
+`docs/compliance/export-counsel-precondition.md`; this is not a legal
+classification or permission to distribute the WASM-enabled artifact.
 <!-- END PRESERVED:export -->
