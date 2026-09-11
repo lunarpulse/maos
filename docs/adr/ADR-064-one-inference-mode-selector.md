@@ -11,35 +11,51 @@ Supersedes: the uncoordinated `--live`, `--replay-llm`, `MAOS_JOURNEY_MODE`, and
 
 ## Context
 
-MAOS currently has no `MAOS_INFERENCE_MODE` entry in
-`crates/maos-bin/src/env_contract.rs`. Mode selection is distributed across a
-CLI flag and environment-variable presence.
+Story 15-6 implements the accepted selector. `MAOS_INFERENCE_MODE` is now a
+user-facing entry in `crates/maos-bin/src/env_contract.rs`, and
+`MAOS_REPLAY_CASSETTE` supplies the record/replay payload path. Mode selection
+is resolved once in the `maos-bin` composition root, before any inference
+consumer can execute.
 
-`crates/maos-bin/src/worker_spawn.rs:54-59` accepts `--live` and accepts
-`--replay-llm` as a no-op that sets the same default selected by omitting
-`--live`. The spellings `--replay` and `--deterministic` have never existed;
-they are not compatibility obligations and are not described as retired.
+`crates/maos-bin/src/worker_spawn.rs` still accepts `--live`.
+`--replay-llm` is retired. Before retirement it was not a true no-op: its
+parser arm assigned `live = false`, so its result was order-sensitive when
+combined with `--live`. The spellings `--replay` and `--deterministic` have
+never existed; they are not compatibility obligations and are not described
+as retired.
 
-The Researcher path in `crates/maos-bin/src/main.rs:4633-4680` has three
-branches. `--live` wins first. `MAOS_JOURNEY_MODE=record` wraps the live port
-and requires `MAOS_REPLAY_CASSETTE`. Otherwise, cassette presence selects
-replay, and absence selects the deterministic survey path. Ten existing
-`maos run … --once` callers rely on those unset semantics.
+Unset mode preserves the former Researcher selection: `--live` wins;
+otherwise cassette presence selects replay; otherwise the deterministic
+survey path is selected. A measured inventory found 35 `maos run … --once`
+invocation sites across 18 files, including eight that load the Researcher;
+none explicitly set `MAOS_REPLAY_CASSETTE`.
 
 `MAOS_REPLAY_STRICT` is orthogonal. It changes replay hash-drift handling; it
 does not select record, replay, or live. Three Epic-18 exit commands use it in
 that role.
 
-The shared adapter at `crates/maos-bin/src/main.rs:3170` has no cassette branch.
-Consequently `MAOS_REPLAY_CASSETTE` is currently inert for `maos shell`, even
-though downstream hermetic exit commands name a shell cassette. Supporting
-that consumer is new wiring, not a rename.
+The router-level cassette provider seam is in the composition root before
+`MultiProviderRouter::new`: replay and record replace or wrap every existing
+provider value through `providers_map.values_mut()` while preserving the key
+set and default identifier. The replay arm constructs
+`cassette_replay::CassetteReplayProvider::from_file(cassette, *strict)` and
+the record arm `cassette_replay::CassetteRecordProvider::new(…)`, and each
+arm is anti-rot-anchored independently. The resulting router remains behind
+`InferencePortAdapter`, so capability checks, attribution, IAC emission, and
+Transparency-Log recording still mediate completions.
 
-Provider availability also needs an explicit predicate. When no real provider
-is configured, `main.rs:3155-3159` installs `UnconfiguredProvider` under the
-`anthropic` identifier, and the router wiring at `main.rs:3157` inserts a
-matching default identifier, so identifier presence cannot prove that live
-inference is usable.
+Provider availability is tracked separately from identifier presence. A
+keyless boot can register the guessed-default Ollama endpoint without an
+operator configuration, and an empty provider map still installs
+`UnconfiguredProvider`; both fallbacks are explicitly flagged and do not
+satisfy the live predicate. The `ReplayLiveConflict` refusal protects the
+explicit replay-plus-`--live` contradiction.
+
+Cassettes retain schema version `maos.journey.cassette/v1`. Runtime replay is
+compatible with older v1 files that lack provenance and rejects a present
+illegal value. The checked-in corpus separately requires
+`provenance ∈ {seed, live-record}`, with a non-empty denominator enforced by
+CI; record output uses `live-record`.
 
 ## Decision
 
@@ -50,7 +66,7 @@ this ADR rather than restating the precedence rules.
 
 The compatibility lattice is deliberate:
 
-1. When `MAOS_INFERENCE_MODE` is unset, behavior remains byte-for-byte today's
+1. When `MAOS_INFERENCE_MODE` is unset, behavior preserves the prior
    selection: `--live` wins; otherwise cassette presence selects replay;
    otherwise the deterministic path remains selected.
 2. When `MAOS_INFERENCE_MODE` is set, it is authoritative.
@@ -58,22 +74,32 @@ The compatibility lattice is deliberate:
    error with a non-zero exit, never a silent precedence choice.
 4. `record` and `replay` require `MAOS_REPLAY_CASSETTE`; absence is a typed
    configuration error.
-5. `live` requires a real configured provider. `UnconfiguredProvider` remains
-   installed for the unset compatibility path but is explicitly flagged and
-   does not satisfy the live predicate.
+5. `live` requires a real configured provider. `UnconfiguredProvider` and the
+   guessed-default Ollama endpoint remain available for unset compatibility,
+   but are explicitly flagged and do not satisfy the live predicate.
+
+The provider-value seam identified in Context is normative. Record and replay
+replace or wrap router provider values before adapter construction; they do
+not bypass `InferencePortAdapter`, change provider keys, or change the default
+identifier.
+
+The record wrapper's `credential_fingerprint()` hashes the cassette path by
+ruling (15-6 §A6 review, decision 3): record-mode rate-limit identity and
+`RateLimited` telemetry are intentionally keyed by cassette, not by
+credential bytes.
+
+Runtime replay accepts an absent provenance field for v1 compatibility and
+rejects any present value outside `seed|live-record`. Every checked-in cassette
+in the journey corpus must carry one of those two values, with the corpus
+denominator checked before validation. The recorder writes `live-record`;
+hand-authored fixtures use `seed`.
 
 `MAOS_REPLAY_STRICT` remains a replay modifier and stays `HarnessOnly`.
-`MAOS_INFERENCE_MODE` is `UserFacing`. `MAOS_REPLAY_CASSETTE` is promoted from
-`HarnessOnly` to `UserFacing` with it because a user-facing mode cannot depend
-on a hidden-only required argument.
+`MAOS_INFERENCE_MODE` and `MAOS_REPLAY_CASSETTE` are `UserFacing`.
 
 `--replay-llm` and `MAOS_JOURNEY_MODE` are retired by Story 15-6. No
 `--replay` or `--deterministic` retirement is claimed because neither spelling
 has existed.
-
-The shell/shared adapter gains cassette handling in Story 15-6. That is an
-explicit implementation obligation; this ADR does not pretend the current
-Researcher-only branch already covers every inference consumer.
 
 ## Consumers
 

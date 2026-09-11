@@ -72,6 +72,11 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_ANTHROPIC_API_KEY",
+        purpose: "Anthropic credential; a present non-empty value marks the live provider eligible (15-6 §A6 review)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_MCP_CALENDAR_URI",
         purpose: "Butler MCP calendar server URI",
         stability: EnvStability::UserFacing,
@@ -252,14 +257,14 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
-        name: "MAOS_REPLAY_CASSETTE",
-        purpose: "Path to cassette file for replay InferencePort (journey-test harness)",
-        stability: EnvStability::HarnessOnly,
+        name: "MAOS_INFERENCE_MODE",
+        purpose: "Authoritative inference mode: live, record, or replay",
+        stability: EnvStability::UserFacing,
     },
     EnvVar {
-        name: "MAOS_JOURNEY_MODE",
-        purpose: "Journey test mode: 'record' appends live responses to cassette",
-        stability: EnvStability::HarnessOnly,
+        name: "MAOS_REPLAY_CASSETTE",
+        purpose: "Cassette path for authoritative inference record or replay",
+        stability: EnvStability::UserFacing,
     },
     EnvVar {
         name: "MAOS_REPLAY_STRICT",

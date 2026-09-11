@@ -866,7 +866,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // (no `manifest_scopes`) applies to `verbs.rs` like every other file: it
     // is a pure argv table and must never seed the manifest-derived policy
     // table.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 18] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 19] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -933,6 +933,12 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // negative covers it: the table resolves argv tokens only and must
         // never seed the manifest-derived policy table.
         ("verbs.rs", include_str!("../src/verbs.rs")),
+        // Story 15-6 — authoritative inference-mode resolution. Listed so its
+        // composition-root inputs cannot become a manifest-scope back-channel.
+        (
+            "inference_mode.rs",
+            include_str!("../src/inference_mode.rs"),
+        ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

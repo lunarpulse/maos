@@ -881,3 +881,18 @@ run and is filed with a live owner rather than patched here.
 - **Corpus regex tolerance** — `^ADR-[0-9]{3}-.+\.md$` plus top-level-only scan makes `ADR-060b`-suffixed, subdirectory, and case-variant ADR files invisible to the corpus, the bijection, and the denominator. R6 deliberately tolerates the superseding-suffix case ("existence, not exclusivity"); revisit when a superseding ADR actually appears. Evidence: `xtask/tests/decision_adrs_and_provisioning.rs:50-68,:91-103`.
 - **No checklist row→secret reverse bijection** — the oracle requires every workflow secret to have a checklist row, but a retired secret's row is never flagged, so stale rows accumulate silently. Evidence: `xtask/tests/decision_adrs_and_provisioning.rs:586-593`.
 - **Fixture checklist header shape divergence** — the test fixture builds a 7-cell checklist header while the real file is 5-cell; parser is shape-agnostic so both parse, but d19's stated methodology ("fixtures mirror the real file's shape") is not followed. Evidence: `xtask/tests/decision_adrs_and_provisioning.rs:734` vs `docs/runbooks/provisioning-checklist.md:20`.
+
+## Deferred from: 15-6-inference-replay-seam (2026-09-10)
+
+- **`EnvStability` declarations have no user-facing reader.** `MAOS_INFERENCE_MODE` and
+  `MAOS_REPLAY_CASSETTE` are correctly classified `UserFacing`, but neither
+  `check-env-contract` nor a runtime/docs surface renders that classification. **Owner:
+  `16-4-maos-uninstall-and-keyring`** — add the `maos --help` / `docs/maos.dev/run-maos.md`
+  environment surface while documenting the provider-key source. This is presentation of the
+  selector contract, not selector behavior.
+- **FR47 replay-mediation asymmetry — CLOSED by Story 15-6's selected provider-value seam, not open
+  implementation debt.** Replay now remains behind `InferencePortAdapter`; the mediated spike
+  passed, so the fallback-only per-consumer wrap and its unmediated claim boundary were not taken.
+  **Contingency route:** if that architecture is later replaced by an unmediated fallback, record
+  the runnable probe and claim boundary in `RELEASE-HOLDS.md` under D-15-6-I/L before claiming
+  hermetic replay; do not assign a code story while the mediated invariant remains true.

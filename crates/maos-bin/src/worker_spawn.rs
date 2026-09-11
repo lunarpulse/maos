@@ -53,10 +53,6 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
         match a.as_str() {
             "--live" => live = true,
             "--once" => once = true,
-            // `--replay-llm` is the explicit hermetic flag JB-3's PTY command
-            // uses; it is the DEFAULT (no `--live`) and accepted as a no-op so
-            // the documented command string stays stable.
-            "--replay-llm" => live = false,
             other if !other.starts_with("--") && manifest_path.is_none() => {
                 manifest_path = Some(other.to_string());
             }

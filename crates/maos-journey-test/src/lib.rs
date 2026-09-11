@@ -327,16 +327,16 @@ impl Drop for MockMcp {
     }
 }
 
-/// A replay LLM provider keyed by a cassette file.
+/// A replay/record LLM provider keyed by a cassette file.
 pub struct ReplayProvider {
-    _cassette: String,
+    cassette_source: Option<PathBuf>,
     cassette_file: Option<PathBuf>,
 }
 
 impl Default for ReplayProvider {
     fn default() -> Self {
         Self {
-            _cassette: String::new(),
+            cassette_source: None,
             cassette_file: None,
         }
     }
@@ -356,7 +356,7 @@ impl ReplayProvider {
                 .unwrap_or_else(|e| panic!("ReplayProvider: failed to copy cassette {path}: {e}"));
         }
         Self {
-            _cassette: path.to_string(),
+            cassette_source: Some(src.to_path_buf()),
             cassette_file: Some(dest),
         }
     }
@@ -369,7 +369,11 @@ impl ReplayProvider {
     pub fn queue_scalar(&self, _tag: &str, _value: f64) {}
 
     pub fn cassette_path(&self) -> Option<&Path> {
-        self.cassette_file.as_deref()
+        if std::env::var("MAOS_INFERENCE_MODE").as_deref() == Ok("record") {
+            self.cassette_source.as_deref()
+        } else {
+            self.cassette_file.as_deref()
+        }
     }
 }
 
@@ -454,6 +458,14 @@ impl Pty {
             cmd.env(k, v);
         }
 
+        // 15-6 §A6 review P1: a cassette-free world must not inherit an
+        // outer MAOS_INFERENCE_MODE — the nightly rerecord leg exports
+        // `record` job-wide, and the selector would refuse a cassette-free
+        // child before the journey runs. Cassette-bearing worlds keep it:
+        // they are that leg's re-record targets.
+        if !world.env().contains_key("MAOS_REPLAY_CASSETTE") {
+            cmd.env_remove("MAOS_INFERENCE_MODE");
+        }
         let child = pair
             .slave
             .spawn_command(cmd)

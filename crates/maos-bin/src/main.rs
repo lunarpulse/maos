@@ -28,7 +28,6 @@
 //! Story 1b.5a adds the one-shot mode: set `MAOS_ONE_SHOT=hello-spirit`
 //! to run the reference Spirit once and print JSON to stdout.
 
-mod cassette_replay;
 mod env_contract;
 // Story 11.4b — out-of-kernel sandbox-escape detector consumer (ADR-024).
 // Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
@@ -56,7 +55,11 @@ mod verbs;
 // `&EnterprisePdpRuntime`; both are CONSUMED here, never re-declared as a second,
 // test-invisible `mod`.
 #[cfg(feature = "network")]
+use maos_bin::cassette_replay;
+#[cfg(feature = "network")]
 use maos_bin::enterprise_pdp_runtime;
+#[cfg(feature = "network")]
+use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
 #[cfg(feature = "network")]
 use maos_bin::worker_spawn::{
     issue_enterprise_governed_capability, parse_run_args, resolve_cli_binary,
@@ -3114,14 +3117,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // maos-secrets / OS keyring is a later story.
     let mut providers_map: std::collections::BTreeMap<String, Arc<dyn maos_providers::Provider>> =
         std::collections::BTreeMap::new();
+    let mut live_provider_available = false;
     let mut default_id: Option<String> = None;
 
+    // Review P2 (15-6 §A6): an empty credential string is not a configured
+    // provider — registration stays (unset-mode compatibility), but it must
+    // not satisfy the explicit-live predicate.
+    let anthropic_key_usable = std::env::var("MAOS_ANTHROPIC_API_KEY")
+        .map(|key| !key.trim().is_empty())
+        .unwrap_or(false);
     if let Ok(provider) = AnthropicProvider::new(
         Arc::clone(&io_arc),
         "https://api.anthropic.com".into(),
         "claude-haiku-4-5-20251001".into(),
     ) {
         providers_map.insert("anthropic".into(), Arc::new(provider));
+        live_provider_available |= anthropic_key_usable;
         default_id.get_or_insert_with(|| "anthropic".into());
         eprintln!("maos: Anthropic provider registered");
     }
@@ -3132,13 +3143,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "gpt-4o-mini".into(),
     ) {
         providers_map.insert("openai".into(), Arc::new(provider));
+        live_provider_available = true;
         default_id.get_or_insert_with(|| "openai".into());
         eprintln!("maos: OpenAI provider registered");
     }
 
     {
-        let ollama_url =
-            std::env::var("MAOS_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
+        let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
+        let ollama_is_explicit = configured_ollama_url
+            .as_deref()
+            .is_some_and(|url| !url.trim().is_empty() && url != "skip");
+        let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
         if !ollama_url.is_empty() && ollama_url != "skip" {
             if let Ok(provider) = maos_providers::OllamaProvider::new(
                 Arc::clone(&io_arc),
@@ -3146,6 +3161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "llama3.1:8b".into(),
             ) {
                 providers_map.insert("ollama".into(), Arc::new(provider));
+                live_provider_available |= ollama_is_explicit;
                 default_id.get_or_insert_with(|| "ollama".into());
                 eprintln!("maos: Ollama provider registered");
             }
@@ -3156,6 +3172,78 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         providers_map.insert("anthropic".into(), Arc::new(UnconfiguredProvider));
         let _ = default_id.insert("anthropic".into());
         eprintln!("maos: no providers configured — all inference calls return Unconfigured");
+    }
+
+    // Story 15-6 / ADR-064 — resolve the authoritative selector once, after
+    // provider eligibility is known and before either shell or run inference
+    // can execute. Unset preserves the pre-story `--live`/cassette precedence.
+    // Review P3 (15-6 §A6): a present-but-non-UTF-8 mode is a set mode and
+    // must refuse typed, never silently fall back to the unset lattice.
+    let inference_mode_value = match std::env::var_os("MAOS_INFERENCE_MODE") {
+        Some(value) => match value.to_str() {
+            Some(mode) => Some(mode.to_owned()),
+            None => {
+                return Err(InferenceModeError::NonUtf8Mode.to_string().into());
+            }
+        },
+        None => None,
+    };
+    // Review P10: an empty cassette value stays a present value — HEAD's
+    // unset path treated it as cassette-selected (failing the read loudly);
+    // the empty→absent fold broke clause 1's byte-identical contract.
+    let cassette_path = std::env::var_os("MAOS_REPLAY_CASSETTE").map(std::path::PathBuf::from);
+    let replay_strict = std::env::var("MAOS_REPLAY_STRICT").as_deref() == Ok("1");
+    let inference_mode = ResolvedInferenceMode::resolve(
+        inference_mode_value.as_deref(),
+        cassette_path,
+        replay_strict,
+        run_args.as_ref().is_some_and(|run| run.live),
+        live_provider_available,
+    )
+    .map_err(|error| error.to_string())?;
+
+    // The router's public key set and default remain unchanged. Only each
+    // key's driver is replaced/wrapped, so capability scopes, fallback, IAC,
+    // attribution, and Transparency Log behavior stay in the kernel adapter.
+    let mut cassette_recorder: Option<Arc<cassette_replay::CassetteRecorder>> = None;
+    match &inference_mode {
+        ResolvedInferenceMode::Replay {
+            cassette,
+            strict,
+            explicit: true,
+        } => {
+            let replay: Arc<dyn maos_providers::Provider> = Arc::new(
+                cassette_replay::CassetteReplayProvider::from_file(cassette, *strict).map_err(
+                    |error| {
+                        format!(
+                            "MAOS_INFERENCE_MODE=replay cassette initialization failed: {error}"
+                        )
+                    },
+                )?,
+            );
+            for provider in providers_map.values_mut() {
+                *provider = Arc::clone(&replay);
+            }
+        }
+        ResolvedInferenceMode::Record { cassette } => {
+            let recorder = Arc::new(cassette_replay::CassetteRecorder::new(
+                cassette.clone(),
+                "maos".into(),
+                format!("process-{}", std::process::id()),
+            ));
+            for provider in providers_map.values_mut() {
+                *provider = Arc::new(cassette_replay::CassetteRecordProvider::new(
+                    Arc::clone(provider),
+                    Arc::clone(&recorder),
+                ));
+            }
+            cassette_recorder = Some(recorder);
+        }
+        ResolvedInferenceMode::Deterministic
+        | ResolvedInferenceMode::Live { .. }
+        | ResolvedInferenceMode::Replay {
+            explicit: false, ..
+        } => {}
     }
 
     let router = Arc::new(
@@ -3172,12 +3260,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&capability),
         Arc::clone(&transparency_log),
         Arc::clone(&telemetry),
-    )
-    .with_rate_limiter(Arc::clone(&rate_limiter))
+    );
+    let inference = if inference_mode.uses_rate_limiter() {
+        inference.with_rate_limiter(Arc::clone(&rate_limiter))
+    } else {
+        inference
+    }
     .with_iac(Arc::clone(&iac));
     eprintln!("maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)");
     // Story 8.14a — kernel-rendered shell dispatch.
     if shell_mode {
+        if let Some(mode) = inference_mode_value.as_deref() {
+            eprintln!("maos shell: MAOS_INFERENCE_MODE={mode}");
+        }
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let color = maos_cli::accessibility::ColorChoice::resolve(
             plain_flag,
@@ -3280,12 +3375,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let inference_arc: Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync> =
             Arc::new(inference);
-        return maos_shell::run_shell(
+        let shell_result = maos_shell::run_shell(
             inference_arc,
             Arc::clone(&capability),
             color,
             default_provider,
         );
+        // Review P13: the causal shell failure wins. A flush error on the
+        // failure path is reported, never allowed to mask the real cause;
+        // on the success path the flush refusal stays fatal (D-15-6-K).
+        if let Some(recorder) = cassette_recorder.as_ref() {
+            match recorder.flush() {
+                Ok(_) => {}
+                Err(flush_error) => {
+                    if shell_result.is_err() {
+                        eprintln!("maos: record-mode flush failed after shell error: {flush_error}");
+                    } else {
+                        return Err(format!("maos: record-mode flush failed: {flush_error}").into());
+                    }
+                }
+            }
+        }
+        return shell_result;
     }
     // ─────────────────────────────────────────────────────────────
 
@@ -3998,6 +4109,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                     );
                 }
+                if let Some(recorder) = cassette_recorder.as_ref() {
+                    recorder.flush().map_err(|error| {
+                        format!("maos run: topology record-mode flush failed: {error}")
+                    })?;
+                }
                 println!(
                     "{}",
                     serde_json::json!({
@@ -4116,6 +4232,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         completion.label()
                     )
                     .into());
+                }
+                // Review P5 (15-6 §A6): this early return bypassed every
+                // record-mode drain point — a record run here exited 0 with
+                // no cassette. Route it through the same fallible finalizer.
+                if let Some(recorder) = cassette_recorder.as_ref() {
+                    recorder.flush().map_err(|error| {
+                        format!("maos run: standalone cli_wrapper record-mode flush failed: {error}")
+                    })?;
                 }
                 return Ok(());
             }
@@ -4635,34 +4759,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Arc::clone(&capability),
                             Arc::clone(&transparency_log),
                             Arc::clone(&telemetry),
-                        )
-                        .with_rate_limiter(Arc::clone(&rate_limiter))
+                        );
+                        let researcher_inference = if inference_mode.uses_rate_limiter() {
+                            researcher_inference.with_rate_limiter(Arc::clone(&rate_limiter))
+                        } else {
+                            researcher_inference
+                        }
                         .with_iac(Arc::clone(&iac));
                         let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                            if std::env::var("MAOS_JOURNEY_MODE").as_deref() == Ok("record") {
-                                let cassette_path = std::env::var("MAOS_REPLAY_CASSETTE")
-                                .map_err(|_| "maos run: MAOS_JOURNEY_MODE=record requires MAOS_REPLAY_CASSETTE".to_string())?;
-                                eprintln!("maos run: researcher record-mode → {cassette_path}");
-                                Arc::new(cassette_replay::CassetteRecordPort::new(
-                                    Box::new(researcher_inference),
-                                    std::path::PathBuf::from(&cassette_path),
-                                    spirit_id.to_string(),
-                                    "live-record".into(),
-                                ))
-                            } else {
-                                Arc::new(researcher_inference)
-                            };
+                            Arc::new(researcher_inference);
                         researcher = researcher.with_deferred_inference_port(port, binding);
                         eprintln!("maos run: researcher live-inference seam wired (--live)");
-                    } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
-                        let strict = std::env::var("MAOS_REPLAY_STRICT")
-                            .map(|v| v == "1")
-                            .unwrap_or(false);
-                        let replay = cassette_replay::CassetteReplayPort::from_file(
-                            std::path::Path::new(&cassette_path),
-                            strict,
-                        )
-                        .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
+                    } else if inference_mode.is_explicit() {
+                        // Explicit mode is authoritative even without the legacy
+                        // `--live` switch. Replay/record already replaced or wrapped
+                        // every router driver above.
+                        let provider = router
+                            .default_id()
+                            .ok_or("maos run: selected inference mode has no provider key")?
+                            .to_string();
+                        researcher_inference_provider = Some(provider);
+                        let binding = Arc::new(std::sync::Mutex::new(None));
+                        researcher_inference_binding = Some(Arc::clone(&binding));
+                        let researcher_inference = InferencePortAdapter::new(
+                            Arc::clone(&router),
+                            Arc::clone(&capability),
+                            Arc::clone(&transparency_log),
+                            Arc::clone(&telemetry),
+                        );
+                        let researcher_inference = if inference_mode.uses_rate_limiter() {
+                            researcher_inference.with_rate_limiter(Arc::clone(&rate_limiter))
+                        } else {
+                            researcher_inference
+                        }
+                        .with_iac(Arc::clone(&iac));
+                        let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                            Arc::new(researcher_inference);
+                        researcher = researcher.with_deferred_inference_port(port, binding);
+                        eprintln!("maos run: researcher inference seam wired ({inference_mode:?})");
+                    } else if let ResolvedInferenceMode::Replay {
+                        cassette,
+                        strict,
+                        explicit: false,
+                    } = &inference_mode
+                    {
+                        // Exact pre-ADR-064 compatibility path: cassette presence
+                        // alone bypasses the shared router only for Researcher.
+                        let replay =
+                            cassette_replay::CassetteReplayPort::from_file(cassette, *strict)
+                                .map_err(|error| {
+                                    format!("maos run: cassette replay init failed: {error}")
+                                })?;
                         let binding = Arc::new(std::sync::Mutex::new(None));
                         researcher_inference_binding = Some(Arc::clone(&binding));
                         let _ = researcher_inference_provider.insert("replay".into());
@@ -4671,7 +4818,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         researcher = researcher.with_deferred_inference_port(port, binding);
                         eprintln!(
                             "maos run: researcher cassette-replay inference wired ({})",
-                            cassette_path
+                            cassette.display()
                         );
                     } else {
                         eprintln!(
@@ -4883,6 +5030,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "{}",
                     serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                 );
+                if let Some(recorder) = cassette_recorder.as_ref() {
+                    recorder.flush().map_err(|error| {
+                        format!("maos run: record-mode flush failed after on_idle: {error}")
+                    })?;
+                }
                 if kind == LoadedSpiritKind::Researcher
                     && researcher_collective_failure
                         .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
@@ -8091,6 +8243,11 @@ description = "smoke test spirit successor"
         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
         let resp = maos_spirit_hello::run(&inference, token)
             .map_err(|e| format!("hello-Spirit error: {e}"))?;
+        if let Some(recorder) = cassette_recorder.as_ref() {
+            recorder
+                .flush()
+                .map_err(|error| format!("maos: record-mode flush failed: {error}"))?;
+        }
 
         let json =
             serde_json::to_string(&resp).map_err(|e| format!("JSON serialization error: {e}"))?;
@@ -8263,6 +8420,12 @@ description = "smoke test spirit successor"
             Ok(Err(e)) => eprintln!("maos: EnterprisePdpRuntime task returned error: {e}"),
             Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
         }
+    }
+
+    if let Some(recorder) = cassette_recorder.as_ref() {
+        recorder
+            .flush()
+            .map_err(|error| format!("maos: record-mode shutdown flush failed: {error}"))?;
     }
 
     let cap_audit_rows = match transparency_log.query_frames(FrameFilter {

@@ -3,7 +3,16 @@ use maos_domain::ports::inference::{
     StopReason, TokenUsage,
 };
 use sha2::{Digest, Sha256};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+
+fn cassette_fingerprint(path: &std::path::Path) -> u64 {
+    let digest = Sha256::digest(path.as_os_str().as_encoded_bytes());
+    u64::from_be_bytes(
+        digest[..8]
+            .try_into()
+            .expect("SHA-256 digest always contains eight bytes"),
+    )
+}
 
 pub struct CassetteReplayPort {
     entries: Vec<CassetteEntry>,
@@ -32,6 +41,16 @@ impl CassetteReplayPort {
             return Err(format!(
                 "cassette: unsupported schema_version '{schema}' (expected maos.journey.cassette/v1)"
             ));
+        }
+        if let Some(provenance) = root.get("provenance") {
+            match provenance.as_str() {
+                Some("seed" | "live-record") => {}
+                _ => {
+                    return Err(format!(
+                        "cassette: illegal provenance {provenance} (expected seed or live-record)"
+                    ));
+                }
+            }
         }
 
         let entries_arr = root
@@ -110,19 +129,17 @@ impl CassetteReplayPort {
             strict,
         })
     }
-}
 
-impl InferencePort for CassetteReplayPort {
-    fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
+    fn complete_ref(&self, req: &InferenceRequest) -> Result<InferenceResponse, String> {
         let mut cursor = self.cursor.lock().unwrap_or_else(|e| e.into_inner());
         let idx = *cursor;
         if idx >= self.entries.len() {
-            let msg = format!(
+            let message = format!(
                 "cassette replay: exhausted ({} entries consumed, no more available)",
                 self.entries.len()
             );
-            eprintln!("maos: CASSETTE EXHAUSTED — {msg}");
-            return Err(InferenceError::ProviderTransport(msg));
+            eprintln!("maos: CASSETTE EXHAUSTED — {message}");
+            return Err(message);
         }
         let entry = &self.entries[idx];
 
@@ -134,15 +151,15 @@ impl InferencePort for CassetteReplayPort {
         if entry.prompt_sha256 != "0000000000000000000000000000000000000000000000000000000000000000"
             && (entry.prompt_sha256 != actual_hash || entry.prompt_len != actual_len)
         {
-            let msg = format!(
+            let message = format!(
                 "cassette drift at seq {idx}: expected sha256={} len={}, got sha256={actual_hash} len={actual_len}",
                 entry.prompt_sha256, entry.prompt_len
             );
             if self.strict {
-                eprintln!("maos: CASSETTE STRICT ERROR — {msg}");
-                return Err(InferenceError::ProviderTransport(msg));
+                eprintln!("maos: CASSETTE STRICT ERROR — {message}");
+                return Err(message);
             }
-            eprintln!("maos: CASSETTE DRIFT WARNING — {msg}");
+            eprintln!("maos: CASSETTE DRIFT WARNING — {message}");
         }
 
         *cursor = idx + 1;
@@ -150,12 +167,165 @@ impl InferencePort for CassetteReplayPort {
     }
 }
 
-pub struct CassetteRecordPort {
-    inner: Box<dyn InferencePort + Send + Sync>,
+impl InferencePort for CassetteReplayPort {
+    fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
+        self.complete_ref(&req)
+            .map_err(InferenceError::ProviderTransport)
+    }
+}
+
+/// Provider-level replay adapter used by the shared multi-provider router.
+pub struct CassetteReplayProvider {
+    replay: CassetteReplayPort,
+    credential_fingerprint: u64,
+}
+
+impl CassetteReplayProvider {
+    pub fn from_file(path: &std::path::Path, strict: bool) -> Result<Self, String> {
+        CassetteReplayPort::from_file(path, strict).map(|replay| Self {
+            replay,
+            credential_fingerprint: cassette_fingerprint(path),
+        })
+    }
+}
+
+impl maos_providers::Provider for CassetteReplayProvider {
+    fn complete(
+        &self,
+        req: &InferenceRequest,
+    ) -> Result<InferenceResponse, maos_providers::provider::ProviderError> {
+        // Review D2 (15-6 §A6): exhaustion and strict drift must surface as
+        // `ProviderError::Serde` → `InferenceError::MalformedResponse`. The
+        // former `Transport` mapping let `maos-spirit-hello`'s fallback arm
+        // convert a failed explicit replay into a canned "provider
+        // unreachable" success with exit 0; `MalformedResponse` propagates.
+        self.replay
+            .complete_ref(req)
+            .map_err(maos_providers::provider::ProviderError::Serde)
+    }
+
+    fn credential_fingerprint(&self) -> u64 {
+        self.credential_fingerprint
+    }
+}
+
+/// Shared record sink for every provider key in a router.
+pub struct CassetteRecorder {
     path: std::path::PathBuf,
-    entries: Mutex<Vec<serde_json::Value>>,
+    state: Mutex<RecorderState>,
     spirit_id: String,
     session: String,
+}
+
+struct RecorderState {
+    entries: Vec<serde_json::Value>,
+    flushed_entries: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlushOutcome {
+    Written { entries: usize },
+    AlreadyFlushed { entries: usize },
+}
+
+impl CassetteRecorder {
+    pub fn new(path: std::path::PathBuf, spirit_id: String, session: String) -> Self {
+        Self {
+            path,
+            state: Mutex::new(RecorderState {
+                entries: Vec::new(),
+                flushed_entries: 0,
+            }),
+            spirit_id,
+            session,
+        }
+    }
+
+    fn record(&self, req: &InferenceRequest, response: &InferenceResponse) {
+        let mut hasher = Sha256::new();
+        hasher.update(req.prompt.as_bytes());
+        let prompt_sha256 = hex::encode(hasher.finalize());
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let sequence = state.entries.len();
+        state.entries.push(serde_json::json!({
+            "sequence": sequence,
+            "prompt_sha256": prompt_sha256,
+            "prompt_len": req.prompt.len(),
+            "response": {
+                "text": response.text,
+                "stop_reason": match &response.stop_reason {
+                    StopReason::MaxTokens => "max_tokens",
+                    StopReason::StopSequence => "stop_sequence",
+                    StopReason::ProviderStop(reason) => reason,
+                },
+                "usage": {
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                },
+                "provider_attribution": {
+                    "provider_id": response.provider_attribution.provider_id,
+                    "endpoint_url": response.provider_attribution.endpoint_url,
+                    "model_id": response.provider_attribution.model_id,
+                },
+            },
+        }));
+    }
+
+    pub fn flush(&self) -> Result<FlushOutcome, String> {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if state.entries.is_empty() {
+            return Err(
+                "cassette record flush refused: zero successful inference responses".into(),
+            );
+        }
+        if state.flushed_entries == state.entries.len() {
+            return Ok(FlushOutcome::AlreadyFlushed {
+                entries: state.entries.len(),
+            });
+        }
+        // AC4 / review P4: the top-level `model_id` is the real model the
+        // first recorded response attributed itself to — never a placeholder.
+        let model_id = state
+            .entries
+            .first()
+            .and_then(|entry| entry.get("response"))
+            .and_then(|response| response.get("provider_attribution"))
+            .and_then(|attribution| attribution.get("model_id"))
+            .and_then(|value| value.as_str())
+            .map(str::to_owned)
+            .unwrap_or_else(|| "unattributed".into());
+        let cassette = serde_json::json!({
+            "schema_version": "maos.journey.cassette/v1",
+            "provenance": "live-record",
+            "recorded_at": chrono_stub(),
+            "model_id": model_id,
+            "spirit_id": self.spirit_id,
+            "session": self.session,
+            "entries": &state.entries,
+        });
+        let serialized = serde_json::to_string_pretty(&cassette)
+            .map_err(|error| format!("cassette serialization failed: {error}"))?;
+        std::fs::write(&self.path, serialized)
+            .map_err(|error| format!("cassette record write failed: {error}"))?;
+        state.flushed_entries = state.entries.len();
+        Ok(FlushOutcome::Written {
+            entries: state.entries.len(),
+        })
+    }
+}
+
+impl Drop for CassetteRecorder {
+    fn drop(&mut self) {
+        if let Err(error) = self.flush() {
+            eprintln!("maos: cassette recorder drop backstop: {error}");
+        }
+    }
+}
+
+/// Legacy port-level recorder retained for the unset compatibility path.
+pub struct CassetteRecordPort {
+    inner: Box<dyn InferencePort + Send + Sync>,
+    recorder: Arc<CassetteRecorder>,
 }
 
 impl CassetteRecordPort {
@@ -167,75 +337,57 @@ impl CassetteRecordPort {
     ) -> Self {
         Self {
             inner,
-            path,
-            entries: Mutex::new(Vec::new()),
-            spirit_id,
-            session,
+            recorder: Arc::new(CassetteRecorder::new(path, spirit_id, session)),
         }
     }
 }
 
 impl Drop for CassetteRecordPort {
     fn drop(&mut self) {
-        let entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
-        if entries.is_empty() {
-            return;
-        }
-        let cassette = serde_json::json!({
-            "schema_version": "maos.journey.cassette/v1",
-            "recorded_at": chrono_stub(),
-            "model_id": "live-recorded",
-            "spirit_id": self.spirit_id,
-            "session": self.session,
-            "entries": *entries,
-        });
-        let serialized = match serde_json::to_string_pretty(&cassette) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("maos: cassette serialization failed: {e}");
-                return;
-            }
-        };
-        if let Err(e) = std::fs::write(&self.path, serialized) {
-            eprintln!("maos: cassette record write failed: {e}");
+        if let Err(error) = self.recorder.flush() {
+            eprintln!("maos: {error}");
         }
     }
 }
 
 impl InferencePort for CassetteRecordPort {
     fn complete(&self, req: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
-        let resp = self.inner.complete(req.clone())?;
-        let mut hasher = Sha256::new();
-        hasher.update(req.prompt.as_bytes());
-        let hash = hex::encode(hasher.finalize());
+        let response = self.inner.complete(req.clone())?;
+        self.recorder.record(&req, &response);
+        Ok(response)
+    }
+}
 
-        let entry = serde_json::json!({
-            "sequence": self.entries.lock().unwrap_or_else(|e| e.into_inner()).len(),
-            "prompt_sha256": hash,
-            "prompt_len": req.prompt.len(),
-            "response": {
-                "stop_reason": match resp.stop_reason {
-                    StopReason::MaxTokens => "max_tokens".to_string(),
-                    StopReason::StopSequence => "stop_sequence".to_string(),
-                    StopReason::ProviderStop(ref s) => s.clone(),
-                },
-                "usage": {
-                    "input_tokens": resp.usage.input_tokens,
-                    "output_tokens": resp.usage.output_tokens,
-                },
-                "provider_attribution": {
-                    "provider_id": resp.provider_attribution.provider_id,
-                    "endpoint_url": resp.provider_attribution.endpoint_url,
-                    "model_id": resp.provider_attribution.model_id,
-                },
-            },
-        });
+/// Provider-level recording adapter used by every existing router key.
+pub struct CassetteRecordProvider {
+    inner: Arc<dyn maos_providers::Provider>,
+    recorder: Arc<CassetteRecorder>,
+    credential_fingerprint: u64,
+}
 
-        self.entries
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .push(entry);
-        Ok(resp)
+impl CassetteRecordProvider {
+    pub fn new(inner: Arc<dyn maos_providers::Provider>, recorder: Arc<CassetteRecorder>) -> Self {
+        let credential_fingerprint = cassette_fingerprint(&recorder.path);
+        Self {
+            inner,
+            recorder,
+            credential_fingerprint,
+        }
+    }
+}
+
+impl maos_providers::Provider for CassetteRecordProvider {
+    fn complete(
+        &self,
+        req: &InferenceRequest,
+    ) -> Result<InferenceResponse, maos_providers::provider::ProviderError> {
+        let response = self.inner.complete(req)?;
+        self.recorder.record(req, &response);
+        Ok(response)
+    }
+
+    fn credential_fingerprint(&self) -> u64 {
+        self.credential_fingerprint
     }
 }
 

@@ -47,6 +47,10 @@ fn maos_cmd() -> Command {
             c
         }
     };
+    let mut cmd = cmd;
+    // 15-6 §A6 review P1: cassette-free child; never inherit a job-level
+    // MAOS_INFERENCE_MODE (nightly rerecord leg).
+    cmd.env_remove("MAOS_INFERENCE_MODE");
     cmd
 }
 

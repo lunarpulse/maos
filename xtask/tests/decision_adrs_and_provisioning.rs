@@ -386,19 +386,52 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
             }
         }
         "064" => {
-            if let Some(env_contract) = anchor_source(
+            if let Some(inference_mode) = anchor_source(
                 root,
                 number,
-                "crates/maos-bin/src/env_contract.rs",
+                "crates/maos-bin/src/inference_mode.rs",
                 findings,
             ) {
-                require_absent(
+                require_contains(
                     number,
                     context,
-                    "MAOS_INFERENCE_MODE",
-                    "crates/maos-bin/src/env_contract.rs",
-                    &env_contract,
-                    "MAOS_INFERENCE_MODE",
+                    "ReplayLiveConflict",
+                    "crates/maos-bin/src/inference_mode.rs",
+                    &inference_mode,
+                    "\"replay\" if cli_live => Err(InferenceModeError::ReplayLiveConflict)",
+                    findings,
+                );
+            }
+            if let Some(main) = anchor_source(root, number, "crates/maos-bin/src/main.rs", findings)
+            {
+                require_contains(
+                    number,
+                    context,
+                    "providers_map.values_mut()",
+                    "crates/maos-bin/src/main.rs",
+                    &main,
+                    "for provider in providers_map.values_mut()",
+                    findings,
+                );
+                // Review P7 (15-6 §A6): the loop text occurs in BOTH the
+                // replay and record arms — each arm is anchored by its own
+                // construction so deleting either half alone still reds.
+                require_contains(
+                    number,
+                    context,
+                    "CassetteReplayProvider::from_file",
+                    "crates/maos-bin/src/main.rs",
+                    &main,
+                    "cassette_replay::CassetteReplayProvider::from_file(cassette, *strict)",
+                    findings,
+                );
+                require_contains(
+                    number,
+                    context,
+                    "CassetteRecordProvider::new",
+                    "crates/maos-bin/src/main.rs",
+                    &main,
+                    "cassette_replay::CassetteRecordProvider::new(",
                     findings,
                 );
             }
@@ -408,7 +441,7 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                 "crates/maos-bin/src/worker_spawn.rs",
                 findings,
             ) {
-                require_contains(
+                require_absent(
                     number,
                     context,
                     "--replay-llm",
@@ -838,7 +871,7 @@ impl Fixture {
                 61 => "env_clear is forbidden before the proxy; --network=none is the T3 model.",
                 62 => "The four GET routes have no 405 today and maos-kernel-core remains excluded.",
                 63 => "RuptureReason lacks the variant and build_server_config uses a flat lookup.",
-                64 => "MAOS_INFERENCE_MODE is absent and --replay-llm remains accepted.",
+                64 => "ReplayLiveConflict guards replay plus --live; providers_map.values_mut() is the router provider-value seam — its arms construct CassetteReplayProvider::from_file and CassetteRecordProvider::new, each anchored independently; --replay-llm is retired.",
                 _ => "Fixture context anchored to no governed decision.",
             };
             let filler = (0..35)
@@ -908,14 +941,15 @@ impl Fixture {
         );
         write_file(
             root,
-            "crates/maos-bin/src/env_contract.rs",
-            "MAOS_REPLAY_CASSETTE\n",
+            "crates/maos-bin/src/inference_mode.rs",
+            "\"replay\" if cli_live => Err(InferenceModeError::ReplayLiveConflict)\n",
         );
         write_file(
             root,
-            "crates/maos-bin/src/worker_spawn.rs",
-            "\"--replay-llm\" => live = false\n",
+            "crates/maos-bin/src/main.rs",
+            "for provider in providers_map.values_mut() {}\ncassette_replay::CassetteReplayProvider::from_file(cassette, *strict)\ncassette_replay::CassetteRecordProvider::new(\n",
         );
+        write_file(root, "crates/maos-bin/src/worker_spawn.rs", "--live\n");
 
         write_file(
             root,
@@ -1081,6 +1115,56 @@ fn every_clause_and_denominator_has_a_planted_red() {
         format!("{body}let _ = \"class.forms\";\n")
     });
     assert_red_contains(&fx, "now contains `class.forms`");
+
+    // ADR-064 conflict refusal: deleting the behavior while keeping an
+    // unrelated environment registry receipt must red.
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-bin/src/inference_mode.rs", |_| {
+        "pub enum InferenceModeError { ReplayLiveConflict }\n".into()
+    });
+    write_file(
+        fx.root(),
+        "crates/maos-bin/src/env_contract.rs",
+        "MAOS_INFERENCE_MODE\n",
+    );
+    assert_red_contains(&fx, "inference_mode.rs no longer contains");
+
+    // ADR-064 seam location: moving provider replacement away from the
+    // router values must red.
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-bin/src/main.rs", |_| {
+        "let replay = CassetteReplayProvider;\n".into()
+    });
+    assert_red_contains(&fx, "main.rs no longer contains");
+
+    // ADR-064 replay arm alone: the record loop survives, the replay
+    // construction is gone — the per-arm anchor must still red.
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-bin/src/main.rs", |_| {
+        "for provider in providers_map.values_mut() {}\ncassette_replay::CassetteRecordProvider::new(\n".into()
+    });
+    assert_red_contains(
+        &fx,
+        "main.rs no longer contains `cassette_replay::CassetteReplayProvider::from_file(cassette, *strict)`",
+    );
+
+    // ADR-064 record arm alone: the replay loop survives, the record
+    // construction is gone — the per-arm anchor must still red.
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-bin/src/main.rs", |_| {
+        "for provider in providers_map.values_mut() {}\ncassette_replay::CassetteReplayProvider::from_file(cassette, *strict)\n".into()
+    });
+    assert_red_contains(
+        &fx,
+        "main.rs no longer contains `cassette_replay::CassetteRecordProvider::new(`",
+    );
+
+    // ADR-064 retired flag: restoring the order-sensitive parser arm must red.
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-bin/src/worker_spawn.rs", |body| {
+        format!("{body}\"--replay-llm\" => live = false\n")
+    });
+    assert_red_contains(&fx, "now contains `\"--replay-llm\" => live = false`");
 
     // An anchor file that disappears must red, never pass silently.
     let fx = Fixture::complete();

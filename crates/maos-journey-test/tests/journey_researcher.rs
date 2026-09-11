@@ -109,6 +109,9 @@ fn jr_zero_side_effect_deterministic_floor() {
         ])
         .env("XDG_DATA_HOME", audit_db.path())
         .env("MAOS_HOME", audit_db.path())
+        // 15-6 §A6 review P1: cassette-free child; never inherit a
+        // job-level MAOS_INFERENCE_MODE (nightly rerecord leg).
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn researcher deterministic");

@@ -282,7 +282,12 @@ pub fn run_shell(
                 );
             }
             Err(e) => {
+                // 15-6 §A6 review D2: a failed inference turn (exhausted
+                // cassette, strict drift, unreachable provider) must fail
+                // the shell — printed AND non-zero, never a quiet exit 0.
                 writeln!(stdout, "maos: error: {e}")?;
+                print_line(color_choice, "maos: shell exiting");
+                return Err(e.into());
             }
         }
         stdout.flush()?;
