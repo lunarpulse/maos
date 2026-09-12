@@ -149,9 +149,9 @@
     - Stories: 14.0 **preflight decision register** (Epic-13 retro C2; blocks 14.1) · 14.1 100-host churn · 14.2 10-host rotation chaos · 14.3 ecosystem-readiness + v2.5 ledger · 14.4 operational sweep · 14.5 backend/provider sweep · 14.6 ADR-057 ceiling · 14.7 shared env registry · 14.8 workspace env classification · 14.9 secret-var governance · **14.2a production rotation trigger** (from 14-2's review) · **14.2b cohort convergence observability** · **14.2c plane-C local leaf declaration** · **14.2d self-identity rotation** (three-way split 2026-09-02)
     - Minted by 14.0's rulings (2026-08-26), because a decision whose target is not a story key is not a decision: 14-d3 audit-drop **and legal-hold serialization** (D3 + D5.1, ZERO kernel-Δ, class of eight; merged 2026-08-30 — one crate, one fence, one moment) · 14-d4a `MAOS_REGION_HOME` boot reconciliation (D4a; neither 14.7 nor 14.8 can host a runtime check) · 14-e1 erasure-attestation honesty (D5.2+D5.3) (D5.1 merged into 14-d3, 2026-08-30). Three further vehicles sit outside this epic: `e12-b1-gate-binding-decay-residual` (D20), `v25-erasure-crash-reconciliation` (D5.4), `v25-private-tier-erase-atomicity` (D6's surviving residual).
   - **—— Product-Spine Recovery Lane (correct-course R2 2026-09-04, Lunarpulse-ratified, Fork C; Epics 15–21, 34 stories + operator lane; each epic closes on a hermetic exit command) ——**
-  - [Epic 15: Foundations (W0)](./epic-15-foundations-w0.md) — 6 stories, `in-progress` (opened 2026-09-06 by `15-2-kloc-ceiling-rebase`, the epic's own dependency-order opener)
+  - [Epic 15: Foundations (W0)](./epic-15-foundations-w0.md) — 6 stories, `done` (opened 2026-09-06 by `15-2-kloc-ceiling-rebase`, the epic's own dependency-order opener; closed green 2026-09-12 — all 8 exit legs measured, retro `epic-15-retro-2026-09-12.md`)
     - Stories: 15.1 green at HEAD · 15.2 **kloc ceiling re-base** · 15.3 single phase source + `check-exit-commands` · 15.4 release repair + first signed tag · 15.5 ADR-060..064 + provisioning checklist · 15.6 inference record/replay seam
-  - [Epic 16: One Daemon, One Door — J0 (W1)](./epic-16-one-daemon-one-door-j0-w1.md) — 5 stories, `backlog`
+  - [Epic 16: One Daemon, One Door — J0 (W1)](./epic-16-one-daemon-one-door-j0-w1.md) — 6 stories, `backlog`
     - Stories: 16.1 daemon POST surface + verb re-target · 16.2 shell halt registry + **J0 scene** · 16.3 subprocess crash → handle_crash · 16.4 `maos uninstall` + keyring · 16.5 debt (audit drop, legal hold, deny vocabulary; FLAG-Winston)
   - [Epic 17: Workers and the Third-Party Form — Fork C (W2)](./epic-17-workers-and-third-party-form-w2.md) — 5 stories, `backlog`
     - Stories: 17.1 Worker egress allowlist + scoped credential · 17.2 Worker cgroups · 17.3a WASM recall/componentize spike · 17.3b WASM third-party form with `log.recall` · 17.4 hooks + Observer + activity corpus
@@ -159,7 +159,7 @@
     - Stories: 18.1 Butler inference seam + conformant MCP · 18.2 `maos eval halt` + per-class numbers · 18.3 Researcher replay/live + judged five-metric · 18.4 self-tuning halt with injectable clock
   - [Epic 19: The Founder Loop (W4)](./epic-19-founder-loop-w4.md) — 4 stories, `backlog`
     - Stories: 19.1 Orchestrator dispatch loop + `--epic` · 19.2 FR20 enqueue door · 19.3 real Worker default + effect oracle · 19.4 **J1 beats** + `demo-j1 --replay`
-  - [Epic 20: Ship It (W5)](./epic-20-ship-it-w5.md) — 5 stories, `backlog`
+  - [Epic 20: Ship It (W5)](./epic-20-ship-it-w5.md) — 6 stories, `backlog`
     - Stories: 20.1 registry client + `spirit install` + vetter CLI + yank policy · 20.2 deb/air-gap/Docker/formulas · 20.3 gate honesty pass · 20.4 Gemini + endpoint pin · 20.5 `v1.0.0-rc.1` + LTS rule
   - [Epic 21: Multi-Host on Live Substrate (W6)](./epic-21-multi-host-on-live-substrate-w6.md) — 5 stories, `backlog`
     - Stories: 21.1 J4 incident fixture + live Mira/Nash · 21.2 nightly Postgres + ignored journeys · 21.3 durable TOFU + self-leaf rotation · 21.4 one instrument + env registry · 21.5 optional orchestrator port + move (negative FLAG-Winston)

@@ -46,6 +46,54 @@
 # That premise is dead: the gate is GREEN (the Epic-10/12 retros re-based ceilings
 # to measured residuals), and Phase 4 never ran. Retained here as history only.
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# RECOVERY-LANE CEILING RULE (operator-ratified 2026-09-12, Epic-15 retrospective)
+# -----------------------------------------------------------------------------
+# SUPERSEDES the "Recalculated ONLY at..." paragraph of the CEILING RULE below
+# for the duration of the recovery lane. Everything else in that block stands.
+#
+# Lunarpulse: "I approve ease the constraints on the budgets of kloc until we
+# complete the future epics. We seal it after all developed. Be aware only
+# important and necessary increments allowed, no slops or uncontrolled addition
+# to the kloc."
+#
+# WHO MAY RAISE, AND WHEN — eased:
+#   ANY story may raise ANY per-crate ceiling, provided all three hold:
+#     (1) the code EXISTS and was `cargo fmt --all`-measured BEFORE the ask
+#         (unchanged: "a grant is measured, never estimated" — fmt is what CI
+#         measures, so an unformatted figure is not a measurement);
+#     (2) the raise CITES a `sprint-status.yaml` story key that is NOT `done`;
+#     (3) the measured figure and the driver land in the SAME commit.
+#   The formula `measured + max(100, ceil(0.02 * measured))` becomes the DEFAULT,
+#   not a cap: a story may take exactly measured plus its named driver.
+#   Lowering stays unconditional (architecture §15.5 clause 2(a)).
+#
+# WHEN IT SEALS — derived from the tree, never promised for a date:
+#   the lane FREEZES once every numbered `epic-N` key in sprint-status.yaml is
+#   `done`. No further raise without a NEW operator decision. This is the same
+#   mechanism Story 15-4 built for `xtask` alone (D-15-4-A rule ii), generalised.
+#
+# WHAT WAS **NOT** EASED — the operator drew this boundary explicitly:
+#   * `maos-kernel-core` keeps ZERO HEADROOM (D13(a)). Every kernel-core line
+#     still costs its own measured FLAG-Winston grant and a HISTORY row.
+#   * `xtask/kernel-core-baseline.toml`'s PIN is untouched. The block below says
+#     why these are different mechanisms: the PIN is anti-DRIFT (it never forbade
+#     growth, only UNRECORDED growth); the CEILINGS are anti-GROWTH. The operator
+#     eased budgets. Easing the pin would silently widen the drift that Story
+#     `16-0-kernel-pin-content-hash` exists to close.
+#
+# "NO SLOPS" IS THE EVIDENCE REQUIREMENT, NOT THE CEILING VALUE. What is eased is
+# who may raise and when. What is unchanged is that the code must exist first, be
+# measured formatted, cite an open story, and record its driver. A reservation for
+# planned growth remains forbidden (§8 / the `14-2d T8` phantom) — a grant is a
+# global consumed by whichever story measures first, never a reservation.
+#
+# ENFORCED, not prose: `xtask/tests/recovery_lane_ceiling_rule.rs` (kloc-free)
+# carries the decision procedure with every refusal proven, the kernel-core
+# boundary asserted against this file, and a tree-bound test that FAILS on the day
+# the lane seals so the seal cannot be missed. Its `xtask`-only predecessor is
+# `xtask/tests/d11_xtask_ceiling_ratchet.rs` (Story 15-4).
+#
 # CEILING RULE (founder-ratified 2026-07-25; replaces "tight measured residual")
 # -----------------------------------------------------------------------------
 # Lunarpulse: "as the founder I am okay with incrementing the kernel size."
