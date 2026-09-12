@@ -3418,7 +3418,7 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
-          # - aarch64-apple-darwin # excluded by D-15-4-F: macOS bills ~10x with zero precedent in 177 Linux jobs, and `aggregate` is the branch-protection check — linux first. Kept in place, never deleted: release.yml still ships this artifact on a native macOS runner (packaging/homebrew/maos.rb:24 downloads it), and tag-procedure.md carries the pre-tag workflow_dispatch that gives the target its first build.
+          # - aarch64-apple-darwin # excluded by D-15-4-F: macOS bills ~10x with zero precedent in 177 Linux jobs, and `aggregate` is the branch-protection check — linux first. Kept in place, never deleted: release.yml still ships this artifact on a native macOS runner (packaging/homebrew/maos.rb:24 downloads it), and tag-procedure.md carries the pre-tag rehearsal that gives the target its first build. ⚠ AMENDED 2026-09-12 (Epic-15 retrospective, operator-ratified): that rehearsal is now a LABEL-GATED `pull_request` run of release.yml (`release-rehearsal`), not only a post-merge `workflow_dispatch` — `workflow_dispatch` is unusable until the workflow reaches the default branch, which is the very merge the rehearsal exists to de-risk. The COST RULING IS UNCHANGED: macOS stays out of this matrix and off unlabelled PRs.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1

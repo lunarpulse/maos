@@ -2,14 +2,39 @@ name: release
 on:
   push:
     tags: ['v*']
-  # Pre-tag build rehearsal; sign-and-publish remains tag-push-only.
+  # Pre-tag build rehearsals. `sign-and-publish` is guarded on
+  # `github.event_name == 'push'`, so NEITHER of these can publish.
+  #
+  #  * workflow_dispatch — rehearse at `main` after a merge.
+  #  * pull_request      — rehearse BEFORE a merge, label-gated (see `build.if`).
+  #    Added 2026-09-12 (Epic-15 retrospective, operator-ratified) so that
+  #    `aarch64-apple-darwin`'s first compile in this project's history happens
+  #    on a PR rather than on `main`. `workflow_dispatch` is unusable until the
+  #    workflow reaches the default branch — GitHub only exposes a dispatch
+  #    trigger for workflows present on it — which is exactly the merge the
+  #    rehearsal is supposed to de-risk. A `pull_request` run uses the workflow
+  #    file from the merge commit, so this trigger works on the PR that adds it.
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
+    # D-15-4-F (amended 2026-09-12, Epic-15 retrospective): macOS bills ~10x and
+    # `aggregate` is the branch-protection check, so macOS stays out of the
+    # discipline matrix and OFF ordinary pull requests. The ruling's own purpose
+    # was to give `aarch64-apple-darwin` a first build BEFORE the tag; this gate
+    # serves that purpose one merge earlier at the same cost — one operator-
+    # triggered run, never a per-PR tax.
+    #
+    # Push (tags) and workflow_dispatch are unaffected. A pull request builds
+    # only when it carries the `release-rehearsal` label.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'release-rehearsal')
     timeout-minutes: 45
     strategy:
       fail-fast: false

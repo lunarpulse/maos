@@ -79,6 +79,39 @@ fn release_workflow_flattens_and_publishes_the_explicit_six_binary_set() {
         "manual rehearsals must never publish"
     );
 
+    // Epic-15 retrospective, 2026-09-12 (operator-ratified): the pre-merge
+    // rehearsal path. `workflow_dispatch` is unusable until the workflow reaches
+    // the default branch, which is the very merge the rehearsal de-risks, so the
+    // PR trigger is what gives `aarch64-apple-darwin` its first compile off
+    // `main`. Both assertions below are load-bearing in OPPOSITE directions.
+    let pull_request =
+        get(triggers, "pull_request").expect("pre-merge rehearsal needs a pull_request trigger");
+    assert_eq!(
+        key(pull_request, "branches")
+            .as_sequence()
+            .map(|b| { b.iter().filter_map(Value::as_str).collect::<Vec<_>>() }),
+        Some(vec!["main"]),
+        "the rehearsal trigger is scoped to PRs into main"
+    );
+
+    // THE COST CONTROL. Without this gate every pull request into `main` runs
+    // the full three-target release build, and `macos-latest` bills ~10x — which
+    // is the exact expense D-15-4-F removed macOS from the discipline matrix to
+    // avoid. Deleting the `if` leaves the workflow valid and the rehearsal
+    // working, so nothing else in this suite would notice: a PR tax is a silent
+    // regression, not a broken build. Pin the label by name, because a gate that
+    // matches any label is the same as no gate.
+    // Normalised on BOTH sides: the YAML is a folded scalar and `cargo fmt`
+    // rewrites a `\`-continued Rust literal, so comparing raw text pins the
+    // formatter's whitespace rather than the gate.
+    const REHEARSAL_GATE: &str = "github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'release-rehearsal')";
+    let normalise = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert_eq!(
+        key(build, "if").as_str().map(normalise),
+        Some(normalise(REHEARSAL_GATE)),
+        "the macOS build must stay OFF unlabelled pull requests, and push/dispatch must stay unaffected"
+    );
+
     assert!(key(build, "timeout-minutes").as_u64().is_some());
     assert!(key(publish, "timeout-minutes").as_u64().is_some());
 
