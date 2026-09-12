@@ -14,6 +14,7 @@ pub mod check_host_surface;
 pub mod check_kernel_baseline;
 pub mod check_mock_not_in_release;
 pub mod check_trial_attestation;
+pub mod release_dry_run;
 // corpus_types + gate_common exposed so the lib-compiled gate modules
 // (check_fkcs, check_trial_attestation) can resolve `crate::gate_common`
 // (Option C leg-binding, Epic 12 retro B1). corpus_types is self-contained;

@@ -34,3 +34,6 @@ __pycache__/
 # evidence states). Produced by every ledger-set gate run and uploaded by CI;
 # never committed.
 tests/reports/evidence-ledger-*.json
+
+# Story 15-4 — local release artifact staging.
+/dist/

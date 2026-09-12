@@ -104,9 +104,7 @@ pub enum InferenceModeError {
         "MAOS_INFERENCE_MODE has unsupported value '{value}' (expected live, record, or replay)"
     )]
     InvalidMode { value: String },
-    #[error(
-        "MAOS_INFERENCE_MODE is not valid UTF-8 (expected live, record, or replay)"
-    )]
+    #[error("MAOS_INFERENCE_MODE is not valid UTF-8 (expected live, record, or replay)")]
     NonUtf8Mode,
     #[error("MAOS_INFERENCE_MODE={mode} requires MAOS_REPLAY_CASSETTE")]
     CassetteRequired { mode: &'static str },

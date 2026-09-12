@@ -122,6 +122,8 @@ pub enum Subcommand {
     /// oracle, row count). The source MUST be quiesced (no active writers)
     /// before invoking — the migration engine does not take a write lock.
     Migrate(MigrateArgs),
+    /// Print the release-verification public key embedded in this binary.
+    ReleasePubkey,
     /// `j1-crosshost-2e` AC2 (F1) — cohort-manifest operator surface.
     ///
     /// `sign` is the ONLY thing in the workspace that can produce a signed

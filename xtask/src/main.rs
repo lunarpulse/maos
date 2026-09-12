@@ -89,6 +89,7 @@ mod check_multi_provider_drift;
 mod check_pentest_gate;
 mod check_pub_field_constructors;
 mod check_red_team_gate;
+mod check_release_precondition;
 mod check_review_findings_resolved;
 mod check_security_md;
 mod check_ship_gate_completeness;
@@ -137,6 +138,7 @@ mod invariant_lock;
 mod kloc_check;
 mod nfr_onb_1_gate;
 mod rebaseline_check;
+mod release_dry_run;
 mod release_verify;
 mod sprint_status;
 mod stability_matrix;
@@ -774,6 +776,30 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Story 15-4 AC1 — build and stage release artifacts without secrets.
+    #[command(name = "release-dry-run")]
+    ReleaseDryRun {
+        /// Generate a manifest over already-staged artifacts without building.
+        #[arg(long)]
+        manifest_only: bool,
+        /// Release staging directory.
+        #[arg(long, default_value = "dist")]
+        dist_dir: String,
+        /// Explicit target triples; repeat the option or separate values with commas.
+        #[arg(long, value_delimiter = ',')]
+        targets: Vec<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 15-4 AC3 — require a successful discipline aggregate before publication.
+    #[command(name = "check-release-precondition")]
+    CheckReleasePrecondition {
+        /// GitHub check-runs API response; reads stdin when omitted.
+        #[arg(long)]
+        check_runs: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Story 9.4 R-AG1 — air-gap no-network-symbols CI gate + dirty-fixture bite.
     #[command(name = "check-air-gap")]
     CheckAirGap {
@@ -1359,6 +1385,15 @@ fn main() {
             artifacts_dir.as_deref(),
             json,
         ),
+        Commands::ReleaseDryRun {
+            manifest_only,
+            dist_dir,
+            targets,
+            json,
+        } => release_dry_run::run(manifest_only, &dist_dir, &targets, json),
+        Commands::CheckReleasePrecondition { check_runs, json } => {
+            check_release_precondition::run(check_runs.as_deref(), json)
+        }
         Commands::CheckAirGap {
             binary,
             build_first,

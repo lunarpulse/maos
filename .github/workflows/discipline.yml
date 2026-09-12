@@ -3408,6 +3408,61 @@ jobs:
         run: |
           set -o pipefail
           cargo run -p xtask -- check-escape-detector --json 2>&1 | tee /tmp/escape-detector-gate.json
+  # Story 15-4 AC2 — secret-free release artifact build on both supported Linux targets.
+  release-dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          # - aarch64-apple-darwin # excluded by D-15-4-F: macOS bills ~10x with zero precedent in 177 Linux jobs, and `aggregate` is the branch-protection check — linux first. Kept in place, never deleted: release.yml still ships this artifact on a native macOS runner (packaging/homebrew/maos.rb:24 downloads it), and tag-procedure.md carries the pre-tag workflow_dispatch that gives the target its first build.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-dry-run-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install cross-compile deps (aarch64-linux)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Run release dry-run
+        run: cargo run --locked -p xtask -- release-dry-run --targets ${{ matrix.target }} --json
+      - name: Sign staged manifest with development seed
+        env:
+          RELEASE_SIGNING_KEY: 794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d
+        run: cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
+      - name: Verify with shipped maosctl
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        run: |
+          chmod +x ./dist/maosctl-linux-amd64
+          ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only
+      - name: Reject signature from different seed
+        if: matrix.target != 'aarch64-unknown-linux-gnu'
+        env:
+          RELEASE_SIGNING_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+        run: |
+          cp dist/SHA256SUMS.sig /tmp/maos-release-correct.sig
+          cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
+          if ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only; then
+            echo "forged-signature control failed: maosctl accepted a signature from a different key"
+            exit 1
+          fi
+          mv /tmp/maos-release-correct.sig dist/SHA256SUMS.sig
+      - name: Upload dry-run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run-${{ matrix.target }}
+          path: dist/
+          retention-days: 7
+
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
   # Story 15-1 AC7 / D-3 — the exit line's final clause becomes machine-checked.
@@ -3695,6 +3750,7 @@ jobs:
       - check-red-team-gate
       - check-migration-merkle
       - workspace-test-suite
+      - release-dry-run
     if: always()
     permissions:
       pull-requests: write
@@ -3751,6 +3807,7 @@ jobs:
           echo "ecg=${{ needs.check-epic-close-green.result }}" >> $GITHUB_OUTPUT
           echo "ecc=${{ needs.check-epic-close-coherence.result }}" >> $GITHUB_OUTPUT
           echo "jht1=${{ needs.journey-hermetic-tier-1.result }}" >> $GITHUB_OUTPUT
+          echo "rdr=${{ needs.release-dry-run.result }}" >> $GITHUB_OUTPUT
       - name: Check for failures
         id: status
         run: |
@@ -3813,6 +3870,7 @@ jobs:
             const ecg = '${{ needs.check-epic-close-green.result }}';
             const ecc = '${{ needs.check-epic-close-coherence.result }}';
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
+            const rdr = '${{ needs.release-dry-run.result }}';
             // Pre-existing latent bug fixed by Story 8.16 (surfaced on the FIRST PR, run 27397275823):
             // `dt` is used in the advisory determinism-tests table row but was never declared, so the
             // github-script threw ReferenceError on every `pull_request` event (this step is PR-only,
@@ -3874,6 +3932,7 @@ jobs:
             | check-epic-close-green | ${icon(ecg)} ${ecg} |
             | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
+            | release-dry-run | ${icon(rdr)} ${rdr} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).

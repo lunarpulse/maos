@@ -3389,7 +3389,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(_) => {}
                 Err(flush_error) => {
                     if shell_result.is_err() {
-                        eprintln!("maos: record-mode flush failed after shell error: {flush_error}");
+                        eprintln!(
+                            "maos: record-mode flush failed after shell error: {flush_error}"
+                        );
                     } else {
                         return Err(format!("maos: record-mode flush failed: {flush_error}").into());
                     }
@@ -4238,7 +4240,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // no cassette. Route it through the same fallible finalizer.
                 if let Some(recorder) = cassette_recorder.as_ref() {
                     recorder.flush().map_err(|error| {
-                        format!("maos run: standalone cli_wrapper record-mode flush failed: {error}")
+                        format!(
+                            "maos run: standalone cli_wrapper record-mode flush failed: {error}"
+                        )
                     })?;
                 }
                 return Ok(());

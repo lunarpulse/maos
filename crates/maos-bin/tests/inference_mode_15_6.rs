@@ -521,15 +521,14 @@ fn rate_limiter_polarity_is_mode_scoped() {
     assert!(record.uses_rate_limiter());
 
     let live =
-        ResolvedInferenceMode::resolve(Some("live"), Some(cassette()), false, false, true)
-            .unwrap();
+        ResolvedInferenceMode::resolve(Some("live"), Some(cassette()), false, false, true).unwrap();
     assert!(live.uses_rate_limiter());
 
-    let unset_live = ResolvedInferenceMode::resolve(None, Some(cassette()), false, true, false)
-        .unwrap();
+    let unset_live =
+        ResolvedInferenceMode::resolve(None, Some(cassette()), false, true, false).unwrap();
     assert!(unset_live.uses_rate_limiter());
-    let unset_replay = ResolvedInferenceMode::resolve(None, Some(cassette()), true, false, false)
-        .unwrap();
+    let unset_replay =
+        ResolvedInferenceMode::resolve(None, Some(cassette()), true, false, false).unwrap();
     assert!(unset_replay.uses_rate_limiter());
     let deterministic = ResolvedInferenceMode::resolve(None, None, false, false, false).unwrap();
     assert!(deterministic.uses_rate_limiter());

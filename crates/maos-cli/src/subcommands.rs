@@ -46,8 +46,17 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Governance(args) => dispatch_governance(args, color),
         Subcommand::Backup(args) => dispatch_backup(args, color),
         Subcommand::Migrate(args) => dispatch_migrate(args, color),
+        Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
     }
+}
+
+fn release_pubkey() -> ExitCode {
+    println!(
+        "{}",
+        hex::encode(maos_audit::release_verify::RELEASE_PUBKEY)
+    );
+    ExitCode::SUCCESS
 }
 
 /// `j1-crosshost-2e` AC2 (F1) — `maosctl cohort <sign>`.

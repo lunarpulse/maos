@@ -20,7 +20,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 
 | Leg | Live value |
 |---|---|
-| `kernel_version` | `0.1.0-alpha` |
+| `kernel_version` | `0.1.0-alpha.1` |
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `4` |
 | supported schema window | `1..=4` |

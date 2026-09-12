@@ -23,11 +23,11 @@ than inherited from planning prose.
 | `DOCKERHUB_USERNAME` | `.github/workflows/container.yml:43,52,80` | hard fail: Docker Hub login/image name cannot resolve | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `FUZZ_LEDGER_WRITE_TOKEN` | `.github/workflows/fuzz-cadence.yml:124` | skip-by-design: expression falls back to auto-provided `GITHUB_TOKEN` | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN fallback is sufficient; fuzz branch is blocked by a code bug)` |
 | `MAOS_ANTHROPIC_API_KEY` | `.github/workflows/journey-nightly.yml:88` | hard fail for the paid live re-record leg; hermetic replay is unaffected | `ops-nightly-cassette-rerecord` | `absent` |
-| `MAOS_RELEASE_PUBKEY` | `.github/workflows/release.yml:77,82` | vacuous pass: compile-time guard is omitted when unset | `ops-provisioning-secrets-and-accounts` | `absent` |
-| `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:74,76` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `MAOS_RELEASE_PUBKEY` | `.github/workflows/release.yml:41-46,90-110` | hard fail: an absent/empty key fails the exact lowercase parser; the shipped `maosctl` also refuses the bundled development key | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:93,95` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml:113` | skip-by-design: expression falls back to auto-provided `GITHUB_TOKEN` | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
 | `GitHub OIDC for cosign` | `.github/workflows/container.yml:23-26,74-80` | invalid-ref only if workflow `id-token: write` is removed; no operator secret is required | `ops-provisioning-secrets-and-accounts` | `present` |
-| `macOS/aarch64 release build` | `.github/workflows/release.yml:10-54` | skip-by-design until a release tag dispatches the matrix | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `macOS/aarch64 release build` | `.github/workflows/release.yml:10-60`; `.github/workflows/discipline.yml` `release-dry-run` | partial: Linux aarch64 is blocking per commit; macOS arm64 remains a required manual pre-tag dispatch and tagged-release leg | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `lunarpulse/homebrew-maos` | `packaging/homebrew/maos.rb` | hard fail for publication: repository does not exist and formula hashes remain placeholders | `ops-brew-tap-and-aur-publication` | `absent` |
 | `AUR account and package publication` | `packaging/aur/PKGBUILD` | hard fail for publication: package was not submitted and hashes/version remain scaffold values | `ops-brew-tap-and-aur-publication` | `absent` |
 | `rto-ledger branch permission` | `.github/workflows/rpo-rto-cadence.yml:111-135` | hard fail only if the existing `GITHUB_TOKEN` branch permission is removed | `ops-provisioning-secrets-and-accounts` | `present` |
@@ -53,18 +53,16 @@ than inherited from planning prose.
   `$rec[0]` is an object, so jq refuses the addition. The failed command is left
   of `&&`; execution continues, nothing is staged, and the push is never
   attempted. Story 20-3 owns the code repair.
-- Provisioning `MAOS_RELEASE_PUBKEY` alone does not make its guard reliable.
-  `production_pubkey_must_differ_from_dev_seed` uses `option_env!` at
-  `crates/maos-audit/src/release_verify.rs:280-293`, `maos-audit` has no
-  `build.rs` or `cargo:rerun-if-env-changed`, and
-  `.github/workflows/release.yml:66` restores `rust-cache`. A cached rlib can
-  therefore retain the wrong compile-time value.
-- Provisioning `RELEASE_SIGNING_KEY` alone cannot produce a signature at HEAD.
-  `.github/workflows/release.yml:67-73` downloads matrix artifacts without
-  `merge-multiple: true`; `sha256sum maos-*` receives directories and fails
-  before the key is read. Story 15-4 owns that repair. The workflow also
-  packages only `maos`, while `ops-first-signed-tag` expects the final release
-  artifact set.
+- Provisioning `MAOS_RELEASE_PUBKEY` is required at binary build time. The
+  compile-time parser rejects an absent secret (GitHub supplies an empty value),
+  non-lowercase input, and any length other than 64 hex characters. The release
+  workflow then executes the shipped `maosctl release-pubkey` and refuses the
+  documented development key before self-verification or publication. The
+  existing `production_pubkey_must_differ_from_dev_seed` unit assertion remains
+  an additional guard; it is not the artifact-level publication predicate.
+- `RELEASE_SIGNING_KEY` is still absent. Artifact flattening, the explicit
+  six-binary manifest, and signing invocation are wired; publication now reaches
+  `release-verify --sign` and hard-fails when this key is unavailable.
 - The penetration-test schedule, owner, findings threshold, and GA effect are
   not duplicated here. `RELEASE-HOLDS.md` Hold 1 is authoritative.
 
