@@ -116,7 +116,7 @@ pub fn run(
 }
 
 fn capability_scope_default() -> Vec<String> {
-    vec!["provider.complete:anthropic.claude-3-haiku-20240307".into()]
+    vec!["provider.complete:anthropic.claude-haiku-4-5-20251001".into()]
 }
 
 fn posture_default() -> String {

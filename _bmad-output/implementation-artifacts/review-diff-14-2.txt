@@ -1,0 +1,3932 @@
+diff --git a/.github/workflows/discipline.yml b/.github/workflows/discipline.yml
+index 46971bd3..6d774407 100644
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -2650,7 +2650,9 @@ jobs:
+       - name: Run check-live-bilateral-consent
+         run: cargo test -p maos-a2a-tcp --test t_10_4b_live_bilateral -- --test-threads=1
+ 
+-  # Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
++  # Story 10.4b / 14-2 (NFR-Sec-13 rotation chaos; NFR-Rel-9 mislabel corrected
++  # by 14-2 — the 30s/90s propagation floors are NFR-Sec-13's chaos scope, not
++  # NFR-Rel-9's token-validation axis) — rotation real-timing gate.
+   check-rotation-real-timing:
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+@@ -2662,8 +2664,12 @@ jobs:
+       - uses: Swatinem/rust-cache@v2
+         with:
+           key: ${{ hashFiles('**/Cargo.lock') }}
++      # Story 14-2 (AC5.2/AC5.5.a): the bare `cargo test` step became the
++      # leg-structured gate in the SAME change that #[ignore]-gated the
++      # drill's tests — one without the other would make this hard-failing
++      # job run ZERO tests and pass vacuously.
+       - name: Run check-rotation-real-timing
+-        run: cargo test -p maos-a2a-tcp --test t_10_4b_rotation_real_timing -- --test-threads=1
++        run: cargo run -p xtask -- check-rotation-real-timing --json
+ 
+   # Story 10.4c — J4 §13.1 Mira-Nash Observer colocation-latency gate.
+   # Real in-kernel scalar.tap measurement via `kernel_measurement` feature.
+diff --git a/RELEASE-HOLDS.md b/RELEASE-HOLDS.md
+index 54c106bb..115b4606 100644
+--- a/RELEASE-HOLDS.md
++++ b/RELEASE-HOLDS.md
+@@ -73,6 +73,32 @@
+    external publication (or that path stays flag-gated at GA).
+ 3. Only then cut the GA tag. Update this ledger's Status to reflect the tag.
+ 
++## Story 14-2 — mTLS rotation honesty clauses (2026-08-29)
++
++Not GA holds — **claim boundaries**, recorded so Epic 14's rotation evidence
++can never imply more than it measured (mirrors row 18's hand-off):
++
++- **(a) Revocation is NOT measured.** No OCSP/CRL exists — ADR-047 §3/§4
++  forbid it under NFR-Ops-12 (zero outbound network calls). `t_1` is the
++  new-pin-observably-active proxy.
++- **(b) The mesh is in-process.** Real sockets, real rustls, real mTLS, one
++  process, one runtime, loopback (11.3's F1 disclosure, re-stated at N=10).
++- **(c) Rotation ASSUMES provisioning already declared the replacement**
++  (AC2.0): the operator moves `A2APeerConfig.cert_fingerprint` at
++  `t_provision`; there is no live peer-config reload path and 14-2 does not
++  build one — an inherited ordering, written as ASSUMES, not "requires".
++  Named owner: none exists; the production rotation trigger is unbuilt
++  (AC6.5(c) boundary — `swap_serving_cert`/`open_rotation_window` have test
++  callers only).
++- **(d) Timings are compressed-loopback regression floors, not geo
++  figures.** §15.6 keeps the 30-day soak and absolute geo-SLO as
++  release-gate artifacts, never CI-claimed.
++
++Runnable evidence (pointer, never a hand-copied transcript):
++`cargo run -p xtask -- check-rotation-real-timing --json` — the leg JSON
++carries the drills' own percentile disclosures with `n=` beside every
++percentile.
++
+ ## References
+ 
+ - E12 retro action B2 (retro doc `epic-12-retro-2026-07-13.md`).
+diff --git a/crates/maos-a2a-core/src/chaos/harness_3_host.rs b/crates/maos-a2a-core/src/chaos/harness_3_host.rs
+deleted file mode 100644
+index c5b52453..00000000
+--- a/crates/maos-a2a-core/src/chaos/harness_3_host.rs
++++ /dev/null
+@@ -1,138 +0,0 @@
+-//! 3-host in-process chaos drill orchestrator.
+-//!
+-//! Per architecture §7.2.1 the production drill is quarterly across the full
+-//! fleet. The 3-host harness is the **calibration-mode scaffold** — three
+-//! `tokio::spawn`ed agent tasks (Agent A = issuing CA stand-in; Agents B, C
+-//! = peer pair). Synthetic load generator emits IAC frames between B↔C at
+-//! the p95 of `iac_handshake_duration_us`; rotation is triggered at
+-//! `drill_t_0`; per-agent `(t_0, t_1, t_2)` timestamps are collected.
+-//!
+-//! Uses `tokio::time::pause()` + `advance()` for deterministic harness
+-//! reproduction (per `[[feedback_deepseek_v4_pro_patterns]]` synthetic time
+-//! must be controlled).
+-
+-use crate::chaos::metrics::MetricsCollector;
+-use crate::chaos::rotation::{compute_t_grace, AgentRotationTimestamps, RotationDrillReport};
+-
+-#[derive(Debug, Clone)]
+-pub struct DrillConfig {
+-    pub drill_id: String,
+-    pub host_count: u32,
+-    pub p99_handshake_rtt_ms: u64,
+-    pub days_of_history: u32,
+-    /// Per-agent target revocation propagation time (ms). Used to seed
+-    /// the synthetic `t_1` for each agent.
+-    pub target_propagation_ms_per_agent: Vec<u64>,
+-    /// Per-agent target re-handshake time (ms). Used to seed the synthetic
+-    /// `t_2` (relative to `t_1`).
+-    pub target_re_handshake_ms_per_agent: Vec<u64>,
+-    pub post_grace_reject_count: u64,
+-    pub post_grace_total_count: u64,
+-}
+-
+-impl Default for DrillConfig {
+-    fn default() -> Self {
+-        Self {
+-            drill_id: "harness-3-host-default".into(),
+-            host_count: 3,
+-            p99_handshake_rtt_ms: 500,
+-            days_of_history: 7,
+-            target_propagation_ms_per_agent: vec![10_000, 15_000, 20_000],
+-            target_re_handshake_ms_per_agent: vec![5_000, 8_000, 12_000],
+-            post_grace_reject_count: 0,
+-            post_grace_total_count: 100,
+-        }
+-    }
+-}
+-
+-/// Run the synthetic 3-host drill. At v0.5 the agents are simulated — each
+-/// agent's `(t_0, t_1, t_2)` is computed from `DrillConfig`. The substrate
+-/// is the harness shape itself; production-scale rotation uses the same
+-/// pipeline with real OCSP polling.
+-pub async fn run_drill(config: DrillConfig) -> RotationDrillReport {
+-    let metrics = MetricsCollector::new();
+-    let t_grace = compute_t_grace(config.p99_handshake_rtt_ms, config.days_of_history);
+-    let t_grace_ms = t_grace.as_millis() as u64;
+-
+-    // For each agent, compute synthetic timestamps.
+-    // t_0 is the rotation start (all agents share t_0 = 0 in synthetic time).
+-    let agent_count = config
+-        .target_propagation_ms_per_agent
+-        .len()
+-        .min(config.target_re_handshake_ms_per_agent.len());
+-    for i in 0..agent_count {
+-        let prop_ms = config.target_propagation_ms_per_agent[i];
+-        let rh_ms = config.target_re_handshake_ms_per_agent[i];
+-        let t_0_ns = 0;
+-        let t_1_ns = (prop_ms as u64) * 1_000_000;
+-        let t_2_ns = t_1_ns + (rh_ms as u64) * 1_000_000;
+-        metrics
+-            .record(AgentRotationTimestamps {
+-                agent_id: format!("agent-{}", i),
+-                t_0_ns,
+-                t_1_ns: Some(t_1_ns),
+-                t_2_ns: Some(t_2_ns),
+-            })
+-            .await;
+-    }
+-
+-    let per_agent = metrics.snapshot().await;
+-    RotationDrillReport::from_per_agent(
+-        config.drill_id,
+-        config.host_count,
+-        config.p99_handshake_rtt_ms,
+-        t_grace_ms,
+-        per_agent,
+-        config.post_grace_reject_count,
+-        config.post_grace_total_count,
+-    )
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-
+-    #[tokio::test]
+-    async fn drill_under_floors_passes_v07_v10() {
+-        // Default config — all 3 agents at 10/15/20s prop, 5/8/12s rh
+-        let report = run_drill(DrillConfig::default()).await;
+-        assert!(report.passes_v07_floors, "{report:?}");
+-        assert!(report.passes_v10_floors, "{report:?}");
+-        assert_eq!(report.per_agent.len(), 3);
+-        assert!(report.t_grace_ms >= 5_000);
+-    }
+-
+-    #[tokio::test]
+-    async fn drill_one_lagged_agent_breaches_p99_in_calibration_mode() {
+-        // Per AC5 §5.2 — agent C's OCSP poll lagged 60s; assert p99 floats
+-        // above floor; in calibration mode the test reports the breach
+-        // without failing.
+-        let cfg = DrillConfig {
+-            drill_id: "lagged".into(),
+-            target_propagation_ms_per_agent: vec![10_000, 15_000, 100_000],
+-            target_re_handshake_ms_per_agent: vec![5_000, 8_000, 12_000],
+-            ..DrillConfig::default()
+-        };
+-        let report = run_drill(cfg).await;
+-        // The lagged agent's 100s prop pushes p99 over the 90s floor.
+-        assert!(report.revocation_propagation_p99_ms >= 90_000);
+-        // Calibration mode: harness reports the breach (passes_v07_floors = false
+-        // signals to CI that the calibration window's floor is BREACHED but
+-        // does not panic).
+-        assert!(!report.passes_v07_floors);
+-    }
+-
+-    #[tokio::test]
+-    async fn drill_post_grace_reject_above_01pct_fails_v10() {
+-        // Per AC5 §5.3 — agent presents old cert AFTER t_revoke + T_grace.
+-        let cfg = DrillConfig {
+-            drill_id: "post-grace".into(),
+-            post_grace_reject_count: 5,
+-            post_grace_total_count: 1_000,
+-            ..DrillConfig::default()
+-        };
+-        let report = run_drill(cfg).await;
+-        assert!(!report.passes_v10_floors);
+-        assert!(report.passes_v07_floors); // v0.7 floors unaffected
+-    }
+-}
+diff --git a/crates/maos-a2a-core/src/chaos/metrics.rs b/crates/maos-a2a-core/src/chaos/metrics.rs
+deleted file mode 100644
+index a0a4ed96..00000000
+--- a/crates/maos-a2a-core/src/chaos/metrics.rs
++++ /dev/null
+@@ -1,51 +0,0 @@
+-//! Per-agent metrics collection for the rotation chaos harness.
+-//!
+-//! At v0.5 the metrics are in-process — the harness's agent tasks write to a
+-//! `tokio::sync::Mutex<Vec<AgentRotationTimestamps>>`. Production wiring
+-//! would publish to the existing telemetry surface (`iac_handshake_duration_us`
+-//! histogram per architecture §4.7.1).
+-
+-use crate::chaos::rotation::AgentRotationTimestamps;
+-use std::sync::Arc;
+-use tokio::sync::Mutex;
+-
+-#[derive(Debug, Clone, Default)]
+-pub struct MetricsCollector {
+-    inner: Arc<Mutex<Vec<AgentRotationTimestamps>>>,
+-}
+-
+-impl MetricsCollector {
+-    pub fn new() -> Self {
+-        Self::default()
+-    }
+-
+-    pub async fn record(&self, ts: AgentRotationTimestamps) {
+-        let mut g = self.inner.lock().await;
+-        g.push(ts);
+-    }
+-
+-    pub async fn snapshot(&self) -> Vec<AgentRotationTimestamps> {
+-        let g = self.inner.lock().await;
+-        g.clone()
+-    }
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-
+-    #[tokio::test]
+-    async fn collector_records_and_snapshots() {
+-        let c = MetricsCollector::new();
+-        c.record(AgentRotationTimestamps {
+-            agent_id: "a".into(),
+-            t_0_ns: 0,
+-            t_1_ns: Some(1),
+-            t_2_ns: Some(2),
+-        })
+-        .await;
+-        let snap = c.snapshot().await;
+-        assert_eq!(snap.len(), 1);
+-        assert_eq!(snap[0].agent_id, "a");
+-    }
+-}
+diff --git a/crates/maos-a2a-core/src/chaos/mod.rs b/crates/maos-a2a-core/src/chaos/mod.rs
+index 61f75932..27d1ea1f 100644
+--- a/crates/maos-a2a-core/src/chaos/mod.rs
++++ b/crates/maos-a2a-core/src/chaos/mod.rs
+@@ -1,17 +1,19 @@
+-//! NFR-Sec-13 mTLS cert rotation chaos + NFR-Rel-7 A2A churn scaffolding.
++//! NFR-Sec-13 mTLS cert rotation + NFR-Rel-7 churn scaffolding.
+ //!
+-//! Per architecture §7.2.1 + §7.2.1.a + §7.2.1.b. v0.5 ships in CALIBRATION
+-//! PHASE — metrics are MEASURED and REPORTED but NOT enforced. v0.7 flips
+-//! revocation propagation + re-handshake to hard-fail; v1.0 flips
+-//! `cert_post_grace_reject` ≤0.1%.
+-//!
+-//! **Calibration mode = report, not enforce.** Per
+-//! `[[feedback_lunarpulse_observability_preference]]`, the harness output IS
+-//! the observable evidence. The calibration window is bounded — the dev
+-//! record documents the v0.7 hard-fail flip date.
++//! Per architecture §7.2.1 + §7.2.1.a + §7.2.1.b. The v0.5 CALIBRATION
++//! window this module once advertised is CLOSED, and its promised v0.7
++//! hard-fail flip date was **never written** — recorded here in plain words
++//! because the previous doc pointed at a date that never existed (the
++//! project passed v0.7 on both owning NFRs with nothing noticing; Story
++//! 14-2 Blocking condition 6). Enforcement no longer lives here at all:
++//! the real-socket drill (`crates/maos-a2a-tcp/tests/
++//! t_10_4b_rotation_real_timing.rs`) measures on a live mesh, `rotation.rs`
++//! holds the floors, and the `check-rotation-real-timing` gate owns
++//! execution — skipped ≠ passed. The synthetic `harness_3_host` twin and
++//! its `metrics` collector were DELETED by Story 14-2 (AC6.1): they seeded
++//! timestamps from `DrillConfig` constants and asserted their own floors
++//! green — 11.3's `run_scaffold` defect wearing rotation's hat.
+ 
+ pub mod churn;
+-pub mod harness_3_host;
+-pub mod metrics;
+ pub mod report;
+ pub mod rotation;
+diff --git a/crates/maos-a2a-core/src/chaos/report.rs b/crates/maos-a2a-core/src/chaos/report.rs
+index e840fd9c..1374d606 100644
+--- a/crates/maos-a2a-core/src/chaos/report.rs
++++ b/crates/maos-a2a-core/src/chaos/report.rs
+@@ -1,57 +1,41 @@
+-//! Calibration-mode report writer.
++//! Rotation drill markdown surface — Story 14-2 / AC6.1.a: **WIRED, not
++//! deleted.** This module sat dead for eleven stories (zero callers since
++//! 6-3's calibration phase); it is now the rendered-markdown publication
++//! surface for the rotation report, with the sample-count disclosure AC4.2
++//! requires.
+ //!
+-//! At v0.5 the rotation drill report is appended to
+-//! `_bmad-output/implementation-artifacts/mtls-rotation-chaos-report.md` as a
+-//! fenced JSON block. Per `[[feedback_lunarpulse_observability_preference]]`
+-//! the report IS the observable evidence.
++//! Every percentile axis publishes its sample count **computed from the
++//! same filter the percentile engine uses** (`rotation.rs:
++//! per_agent.iter().filter_map(...)`, never `.len()`): at n ≤ 100 the p99
++//! IS the worst of n (first real percentile at n=101), and a reader must
++//! not mistake a max-of-ten for a characterised tail.
+ 
+ use crate::chaos::rotation::RotationDrillReport;
+ 
+-/// Serialize the report to a markdown-fenced JSON block.
++/// Serialize the report to a markdown block, headed by the per-axis sample
++/// counts. The counts derive from `per_agent` exactly as
++/// `RotationDrillReport::from_per_agent` derives its samples.
+ pub fn report_to_markdown(report: &RotationDrillReport) -> Result<String, serde_json::Error> {
++    let n_prop = report
++        .per_agent
++        .iter()
++        .filter(|a| a.t_1_ns.is_some())
++        .count();
++    let n_rh = report
++        .per_agent
++        .iter()
++        .filter(|a| a.t_1_ns.is_some() && a.t_2_ns.is_some())
++        .count();
++    let n_e2e = report
++        .per_agent
++        .iter()
++        .filter(|a| a.t_2_ns.is_some())
++        .count();
+     let json = serde_json::to_string_pretty(report)?;
+     Ok(format!(
+-        "\n## Rotation drill {}\n\n_v0.5 calibration mode — metrics measured, gates not enforced._\n\n```json\n{json}\n```\n",
++        "\n## Rotation drill {} \
++         (n: propagation={n_prop}, re-handshake={n_rh}, end-to-end={n_e2e}; \
++         at n <= 100 every p99 IS the worst of n)\n\n```json\n{json}\n```\n",
+         report.drill_id
+     ))
+ }
+-
+-/// Calibration-mode breach reporter — logs but does NOT panic.
+-pub fn report_breach(metric: &str, observed: u64, floor: u64) -> String {
+-    format!("[v0.5 calibration] {metric} = {observed}ms breached floor {floor}ms (NOT enforced)")
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-    use crate::chaos::rotation::AgentRotationTimestamps;
+-
+-    #[test]
+-    fn report_markdown_contains_drill_id_and_json() {
+-        let r = RotationDrillReport::from_per_agent(
+-            "drill-001",
+-            3,
+-            500,
+-            5_000,
+-            vec![AgentRotationTimestamps {
+-                agent_id: "a".into(),
+-                t_0_ns: 0,
+-                t_1_ns: Some(1_000_000_000),
+-                t_2_ns: Some(2_000_000_000),
+-            }],
+-            0,
+-            100,
+-        );
+-        let md = report_to_markdown(&r).expect("md");
+-        assert!(md.contains("drill-001"));
+-        assert!(md.contains("```json"));
+-        assert!(md.contains("v0.5 calibration mode"));
+-    }
+-
+-    #[test]
+-    fn report_breach_logs_metric() {
+-        let s = report_breach("revocation_propagation_p99", 100_000, 90_000);
+-        assert!(s.contains("breached floor 90000"));
+-        assert!(s.contains("calibration"));
+-    }
+-}
+diff --git a/crates/maos-a2a-core/src/tofu.rs b/crates/maos-a2a-core/src/tofu.rs
+index 37062d22..40ea5e37 100644
+--- a/crates/maos-a2a-core/src/tofu.rs
++++ b/crates/maos-a2a-core/src/tofu.rs
+@@ -50,6 +50,20 @@ pub enum EPinMismatch {
+     NotPinned(String),
+     #[error("TOFU pin invalidated for peer {peer}: {reason}")]
+     Invalidated { peer: String, reason: String },
++    /// Story 14-2 / AC2.2.a.i — `open_rotation_window` refused a `next`
++    /// fingerprint already held by ANOTHER peer's current pin or open
++    /// window. Founder-ratified 2026-08-28 as a NEW variant (never a reuse
++    /// of `Mismatch`): a collision is an impersonation attempt in progress,
++    /// a different security event than "observed cert does not match the
++    /// pin", and conflating them makes the two indistinguishable in logs
++    /// and SIEM precisely when someone is investigating one. `EPinMismatch`
++    /// is `#[non_exhaustive]`, so the variant is non-breaking downstream.
++    #[error("rotation window refused for peer {peer}: fingerprint {fingerprint} is already held by {colliding_peer}")]
++    FingerprintCollision {
++        peer: String,
++        colliding_peer: String,
++        fingerprint: String,
++    },
+ }
+ 
+ /// Operator decision on a re-pin request.
+@@ -129,9 +143,25 @@ pub trait TofuPinStore: Send + Sync {
+ 
+ /// Default in-memory TOFU pin store. Per architecture I9 ("Empty kernel") the
+ /// production impl is persistence-backed at `maos-persistence`; this default
+-/// is the v0.5 scaffold + test fixture.
+ pub struct InMemoryTofuPinStore {
+     pins: Arc<DashMap<String, TofuPin>>,
++    /// Story 14-2 / AC2.1 — the rotation window side-map: peer → NEXT
++    /// fingerprint. A SIDE-MAP, not a `TofuPin` field, on four measured
++    /// grounds: zero serde delta (`TofuPin` stays byte-identical, so the
++    /// `PinnedFingerprint` / `TcpA2AConfig` strict-schema blast radius is
++    /// untouched); fail-closed on restart by construction (a process-local
++    /// window cannot be persisted, so a reboot closes it — a `TofuPin` field
++    /// would RE-OPEN a widened trust set on reboot, the wrong default);
++    /// `PinnedFingerprint` deliberately gains no `next` (a boot-time window
++    /// nobody closes is the permanently widened trust set this story exists
++    /// to prevent); and the window becomes a state you read rather than a
++    /// field you interpret.
++    rotation_next: Arc<DashMap<String, PeerCertFingerprint>>,
++    /// §A6 mid-story (Blind-3/Edge-2): serializes open's scan+insert,
++    /// close's remove+promote, and the invalidation/re-pin lifecycle — no
++    /// half-applied window can interleave. Lock ORDER: `window_lock` BEFORE
++    /// any `pins` entry lock.
++    window_lock: Arc<std::sync::Mutex<()>>,
+     /// Optional hook to drive `await_repin_consent` deterministically from
+     /// tests; production path defers to the Approval Decision Log (which is
+     /// out-of-band and not modeled in this crate's surface).
+@@ -142,6 +172,8 @@ impl Default for InMemoryTofuPinStore {
+     fn default() -> Self {
+         Self {
+             pins: Arc::new(DashMap::new()),
++            rotation_next: Arc::new(DashMap::new()),
++            window_lock: Arc::new(std::sync::Mutex::new(())),
+             test_repin_hook: Arc::new(|_, _, _| RePinDecision::TimedOut),
+         }
+     }
+@@ -175,16 +207,141 @@ impl InMemoryTofuPinStore {
+     /// (unpinned / invalidated). This is the TOFU trust oracle the
+     /// `TofuPinningVerifier` consults after WebPKI succeeds.
+     pub fn find_active_pin_by_fingerprint(&self, observed: &PeerCertFingerprint) -> Option<PeerId> {
+-        self.pins.iter().find_map(|entry| {
++        if let Some(peer) = self.pins.iter().find_map(|entry| {
+             let pin = entry.value();
+             if pin.invalidated.is_none() && &pin.fingerprint == observed {
+                 Some(pin.peer.clone())
+             } else {
+                 None
+             }
++        }) {
++            return Some(peer);
++        }
++        self.rotation_next.iter().find_map(|entry| {
++            if entry.value() == observed {
++                // §A6 mid-story Edge-1: a window is an ACTIVE identity only
++                // while the peer's CURRENT pin is active — an invalidated
++                // pin (Spirit restart) must not keep the replacement
++                // trusted at the listen side.
++                let pin_active = self
++                    .pins
++                    .get(entry.key())
++                    .map(|p| p.value().invalidated.is_none())
++                    .unwrap_or(false);
++                if pin_active {
++                    Some(PeerId::new(entry.key().clone()))
++                } else {
++                    None
++                }
++            } else {
++                None
++            }
++        })
++    }
++
++    /// Story 14-2 / AC2.1 — open the one-generation overlap window for
++    /// `peer` (§7.2.1.a: agents accept either cert on inbound handshakes
++    /// during `[t_provision, t_revoke + T_grace]`; the close is an explicit
++    /// state transition, never a clock — AC2.1.c). The store additionally
++    /// accepts `next` as this peer's active identity until the window
++    /// closes.
++    ///
++    /// ⚠ **THE UNIQUENESS GUARD IS THE SECURITY CONTROL, NOT A RIDER
++    /// (AC2.2.a).** Without it this method OPENS a cross-peer
++    /// impersonation vector: `find_active_pin_by_fingerprint` is
++    /// first-match-wins over a per-process randomized `DashMap` iteration,
++    /// so a `next` colliding with another peer's held fingerprint would
++    /// resolve non-deterministically to EITHER peer at sites 2/3 — the
++    /// attacker's key-holder dials in, site 2 accepts, site 3 may resolve
++    /// the victim, and the binding check passes. Refused here, at open,
++    /// with a dedicated variant the catalog can enumerate.
++    pub fn open_rotation_window(
++        &self,
++        peer: &PeerId,
++        next: &PeerCertFingerprint,
++    ) -> Result<(), EPinMismatch> {
++        // §A6 mid-story (Blind-1/Edge-2): scan + insert under ONE lock, or
++        // two concurrent opens with the same colliding `next` both pass
++        // their scans and both insert — recreating exactly the duplicate the
++        for entry in self.pins.iter() {
++            let pin = entry.value();
++            // §A6 mid-story (Acceptance-6): the guard refuses against ANY
++            // other peer's stored current fingerprint — an INVALIDATED pin's
++            // fingerprint is not exempt: B restart-invalidates, A opens a
++            // window on B's retired fp, B re-pins to the same cert, and two
++            // active entries share one fingerprint.
++            if pin.peer.as_str() != peer.as_str() && &pin.fingerprint == next {
++                return Err(EPinMismatch::FingerprintCollision {
++                    peer: peer.as_str().to_string(),
++                    colliding_peer: pin.peer.as_str().to_string(),
++                    fingerprint: next.wire(),
++                });
++            }
++        }
++        for entry in self.rotation_next.iter() {
++            if entry.key() != peer.as_str() && entry.value() == next {
++                return Err(EPinMismatch::FingerprintCollision {
++                    peer: peer.as_str().to_string(),
++                    colliding_peer: entry.key().clone(),
++                    fingerprint: next.wire(),
++                });
++            }
++        }
++        let pin = self
++            .pins
++            .get(peer.as_str())
++            .map(|r| r.value().clone())
++            .ok_or_else(|| EPinMismatch::NotPinned(peer.as_str().to_string()))?;
++        if pin.invalidated.is_some() {
++            // §A6 mid-story Edge-1: an invalidated pin (Spirit restart) must
++            // not keep a window openable — rotation trust dies with the pin.
++            return Err(EPinMismatch::Invalidated {
++                peer: peer.as_str().to_string(),
++                reason: "cannot open a rotation window on an invalidated pin".into(),
++            });
++        }
++        if &pin.fingerprint == next {
++            // §A6 mid-story Edge-3: `next == current` would put ONE
++            // fingerprint in two active entries and make close "retire" a
++            // cert that stays current — a self-collision, refused as one.
++            return Err(EPinMismatch::FingerprintCollision {
++                peer: peer.as_str().to_string(),
++                colliding_peer: peer.as_str().to_string(),
++                fingerprint: next.wire(),
++            });
++        }
++        self.rotation_next
++            .insert(peer.as_str().to_string(), next.clone());
++        Ok(())
++    }
++
++    /// Story 14-2 / AC2.1.a — close the window PROMOTE-and-retire, never
++    /// discard: the store must end up holding NEW, not OLD. Promotes
++    /// `next → current` under the pin's entry lock, clears the side-map
++    /// entry, and returns the RETIRED OLD fingerprint. A close that
++    /// merely dropped `next` would leave the mesh pinned to a cert
++    /// nobody serves. Returns `None` if no window was open. Serialized
++    /// against open/re-pin by `window_lock` (§A6 Blind-3): no transition
++    /// can interleave inside the remove→promote pair.
++    pub fn close_rotation_window(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
++        let _guard = self.window_lock.lock().ok()?;
++        let (_, next) = self.rotation_next.remove(peer.as_str())?;
++        self.pins.get_mut(peer.as_str()).map(|mut entry| {
++            let retired = entry.fingerprint.clone();
++            entry.fingerprint = next;
++            entry.pinned_at_ns = now_ns();
++            retired
+         })
+     }
+ 
++    /// Story 14-2 / AC2.1 — the window oracle: this peer's open `next`,
++    /// if a rotation window is currently open.
++    pub fn rotation_next(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
++        self.rotation_next
++            .get(peer.as_str())
++            .map(|e| e.value().clone())
++    }
++
+     /// Story 8.6 — synchronous mirror of [`TofuPinStore::verify_pinned`] for the
+     /// sync rustls verifier callback (same semantics: `NotPinned` / `Invalidated`
+     /// / `Mismatch`). Additive; does NOT change the async trait surface.
+@@ -213,6 +370,15 @@ impl InMemoryTofuPinStore {
+         }
+         if &pin.fingerprint == observed {
+             Ok(())
++        } else if self
++            .rotation_next
++            .get(peer.as_str())
++            .is_some_and(|next| next.value() == observed)
++        {
++            // Story 14-2 / AC2.2 (site 1, dial side + the sync mirror of
++            // site 4): during an open rotation window the peer's `next` is
++            // equally pinned — one-generation overlap, §7.2.1.a.
++            Ok(())
+         } else {
+             Err(EPinMismatch::Mismatch {
+                 peer: peer.as_str().to_string(),
+@@ -291,6 +457,17 @@ impl TofuPinStore for InMemoryTofuPinStore {
+         }
+         if &pin.fingerprint == observed {
+             Ok(())
++        } else if self
++            .rotation_next
++            .get(peer.as_str())
++            .is_some_and(|next| next.value() == observed)
++        {
++            // Story 14-2 / AC2.2 (site 4 — async trait IMPL BODY; the six
++            // trait SIGNATURES are untouched, per the house additive-mirror
++            // convention): during an open rotation window the peer's `next`
++            // is equally pinned. Sites 5/6 (`router.rs`) call this and pass
++            // because of AC2.0's provisioning ordering — they need no edit.
++            Ok(())
+         } else {
+             Err(EPinMismatch::Mismatch {
+                 peer: peer.as_str().to_string(),
+@@ -305,6 +482,11 @@ impl TofuPinStore for InMemoryTofuPinStore {
+         peer: &PeerId,
+         prior_boot_nonce: u64,
+     ) -> Result<(), A2AError> {
++        // §A6 (Blind-2): pin invalidation CLOSES any open rotation window —
++        // pre-consent rotation trust must not survive it.
++        if let Ok(_guard) = self.window_lock.lock() {
++            self.rotation_next.remove(peer.as_str());
++        }
+         let mut entry =
+             self.pins
+                 .get_mut(peer.as_str())
+@@ -326,6 +508,12 @@ impl TofuPinStore for InMemoryTofuPinStore {
+         if let RePinDecision::AcceptedByOperator { approval_id } = &decision {
+             // Materialize the re-pin record so verify_pinned succeeds again,
+             // carrying the actual boot_nonce from the re-pin observation.
++            // §A6 mid-story (Blind-2): the operator approved NEW_OBSERVED —
++            // any open rotation window (a DIFFERENT pre-consent `next`)
++            // closes with the consent, never survives it.
++            if let Ok(_guard) = self.window_lock.lock() {
++                self.rotation_next.remove(peer.as_str());
++            }
+             let new_pin = TofuPin {
+                 peer: peer.clone(),
+                 fingerprint: new_observed.clone(),
+@@ -360,6 +548,16 @@ impl TofuPinStore for InMemoryTofuPinStore {
+                     entry.invalidated = Some(Invalidated::SpiritRestarted {
+                         prior_boot_nonce: prior,
+                     });
++                    // §A6 mid-story (Blind-2): the invalidation (and ONLY a
++                    // real invalidation — this method runs as the router's
++                    // PER-FRAME boot-nonce TOCTOU check, so an unconditional
++                    // close here would kill every window the moment traffic
++                    // flows) closes the rotation window: pre-consent rotation
++                    // trust must not survive a Spirit-restart invalidation.
++                    drop(entry);
++                    if let Ok(_guard) = self.window_lock.lock() {
++                        self.rotation_next.remove(peer.as_str());
++                    }
+                     return Ok(Some(prior));
+                 }
+                 // Already invalidated — return the stored prior nonce so the
+diff --git a/crates/maos-a2a-tcp/Cargo.toml b/crates/maos-a2a-tcp/Cargo.toml
+index 3cf47ed7..0c2c44b7 100644
+--- a/crates/maos-a2a-tcp/Cargo.toml
++++ b/crates/maos-a2a-tcp/Cargo.toml
+@@ -68,3 +68,11 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
+ # `cargo tree --release` absence SHIP-BLOCKER. Mirrors `slo-fault-inject`
+ # (`maos-bench/Cargo.toml`).
+ churn-fault-inject = []
++# Story 14-2 (AC5.5b) — rotation fault-injection for the
++# check-rotation-real-timing falsifier surface. Blinds the HARNESS
++# observation seam only (the test-side drop/verdict accounting) — NEVER
++# `verifier.rs`, never the router (subsystem-gating is the 11.2b P2 sin).
++# MUST NOT appear in any release/GA feature set — guarded by the
++# `compile_error!` in `t_10_4b_rotation_real_timing.rs` + the gate's
++# `cargo tree --release` absence SHIP-BLOCKER. Mirrors `churn-fault-inject`.
++rotation-fault-inject = []
+diff --git a/crates/maos-a2a-tcp/src/transport.rs b/crates/maos-a2a-tcp/src/transport.rs
+index 5d473049..60fde813 100644
+--- a/crates/maos-a2a-tcp/src/transport.rs
++++ b/crates/maos-a2a-tcp/src/transport.rs
+@@ -30,7 +30,7 @@ use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
+ use rustls::{ClientConfig, ServerConfig};
+ use std::net::SocketAddr;
+ use std::sync::atomic::{AtomicUsize, Ordering};
+-use std::sync::{Arc, Mutex};
++use std::sync::{Arc, Mutex, RwLock};
+ use std::time::Duration;
+ use tokio::net::{TcpListener, TcpStream};
+ use tokio::task::JoinHandle;
+@@ -103,6 +103,14 @@ impl Drop for ServeGuard {
+ pub struct TcpA2ATransport {
+     core: Arc<A2ARouterCore>,
+     pins: Arc<InMemoryTofuPinStore>,
++    /// §A6 mid-story (Blind-5): serializes generation swaps so two
++    /// concurrent `swap_serving_cert` calls cannot interleave their
++    /// dial/serve halves (dial-A, dial-B, serve-B, serve-A — a node serving
++    /// one leaf while presenting another).
++    swap_lock: std::sync::Mutex<()>,
++    /// the `ServerConfig`, so `swap_serving_cert` can rotate the serving
++    /// generation in place without a rebind.
++    serving_cert: Arc<SwappableServingCert>,
+     /// Shared (unscoped) dialing config — kept for the raw-socket test helpers
+     /// (AC-T2/7/8/9) and as the `client_config()` accessor. Real
+     /// `route_outbound` dials build a PER-PEER scoped config instead (review
+@@ -111,8 +119,12 @@ pub struct TcpA2ATransport {
+     /// Materials to rebuild a per-dial `ClientConfig` whose `ServerCertVerifier`
+     /// is scoped to the EXPECTED peer (review patch P1) — the dial target is only
+     /// known per `route_outbound` call, so the verifier cannot be fixed at bind.
+-    own_chain: Vec<CertificateDer<'static>>,
+-    own_key: PrivateKeyDer<'static>,
++    /// Story 14-2 / AC2.4 — swappable with the SERVING generation: a node's
++    /// leaf is ONE identity (it serves it AND presents it on outbound mTLS
++    /// handshakes), so `swap_serving_cert` rotates BOTH or post-swap dials
++    /// present the retired leaf and promoted peers refuse them (measured by
++    /// the scene's beat-5 positive control, 2026-08-29).
++    dial_materials: Arc<SwappableDialMaterials>,
+     posture: TrustPosture,
+     validation_time: Option<UnixTime>,
+     local_addr: SocketAddr,
+@@ -404,13 +416,14 @@ impl TcpA2ATransport {
+             core.install_intake_sink(sink).await;
+         }
+ 
+-        let server_config = Arc::new(build_server_config(
++        let (server_config, serving_cert) = build_server_config(
+             &own_chain,
+             &own_key,
+             pins.clone(),
+             posture.clone(),
+             validation_time,
+-        )?);
++        )?;
++        let server_config = Arc::new(server_config);
+         let client_config = Arc::new(build_client_config(
+             &own_chain,
+             &own_key,
+@@ -447,9 +460,13 @@ impl TcpA2ATransport {
+         Ok(Self {
+             core,
+             pins,
++            serving_cert,
+             client_config,
+-            own_chain,
+-            own_key,
++            dial_materials: Arc::new(SwappableDialMaterials::new(
++                own_chain.clone(),
++                clone_key(&own_key),
++            )),
++            swap_lock: std::sync::Mutex::new(()),
+             posture,
+             validation_time,
+             local_addr,
+@@ -487,6 +504,35 @@ impl TcpA2ATransport {
+         self.pins.clone()
+     }
+ 
++    /// Story 14-2 / AC2.4 — swap the cert generation IN PLACE: no rebind, no
++    /// listener churn, no connection teardown. Rotates BOTH halves of the
++    /// node's ONE identity — the SERVING resolver (new handshakes resolve the
++    /// replacement from the next ClientHello; established connections are
++    /// untouched, rustls never renegotiates) and the DIAL materials (outbound
++    /// mTLS handshakes present the replacement; a half-swapped node would
++    /// serve the new leaf while presenting the retired one, and promoted
++    /// peers refuse it — measured by the scene's beat-5 control). Callers:
++    /// the rotation drill and the N=3 scene — there is NO production caller;
++    /// the production trigger is the operator provisioning act of AC2.0,
++    /// which has no live reload path (AC2.2.d/AC6.5(c)).
++    pub fn swap_serving_cert(
++        &self,
++        chain: Vec<CertificateDer<'static>>,
++        key: PrivateKeyDer<'static>,
++    ) -> Result<(), TcpTransportError> {
++        // §A6 mid-story (Edge-5/Blind-5): VALIDATE FIRST, commit both halves
++        // under ONE lock. A rejected rotation (bad key, empty/mismatched
++        // chain) must leave the node UNCHANGED, and two concurrent swaps
++        // must publish as one generation each — never interleaved halves.
++        let ck = SwappableServingCert::certified_key(chain.clone(), &key)?;
++        let _guard = self
++            .swap_lock
++            .lock()
++            .map_err(|_| TcpTransportError::Config("swap lock poisoned".into()))?;
++        self.dial_materials.swap(chain, key)?;
++        self.serving_cert.swap(ck)
++    }
++
+     /// A client `ClientConfig` carrying this endpoint's own auth cert + the
+     /// TOFU verifier — tests use it to craft raw mTLS connections (AC-T2/7/8/9).
+     pub fn client_config(&self) -> Arc<ClientConfig> {
+@@ -521,17 +567,29 @@ impl TcpA2ATransport {
+         rest.parse::<SocketAddr>()
+             .map_err(|e| TcpTransportError::Config(format!("bad endpoint addr '{rest}': {e}")))
+     }
+-
+     /// Build a dialing `ClientConfig` whose `ServerCertVerifier` is scoped to the
+     /// EXPECTED peer (review patch P1), so a leaf pinned for a different peer
+     /// cannot satisfy this dial. Built once per `route_outbound` call.
++    ///
++    /// **Story 14-2 / AC2.4.b — STANDING CONSTRAINT: never cache
++    /// `ClientConfig` per peer.** Every dial MUST remain a full handshake.
++    /// `ServerConfig` defaults issue TLS 1.3 tickets; a resumed handshake
++    /// sends no Certificate message, so a cached `ClientConfig` would resume
++    /// sessions across a cert rotation and NEVER re-run `TofuPinningVerifier`
++    /// — the dialer would keep verifying the PRE-ROTATION leaf indefinitely.
++    /// The next person optimising throughput will reach for exactly that
++    /// cache; this comment is the tripwire.
+     fn scoped_client_config(
+         &self,
+         expected: &PeerId,
+     ) -> Result<Arc<ClientConfig>, TcpTransportError> {
++        let (chain, key) = self
++            .dial_materials
++            .snapshot()
++            .ok_or_else(|| TcpTransportError::Config("dial materials lock poisoned".into()))?;
+         Ok(Arc::new(build_client_config(
+-            &self.own_chain,
+-            &self.own_key,
++            &chain,
++            &key,
+             self.pins.clone(),
+             self.posture.clone(),
+             Some(expected.clone()),
+@@ -875,15 +933,125 @@ fn is_frame_too_large(e: &std::io::Error) -> bool {
+     s.contains("frame size too big") || s.contains("too big") || s.contains("max_frame_length")
+ }
+ 
+-/// Build the listening-side `ServerConfig` with the `TofuPinningVerifier` as the
+-/// `ClientCertVerifier` (mTLS — both directions pin, AC-A3).
++/// Story 14-2 / AC2.4 — the node's DIAL identity (client-auth chain + key),
++/// swappable in place with the serving generation for the same reason the
++/// serving resolver is: rotation is a generation swap of ONE identity, and a
++/// half-swapped node serves the new leaf while still PRESENTING the retired
++/// one on outbound handshakes. Poison fails CLOSED (no materials read → no
++/// dial), matching the file's existing `if let Ok(...)` idiom.
++struct SwappableDialMaterials(
++    std::sync::RwLock<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)>,
++);
++
++impl SwappableDialMaterials {
++    fn new(chain: Vec<CertificateDer<'static>>, key: PrivateKeyDer<'static>) -> Self {
++        Self(std::sync::RwLock::new((chain, key)))
++    }
++
++    /// Clone the current dial materials for one per-dial `ClientConfig`
++    /// build. `None` on poison — callers fail closed.
++    fn snapshot(&self) -> Option<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
++        self.0.read().ok().map(|g| (g.0.clone(), g.1.clone_key()))
++    }
++
++    fn swap(
++        &self,
++        chain: Vec<CertificateDer<'static>>,
++        key: PrivateKeyDer<'static>,
++    ) -> Result<(), TcpTransportError> {
++        let mut guard = self
++            .0
++            .write()
++            .map_err(|_| TcpTransportError::Config("dial materials lock poisoned".into()))?;
++        *guard = (chain, key);
++        Ok(())
++    }
++}
++
++/// Story 14-2 / AC2.4.a — a swappable serving-cert resolver: interior
++/// mutability behind a `std::sync::RwLock`, so the serving generation can be
++/// rotated IN PLACE. `TlsAcceptor::accept` re-reads the same resolver `Arc`
++/// per connection (tokio-rustls `server.rs`), `resolve` runs exactly once
++/// per ClientHello (rustls `server/hs.rs`), and rustls performs NO
++/// renegotiation at all — so in-flight connections are provably unaffected
++/// by a swap and the accept loop needs ZERO changes. Connection continuity,
++/// not dual-serving, is the reason this exists: the one-generation overlap
++/// (§7.2.1.a) requires old and new cert to be acceptable DURING the swap
++/// window, and a teardown-rebind physically cannot provide it.
++#[derive(Debug)]
++struct SwappableServingCert(RwLock<Arc<rustls::sign::CertifiedKey>>);
++
++impl SwappableServingCert {
++    fn new(
++        chain: Vec<CertificateDer<'static>>,
++        key: &PrivateKeyDer<'static>,
++    ) -> Result<Self, TcpTransportError> {
++        Ok(Self(std::sync::RwLock::new(Arc::new(Self::certified_key(
++            chain, key,
++        )?))))
++    }
++
++    /// §A6 mid-story (Blind-4/Edge-4/Acceptance-3): build through
++    /// `CertifiedKey::from_der` — the path `with_single_cert` used — so an
++    /// EMPTY chain or a key that does not match the leaf is refused HERE,
++    /// at build/swap time, instead of succeeding and failing every later
++    /// handshake.
++    fn certified_key(
++        chain: Vec<CertificateDer<'static>>,
++        key: &PrivateKeyDer<'static>,
++    ) -> Result<rustls::sign::CertifiedKey, TcpTransportError> {
++        if chain.is_empty() {
++            return Err(TcpTransportError::Config(
++                "serving chain must carry at least the leaf certificate".into(),
++            ));
++        }
++        let provider = rustls::crypto::ring::default_provider();
++        rustls::sign::CertifiedKey::from_der(chain, clone_key(key), &provider).map_err(|e| {
++            TcpTransportError::Config(format!(
++                "serving cert/key pair unusable (mismatched key or unparseable): {e:?}"
++            ))
++        })
++    }
++
++    /// Commit a PRE-BUILT certified key (AC2.4). New handshakes resolve the
++    /// replacement from the next ClientHello on; established connections are
++    /// untouched (no renegotiation). Poison PROPAGATES (§A6 Edge-6): a
++    /// failed swap must not report success.
++    fn swap(&self, ck: rustls::sign::CertifiedKey) -> Result<(), TcpTransportError> {
++        let mut guard = self
++            .0
++            .write()
++            .map_err(|_| TcpTransportError::Config("serving cert lock poisoned".into()))?;
++        *guard = Arc::new(ck);
++        Ok(())
++    }
++}
++
++impl rustls::server::ResolvesServerCert for SwappableServingCert {
++    fn resolve(
++        &self,
++        _client_hello: rustls::server::ClientHello,
++    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
++        // Poison idiom (the file's existing `if let Ok(...)` shape): a
++        // poisoned lock fails CLOSED — no cert resolved, handshake refused.
++        self.0.read().ok().map(|g| g.clone())
++    }
++}
++/// Build the listening-side `ServerConfig` with the `TofuPinningVerifier` as
++/// the `ClientCertVerifier` (mTLS — both directions pin, AC-A3), serving via
++/// a [`SwappableServingCert`] resolver so Story 14-2's one-generation overlap
++/// can swap the serving cert in place (AC2.4.a). Returns the config AND the
++/// shared resolver handle — `with_cert_resolver` builds the
++/// `rustls::sign::CertifiedKey` itself, which `with_single_cert` used to do
++/// for us. The `?` on protocol versions survives, hence the tuple in a
++/// `Result`, not a bare tuple.
+ pub fn build_server_config(
+     chain: &[CertificateDer<'static>],
+     key: &PrivateKeyDer<'static>,
+     pins: Arc<InMemoryTofuPinStore>,
+     posture: TrustPosture,
+     validation_time: Option<UnixTime>,
+-) -> Result<ServerConfig, TcpTransportError> {
++) -> Result<(ServerConfig, Arc<SwappableServingCert>), TcpTransportError> {
+     let verifier = Arc::new(TofuPinningVerifier::new(
+         pins,
+         posture,
+@@ -891,13 +1059,14 @@ pub fn build_server_config(
+         None, // listen side learns the peer from the cert — flat TOFU lookup
+         validation_time,
+     ));
++    let resolver = Arc::new(SwappableServingCert::new(chain.to_vec(), key)?);
+     let provider = Arc::new(rustls::crypto::ring::default_provider());
+-    ServerConfig::builder_with_provider(provider)
++    let config = ServerConfig::builder_with_provider(provider)
+         .with_safe_default_protocol_versions()
+         .map_err(|e| TcpTransportError::Config(format!("protocol versions: {e}")))?
+         .with_client_cert_verifier(verifier)
+-        .with_single_cert(chain.to_vec(), clone_key(key))
+-        .map_err(|e| TcpTransportError::Config(format!("server cert: {e}")))
++        .with_cert_resolver(resolver.clone());
++    Ok((config, resolver))
+ }
+ 
+ /// Build the dialing-side `ClientConfig` with the `TofuPinningVerifier` as the
+diff --git a/crates/maos-a2a-tcp/tests/support/mod.rs b/crates/maos-a2a-tcp/tests/support/mod.rs
+index 38ef8713..d15efa52 100644
+--- a/crates/maos-a2a-tcp/tests/support/mod.rs
++++ b/crates/maos-a2a-tcp/tests/support/mod.rs
+@@ -485,7 +485,50 @@ pub async fn build_mesh_n(
+     retry: HandshakeRetryPolicy,
+ ) -> Vec<MeshNode> {
+     let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
+-    build_mesh_inner(clock, ca, names, serving, expected, retry, &gates, &[]).await
++    build_mesh_inner(
++        clock,
++        ca,
++        names,
++        serving,
++        expected,
++        retry,
++        &gates,
++        &[],
++        None,
++    )
++    .await
++}
++
++/// Story 14-2 / AC2.0.a — the PROVISIONED mesh: `serving`/`expected` stay the
++/// OLD generation while every `A2APeerConfig` DECLARES the replacement
++/// (`declared`), modelling the operator's `t_provision` act —
++/// `A2APeerConfig.cert_fingerprint` moves to NEW at provision time, before
++/// the wire does (AC2.0's ordering: provision → swap → close). A thin
++/// options-wrapper over the ONE mesh primitive (`build_mesh_inner`), NOT a
++/// second builder — extending the single primitive is explicitly carved out
++/// of AC3.1's prohibition and is the shape 14-1 refactored toward.
++pub async fn build_mesh_n_provisioned(
++    clock: &Clock,
++    ca: &Ca,
++    names: &[String],
++    serving: &[&Leaf],
++    expected: &[&Leaf],
++    declared: &[&Leaf],
++    retry: HandshakeRetryPolicy,
++) -> Vec<MeshNode> {
++    let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
++    build_mesh_inner(
++        clock,
++        ca,
++        names,
++        serving,
++        expected,
++        retry,
++        &gates,
++        &[],
++        Some(declared),
++    )
++    .await
+ }
+ 
+ /// Gate-wiring variant of [`build_mesh_n`]: per-node cohort manifest gates
+@@ -500,7 +543,7 @@ pub async fn build_mesh_n_with_gates(
+     retry: HandshakeRetryPolicy,
+     gates: &[Option<Arc<dyn CohortManifestGate>>],
+ ) -> Vec<MeshNode> {
+-    build_mesh_inner(clock, ca, names, serving, expected, retry, gates, &[]).await
++    build_mesh_inner(clock, ca, names, serving, expected, retry, gates, &[], None).await
+ }
+ 
+ /// The ONE node-construction loop behind every mesh builder (AC2.1: the 11.3
+@@ -525,6 +568,11 @@ async fn build_mesh_inner(
+     retry: HandshakeRetryPolicy,
+     gates: &[Option<Arc<dyn CohortManifestGate>>],
+     plants: &[Plant],
++    // Story 14-2 / AC2.0.a — `Some(leaves)` makes every peer_cfg DECLARE
++    // `leaves[j]`'s fingerprint (the provisioned state: operator config
++    // names the replacement while pins/serving stay on the old generation);
++    // `None` ⇒ today's behaviour (`expected`).
++    declared: Option<&[&Leaf]>,
+ ) -> Vec<MeshNode> {
+     let n = names.len();
+     assert_eq!(serving.len(), n, "serving leaves must match host count");
+@@ -556,13 +604,16 @@ async fn build_mesh_inner(
+         let peer_cfgs: Vec<_> = peers
+             .iter()
+             .map(|(j, leaf)| {
+-                peer_cfg(
+-                    &names[*j],
+-                    "tls://127.0.0.1:0",
+-                    &leaf.fingerprint,
+-                    send,
+-                    accept,
+-                )
++                // Story 14-2 / AC2.0.a — the DECLARED fingerprint is what
++                // the operator's A2APeerConfig.cert_fingerprint carries
++                // (sites 5/6 compare the store pin against THIS). Under
++                // provision, cfg declares NEW while the store still pins
++                // OLD and the wire still serves OLD.
++                let declared_fp = declared
++                    .and_then(|d| d.get(*j))
++                    .map(|l| &l.fingerprint)
++                    .unwrap_or(&leaf.fingerprint);
++                peer_cfg(&names[*j], "tls://127.0.0.1:0", declared_fp, send, accept)
+             })
+             .collect();
+         let pems = write_pem(serving[i], Some(ca));
+@@ -862,7 +913,10 @@ pub async fn build_mesh_with_planted(
+     retry: HandshakeRetryPolicy,
+ ) -> Vec<MeshNode> {
+     let gates: Vec<Option<Arc<dyn CohortManifestGate>>> = vec![None; names.len()];
+-    build_mesh_inner(clock, ca, names, serving, expected, retry, &gates, plants).await
++    build_mesh_inner(
++        clock, ca, names, serving, expected, retry, &gates, plants, None,
++    )
++    .await
+ }
+ 
+ /// The real outcome of one mesh-level eviction (AC1.2): the beats a caller
+diff --git a/crates/maos-a2a-tcp/tests/t_10_4b_rotation_real_timing.rs b/crates/maos-a2a-tcp/tests/t_10_4b_rotation_real_timing.rs
+index 33064844..2c0c9ef0 100644
+--- a/crates/maos-a2a-tcp/tests/t_10_4b_rotation_real_timing.rs
++++ b/crates/maos-a2a-tcp/tests/t_10_4b_rotation_real_timing.rs
+@@ -1,145 +1,138 @@
+-//! AC-10.4b — REAL-socket mTLS cert-rotation chaos drill with MEASURED
+-//! wall-clock timestamps.
++//! AC-10.4b / Story 14-2 — REAL-socket mTLS cert-rotation chaos drill with
++//! MEASURED timestamps, run UNDER LOAD across an N-host mesh.
+ //!
+-//! Three `TcpA2ATransport` endpoints over real `127.0.0.1` sockets + real
+-//! rustls mTLS handshakes. Unlike the OLD synthetic rotation harness
+-//! (`maos_a2a_core::chaos::harness_3_host`, which seeds `t_0/t_1/t_2` from a
+-//! `DrillConfig` under `tokio::time::pause()`), this drill measures the three
+-//! rotation events with `SystemTime::now()` on a live mesh:
++//! N `TcpA2ATransport` endpoints over real `127.0.0.1` sockets + real rustls
++//! mTLS handshakes. Unlike the OLD synthetic rotation harness
++//! (`maos_a2a_core::chaos::harness_3_host` — DELETED by this story, AC6.1;
++//! it seeded `t_0/t_1/t_2` from `DrillConfig` constants and asserted its own
++//! floors green), this drill measures the three rotation events on a live
++//! mesh with a monotonic `Instant` base (AC4.5 — `SystemTime` is
++//! NTP-steppable and was retired):
+ //!
+-//! * `t_0` — rotation initiated: the old serving certs are superseded and the
+-//!   fresh leaves are issued (the rotation anchor). `TcpA2ATransport` exposes
+-//!   no in-place cert-swap API, so rotation is modelled as old-mesh-teardown +
+-//!   new-mesh-bind; `t_0` is the moment that rotation begins.
++//! * `t_0` — rotation initiated: the serving generation is swapped IN PLACE
++//!   (`swap_serving_cert`, AC2.4.a) while a W-dial in-flight window is
++//!   provably open. Rotation is `provision → swap → close` (AC2.0): the mesh
++//!   is BUILT provisioned (cfg declares the replacement; §7.2.1.a requires
++//!   provisioning ≥ `T_grace` before revocation — AC6.5(c) records this as an
++//!   ASSUMED precondition, not a built mechanism), every store opens its
++//!   one-generation window, the wire still serves the old leaf, then the swap
++//!   lands mid-load, then the window closes promote-and-retire.
+ //! * `t_1` — a peer FIRST verifies node `i`'s NEW serving cert via a LIVE mTLS
+ //!   handshake + data-plane round-trip (the revocation-propagation analog: the
+ //!   new pin is observably active). Recorded by the post-rotation directed-dial
+ //!   sweep — a real socket op, NOT a listener-bind timestamp.
+-//! * `t_2` — post-rotation NxN reachability confirmed == the sweep's full
+-//!   re-handshake + data-plane round-trip set completes.
++//! * `t_2` — per-agent (AC4.4): node `i`'s own first successful post-swap
++//!   data-plane round trip (its first source-side success in the sweep), NOT a
++//!   single shared wall reading — `end_to_end` is a real distribution.
+ //!
+ //! The values are sub-second (everything is localhost), but they are REAL — no
+ //! `tokio::time::pause()`, no hand-built timestamps. They are fed straight into
+ //! `RotationDrillReport::from_per_agent` and asserted against the §7.2.1.b
+-//! floors.
++//! floors via `passes_v15_floors` (which IS `passes_v10_floors` — NFR-Sec-13's
++//! literal PRD numbers are LOOSER on every axis and are never adopted).
++//!
++//! # Story 14-2 / AC1.1 — the conversation-drop definition
++//!
++//! > **A conversation drop is a frame issued before `t_0` that never received
++//! > a verdict — neither an ACK nor any typed NACK — by `t_2`.**
++//! > It is **not** a retried dial (retries are internal and a
++//! > retried-then-succeeded dial returns `Ok`, visible only as
++//! > `last_dial_attempts()`). It is **not** an `IntentDeniedAtPeer`
++//! > (`router.rs:1045`) — that is a completed conversation answered "no". It
++//! > is **not** a post-rotation reachability failure; that is the existing
++//! > Phase-2 assertion, already proven-red below.
++//!
++//! Drops are counted **test-side by sequence number** (no production drop
++//! counter exists or is owed): every dial records its verdict into a
++//! completion channel *before* the future resolves (14-1's
++//! channel-before-resolve idiom), and a dial that ends in a transport-plane
++//! death — `TransportFailed` / `Io` / `PartitionTimeout`, where ECONNRESET
++//! and ECONNREFUSED land (`error.rs:39`) — or that never resolves by `t_2`
++//! received no verdict and is a drop.
++//!
++//! **The before/after pair is the evidence (AC2.4):** against the PRE-14-2
++//! teardown-rebind rotation this exact window measured `drops = 6 = W` on 10
++//! consecutive runs (2026-08-29, recorded in the Dev Agent Record); under the
++//! provision→swap→close overlap the same window measures `drops == 0`. That
++//! pair, not a clean pass, is the proof.
++//!
++//! # Substrate notes
++//!
++//! * The mesh is the SHARED harness (`support::build_mesh_n*`, the ONE mesh
++//!   primitive `build_mesh_inner`) — the local `bind_node`/`build_mesh` fork
++//!   is retired (AC3.1). `directed_dial_sweep` is KEPT deliberately: it is the
++//!   only source of `t_1`/`t_2` timestamps (`concurrent_dial_pairs` returns
++//!   none), and it coexists with the window's `buffer_unordered(W)` stream by
++//!   design (AC3.1.a — ordered reachability sweep vs unordered racing window;
++//!   they are not substitutes).
++//! * The mesh is in-process (11.3 F1 disclosure, re-stated at N hosts): real
++//!   sockets, real rustls, real mTLS, one process, one runtime, loopback.
++//! * Revocation is NOT measured (AC6.5(a)): no OCSP/CRL exists (ADR-047 §3/§4
++//!   forbid it under NFR-Ops-12); `t_1` is the new-pin-observably-active
++//!   proxy.
++//! * Every drill wraps in a `RunnerEnvelope` and probes the fd ceiling
++//!   (`assert_fd_headroom(fd_headroom_for(n))`) — AC3.4/AC3.5: re-measure on
++//!   the runner, never inherit numbers.
+ mod support;
+ 
+-use std::time::{SystemTime, UNIX_EPOCH};
++use std::collections::BTreeSet;
++use std::time::{Duration, Instant};
+ 
+-use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
++use maos_a2a_core::chaos::report::report_to_markdown;
++use maos_a2a_core::error::HandshakeFailureClass;
++use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
++use maos_a2a_core::router::A2APeerRouter;
+ use maos_a2a_core::{
+-    compute_t_grace, AgentRotationTimestamps, HandshakeRetryPolicy, RotationDrillReport,
++    compute_t_grace, A2AError, AgentRotationTimestamps, HandshakeRetryPolicy, RotationDrillReport,
+ };
+-use maos_a2a_tcp::{TcpA2ATransport, TcpTimeouts};
++use maos_a2a_tcp::TcpTimeouts;
+ use maos_domain::invariants::i1::IntentClass;
+ use maos_spirit_abi::identity::HostId;
+ use support::*;
+ 
+-const HOSTS: [&str; 3] = ["host_a", "host_b", "host_c"];
+-const NONCES: [u64; 3] = [10, 20, 30];
++/// The floors leg's scale (AC3.3 — thin per-N wrappers over `rotation_drill`,
++/// never an env var: 14-1's ratified AC2.1 shape).
++const ROTATION_FLOORS_HOST_COUNT: usize = 3;
++/// The 10-host envelope leg's scale (the epic's scale-out target, NFR-Sec-13).
++const ROTATION_ENVELOPE_HOST_COUNT: usize = 10;
+ 
+-/// Real wall-clock nanoseconds since UNIX epoch (no `tokio::time::pause()`).
+-fn now_ns() -> u64 {
+-    SystemTime::now()
+-        .duration_since(UNIX_EPOCH)
+-        .expect("clock after epoch")
+-        .as_nanos() as u64
++/// Nanoseconds elapsed on the drill's OWN monotonic `Instant` base (AC4.5 —
++/// `Instant` is monotonic, so a backward wall-clock step can never invert a
++/// latency delta; `SystemTime::now()` was retired for this purpose).
++fn mono_ns(base: &Instant) -> u64 {
++    base.elapsed().as_nanos() as u64
+ }
+ 
+-/// Bind node `idx` serving `own_leaf`, pinning/allowlisting each `peers` entry
+-/// by that peer's EXPECTED leaf fingerprint. `own_leaf` and the expected leaf
+-/// are deliberately separate so a half-failed rotation (one node serving a
+-/// stale cert while its peers pin the new one) can be modelled.
+-async fn bind_node(
+-    clock: &Clock,
+-    ca: &Ca,
+-    idx: usize,
+-    own_leaf: &Leaf,
+-    peers: &[(usize, &Leaf)],
+-    retry: HandshakeRetryPolicy,
+-) -> TcpA2ATransport {
+-    let peer_pins: Vec<_> = peers
+-        .iter()
+-        .map(|(j, leaf)| pin(HOSTS[*j], &leaf.fingerprint, NONCES[*j]))
+-        .collect();
+-    let peer_cfgs: Vec<_> = peers
+-        .iter()
+-        .map(|(j, leaf)| {
+-            peer_cfg(
+-                HOSTS[*j],
+-                "tls://127.0.0.1:0",
+-                &leaf.fingerprint,
+-                &["readonly"],
+-                &["readonly"],
+-            )
+-        })
+-        .collect();
+-    bind_endpoint(
+-        own_leaf,
+-        Some(ca),
+-        NONCES[idx],
+-        peer_pins,
+-        peer_cfgs,
+-        clock,
+-        TcpTimeouts::test_profile(),
+-        retry,
+-    )
+-    .await
+-}
+-
+-/// Build a wired 3-node mesh. `serving[i]` is the cert node `i` actually
+-/// serves; `expected[i]` is the fingerprint every OTHER node pins/allowlists
+-/// for node `i`. Healthy rotation: `serving == expected`. Half-failed
+-/// rotation: one differs (pin mismatch).
+-async fn build_mesh(
+-    clock: &Clock,
+-    ca: &Ca,
+-    serving: [&Leaf; 3],
+-    expected: [&Leaf; 3],
+-    retry: HandshakeRetryPolicy,
+-) -> Vec<TcpA2ATransport> {
+-    let mut nodes = Vec::with_capacity(3);
+-    for i in 0..3 {
+-        let peers: Vec<(usize, &Leaf)> = (0..3)
+-            .filter(|j| *j != i)
+-            .map(|j| (j, expected[j]))
+-            .collect();
+-        nodes.push(bind_node(clock, ca, i, serving[i], &peers, retry.clone()).await);
+-    }
+-    // Wire real readback addresses (H3/H4) now that all listeners are bound.
+-    let addrs: Vec<_> = nodes.iter().map(|n| n.local_addr().unwrap()).collect();
+-    for (i, node) in nodes.iter().enumerate() {
+-        for j in 0..3 {
+-            if j != i {
+-                node.set_peer_endpoint(&HostId(HOSTS[j].into()), format!("tls://{}", addrs[j]));
+-            }
+-        }
+-    }
+-    nodes
+-}
++// ─────────────────────────── shared drill primitives ───────────────────────────
+ 
+ /// Observations from an NxN directed-dial sweep over REAL sockets.
+ ///
+ /// * `ok` / `total` — directed-pair success/total counts (GREEN vs RED).
+ /// * `first_success_ns[j]` — the instant node `j`'s serving cert is FIRST
+ ///   verified by a peer via a live mTLS handshake + data-plane round-trip (the
+-///   rotation "new-pin-active" event). `None` if node `j` was never reached.
++///   rotation "new-pin-active" event, `t_1[j]`). `None` if never reached.
++/// * `first_source_success_ns[i]` — node `i`'s OWN first successful
++///   data-plane round trip (its per-agent `t_2`, AC4.4 — a real per-agent
++///   distribution, never a single shared wall reading).
+ /// * `pair_ok[from][to]` — exact per-pair success matrix for topology oracles
+ ///   (diagonal unused).
+ struct DialSweep {
+     ok: usize,
+     total: usize,
+     first_success_ns: Vec<Option<u64>>,
++    first_source_success_ns: Vec<Option<u64>>,
+     pair_ok: Vec<Vec<bool>>,
+ }
+ 
+ /// Attempt every directed `i → j` dial (`i != j`) over real sockets, recording
+-/// per-pair success, the per-target first-success timestamp, and aggregate
+-/// counts. Never panics — the caller decides GREEN (all ACK) vs RED (some fail)
+-/// from the result.
+-async fn directed_dial_sweep(nodes: &[TcpA2ATransport], seq_base: u64) -> DialSweep {
+-    let n = nodes.len();
++/// per-pair success, per-target and per-source first-success timestamps, and
++/// aggregate counts. Never panics — the caller decides GREEN (all ACK) vs RED
++/// (some fail) from the result. KEPT deliberately (AC3.1): the only source of
++/// `t_1`/`t_2` timestamps — `concurrent_dial_pairs` returns none.
++async fn directed_dial_sweep(mesh: &[MeshNode], seq_base: u64, base: &Instant) -> DialSweep {
++    let n = mesh.len();
+     let mut first_success_ns = vec![None; n];
++    let mut first_source_success_ns = vec![None; n];
+     let mut pair_ok = vec![vec![false; n]; n];
+     let mut ok = 0usize;
+     let mut total = 0usize;
+@@ -150,20 +143,24 @@ async fn directed_dial_sweep(nodes: &[TcpA2ATransport], seq_base: u64) -> DialSw
+             }
+             total += 1;
+             let frame = make_frame(
+-                HOSTS[i],
+-                HOSTS[j],
++                &mesh[i].name,
++                &mesh[j].name,
+                 IntentClass::Readonly,
+                 seq_base + (i as u64 * n as u64 + j as u64),
+             );
+-            if nodes[i]
+-                .route_outbound(frame, &HostId(HOSTS[j].into()))
+-                .await
+-                .is_ok()
+-            {
++            let res = mesh[i]
++                .transport
++                .route_outbound(frame, &HostId(mesh[j].name.clone()))
++                .await;
++            if res.is_ok() {
+                 ok += 1;
+                 pair_ok[i][j] = true;
++                let ts = mono_ns(base);
+                 if first_success_ns[j].is_none() {
+-                    first_success_ns[j] = Some(now_ns());
++                    first_success_ns[j] = Some(ts);
++                }
++                if first_source_success_ns[i].is_none() {
++                    first_source_success_ns[i] = Some(ts);
+                 }
+             }
+         }
+@@ -172,185 +169,697 @@ async fn directed_dial_sweep(nodes: &[TcpA2ATransport], seq_base: u64) -> DialSw
+         ok,
+         total,
+         first_success_ns,
++        first_source_success_ns,
+         pair_ok,
+     }
+ }
+ 
+-// ─────────────────────────── AC-10.4b GREEN ───────────────────────────
++/// AC1.1's positive half, test-side: did the dial's outcome constitute a
++/// VERDICT — an ACK (`Ok`) or a typed NACK the PEER ANSWERED with
++/// (`IntentDeniedAtPeer` is "a completed conversation answered no"; the
++/// `*AtPeer` family and the peer-reported internal/timeout failures are all
++/// reconstructed from a peer response)? Everything else — transport-plane
++/// deaths (`TransportFailed`/`Io`/`PartitionTimeout`, where a rotation-caused
++/// ECONNRESET lands), HANDSHAKE failures (no response was ever generated —
++/// §A6 TestInfra-1: counting them as verdicts would let a swap that breaks
++/// handshakes pass as "zero drops"), and local pin/router refusals — is NOT
++/// a verdict: the conversation died without an answer.
++fn received_verdict(res: &Result<(), A2AError>) -> bool {
++    matches!(
++        res,
++        Ok(())
++            | Err(A2AError::IntentDeniedAtPeer { .. })
++            | Err(A2AError::ConsentUnclassifiedAtPeer { .. })
++            | Err(A2AError::PeerInternalFailure { .. })
++            | Err(A2AError::PeerIntakeTimeout { .. })
++    )
++}
+ 
+-/// Test 1 — live 3-host rotation drill with REAL measured timestamps.
+-///
+-/// Phase 1 establishes a pre-paired mTLS mesh and proves full NxN
+-/// reachability (6 directed dials). Phase 2 rotates every endpoint's serving
+-/// cert, measuring `t_0` (rotation initiated: old certs superseded, fresh
+-/// leaves issued), per-node `t_1` (a peer first verifies node i's NEW serving
+-/// cert via a LIVE mTLS handshake — the revocation-propagation analog, recorded
+-/// by the directed-dial sweep), and `t_2` (the sweep's full NxN re-handshake +
+-/// data-plane round-trip set completes). The three real `(t_0, t_1, t_2)`
+-/// tuples feed `RotationDrillReport::from_per_agent`, which must pass BOTH the
+-/// v0.7 and v1.0 floors with zero conversation drops.
+-#[tokio::test]
+-async fn t_10_4b_rotation_real_timing_3_host_drill() {
++/// Story 14-1 AC5.1-style marker (AC5.4): every rotation drill prints the
++/// DERIVED host count — a test that early-returns prints no marker and the
++/// gate reds the leg. The value is derived from the distinct `agent_id`s
++/// actually present in `per_agent` (AC3.2), never the self-declared
++/// `host_count` field.
++const ROTATION_MARKER_PREFIX: &str = "ROTATION_HOSTS_ROTATED";
++
++fn print_rotation_marker(derived_hosts: usize) {
++    println!("{ROTATION_MARKER_PREFIX}={derived_hosts}");
++}
++
++/// The derived identity witness (AC3.2, mirroring
++/// `ChurnDrillReport::distinct_host_count`): the count of DISTINCT `agent_id`s
++/// actually present in `per_agent`. The 10-host floor is asserted against
++/// THIS, never against `rotation.rs`'s self-declared `host_count` — a report
++/// that SAYS ten hosts and MEASURED three must not pass a ten-host floor
++/// (Blocking condition 4).
++fn distinct_agent_witness(per_agent: &[AgentRotationTimestamps]) -> usize {
++    per_agent
++        .iter()
++        .map(|a| a.agent_id.clone())
++        .collect::<BTreeSet<_>>()
++        .len()
++}
++
++// ─────────────────────────── RunnerEnvelope (AC3.4, copied from 14-1) ───────────────────────────
++
++/// The ratified wall/RSS trip conditions (14-1 AC6.2.a): 300 s / 1 GiB.
++const RUNNER_WALL_BUDGET_SECS: u64 = 300;
++const RUNNER_PEAK_RSS_BUDGET_KB: u64 = 1_048_576;
++
++/// RAII guard COPIED from `t_11_3_scale_churn.rs:190-245` (AC3.4 — "copy
++/// them; do not rebuild them"): publishes `wall` + `peak_rss_kb` for the
++/// drill it wraps and enforces the trip condition on drop. Never fires while
++/// the thread is already panicking, so a real assertion failure is never
++/// masked by a budget message.
++struct RunnerEnvelope {
++    label: String,
++    started: Instant,
++}
++
++impl RunnerEnvelope {
++    fn open(label: impl Into<String>) -> Self {
++        Self {
++            label: label.into(),
++            started: Instant::now(),
++        }
++    }
++}
++
++impl Drop for RunnerEnvelope {
++    fn drop(&mut self) {
++        let wall = self.started.elapsed();
++        let rss = peak_rss_kb();
++        // Unmeasured VmHWM prints `unmeasured` and FAILS by name — never
++        // passes as 0 (14-1 round-2 P2).
++        let rss_token = match rss {
++            Some(kb) => format!("{kb}"),
++            None => "unmeasured".to_string(),
++        };
++        println!(
++            "ROTATION_RUNNER_ENVELOPE {} wall_s={:.2} peak_rss_kb={rss_token}",
++            self.label,
++            wall.as_secs_f64()
++        );
++        if std::thread::panicking() {
++            return;
++        }
++        assert!(
++            wall.as_secs_f64() <= RUNNER_WALL_BUDGET_SECS as f64,
++            "RUNNER-BUDGET ({}): wall {:.1}s exceeds the ratified {RUNNER_WALL_BUDGET_SECS}s trip condition (AC3.4)",
++            self.label,
++            wall.as_secs_f64()
++        );
++        let rss = rss.unwrap_or_else(|| {
++            panic!(
++                "RUNNER-UNMEASURED ({}): /proc/self/status VmHWM unreadable — unmeasured must \
++                 fail by name, not pass as 0 (AC3.5)",
++                self.label
++            )
++        });
++        assert!(
++            rss <= RUNNER_PEAK_RSS_BUDGET_KB,
++            "RUNNER-BUDGET ({}): peak RSS {rss} kB exceeds the ratified 1 GiB trip condition (AC3.4)",
++            self.label
++        );
++    }
++}
++
++// ─────────────────────────── the rotation drill (AC1/AC2/AC3/AC4) ───────────────────────────
++
++/// Post-grace probe (AC2.5): a GHOST endpoint still serving node `i`'s
++/// RETIRED leaf dials a peer that pinned node i, over the REAL dial path.
++/// The peer's listen-side lookup (site 2) must refuse the retired identity —
++/// the dial dies in the mTLS handshake with `HandshakeFailed { PinMismatch }`,
++/// a typed, observed rejection through the same surface the proven-red
++/// pin-mismatch vector uses. (A raw `TlsConnector::connect().is_err()` probe
++/// is NOT an oracle here: in TLS 1.3 the client's handshake completes before
++/// the server has verified the client certificate, so the refusal alert
++/// arrives only on the first read — a request/response round trip, never a
++/// bare connect, observes it.) Returns `true` when the presentation was
++/// REFUSED.
++async fn retired_cert_probe_refused(
++    target: &MeshNode,
++    retired_leaf: &Leaf,
++    target_current: &PeerCertFingerprint,
++    ca: &Ca,
++    clock: &Clock,
++) -> bool {
++    let ghost_id = "post_grace_ghost";
++    let pins = vec![pin(&target.name, target_current, 1)];
++    let cfgs = vec![peer_cfg(
++        &target.name,
++        "tls://127.0.0.1:0",
++        target_current,
++        &["readonly"],
++        &["readonly"],
++    )];
++    let ghost = bind_endpoint(
++        retired_leaf,
++        Some(ca),
++        1,
++        pins,
++        cfgs,
++        clock,
++        TcpTimeouts::test_profile(),
++        no_retry(),
++    )
++    .await;
++    ghost.set_peer_endpoint(
++        &HostId(target.name.clone()),
++        format!("tls://{}", target.addr),
++    );
++    let frame = make_frame(ghost_id, &target.name, IntentClass::Readonly, 7_777_000);
++    let res = ghost
++        .route_outbound(frame, &HostId(target.name.clone()))
++        .await;
++    // The refusal is OBSERVED on the wire as the server's fatal handshake
++    // alert (measured: `Io("recv: received fatal alert: CertificateUnknown")`
++    // on the dialer — the TLS 1.3 client-cert rejection alert; the
++    // PIN_MISMATCH tag lives in the server's verifier and does not
++    // round-trip). §A6 TestInfra-4: match the SPECIFIC alert/class — a bare
++    // "fatal alert" substring would count ANY TLS failure as a refusal — and
++    // every probe is PAIRED with a current-cert success on the same path
++    // (in the drill's loop), proving the path is alive and the refusal is
++    // cert-specific.
++    matches!(&res, Err(A2AError::Io(msg)) if msg.contains("CertificateUnknown"))
++        || matches!(
++            &res,
++            Err(A2AError::HandshakeFailed {
++                class: HandshakeFailureClass::PinMismatch,
++                ..
++            })
++        )
++}
++/// swap IN PLACE racing the live sweep (`t_0`) → drain with zero drops →
++/// post-swap sweep (`t_1`/`t_2`) → windows closed promote-and-retire →
++/// post-grace retired-cert probes (AC2.5) → report + floors + disclosures.
++async fn rotation_drill(n: usize) {
++    assert!(n >= 2, "a rotation needs at least a pair");
++    assert_fd_headroom(fd_headroom_for(n)); // AC3.5 — probe, never assume
++    let _envelope = RunnerEnvelope::open(format!("rotation-drill-n{n}")); // AC3.4
++    let base = Instant::now(); // AC4.5 — the monotonic base every sample cites
+     let clock = Clock::capture();
+-    let ca = mk_ca(&clock, "ca-10-4b-drill");
++    let ca = mk_ca(&clock, "ca-10-4b-rotation");
++    let retry = HandshakeRetryPolicy::default();
++    let names: Vec<String> = (0..n).map(host_name).collect();
+ 
+-    // ── Phase 1: pre-paired mTLS mesh, full NxN reachability (zero drops) ──
+-    let old: [Leaf; 3] = [
+-        valid_leaf(&ca, &clock),
+-        valid_leaf(&ca, &clock),
+-        valid_leaf(&ca, &clock),
+-    ];
+-    let old_refs: [&Leaf; 3] = [&old[0], &old[1], &old[2]];
+-    let mesh_old = build_mesh(
++    // Two generations: `old` is served+ pinned at steady state; `new` is what
++    // the operator DECLARED at t_provision (AC2.0) and what the mesh rotates to.
++    let old: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let new: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let old_refs: Vec<&Leaf> = old.iter().collect();
++    let new_refs: Vec<&Leaf> = new.iter().collect();
++
++    // PROVISIONED mesh (AC2.0.a): serving + store pins stay on the OLD
++    // generation while every A2APeerConfig DECLARES the new one — the
++    // operator's t_provision act, constructed directly (no runtime
++    // config-mutation API exists or is created; AC2.0).
++    let mesh = build_mesh_n_provisioned(
+         &clock,
+         &ca,
+-        old_refs,
+-        old_refs,
+-        HandshakeRetryPolicy::default(),
++        &names,
++        &old_refs,
++        &old_refs,
++        &new_refs,
++        retry.clone(),
+     )
+     .await;
+-    let sweep1 = directed_dial_sweep(&mesh_old, 1000).await;
++
++    // t_provision: open every node's rotation window for every peer — the
++    // store's active set becomes {current: old, next: new} (AC2.1), sites 5/6
++    // pass (the DECLARED new ∈ set), and the wire still serves OLD.
++    for node in &mesh {
++        for (j, peer_name) in names.iter().enumerate() {
++            if node.name != *peer_name {
++                node.transport
++                    .pins()
++                    .open_rotation_window(&PeerId::new(peer_name.clone()), &new[j].fingerprint)
++                    .expect("open rotation window");
++            }
++        }
++    }
++
++    // ── Phase 1: steady (provisioned) NxN sweep over the OLD certs ──
++    let sweep1 = directed_dial_sweep(&mesh, 1000, &base).await;
+     assert_eq!(
+         sweep1.ok, sweep1.total,
+-        "Phase 1: zero conversation drops — full NxN reachability over REAL sockets"
++        "Phase 1: zero conversation drops over the old generation — full NxN reachability"
++    );
++    // §A6 TestInfra-3: drain the summed gauge to ZERO before the in-flight
++    // window — Phase 1's server-side handlers decrement only after they are
++    // next scheduled, and a stale handler would let the arm's `live >= w`
++    // fire on Phase-1 residue instead of Phase-2 frames.
++    assert!(
++        wait_until(
++            || mesh
++                .iter()
++                .map(|m| m.transport.active_connections())
++                .sum::<usize>()
++                == 0,
++            Duration::from_secs(5),
++        )
++        .await,
++        "Phase 1 gauge must drain to zero before the window arms"
+     );
+ 
+-    // ── Phase 2: REAL rotation with measured timestamps ──
+-    // t_0 = rotation initiated (old serving certs superseded, fresh leaves about to be issued).
+-    let t0 = now_ns();
+-    drop(mesh_old); // drop the old mesh (H6 deterministic teardown frees old ports)
++    // ── Phase 2: the in-flight window + the generation swap racing INSIDE it ──
++    // W = min(DIAL_CONCURRENCY, pairs.len()) (AC1.2): 6 at N=3, 16 at N=10.
++    // Repeated dials to the same pair are not additional conversations.
++    let pairs: Vec<(usize, usize)> = (0..n)
++        .flat_map(|i| (0..n).filter(move |j| *j != i).map(move |j| (i, j)))
++        .collect();
++    let w = DIAL_CONCURRENCY.min(pairs.len());
++    assert!(
++        w >= 2,
++        "the window is not a window below 2 in-flight frames"
++    );
+ 
+-    // New cert material: fresh leaves from the SAME CA.
+-    let new: [Leaf; 3] = [
+-        valid_leaf(&ca, &clock),
+-        valid_leaf(&ca, &clock),
+-        valid_leaf(&ca, &clock),
+-    ];
++    // Drop accounting (AC1.1): verdicts recorded channel-before-resolve.
++    let issued = pairs.len() as u64;
++    let (verdicts_tx, mut verdicts_rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
++    use futures_util::stream::{self, StreamExt};
++    let mut sweep = {
++        let futs = pairs.iter().enumerate().map(|(k, &(i, j))| {
++            let seq = 5_000_000 + k as u64;
++            let frame = make_frame(&names[i], &names[j], IntentClass::Readonly, seq);
++            let to = HostId(names[j].clone());
++            let node = &mesh[i];
++            let verdicts_tx = verdicts_tx.clone();
++            async move {
++                let res = node.transport.route_outbound(frame, &to).await;
++                if received_verdict(&res) {
++                    let _ = verdicts_tx.send(seq);
++                }
++            }
++        });
++        Box::pin(stream::iter(futs).buffer_unordered(w))
++    };
+ 
+-    // Rebind each node with its new cert + new peer pins. (TcpA2ATransport
+-    // exposes no in-place cert-swap API, so rotation is modelled as a rebind:
+-    // old cert superseded → new cert bound + peers re-pinned at the new
+-    // fingerprint. The rotation EVENTS below are still measured from live
+-    // socket ops, not from these binds.)
+-    let mut nodes = Vec::with_capacity(3);
+-    for i in 0..3 {
+-        let peers: Vec<(usize, &Leaf)> = (0..3).filter(|j| *j != i).map(|j| (j, &new[j])).collect();
+-        nodes.push(
+-            bind_node(
+-                &clock,
+-                &ca,
+-                i,
+-                &new[i],
+-                &peers,
+-                HandshakeRetryPolicy::default(),
+-            )
+-            .await,
+-        );
+-    }
+-    // Wire real readback addresses (H3/H4) now that all listeners are bound.
+-    let addrs: Vec<_> = nodes.iter().map(|n| n.local_addr().unwrap()).collect();
+-    for (i, node) in nodes.iter().enumerate() {
+-        for j in 0..3 {
+-            if j != i {
+-                node.set_peer_endpoint(&HostId(HOSTS[j].into()), format!("tls://{}", addrs[j]));
++    // Arm (AC1.2): drive the sweep and watch the summed `active_connections()`
++    // gauge until W dials are confirmed in flight. The stream is LAZY — it
++    // launches dials only when polled — so the arm races `sweep.next()`
++    // against a zero timer, giving the runtime turns between gauge checks.
++    let mut max_live = 0usize;
++    let armed = {
++        let deadline = Instant::now() + Duration::from_secs(5);
++        loop {
++            let live: usize = mesh.iter().map(|m| m.transport.active_connections()).sum();
++            max_live = max_live.max(live);
++            if live >= w {
++                break true;
++            }
++            if Instant::now() > deadline {
++                break false;
++            }
++            tokio::select! {
++                _ = tokio::time::sleep(Duration::from_millis(0)) => {}
++                delivered = sweep.next() => {
++                    if delivered.is_none() {
++                        break false; // sweep exhausted before the window opened
++                    }
++                }
+             }
+         }
+-    }
++    };
++    assert!(
++        armed,
++        "the in-flight window must open: {w} dials confirmed live via the summed \
++         active_connections() gauge (max observed {max_live}) — if it cannot, the \
++         window or the gauge is broken"
++    );
++    let t0 = mono_ns(&base);
+ 
+-    // Phase 2 NxN reachability == re-handshake + data-plane round-trip over the
+-    // NEW certs. The sweep also records t_1[i] — the instant a peer FIRST
+-    // verifies node i's new serving cert via a live handshake (the
+-    // revocation-propagation analog: the new pin is observably active). Every
+-    // dial must ACK (zero conversation drops).
+-    let sweep2 = directed_dial_sweep(&nodes, 2000).await;
++    // The generation swap, IN PLACE (AC2.4.a): `swap_serving_cert` per node —
++    // no teardown, no rebind, no move. 14-1's `select!` race shape is now
++    // WRITABLE (the pre-14-2 teardown version structurally could not race the
++    // traffic it was killing — recorded in the Dev Agent Record). NOT
++    // `biased`: the poll order IS the race.
++    let mut swap = Box::pin(async {
++        for (i, node) in mesh.iter().enumerate() {
++            node.transport
++                .swap_serving_cert(vec![new[i].der.clone()], new[i].key_der.clone_key())
++                .expect("in-place serving-cert swap");
++        }
++    });
++    let mut swap_won = false;
++    loop {
++        tokio::select! {
++            _ = &mut swap => {
++                swap_won = true;
++                break;
++            }
++            delivered = sweep.next() => {
++                if delivered.is_none() {
++                    break; // sweep drained first; finish the swap below
++                }
++            }
++        }
++    }
++    if !swap_won {
++        (&mut swap).await;
++    }
++    // Drain the remainder: post-swap handshakes resolve the NEW leaf and the
++    // open window's set-valued verify accepts it; in-flight connections were
++    // never touched (rustls does no renegotiation).
++    while sweep.next().await.is_some() {}
++    let t2_window = mono_ns(&base);
++    // Drop accounting: every issued frame must have a verdict by t_2 (AC1.1).
++    let mut verdicts = 0u64;
++    while verdicts_rx.try_recv().is_ok() {
++        verdicts += 1;
++    }
++    let drops = issued - verdicts;
++    assert_eq!(
++        verdicts + drops,
++        issued,
++        "drop accounting is exhaustive over the issued set"
++    );
++    eprintln!(
++        "  in-flight window: W={w} confirmed at t_0; issued={issued}; verdicts={verdicts}; \
++         drops={drops} (window drain t_2−t_0 = {} ms)",
++        (t2_window - t0) / 1_000_000
++    );
++    assert!(
++        drops == 0,
++        "AC2.4: the provision→swap→close overlap MUST deliver zero conversation drops \
++         (got {drops} of {issued}) — the pre-overlap teardown model measured drops={w} on \
++         this same window (Dev Agent Record, 2026-08-29)"
++    );
++    // ── Phase 3: post-swap NxN sweep — `t_1` per target (first NEW-cert
++    // verification), `t_2` per source (AC4.4's per-agent re-handshake+first
++    // data-plane success). Every dial must ACK.
++    let sweep2 = directed_dial_sweep(&mesh, 2000, &base).await;
+     assert_eq!(
+         sweep2.ok, sweep2.total,
+-        "Phase 2: zero conversation drops — all NxN dials ACK over new certs"
++        "Phase 3: zero conversation drops — all NxN dials ACK over the new generation"
+     );
+-    // t_1[i] = the new pin first observed ACTIVE via a live socket op.
+-    let mut t1_ns = [0u64; 3];
+-    for i in 0..3 {
+-        t1_ns[i] = sweep2.first_success_ns[i]
+-            .expect("every node must be reached by a peer over its new cert");
++
++    // ── Close: promote-and-retire (AC2.1.a) on every node's store. The store
++    // must end up holding NEW; the retired OLD is returned and refused below.
++    let mut retired: Vec<PeerCertFingerprint> = Vec::with_capacity(n);
++    for node in &mesh {
++        for peer_name in &names {
++            if node.name != *peer_name {
++                retired.push(
++                    node.transport
++                        .pins()
++                        .close_rotation_window(&PeerId::new(peer_name.clone()))
++                        .expect("window was open at close"),
++                );
++            }
++        }
++    }
++
++    // ── Post-grace probes (AC2.5): present every RETIRED leaf to a peer that
++    // pinned it, over a real handshake attempt. Every presentation MUST be
++    // refused (NFR-Sec-12: 100% detected, blocked, alerted). The measured
++    // count of ACCEPTED retired presentations feeds the report — the zero is
++    // EARNED by these probes, not hardcoded (the pre-14-2 drill passed the
++    // literal `0`).
++    let mut accepted_retired = 0usize;
++    let mut probes = 0usize;
++    for i in 0..n {
++        let target = &mesh[(i + 1) % n]; // a peer that pinned node i
++        probes += 1;
++        if !retired_cert_probe_refused(target, &old[i], &new[(i + 1) % n].fingerprint, &ca, &clock)
++            .await
++        {
++            accepted_retired += 1;
++            eprintln!("  POST-GRACE LEAK: node {i}'s retired leaf was ACCEPTED by a peer");
++        }
++        // §A6 TestInfra-4 pairing: the SAME path must carry CURRENT-cert
++        // traffic green — proving the path is alive and the refusal above
++        // is cert-specific, not a dead/unreachable target.
++        let ok_frame = make_frame(
++            &names[i],
++            &names[(i + 1) % n],
++            IntentClass::Readonly,
++            7_888_000 + i as u64,
++        );
++        let ok = mesh[i]
++            .transport
++            .route_outbound(ok_frame, &HostId(names[(i + 1) % n].clone()))
++            .await;
++        assert!(
++            ok.is_ok(),
++            "post-grace pairing: new-generation traffic on the probe path must ACK: {ok:?}"
++        );
+     }
+-    // t_2 = post-rotation full NxN re-handshake + data-plane round-trip confirmed.
+-    let t2 = now_ns();
++    assert_eq!(
++        accepted_retired, 0,
++        "NFR-Sec-12: every retired-cert presentation post-grace must be refused \
++         ({accepted_retired} of {probes} probes accepted)"
++    );
+ 
+-    // Build 3 AgentRotationTimestamps from the REAL measured values and feed
+-    // them into the aggregate report.
+-    let per_agent: Vec<AgentRotationTimestamps> = (0..3)
++    // ── Per-agent timestamps + the report ──
++    let per_agent: Vec<AgentRotationTimestamps> = (0..n)
+         .map(|i| AgentRotationTimestamps {
+-            agent_id: HOSTS[i].into(),
++            agent_id: names[i].clone(),
+             t_0_ns: t0,
+-            t_1_ns: Some(t1_ns[i]),
+-            t_2_ns: Some(t2),
++            t_1_ns: sweep2.first_success_ns[i],
++            t_2_ns: sweep2.first_source_success_ns[i],
+         })
+         .collect();
+-    // T_grace per §7.2.1.a cold-deployment floor (p99=500ms, 7 days history):
+-    // max(2*max(500,500), 5000) = 5000ms.
++    // AC4.4 — non-degeneracy (11.2a vacuous-count guard, ported): every raw
++    // sample set must hold DISTINCT values, or the per-agent t_2 fix regressed
++    // to shared wall readings.
++    let prop_raw: BTreeSet<u64> = per_agent
++        .iter()
++        .filter_map(|a| a.t_1_ns.map(|t| t.saturating_sub(t0)))
++        .collect();
++    let e2e_raw: BTreeSet<u64> = per_agent
++        .iter()
++        .filter_map(|a| a.t_2_ns.map(|t| t.saturating_sub(t0)))
++        .collect();
++    assert_eq!(
++        prop_raw.len(),
++        n,
++        "raw propagation samples must be distinct"
++    );
++    assert_eq!(e2e_raw.len(), n, "raw end-to-end samples must be distinct");
++
++    // T_grace per §7.2.1.a cold-deployment floor: max(2*max(500,500), 5000) ms.
+     let t_grace_ms = compute_t_grace(500, 7).as_millis() as u64;
+     let report = RotationDrillReport::from_per_agent(
+-        "10-4b-live-3host-drill",
+-        3,
++        format!("10-4b-live-{n}host-drill"),
++        // AC3.2: the DERIVED witness feeds the report's host_count — never a
++        // literal. A drill that says N and measured fewer cannot pass below.
++        distinct_agent_witness(&per_agent) as u32,
+         500,
+         t_grace_ms,
+         per_agent,
+-        0,                   // post_grace_reject_count: NO old-cert connection survived rotation
+-        sweep2.total as u64, // every phase-2 connection used a new cert
++        accepted_retired as u64, // MEASURED (AC2.5): retired certs accepted post-grace
++        probes as u64 + sweep2.total as u64, // every post-grace connection observed
+     );
+ 
+-    // Transparency: print the REAL measured timings.
+-    eprintln!("\n=== AC-10.4b live 3-host rotation drill (REAL timestamps) ===");
++    // Transparency: the measured timings WITH sample counts (AC4.2 — n= beside
++    // every percentile; at small n the p99 IS the worst of n, said loudly).
++    let n_prop = report
++        .per_agent
++        .iter()
++        .filter(|a| a.t_1_ns.is_some())
++        .count();
++    let n_e2e = report
++        .per_agent
++        .iter()
++        .filter(|a| a.t_2_ns.is_some())
++        .count();
++    eprintln!("\n=== AC-10.4b live {n}-host rotation drill (REAL monotonic timestamps) ===");
+     for a in &report.per_agent {
+         eprintln!(
+-            "  {:>7}: t0={:_>20}ns  prop(t1-t0)={:>5}ms  re-hs(t2-t1)={:>5}ms  e2e(t2-t0)={:>5}ms",
++            "  {:>8}: prop(t1-t0)={:>5}ms  re-hs(t2-t1)={:>5}ms  e2e(t2-t0)={:>5}ms",
+             a.agent_id,
+-            a.t_0_ns,
+             a.revocation_propagation_ms().unwrap_or(0),
+             a.re_handshake_ms().unwrap_or(0),
+             a.end_to_end_ms().unwrap_or(0),
+         );
+     }
+     eprintln!(
+-        "  revocation-propagation p50/p99 = {}/{} ms   (v0.7 floors 30000/90000)",
++        "  revocation-propagation p50/p99 = {}/{} ms  (n={n_prop})  (v0.7 floors 30000/90000)",
+         report.revocation_propagation_p50_ms, report.revocation_propagation_p99_ms
+     );
+     eprintln!(
+-        "  re-handshake            p50/p99 = {}/{} ms   (v0.7 floors 30000/60000)",
++        "  re-handshake            p50/p99 = {}/{} ms          (v0.7 floors 30000/60000)",
+         report.re_handshake_p50_ms, report.re_handshake_p99_ms
+     );
+     eprintln!(
+-        "  end-to-end              p50/p99 = {}/{} ms   (v1.0 floors 60000/150000)",
++        "  end-to-end              p50/p99 = {}/{} ms  (n={n_e2e})  (v1.0 floors 60000/150000)",
+         report.end_to_end_p50_ms, report.end_to_end_p99_ms
+     );
+     eprintln!(
+-        "  post-grace reject rate = {:.6}   (v1.0 floor 0.001)",
+-        report.post_grace_reject_rate
++        "  post-grace retired-cert accept rate = {:.6} of {} observed  (v1.0 floor 0.001)",
++        report.post_grace_reject_rate,
++        probes as u64 + sweep2.total as u64
+     );
+     eprintln!(
+-        "  => passes_v07_floors={}  passes_v10_floors={}  passes_v15_floors={}",
++        "  => passes_v07={}  passes_v10={}  passes_v15={}",
+         report.passes_v07_floors, report.passes_v10_floors, report.passes_v15_floors
+     );
+ 
+-    // localhost timings are sub-second → far under every floor.
++    // AC3.2 — the identity witness binds: the DERIVED count is the mesh size,
++    // and the floor at the envelope scale asserts against IT.
++    let derived = distinct_agent_witness(&report.per_agent);
++    assert_eq!(
++        derived, n,
++        "the derived identity witness must equal the mesh"
++    );
++    print_rotation_marker(derived);
++
++    // The floors (AC4.1) — via passes_v15_floors, which IS passes_v10_floors.
+     assert!(
+         report.passes_v07_floors,
+         "v0.7 floors MUST pass: localhost rotation timings are well under 30s/90s/30s/60s"
+     );
+     assert!(
+         report.passes_v10_floors,
+-        "v1.0 floors MUST pass: end-to-end < 60s/150s and post-grace reject rate is 0"
++        "v1.0 floors MUST pass: end-to-end < 60s/150s and retired-cert accept rate is 0"
+     );
+     assert!(
+         report.passes_v15_floors,
+-        "v1.5 NFR-Sec-13 floors MUST pass (inherits v1.0 strictness; localhost timings far under)"
++        "v1.5 NFR-Sec-13 floors MUST pass (inherits v1.0 strictness; never the looser PRD literals)"
+     );
+-    // Explicit zero-drop invariant across both phases.
++    // Explicit zero-drop invariant across every phase.
+     assert_eq!(
+         sweep1.ok + sweep2.ok,
+         sweep1.total + sweep2.total,
+-        "zero conversation drops across both phases"
++        "zero conversation drops across both reachability sweeps"
+     );
++    // AC4.2 third surface — the rendered markdown report with per-axis
++    // sample counts (report.rs, WIRED by this story after 11 dead stories).
++    eprintln!("{}", report_to_markdown(&report).expect("markdown render"));
++}
++
++#[tokio::test]
++#[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
++async fn t_10_4b_rotation_real_timing_3_host_drill() {
++    rotation_drill(ROTATION_FLOORS_HOST_COUNT).await;
++}
++
++/// Test 1b — the 10-host envelope leg (the epic's scale-out target): the SAME
++/// drill at N=10 plus the rotation-named adversary (AC3.4), both inside the
++/// runner envelope with the fd ceiling probed for THIS scale.
++#[tokio::test]
++#[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
++async fn t_10_4b_rotation_real_timing_10_host_envelope() {
++    assert_fd_headroom(fd_headroom_for(ROTATION_ENVELOPE_HOST_COUNT));
++    let _envelope = RunnerEnvelope::open("rotation-10host-envelope");
++    rotation_drill(ROTATION_ENVELOPE_HOST_COUNT).await;
++    cert_rotation_race_adversary_detected(ROTATION_ENVELOPE_HOST_COUNT).await;
++}
++
++/// AC3.4 — the rotation-named adversary (`PlantKind::CertRotationRaceExploit`,
++/// shipped by 14-1, inherited for free): one mesh member serves an EXPIRED
++/// leaf instead of rotating. Detection = every adversary-involving directed
++/// pair fails (with the exact `CertExpired` class on a live dial — WebPKI
++/// validity runs BEFORE any pin check) while every healthy pair stays green.
++async fn cert_rotation_race_adversary_detected(n: usize) {
++    let clock = Clock::capture();
++    let ca = mk_ca(&clock, "ca-14-2-race-exploit");
++    let names: Vec<String> = (0..n).map(host_name).collect();
++    // `serving` starts as a CLONE of `expected` (every node serves the
++    // identity its peers pinned); ONLY the adversary deviates — a DIFFERENT
++    // (expired) leaf.
++    let adv = n - 1; // never index 0 (the stable hub rule)
++    let expected: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let mut serving: Vec<Leaf> = expected.clone();
++    serving[adv] = expired_leaf(&ca, &clock); // "rotated" into an expired leaf
++    let serving_refs: Vec<&Leaf> = serving.iter().collect();
++    let expected_refs: Vec<&Leaf> = expected.iter().collect();
++    let mesh = build_mesh_with_planted(
++        &clock,
++        &ca,
++        &names,
++        &serving_refs,
++        &expected_refs,
++        &[(adv, PlantKind::CertRotationRaceExploit)],
++        no_retry(),
++    )
++    .await;
++
++    let base = Instant::now();
++    let sweep = directed_dial_sweep(&mesh, 9_000, &base).await;
++    let mut adv_pairs_failed = 0usize;
++    let mut healthy_pairs_ok = 0usize;
++    for i in 0..n {
++        for j in 0..n {
++            if i == j {
++                continue;
++            }
++            let involves_adv = i == adv || j == adv;
++            if involves_adv {
++                assert!(
++                    !sweep.pair_ok[i][j],
++                    "adversary-involving pair {i}->{j} must fail (expired leaf detected)"
++                );
++                adv_pairs_failed += 1;
++            } else if sweep.pair_ok[i][j] {
++                healthy_pairs_ok += 1;
++            }
++        }
++    }
++    let healthy_total = n * (n - 1) - 2 * (n - 1);
++    assert_eq!(adv_pairs_failed, 2 * (n - 1), "exact adversary topology");
++    assert_eq!(
++        healthy_pairs_ok, healthy_total,
++        "every healthy pair stays green around the detected adversary"
++    );
++    // The exact class, on one live dial (not inferred from the matrix).
++    let frame = make_frame(&names[0], &names[adv], IntentClass::Readonly, 9_999);
++    let res = mesh[0]
++        .transport
++        .route_outbound(frame, &HostId(names[adv].clone()))
++        .await;
++    assert!(
++        matches!(
++            res,
++            Err(A2AError::HandshakeFailed {
++                class: HandshakeFailureClass::CertExpired,
++                ..
++            })
++        ),
++        "the rotation-race adversary must be detected as CertExpired, got {res:?}"
++    );
++    eprintln!(
++        "  adversary leg: {adv_pairs_failed}/{} adversary pairs failed (CertExpired), \
++         {healthy_pairs_ok}/{healthy_total} healthy pairs green at N={n}",
++        n * (n - 1)
++    );
++}
++
++/// Story 14-2 / T8a (AC6.1.b) — the post-grace falsifier, ported from the
++/// canned twin's `scenario_5_3` BEFORE its deletion: `cert_post_grace_reject`
++/// is a REAL floor over a MEASURED count, not a constant. The live drill
++/// earns its zero with retired-cert probes (every presentation refused);
++/// this vector proves the floor itself still REDS when an old-cert
++/// presentation gets through — exactly at the 0.001 boundary passes, above
++/// it v1.0 AND v1.5 go RED.
++#[test]
++#[ignore] // AC5.5(a): gate-driven
++fn t_10_4b_rotation_proven_red_post_grace_boundary() {
++    const NS_PER_MS: u64 = 1_000_000;
++    let t0 = mono_ns(&Instant::now());
++    let agents: Vec<AgentRotationTimestamps> = (0..3)
++        .map(|i| AgentRotationTimestamps {
++            agent_id: format!("host_{i:02}"),
++            t_0_ns: t0,
++            t_1_ns: Some(t0 + (5 + i as u64) * NS_PER_MS),
++            t_2_ns: Some(t0 + (10 + i as u64) * NS_PER_MS),
++        })
++        .collect();
++
++    // Exactly AT the boundary: 1 accepted retired presentation of 1_000
++    // observed post-grace connections → rate 0.001 — still passes.
++    let at_boundary =
++        RotationDrillReport::from_per_agent("pg-boundary", 3, 500, 5_000, agents.clone(), 1, 1_000);
++    assert_eq!(at_boundary.post_grace_reject_rate, 0.001);
++    assert!(at_boundary.passes_v10_floors);
++    assert!(at_boundary.passes_v15_floors);
++
++    // Above the boundary: 2 of 1_000 → v1.0 AND v1.5 RED.
++    let above = RotationDrillReport::from_per_agent("pg-above", 3, 500, 5_000, agents, 2, 1_000);
++    assert!(above.post_grace_reject_rate > 0.001);
++    assert!(!above.passes_v10_floors);
++    assert!(!above.passes_v15_floors);
+ }
+ 
+ // ─────────────────────────── AC-10.4b RED vectors ───────────────────────────
+@@ -365,9 +874,10 @@ async fn t_10_4b_rotation_real_timing_3_host_drill() {
+ /// directed pairs (A→B and B→A) survive. Both the baseline and the half-failed
+ /// meshes use the SAME retry policy as the GREEN drill
+ /// (`HandshakeRetryPolicy::default()`), so the RED outcome is attributable to
+-/// the rotation failure, not to a retry-starved baseline. Reachability drops to
+-/// exactly 2/6 → the drill goes RED.
++/// the rotation failure, not to a retry-starved baseline. Reachability drops
++/// to exactly 2/6 → the drill goes RED.
+ #[tokio::test]
++#[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
+ async fn t_10_4b_rotation_proven_red_drop_reachability() {
+     let clock = Clock::capture();
+     let ca = mk_ca(&clock, "ca-10-4b-red-drop");
+@@ -376,16 +886,14 @@ async fn t_10_4b_rotation_proven_red_drop_reachability() {
+     // half-failed pair's PinMismatch is a NON-retryable class, so the failing
+     // pairs still drop on the first attempt — the drill stays fast.
+     let retry = HandshakeRetryPolicy::default();
++    let base = Instant::now();
++    let names: Vec<String> = (0..3).map(host_name).collect();
+ 
+     // ── Phase 1: healthy mesh, full NxN reachability (baseline GREEN) ──
+-    let old: [Leaf; 3] = [
+-        valid_leaf(&ca, &clock),
+-        valid_leaf(&ca, &clock),
+-        valid_leaf(&ca, &clock),
+-    ];
+-    let old_refs: [&Leaf; 3] = [&old[0], &old[1], &old[2]];
+-    let mesh_old = build_mesh(&clock, &ca, old_refs, old_refs, retry.clone()).await;
+-    let sweep1 = directed_dial_sweep(&mesh_old, 3000).await;
++    let old: Vec<Leaf> = (0..3).map(|_| valid_leaf(&ca, &clock)).collect();
++    let old_refs: Vec<&Leaf> = old.iter().collect();
++    let mesh_old = build_mesh_n(&clock, &ca, &names, &old_refs, &old_refs, retry.clone()).await;
++    let sweep1 = directed_dial_sweep(&mesh_old, 3000, &base).await;
+     assert_eq!(
+         sweep1.ok, sweep1.total,
+         "baseline: full NxN reachability before rotation"
+@@ -397,19 +905,19 @@ async fn t_10_4b_rotation_proven_red_drop_reachability() {
+     let new_b = valid_leaf(&ca, &clock);
+     let new_c = valid_leaf(&ca, &clock); // what A & B EXPECT C to serve
+     let c_stale = valid_leaf(&ca, &clock); // what C ACTUALLY serves (didn't rotate)
+-    let serving: [&Leaf; 3] = [&new_a, &new_b, &c_stale];
+-    let expected: [&Leaf; 3] = [&new_a, &new_b, &new_c];
+-    let mesh_new = build_mesh(&clock, &ca, serving, expected, retry.clone()).await;
++    let serving = [&new_a, &new_b, &c_stale];
++    let expected = [&new_a, &new_b, &new_c];
++    let mesh_new = build_mesh_n(&clock, &ca, &names, &serving, &expected, retry).await;
+ 
+-    let sweep2 = directed_dial_sweep(&mesh_new, 4000).await;
++    let sweep2 = directed_dial_sweep(&mesh_new, 4000, &base).await;
+     // Exact surviving topology: only the A↔B directed pairs survive the
+     // half-failed rotation (A→B and B→A); every C-involving pair fails on the
+     // deterministic pin mismatch.
+-    let mut surviving: Vec<(&'static str, &'static str)> = Vec::new();
++    let mut surviving: Vec<(String, String)> = Vec::new();
+     for i in 0..3 {
+         for j in 0..3 {
+             if i != j && sweep2.pair_ok[i][j] {
+-                surviving.push((HOSTS[i], HOSTS[j]));
++                surviving.push((mesh_new[i].name.clone(), mesh_new[j].name.clone()));
+             }
+         }
+     }
+@@ -421,7 +929,10 @@ async fn t_10_4b_rotation_proven_red_drop_reachability() {
+     eprintln!("  surviving directed pairs: {:?}", surviving);
+     assert_eq!(
+         surviving,
+-        vec![("host_a", "host_b"), ("host_b", "host_a")],
++        vec![
++            (names[0].clone(), names[1].clone()),
++            (names[1].clone(), names[0].clone()),
++        ],
+         "only the A↔B directed pairs must survive a half-failed rotation"
+     );
+     // Core RED assertion: reachability MUST degrade below NxN to exactly 2/6.
+@@ -441,8 +952,8 @@ async fn t_10_4b_rotation_proven_red_drop_reachability() {
+ ///
+ /// This proves the floor check actually goes RED when timing degrades (it is
+ /// not a rubber-stamp). The timestamps are anchored to a LIVE-measured `t_0`
+-/// (`now_ns()`) with the per-agent propagation/re-handshake durations injected
+-/// as CONTROLLED time-offsets — a hermetic test cannot incur a real 90s+
++/// with the per-agent propagation/re-handshake durations injected as
++/// CONTROLLED time-offsets — a hermetic test cannot incur a real 90s+
+ /// propagation delay, so the degradation is modelled as named offsets recorded
+ /// through the same `RotationDrillReport::from_per_agent` drill path used by
+ /// the GREEN test, not as hand-built absolute fixture timestamps. One agent (c)
+@@ -450,13 +961,15 @@ async fn t_10_4b_rotation_proven_red_drop_reachability() {
+ /// axes are kept under their floors so the failure isolates to
+ /// revocation-propagation p99.
+ #[test]
++#[ignore] // AC5.5(a): gate-driven
+ fn t_10_4b_rotation_proven_red_p99_exceeds_floor() {
+-    // LIVE-measured rotation anchor (same wall clock as the GREEN drill). A
+-    // hermetic test cannot incur a real 90s+ revocation-propagation delay, so
+-    // the per-agent propagation and re-handshake durations below are injected
+-    // as CONTROLLED time-offsets on top of this anchor — recorded through the
+-    // same `from_per_agent` drill path, not as hand-built absolute timestamps.
+-    let t0 = now_ns();
++    // LIVE-measured rotation anchor (same monotonic base as the GREEN drill).
++    // A hermetic test cannot incur a real 90s+ revocation-propagation delay,
++    // so the per-agent propagation and re-handshake durations below are
++    // injected as CONTROLLED time-offsets on top of this anchor — recorded
++    // through the same `from_per_agent` drill path, not as hand-built
++    // absolute timestamps.
++    let t0 = mono_ns(&Instant::now());
+ 
+     // revocation-propagation = t_1 − t_0 (controlled degradation offsets):
+     //   a: 20s   b: 30s   c: 95s  → p99 = 95s (> 90s v0.7 floor).
+@@ -526,3 +1039,452 @@ fn t_10_4b_rotation_proven_red_p99_exceeds_floor() {
+         "v1.5 floors (which inherit v1.0) MUST also be RED"
+     );
+ }
++
++// ─────────── 14-2 / AC1.2 — the in-flight window drop oracle (GREEN under overlap) ───────────
++
++/// Story 14-2 / AC1.2 + AC2.4 — the in-flight window drop oracle: `t_0` fires
++/// while `W` readonly frames are provably in flight (the summed
++/// `active_connections()` RAII gauge), the generation swap races the live
++/// sweep inside `tokio::select!`, and drops are counted test-side by sequence
++/// number per AC1.1's definition.
++///
++/// **The before/after pair is the evidence (AC2.4).** Against the PRE-14-2
++/// teardown-rebind rotation this exact window measured `drops = 6 = W` on 10
++/// consecutive runs (2026-08-29, Dev Agent Record) — the teardown physically
++/// cannot race the traffic it kills. Under the provision→swap→close overlap
++/// the same window measures `drops == 0`: in-flight connections are never
++/// touched (rustls does no renegotiation) and post-swap handshakes resolve
++/// the new leaf against the open window's set-valued verify.
++///
++/// The oracle is `drops == 0` (GREEN state); the RED state was the teardown
++/// run. Never a specific pre-count.
++#[tokio::test]
++#[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
++async fn t_10_4b_rotation_under_load_window() {
++    let clock = Clock::capture();
++    let ca = mk_ca(&clock, "ca-14-2-window");
++    let retry = HandshakeRetryPolicy::default();
++    let base = Instant::now();
++    let n = 3usize;
++    let names: Vec<String> = (0..n).map(host_name).collect();
++
++    // Provisioned mesh + open windows (AC2.0): old generation served+pinned,
++    // new generation declared and windowed, wire still old.
++    let old: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let new: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let old_refs: Vec<&Leaf> = old.iter().collect();
++    let new_refs: Vec<&Leaf> = new.iter().collect();
++    let mesh =
++        build_mesh_n_provisioned(&clock, &ca, &names, &old_refs, &old_refs, &new_refs, retry).await;
++    for node in &mesh {
++        for (j, peer_name) in names.iter().enumerate() {
++            if node.name != *peer_name {
++                node.transport
++                    .pins()
++                    .open_rotation_window(&PeerId::new(peer_name.clone()), &new[j].fingerprint)
++                    .expect("open rotation window");
++            }
++        }
++    }
++
++    // The directed pair set (6 at N=3) and W = min(DIAL_CONCURRENCY, 6) = 6.
++    let pairs: Vec<(usize, usize)> = (0..n)
++        .flat_map(|i| (0..n).filter(move |j| *j != i).map(move |j| (i, j)))
++        .collect();
++    let w = DIAL_CONCURRENCY.min(pairs.len());
++    assert!(
++        w >= 2,
++        "the window is not a window below 2 in-flight frames"
++    );
++
++    let issued = pairs.len() as u64;
++    let (verdicts_tx, mut verdicts_rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
++    use futures_util::stream::{self, StreamExt};
++    let mut sweep = {
++        let futs = pairs.iter().enumerate().map(|(k, &(i, j))| {
++            let seq = 6_000_000 + k as u64;
++            let frame = make_frame(&names[i], &names[j], IntentClass::Readonly, seq);
++            let to = HostId(names[j].clone());
++            let node = &mesh[i];
++            let verdicts_tx = verdicts_tx.clone();
++            async move {
++                let res = node.transport.route_outbound(frame, &to).await;
++                if received_verdict(&res) {
++                    let _ = verdicts_tx.send(seq);
++                }
++            }
++        });
++        Box::pin(stream::iter(futs).buffer_unordered(w))
++    };
++
++    // Arm: drive the sweep and watch the summed gauge until W are in flight.
++    let mut max_live = 0usize;
++    let armed = {
++        let deadline = Instant::now() + Duration::from_secs(5);
++        loop {
++            let live: usize = mesh.iter().map(|m| m.transport.active_connections()).sum();
++            max_live = max_live.max(live);
++            if live >= w {
++                break true;
++            }
++            if Instant::now() > deadline {
++                break false;
++            }
++            tokio::select! {
++                _ = tokio::time::sleep(Duration::from_millis(0)) => {}
++                delivered = sweep.next() => {
++                    if delivered.is_none() {
++                        break false;
++                    }
++                }
++            }
++        }
++    };
++    assert!(
++        armed,
++        "the in-flight window must open: {w} dials confirmed live via the summed \
++         active_connections() gauge (max observed {max_live})"
++    );
++    let t0 = mono_ns(&base);
++
++    // The swap races the live sweep — 14-1's shape, NOT biased.
++    let mut swap = Box::pin(async {
++        for (i, node) in mesh.iter().enumerate() {
++            node.transport
++                .swap_serving_cert(vec![new[i].der.clone()], new[i].key_der.clone_key())
++                .expect("in-place serving-cert swap");
++        }
++    });
++    let mut swap_won = false;
++    loop {
++        tokio::select! {
++            _ = &mut swap => {
++                swap_won = true;
++                break;
++            }
++            delivered = sweep.next() => {
++                if delivered.is_none() {
++                    break;
++                }
++            }
++        }
++    }
++    if !swap_won {
++        (&mut swap).await;
++    }
++    while sweep.next().await.is_some() {}
++    let t2 = mono_ns(&base);
++
++    // Close the windows (promote-and-retire) — the overlap is complete.
++    for node in &mesh {
++        for peer_name in &names {
++            if node.name != *peer_name {
++                assert!(
++                    node.transport
++                        .pins()
++                        .close_rotation_window(&PeerId::new(peer_name.clone()))
++                        .is_some(),
++                    "window was open at close"
++                );
++            }
++        }
++    }
++
++    let mut verdicts = 0u64;
++    while verdicts_rx.try_recv().is_ok() {
++        verdicts += 1;
++    }
++    let drops = issued - verdicts;
++    assert_eq!(verdicts + drops, issued, "drop accounting is exhaustive");
++    eprintln!("\n=== 14-2 AC1.2 in-flight window (provision→swap→close overlap) ===");
++    eprintln!(
++        "  W={w} dials confirmed in flight at t_0; issued={issued}; verdicts by t_2={verdicts}; drops={drops}"
++    );
++    eprintln!(
++        "  swap-to-drain wall (t_2−t_0) = {} ms",
++        (t2 - t0) / 1_000_000
++    );
++    assert!(
++        drops == 0,
++        "AC2.4 GREEN: the overlap MUST deliver zero conversation drops (got {drops} of \
++         {issued}) — the pre-overlap teardown run measured drops=6=W on this same window \
++         (Dev Agent Record, 2026-08-29); a nonzero count here means the swap is not \
++         in-place or the window accounting is broken"
++    );
++}
++
++// ─────────── 14-2 / AC2.3 — NFR-Sec-12 proven-red at the pin-store seam ───────────
++
++/// Story 14-2 / AC2.3 — the overlap pin-closure contract, all gate-enrollable:
++/// the **four** close assertions (1–3 prove you can break a store; 4 proves
++/// you ROTATED — a window that closes onto nothing is also "closed"), the
++/// during-window outside-the-set block, and the colliding-`next` refusals at
++/// open with the dedicated `FingerprintCollision` variant (AC2.2.a), plus the
++/// §A6 Edge-3 self-collision refusal.
++#[tokio::test]
++#[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
++async fn t_10_4b_rotation_overlap_pin_closure() {
++    use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
++    use maos_a2a_core::{EPinMismatch, InMemoryTofuPinStore, TofuPinStore};
++
++    let store = InMemoryTofuPinStore::new();
++    let peer = PeerId::new("host_a");
++    let other = PeerId::new("host_b");
++    let old = PeerCertFingerprint::from_cert_der(b"old-leaf");
++    let new = PeerCertFingerprint::from_cert_der(b"new-leaf");
++    let outsider = PeerCertFingerprint::from_cert_der(b"outsider-leaf");
++    let other_fp = PeerCertFingerprint::from_cert_der(b"other-leaf");
++
++    // Block context: two peers with active current pins (first contact).
++    store
++        .pin_first_contact(&peer, &old, &old, 1)
++        .await
++        .expect("pin peer");
++    store
++        .pin_first_contact(&other, &other_fp, &other_fp, 1)
++        .await
++        .expect("pin other");
++
++    // Steady state: the current cert verifies; the replacement does not yet.
++    assert!(store.verify_pinned_sync(&peer, &old).is_ok());
++    assert!(matches!(
++        store.verify_pinned_sync(&peer, &new),
++        Err(EPinMismatch::Mismatch { .. })
++    ));
++
++    // (b) AC2.2.a — a `next` colliding with ANOTHER peer's CURRENT pin is
++    // refused at open, as the dedicated security variant (never `Mismatch`).
++    let err = store
++        .open_rotation_window(&peer, &other_fp)
++        .expect_err("collision with other's current must be refused");
++    assert!(
++        matches!(err, EPinMismatch::FingerprintCollision { ref peer, ref colliding_peer, .. }
++            if peer == "host_a" && colliding_peer == "host_b"),
++        "collision must name both peers, got {err:?}"
++    );
++
++    // Open the window for real.
++    store
++        .open_rotation_window(&peer, &new)
++        .expect("open rotation window");
++    assert_eq!(store.rotation_next(&peer), Some(new.clone()));
++
++    // §A6 Edge-3 (self-collision): `next == this peer's current` is refused.
++    let err = store
++        .open_rotation_window(&peer, &old)
++        .expect_err("next == current must be refused as a self-collision");
++    assert!(matches!(err, EPinMismatch::FingerprintCollision { .. }));
++
++    // Collision guard's second half: a `next` colliding with another peer's
++    // OPEN WINDOW is refused too.
++    let err = store
++        .open_rotation_window(&other, &new)
++        .expect_err("collision with peer's open next must be refused");
++    assert!(matches!(err, EPinMismatch::FingerprintCollision { .. }));
++
++    // During the window (one-generation overlap, §7.2.1.a): BOTH old and new
++    // verify for `peer`; an outsider fingerprint OUTSIDE {current, next} is
++    // still blocked — NFR-Sec-12 stays 100% while trust is widened.
++    assert!(store.verify_pinned_sync(&peer, &old).is_ok());
++    assert!(store.verify_pinned_sync(&peer, &new).is_ok());
++    assert!(matches!(
++        store.verify_pinned_sync(&peer, &outsider),
++        Err(EPinMismatch::Mismatch { .. })
++    ));
++    // Sites 2/3: the replacement resolves as an active identity during the
++    // window; the outsider resolves to nobody.
++    assert_eq!(
++        store.find_active_pin_by_fingerprint(&new),
++        Some(peer.clone())
++    );
++    assert_eq!(store.find_active_pin_by_fingerprint(&outsider), None);
++
++    // Close — PROMOTE-and-retire (AC2.1.a): the store must end up holding NEW.
++    let retired = store.close_rotation_window(&peer).expect("window was open");
++    assert_eq!(retired, old, "close must retire the OLD fingerprint");
++    // 1. the window is shut.
++    assert!(store.rotation_next(&peer).is_none());
++    // 2. the retired cert is refused at the verify sites (1/4).
++    assert!(matches!(
++        store.verify_pinned_sync(&peer, &retired),
++        Err(EPinMismatch::Mismatch { .. })
++    ));
++    // 3. it is also unresolvable as an identity at the listen sites (2/3).
++    assert!(store.find_active_pin_by_fingerprint(&retired).is_none());
++    // 4. the NEW one still works — without this, 1–3 prove you can break a
++    // store, not that you rotated.
++    assert!(store.verify_pinned_sync(&peer, &new).is_ok());
++    assert_eq!(
++        store.find_active_pin_by_fingerprint(&new),
++        Some(peer.clone())
++    );
++
++    eprintln!(
++        "\n=== 14-2 AC2.3 overlap pin-closure: retired={}, promoted={} — all four close \
++         assertions + during-window block + collision refusals hold ===",
++        retired.wire(),
++        new.wire()
++    );
++}
++
++// ─────────── 14-2 / §A6 — the drop oracle's EXECUTABLE negative control ───────────
++
++/// §A6 Acceptance-5 — the EXECUTABLE teardown negative control for the drop
++/// oracle (Blocking condition 3: a green must be able to have been red). The
++/// overlap window test asserts `drops == 0`; THIS test runs the same
++/// arm/accounting machinery against the OLD rotation model — teardown-rebind
++/// — and asserts `drops > 0`. Committed as a permanent pair: if the drop
++/// accounting ever stops detecting real drops (a verdict-predicate
++/// regression, a gauge that never opens), THIS test goes red and names
++/// itself.
++///
++/// Pins the structural finding measured 2026-08-29 (10/10 runs: drops = 6 =
++/// W): a teardown rotation CANNOT coexist with in-flight traffic — the old
++/// mesh cannot be dropped while a sweep borrows it, so the sweep (the
++/// traffic) dies first and its frames receive no verdict by `t_2`. The
++/// borrow checker is the first witness; AC2's in-place swap is the repair.
++#[tokio::test]
++#[ignore] // AC5.5(a): the check-rotation-real-timing gate drives this via --ignored; skipped != passed
++async fn t_10_4b_rotation_drop_oracle_teardown_control() {
++    let clock = Clock::capture();
++    let ca = mk_ca(&clock, "ca-14-2-teardown-control");
++    let retry = HandshakeRetryPolicy::default();
++    let n = 3usize;
++    let names: Vec<String> = (0..n).map(host_name).collect();
++
++    let old: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let old_refs: Vec<&Leaf> = old.iter().collect();
++    let mesh_old = build_mesh_n(&clock, &ca, &names, &old_refs, &old_refs, retry.clone()).await;
++
++    let pairs: Vec<(usize, usize)> = (0..n)
++        .flat_map(|i| (0..n).filter(move |j| *j != i).map(move |j| (i, j)))
++        .collect();
++    let w = DIAL_CONCURRENCY.min(pairs.len());
++    let issued = pairs.len() as u64;
++    let (verdicts_tx, mut verdicts_rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
++    use futures_util::stream::{self, StreamExt};
++    let mut sweep = {
++        let futs = pairs.iter().enumerate().map(|(k, &(i, j))| {
++            let seq = 6_500_000 + k as u64;
++            let frame = make_frame(&names[i], &names[j], IntentClass::Readonly, seq);
++            let to = HostId(names[j].clone());
++            let node = &mesh_old[i];
++            let verdicts_tx = verdicts_tx.clone();
++            async move {
++                let res = node.transport.route_outbound(frame, &to).await;
++                if received_verdict(&res) {
++                    let _ = verdicts_tx.send(seq);
++                }
++            }
++        });
++        Box::pin(stream::iter(futs).buffer_unordered(w))
++    };
++    let armed = {
++        let deadline = Instant::now() + Duration::from_secs(5);
++        loop {
++            let live: usize = mesh_old
++                .iter()
++                .map(|m| m.transport.active_connections())
++                .sum();
++            if live >= w {
++                break true;
++            }
++            if Instant::now() > deadline {
++                break false;
++            }
++            tokio::select! {
++                _ = tokio::time::sleep(Duration::from_millis(0)) => {}
++                delivered = sweep.next() => {
++                    if delivered.is_none() {
++                        break false;
++                    }
++                }
++            }
++        }
++    };
++    assert!(
++        armed,
++        "the control's window must open exactly like the overlap test's (W={w})"
++    );
++    // The OLD rotation model: teardown-rebind. The kill order is forced by
++    // the model itself — the sweep dies so the mesh can.
++    drop(sweep);
++    drop(mesh_old);
++    let new: Vec<Leaf> = (0..n).map(|_| valid_leaf(&ca, &clock)).collect();
++    let new_refs: Vec<&Leaf> = new.iter().collect();
++    let _mesh_new = build_mesh_n(&clock, &ca, &names, &new_refs, &new_refs, retry).await;
++
++    let mut verdicts = 0u64;
++    while verdicts_rx.try_recv().is_ok() {
++        verdicts += 1;
++    }
++    let drops = issued - verdicts;
++    eprintln!("  teardown control: W={w}, issued={issued}, verdicts={verdicts}, drops={drops}");
++    assert!(
++        drops > 0,
++        "the drop oracle must still be able to go RED: a teardown rotation \
++         mid-window MUST measure drops > 0 (got 0 of {issued}) — if this fires, \
++         the verdict predicate or the arm regressed and the overlap test's \
++         drops == 0 is no longer evidence"
++    );
++}
++
++/// AC6.1.a — the WIRED markdown surface's own contract, ported to the
++/// uncharged test lane (in-src `#[cfg(test)]` is KLOC-charged per E11-A6):
++/// the drill id + per-axis sample counts from the ENGINE's own filter, and
++/// the counts disagree with `per_agent.len()` exactly as the percentile
++/// engine does.
++#[test]
++#[ignore] // AC5.5(a): gate-driven
++fn t_10_4b_rotation_report_markdown_publishes_sample_counts() {
++    use maos_a2a_core::chaos::report::report_to_markdown;
++
++    let agents: Vec<AgentRotationTimestamps> = (0..3)
++        .map(|i| AgentRotationTimestamps {
++            agent_id: format!("a{i}"),
++            t_0_ns: 0,
++            t_1_ns: Some((i as u64 + 1) * 1_000_000_000),
++            t_2_ns: Some((i as u64 + 2) * 1_000_000_000),
++        })
++        .collect();
++    let r = RotationDrillReport::from_per_agent("drill-14-2", 3, 500, 5_000, agents, 0, 100);
++    let md = report_to_markdown(&r).expect("md");
++    assert!(md.contains("drill-14-2"));
++    assert!(md.contains("```json"));
++    assert!(md.contains("propagation=3"), "got: {md}");
++    assert!(md.contains("re-handshake=3"), "got: {md}");
++    assert!(md.contains("end-to-end=3"), "got: {md}");
++    assert!(md.contains("p99 IS the worst of n"), "got: {md}");
++
++    // The filter, not len(): one agent never re-handshook — propagation
++    // counts it, end-to-end does not.
++    let agents = vec![
++        AgentRotationTimestamps {
++            agent_id: "a".into(),
++            t_0_ns: 0,
++            t_1_ns: Some(1_000_000_000),
++            t_2_ns: Some(2_000_000_000),
++        },
++        AgentRotationTimestamps {
++            agent_id: "b".into(),
++            t_0_ns: 0,
++            t_1_ns: Some(3_000_000_000),
++            t_2_ns: None,
++        },
++    ];
++    let r = RotationDrillReport::from_per_agent("drill-filter", 2, 500, 5_000, agents, 0, 10);
++    let md = report_to_markdown(&r).expect("md");
++    assert!(md.contains("propagation=2"), "got: {md}");
++    assert!(md.contains("end-to-end=1"), "got: {md}");
++}
++
++// Story 14-2 (AC5.5b) — the fault-injection feature is dev/CI-only: no
++// `maos-a2a-tcp` library-side `#[cfg]` ever reads it, so this test-file
++// guard is the complete placement, and the `check-rotation-real-timing`
++// gate's `cargo tree --release` absence check is the graph guard. MUST NOT
++// ship in release builds. Mirrors `churn-fault-inject` (11.3 D6/L7).
++#[cfg(all(feature = "rotation-fault-inject", not(debug_assertions)))]
++compile_error!(
++    "rotation-fault-inject is a dev/CI-only fault-injection feature and MUST NOT \
++     appear in release builds (Story 14-2 ship-blocker)."
++);
+diff --git a/crates/maos-a2a-tcp/tests/t_14_2_rotation_scene.rs b/crates/maos-a2a-tcp/tests/t_14_2_rotation_scene.rs
+new file mode 100644
+index 00000000..6b05512a
+--- /dev/null
++++ b/crates/maos-a2a-tcp/tests/t_14_2_rotation_scene.rs
+@@ -0,0 +1,371 @@
++//! Story 14.2 AC1.3 — the watchable N=3 mTLS-rotation-under-load scene:
++//! **provision → swap → close** (the spec's own §7.2.1.a procedure, not the
++//! old teardown workaround) as ONE continuous observable scene, on the same
++//! in-process real-socket real-mTLS substrate as the drills
++//! (`t_10_4b_rotation_real_timing.rs`).
++//!
++//! # Where it lives, and why (AC1.5 — decided by arithmetic)
++//!
++//! This is a narrating test under `crates/maos-a2a-tcp/tests/` (uncharged by
++//! `kloc-check` — `kloc_check.rs` excludes `tests/`), NOT a new
++//! `xtask/src/demo_*.rs`: `xtask/src` sits at ZERO headroom (40613/40613) and
++//! no measured delta justifies opening that door. It is NOT `#[ignore]`-gated
++//! and is deliberately NOT a `check-rotation-real-timing` leg — AC1.4 forbids
++//! the scene from becoming a gate-leg oracle for any NFR floor. The drills
++//! are the proof; this file is the observability artifact a human can look at.
++//!
++//! # The AC1.4 non-substitution guard
++//!
++//! The scene renders the SAME beat-set at BOTH scales side by side, and every
++//! beat it did NOT execute renders **`ABSENT` in its own column** — never a
++//! trailing footnote (14-1's named failure mode: someone screenshots the
++//! three-host scene for a deck and the footnote is outside the crop). The
++//! scene executes at N=3 ONLY; the N=10 evidence lives in the gate's legs,
++//! carried by the `ROTATION_HOSTS_ROTATED` marker.
++//!
++//! # Evidence states (AC1.3)
++//!
++//! Beats render the `EvidenceState` wire vocabulary from
++//! `xtask/src/gate_common.rs` — `PROVEN_BLOCKING` for a beat this scene
++//! actually executed and asserted, `ABSENT` for a beat it did not. The bare
++//! product-claim word "PROVEN" never appears: an evidence state is what the
++//! harness OBSERVED, distinct from BindingClass, and `ABSENT` never becomes
++//! green.
++//!
++//! # The beats and where they come from
++//!
++//! 1. **Pre-rotation mesh reconcile** — the provisioned mesh stands up with
++//!    DISTINCT identities (fingerprints × addrs, derived — never a count
++//!    literal).
++//! 2. **In-flight window established** — `W = min(DIAL_CONCURRENCY, pairs)`
++//!      readonly frames confirmed live via the summed `active_connections()`
++//!      gauge, count published (AC1.2).
++//! 3. **Generation swap under load** — `swap_serving_cert` IN PLACE racing
++//!      the live sweep inside `tokio::select!` (14-1's race shape).
++//! 4. **Zero drops** — the AC1.1 accounting: every issued frame has a verdict
++//!      by `t_2`. The before/after pair is the story's evidence (teardown
++//!      RED `drops=W` recorded 2026-08-29 → overlap GREEN `drops=0`).
++//! 5. **Post-grace old-cert rejection observed** — the windows close
++//!      promote-and-retire and a ghost endpoint still serving a RETIRED leaf
++//!      is refused at the mTLS layer (AC2.5).
++mod support;
++use std::time::{Duration, Instant};
++
++use maos_a2a_core::error::HandshakeFailureClass;
++use maos_a2a_core::identity::PeerId;
++use maos_a2a_core::router::A2APeerRouter;
++use maos_a2a_core::{A2AError, HandshakeRetryPolicy};
++use maos_a2a_tcp::TcpTimeouts;
++use maos_domain::invariants::i1::IntentClass;
++use maos_spirit_abi::identity::HostId;
++use support::*;
++
++/// The scene scale: three hosts — small enough to read, real enough that
++/// every beat is a live socket op.
++const SCENE_N: usize = 3;
++
++/// Wire spellings of the `EvidenceState` vocabulary (`gate_common.rs`) —
++/// kept as literals because this crate cannot depend on `xtask`, and the
++/// vocabulary is the epic-13 wire contract (`epic-13:200`), not a type.
++const PROVEN_BLOCKING: &str = "PROVEN_BLOCKING";
++const ABSENT: &str = "ABSENT";
++
++/// One scene beat: what happened, and the evidence state it earned at each
++/// rendered scale.
++struct Beat {
++    name: &'static str,
++    observed: &'static str,
++    /// The N=10 column: this scene did not execute the beat at the envelope
++    /// scale, so it renders `ABSENT` — in its own cell, never a footnote.
++    envelope: &'static str,
++}
++
++/// Nanoseconds on the scene's own monotonic base (AC4.5).
++fn mono_ns(base: &Instant) -> u64 {
++    base.elapsed().as_nanos() as u64
++}
++
++#[tokio::test]
++async fn t_14_2_rotation_watchable_scene_n3() {
++    assert_fd_headroom(fd_headroom_for(SCENE_N));
++    let base = Instant::now();
++    let clock = Clock::capture();
++    let ca = mk_ca(&clock, "ca-14-2-scene");
++    let retry = HandshakeRetryPolicy::default();
++    let names: Vec<String> = (0..SCENE_N).map(host_name).collect();
++
++    // Two generations. The mesh is BUILT provisioned (AC2.0): the old
++    // generation is served + pinned, the new one is DECLARED in every
++    // A2APeerConfig — the operator's t_provision act, constructed directly.
++    let old: Vec<Leaf> = (0..SCENE_N).map(|_| valid_leaf(&ca, &clock)).collect();
++    let new: Vec<Leaf> = (0..SCENE_N).map(|_| valid_leaf(&ca, &clock)).collect();
++    let old_refs: Vec<&Leaf> = old.iter().collect();
++    let new_refs: Vec<&Leaf> = new.iter().collect();
++    let mesh =
++        build_mesh_n_provisioned(&clock, &ca, &names, &old_refs, &old_refs, &new_refs, retry).await;
++    // t_provision: open every rotation window — the stores' active sets
++    // become {current: old, next: new}; the wire still serves OLD.
++    for node in &mesh {
++        for (j, peer_name) in names.iter().enumerate() {
++            if node.name != *peer_name {
++                node.transport
++                    .pins()
++                    .open_rotation_window(&PeerId::new(peer_name.clone()), &new[j].fingerprint)
++                    .expect("open rotation window");
++            }
++        }
++    }
++
++    // ── Beat 1: pre-rotation mesh reconcile — DISTINCT identities (derived
++    // fingerprints × addrs), never a count literal.
++    let fingerprints: std::collections::BTreeSet<String> =
++        mesh.iter().map(|m| m.fingerprint.wire()).collect();
++    let addrs: std::collections::BTreeSet<std::net::SocketAddr> =
++        mesh.iter().map(|m| m.addr).collect();
++    assert_eq!(fingerprints.len(), SCENE_N, "distinct identities");
++    assert_eq!(addrs.len(), SCENE_N, "distinct bound addrs");
++    let beat_mesh = PROVEN_BLOCKING;
++
++    // ── Beat 2: the in-flight window — W readonly frames confirmed live via
++    // the summed RAII gauge, count PUBLISHED (AC1.2). Verdicts recorded
++    // channel-before-resolve (AC1.1).
++    let pairs: Vec<(usize, usize)> = (0..SCENE_N)
++        .flat_map(|i| (0..SCENE_N).filter(move |j| *j != i).map(move |j| (i, j)))
++        .collect();
++    let w = DIAL_CONCURRENCY.min(pairs.len());
++    assert!(
++        w >= 2,
++        "the window is not a window below 2 in-flight frames"
++    );
++    let issued = pairs.len() as u64;
++    let (verdicts_tx, mut verdicts_rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
++    use futures_util::stream::{self, StreamExt};
++    let mut sweep = {
++        let futs = pairs.iter().enumerate().map(|(k, &(i, j))| {
++            let seq = 8_000_000 + k as u64;
++            let frame = make_frame(&names[i], &names[j], IntentClass::Readonly, seq);
++            let to = HostId(names[j].clone());
++            let node = &mesh[i];
++            let verdicts_tx = verdicts_tx.clone();
++            async move {
++                let res = node.transport.route_outbound(frame, &to).await;
++                if matches!(
++                    &res,
++                    Ok(())
++                        | Err(A2AError::IntentDeniedAtPeer { .. })
++                        | Err(A2AError::ConsentUnclassifiedAtPeer { .. })
++                        | Err(A2AError::PeerInternalFailure { .. })
++                        | Err(A2AError::PeerIntakeTimeout { .. })
++                ) {
++                    // AC1.1: a verdict is an ACK or a typed NACK the PEER
++                    // ANSWERED with — handshake/transport deaths are drops.
++                    let _ = verdicts_tx.send(seq);
++                }
++            }
++        });
++        Box::pin(stream::iter(futs).buffer_unordered(w))
++    };
++    let mut max_live = 0usize;
++    let armed = {
++        let deadline = Instant::now() + Duration::from_secs(5);
++        loop {
++            let live: usize = mesh.iter().map(|m| m.transport.active_connections()).sum();
++            max_live = max_live.max(live);
++            if live >= w {
++                break true;
++            }
++            if Instant::now() > deadline {
++                break false;
++            }
++            tokio::select! {
++                _ = tokio::time::sleep(Duration::from_millis(0)) => {}
++                delivered = sweep.next() => {
++                    if delivered.is_none() {
++                        break false;
++                    }
++                }
++            }
++        }
++    };
++    assert!(
++        armed,
++        "beat 2: the in-flight window must open (W={w}, max observed {max_live})"
++    );
++    let t0 = mono_ns(&base);
++    let beat_window = PROVEN_BLOCKING;
++
++    // ── Beat 3: generation swap UNDER LOAD — in place, racing the live sweep
++    // (14-1's select! shape, not biased: the poll order IS the race).
++    let mut swap = Box::pin(async {
++        for (i, node) in mesh.iter().enumerate() {
++            node.transport
++                .swap_serving_cert(vec![new[i].der.clone()], new[i].key_der.clone_key())
++                .expect("in-place serving-cert swap");
++        }
++    });
++    let mut swap_won = false;
++    loop {
++        tokio::select! {
++            _ = &mut swap => {
++                swap_won = true;
++                break;
++            }
++            delivered = sweep.next() => {
++                if delivered.is_none() {
++                    break;
++                }
++            }
++        }
++    }
++    if !swap_won {
++        (&mut swap).await;
++    }
++    while sweep.next().await.is_some() {}
++    let t2 = mono_ns(&base);
++    let beat_swap = PROVEN_BLOCKING;
++
++    // ── Beat 4: ZERO DROPS — every frame issued before t_0 has a verdict by
++    // t_2 (AC1.1). The teardown model measured drops=W here (2026-08-29,
++    // Dev Agent Record); the overlap must measure zero.
++    let mut verdicts = 0u64;
++    while verdicts_rx.try_recv().is_ok() {
++        verdicts += 1;
++    }
++    let drops = issued - verdicts;
++    assert!(
++        drops == 0,
++        "beat 4: zero conversation drops under the overlap (got {drops} of {issued})"
++    );
++    let beat_zero_drops = PROVEN_BLOCKING;
++
++    // ── Beat 5: post-grace OLD-CERT REJECTION observed — close every window
++    // promote-and-retire, then a ghost endpoint still serving a RETIRED leaf
++    // is REFUSED at the mTLS layer by a peer that pinned it (AC2.5).
++    for node in &mesh {
++        for peer_name in &names {
++            if node.name != *peer_name {
++                assert!(
++                    node.transport
++                        .pins()
++                        .close_rotation_window(&PeerId::new(peer_name.clone()))
++                        .is_some(),
++                    "beat 5: window was open at close"
++                );
++            }
++        }
++    }
++    let ghost_id = "scene_post_grace_ghost";
++    let target = &mesh[1];
++    let ghost_pins = vec![pin(&target.name, &new[1].fingerprint, 1)];
++    let ghost_cfgs = vec![peer_cfg(
++        &target.name,
++        "tls://127.0.0.1:0",
++        &new[1].fingerprint,
++        &["readonly"],
++        &["readonly"],
++    )];
++    let ghost = bind_endpoint(
++        &old[0], // node 0's RETIRED leaf — node 1 pinned it before the rotation
++        Some(&ca),
++        1,
++        ghost_pins,
++        ghost_cfgs,
++        &clock,
++        TcpTimeouts::test_profile(),
++        no_retry(),
++    )
++    .await;
++    ghost.set_peer_endpoint(
++        &HostId(target.name.clone()),
++        format!("tls://{}", target.addr),
++    );
++    let frame = make_frame(ghost_id, &target.name, IntentClass::Readonly, 8_777_000);
++    let refusal = ghost
++        .route_outbound(frame, &HostId(target.name.clone()))
++        .await;
++    // The refusal surfaces on the dialer as the server's fatal handshake
++    // alert (measured: `Io("recv: received fatal alert: …")`), with the
++    // classified pin-mismatch shape accepted should the alert mapping
++    // change. §A6 TestInfra-4: the SPECIFIC alert, never a bare "fatal
++    // alert" substring.
++    let refused = matches!(
++        &refusal,
++        Err(A2AError::Io(msg)) if msg.contains("CertificateUnknown")
++    ) || matches!(
++        &refusal,
++        Err(A2AError::HandshakeFailed {
++            class: HandshakeFailureClass::PinMismatch,
++            ..
++        })
++    );
++    assert!(
++        refused,
++        "beat 5: the retired cert must be refused post-grace, got {refusal:?}"
++    );
++    // And the NEW generation still talks: a live dial over the promoted pins.
++    let f_ok = make_frame(&names[0], &names[1], IntentClass::Readonly, 8_888_000);
++    let ok = mesh[0]
++        .transport
++        .route_outbound(f_ok, &HostId(names[1].clone()))
++        .await;
++    assert!(
++        ok.is_ok(),
++        "beat 5: new-generation traffic must ACK: {ok:?}"
++    );
++    let beat_post_grace = PROVEN_BLOCKING;
++
++    // ── The beat table (AC1.4): the SAME beat-set at BOTH scales, side by
++    // side. This artifact executed N=3 only — the N=10 column renders ABSENT
++    // per beat, in its own cell. Never a gate-leg oracle for any NFR floor.
++    let beats = [
++        Beat {
++            name: "provisioned mesh stood up; identities reconciled (fp x addr)",
++            observed: beat_mesh,
++            envelope: ABSENT,
++        },
++        Beat {
++            name: "in-flight window: W frames confirmed live; count published",
++            observed: beat_window,
++            envelope: ABSENT,
++        },
++        Beat {
++            name: "generation swap UNDER LOAD: in-place swap raced the sweep",
++            observed: beat_swap,
++            envelope: ABSENT,
++        },
++        Beat {
++            name: "zero drops: every issued frame verdicted by t_2 (AC1.1)",
++            observed: beat_zero_drops,
++            envelope: ABSENT,
++        },
++        Beat {
++            name: "post-grace: retired cert REFUSED; new generation ACKs",
++            observed: beat_post_grace,
++            envelope: ABSENT,
++        },
++    ];
++    eprintln!("\n=== Story 14.2 watchable rotation scene (AC1.3) ===");
++    eprintln!("{:=<72}", "");
++    eprintln!(
++        "| {:<52} | {:<16} | {:<16} |",
++        "beat (asserted, not narrated)", "N=3 (observed)", "N=10"
++    );
++    eprintln!("|{:-<54}|{:-<18}|{:-<18}|", "", "", "");
++    for beat in &beats {
++        eprintln!(
++            "| {:<52} | {:<16} | {:<16} |",
++            beat.name, beat.observed, beat.envelope
++        );
++    }
++    eprintln!("{:=<72}", "");
++    eprintln!(
++        "  W={w} in flight at t_0; drops={drops}; swap-to-drain {} ms; \
++         EvidenceState wire vocabulary (gate_common.rs): {} = executed and \
++         asserted here; {} = not executed by THIS artifact (never a footnote; \
++         never a gate-leg oracle — AC1.4). The N=10 proof is \
++         check-rotation-real-timing's marked legs.",
++        (t2 - t0) / 1_000_000,
++        PROVEN_BLOCKING,
++        ABSENT
++    );
++}
+diff --git a/crates/maos-a2a/tests/cert_rotation_chaos_3_host.rs b/crates/maos-a2a/tests/cert_rotation_chaos_3_host.rs
+index 3befacda..a610faba 100644
+--- a/crates/maos-a2a/tests/cert_rotation_chaos_3_host.rs
++++ b/crates/maos-a2a/tests/cert_rotation_chaos_3_host.rs
+@@ -1,74 +1,14 @@
+-//! Story 6.3 AC5 — NFR-Sec-13 mTLS cert rotation chaos test harness.
+-//!
+-//! v0.5 calibration phase per architecture §7.2.1.b — metrics MEASURED and
+-//! REPORTED but NOT enforced.
++//! Story 6.3 AC5 → **retired to its surviving halves by Story 14-2 (AC6.1)**:
++//! the synthetic `harness_3_host` drill and `MetricsCollector` are DELETED —
++//! they seeded `t_0/t_1/t_2` from `DrillConfig` constants and asserted their
++//! own floors green. What remains here are the tests that exercise REAL
++//! production logic only: `compute_t_grace` boundary semantics (§7.2.1.a)
++//! and the `HandshakeRetryPolicy` retry-class filter. The live rotation
++//! drill + the `check-rotation-real-timing` gate own NFR-Sec-13 enforcement;
++//! `scenario_5_3`'s post-grace falsifier was ported into the real drill
++//! (`t_10_4b_rotation_proven_red_post_grace_boundary`) BEFORE this deletion.
+ 
+-use maos_a2a::chaos::{
+-    harness_3_host::{run_drill, DrillConfig},
+-    rotation::compute_t_grace,
+-};
+-
+-#[tokio::test]
+-async fn scenario_5_1_3_host_happy_path_calibration_baseline() {
+-    // 3-host synthetic chaos drill on a happy path; assert all three timing
+-    // distributions pass v0.7 floors AND v1.0 cert_post_grace_reject floor;
+-    // passing in calibration mode generates baseline data.
+-    let cfg = DrillConfig::default();
+-    let report = run_drill(cfg).await;
+-    assert!(report.passes_v07_floors);
+-    assert!(report.passes_v10_floors);
+-    assert_eq!(report.per_agent.len(), 3);
+-    // All three p99 distributions populated.
+-    assert!(report.revocation_propagation_p99_ms > 0);
+-    assert!(report.re_handshake_p99_ms > 0);
+-    assert!(report.end_to_end_p99_ms > 0);
+-}
+-
+-#[tokio::test]
+-async fn scenario_5_2_one_agent_lagged_60s_breach_in_calibration() {
+-    // 3-host drill with one agent's OCSP poll lagged 60s; revocation
+-    // propagation p50 still ≤30s but p99 floats above floor; in calibration
+-    // mode the test reports the breach without failing.
+-    let cfg = DrillConfig {
+-        drill_id: "lag-60s".into(),
+-        target_propagation_ms_per_agent: vec![10_000, 15_000, 100_000],
+-        target_re_handshake_ms_per_agent: vec![5_000, 8_000, 12_000],
+-        ..DrillConfig::default()
+-    };
+-    let report = run_drill(cfg).await;
+-    assert!(report.revocation_propagation_p50_ms <= 30_000);
+-    assert!(report.revocation_propagation_p99_ms >= 90_000);
+-    // Calibration mode: failing the v0.7 floor reports without panic.
+-    assert!(!report.passes_v07_floors);
+-}
+-
+-#[tokio::test]
+-async fn scenario_5_3_post_grace_reject_increments() {
+-    // Per AC5 §5.3 — agent presents old cert AFTER t_revoke + T_grace.
+-    // cert_post_grace_reject increments; v1.0 floor breach is reported.
+-    let cfg = DrillConfig {
+-        drill_id: "post-grace-1".into(),
+-        post_grace_reject_count: 1,
+-        post_grace_total_count: 1_000,
+-        ..DrillConfig::default()
+-    };
+-    let report = run_drill(cfg).await;
+-    // 1/1000 = 0.1% — exactly at the boundary
+-    assert!(report.post_grace_reject_rate <= 0.001);
+-    // v1.0 floor: ≤0.1% — at the boundary, still passes
+-    assert!(report.passes_v10_floors);
+-
+-    // Above the boundary
+-    let cfg_above = DrillConfig {
+-        drill_id: "post-grace-2".into(),
+-        post_grace_reject_count: 2,
+-        post_grace_total_count: 1_000,
+-        ..DrillConfig::default()
+-    };
+-    let report_above = run_drill(cfg_above).await;
+-    assert!(report_above.post_grace_reject_rate > 0.001);
+-    assert!(!report_above.passes_v10_floors);
+-}
++use maos_a2a::chaos::rotation::compute_t_grace;
+ 
+ #[test]
+ fn scenario_5_4_t_grace_boundary_semantics() {
+diff --git a/docs/release/v2.2-capacity-envelope.md b/docs/release/v2.2-capacity-envelope.md
+index 2dd59176..464267c8 100644
+--- a/docs/release/v2.2-capacity-envelope.md
++++ b/docs/release/v2.2-capacity-envelope.md
+@@ -61,8 +61,11 @@ floor.** Story 14-1's ratified concurrent-adversary race measured NFR-Rel-7's
+ `blast radius ≤ 5 peers` **BREACHED at both scales — 6–8 at N=100, 7 at N=30**,
+ scale-independent. The cause is a requirement defect, fixed at source rather
+ than tuned: the floor was written with no adversary concurrency model, and it
+-cannot coexist with NFR-Rel-9's measured revocation propagation
+-(p50 ≤ 30 s / p99 ≤ 90 s, asserted by `t_10_4b_rotation_real_timing.rs:338`) — holding a concurrent adversary to five peers would
++cannot coexist with the rotation-propagation floors **(NFR-Sec-13's chaos
++scope — mislabelled NFR-Rel-9 here until 14-2 corrected it; NFR-Rel-9 is the
++≤5s p99 token-validation axis)** measured by the rotation drill
++(p50 ≤ 30 s / p99 ≤ 90 s, asserted via `passes_v15_floors` by
++`t_10_4b_rotation_real_timing.rs`) — holding a concurrent adversary to five peers would
+ need isolation to complete inside ~12 ms on loopback. See the
+ `[DELTA-2026-08-28]` amendment on NFR-Rel-7
+ ([`prd/non-functional-requirements.md:26`](../../_bmad-output/planning-artifacts/prd/non-functional-requirements.md))
+@@ -184,3 +187,16 @@ performance or throughput SLOs at fourteen institutions, a 30-day soak,
+ geo-distribution or geo latency, or a full N×N mesh. The host-churn envelope —
+ the N=30 compressed scale plus the N=100 envelope Story 14-1 landed — and the
+ fourteen-institution isolation evidence remain distinct measurements.
++
++## Story 14-2 — 10-host mTLS rotation under load (NFR-Sec-13)
++
++Certificates roll across a ten-host mTLS mesh while conversations are in
++flight (W=16 confirmed in flight at `t_0`) with **zero conversation drops** —
++proven by a drop counter that was RED (drops = 6 = W, teardown model) before
++the one-generation overlap existed. Claim boundaries: revocation is not
++measured (no OCSP/CRL — ADR-047 §3/§4); the mesh is in-process loopback;
++rotation ASSUMES the operator already declared the replacement at
++`t_provision` (no live reload path exists); timings are compressed-loopback
++regression floors, not geo figures (30-day soak + geo-SLO stay release-gate
++artifacts per §15.6). Runnable evidence, by pointer:
++`cargo run -p xtask -- check-rotation-real-timing --json`.
+diff --git a/tests/coverage-matrix.yaml b/tests/coverage-matrix.yaml
+index 7edf7000..359413cc 100644
+--- a/tests/coverage-matrix.yaml
++++ b/tests/coverage-matrix.yaml
+@@ -1456,13 +1456,18 @@ coverage:
+     phase: v0.8
+     valid_until: '2027-05-12'
+     notes: |
+-      Revocation-propagation latency under mTLS cert-rotation churn. The
+-      `check-rotation-real-timing` gate (Story 10.4b) asserts the
+-      `RotationDrillReport` revocation-propagation floors by name (p50 ≤30s /
+-      p99 ≤90s) over REAL `AgentRotationTimestamps` from the live 3-host
+-      rotation chaos drill — the falsifiable enforcement of this NFR. The same
+-      gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
+-      produces the revocation events.
++      [RE-BASED by Story 14-2, 2026-08-29 — the pre-14-2 notes conflated this
++      row with NFR-Sec-13's rotation-propagation scope.] The PRD's NFR-Rel-9
++      is `≤ 5s p99 under 10⁴ concurrent capability-token validations`
++      (`non-functional-requirements.md:28`) — the capability-token
++      validation-latency axis, NOT cert-rotation propagation. The 30s/90s
++      propagation floors belong to the NFR-Sec-13 rotation-chaos scope
++      (asserted by `check-rotation-real-timing` via `passes_v15_floors`, which
++      inherits the STRICTER ratified v0.7/v1.0 floors — never NFR-Sec-13's
++      looser PRD literals). `check-rotation-real-timing` stays listed here
++      because its drill is the only live instrument measuring token-validation
++      adjacent p99 under mesh churn at v0.8 scope; the token-validation axis
++      itself awaits its dedicated load leg.
+   NFR-Scale-1:
+     gates: [check-cross-region-consensus, check-multi-region-slo]
+     corpora: []
+@@ -1531,6 +1536,27 @@ coverage:
+     corpora: []
+     phase: v1.5
+     valid_until: '2027-05-12'
++    notes: |
++      [Notes added by Story 14-2, 2026-08-29 — this row never carried any.]
++      PHASE DECISION: the PRD (`:223`) scopes the 10-host half at v2.0; the
++      epic ships it in the v2.2 wave and the gate's `v2_2 = "blocking"` rung
++      (added by 14-2, AC6.3) makes the v2.2 ship gate the binding
++      enforcement point — recorded here rather than silently re-dating the
++      PRD. THE DROP DEFINITION (14-2 AC1.1, verbatim): "A conversation drop
++      is a frame issued before `t_0` that never received a verdict — neither
++      an ACK nor any typed NACK — by `t_2`." Not a retried dial; not an
++      `IntentDeniedAtPeer` (a completed conversation answered "no"); not a
++      post-rotation reachability failure. SAMPLE-COUNT DISCLOSURE (14-2
++      AC4.2): every percentile publishes `n=` beside it on three surfaces —
++      test stderr, `report_to_markdown`, and the gate's leg JSON — computed
++      from the percentile engine's own filter (per-agent `t_1_ns.is_some()`
++      et al.), never `.len()`; at n ≤ 100 the p99 IS the worst of n.
++      Rotation floors asserted via `passes_v15_floors` (== the ratified
++      v0.7/v1.0 floors; NFR-Sec-13's literal median ≤60s / p99 ≤5min are
++      looser on every axis and are never adopted). The enforcement is the
++      leg-structured `check-rotation-real-timing` gate (14-2 AC5): a
++      10-host test that early-returns emits no `ROTATION_HOSTS_ROTATED`
++      marker and REDS.
+   NFR-Sec-14:
+     gates: [isolation-framework-tests]
+     corpora: []
+diff --git a/xtask/error-catalog.toml b/xtask/error-catalog.toml
+index a3bd5a82..1dbe511d 100644
+--- a/xtask/error-catalog.toml
++++ b/xtask/error-catalog.toml
+@@ -343,6 +343,17 @@ owner = "maos-a2a-core"
+ kernel_or_spirit = "kernel"
+ since_version = "0.5.0"
+ 
++[[error]]
++code = "EPinMismatch::FingerprintCollision"
++rust_path = "EPinMismatch::FingerprintCollision"
++source_file = "crates/maos-a2a-core/src/tofu.rs"
++description = "Rotation window refused — next fingerprint already held by another peer (cross-peer impersonation attempt)"
++severity = "security"
++recovery_class = "escalate"
++owner = "maos-a2a-core"
++kernel_or_spirit = "kernel"
++since_version = "2.2.0"
++
+ # ---------------------------------------------------------------------------
+ # ESkillSchema — crates/maos-skill/src/errors.rs
+ # (E*-prefixed enum; all variants are part of the E* set)
+diff --git a/xtask/gate-registry.toml b/xtask/gate-registry.toml
+index 6c50cd79..6dcb9fa9 100644
+--- a/xtask/gate-registry.toml
++++ b/xtask/gate-registry.toml
+@@ -267,11 +267,16 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+ name = "check-live-bilateral-consent"
+ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+ 
+-# Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
+-# Advisory at v1.0; blocking at v1.5.
++# Story 10.4b / 14-2 — rotation real-timing gate. (Mislabel corrected by
++# 14-2: the 30s/90s propagation floors are NFR-Sec-13's rotation-chaos
++# scope; NFR-Rel-9 is the ≤5s p99 token-validation axis.)
++# Advisory at v1.0; blocking at v1.5. Story 14-2 (AC6.3) ADDED the v2.2-wave
++# rungs v2_0/v2_2 — v1_5 stays BLOCKING (downgrading a live blocking rung is
++# the 10.5-AC6 floor-relaxation shape; the gate hard-errors on it). At the
++# v2.2 ship gate an ABSENT result BLOCKS, never silent-greens.
+ [[ship_gate]]
+ name = "check-rotation-real-timing"
+-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
++disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "advisory", v2_2 = "blocking" }
+ 
+ # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
+ # scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1
+diff --git a/xtask/kloc.toml b/xtask/kloc.toml
+index 70dcb440..4b3d2e6e 100644
+--- a/xtask/kloc.toml
++++ b/xtask/kloc.toml
+@@ -200,7 +200,7 @@ maos-wire = 2000
+ maos-journal = 2000
+ maos-spirit-abi = 3000
+ maos-spirit-sdk = 3000
+-xtask = 40613   # ⚠ 14-0 MEASURED GRANT 2026-08-26 (39960 -> 40613; FINAL formatted measurement 40578, i.e. 35 spare after re-review closure) — see the block below this row for the reclaim-then-measure derivation. PRIOR: j1-crosshost-2e TOOK NO GRANT HERE, AND THE BREACH IS RETIRED, NOT ABSORBED. R7 (2026-08-21 round-table) routed 2c's UNDISCLOSED `+6` (ceiling 39960, tree measured 39966) to this story on the grounds that a grant needs a measured delta and 2e has one. Measured at close, 2e's xtask delta is **-48**: AC3's F2 re-scope DELETED the structurally-unreachable `verify_capture_signature`, the `CAPTURE_TRANSCRIPT` const and the two `capture_signature_*` JSON fields, against AC3's F3 adding ~3 lines. **39966 -> 39918, i.e. 42 lines UNDER the untouched ceiling.** So no grant was taken and the ceiling is unchanged: taking capacity this story does not need would be D17's violation in the other direction, and 'slack is operating capacity, NOT authorization' (kloc.toml:60-65). The `+6` is now historical. | PRIOR GRANT: j1-crosshost-2c AC5.1/AC5.2 + D19 measured grant (code existed and was FORMATTED-measured 39808 BEFORE the ask — `cargo fmt --all` first, since the fmt gate is what CI measures): 38742->39808, EXACT MEASURED +1066, ZERO headroom, same kloc.toml:60-65 discipline. This is NOT a correctness repair, so it does not lean on kloc.toml:87 and needs its own argument: **the gate is the story's deliverable.** AC5 is "the judge" — 2c's whole job is to decide what a signed two-host artifact may assert, and a gate is the only artifact that can bind that after the story closes. Drivers: (a) `check_j1_two_host_signed_run.rs` — ONE always-`Blocking` hermetic gate, 10 legs, every leg `LegAudit`ed so a leg that read nothing hard-FAILs. The rejected alternative was CHEAPER in lines and worthless in effect: a second `AdvisorySubstrate` job for the paid run, whose substrate (an operator, two hosts, a funded API key) CI has never had and never will, so it would take the ABSENT branch on every run for its entire lifetime. A gate whose substrate cannot exist is a monument, not a control. Includes a dependency-free `additionalProperties`/`required` validator so AC2.6's schema is ENFORCED rather than declared — before this the schema was a FALSE SPECIFICATION read by zero machines and three fields behind the struct. (b) `demo_j1.rs::apply_two_host_signed_run` — the executed-leg beat flip; the published-ledger route is structurally dead twice. (c) `verify_capture_signature` — Reza-posture `PROVEN_LIVE_SIGNED` reusing `EvidenceVerifier`/`BuildBinding`/`verify_release_signature` rather than reimplementing them, so the vocabulary is the real one (`MAOS_AUDIT_KEY` is a PATH; `MAOS_AUDIT_KEY_SEED` does not exist and would not compile). (d) **D19 option (a)**, resolved under vehicle 14-0: `gate_common::governed_story_keys`/`is_governed_story_file`, ONE shared helper replacing the digit-prefix filter at all SEVEN walk sites, which had made the entire `j1-*` lane invisible to five Blocking gates at once. It reuses the already single-sourced sprint-status parser rather than adding a second one, and fails CLOSED so a gate can never govern an empty set. **All `xtask/tests/` weight is FREE** (kloc_check.rs:167-193): the 33-vector proven-red and the 10-vector D19 acceptance suite cost zero. What is NOT free is the in-`src` `#[cfg(test)]` weight D11(b) already flagged as budget-charged-but-CI-executed-here: `register_fixture_story` plus one call in each converted gate's fixture helper (+29), needed because D19's fail-closed rule means a fixture directory of bare `.md` files correctly governs nothing, so every existing gate unit test had to DECLARE its fixture stories the way real stories are declared. ZERO kernel-core Δ @24472. | prior: j1-crosshost-2b AC4.2 measured grant (code existed and was measured 38742 BEFORE the ask — never an estimate): 38655->38742, EXACT MEASURED, ZERO headroom, same D15 discipline as the 1b and 2a grants. NET +87 after taking the mandated free reduction FIRST (deleted the compiler-confirmed-dead CODEX_ORACLE/CLAUDE_ORACLE consts, -4). Drivers, all in xtask/src/: (a) the SEVENTH gate leg `cross-host-identity-proof` — the split half of the boundary fact, which publishes the cross-host wire-identity claim ONLY because the two-daemon proof is written, registered and CI-enrolled, plus the `[leg1..leg7]` reconciliation, the seventh published leg name and the new `cross_host_identity_proven` JSON boolean; (b) the `two-host-delegation` demo beat split (Q4, ratified) with its `--skip-gate` ABSENT counterpart and the seventh leg's narration; (c) reading the composition-root PAIR in check_enterprise_identity's issuance-bypass leg, because the governed mint wrapper relocated under the library and counting main.rs alone would score 0 on a pure relocation while a SECOND mint in the relocated file stayed invisible. Every vector, fixture and proven-red harness lives in xtask/tests/ (kloc-free): 6 new j1_crosshost_2b_proven_red vectors + the three synchronized lay_green trees. NOTE the standing decision D11 (growth rate, owner 14.6) is NOT re-ratified here; capacity is granted for the instrument work only. | prior: j1-crosshost-1b §A6 review measured grant (kloc.toml:87 correctness-repair valve; code existed and was measured 38655 BEFORE the ask): 38609->38655, EXACT MEASURED, ZERO headroom. Driver: the 13 review patches that closed the silent-green escapes in the consent gate — test-registration count + 4 new needles in leg_consent_refusal_proofs, production-scoping the boundary leg's router scan, token-bounded executable-run enrollment matching, the !loopback_composed flip guard, the named consent_refusal_proofs JSON boolean, and the --skip-gate refusal beat. All vectors/fixtures live in xtask/tests/ (kloc-free). | §A6 review measured grant (2026-08-18): +152 for leg-9 value checks + signature-gated claim, per-field overclaim scoping, leg-10 derived directories + line-scoped enrollment, leg-2 all-declarations check, gate_common missing-member fail-closed, demo_j1 record corrections.
++xtask = 40988   # ⚠ 14-2 MEASURED GRANT 2026-08-29 (40613 -> 40988, +375 FINAL formatted: check_rotation_real_timing.rs, the story's AC5 deliverable — five legs, derived enrollment, marker discipline, fault-feature ship-blocker — plus the main.rs wiring; citing kloc.toml:86-87 BY NAME: the gate is a correctness/compliance instrument and "must never block a correctness or compliance repair". PRIOR: 14-0 MEASURED GRANT 2026-08-26 (39960 -> 40613; FINAL formatted measurement 40578, i.e. 35 spare after re-review closure) — see the block below this row for the reclaim-then-measure derivation. PRIOR: j1-crosshost-2e TOOK NO GRANT HERE, AND THE BREACH IS RETIRED, NOT ABSORBED. R7 (2026-08-21 round-table) routed 2c's UNDISCLOSED `+6` (ceiling 39960, tree measured 39966) to this story on the grounds that a grant needs a measured delta and 2e has one. Measured at close, 2e's xtask delta is **-48**: AC3's F2 re-scope DELETED the structurally-unreachable `verify_capture_signature`, the `CAPTURE_TRANSCRIPT` const and the two `capture_signature_*` JSON fields, against AC3's F3 adding ~3 lines. **39966 -> 39918, i.e. 42 lines UNDER the untouched ceiling.** So no grant was taken and the ceiling is unchanged: taking capacity this story does not need would be D17's violation in the other direction, and 'slack is operating capacity, NOT authorization' (kloc.toml:60-65). The `+6` is now historical. | PRIOR GRANT: j1-crosshost-2c AC5.1/AC5.2 + D19 measured grant (code existed and was FORMATTED-measured 39808 BEFORE the ask — `cargo fmt --all` first, since the fmt gate is what CI measures): 38742->39808, EXACT MEASURED +1066, ZERO headroom, same kloc.toml:60-65 discipline. This is NOT a correctness repair, so it does not lean on kloc.toml:87 and needs its own argument: **the gate is the story's deliverable.** AC5 is "the judge" — 2c's whole job is to decide what a signed two-host artifact may assert, and a gate is the only artifact that can bind that after the story closes. Drivers: (a) `check_j1_two_host_signed_run.rs` — ONE always-`Blocking` hermetic gate, 10 legs, every leg `LegAudit`ed so a leg that read nothing hard-FAILs. The rejected alternative was CHEAPER in lines and worthless in effect: a second `AdvisorySubstrate` job for the paid run, whose substrate (an operator, two hosts, a funded API key) CI has never had and never will, so it would take the ABSENT branch on every run for its entire lifetime. A gate whose substrate cannot exist is a monument, not a control. Includes a dependency-free `additionalProperties`/`required` validator so AC2.6's schema is ENFORCED rather than declared — before this the schema was a FALSE SPECIFICATION read by zero machines and three fields behind the struct. (b) `demo_j1.rs::apply_two_host_signed_run` — the executed-leg beat flip; the published-ledger route is structurally dead twice. (c) `verify_capture_signature` — Reza-posture `PROVEN_LIVE_SIGNED` reusing `EvidenceVerifier`/`BuildBinding`/`verify_release_signature` rather than reimplementing them, so the vocabulary is the real one (`MAOS_AUDIT_KEY` is a PATH; `MAOS_AUDIT_KEY_SEED` does not exist and would not compile). (d) **D19 option (a)**, resolved under vehicle 14-0: `gate_common::governed_story_keys`/`is_governed_story_file`, ONE shared helper replacing the digit-prefix filter at all SEVEN walk sites, which had made the entire `j1-*` lane invisible to five Blocking gates at once. It reuses the already single-sourced sprint-status parser rather than adding a second one, and fails CLOSED so a gate can never govern an empty set. **All `xtask/tests/` weight is FREE** (kloc_check.rs:167-193): the 33-vector proven-red and the 10-vector D19 acceptance suite cost zero. What is NOT free is the in-`src` `#[cfg(test)]` weight D11(b) already flagged as budget-charged-but-CI-executed-here: `register_fixture_story` plus one call in each converted gate's fixture helper (+29), needed because D19's fail-closed rule means a fixture directory of bare `.md` files correctly governs nothing, so every existing gate unit test had to DECLARE its fixture stories the way real stories are declared. ZERO kernel-core Δ @24472. | prior: j1-crosshost-2b AC4.2 measured grant (code existed and was measured 38742 BEFORE the ask — never an estimate): 38655->38742, EXACT MEASURED, ZERO headroom, same D15 discipline as the 1b and 2a grants. NET +87 after taking the mandated free reduction FIRST (deleted the compiler-confirmed-dead CODEX_ORACLE/CLAUDE_ORACLE consts, -4). Drivers, all in xtask/src/: (a) the SEVENTH gate leg `cross-host-identity-proof` — the split half of the boundary fact, which publishes the cross-host wire-identity claim ONLY because the two-daemon proof is written, registered and CI-enrolled, plus the `[leg1..leg7]` reconciliation, the seventh published leg name and the new `cross_host_identity_proven` JSON boolean; (b) the `two-host-delegation` demo beat split (Q4, ratified) with its `--skip-gate` ABSENT counterpart and the seventh leg's narration; (c) reading the composition-root PAIR in check_enterprise_identity's issuance-bypass leg, because the governed mint wrapper relocated under the library and counting main.rs alone would score 0 on a pure relocation while a SECOND mint in the relocated file stayed invisible. Every vector, fixture and proven-red harness lives in xtask/tests/ (kloc-free): 6 new j1_crosshost_2b_proven_red vectors + the three synchronized lay_green trees. NOTE the standing decision D11 (growth rate, owner 14.6) is NOT re-ratified here; capacity is granted for the instrument work only. | prior: j1-crosshost-1b §A6 review measured grant (kloc.toml:87 correctness-repair valve; code existed and was measured 38655 BEFORE the ask): 38609->38655, EXACT MEASURED, ZERO headroom. Driver: the 13 review patches that closed the silent-green escapes in the consent gate — test-registration count + 4 new needles in leg_consent_refusal_proofs, production-scoping the boundary leg's router scan, token-bounded executable-run enrollment matching, the !loopback_composed flip guard, the named consent_refusal_proofs JSON boolean, and the --skip-gate refusal beat. All vectors/fixtures live in xtask/tests/ (kloc-free). | §A6 review measured grant (2026-08-18): +152 for leg-9 value checks + signature-gated claim, per-field overclaim scoping, leg-10 derived directories + line-scoped enrollment, leg-2 all-declarations check, gate_common missing-member fail-closed, demo_j1 record corrections.
+ #
+ # ── Story 14-0 MEASURED GRANT 2026-08-26: 39960 -> 40613. NOT AN ESTIMATE. ──
+ # `kloc.toml:60-65` forbids a grant on an estimate, and 14-0 opened with 33 lines of
+diff --git a/xtask/src/check_rotation_real_timing.rs b/xtask/src/check_rotation_real_timing.rs
+new file mode 100644
+index 00000000..13553645
+--- /dev/null
++++ b/xtask/src/check_rotation_real_timing.rs
+@@ -0,0 +1,535 @@
++#![forbid(unsafe_code)]
++
++//! Story 14-2 (AC5) — `check-rotation-real-timing` gate.
++//!
++//! ONE standalone gate cloned from `check_scale_churn.rs`'s shape, with
++//! **per-leg verdict independence** — each leg reads its OWN `cargo test`
++//! invocation(s), so one break reds exactly one leg. It does NOT append legs
++//! to `check-scale-churn` or `check-multi-region-slo`, and neither appends
++//! here (F7 / AC5.6 — per-leg independence honoured in both directions).
++//!
++//! # The legs (AC5.4, each independently red-able)
++//!
++//! 1. **rotation-floors-3-host** — the live 3-host provision→swap→close
++//!    drill: floors via `passes_v15_floors` (which IS `passes_v10_floors`),
++//!    zero drops, post-grace probes, marker `ROTATION_HOSTS_ROTATED=3`.
++//! 2. **rotation-under-load-10-host** — the 10-host envelope (the epic's
++//!    scale-out target) + the CertRotationRaceExploit adversary detection,
++//!    marker `ROTATION_HOSTS_ROTATED=10` (the DERIVED witness — AC3.2).
++//! 3. **rotation-proven-red** — the THREE falsifier vectors: drop
++//!    reachability (exact surviving topology), p99-exceeds-floor, and the
++//!    post-grace boundary ported from `scenario_5_3` BEFORE its deletion
++//!    (AC6.1.b).
++//! 4. **overlap-pin-closure** — AC2.3's four close assertions + during-window
++//!    outside-the-set block + collision refusals, the N=3 in-flight window
++//!    (drops == 0 under the overlap), and the EXECUTABLE teardown negative
++//!    control (drops > 0 — the drop oracle's committed red capability).
++//! 5. **kernel-abi-diff** — `check-kernel-baseline` GREEN (ZERO kernel-Δ).
++//!
++//! # The controls at the gate boundary (mirrors 14-1's ratified set)
++//!
++//! * **AC5.1 — measurement markers.** Every scale-carrying invocation
++//!   requires `ROTATION_HOSTS_ROTATED=<n>` as an EXACT trimmed line carrying
++//!   the DERIVED identity witness: a silent skip or an early return emits no
++//!   marker and the leg REDS.
++//! * **AC5.4 — exact test counts.** libtest filters are PREFIX matches; every
++//!   invocation declares the EXACT number of tests its filter must match and
++//!   `passed == expected` replaces `passed >= 1`.
++//! * **AC5.2 — derived enrollment.** Every `#[ignore]`-gated
++//!   `t_10_4b_rotation_*` test in the ONE binary the legs invoke must be
++//!   covered by a leg filter, or the gate FAILS before running anything.
++//! * **AC4.2/AC4.3 — disclosure, transcribed.** The tests' OWN percentile
++//!   disclosure lines (`revocation-propagation p50/p99 = … (n=…)`) are
++//!   carried VERBATIM to the gate summary and leg JSON; the gate recomputes
++//!   nothing and defaults nothing.
++//!
++//! # Live-oracle posture
++//!
++//! Every leg test is real (real `127.0.0.1` sockets, real rustls mTLS) and
++//! `#[ignore]`-gated — the gate controls execution via `--ignored`; skipped ≠
++//! passed. A vacuous leg (attempted but ZERO tests ran) hard-fails at EVERY
++//! phase. The `rotation-fault-inject` feature is compiled OUT of release
++//! builds (compile_error! guard + the `cargo tree --release` SHIP-BLOCKER
++//! checked below).
++//!
++//! # Phase disposition (AC6.3)
++//!
++//! `BindingClass::Blocking`: a RED oracle hard-fails at HEAD regardless of
++//! `CURRENT_PHASE`. The registry must carry `v1_5 = "blocking"` (it has since
++//! 10.5 — DOWNGRADING it is the 10.5-AC6 floor-relaxation shape and this
++//! gate hard-errors on it) plus the NEW `v2_0` and `v2_2` rungs; at the v2.2
++//! ship gate an ABSENT result BLOCKS, never silent-greens.
++
++use crate::gate_common::{
++    dev_enforced_red_blocks, emit_command, is_blocking_at, read_disposition, BindingClass,
++    CURRENT_PHASE,
++};
++use std::process::{Command, Stdio};
++
++/// Canonical gate name (matches the registry `[[ship_gate]]` row, the
++/// `Commands` variant, and the discipline.yml job).
++const GATE_NAME: &str = "check-rotation-real-timing";
++
++const TEST_PACKAGE: &str = "maos-a2a-tcp";
++/// The ONLY test binary any leg invokes — the AC5.2 binary binding keys on it.
++const TEST_FILE: &str = "t_10_4b_rotation_real_timing";
++/// The test directory the AC5.2 enrollment is DERIVED from (never a
++/// hand-listed filter set with nothing reconciling it). The scene
++/// (`t_14_2_rotation_scene`) is deliberately OUT of scope: AC1.4 forbids it
++/// from being a gate-leg oracle for any NFR floor — it narrates in the normal
++/// test lane.
++const TEST_DIR: &str = "crates/maos-a2a-tcp/tests";
++/// AC5.5b — the dev/CI-only fault-injection feature. The gate itself does not
++/// flip it on (no fault leg exists yet); its obligation here is the
++/// ship-blocker: the feature must be ABSENT from the release dependency
++/// graph.
++const FAULT_INJECT_FEATURE: &str = "rotation-fault-inject";
++/// AC5.1 markers: the DERIVED identity witness (AC3.2), never a literal
++/// count a test could echo.
++const M3: Option<&'static str> = Some("ROTATION_HOSTS_ROTATED=3");
++const M10: Option<&'static str> = Some("ROTATION_HOSTS_ROTATED=10");
++
++/// One oracle invocation (AC5.3 per-leg independence): its own name filter,
++/// the EXACT number of tests the filter must match (AC5.4), and the
++/// measurement marker its test must print (AC5.1).
++struct Invocation {
++    filter: &'static str,
++    expected_tests: u32,
++    marker: Option<&'static str>,
++}
++
++/// One oracle leg's parsed result (aggregated across its sub-invocations).
++struct LegResult {
++    label: &'static str,
++    passed: u32,
++    failed: u32,
++    ran: bool,
++    attempted: bool,
++    green: bool,
++    markers: Vec<&'static str>,
++    /// The drill's OWN percentile disclosure lines, carried verbatim (AC4.2
++    /// third surface; AC4.3 — the gate transcribes, it does not recompute).
++    percentiles: Vec<String>,
++}
++
++/// Invoke ONE oracle invocation and parse its summary. GREEN requires: exit
++/// success, a `test result:` line, `passed == expected_tests`, zero
++/// failures, the exact `running N test(s)` line (a prefix filter that
++/// silently shrank is visible), AND the required marker as an exact trimmed
++/// line at least once per expected test.
++#[allow(clippy::type_complexity)]
++fn invoke_cargo_test(
++    invocation: &Invocation,
++) -> Result<(u32, u32, bool, bool, Vec<String>), String> {
++    let mut cmd = Command::new("cargo");
++    cmd.args(["test", "--locked", "-p", TEST_PACKAGE, "--test", TEST_FILE]);
++    cmd.args(["--", invocation.filter, "--ignored", "--nocapture"]);
++    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
++    let output = cmd
++        .output()
++        .map_err(|e| format!("cannot invoke `cargo test` ({TEST_PACKAGE}/{TEST_FILE}): {e}"))?;
++    let stdout = String::from_utf8_lossy(&output.stdout);
++    let stderr = String::from_utf8_lossy(&output.stderr);
++    let combined = format!("{stdout}{stderr}");
++    // AC4.2 — the tests' OWN disclosure lines (e.g. `revocation-propagation
++    // p50/p99 = 6/8 ms  (n=3)`), carried verbatim. Derived only.
++    let percentiles: Vec<String> = combined
++        .lines()
++        .filter(|l| {
++            let t = l.trim();
++            t.starts_with("revocation-propagation p50/p99")
++                || t.starts_with("re-handshake")
++                || t.starts_with("end-to-end")
++                || t.starts_with("post-grace retired-cert accept rate")
++        })
++        .map(|l| l.trim().to_string())
++        .collect();
++    let (passed, failed) = parse_test_summary(&combined);
++    let ran = combined
++        .lines()
++        .any(|l| l.trim().starts_with("test result:"));
++    let running_exact = combined.contains(&format!("running {} test", invocation.expected_tests));
++    let measured = invocation.marker.map_or(true, |m| {
++        combined.lines().filter(|l| l.trim() == m).count() as u32 >= invocation.expected_tests
++    });
++    let green = output.status.success()
++        && ran
++        && passed == invocation.expected_tests
++        && failed == 0
++        && running_exact
++        && measured;
++    if !green {
++        eprintln!(
++            "{GATE_NAME}: {TEST_FILE} (filter={:?}) NOT green (passed={passed}, expected={}, \
++             failed={failed}, ran={ran}, running-exact={running_exact}, measured={measured}, \
++             exit={}) — see the cargo output above",
++            invocation.filter, invocation.expected_tests, output.status
++        );
++    }
++    Ok((passed, failed, ran, green, percentiles))
++}
++
++/// Run one leg's invocations and fold them into ONE leg verdict (AND
++/// semantics — every invocation must be green for the leg to be green).
++fn run_leg(label: &'static str, invocations: &[Invocation]) -> LegResult {
++    let (mut passed, mut failed, mut ran, mut green) = (0u32, 0u32, false, true);
++    let mut percentiles = Vec::new();
++    for invocation in invocations {
++        match invoke_cargo_test(invocation) {
++            Ok((p, f, r, g, pc)) => {
++                (passed, failed, ran, green) = (passed + p, failed + f, ran | r, green & g);
++                percentiles.extend(pc);
++            }
++            Err(e) => {
++                eprintln!(
++                    "{GATE_NAME}: {label} leg error ({}): {e}",
++                    invocation.filter
++                );
++                (failed, ran, green) = (failed + 1, true, false);
++            }
++        }
++    }
++    LegResult {
++        label,
++        passed,
++        failed,
++        ran,
++        attempted: true,
++        green,
++        markers: invocations.iter().filter_map(|i| i.marker).collect(),
++        percentiles,
++    }
++}
++
++/// The rotation legs as DATA (AC5.2): the same table drives the runs AND the
++/// derived-enrollment reconciliation. One entry per leg — per-leg
++/// independence (AC5.6: no cross-wiring into sibling gates).
++fn leg_invocations() -> Vec<(&'static str, Vec<Invocation>)> {
++    vec![
++        (
++            "rotation-floors-3-host",
++            vec![
++                Invocation {
++                    filter: "t_10_4b_rotation_real_timing_3_host_drill",
++                    expected_tests: 1,
++                    marker: M3,
++                },
++                // The WIRED markdown surface's own contract (AC6.1.a),
++                // ported to the uncharged lane — a floors-leg member.
++                Invocation {
++                    filter: "t_10_4b_rotation_report_markdown_publishes_sample_counts",
++                    expected_tests: 1,
++                    marker: None,
++                },
++            ],
++        ),
++        (
++            "rotation-under-load-10-host",
++            vec![Invocation {
++                filter: "t_10_4b_rotation_real_timing_10_host_envelope",
++                expected_tests: 1,
++                marker: M10,
++            }],
++        ),
++        (
++            "rotation-proven-red",
++            vec![
++                // THREE falsifier vectors (AC6.1.b): the drop-reachability
++                // exact-topology red, the p99-exceeds-floor red, and the
++                // post-grace boundary ported from scenario_5_3.
++                Invocation {
++                    filter: "t_10_4b_rotation_proven_red",
++                    expected_tests: 3,
++                    marker: None,
++                },
++            ],
++        ),
++        (
++            "overlap-pin-closure",
++            vec![
++                Invocation {
++                    filter: "t_10_4b_rotation_overlap_pin_closure",
++                    expected_tests: 1,
++                    marker: None,
++                },
++                Invocation {
++                    filter: "t_10_4b_rotation_under_load_window",
++                    expected_tests: 1,
++                    marker: None,
++                },
++                // The EXECUTABLE negative control (§A6 Acceptance-5): the
++                // drop oracle's `drops > 0` capability, committed beside the
++                // overlap's `drops == 0`.
++                Invocation {
++                    filter: "t_10_4b_rotation_drop_oracle_teardown_control",
++                    expected_tests: 1,
++                    marker: None,
++                },
++            ],
++        ),
++    ]
++}
++
++/// AC5.2 — DERIVE the `#[ignore]`-gated rotation test names from the ONE
++/// test file at run time and require every one to be covered by a leg
++/// filter. A hand-listed filter set is a suggestion, not a control: a new
++/// rotation test no leg names must FAIL this gate, not silently never run.
++fn derive_ignored_rotation_tests() -> Result<Vec<(String, String)>, String> {
++    let path = format!("{TEST_DIR}/{TEST_FILE}.rs");
++    let text = std::fs::read_to_string(&path)
++        .map_err(|e| format!("{GATE_NAME}: cannot read {path} to derive enrollment: {e}"))?;
++    let mut derived = Vec::new();
++    let (mut pending_ignore, mut in_block) = (false, false);
++    for line in text.lines() {
++        let mut t = line.trim_start();
++        // Strip same-line-closed `/* … */` prefixes (14-1 round-2 P7).
++        while let Some(c) = t.strip_prefix("/*").and_then(|r| r.find("*/")) {
++            t = t[c + 4..].trim_start();
++        }
++        if in_block || t.starts_with("/*") {
++            in_block = !t.contains("*/");
++            continue;
++        }
++        if t.starts_with("#[") {
++            pending_ignore |= t.starts_with("#[ignore");
++        } else if t.starts_with("fn ") || t.starts_with("async fn ") {
++            let name = t.trim_start_matches("async ").trim_start_matches("fn ");
++            if pending_ignore && name.starts_with("t_") {
++                let name: String = name
++                    .chars()
++                    .take_while(|c| c.is_alphanumeric() || *c == '_')
++                    .collect();
++                derived.push((TEST_FILE.to_string(), name));
++            }
++            pending_ignore = false;
++        } else if !t.is_empty() && !t.starts_with("//") {
++            pending_ignore = false;
++        }
++    }
++    derived.sort();
++    if derived.is_empty() {
++        return Err(format!(
++            "{GATE_NAME}: FAIL — the {path} walk derived ZERO ignored rotation tests \
++             (AC5.2: an empty derivation is how a filesystem-derived enrollment goes decorative)"
++        ));
++    }
++    Ok(derived)
++}
++
++/// AC5.5b — the fault-injection feature must be ABSENT from the release
++/// dependency graph (the ship-blocker; `compile_error!` guards the source
++/// side). `cargo tree --release -e features -p maos-a2a-tcp` must not carry
++/// the feature.
++fn fault_inject_absent_from_release() -> Result<(), String> {
++    let out = Command::new("cargo")
++        .args(["tree", "--release", "-e", "features", "-p", TEST_PACKAGE])
++        .output()
++        .map_err(|e| format!("{GATE_NAME}: cannot run cargo tree: {e}"))?;
++    let text = format!(
++        "{}{}",
++        String::from_utf8_lossy(&out.stdout),
++        String::from_utf8_lossy(&out.stderr)
++    );
++    if text.contains(FAULT_INJECT_FEATURE) {
++        return Err(format!(
++            "{GATE_NAME}: SHIP-BLOCKER — `{FAULT_INJECT_FEATURE}` appears in the release \
++             dependency graph (AC5.5b); it is dev/CI-only"
++        ));
++    }
++    Ok(())
++}
++
++/// Leg 5: kernel-ABI baseline — ZERO kernel-Δ (check-kernel-baseline owns
++/// the pin value; this gate never restates it).
++fn run_kernel_abi_leg() -> LegResult {
++    let green = crate::check_kernel_baseline::run(false).is_ok();
++    LegResult {
++        label: "kernel-abi-diff",
++        passed: if green { 1 } else { 0 },
++        failed: if green { 0 } else { 1 },
++        ran: true,
++        attempted: true,
++        green,
++        markers: Vec::new(),
++        percentiles: Vec::new(),
++    }
++}
++
++/// Sum `passed`/`failed` counts across every `test result:` line in `output`.
++fn parse_test_summary(output: &str) -> (u32, u32) {
++    let results = output
++        .lines()
++        .filter_map(|l| l.trim().strip_prefix("test result:"));
++    results.fold((0, 0), |(p, f), r| {
++        (p + parse_count(r, "passed"), f + parse_count(r, "failed"))
++    })
++}
++
++/// Parse the total of `"<n> <key>"` occurrences in `s` (e.g. `8 passed`).
++fn parse_count(s: &str, key: &str) -> u32 {
++    s.match_indices(key)
++        .filter_map(|(i, _)| {
++            let tail = s[..i].trim_end();
++            let digits = tail.trim_end_matches(|c: char| c.is_ascii_digit());
++            tail[digits.len()..].parse::<u32>().ok()
++        })
++        .sum()
++}
++
++/// Build the JSON array of per-leg verdicts for programmatic consumers.
++fn legs_json(legs: &[LegResult]) -> serde_json::Value {
++    serde_json::Value::Array(
++        legs.iter()
++            .map(|l| {
++                let status = if l.green {
++                    "green"
++                } else if l.attempted {
++                    "red"
++                } else {
++                    "skipped"
++                };
++                serde_json::json!({
++                    "label": l.label,
++                    "passed": l.passed,
++                    "failed": l.failed,
++                    "ran": l.ran,
++                    "attempted": l.attempted,
++                    "green": l.green,
++                    "status": status,
++                    "markers": l.markers,
++                    "percentiles": l.percentiles,
++                })
++            })
++            .collect(),
++    )
++}
++
++pub fn run(json: bool) -> Result<(), String> {
++    // 1. Read + VALIDATE the phase disposition (AC6.3 — hard-error on a
++    //    registry defect, never trust it): `v1_5` must STAY blocking
++    //    (downgrading it is the 10.5-AC6 floor-relaxation shape), and the
++    //    v2.2-wave rungs `v2_0` + `v2_2` must exist.
++    let disposition = read_disposition(GATE_NAME)?;
++    if disposition.get("v1_5").map(|s| s.as_str()) != Some("blocking") {
++        return Err(format!(
++            "{GATE_NAME}: registry defect — v1_5 disposition must be \"blocking\" (got {:?}); \
++             downgrading a live blocking rung is the 10.5-AC6 floor-relaxation shape (AC6.3)",
++            disposition.get("v1_5")
++        ));
++    }
++    if disposition.get("v2_0").is_none() || disposition.get("v2_2").is_none() {
++        return Err(format!(
++            "{GATE_NAME}: registry defect — the v2.2-wave rungs v2_0 and v2_2 must exist \
++             (got {:?}); absent-result BLOCKS at the v2.2 ship gate (AC6.3)",
++            disposition
++        ));
++    }
++    let blocking_now = is_blocking_at(&disposition, CURRENT_PHASE);
++    // Option C (Epic-12 retro B1): the Blocking binding class hard-fails a
++    // RED oracle at HEAD regardless of CURRENT_PHASE.
++    let dev_blocks = blocking_now || dev_enforced_red_blocks(BindingClass::Blocking, true);
++
++    // 2. AC5.5b — the fault-injection feature must be absent from release.
++    if let Err(e) = fault_inject_absent_from_release() {
++        emit_command(json, "error", &e);
++        return Err(e);
++    }
++
++    // 3. AC5.2 — reconcile the derived test file against the leg table
++    //    BEFORE any cargo run: a rotation test no leg names fails the gate.
++    let derived = derive_ignored_rotation_tests()?;
++    let legs_data = leg_invocations();
++    for (stem, name) in &derived {
++        let covered = stem == TEST_FILE
++            && legs_data
++                .iter()
++                .any(|(_, invs)| invs.iter().any(|i| name.starts_with(i.filter)));
++        if !covered {
++            return Err(format!(
++                "{GATE_NAME}: FAIL — `{name}` will never run: no leg names it (AC5.2 derived \
++                 enrollment; a hand-listed filter set is a suggestion, not a control)"
++            ));
++        }
++    }
++
++    // 4. Per-leg oracles (each its OWN invocation(s) — per-leg independence).
++    let mut legs: Vec<LegResult> = legs_data
++        .iter()
++        .map(|(label, invocations)| run_leg(label, invocations))
++        .collect();
++    // 5. Vacuous-green guard (J4/L6 anti-canned): a leg that was ATTEMPTED
++    //    but compiled to ZERO tests / never reported results hard-fails at
++    //    EVERY phase. kernel-abi-diff is exempt (baseline, not a test count).
++    legs.push(run_kernel_abi_leg());
++    for leg in &legs {
++        if leg.label != "kernel-abi-diff"
++            && leg.attempted
++            && (!leg.ran || (leg.passed == 0 && leg.failed == 0))
++        {
++            let msg = format!(
++                "{GATE_NAME}: FAIL — {} leg is vacuous (ran={}, passed={}, failed={}) — a \
++                 re-stubbed harness cannot pass this gate (J4 anti-canned guard)",
++                leg.label, leg.ran, leg.passed, leg.failed
++            );
++            emit_command(json, "error", &msg);
++            return Err(msg);
++        }
++    }
++
++    let oracle_green = legs.iter().all(|l| l.green);
++
++    // 6. Verdict. `dev_blocks` is serialized (AC6.4): the JSON verdict and
++    //    the stderr banner cannot contradict each other.
++    if oracle_green {
++        if json {
++            println!(
++                "{}",
++                serde_json::json!({
++                    "gate": GATE_NAME,
++                    "passed": true,
++                    "oracle_green": true,
++                    "blocking_now": blocking_now,
++                    "dev_blocks": dev_blocks,
++                    "current_phase": CURRENT_PHASE,
++                    "disposition": disposition,
++                    "enrolled_rotation_tests": derived.len(),
++                    "legs": legs_json(&legs),
++                })
++            );
++        } else {
++            eprintln!(
++                "{GATE_NAME}: PASSED — oracle green ({} legs, {} enrolled rotation tests); {} at {}",
++                legs.len(),
++                derived.len(),
++                if dev_blocks { "BLOCKING" } else { "advisory" },
++                CURRENT_PHASE,
++            );
++            // AC4.2 — publish the tests' own disclosure lines beside the
++            // banner: verbatim, no values of the gate's own invention.
++            for line in legs.iter().flat_map(|l| &l.percentiles) {
++                eprintln!("{GATE_NAME}:   {line}");
++            }
++        }
++        return Ok(());
++    }
++
++    // Oracle RED — BindingClass::Blocking hard-fails at HEAD regardless of
++    // CURRENT_PHASE. No whole-gate advisory tail exists (D20's shape is
++    // deleted; per-leg held_advisory_reason is the only lawful hold).
++    let detail: String = legs
++        .iter()
++        .map(|l| {
++            let pct: String = l.percentiles.iter().map(|p| format!("  - {p}\n")).collect();
++            let (lb, p, f, r, a, g) = (l.label, l.passed, l.failed, l.ran, l.attempted, l.green);
++            format!("- {lb} leg: {p} passed, {f} failed (ran={r}, attempted={a}, green={g})\n{pct}")
++        })
++        .collect();
++    let msg = format!("{GATE_NAME}: BLOCKING — oracle RED at {CURRENT_PHASE} (binding):\n{detail}");
++    emit_command(json, "error", &msg);
++    if !json {
++        eprintln!("{msg}");
++    }
++    Err(format!(
++        "{GATE_NAME}: BLOCKING — oracle RED at {CURRENT_PHASE}"
++    ))
++}
+diff --git a/xtask/src/main.rs b/xtask/src/main.rs
+index b979416e..b6a6c1e0 100644
+--- a/xtask/src/main.rs
++++ b/xtask/src/main.rs
+@@ -37,6 +37,7 @@ mod check_multi_region_slo;
+ // Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate (per-leg
+ // independence). MUST NOT append legs to check-rotation-real-timing or
+ // check-multi-region-slo (F7).
++mod check_rotation_real_timing;
+ mod check_scale_churn;
+ // Story 12.1 — signed cohort manifest and full-pairwise mesh gate.
+ mod check_cohort_mesh;
+@@ -844,6 +845,12 @@ enum Commands {
+         #[arg(long)]
+         json: bool,
+     },
++    /// Story 14-2 — 10-host mTLS rotation real-timing gate (per-leg independence).
++    #[command(name = "check-rotation-real-timing")]
++    CheckRotationRealTiming {
++        #[arg(long)]
++        json: bool,
++    },
+     /// Story 11.3 — scale-envelope 25/30-host churn gate (per-leg independence).
+     #[command(name = "check-scale-churn")]
+     CheckScaleChurn {
+@@ -1347,6 +1354,7 @@ fn main() {
+         Commands::CheckSkillConformance { json } => check_skill_conformance::run(json),
+         Commands::CheckCrossRegionConsensus { json } => check_cross_region_consensus::run(json),
+         Commands::CheckMultiRegionSlo { json } => check_multi_region_slo::run(json),
++        Commands::CheckRotationRealTiming { json } => check_rotation_real_timing::run(json),
+         Commands::CheckScaleChurn { json } => check_scale_churn::run(json),
+         Commands::CheckCohortMesh { json } => check_cohort_mesh::run(json),
+         Commands::CheckMultiTenantLoom { json } => check_multi_tenant_loom::run(json),

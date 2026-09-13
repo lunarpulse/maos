@@ -146,9 +146,20 @@ fn live_substrate_present() -> bool {
 /// `WriteEntryPoint::CrossRegionReadmit` addition must not drift the kernel.
 fn run_kernel_abi_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
     // Reuse the real baseline check rather than duplicating the line counter.
-    // `run(false)` keeps its output on stderr (diagnostic) and returns Ok/Err;
-    // it never emits JSON to stdout, so this gate's JSON output stays clean.
-    let green = crate::check_kernel_baseline::run(false).is_ok();
+    // `check()` (not `run(false)`) — `run` PRINTS a human PASSED line to STDOUT
+    // on the green path, which lands inside this gate's own `--json` payload.
+    // Story 16-0 closed that (`deferred-work.md:637`); `check_fkcs.rs:95-97`
+    // documents the same shape.
+    let kernel = crate::check_kernel_baseline::check();
+    let green = kernel.as_ref().is_ok_and(|report| report.passed);
+    let detail = match &kernel {
+        Ok(report) if report.passed => "kernel baseline re-pin GREEN".to_string(),
+        Ok(report) => format!(
+            "kernel baseline re-pin FAILED — {}",
+            crate::check_kernel_baseline::failure_detail(report)
+        ),
+        Err(error) => format!("kernel baseline check ERRORED — {error}"),
+    };
     EvidenceLeg::observe(
         LegObservation {
             name: KERNEL_ABI_LEG,
@@ -156,11 +167,7 @@ fn run_kernel_abi_leg(verifier: &EvidenceVerifier) -> EvidenceLeg {
             attempted: true,
             substrate_present: true,
             green,
-            detail: if green {
-                "kernel baseline re-pin GREEN".to_string()
-            } else {
-                "kernel baseline re-pin FAILED".to_string()
-            },
+            detail,
             signature: SignatureCheck::default(),
             passed: Some(u32::from(green)),
             failed: Some(u32::from(!green)),

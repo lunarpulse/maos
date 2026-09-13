@@ -64,7 +64,7 @@ fn seed_tl_with_secret() -> (TempDir, std::path::PathBuf) {
 }
 
 #[test]
-#[ignore]
+#[ignore = "requires --features siem-fault-inject; gate-driven via check-enterprise-identity (Story 15-1 R-4)"]
 fn fault_inject_bypass_drops_redaction_provenance_so_a_leak_can_invert() {
     let (_dir, db_path) = seed_tl_with_secret();
 

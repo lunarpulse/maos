@@ -46,8 +46,17 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Governance(args) => dispatch_governance(args, color),
         Subcommand::Backup(args) => dispatch_backup(args, color),
         Subcommand::Migrate(args) => dispatch_migrate(args, color),
+        Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
     }
+}
+
+fn release_pubkey() -> ExitCode {
+    println!(
+        "{}",
+        hex::encode(maos_audit::release_verify::RELEASE_PUBKEY)
+    );
+    ExitCode::SUCCESS
 }
 
 /// `j1-crosshost-2e` AC2 (F1) — `maosctl cohort <sign>`.
@@ -263,11 +272,27 @@ fn cohort_sign(
 /// canonical-parent comparison. Not a general-purpose utility: callers pass one
 /// existing path (the key) and one possibly-absent path (the output).
 fn same_file(output: &std::path::Path, key: &std::path::Path) -> bool {
-    use std::os::unix::fs::MetadataExt;
     let meta = |p: &std::path::Path| std::fs::metadata(p).ok();
     if let (Some(a), Some(b)) = (meta(output), meta(key)) {
         // Symlinks are followed by `metadata`; hard links share dev+ino.
-        return a.dev() == b.dev() && a.ino() == b.ino();
+        // Windows has no stable dev+ino through std, so canonicalize both
+        // existing paths instead (symlinks still resolve; hard-link aliases
+        // are the accepted gap — std cannot see them without
+        // GetFileInformationByHandle, and the not-yet-born fallback below
+        // has the same gap).
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            return a.dev() == b.dev() && a.ino() == b.ino();
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (&a, &b);
+            return match (output.canonicalize().ok(), key.canonicalize().ok()) {
+                (Some(x), Some(y)) => x == y,
+                _ => false,
+            };
+        }
     }
     // Output does not exist yet (the normal case): compare the canonical parent
     // plus the final component, so `dir/../key`, `./key` and `key` all alias.

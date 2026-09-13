@@ -16,6 +16,9 @@
   All PRD journeys served.
 - **GA tag:** ⏳ **Held.** Blocked only by the two external items below. Neither
   blocks further development, branch merges, or internal milestones.
+- **Signed pre-release:** `v0.1.0-alpha.1` is not a GA tag and is unaffected
+  by Holds 1–2 under this ledger's development/GA scope above. Cut it only by
+  following `docs/release/tag-procedure.md`.
 
 ## Holds
 
@@ -62,8 +65,14 @@
 | 15 | `j1-crosshost-2e`: **the cross-host pairing is operator-mediated by construction, and `stranger_verification` remains a sworn string.** AC5 made the pairing *executable* — host A publishes its boot nonce under `cohort:crosshost-started` after the bind and before the dial, then holds on a bounded barrier that fails closed — but the nonce still crosses to host B through a **human transcription**, deliberately: the value stays a fresh random per-process integer so `NFR-Rel-6` restart detection keeps working (`tofu.rs:351-372`), and making it stable or derived would trade one control for another. Separately, leg 9's `stranger_verification` check is **non-emptiness only** (`:910-926`); it never executes `verify.py` and cannot distinguish `"verify.py OK on both halves"` from `"looks fine to me"` — and the shipped template supplies an acceptable string. | That pairing is automated, or that `stranger_verification` is a verified result rather than an operator's sworn statement. | Automated pairing needs a durable consented pending-pin protocol (larger security surface, `deferred-work.md`). Executing `verify.py` from the gate needs the zero-`Command::new` property to be revisited — a ratified constraint, not an oversight. |
 | 16 | **`claude`'s completion verdict is NOT an effect oracle, and the paid two-host run rests on it.** The two adapters are asymmetric and it matters here: `codex_jsonl_oracle` requires **native effect evidence** — an `item.completed` of type `file_change` with `status: "completed"` and a non-empty `changes` array — and emits `NoEffectEvidence` without it (`worker_cli.rs:462-465`). `claude_result_object_oracle` (`:498-537`) has **no effect check at all**: it scores `Completed` on `subtype == "success"` + `is_error == false` + an **empty** `permission_denials`, and nothing more. The residual is named precisely in code (`:490-497`: *"a model that simply declines without attempting a tool call leaves `permission_denials` empty and is indistinguishable from success … it is not an effect oracle"*) — but it appeared in **no published claim boundary and no runbook** until now. **T6 (already signed) ran codex and had effect evidence natively; the two-host run puts `claude` on host B (`runbook-j1-tier-2-signed-live-run.md` §7 decision row) and silently loses that property.** Measured 2026-08-22 against the real adapter with three fake-`claude` result objects: a permission denial → `not_completed:permission_denied`, `completed=false`, **exit 1** (the ship-blocker's shape IS caught ✅); a clean object claiming *"I have written the file"* over an untouched tree → **`completed=true`, exit 0** ⚠. | That a green `worker_completion completed=true` on the **claude** adapter is evidence any file was written, or that a signed two-host artifact attests remote *work* rather than remote *non-refusal*. The signature covers the verdict; the verdict covers the absence of a denial, not the presence of an effect. | Either an effect oracle for claude (claude's result object carries no per-file change list, so this needs a different signal — e.g. a MAOS-side worktree diff at the spawn seam), or a mandatory operator effect check recorded in the capture. Until one exists, `runbook-j1-t8-two-host-paid-run.md` Appendix B abort condition 9 makes the manual check **blocking**. |
 | 17 | `j1-crosshost-2e` AC4.6 (§A6 review P13): **the delegated goal is free text on the wire with only the 1 MiB frame cap** (`transport.rs:44-50`). A goal containing a credential fragment (`sk-…`) is **scrubbed in the Transparency Log** by `redact_unscoped` (`redaction.rs:142-180`) but is **delivered raw on the wire and to the receiving host's mailbox** — the operator's own `MAOS_DELEGATED_GOAL` is trusted operator input by design, and `j1-crosshost-1a`'s frame-borne rule (the remote worker cannot inherit local env) is why the goal must cross at all. | That a delegated goal is confidential in transit, or that the TL redaction implies the wire copy is redacted too. | Not this lane: an on-the-wire goal envelope (encrypt or sign-then-encrypt under the cohort authority) is a design change in `maos-a2a-core`, filed per Q3 of story `j1-crosshost-2e` (owner: Murat to schedule). |
+| 18 | **`check-scale-churn` N=100 churn envelope (Story 14-1, 2026-08-27; blast axis re-dispositioned 2026-08-28)**: the 100-host claim is a **compressed-loopback regression envelope** over 100 distinct in-process mTLS identities — one OS process, one runtime, one loopback IP; detection/recovery/RTO are loopback events, the blast floor is exercised by falsifiers against a probing adversary, not by production geo propagation. **And the NFR-Rel-7 `blast radius ≤ 5 peers` floor is MEASURED BREACHED against a *concurrent* adversary: 6–8 at N=100 and 7 at N=30 — scale-independent.** Cause is a spec defect, now fixed at source: the floor was written with no adversary concurrency model and is unsatisfiable alongside the ratified propagation envelope — NFR-Rel-9 ≤ 5 s p99 capability-token revocation; cert-rotation chaos p50 ≤30 s / p99 ≤90 s per `t_10_4b_rotation_real_timing.rs:338` (holding 5 peers needs isolation inside ~12 ms loopback / ~0.3–1 s geo) [attribution corrected 2026-08-28, 14-1 round-2 review]. See `[DELTA-2026-08-28]` on NFR-Rel-7. What is PROVEN here is the mechanism-derived property *detection interrupts propagation* — reach ≤ 4W (a constant that cannot grow with the fleet, W=6) AND reach × 2 < the offered set (derived from the run, so it reds at every scale) — plus detection ≤1h and recovery ≤24h. | That NFR-Rel-7's blast-radius floor is **met**, in any form, at any scale, by this release. `≤5` remains the **serial-adversary** floor and is unproven for a concurrent adversary; the absolute reached count is reported, never claimed. Also may NOT claim geo-distribution, geo latency, a full N×N mesh, 100-host production churn, or the 30-day soak (NFR-Scale-1). | The revocation-propagation family (NFR-Rel-9 / NFR-Sec-13) owns the mechanism axis (delivered; rotation floors asserted by `t_10_4b_rotation_real_timing.rs`). NOTE, pre-existing and NOT introduced here: the registry lists a `check-rotation-real-timing` ship gate (blocking at v1.5) and `check_ship_gate_completeness.rs:48` expects it, but no xtask subcommand implements it at HEAD — the floors live in the test, not in a runnable gate. Handed to Story 14-2 (rotation owner). Mesh-wide per-identity fan-out limiting deliberately NOT adopted — it would refuse reads an identity is still allowlisted for. No successor story: the defect was the requirement text, and it is amended. |
+| 19 | The four package recipes remain publication scaffolds: they still contain a `0.5.0` tag, the development release public key, or `PLACEHOLDER_SHA256_*`; AUR `pkgver` and RPM `Version:` also cannot contain the tag's hyphenated pre-release form directly. | That `v0.1.0-alpha.1` is installable through Homebrew, AUR, Debian, or RPM, or that those recipes are publication-ready. | `ops-brew-tap-and-aur-publication`; use `_tag=` in `PKGBUILD` and `%global tag` in `maos.spec` to decouple the download tag from normalized package versions. |
 
 ## GA-tag procedure (do not tag until both clear)
+This section governs GA tags only. The signed `v0.1.0-alpha.1` pre-release
+follows `docs/release/tag-procedure.md` and may be cut while Holds 1–2 remain
+open, consistent with this ledger's Scope.
+
 
 1. Hold 1: pen-test report received, joint-panel triage records **zero P0/P1
    open**; attach report reference here.
@@ -71,6 +80,127 @@
    EAR99/5D002 determination; export counsel signs off on WASM-inclusive
    external publication (or that path stays flag-gated at GA).
 3. Only then cut the GA tag. Update this ledger's Status to reflect the tag.
+
+## Story 14-2 — mTLS rotation honesty clauses (2026-08-29)
+
+Not GA holds — **claim boundaries**, recorded so Epic 14's rotation evidence
+can never imply more than it measured (mirrors row 18's hand-off):
+
+- **(a) Revocation is NOT measured.** No OCSP/CRL exists — ADR-047 §3/§4
+  forbid it under NFR-Ops-12 (zero outbound network calls). `t_1` is the
+  new-pin-observably-active proxy.
+- **(b) The mesh is in-process.** Real sockets, real rustls, real mTLS, one
+  process, one runtime, loopback (11.3's F1 disclosure, re-stated at N=10).
+- **(c) Rotation of a peer's DECLARED certificate is now LIVE; the local leaf is
+  not.** Story `14-2a-production-mtls-rotation-trigger` (2026-08-30) built the
+  production trigger: a signed, version-monotonic, cohort-id-pinned
+  `cohort:manifest-reissue` re-derives the peer set through
+  `CohortManifest::peer_configs_for` and moves BOTH runtime declaration
+  surfaces — `A2ARouterCore.peers[p].cert_fingerprint` and the
+  `InMemoryTofuPinStore` pin/`rotation_next` pair — for every member whose
+  signed fingerprint changed, with a one-generation overlap that closes on a
+  real `T_grace` deadline. `open_rotation_window` therefore HAS a production
+  caller. Eight boundaries, all measured, none of them implied away:
+  - **(c.1) SIGNED COHORT MEMBERS ONLY.** Bilateral non-member peers (the J1
+    pair) are deliberately outside the manifest and keep the restart-to-rotate
+    posture. A member the manifest ADDS is refused with a named audit row, not
+    inserted: membership addition is not rotation.
+  - **(c.2) `swap_serving_cert` STILL HAS NO PRODUCTION CALLER.** A signed
+    manifest carries `members[].fingerprint` — a HASH — and must never carry a
+    private key, and `TcpA2AConfig`'s `own_cert_chain` / `own_private_key` paths
+    are consumed by value at bind and dropped. So this mechanism provably cannot
+    rotate THIS host's own leaf. Named owner:
+    `14-2d-self-identity-rotation` (backlog). Anyone reading clause (c) as
+    "certificate rotation is live" is reading half of it.
+  - **(c.3) `T_grace` IS ON §7.2.1.a's COLD-DEPLOYMENT BRANCH, and that is a
+    disclosure, not a default.** The steady-state branch needs the trailing
+    30-day p99 of `iac_handshake_duration_us`, a metric with NO PRODUCER
+    anywhere in the workspace (its only in-code occurrence is a doc comment).
+    Zero days of history exist, so the shipped call is `compute_t_grace(500, 0)`
+    — the spec's own cold floor — which resolves to the §7.2.1.a hard floor of
+    **5 s**, the narrowest window either branch permits. It is DERIVED through
+    the shipped formula at one call site, never restated as a literal, and
+    deliberately NOT an operator knob (§7.2.1.a defines `T_grace` as derived,
+    not chosen). When the metric ships, the real p99 goes in at that call site
+    and nothing else changes.
+  - **(c.4) AFTER PROMOTION THERE IS NO REVERT, AND A RESTART IS AN UNLOGGED
+    ONE.** Rollback exists only BEFORE promotion (`abort_rotation_window`
+    discards the incoming generation; the reload restores the router declaration
+    first and narrows the window second). A post-promotion "rollback" is a NEW
+    rotation back to the old fingerprint, subject to the same window, the same
+    grace and the same uniqueness guard. And pins live in memory only — there is
+    still no persistence-backed `TofuPinStore` — so **a process restart silently
+    reverts every node to whatever the operator TOML declares, which after a
+    rotation is the RETIRED fingerprint.** For signed cohort members the boot
+    reconciler (`main.rs:9855`) then refuses to boot on the disagreement,
+    converting a silent revert into a loud failure; **non-member bilateral peers
+    do not get that mitigation.**
+  - **(c.5) THE COHORT AUTHORITY KEY NOW CONTROLS LIVE TLS TRUST — a
+    threat-model delta, in plain words.** Before this story a signed
+    `cohort:manifest-reissue` changed WHO IS IN THE COHORT. It now changes WHICH
+    CERTIFICATES EVERY NODE ACCEPTS ON A LIVE HANDSHAKE, MID-SESSION, WITH NO
+    RESTART. The blast radius of a compromised cohort authority key grows from
+    membership to live transport identity. 14-2's collision guard stops an
+    attacker STEALING an existing peer's fingerprint; it does NOT stop one being
+    ADDED. Mitigations, all shipped: the only way in is the same signed,
+    version-monotonic, cohort-id-pinned, fail-closed path (no bypass, no `force`
+    flag, no unsigned test hatch); every transition and every refusal is
+    journaled under ONE stable greppable intent `a2a:cert-rotation`; and an
+    operator can SEE the open-window set and any manifest-vs-plane divergence at
+    `GET /v1/a2a/rotation-windows` on the authenticated loopback operator
+    surface — READ-ONLY, because a mutating verb there would be a second trust
+    path for certificate identity, which `main.rs:9844-9853` warns against by
+    name.
+  - **(c.6) The §7.2.1.a `cert_post_grace_reject` LABEL is partial and this
+    boundary remains OPEN.** Both handshake refusal classes now leave a
+    queryable `ConsentRupture` row (before Story 14-2a the
+    certificate-validity class left NO trace at all). But
+    `journal_peer_identity_refusal` has no detail field, and the seam cannot
+    distinguish "retired generation after the grace" from "unknown leaf":
+    the store deliberately keeps no retired-generation history. A new reason
+    token would therefore assert a distinction the system cannot make. The
+    available audit join remains the rotation timeline — a
+    `cert_rotation_window_closed` row for the peer, then the refusal. Story
+    `14-2c-plane-c-local-leaf-declaration` corrected this record; it did not
+    close it.
+- **(c.7) PROVISION BEFORE REISSUE IS PEER-SCOPED.** The operator MUST deploy
+  the peer's next certificate before signing/reissuing
+  `cohort:manifest-reissue`. Promotion checks elapsed `T_grace` and the local
+  declaration, but cannot prove that the peer serves the new leaf. A signature
+  is therefore not certificate provisioning; signing first can promote trust
+  in a leaf the peer does not yet serve. This peer boundary belongs to
+  `14-2a-production-mtls-rotation-trigger`; local self-identity recovery is the
+  separate boundary below.
+- **(c.8) LOCAL SELF-IDENTITY RECOVERY REQUIRES N+1 ARTIFACTS AND AN OUTAGE.**
+  Story `14-2c-plane-c-local-leaf-declaration` observes plane C; it does not
+  write it. Writing `F_new` into the local declaration without swapping the
+  served certificate would make the host advertise a fingerprint its own TLS
+  channel cannot present — a harder-to-diagnose partition, not recovery. The
+  one working recovery order is: write the `F_new` PEM on this host **without
+  restarting**; distribute the new signed manifest TOML to **every** member;
+  update **every** member's static transport configuration entries that name
+  this host (`tcp.peer_pins` AND `file.peers`) to `F_new` — the boot
+  reconciler's arms (a)/(b) make any member restart a boot-error while those
+  still say `F_old`; restart **one** non-target member, which loads the new
+  TOML at boot and becomes the seed that serves v2 over the polling pulls
+  (an on-disk TOML is applied ONLY at boot, so without a seed restart nothing
+  propagates); let the reissue propagate to the still-running members through
+  their pulls; accept the partition window; then restart this host last. Only
+  that final restart makes the on-disk PEM and manifest agree at `F_new`.
+  The outage is unavoidable with the current mechanism. Restarting after
+  deploying the PEM but before the manifest is a **boot-brick** (`F_new` PEM
+  versus `F_old` manifest). Restarting after deploying neither is
+  **boot-green but permanently partitioned** (`F_old` agrees locally while
+  every peer pins `F_new`). Production self-rotation and eventual closure of
+  this boundary belong to `14-2d-self-identity-rotation`.
+- **(d) Timings are compressed-loopback regression floors, not geo
+  figures.** §15.6 keeps the 30-day soak and absolute geo-SLO as
+  release-gate artifacts, never CI-claimed.
+
+Runnable evidence (pointer, never a hand-copied transcript):
+`cargo run -p xtask -- check-rotation-real-timing --json` — the leg JSON
+carries the drills' own percentile disclosures with `n=` beside every
+percentile.
 
 ## References
 

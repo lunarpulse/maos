@@ -28,7 +28,6 @@
 //! Story 1b.5a adds the one-shot mode: set `MAOS_ONE_SHOT=hello-spirit`
 //! to run the reference Spirit once and print JSON to stdout.
 
-mod cassette_replay;
 mod env_contract;
 // Story 11.4b — out-of-kernel sandbox-escape detector consumer (ADR-024).
 // Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
@@ -36,6 +35,11 @@ mod env_contract;
 mod escape_detector_consumer;
 #[cfg(feature = "network")]
 mod migration_plan;
+/// Story 15-3 (AC4, F6, F13) — the single verb table. Included by the
+/// BINARY (not `lib.rs`): the table and `verbs::dispatch` are the dispatch
+/// path of both `main()`s below, and `tests/verb_table_15_3.rs` compiles the
+/// same file by `#[path]` so the test sees exactly what the binary sees.
+mod verbs;
 // J1 Tier-2 bridge (T2) — the swappable Worker-CLI adapter (codex/claude/fixture
 // share one trait). Composition-root only; runtime.rs stays CLI-agnostic (ZERO
 // kernel-Δ). Declared in `lib.rs`, NOT in api.rs (not a kernel-core adapter) and
@@ -51,7 +55,11 @@ mod migration_plan;
 // `&EnterprisePdpRuntime`; both are CONSUMED here, never re-declared as a second,
 // test-invisible `mod`.
 #[cfg(feature = "network")]
+use maos_bin::cassette_replay;
+#[cfg(feature = "network")]
 use maos_bin::enterprise_pdp_runtime;
+#[cfg(feature = "network")]
+use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
 #[cfg(feature = "network")]
 use maos_bin::worker_spawn::{
     issue_enterprise_governed_capability, parse_run_args, resolve_cli_binary,
@@ -1317,46 +1325,57 @@ fn emit_model_provenance_event(
 // ─────────────────────────────────────────────────────────────────────────────
 #[cfg(not(feature = "network"))]
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.is_empty() {
-        print_air_gap_usage();
-        std::process::exit(1);
-    }
-
-    match args[0].as_str() {
-        "init" => air_gap_init(),
-        "run" => air_gap_run(&args[1..]),
-        "backup" => air_gap_backup(&args[1..]),
-        "audit" => air_gap_audit(&args[1..]),
-        "install" => air_gap_install(&args[1..]),
-        "--version" | "-V" => {
-            println!("maos {}", env!("CARGO_PKG_VERSION"));
-            std::process::exit(0);
+    // Story 15-3 AC4 (F6) — lookup-then-dispatch: argv resolves through the
+    // verb table before anything else, so `--help`/`-h`/`help`/`--version`
+    // answer from `VERBS` (F5) and an unknown verb exits non-zero instead of
+    // being silently unmatched. The dispatcher arms are keyed on
+    // `verbs::VerbName`, never on raw string literals (AC4 ship-blocker:
+    // zero string-matched arms inside each `main()`).
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    match verbs::dispatch(&argv) {
+        verbs::Outcome::Help => {
+            verbs::print_help(&mut std::io::stdout());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
         }
-        _ => {
-            eprintln!("maos: unknown command '{}' in air-gap mode", args[0]);
+        verbs::Outcome::Version => {
+            verbs::print_version(&mut std::io::stdout());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+        verbs::Outcome::NoArgs => {
             print_air_gap_usage();
             std::process::exit(1);
         }
+        verbs::Outcome::Unknown(unknown) => {
+            eprintln!("maos: unknown command '{unknown}' in air-gap mode");
+            verbs::print_help(&mut std::io::stdout());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            std::process::exit(1);
+        }
+        verbs::Outcome::Verb(verb) => match verb.name {
+            verbs::VerbName::Init => air_gap_init(),
+            verbs::VerbName::Run => air_gap_run(&argv[1..]),
+            verbs::VerbName::Backup => air_gap_backup(&argv[1..]),
+            verbs::VerbName::Audit => air_gap_audit(&argv[1..]),
+            verbs::VerbName::Install => air_gap_install(&argv[1..]),
+            verbs::VerbName::Shell | verbs::VerbName::Traceback => {
+                unreachable!("shell and traceback are not rows of the air-gap table")
+            }
+        },
     }
 }
 
 #[cfg(not(feature = "network"))]
 fn print_air_gap_usage() {
-    eprintln!(
+    // Story 15-3 AC4 — the usage page renders its rows from `verbs::VERBS`
+    // (one table, one truth); it is no longer a second, hand-written copy.
+    print!(
         "maos {} (air-gap build — network surface compiled out)\n\n\
          Usage: maos <COMMAND>\n\n\
-         Commands:\n\
-           init                    Initialize MAOS home directory\n\
-           run <manifest>         Run a Spirit manifest offline (stub inference)\n\
-           backup create <dest>   Create a TL backup\n\
-           backup verify <backup> Verify a TL backup via cold restore\n\
-           backup restore <backup> <target>  Restore a TL backup\n\
-           audit query             Offline audit query stub\n\
-           install --from-local <dir>  Install a verified release artifact\n\
-           --version               Print version",
+         Commands:\n",
         env!("CARGO_PKG_VERSION")
     );
+    verbs::print_verb_rows(&mut std::io::stdout());
+    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
 
 #[cfg(not(feature = "network"))]
@@ -1643,6 +1662,101 @@ fn air_gap_platform_binary_name() -> Result<&'static str, String> {
 #[cfg(feature = "network")]
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Story 15-3 AC4 — resolve argv through the verb table BEFORE any output
+    // (F6 lookup-then-dispatch). `--help`/`-h`/`help` and `--version`/`-V`
+    // (F5) must emit nothing but the table/version on stdout — at the story's
+    // baseline the network build fell through to the daemon boot and hung
+    // (EXIT 124, zero stdout bytes) on all four — and an unknown verb must
+    // exit non-zero with the usage table instead of silently falling through
+    // to the daemon (Epic 18 AC1 reds on a timeout otherwise). The arms below
+    // are keyed on `verbs::VerbName` resolved from `verbs::VERBS`, never on
+    // raw string literals: the AC4 ship-blocker measure is zero.
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    let mut shell_mode = false;
+    let mut plain_flag = false;
+    match verbs::dispatch(&argv) {
+        verbs::Outcome::Help => {
+            verbs::print_help(&mut std::io::stdout());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            return Ok(());
+        }
+        verbs::Outcome::Version => {
+            verbs::print_version(&mut std::io::stdout());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            return Ok(());
+        }
+        verbs::Outcome::Unknown(unknown) => {
+            eprintln!("maos: unknown command '{unknown}' in network mode — see 'maos --help'");
+            verbs::print_help(&mut std::io::stdout());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            std::process::exit(1);
+        }
+        verbs::Outcome::NoArgs => {
+            // Only enter shell mode if MAOS_ONE_SHOT is not set
+            // (MAOS_ONE_SHOT invocations have no CLI args but should not enter shell).
+            if std::env::var("MAOS_ONE_SHOT").is_err() {
+                shell_mode = true;
+            }
+        }
+        verbs::Outcome::Verb(verb) => match verb.name {
+            verbs::VerbName::Init => {
+                plain_flag = argv.iter().skip(1).any(|a| a == "--plain");
+                let color = maos_cli::accessibility::ColorChoice::resolve(
+                    plain_flag,
+                    &maos_cli::accessibility::RealEnv,
+                );
+                return maos_shell::run_init(color);
+            }
+            verbs::VerbName::Audit => {
+                // Expected: audit query [--spirit <name>] [--format ndjson|plain]
+                if !argv.get(1).is_some_and(|token| token == "query") {
+                    eprintln!("Usage: maos audit query [--spirit <name>] [--format ndjson|plain] [--plain]");
+                    return Err("expected subcommand: query".into());
+                }
+                let mut audit_spirit: Option<String> = None;
+                let mut audit_format = "plain".to_string();
+                let mut rest = argv.iter().skip(2);
+                while let Some(a) = rest.next() {
+                    match a.as_str() {
+                        "--spirit" => {
+                            audit_spirit = rest.next().cloned();
+                            if audit_spirit.is_none() {
+                                return Err("--spirit requires a value".into());
+                            }
+                        }
+                        "--format" => {
+                            if let Some(f) = rest.next() {
+                                audit_format = f.clone();
+                            } else {
+                                return Err("--format requires a value (ndjson|plain)".into());
+                            }
+                        }
+                        "--plain" => {
+                            plain_flag = true;
+                        }
+                        _ => {}
+                    }
+                }
+                let color = maos_cli::accessibility::ColorChoice::resolve(
+                    plain_flag,
+                    &maos_cli::accessibility::RealEnv,
+                );
+                return maos_shell::run_audit_query(audit_spirit.as_deref(), &audit_format, color);
+            }
+            verbs::VerbName::Shell => {
+                plain_flag = argv.iter().skip(1).any(|a| a == "--plain");
+                shell_mode = true;
+            }
+            // Resolved here; acted on by their dedicated parsers below
+            // (`parse_run_args` / `parse_cross_wall_traceback_args`) once the
+            // composition root is built.
+            verbs::VerbName::Run | verbs::VerbName::Traceback => {}
+            verbs::VerbName::Backup | verbs::VerbName::Install => {
+                unreachable!("backup and install are not rows of the network table")
+            }
+        },
+    }
+
     let cpus = worker_thread_count();
     eprintln!(
         "maos {} (v0.1-β scaffold; worker_threads target = {})",
@@ -1668,83 +1782,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
-    // Story 8.14a — dispatch `maos init`, `maos shell`, `maos audit query`.
-    let mut shell_mode = false;
-    let mut audit_spirit: Option<String> = None;
-    let mut audit_format = "plain".to_string();
-    let mut plain_flag = false;
-    {
-        let mut args = std::env::args().skip(1).peekable();
-        match args.next().as_deref() {
-            Some("init") => {
-                for a in args {
-                    if a == "--plain" {
-                        plain_flag = true;
-                    }
-                }
-                let color = maos_cli::accessibility::ColorChoice::resolve(
-                    plain_flag,
-                    &maos_cli::accessibility::RealEnv,
-                );
-                return maos_shell::run_init(color);
-            }
-            Some("audit") => {
-                // Expected: audit query [--spirit <name>] [--format ndjson|plain]
-                if args.next().as_deref() == Some("query") {
-                    while let Some(a) = args.next() {
-                        match a.as_str() {
-                            "--spirit" => {
-                                audit_spirit = args.next();
-                                if audit_spirit.is_none() {
-                                    return Err("--spirit requires a value".into());
-                                }
-                            }
-                            "--format" => {
-                                if let Some(f) = args.next() {
-                                    audit_format = f;
-                                } else {
-                                    return Err("--format requires a value (ndjson|plain)".into());
-                                }
-                            }
-                            "--plain" => {
-                                plain_flag = true;
-                            }
-                            _ => {}
-                        }
-                    }
-                    let color = maos_cli::accessibility::ColorChoice::resolve(
-                        plain_flag,
-                        &maos_cli::accessibility::RealEnv,
-                    );
-                    return maos_shell::run_audit_query(
-                        audit_spirit.as_deref(),
-                        &audit_format,
-                        color,
-                    );
-                } else {
-                    eprintln!("Usage: maos audit query [--spirit <name>] [--format ndjson|plain] [--plain]");
-                    return Err("expected subcommand: query".into());
-                }
-            }
-            Some("traceback") => {}
-            Some("shell") => {
-                for a in args {
-                    if a == "--plain" {
-                        plain_flag = true;
-                    }
-                }
-                shell_mode = true;
-            }
-            Some(_) => { /* unknown subcommand, fall through to maos run */ }
-            None => {
-                // Only enter shell mode if MAOS_ONE_SHOT is not set
-                // (MAOS_ONE_SHOT invocations have no CLI args but should not enter shell).
-                if std::env::var("MAOS_ONE_SHOT").is_err() {
-                    shell_mode = true;
-                }
-            }
-        }
-    }
 
     // Construct the seven adapter shells.
     // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
@@ -2658,10 +2695,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
 
-    // Story 5.5a — the operator endpoint is an adapter over this exact
-    // scheduler Arc. It binds loopback by default when an operator bearer is
-    // configured and never manufactures a one-shot report fallback.
-    let _operator_http_server = match (
+    // Story 5.5a — the operator endpoint is an adapter over this exact scheduler
+    // Arc. ⚠ Story 14-2a: the CONFIG is validated HERE, where it always was, so
+    // a misconfiguration still fails fast with zero side effects and its error
+    // is not masked by the journal-open that follows; the BIND itself moved
+    // below `Arc::get_mut(&mut scheduler)`, which requires `strong_count == 1`
+    // and therefore PANICKED for every process that actually configured this
+    // surface (measured at `a22f0c01`: the daemon never reached its listener).
+    let operator_http_config = match (
         std::env::var("MAOS_OPERATOR_BEARER_TOKEN"),
         std::env::var("MAOS_OPERATOR_HTTP_BIND"),
     ) {
@@ -2673,16 +2714,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 bind.parse()
             }
             .map_err(|error| format!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}"))?;
-            Some(
-                maos_control::OperatorHttpServer::bind(
-                    maos_control::OperatorHttpConfig {
-                        bind,
-                        bearer_token: token,
-                    },
-                    Arc::clone(&scheduler),
-                )
-                .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?,
-            )
+            Some(maos_control::OperatorHttpConfig {
+                bind,
+                bearer_token: token,
+            })
         }
         (Err(_), Ok(_)) => {
             return Err(
@@ -2732,6 +2767,81 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("scheduler Arc strong_count == 1 at composition root")
         .set_crash_detector(Arc::clone(&crash_detector));
     eprintln!("maos: CrashDetector wired (Story 5.3)");
+
+    // ⚠ Story 14-2a — THE OPERATOR HTTP SURFACE MOVED HERE, AND IT HAD TO.
+    //
+    // It used to bind ~90 lines above, immediately after the scheduler was
+    // constructed and immediately BEFORE `Arc::get_mut(&mut scheduler)`
+    // (`:2697`), which `expect`s `strong_count == 1`. `OperatorHttpServer::bind`
+    // RETAINS its `Arc<SpiritSchedulerAdapter>` clone for the server's
+    // lifetime, so any process that actually configured
+    // `MAOS_OPERATOR_BEARER_TOKEN` panicked at that `expect` a few lines later:
+    // `scheduler Arc strong_count == 1 at composition root`. Measured at
+    // `a22f0c01` by booting the daemon with the surface enabled — it never
+    // reached the listener. The whole Story 5.5a endpoint, and therefore
+    // `maosctl spirit inspect --sandbox` (the ONE `maosctl` verb that reaches a
+    // running daemon), was unreachable in every process that also wires the
+    // CrashDetector, which is every real boot. Binding AFTER the exclusive
+    // mutation is the minimal repair: nothing between the two sites uses the
+    // server, and the surface is now actually reachable — which is what makes
+    // AC1.5's rotation-window route verifiable rather than merely present.
+    // Story 14-2a / AC1.5 — the READ half of the rotation seam. `cohort_daemon`
+    // was loaded at `:2038`; its `Arc<CohortManifestState>` is the same one the
+    // daemon dispatch installs the rotation control into ~7,000 lines below, so
+    // the GET and the signed WRITE are one seam with two consumers. The source
+    // reports INSTALLATION state, so a process that reads a cohort config but
+    // never installs the control answers 404 rather than an empty list.
+    #[cfg(feature = "network")]
+    let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> =
+        cohort_daemon.as_ref().map(|bootstrap| {
+            Arc::new(maos_bin::cert_rotation::CohortRotationWindows::new(
+                Arc::clone(&bootstrap.state),
+            )) as Arc<dyn maos_control::RotationWindowSource>
+        });
+    #[cfg(not(feature = "network"))]
+    let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> = None;
+    // Story 14-2b / AC3 — the peer-convergence read source, wired from the SAME
+    // `bootstrap.state` the `Pull` receive arm records into. `None` off the
+    // cohort-daemon arm for the same reason as the rotation source: an absent
+    // cohort state must answer 404, never an empty list that reads as "no peer
+    // has diverged".
+    #[cfg(feature = "network")]
+    let peer_versions: Option<Arc<dyn maos_control::CohortConvergenceSource>> =
+        cohort_daemon.as_ref().map(|bootstrap| {
+            Arc::new(maos_bin::cert_rotation::CohortPeerVersions::new(
+                Arc::clone(&bootstrap.state),
+            )) as Arc<dyn maos_control::CohortConvergenceSource>
+        });
+    #[cfg(not(feature = "network"))]
+    let peer_versions: Option<Arc<dyn maos_control::CohortConvergenceSource>> = None;
+    #[cfg(feature = "network")]
+    let self_identity: Option<Arc<dyn maos_control::CohortSelfIdentitySource>> =
+        cohort_daemon.as_ref().map(|bootstrap| {
+            Arc::new(maos_bin::cert_rotation::CohortSelfIdentity::new(
+                Arc::clone(&bootstrap.state),
+                Arc::clone(&bootstrap.pull_health),
+            )) as Arc<dyn maos_control::CohortSelfIdentitySource>
+        });
+    #[cfg(not(feature = "network"))]
+    let self_identity: Option<Arc<dyn maos_control::CohortSelfIdentitySource>> = None;
+    let _operator_http_server = match operator_http_config {
+        Some(config) => {
+            let server = maos_control::OperatorHttpServer::bind(
+                config,
+                Arc::clone(&scheduler),
+                rotation_windows,
+                peer_versions,
+                self_identity,
+            )
+            .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?;
+            // The bound address is announced because it can be ephemeral
+            // (`MAOS_OPERATOR_HTTP_BIND=127.0.0.1:0`), and an operator surface
+            // nobody can find is an operator surface nobody uses.
+            eprintln!("maos: operator HTTP listening on {}", server.local_addr());
+            Some(server)
+        }
+        None => None,
+    };
 
     // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
     // Story 6.5 — trait-based decoupling: ScbTracker wraps the SCB map.
@@ -3007,14 +3117,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // maos-secrets / OS keyring is a later story.
     let mut providers_map: std::collections::BTreeMap<String, Arc<dyn maos_providers::Provider>> =
         std::collections::BTreeMap::new();
+    let mut live_provider_available = false;
     let mut default_id: Option<String> = None;
 
+    // Review P2 (15-6 §A6): an empty credential string is not a configured
+    // provider — registration stays (unset-mode compatibility), but it must
+    // not satisfy the explicit-live predicate.
+    let anthropic_key_usable = std::env::var("MAOS_ANTHROPIC_API_KEY")
+        .map(|key| !key.trim().is_empty())
+        .unwrap_or(false);
     if let Ok(provider) = AnthropicProvider::new(
         Arc::clone(&io_arc),
         "https://api.anthropic.com".into(),
-        "claude-3-haiku-20240307".into(),
+        "claude-haiku-4-5-20251001".into(),
     ) {
         providers_map.insert("anthropic".into(), Arc::new(provider));
+        live_provider_available |= anthropic_key_usable;
         default_id.get_or_insert_with(|| "anthropic".into());
         eprintln!("maos: Anthropic provider registered");
     }
@@ -3025,13 +3143,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "gpt-4o-mini".into(),
     ) {
         providers_map.insert("openai".into(), Arc::new(provider));
+        live_provider_available = true;
         default_id.get_or_insert_with(|| "openai".into());
         eprintln!("maos: OpenAI provider registered");
     }
 
     {
-        let ollama_url =
-            std::env::var("MAOS_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
+        let configured_ollama_url = std::env::var("MAOS_OLLAMA_URL").ok();
+        let ollama_is_explicit = configured_ollama_url
+            .as_deref()
+            .is_some_and(|url| !url.trim().is_empty() && url != "skip");
+        let ollama_url = configured_ollama_url.unwrap_or_else(|| "http://localhost:11434".into());
         if !ollama_url.is_empty() && ollama_url != "skip" {
             if let Ok(provider) = maos_providers::OllamaProvider::new(
                 Arc::clone(&io_arc),
@@ -3039,6 +3161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "llama3.1:8b".into(),
             ) {
                 providers_map.insert("ollama".into(), Arc::new(provider));
+                live_provider_available |= ollama_is_explicit;
                 default_id.get_or_insert_with(|| "ollama".into());
                 eprintln!("maos: Ollama provider registered");
             }
@@ -3047,8 +3170,80 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if providers_map.is_empty() {
         providers_map.insert("anthropic".into(), Arc::new(UnconfiguredProvider));
-        default_id = Some("anthropic".into());
+        let _ = default_id.insert("anthropic".into());
         eprintln!("maos: no providers configured — all inference calls return Unconfigured");
+    }
+
+    // Story 15-6 / ADR-064 — resolve the authoritative selector once, after
+    // provider eligibility is known and before either shell or run inference
+    // can execute. Unset preserves the pre-story `--live`/cassette precedence.
+    // Review P3 (15-6 §A6): a present-but-non-UTF-8 mode is a set mode and
+    // must refuse typed, never silently fall back to the unset lattice.
+    let inference_mode_value = match std::env::var_os("MAOS_INFERENCE_MODE") {
+        Some(value) => match value.to_str() {
+            Some(mode) => Some(mode.to_owned()),
+            None => {
+                return Err(InferenceModeError::NonUtf8Mode.to_string().into());
+            }
+        },
+        None => None,
+    };
+    // Review P10: an empty cassette value stays a present value — HEAD's
+    // unset path treated it as cassette-selected (failing the read loudly);
+    // the empty→absent fold broke clause 1's byte-identical contract.
+    let cassette_path = std::env::var_os("MAOS_REPLAY_CASSETTE").map(std::path::PathBuf::from);
+    let replay_strict = std::env::var("MAOS_REPLAY_STRICT").as_deref() == Ok("1");
+    let inference_mode = ResolvedInferenceMode::resolve(
+        inference_mode_value.as_deref(),
+        cassette_path,
+        replay_strict,
+        run_args.as_ref().is_some_and(|run| run.live),
+        live_provider_available,
+    )
+    .map_err(|error| error.to_string())?;
+
+    // The router's public key set and default remain unchanged. Only each
+    // key's driver is replaced/wrapped, so capability scopes, fallback, IAC,
+    // attribution, and Transparency Log behavior stay in the kernel adapter.
+    let mut cassette_recorder: Option<Arc<cassette_replay::CassetteRecorder>> = None;
+    match &inference_mode {
+        ResolvedInferenceMode::Replay {
+            cassette,
+            strict,
+            explicit: true,
+        } => {
+            let replay: Arc<dyn maos_providers::Provider> = Arc::new(
+                cassette_replay::CassetteReplayProvider::from_file(cassette, *strict).map_err(
+                    |error| {
+                        format!(
+                            "MAOS_INFERENCE_MODE=replay cassette initialization failed: {error}"
+                        )
+                    },
+                )?,
+            );
+            for provider in providers_map.values_mut() {
+                *provider = Arc::clone(&replay);
+            }
+        }
+        ResolvedInferenceMode::Record { cassette } => {
+            let recorder = Arc::new(cassette_replay::CassetteRecorder::new(
+                cassette.clone(),
+                "maos".into(),
+                format!("process-{}", std::process::id()),
+            ));
+            for provider in providers_map.values_mut() {
+                *provider = Arc::new(cassette_replay::CassetteRecordProvider::new(
+                    Arc::clone(provider),
+                    Arc::clone(&recorder),
+                ));
+            }
+            cassette_recorder = Some(recorder);
+        }
+        ResolvedInferenceMode::Deterministic
+        | ResolvedInferenceMode::Live { .. }
+        | ResolvedInferenceMode::Replay {
+            explicit: false, ..
+        } => {}
     }
 
     let router = Arc::new(
@@ -3065,12 +3260,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&capability),
         Arc::clone(&transparency_log),
         Arc::clone(&telemetry),
-    )
-    .with_rate_limiter(Arc::clone(&rate_limiter))
+    );
+    let inference = if inference_mode.uses_rate_limiter() {
+        inference.with_rate_limiter(Arc::clone(&rate_limiter))
+    } else {
+        inference
+    }
     .with_iac(Arc::clone(&iac));
     eprintln!("maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)");
     // Story 8.14a — kernel-rendered shell dispatch.
     if shell_mode {
+        if let Some(mode) = inference_mode_value.as_deref() {
+            eprintln!("maos shell: MAOS_INFERENCE_MODE={mode}");
+        }
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let color = maos_cli::accessibility::ColorChoice::resolve(
             plain_flag,
@@ -3173,12 +3375,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let inference_arc: Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync> =
             Arc::new(inference);
-        return maos_shell::run_shell(
+        let shell_result = maos_shell::run_shell(
             inference_arc,
             Arc::clone(&capability),
             color,
             default_provider,
         );
+        // Review P13: the causal shell failure wins. A flush error on the
+        // failure path is reported, never allowed to mask the real cause;
+        // on the success path the flush refusal stays fatal (D-15-6-K).
+        if let Some(recorder) = cassette_recorder.as_ref() {
+            match recorder.flush() {
+                Ok(_) => {}
+                Err(flush_error) => {
+                    if shell_result.is_err() {
+                        eprintln!(
+                            "maos: record-mode flush failed after shell error: {flush_error}"
+                        );
+                    } else {
+                        return Err(format!("maos: record-mode flush failed: {flush_error}").into());
+                    }
+                }
+            }
+        }
+        return shell_result;
     }
     // ─────────────────────────────────────────────────────────────
 
@@ -3891,6 +4111,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                     );
                 }
+                if let Some(recorder) = cassette_recorder.as_ref() {
+                    recorder.flush().map_err(|error| {
+                        format!("maos run: topology record-mode flush failed: {error}")
+                    })?;
+                }
                 println!(
                     "{}",
                     serde_json::json!({
@@ -4009,6 +4234,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         completion.label()
                     )
                     .into());
+                }
+                // Review P5 (15-6 §A6): this early return bypassed every
+                // record-mode drain point — a record run here exited 0 with
+                // no cassette. Route it through the same fallible finalizer.
+                if let Some(recorder) = cassette_recorder.as_ref() {
+                    recorder.flush().map_err(|error| {
+                        format!(
+                            "maos run: standalone cli_wrapper record-mode flush failed: {error}"
+                        )
+                    })?;
                 }
                 return Ok(());
             }
@@ -4528,43 +4763,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Arc::clone(&capability),
                             Arc::clone(&transparency_log),
                             Arc::clone(&telemetry),
-                        )
-                        .with_rate_limiter(Arc::clone(&rate_limiter))
+                        );
+                        let researcher_inference = if inference_mode.uses_rate_limiter() {
+                            researcher_inference.with_rate_limiter(Arc::clone(&rate_limiter))
+                        } else {
+                            researcher_inference
+                        }
                         .with_iac(Arc::clone(&iac));
                         let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
-                            if std::env::var("MAOS_JOURNEY_MODE").as_deref() == Ok("record") {
-                                let cassette_path = std::env::var("MAOS_REPLAY_CASSETTE")
-                                .map_err(|_| "maos run: MAOS_JOURNEY_MODE=record requires MAOS_REPLAY_CASSETTE".to_string())?;
-                                eprintln!("maos run: researcher record-mode → {cassette_path}");
-                                Arc::new(cassette_replay::CassetteRecordPort::new(
-                                    Box::new(researcher_inference),
-                                    std::path::PathBuf::from(&cassette_path),
-                                    spirit_id.to_string(),
-                                    "live-record".into(),
-                                ))
-                            } else {
-                                Arc::new(researcher_inference)
-                            };
+                            Arc::new(researcher_inference);
                         researcher = researcher.with_deferred_inference_port(port, binding);
                         eprintln!("maos run: researcher live-inference seam wired (--live)");
-                    } else if let Ok(cassette_path) = std::env::var("MAOS_REPLAY_CASSETTE") {
-                        let strict = std::env::var("MAOS_REPLAY_STRICT")
-                            .map(|v| v == "1")
-                            .unwrap_or(false);
-                        let replay = cassette_replay::CassetteReplayPort::from_file(
-                            std::path::Path::new(&cassette_path),
-                            strict,
-                        )
-                        .map_err(|e| format!("maos run: cassette replay init failed: {e}"))?;
+                    } else if inference_mode.is_explicit() {
+                        // Explicit mode is authoritative even without the legacy
+                        // `--live` switch. Replay/record already replaced or wrapped
+                        // every router driver above.
+                        let provider = router
+                            .default_id()
+                            .ok_or("maos run: selected inference mode has no provider key")?
+                            .to_string();
+                        researcher_inference_provider = Some(provider);
                         let binding = Arc::new(std::sync::Mutex::new(None));
                         researcher_inference_binding = Some(Arc::clone(&binding));
-                        researcher_inference_provider = Some("replay".into());
+                        let researcher_inference = InferencePortAdapter::new(
+                            Arc::clone(&router),
+                            Arc::clone(&capability),
+                            Arc::clone(&transparency_log),
+                            Arc::clone(&telemetry),
+                        );
+                        let researcher_inference = if inference_mode.uses_rate_limiter() {
+                            researcher_inference.with_rate_limiter(Arc::clone(&rate_limiter))
+                        } else {
+                            researcher_inference
+                        }
+                        .with_iac(Arc::clone(&iac));
+                        let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
+                            Arc::new(researcher_inference);
+                        researcher = researcher.with_deferred_inference_port(port, binding);
+                        eprintln!("maos run: researcher inference seam wired ({inference_mode:?})");
+                    } else if let ResolvedInferenceMode::Replay {
+                        cassette,
+                        strict,
+                        explicit: false,
+                    } = &inference_mode
+                    {
+                        // Exact pre-ADR-064 compatibility path: cassette presence
+                        // alone bypasses the shared router only for Researcher.
+                        let replay =
+                            cassette_replay::CassetteReplayPort::from_file(cassette, *strict)
+                                .map_err(|error| {
+                                    format!("maos run: cassette replay init failed: {error}")
+                                })?;
+                        let binding = Arc::new(std::sync::Mutex::new(None));
+                        researcher_inference_binding = Some(Arc::clone(&binding));
+                        let _ = researcher_inference_provider.insert("replay".into());
                         let port: Arc<dyn maos_domain::ports::InferencePort + Send + Sync> =
                             Arc::new(replay);
                         researcher = researcher.with_deferred_inference_port(port, binding);
                         eprintln!(
                             "maos run: researcher cassette-replay inference wired ({})",
-                            cassette_path
+                            cassette.display()
                         );
                     } else {
                         eprintln!(
@@ -4776,6 +5034,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "{}",
                     serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                 );
+                if let Some(recorder) = cassette_recorder.as_ref() {
+                    recorder.flush().map_err(|error| {
+                        format!("maos run: record-mode flush failed after on_idle: {error}")
+                    })?;
+                }
                 if kind == LoadedSpiritKind::Researcher
                     && researcher_collective_failure
                         .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
@@ -4893,7 +5156,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // children, do NOT touch the Inference Port, and do NOT need the
     // cap-audit drain (the 1b.5b drain stays only in the `hello-spirit`
     // arm). They write exactly one Lifecycle Journal entry and exit.
-    if let Ok(mode) = std::env::var("MAOS_ONE_SHOT") {
+    if let Ok(requested_mode) = std::env::var("MAOS_ONE_SHOT") {
+        let Some(mode) = verbs::resolve_one_shot_mode(&requested_mode) else {
+            eprintln!(
+                "maos: unknown MAOS_ONE_SHOT mode '{requested_mode}' — known modes: {}",
+                verbs::MAOS_ONE_SHOT_MODES.join(", ")
+            );
+            return Err(format!("unknown MAOS_ONE_SHOT mode: {requested_mode}").into());
+        };
         if mode == "legal-hold-list" {
             let holds = transparency_log
                 .list_legal_holds()
@@ -6992,105 +7262,7 @@ description = "smoke test spirit successor"
 
         #[cfg(feature = "fixture_replay")]
         if mode == "smoke-multi-provider-5" {
-            use maos_domain::invariants::i1::{CapabilityToken, TokenId};
-            use maos_domain::ports::inference::{
-                InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution,
-                StopReason, TokenUsage,
-            };
-            use maos_kernel_core::inference::router::MultiProviderRouter;
-            use maos_kernel_core::io::take_io_journal;
-            use maos_providers::fixture_replay::FixtureReplayProvider;
-            use maos_providers::Provider;
-            use std::sync::Arc;
-
-            fn ok_response(provider: &str, n: usize) -> InferenceResponse {
-                InferenceResponse {
-                    text: format!("{provider}-reply-{n}"),
-                    stop_reason: StopReason::StopSequence,
-                    usage: TokenUsage {
-                        input_tokens: 10,
-                        output_tokens: 20,
-                    },
-                    provider_attribution: ProviderAttribution {
-                        provider_id: provider.into(),
-                        endpoint_url: format!("http://{provider}.test"),
-                        model_id: None,
-                    },
-                }
-            }
-
-            fn make_req(pid: u32, provider: Option<&str>) -> InferenceRequest {
-                InferenceRequest::new(
-                    pid,
-                    CapabilityToken::new(TokenId::ZERO, pid, 0, [0u8; 64]),
-                    format!("prompt-{pid}"),
-                    InferenceOptions::default(),
-                    provider.map(String::from),
-                    vec![],
-                )
-            }
-
-            // Step 1: Construct router with 3 providers
-            let anthropic = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
-                "anthropic",
-                0,
-            ))]));
-            let openai = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
-                "openai", 0,
-            ))]));
-            let ollama = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
-                "ollama", 0,
-            ))]));
-            let mut providers = std::collections::BTreeMap::new();
-            providers.insert("anthropic".into(), anthropic as Arc<dyn Provider>);
-            providers.insert("openai".into(), openai as Arc<dyn Provider>);
-            providers.insert("ollama".into(), ollama as Arc<dyn Provider>);
-            let router = MultiProviderRouter::new(providers, Some("anthropic".into()));
-            println!(
-                r#"{{"step":1,"surface":"router_construction","providers":3,"default":"anthropic"}}"#
-            );
-
-            // Step 2: Dispatch to default provider
-            let req = make_req(1, None);
-            let p = router.dispatch(req.provider_id.as_deref()).unwrap();
-            let resp = p.complete(&req).unwrap();
-            assert_eq!(resp.provider_attribution.provider_id, "anthropic");
-            println!(r#"{{"step":2,"surface":"dispatch_default","provider":"anthropic"}}"#);
-
-            // Step 3: Dispatch to explicit provider_id
-            let req = make_req(2, Some("ollama"));
-            let p = router.dispatch(req.provider_id.as_deref()).unwrap();
-            let resp = p.complete(&req).unwrap();
-            assert_eq!(resp.provider_attribution.provider_id, "ollama");
-            println!(r#"{{"step":3,"surface":"dispatch_explicit","provider":"ollama"}}"#);
-
-            // Step 4: Fallback chain
-            let req = make_req(3, Some("openai"));
-            let resp = router
-                .dispatch_with_fallback("openai", &["anthropic".into(), "ollama".into()], &req)
-                .unwrap();
-            assert_eq!(resp.provider_attribution.provider_id, "openai");
-            println!(r#"{{"step":4,"surface":"fallback_chain","provider":"openai"}}"#);
-
-            // Step 5: ProviderSwitched lifecycle event — structural fixture-replay path.
-            // Full SecurityManager journal verification requires kernel bootstrap;
-            // smoke arm exercises the router surface, not the admission path.
-            println!(
-                r#"{{"step":5,"surface":"provider_switched_event","outcome":"fixture_replay_path","note":"structural verification of router dispatch — admission journal validation deferred to integration tests"}}"#
-            );
-
-            // Step 6 (AC4): Air-gapped validation — assert zero outbound IO journal entries
-            let journal = take_io_journal();
-            assert!(
-                journal.is_empty(),
-                "smoke: IO journal must be empty in fixture-replay mode"
-            );
-            println!(r#"{{"step":6,"surface":"air_gap_validation","outbound_calls":0}}"#);
-
-            drop(inference);
-            drop(capability);
-            eprintln!("maos: smoke-multi-provider-5 complete — 6 surfaces exercised");
-            return Ok(());
+            return smoke_multi_provider_5(inference, capability);
         }
         #[cfg(not(feature = "fixture_replay"))]
         if mode == "smoke-multi-provider-5" {
@@ -7916,10 +8088,14 @@ description = "smoke test spirit successor"
         }
 
         if mode != "hello-spirit" {
-            eprintln!(
-                "maos: unknown MAOS_ONE_SHOT mode '{mode}' — known modes: hello-spirit, start, stop, unload, posture-shift, halt-list, halt-resolve, orchestrator-queue, orchestrator-status, pause, resume, revoke-token, smoke-epic-4, smoke-spirit-5, hot-swap-precheck, smoke-supervision-5, spirit-upgrade, revocations-import, revocations-list, smoke-upgrade-revoke-5, smoke-t3-sandbox-5, smoke-multi-provider-5, smoke-mcp-acp-5, acp-server, smoke-registry-5d, registry-server, smoke-bench-5e, smoke-abi-7-5a",
+            // Every raw env value was resolved through the single table before
+            // dispatch. Reaching here therefore means the table has a row with
+            // no runtime branch; fail closed instead of silently treating it as
+            // the hello-Spirit fallback.
+            eprintln!("maos: registered MAOS_ONE_SHOT mode '{mode}' has no dispatch arm");
+            return Err(
+                format!("registered MAOS_ONE_SHOT mode has no dispatch arm: {mode}").into(),
             );
-            return Err(format!("unknown MAOS_ONE_SHOT mode: {mode}").into());
         }
 
         // Story 2.1 AC4 — parse manifest and admit via SecurityManagerAdapter
@@ -8071,6 +8247,11 @@ description = "smoke test spirit successor"
         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
         let resp = maos_spirit_hello::run(&inference, token)
             .map_err(|e| format!("hello-Spirit error: {e}"))?;
+        if let Some(recorder) = cassette_recorder.as_ref() {
+            recorder
+                .flush()
+                .map_err(|error| format!("maos: record-mode flush failed: {error}"))?;
+        }
 
         let json =
             serde_json::to_string(&resp).map_err(|e| format!("JSON serialization error: {e}"))?;
@@ -8243,6 +8424,12 @@ description = "smoke test spirit successor"
             Ok(Err(e)) => eprintln!("maos: EnterprisePdpRuntime task returned error: {e}"),
             Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
         }
+    }
+
+    if let Some(recorder) = cassette_recorder.as_ref() {
+        recorder
+            .flush()
+            .map_err(|error| format!("maos: record-mode shutdown flush failed: {error}"))?;
     }
 
     let cap_audit_rows = match transparency_log.query_frames(FrameFilter {
@@ -8760,6 +8947,119 @@ async fn shutdown_unix_term() {
     std::future::pending::<()>().await;
 }
 
+/// Story 5.6 smoke — the fixture-replay multi-provider router surface
+/// (6 surfaces: construction, default dispatch, explicit dispatch, fallback
+/// chain, lifecycle event, air-gap IO-journal validation).
+///
+/// Extracted from the one-shot dispatch block by Story 15-3 (AC4): the arm's
+/// `Some("…")` provider literals sat inside `main`'s body, and the AC4
+/// ship-blocker requires zero `Some("` occurrences inside each `main()`.
+/// Behaviour is unchanged — the dispatch arm delegates here. Requires the
+/// `fixture_replay` feature (which implies `network`).
+#[cfg(feature = "fixture_replay")]
+fn smoke_multi_provider_5(
+    inference: InferencePortAdapter,
+    capability: Arc<CapabilityRegistryAdapter>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use maos_domain::invariants::i1::{CapabilityToken, TokenId};
+    use maos_domain::ports::inference::{
+        InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+        TokenUsage,
+    };
+    use maos_kernel_core::inference::router::MultiProviderRouter;
+    use maos_kernel_core::io::take_io_journal;
+    use maos_providers::fixture_replay::FixtureReplayProvider;
+    use maos_providers::Provider;
+    use std::sync::Arc;
+
+    fn ok_response(provider: &str, n: usize) -> InferenceResponse {
+        InferenceResponse {
+            text: format!("{provider}-reply-{n}"),
+            stop_reason: StopReason::StopSequence,
+            usage: TokenUsage {
+                input_tokens: 10,
+                output_tokens: 20,
+            },
+            provider_attribution: ProviderAttribution {
+                provider_id: provider.into(),
+                endpoint_url: format!("http://{provider}.test"),
+                model_id: None,
+            },
+        }
+    }
+
+    fn make_req(pid: u32, provider: Option<&str>) -> InferenceRequest {
+        InferenceRequest::new(
+            pid,
+            CapabilityToken::new(TokenId::ZERO, pid, 0, [0u8; 64]),
+            format!("prompt-{pid}"),
+            InferenceOptions::default(),
+            provider.map(String::from),
+            vec![],
+        )
+    }
+
+    // Step 1: Construct router with 3 providers
+    let anthropic = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "anthropic",
+        0,
+    ))]));
+    let openai = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "openai", 0,
+    ))]));
+    let ollama = Arc::new(FixtureReplayProvider::new(vec![Ok(ok_response(
+        "ollama", 0,
+    ))]));
+    let mut providers = std::collections::BTreeMap::new();
+    providers.insert("anthropic".into(), anthropic as Arc<dyn Provider>);
+    providers.insert("openai".into(), openai as Arc<dyn Provider>);
+    providers.insert("ollama".into(), ollama as Arc<dyn Provider>);
+    let router = MultiProviderRouter::new(providers, Some("anthropic".into()));
+    println!(r#"{{"step":1,"surface":"router_construction","providers":3,"default":"anthropic"}}"#);
+
+    // Step 2: Dispatch to default provider
+    let req = make_req(1, None);
+    let p = router.dispatch(req.provider_id.as_deref()).unwrap();
+    let resp = p.complete(&req).unwrap();
+    assert_eq!(resp.provider_attribution.provider_id, "anthropic");
+    println!(r#"{{"step":2,"surface":"dispatch_default","provider":"anthropic"}}"#);
+
+    // Step 3: Dispatch to explicit provider_id
+    let req = make_req(2, Some("ollama"));
+    let p = router.dispatch(req.provider_id.as_deref()).unwrap();
+    let resp = p.complete(&req).unwrap();
+    assert_eq!(resp.provider_attribution.provider_id, "ollama");
+    println!(r#"{{"step":3,"surface":"dispatch_explicit","provider":"ollama"}}"#);
+
+    // Step 4: Fallback chain
+    let req = make_req(3, Some("openai"));
+    let resp = router
+        .dispatch_with_fallback("openai", &["anthropic".into(), "ollama".into()], &req)
+        .unwrap();
+    assert_eq!(resp.provider_attribution.provider_id, "openai");
+    println!(r#"{{"step":4,"surface":"fallback_chain","provider":"openai"}}"#);
+
+    // Step 5: ProviderSwitched lifecycle event — structural fixture-replay path.
+    // Full SecurityManager journal verification requires kernel bootstrap;
+    // smoke arm exercises the router surface, not the admission path.
+    println!(
+        r#"{{"step":5,"surface":"provider_switched_event","outcome":"fixture_replay_path","note":"structural verification of router dispatch — admission journal validation deferred to integration tests"}}"#
+    );
+
+    // Step 6 (AC4): Air-gapped validation — assert zero outbound IO journal entries
+    let journal = take_io_journal();
+    assert!(
+        journal.is_empty(),
+        "smoke: IO journal must be empty in fixture-replay mode"
+    );
+    println!(r#"{{"step":6,"surface":"air_gap_validation","outbound_calls":0}}"#);
+
+    drop(inference);
+    drop(capability);
+    eprintln!("maos: smoke-multi-provider-5 complete — 6 surfaces exercised");
+    Ok(())
+}
+
 #[cfg(feature = "network")]
 /// Story 6.2 AC7 — `smoke-orchestrator-fanout-6-2` end-to-end wedge demo.
 ///
@@ -9082,6 +9382,7 @@ struct CohortDaemonFileConfig {
 #[cfg(feature = "network")]
 struct CohortDaemonBootstrap {
     state: std::sync::Arc<maos_cohort::CohortManifestState>,
+    pull_health: std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<String, String>>>,
     tcp: maos_a2a_tcp::TcpA2AConfig,
     peers: Vec<maos_a2a_core::A2APeerConfig>,
     local_host: maos_spirit_abi::identity::HostId,
@@ -9150,6 +9451,7 @@ fn load_cohort_daemon_bootstrap(
     )?);
     Ok(CohortDaemonBootstrap {
         state,
+        pull_health: std::sync::Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new())),
         tcp: file.tcp,
         peers: file.peers,
         local_host,
@@ -9710,6 +10012,12 @@ async fn run_cohort_a2a_daemon(
         None => None,
     };
     let intake_sink = host_b.as_ref().map(|(tx, _, _)| tx.clone());
+    // Story 14-2a / AC1.2 — the rotation control's trust planes are captured
+    // BEFORE `bootstrap` is moved into the builder, and installed AFTER it
+    // returns. Cloning the `Arc` here is not a convenience: this is the ONE
+    // handle the operator read surface already holds (`:2661`), so both
+    // consumers observe the same set-once control.
+    let rotation_state = Arc::clone(&bootstrap.state);
     let runtime = build_cohort_a2a_daemon_runtime(
         Arc::clone(&transparency_log),
         boot_nonce,
@@ -9720,6 +10028,32 @@ async fn run_cohort_a2a_daemon(
         intake_sink,
     )
     .await?;
+    // ── Story 14-2a / AC1.1+AC1.2 — THE PRODUCTION ROTATION TRIGGER ─────────
+    //
+    // This is the story's deliverable, and it is exactly here for measured
+    // reasons. `MAOS_ONE_SHOT=cohort-a2a-daemon` is the ONLY arm where the
+    // concrete `Arc<TcpA2ATransport>` survives: the `maos run` cross-host arm
+    // (`:2457`) coerces its transport to `Arc<dyn A2ARouter>` in the same
+    // expression at `:2484`, and that trait has one method (`route_outbound`)
+    // and is not `Any`-downcastable, so `pins()` and `core()` are
+    // IRRECOVERABLE there. Daemon-only is a declared boundary, not an
+    // oversight — and widening the frozen `maos_domain` port to smuggle the
+    // methods through would be a `maos-domain` delta against a ceiling that is
+    // already over.
+    //
+    // `pins()` and `core()` return clones of the SAME `Arc`s the accept loop,
+    // both verifiers and the router core hold (`transport.rs:492`, `:503`), so
+    // the signed reissue path now reaches the running mesh's trust planes and
+    // not a copy of them. Delete this call and the daemon still serves, still
+    // accepts signed reissues, and silently stops rotating — which is why the
+    // gate's control leg is a RUNTIME observation of the pin set changing and
+    // its proven-red vector is removing this install.
+    rotation_state.install_cert_rotation(
+        runtime.transport.pins(),
+        runtime.transport.core(),
+        Arc::new(maos_bin::cert_rotation::TokioGraceTimer),
+        maos_cohort::cold_deployment_t_grace(),
+    )?;
     // Spawned AFTER the bind so the sink is installed before the listener exists,
     // and BEFORE the readiness line below, so a peer that connects the instant the
     // daemon announces itself finds a live consumer rather than a full queue with
@@ -9942,6 +10276,25 @@ fn reconcile_transport_identity_with_manifest(
 }
 
 #[cfg(feature = "network")]
+fn update_cohort_pull_health(
+    health: &std::sync::Mutex<std::collections::BTreeMap<String, String>>,
+    peer: &maos_spirit_abi::identity::HostId,
+    error: Option<String>,
+) {
+    let Ok(mut errors) = health.lock() else {
+        return;
+    };
+    match error {
+        Some(error) => {
+            errors.insert(peer.as_str().to_string(), error);
+        }
+        None => {
+            errors.remove(peer.as_str());
+        }
+    }
+}
+
+#[cfg(feature = "network")]
 async fn build_cohort_a2a_daemon_runtime(
     transparency_log: std::sync::Arc<maos_iac::TransparencyLogAdapter>,
     boot_nonce: u64,
@@ -9961,6 +10314,7 @@ async fn build_cohort_a2a_daemon_runtime(
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     let CohortDaemonBootstrap {
         state,
+        pull_health,
         tcp: tcp_config,
         peers: peer_configs,
         local_host,
@@ -10034,15 +10388,20 @@ async fn build_cohort_a2a_daemon_runtime(
     let cancel = tokio_util::sync::CancellationToken::new();
     let service_cancel = cancel.child_token();
     let refresh_state = state.clone();
+    let service_pull_health = std::sync::Arc::clone(&pull_health);
     let service = tokio::spawn(async move {
         // Pull-on-connect fallback: each configured bilateral peer is contacted
         // through the reserved control path once the local listener is live.
         for peer in &pull_peers {
-            if let Err(error) = distributor.pull_from(peer).await {
-                eprintln!(
-                    "cohort manifest initial pull from {} failed: {error}",
-                    peer.as_str()
-                );
+            match distributor.pull_from(peer).await {
+                Ok(()) => update_cohort_pull_health(&service_pull_health, peer, None),
+                Err(error) => {
+                    update_cohort_pull_health(&service_pull_health, peer, Some(error.to_string()));
+                    eprintln!(
+                        "cohort manifest initial pull from {} failed: {error}",
+                        peer.as_str()
+                    );
+                }
             }
         }
         let mut tick = tokio::time::interval(std::time::Duration::from_millis(10));
@@ -10057,11 +10416,23 @@ async fn build_cohort_a2a_daemon_runtime(
                 }
                 _ = tokio::time::sleep_until(next_confirmation) => {
                     for peer in &pull_peers {
-                        if let Err(error) = distributor.pull_from(peer).await {
-                            eprintln!(
-                                "cohort manifest renewal pull from {} failed: {error}",
-                                peer.as_str()
-                            );
+                        match distributor.pull_from(peer).await {
+                            Ok(()) => update_cohort_pull_health(
+                                &service_pull_health,
+                                peer,
+                                None,
+                            ),
+                            Err(error) => {
+                                update_cohort_pull_health(
+                                    &service_pull_health,
+                                    peer,
+                                    Some(error.to_string()),
+                                );
+                                eprintln!(
+                                    "cohort manifest renewal pull from {} failed: {error}",
+                                    peer.as_str()
+                                );
+                            }
                         }
                     }
                     next_confirmation =

@@ -2,11 +2,20 @@
 
 //! Story 12.1 — cohort manifest and full-pairwise mesh tripwire.
 
+use crate::gate_common::{dev_enforced_red_blocks, emit_command, BindingClass, CURRENT_PHASE};
 use std::process::Command;
 
 const GATE_NAME: &str = "check-cohort-mesh";
-const CURRENT_PHASE: &str = "v1_5";
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0", "v2_2"];
+
+/// Dev-time enforcement class for this gate's legs.
+///
+/// Story 12.1 hand-rolled a phase-independent hard-fail carve-out here because
+/// keying enforcement off the ship ladder made a RED leg advisory;
+/// `gate_common`'s [`BindingClass`] IS that carve-out, promoted to a shared
+/// home. Adopting it closes the `check-cohort-mesh` half of **D20** — the
+/// ship ladder now governs GA disposition only, and `CURRENT_PHASE` is read
+/// from exactly one place (`gate_common`).
+const BINDING: BindingClass = BindingClass::Blocking;
 
 struct Leg {
     name: &'static str,
@@ -51,13 +60,14 @@ fn build_journey_daemon() -> Result<(), String> {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
-    assert_eq!(
-        CURRENT_PHASE, "v1_5",
-        "Story 12.1 must not advance global phase"
-    );
-    assert!(PHASE_ORDER.contains(&"v2_2"));
-    // Every designated leg is phase-independent and hard-fails here, before
-    // any ship-phase disposition can classify the aggregate as advisory.
+    // Every designated leg is phase-independent and hard-fails under
+    // [`BINDING`], before any ship-phase disposition can classify the aggregate
+    // as advisory. Story 15-3 F4 deleted the two asserts that stood here: they
+    // compared a LOCAL const to its own literal (a tautology that proved
+    // nothing), and repointing them at the shared `CURRENT_PHASE` would have
+    // turned a sanctioned phase advance into a runtime panic — a tripwire
+    // against the operation it is meant to permit, in the very crate that
+    // consolidates the phase source.
     build_journey_daemon()?;
     let legs = [
         Leg {
@@ -133,6 +143,76 @@ pub fn run(json: bool) -> Result<(), String> {
                 "--test",
                 "t_12_1_cohort_mesh",
                 "t_12_1_stale_pull_push_resubmit_real_tcp",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // Story 14-2b convergence-observability legs. Enrolled HERE and not in
+        // a new gate because 14-2a's `check_cert_rotation_trigger.rs` cost 945
+        // raw lines against this story's +35 xtask headroom, and NOT in
+        // `check-cert-rotation-trigger` because its `derive_rotation_tests_in`
+        // hard-fails on any derived test its fixed `TEST_FILES` list does not
+        // name as a leg.
+        //
+        // Both legs are real three-host mTLS sweeps whose assertions an EMPTY
+        // table cannot satisfy: one tells two peers at different versions
+        // apart, the other invalidates exactly one of two live records.
+        Leg {
+            name: "convergence-versions-told-apart",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2b_cohort_convergence",
+                "t_14_2b_peers_at_different_versions_are_told_apart",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        Leg {
+            name: "convergence-record-invalidation",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2b_cohort_convergence",
+                "t_14_2b_a_restarted_peer_is_not_a_convergence_claim",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // Story 14-2c: a local-leaf reissue must remain diagnosable through the
+        // authenticated operator HTTP body after the mesh path is severed.
+        Leg {
+            name: "local-leaf-declaration-diagnosis",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2c_local_leaf_declaration",
+                "t_14_2c_local_leaf_reissue_is_diagnosable",
+                "--",
+                "--ignored",
+                "--exact",
+            ],
+        },
+        // Story 14-2c review: the agree verdict and the pull-health carrier
+        // must be proven on live pulls through the operator HTTP body.
+        Leg {
+            name: "self-identity-agreement-pull-health",
+            args: &[
+                "test",
+                "-p",
+                "maos-bin",
+                "--test",
+                "t_14_2c_local_leaf_declaration",
+                "t_14_2c_self_identity_agreement_and_pull_health",
                 "--",
                 "--ignored",
                 "--exact",
@@ -599,14 +679,57 @@ pub fn run(json: bool) -> Result<(), String> {
         },
     ];
     for leg in &legs {
-        run_leg(leg)?;
+        if let Err(red) = run_leg(leg) {
+            if dev_enforced_red_blocks(BINDING, true) {
+                return Err(red);
+            }
+            // Unreachable while [`BINDING`] is `Blocking`, and deliberately not
+            // an `unreachable!()`: if the class is ever downgraded, a RED leg
+            // must still surface as a banner rather than a silent green.
+            emit_command(
+                json,
+                "warning",
+                &format!("{GATE_NAME}: WOULD-HAVE-BLOCKED — {red}"),
+            );
+        }
     }
-    if !crate::check_kernel_baseline::check()?.passed {
-        return Err(format!("{GATE_NAME}: kernel-abi-diff RED"));
+    // Story 16-0 / AC5: emit this gate's OWN report BEFORE propagating the red.
+    // `Ok(passed: false)` does not abort at the `?` — the bare `return Err` on
+    // the next line did, and a policy red that produces zero bytes of `--json`
+    // looks like a crash (`deferred-work.md:637`). The kernel report's detail is
+    // forwarded too: it NAMES the files that moved, and "kernel-abi-diff RED"
+    // alone does not.
+    let kernel = match crate::check_kernel_baseline::check() {
+        Ok(report) => report,
+        Err(error) => {
+            // The Err class (missing `[kernel_src]`, hand-edited pin, walk
+            // failure) must not abort this gate before its own JSON exists
+            // either — zero-byte `--json` is the `deferred-work.md:637`
+            // crash-shape (Story 16-0 review).
+            if json {
+                println!(
+                    "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":false,\"ship_phase\":\"{CURRENT_PHASE}\",\"legs\":{},\"error\":true}}",
+                    legs.len() + 1
+                );
+            }
+            return Err(format!("{GATE_NAME}: kernel-abi-diff ERRORED — {error}"));
+        }
+    };
+    if !kernel.passed {
+        if json {
+            println!(
+                "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":false,\"ship_phase\":\"{CURRENT_PHASE}\",\"legs\":{}}}",
+                legs.len() + 1
+            );
+        }
+        return Err(format!(
+            "{GATE_NAME}: kernel-abi-diff RED — {}",
+            crate::check_kernel_baseline::failure_detail(&kernel)
+        ));
     }
     if json {
         println!(
-            "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":true,\"current_phase\":\"{CURRENT_PHASE}\",\"legs\":{}}}",
+            "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":true,\"ship_phase\":\"{CURRENT_PHASE}\",\"legs\":{}}}",
             legs.len() + 1
         );
     } else {

@@ -33,20 +33,22 @@ maosctl audit keygen --output /tmp/release-signing.key
 
 ## 서명 흐름 (자동화 — CI)
 
-1. 릴리스 태그: `git tag v0.5.0 && git push --tags`
-2. CI가 `maos-linux-amd64`, `maos-linux-arm64`, `maos-darwin-arm64`를 빌드합니다
-3. CI가 각(네이티브) 바이너리에서 `check-mock-not-in-release`를 실행합니다
-4. CI가 `sha256sum maos-*`로 `SHA256SUMS`를 생성합니다
-5. CI가 `xtask release-verify --sign`으로 `SHA256SUMS`에 서명합니다
-6. CI가 `.sig`를 첨부하여 GitHub Releases에 게시합니다
+1. 프리릴리스 태그: `git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1`
+2. CI가 `maos`와 `maosctl`을 `linux-amd64`, `linux-arm64`, `darwin-arm64`용으로 빌드합니다(총 6개 바이너리)
+   (`maos-linux-amd64`, `maosctl-linux-amd64`, `maos-linux-arm64`, `maosctl-linux-arm64`, `maos-darwin-arm64`, `maosctl-darwin-arm64`)
+3. CI가 각 `maos` 바이너리에서 `check-mock-not-in-release`를 실행합니다
+4. CI가 바이너리별 아티팩트를 `dist/`에 평탄화합니다
+5. CI가 `xtask release-dry-run --manifest-only`로 명시적인 6개 바이너리 집합의 `SHA256SUMS`를 생성합니다
+6. CI가 `xtask release-verify --sign`으로 `SHA256SUMS`에 서명합니다
 7. CI가 `xtask release-verify --verify`로 자체 검증합니다
+8. CI가 6개 바이너리, `SHA256SUMS`, `SHA256SUMS.sig`를 게시합니다
 
 ## 검증 흐름 (운영자)
 
 ```bash
 # Download release artifacts to a local directory
-mkdir maos-v0.5.0 && cd maos-v0.5.0
-# Download: maos-linux-amd64, SHA256SUMS, SHA256SUMS.sig
+mkdir maos-v0.1.0-alpha.1 && cd maos-v0.1.0-alpha.1
+# Download all six binaries, SHA256SUMS, and SHA256SUMS.sig
 
 # Verify with the bundled public key (offline-capable)
 maosctl install --from-local . --verify-only

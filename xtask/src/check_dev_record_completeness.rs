@@ -288,7 +288,7 @@ fn unresolvable_owner(line: usize, token: impl Into<String>) -> OwnerRow {
         line,
         token: token.into(),
         bucket: OwnerBucket::Stale,
-        reason: "owner is not resolvable to a sprint-status key",
+        reason: "owner cue and resolvable sprint-status key must be on one line",
     }
 }
 

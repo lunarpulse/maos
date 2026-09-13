@@ -2038,7 +2038,7 @@ fn check_7_1_6_5_crate_count() -> Result<CheckResult, std::io::Error> {
     let output = std::process::Command::new("cargo")
         .args(["run", "-p", "xtask", "--", "check-workspace-count"])
         .output();
-    let (pass, msg) = match output {
+    let (_pass, msg) = match output {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout);
             let stderr = String::from_utf8_lossy(&o.stderr);

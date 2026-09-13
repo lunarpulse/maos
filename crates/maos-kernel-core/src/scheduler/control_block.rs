@@ -240,6 +240,7 @@ impl Default for SpiritManifestBundle {
 /// Mutable execution snapshot held inside the stable SCB allocation.
 /// Identity, lifecycle atomics, DRR deficit, watchdog clocks, task ledger and
 /// boot nonce deliberately remain outside this cell across hot swaps.
+#[maos_attrs::i9_exempt(reason = "SCB runtime snapshot; per-Spirit structural state per I9")]
 #[derive(Clone)]
 pub struct ScbRuntimeSnapshot {
     pub manifest: SpiritManifestBundle,

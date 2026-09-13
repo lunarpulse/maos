@@ -29,9 +29,12 @@ const EXPECTED_GATES: &[&str] = &[
     "check-wasm-form-equiv",
     "check-red-team-gate",
     // Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
+    // `check-cna-registration` RETIRED 2026-09-07 by Story 15-3 per ADR-065,
+    // and removed from this const LAST: deleting it before the CI job and the
+    // registry rows would leave an orphan job invoking a removed subcommand
+    // (clap exits 2) rather than reding this gate.
     "check-export-control",
     "check-fuzz-targets",
-    "check-cna-registration",
     "check-ko-coverage",
     // Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
@@ -93,6 +96,24 @@ const EXPECTED_GATES: &[&str] = &[
     // judgement; until this gate landed there was no queryer, and eight of
     // nineteen rows were already wrong at HEAD.
     "check-decision-register",
+    // Story 14-2a AC6 — the production peer-certificate rotation trigger's gate.
+    // Its control is a RUNTIME leg (a live daemon rotating on a signed reissue),
+    // because the repo's only production-caller probe visits `visit_expr_call`
+    // only and every call this story makes is a method call — a copied probe
+    // would have been green from birth.
+    "check-cert-rotation-trigger",
+    // Story 15-3 AC5 — the exit-command check. Enrolled here LAST of the three
+    // self-policing directions, because `EXPECTED_GATES` → `needs` and
+    // `EXPECTED_GATES` → `[[ship_gate]]` both red if the other two sites are
+    // missing: adding the name before the job and the registry row exist would
+    // red this gate rather than the new one.
+    "check-exit-commands",
+    // Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Enrolled
+    // LAST of the three self-policing sites for the same reason as
+    // check-exit-commands above: the discipline job and the registry rows
+    // landed first, so this const's expansion can only make the gate red on
+    // a real absence, never on an ordering artifact.
+    "workspace-test-suite",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

@@ -200,3 +200,24 @@ flowchart TD
     classDef backlog fill:#37474f,stroke:#90a4ae,stroke-width:2px,color:#ffffff
     class S141,S142,S143,S144,S145,S146,S147,S148,S149 backlog
 ```
+
+
+## Epics 15–21 — Product-Spine Recovery Lane (correct-course R2 2026-09-04, Fork C) — DAG
+
+Spine (strict): **15 → 16 → 17 → 18 → 19 → 20 → 21**; each epic's hermetic exit is its first CI job (red until green).
+
+| Edge | Why |
+|---|---|
+| hotfix lane ∥ 15 | approved 2026-09-01; keys unchanged (W0-3) |
+| 15-2 → every 16–21 story | the one-time ceiling re-base is what lets a line land |
+| 15-5 → 15-6 (ADR-064), 16-1 (ADR-062), 17-1 (ADR-061), 17-3b (ADR-060), 21-3 (ADR-063) | one decision per fork, before the epic opens |
+| 15-6 → **16-2**, 18-*, 19-*, **20-1**, 20-4, 21-1 | every "live" story replays in CI through the seam |
+| 16-1 → 16-2, 19-2 | the halt resolve and the enqueue door travel over the POST surface |
+| 17-1 → 19-3 | real agent CLIs run only under the egress profile |
+| 17-3a → 17-3b → 20-1, 21-2 | spike, then the WASM form; the registry admits it; J3 recall over the WASM wire |
+| 18-1 → 18-2, 18-4 · 18-1/18-3 → 19-1 | seams before numbers; seams before the Orchestrator loop |
+| 20-3 → 21-2 | the nightly must red on absent evidence before journeys are enrolled |
+| 20-2 → 21-* | multi-host runbooks install from packages |
+| `ops-*` rows | run in parallel; never gate an engineering exit |
+
+Kernel-Δ: **16-5, 17-1, 17-2 FLAG-Winston (+), 21-5 optional (−)**; all else ZERO @24472.

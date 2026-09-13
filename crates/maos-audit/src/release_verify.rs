@@ -22,40 +22,40 @@ use sha2::{Digest, Sha256};
 /// (64 lowercase hex chars). If unset, a documented development key is used so
 /// offline verification works in local/test builds. CI must set the production
 /// key and assert it differs from `dev_seed()`.
-pub const RELEASE_PUBKEY: [u8; 32] = {
-    const DEFAULT: [u8; 32] = [
-        0xbe, 0xdd, 0x2b, 0xa6, 0x34, 0xda, 0x72, 0x40, 0x27, 0x98, 0x3f, 0x36, 0x91, 0x49, 0xf1,
-        0x08, 0x54, 0x1f, 0x43, 0xe6, 0x24, 0xa8, 0x46, 0x43, 0x8c, 0x01, 0x45, 0x2c, 0xa7, 0xf4,
-        0x69, 0xe7,
-    ];
+pub const DEFAULT_RELEASE_PUBKEY: [u8; 32] = [
+    0xbe, 0xdd, 0x2b, 0xa6, 0x34, 0xda, 0x72, 0x40, 0x27, 0x98, 0x3f, 0x36, 0x91, 0x49, 0xf1, 0x08,
+    0x54, 0x1f, 0x43, 0xe6, 0x24, 0xa8, 0x46, 0x43, 0x8c, 0x01, 0x45, 0x2c, 0xa7, 0xf4, 0x69, 0xe7,
+];
 
-    const fn parse_hex_32(s: &str) -> [u8; 32] {
-        let bytes = s.as_bytes();
-        let mut out = [0u8; 32];
-        let mut i = 0;
-        while i < 32 {
-            let hi = match bytes[i * 2] {
-                b'0'..=b'9' => bytes[i * 2] - b'0',
-                b'a'..=b'f' => bytes[i * 2] - b'a' + 10,
-                b'A'..=b'F' => bytes[i * 2] - b'A' + 10,
-                _ => panic!("MAOS_RELEASE_PUBKEY must be 64 lowercase hex chars"),
-            };
-            let lo = match bytes[i * 2 + 1] {
-                b'0'..=b'9' => bytes[i * 2 + 1] - b'0',
-                b'a'..=b'f' => bytes[i * 2 + 1] - b'a' + 10,
-                b'A'..=b'F' => bytes[i * 2 + 1] - b'A' + 10,
-                _ => panic!("MAOS_RELEASE_PUBKEY must be 64 lowercase hex chars"),
-            };
-            out[i] = (hi << 4) | lo;
-            i += 1;
-        }
-        out
+/// Parse the exact lowercase representation accepted from `MAOS_RELEASE_PUBKEY`.
+pub const fn parse_release_pubkey_hex(s: &str) -> [u8; 32] {
+    let bytes = s.as_bytes();
+    if bytes.len() != 64 {
+        panic!("MAOS_RELEASE_PUBKEY must be exactly 64 lowercase hex chars");
     }
 
-    match option_env!("MAOS_RELEASE_PUBKEY") {
-        Some(hex) => parse_hex_32(hex),
-        None => DEFAULT,
+    let mut out = [0u8; 32];
+    let mut i = 0;
+    while i < 32 {
+        let hi = match bytes[i * 2] {
+            b'0'..=b'9' => bytes[i * 2] - b'0',
+            b'a'..=b'f' => bytes[i * 2] - b'a' + 10,
+            _ => panic!("MAOS_RELEASE_PUBKEY must be exactly 64 lowercase hex chars"),
+        };
+        let lo = match bytes[i * 2 + 1] {
+            b'0'..=b'9' => bytes[i * 2 + 1] - b'0',
+            b'a'..=b'f' => bytes[i * 2 + 1] - b'a' + 10,
+            _ => panic!("MAOS_RELEASE_PUBKEY must be exactly 64 lowercase hex chars"),
+        };
+        out[i] = (hi << 4) | lo;
+        i += 1;
     }
+    out
+}
+
+pub const RELEASE_PUBKEY: [u8; 32] = match option_env!("MAOS_RELEASE_PUBKEY") {
+    Some(hex) => parse_release_pubkey_hex(hex),
+    None => DEFAULT_RELEASE_PUBKEY,
 };
 
 #[derive(Debug, thiserror::Error)]

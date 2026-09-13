@@ -585,6 +585,36 @@ impl A2ARouterCore {
         }
     }
 
+    /// Story 14-2a / AC2.2 — move plane A's §7.2 trust pin for `host_id` and
+    /// return the fingerprint it replaced (`None` when plane A never declared
+    /// the peer; this never INSERTS one, because a peer the operator never
+    /// declared has no allowlists, no profile and no endpoint, and inventing
+    /// them here would widen the mesh from a config reload).
+    ///
+    /// This is the second half of the two-plane reload. Plane B's rotation
+    /// window MUST already be open on `fingerprint` when this is called, so
+    /// the value written here is always inside the accepted set
+    /// `{pins[p].fingerprint, rotation_next[p]}` that sites 5/6 check — that
+    /// ORDER is what makes the reload observably atomic without a new lock
+    /// (`tofu.rs` documents the writer order: `window_lock` BEFORE any `pins`
+    /// entry lock; plane A is written after both are released).
+    ///
+    /// Additive; changes no frozen signature (epic AC-A6).
+    pub fn set_peer_cert_fingerprint(
+        &self,
+        host_id: &HostId,
+        fingerprint: PeerCertFingerprint,
+    ) -> Option<PeerCertFingerprint> {
+        self.peers
+            .get_mut(host_id.as_str())
+            .map(|mut entry| std::mem::replace(&mut entry.cert_fingerprint, fingerprint))
+    }
+
+    /// The TLS leaf fingerprint this process is currently configured to serve.
+    pub fn local_leaf_fingerprint(&self) -> Option<PeerCertFingerprint> {
+        self.local_leaf_fingerprint.clone()
+    }
+
     pub fn lookup_peer(&self, host_id: &HostId) -> Result<A2APeerConfig, A2AError> {
         self.peers
             .get(host_id.as_str())
@@ -1216,8 +1246,8 @@ impl A2ARouterCore {
                 // restart detection IS pin invalidation, re-pin IS the designed
                 // recovery, and the variant already maps typed to
                 // `IacBusError::CrossHostPinMismatch`. Lands in `maos-a2a-core` at
-                // ZERO headroom as a correctness repair on a security path, which
-                // **`xtask/kloc.toml:87`** says a ceiling must never block.
+                // ZERO headroom as a correctness repair on a security path: the
+                // CEILING RULE says a ceiling "must never block a correctness or compliance repair."
                 //
                 // SCOPE WALL: this repairs ONLY the code this story makes reachable.
                 //
@@ -1238,8 +1268,8 @@ impl A2ARouterCore {
                 // `j1-crosshost-2c` AC3.2 — SHIP-BLOCKER for AC3's fault windows.
                 // Both of these used to land in the catch-all below, which made a
                 // dropped-receiver internal NACK and a genuine wire partition the
-                // SAME observable at the sender. Same `kloc.toml:87`
-                // correctness-repair grant, same binding scope wall as H13.
+                // SAME observable at the sender. Same CEILING RULE correctness-repair
+                // grant, same binding scope wall as H13.
                 CODE_INTERNAL => Err(A2AError::PeerInternalFailure {
                     peer: peer.as_str().to_string(),
                     message: n.error.message,
@@ -1640,10 +1670,11 @@ impl A2ARouterCore {
         }
         if cohort_intent.eq_ignore_ascii_case(RESERVED_INTENT_REISSUE) {
             let verified_peer = HostId(peer_cfg.peer_id.as_str().to_string());
-            return match self
-                .cohort_manifest_gate
-                .apply_reissue(&verified_peer, frame)
-            {
+            return match self.cohort_manifest_gate.apply_reissue(
+                &verified_peer,
+                request.boot_nonce,
+                frame,
+            ) {
                 Ok(_) => A2AJsonRpcResponse::ack(
                     request.id,
                     AckBody {
@@ -2082,6 +2113,7 @@ mod tests {
         fn apply_reissue(
             &self,
             _verified_peer: &HostId,
+            _peer_boot_nonce: u64,
             _frame: &IacFrame,
         ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
             Ok(CohortReissueDisposition::PullRequested)

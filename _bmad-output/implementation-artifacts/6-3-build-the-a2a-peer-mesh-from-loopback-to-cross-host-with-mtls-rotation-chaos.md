@@ -1272,7 +1272,7 @@ Per Story 6.3 spec §AC4 the boot_nonce can be propagated via cert SAN extension
 
 ### defer
 
-- [x] [Review][Defer] **W1 [Medium] Churn harness + rotation chaos tests use hardcoded synthetic values that always pass their own floors.** `crates/maos-a2a/src/chaos/churn.rs:63-79`, `crates/maos-a2a/src/chaos/harness_3_host.rs` — calibration mode per AC5/AC6 spec; real logic at v2.0. Deferred per architecture §7.2.1.b staging table.
+- [x] [Review][Defer] **W1 [Medium] Churn harness + rotation chaos tests use hardcoded synthetic values that always pass their own floors.** `crates/maos-a2a/src/chaos/churn.rs:63-79`, `crates/maos-a2a/src/chaos/harness_3_host.rs` — calibration mode per AC5/AC6 spec; real logic at v2.0. Deferred per architecture §7.2.1.b staging table. **CLOSED by Story 14-2 (AC6.1, 2026-08-29): `harness_3_host.rs` + `metrics.rs` DELETED (they seeded `t_0/t_1/t_2` from `DrillConfig` constants and asserted their own floors green); the surviving halves are `compute_t_grace` + the retry-policy tests; NFR-Sec-13 enforcement is the leg-structured `check-rotation-real-timing` gate over the real-socket drill.**
 
 - [x] [Review][Patch] **W2 [Low] Smoke test Lamport clock now verifies monotonic advance across 3 serial sends.** `crates/maos-bin/src/main.rs` smoke_a2a_loopback_6_3 — updated to send 3 frames, capture all, and assert strictly increasing logical_clock values.
 

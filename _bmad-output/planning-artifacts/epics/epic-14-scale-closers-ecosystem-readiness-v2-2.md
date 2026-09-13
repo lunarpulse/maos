@@ -1,6 +1,9 @@
 # Epic 14 — v2.2 Hardening + Closers (Scale · Rotation · Ecosystem-Readiness · v2.0 Sweep)
 
-**Status:** `draft-ready-for-preflight` — created 2026-07-10 (Step 3 of the full-PRD planning plan). Built on the **RATIFIED** full architecture §15 (§15.5 ADR-057 ceiling + §15.6 scale-closer/remainder dispositions) + the ratified PRD delta. **Third and final epic of the v2.2 functional-completeness phase** — **absorbs the former Epic-15 v2.0 remainder sweep** (folded 2026-07-10; the gap-map's "Epic 15 may fold into 12–14"). v2.2 = **3 epics**: 12 (J3 journey) · 13 (Reza journey) · 14 (this — hardening/closers).
+> **CLOSED BY RE-SCOPE 2026-09-04** (`sprint-change-proposal-2026-09-04.md` §6/§7, operator-ratified). Delivered: 14-0, 14-1, 14-2, 14-2a, 14-2b, 14-2c. The remaining eleven rows were re-homed to the product-spine recovery lane (`Epics 15–20`) or parked at v2.5; the mapping is in the proposal §7.2 and in `epic-14-retro-2026-09-04.md`. Nothing below this line was edited; it is the record of what was planned.
+
+
+**Status:** `in-progress` — created 2026-07-10; opened 2026-08-26 by `14-0` (preflight decision register) and entered dev 2026-08-27 with `14-1` at `ready-for-dev` (Step 3 of the full-PRD planning plan). Built on the **RATIFIED** full architecture §15 (§15.5 ADR-057 ceiling + §15.6 scale-closer/remainder dispositions) + the ratified PRD delta. **Third and final epic of the v2.2 functional-completeness phase** — **absorbs the former Epic-15 v2.0 remainder sweep** (folded 2026-07-10; the gap-map's "Epic 15 may fold into 12–14"). v2.2 = **3 epics**: 12 (J3 journey) · 13 (Reza journey) · 14 (this — hardening/closers).
 
 **Scope note (supersession):** the v2.2 PRD delta **re-targeted 100-host churn (NFR-Scale-2 / NFR-Rel-7) and NFR-Scale-5 from v2.5 → v2.2** — the Epic-11 plan's "100-host → v2.5" is superseded by the functional-completeness phase. (NFR-Scale-5 14-institution envelope lives in Epic 13.6; this epic carries the host-count closers.)
 
@@ -33,7 +36,7 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 
 | # | Title | Scope (one-line) | ACs | Model | Kernel-Δ risk | Depends |
 |---|-------|------------------|-----|-------|---------------|---------|
-| **14.1** | 100-host churn scale envelope (NFR-Scale-2/Rel-7) | Scale the real 11.3 mesh substrate to N=100; per-event derivation; two-surface detection; floors unchanged; blind-one-detector proven-red; new N=100 leg of `check-scale-churn`. | 6 | frontier + **full §A6** (test-infra risk) | ZERO @23081 (bench/test-infra) | 11.3 |
+| **14.1** | 100-host churn scale envelope (NFR-Scale-2/Rel-7) | Scale the real 11.3 mesh substrate to N=100; per-event derivation; two-surface detection; floors unchanged; blind-one-detector proven-red; new N=100 leg of `check-scale-churn`. | 6 | frontier + **full §A6** (test-infra risk) | ZERO @24472 (bench/test-infra) | 11.3 |
 | **14.2** | 10-host mTLS rotation chaos (NFR-Sec-13) | Scale the ratified `rotation.rs` floors to 10 hosts; rotation-during-load → zero conversation drops; p99 + one-generation-overlap; real-timestamp derivation; `check-rotation` 10-host leg. | 6 | frontier + **full §A6** (test-infra risk) | ZERO (rotation.rs out-of-kernel, maos-a2a-tcp) | 10.4b / 10.5 |
 | **14.3** | Ecosystem-readiness verification + v2.5 graduation ledger | FKCS-infra (11.5) + trial-infra (11.7) proven green at the v2.2 gate via the Chinese-wall proxy; FR37 external-vetter enrollment path structure-reserved-but-disabled; explicit v2.5 graduation ledger. | 6 | frontier + §A6 | ZERO (xtask + maos-fkcs + maos-eval infra) | 11.5, 11.7, 13.4 |
 | **14.4** | v2.0 sweep — operational surfaces | Sentinel canary auto-rollback (ADR-020 ≤30s revert + Loom pattern-scan pre-deploy); native mobile push adapter (§7.4, OQ-7); distro packages + one-line installer (clean-host verified). | 6 | frontier + §A6 | ZERO (orchestration + channel adapter + packaging, out-of-kernel) | 11.7 (clean-env harness) |
@@ -43,7 +46,9 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 | **14.8** | Register + classify the full workspace env surface | Register ~43 non-secret `MAOS_*` reads across 15 crates incl `maos-kernel-core`'s ~18 via the shared registry (NO kernel source edit); classify HarnessOnly vs UserFacing (flag `*_FAST`/`_TEST` reads in production `src/` as a documented smell); flip the workspace gate to BLOCKING; per-crate proven-red. | 6 | frontier + §A6 | ZERO @23141 (registry metadata + xtask) | 14.7 |
 | **14.9** | Secret-var governance + provider keys | Add `EnvStability::Secret`; classify real secrets (`MAOS_ANTHROPIC_API_KEY`, `MAOS_OPENAI_API_KEY`, `MAOS_AUDIT_KEY`, `MAOS_TRIAL_PRODUCER_SEED`) and keep `*_PUBKEY` NON-secret; registry stores name+purpose, NEVER value; gate: `Secret` vars never logged/echoed/serialized. | 6 | frontier + **§A6 security-sensitive** | ZERO @23141 (enum variant + registry + xtask) | 14.7 |
 
-**Sequencing:** 14.1 · 14.2 · 14.3 · 14.4 · 14.5 · 14.6 are largely **parallelizable** (independent surfaces); 14.3 needs 13.4 (FR37 internal machinery); **14.6's kernel-crate-set ceiling binds at the v2.2-wave close** (the last gate to flip). The env-contract closers (added 2026-07-13, promoted from the `12-7` preflight): **14.7 → (14.8 ∥ 14.9)**, all depend on **12.6** (the maos-bin registry+gate foundation, landed). **9 large stories**; absorbs the former Epic-15 v2.0 remainder sweep + the workspace env-contract hardening.
+**Sequencing:** 14.1 · 14.2 · 14.3 · 14.4 · 14.5 · 14.6 are largely **parallelizable** (independent surfaces); 14.3 needs 13.4 (FR37 internal machinery); **14.6's kernel-crate-set ceiling binds at the v2.2-wave close** (the last gate to flip). The env-contract closers (added 2026-07-13, promoted from the `12-7` preflight): **14.7 → (14.8 ∥ 14.9)**, all depend on **12.6** (the maos-bin registry+gate foundation, landed). **17 stories** after delivered splits and evidence-discovered closers; absorbs the former Epic-15 v2.0 remainder sweep + the workspace env-contract hardening.
+
+> **Hotfix-lane pointers (2026-09-01, correct-course):** model-currency gate + retired-pin sweep + provider model env overrides are planned as the standalone **model-pin currency hotfix lane** (see sprint-status; J1-lane boundary precedent — not Epic-14 scope). **14.5 will consume `xtask/model-currency.toml`** when adding Bedrock/Vertex drivers (new IDs enter the allowed list via the same re-pin ceremony). **14.8's census becomes ~47 reads, not ~43** after four `MAOS_*_MODEL` vars are registered UserFacing by the backlog hotfix.
 
 **Demo-ability (watchable multi-node scene for the hardening epic):** unlike Epics 12–13, Epic 14 is otherwise gate-metric-driven (its value is scale/reliability envelopes, not a new journey). So it now carries a small **substrate-under-stress** scene you can *watch* at a scale that runs without big infra: an **N=5 churn scene** (14.1·AC1 — eviction → two-surface detection → reconvergence) plus an **N=3 rotation scene** (14.2·AC2 — certs roll under live traffic, zero drops). The **N=100 churn** and **10-host rotation** runs are the scale-out proofs layered on top (advisory-substrate-gated where CI can't host them); the small scenes are the observable demo of what the epic hardens.
 
@@ -52,6 +57,16 @@ Close everything left to make v2.2 **functionally complete** once the two journe
 ## Per-story AC sketch (finalize at preflight)
 
 **14.1 — 100-host churn scale envelope** (NFR-Scale-2 / NFR-Rel-7 second half)
+> ⚠ **SUPERSEDED IN THREE PLACES by the `14-1` story file (2026-08-27, baseline `38c52811`), which
+> measured this sketch and is the authority where they disagree.** (a) *"real kernel-process/container
+> instances"* is refuted by Story 11.3's ratified **F1** — the substrate is an in-process real-socket
+> real-mTLS mesh, and "the SAME substrate" and "containers" cannot both be true. (b) **RTO is not a
+> floor**: NFR-Rel-7 names three and §15.6 repeats three; 11.3's F3-ledger made `rto_secs`
+> derived-and-reported, promoting to binding at **v2.5** on geo — a condition v2.2-on-loopback does not
+> meet. (c) The N=100 live leg **BINDS**; its advisory-substrate premise (*"where CI cannot host 100
+> instances"*) was measured false — 502 fds and ~0.4 s hub-and-spoke against `ulimit -n` 524,288 and a
+> 15-minute timeout. Also note items 1/2/4 below describe an eviction, an N param and adversaries-at-N=100
+> that do not exist at HEAD; see the story's Measured grounding table.
 1. **Smallest-watchable-first**: stand up the **real** 11.3 mesh at a small **N=5** scale — a host eviction → two-surface detection → mesh reconvergence **observable as a scene** — *then* scale the **SAME** substrate to **N=100** (real kernel-process/container instances, mTLS mesh); the canned `churn.rs::run_scaffold` **stays deleted** (verify — the 11.3 deletion is the live 10.2-trap fix); every metric derived per-event from real timestamps.
 2. Two-surface detection at scale: handshake `TcpTransportError` (verifier layer) + router NACK (the 11.3 F-new pattern), at N=100.
 3. Floors **UNCHANGED** from 11.3, all **derived per-event** not asserted: detection ≤1h median, blast-radius ≤5 peers, recovery ≤24h, RTO 4h-breach. **The teeth are the falsifiers, not the clean pass** (11.3 L5).

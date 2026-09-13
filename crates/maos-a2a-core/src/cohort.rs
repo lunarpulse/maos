@@ -164,9 +164,13 @@ pub trait CohortManifestGate: Send + Sync {
         intent: &str,
         sender_manifest_version: Option<u64>,
     ) -> CohortConsentVerdict;
+    /// `peer_boot_nonce` is the generation authenticated for this exact request.
+    /// Consumers must not re-sample mutable pin state when retaining data from
+    /// the request: a concurrent restart may change that state after admission.
     fn apply_reissue(
         &self,
         verified_peer: &HostId,
+        peer_boot_nonce: u64,
         frame: &IacFrame,
     ) -> Result<CohortReissueDisposition, CohortReissueRejection>;
 
@@ -216,6 +220,7 @@ impl CohortManifestGate for LegacyCohortManifestGate {
     fn apply_reissue(
         &self,
         _verified_peer: &HostId,
+        _peer_boot_nonce: u64,
         _frame: &IacFrame,
     ) -> Result<CohortReissueDisposition, CohortReissueRejection> {
         Err(CohortReissueRejection {

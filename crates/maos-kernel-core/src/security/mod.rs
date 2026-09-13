@@ -112,6 +112,12 @@ pub enum SecurityError {
     EClassRequired { spirit_id: String },
 }
 
+#[derive(Debug, Clone)]
+struct T3ImageVerificationConfig {
+    lock_path: std::path::PathBuf,
+    trust_anchor_pub: [u8; 32],
+}
+
 /// Adapter — implements `SecurityManagerPort` with sandbox tier
 /// enforcement and approval mediation.
 ///
@@ -120,12 +126,6 @@ pub enum SecurityError {
 #[maos_attrs::i9_exempt(
     reason = "security manager adapter; holds Arc<PolicyTable> for runtime policy enforcement — structural-state caching per I9"
 )]
-#[derive(Debug, Clone)]
-struct T3ImageVerificationConfig {
-    lock_path: std::path::PathBuf,
-    trust_anchor_pub: [u8; 32],
-}
-
 #[derive(Debug, Clone)]
 pub struct SecurityManagerAdapter {
     policy: Arc<PolicyTable>,

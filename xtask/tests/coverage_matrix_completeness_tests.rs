@@ -17,7 +17,7 @@ fn fails_on_empty_v1_0_gates() {
 
     let yaml = r#"
 schema_version: 1
-current_phase: v1.0
+delivered_phase: v1.0
 coverage:
   NFR-Test-Empty:
     gates: []
@@ -55,7 +55,7 @@ fn passes_on_populated_v1_0_gates() {
 
     let yaml = r#"
 schema_version: 1
-current_phase: v1.0
+delivered_phase: v1.0
 coverage:
   NFR-Test-Populated:
     gates:
@@ -89,7 +89,7 @@ fn advisory_until_engagement_counts_as_non_empty() {
 
     let yaml = r#"
 schema_version: 1
-current_phase: v1.0
+delivered_phase: v1.0
 coverage:
   NFR-Sec-7-Like:
     gates: []

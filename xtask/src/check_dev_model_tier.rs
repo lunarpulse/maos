@@ -36,8 +36,15 @@ const ENFORCE_FROM_EPIC: u32 = 12;
 /// `opus-4-8`, which is already allowlisted. Extending this list for a newer
 /// frontier model is the documented maintenance of the A1 policy, not a waiver
 /// — a NON-frontier model still fails.
+///
+/// `glm-5.3` added 2026-08-27 (Story 14-1 §A6 review, ruling D-B): the strict
+/// successor of the already-allowlisted `glm-5.2` family — the same documented
+/// A1 maintenance, not a waiver. The §A6 full-layer net remains NON-DEGRADABLE:
+/// the row that triggered this extension still requires a non-author review
+/// re-run, and a token extension is not a substitute for the net.
 const FRONTIER_FAMILIES: &[&str] = &[
     "opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "gpt-5.5", "gpt-5.6", "glm-5.1", "glm-5.2",
+    "glm-5.3",
 ];
 /// §A6 review-net markers — a story that ran the multi-layer adversarial review
 /// names at least one of these somewhere in its record.

@@ -313,21 +313,48 @@ fn trial_gate_rejects_missing_producer_signed_attestation_at_v2_0() {
     );
     // NOTE: deliberately NO derived-attestations.json — the honor-system stamp
     // ([derivation_provenance] stamp=...) is no longer accepted at v2.0.
+    for ship_phase in ["v2_0", "v2_2"] {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .args([
+                "check-third-party-trial",
+                "--json",
+                "--ship-phase",
+                ship_phase,
+            ])
+            .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+            .current_dir(dir.path())
+            .output()
+            .expect("failed to run xtask");
+        assert!(
+            !out.status.success(),
+            "{ship_phase} consumer must reject records lacking producer-signed attestations"
+        );
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("missing producer-signed derived attestation"),
+            "stderr should name the producer-signature provenance failure at {ship_phase}: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn trial_gate_rejects_unknown_ship_phase() {
+    let dir = tempfile::tempdir().unwrap();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"])
-        .env("MAOS_SHIP_PHASE", "v2_0")
-        .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
+        .args([
+            "check-third-party-trial",
+            "--json",
+            "--ship-phase",
+            "v2_typo",
+        ])
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
+    assert!(!out.status.success());
     assert!(
-        !out.status.success(),
-        "v2.0 consumer must reject records lacking producer-signed attestations"
-    );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("missing producer-signed derived attestation"),
-        "stderr should name the producer-signature provenance failure: {stderr}"
+        String::from_utf8_lossy(&out.stderr).contains("invalid ship phase"),
+        "stderr should reject an unrecognised shared-ladder value: {}",
+        String::from_utf8_lossy(&out.stderr)
     );
 }
 /// Story 11.7 consumer graduation (D1, green-half): the cohort carries
@@ -348,8 +375,7 @@ fn trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0() {
         &cohort_signed_attestations_json(None, &TEST_PRODUCER_SEED),
     );
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"])
-        .env("MAOS_SHIP_PHASE", "v2_0")
+        .args(["check-third-party-trial", "--json", "--ship-phase", "v2_0"])
         .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
@@ -382,8 +408,7 @@ fn trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_
         &cohort_signed_attestations_json(Some("P005"), &TEST_PRODUCER_SEED),
     );
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"])
-        .env("MAOS_SHIP_PHASE", "v2_0")
+        .args(["check-third-party-trial", "--json", "--ship-phase", "v2_0"])
         .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
@@ -426,8 +451,7 @@ fn trial_gate_rejects_tampered_producer_signature_at_v2_0() {
         &json,
     );
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"])
-        .env("MAOS_SHIP_PHASE", "v2_0")
+        .args(["check-third-party-trial", "--json", "--ship-phase", "v2_0"])
         .env("MAOS_TRIAL_PRODUCER_PUBKEY", &test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
@@ -484,8 +508,7 @@ fn producer_emit_writes_file_the_consumer_accepts_round_trip() {
     )
     .expect("producer emit must succeed");
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"])
-        .env("MAOS_SHIP_PHASE", "v2_0")
+        .args(["check-third-party-trial", "--json", "--ship-phase", "v2_0"])
         .env("MAOS_TRIAL_PRODUCER_PUBKEY", test_producer_pubkey_hex())
         .current_dir(dir.path())
         .output()
@@ -511,8 +534,7 @@ fn trial_gate_refuses_public_dev_producer_key_at_v2_0() {
     // Deliberately do NOT set MAOS_TRIAL_PRODUCER_PUBKEY → consumer would trust
     // the public dev key. It must refuse instead.
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(["check-third-party-trial", "--json"])
-        .env("MAOS_SHIP_PHASE", "v2_0")
+        .args(["check-third-party-trial", "--json", "--ship-phase", "v2_0"])
         .current_dir(dir.path())
         .output()
         .expect("failed to run xtask");
@@ -1017,6 +1039,25 @@ fn red_team_gate_fails_on_malformed_toml() {
         );
     });
     assert!(!out.status.success(), "gate should fail on malformed TOML");
+}
+
+/// A documented optional field remains type-checked when present.
+#[test]
+fn red_team_gate_rejects_non_string_optional_notes() {
+    let classes = all_classes();
+    let malformed = make_red_team(&classes, 80, 0).replacen("notes = \"test\"", "notes = 42", 1);
+    let out = run_in_tempdir("check-red-team-gate", |root| {
+        write_file(root, "tests/corpora/MANIFEST.toml", &make_manifest());
+        write_file(
+            root,
+            "docs/red-team/results/red-team-results.toml",
+            &malformed,
+        );
+    });
+    assert!(
+        !out.status.success(),
+        "a non-string optional notes value must fail typed schema validation"
+    );
 }
 
 /// #1 pin: trial gate with empty participant array + successes=12 → hard-fail (derive-from-detail).

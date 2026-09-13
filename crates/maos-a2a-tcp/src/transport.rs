@@ -15,7 +15,7 @@ use crate::config::{clone_key, TcpA2AConfig};
 use crate::error::TcpTransportError;
 use crate::verifier::{TofuPinningVerifier, TrustPosture, VerifyDirection};
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{FutureExt, SinkExt, StreamExt};
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ARouterCore, A2ATransport};
 use maos_a2a_core::transport::json_rpc::{CODE_FRAME_TOO_LARGE, CODE_TIMEOUT};
@@ -28,9 +28,10 @@ use maos_domain::frame::IacFrame;
 use maos_spirit_abi::identity::HostId;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
 use rustls::{ClientConfig, ServerConfig};
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
@@ -103,6 +104,14 @@ impl Drop for ServeGuard {
 pub struct TcpA2ATransport {
     core: Arc<A2ARouterCore>,
     pins: Arc<InMemoryTofuPinStore>,
+    /// §A6 mid-story (Blind-5): serializes generation swaps so two
+    /// concurrent `swap_serving_cert` calls cannot interleave their
+    /// dial/serve halves (dial-A, dial-B, serve-B, serve-A — a node serving
+    /// one leaf while presenting another).
+    swap_lock: std::sync::Mutex<()>,
+    /// the `ServerConfig`, so `swap_serving_cert` can rotate the serving
+    /// generation in place without a rebind.
+    serving_cert: Arc<SwappableServingCert>,
     /// Shared (unscoped) dialing config — kept for the raw-socket test helpers
     /// (AC-T2/7/8/9) and as the `client_config()` accessor. Real
     /// `route_outbound` dials build a PER-PEER scoped config instead (review
@@ -111,8 +120,12 @@ pub struct TcpA2ATransport {
     /// Materials to rebuild a per-dial `ClientConfig` whose `ServerCertVerifier`
     /// is scoped to the EXPECTED peer (review patch P1) — the dial target is only
     /// known per `route_outbound` call, so the verifier cannot be fixed at bind.
-    own_chain: Vec<CertificateDer<'static>>,
-    own_key: PrivateKeyDer<'static>,
+    /// Story 14-2 / AC2.4 — swappable with the SERVING generation: a node's
+    /// leaf is ONE identity (it serves it AND presents it on outbound mTLS
+    /// handshakes), so `swap_serving_cert` rotates BOTH or post-swap dials
+    /// present the retired leaf and promoted peers refuse them (measured by
+    /// the scene's beat-5 positive control, 2026-08-29).
+    dial_materials: Arc<SwappableDialMaterials>,
     posture: TrustPosture,
     validation_time: Option<UnixTime>,
     local_addr: SocketAddr,
@@ -126,6 +139,12 @@ pub struct TcpA2ATransport {
     /// `(boot_nonce, lamport)` — `route_outbound` discards the ACK, so AC-T1's
     /// wire round-trip oracles read this instead.
     last_intake: Arc<Mutex<Option<(u64, u64)>>>,
+    /// Story 14-2a review — the supervised-boundary policy for a panic
+    /// escaping a per-connection task (fail-stop in production; the Observe
+    /// seam exists so tests never abort the shared test runner). Read per
+    /// connection at accept time, so `install_connection_panic_policy`
+    /// governs connections accepted after it.
+    panic_policy: Arc<Mutex<ConnectionPanicPolicy>>,
     _serve_guard: Arc<ServeGuard>,
 }
 
@@ -404,13 +423,14 @@ impl TcpA2ATransport {
             core.install_intake_sink(sink).await;
         }
 
-        let server_config = Arc::new(build_server_config(
+        let (server_config, serving_cert) = build_server_config(
             &own_chain,
             &own_key,
             pins.clone(),
             posture.clone(),
             validation_time,
-        )?);
+        )?;
+        let server_config = Arc::new(server_config);
         let client_config = Arc::new(build_client_config(
             &own_chain,
             &own_key,
@@ -431,6 +451,7 @@ impl TcpA2ATransport {
         let active_connections = Arc::new(AtomicUsize::new(0));
         let last_intake: Arc<Mutex<Option<(u64, u64)>>> = Arc::new(Mutex::new(None));
         let conns: Arc<Mutex<Vec<JoinHandle<()>>>> = Arc::new(Mutex::new(Vec::new()));
+        let panic_policy = Arc::new(Mutex::new(ConnectionPanicPolicy::FailStop));
 
         let accept = tokio::spawn(accept_loop(
             listener,
@@ -442,14 +463,19 @@ impl TcpA2ATransport {
             active_connections.clone(),
             last_intake.clone(),
             conns.clone(),
+            panic_policy.clone(),
         ));
 
         Ok(Self {
             core,
             pins,
+            serving_cert,
             client_config,
-            own_chain,
-            own_key,
+            dial_materials: Arc::new(SwappableDialMaterials::new(
+                own_chain.clone(),
+                clone_key(&own_key),
+            )),
+            swap_lock: std::sync::Mutex::new(()),
             posture,
             validation_time,
             local_addr,
@@ -460,8 +486,22 @@ impl TcpA2ATransport {
             active_connections,
             last_dial_attempts: Arc::new(AtomicUsize::new(0)),
             last_intake,
+            panic_policy,
             _serve_guard: Arc::new(ServeGuard { accept, conns }),
         })
+    }
+
+    /// Story 14-2a review — replace the connection-task panic policy. `bind`
+    /// defaults to [`ConnectionPanicPolicy::FailStop`] (a panicking
+    /// connection task terminates the daemon process); tests and embedders
+    /// install [`ConnectionPanicPolicy::Observe`] instead so the supervised
+    /// boundary is exercisable without aborting the host process. The policy
+    /// is read per connection at accept time, so connections accepted after
+    /// this call are governed by it.
+    pub fn install_connection_panic_policy(&self, policy: ConnectionPanicPolicy) {
+        if let Ok(mut guard) = self.panic_policy.lock() {
+            *guard = policy;
+        }
     }
 
     /// The shared engine. Tests drive intake through it directly, and the J1
@@ -485,6 +525,39 @@ impl TcpA2ATransport {
     /// The shared TOFU pin store (AC-T6/T11 post-conditions read it).
     pub fn pins(&self) -> Arc<InMemoryTofuPinStore> {
         self.pins.clone()
+    }
+
+    /// Story 14-2 / AC2.4 — swap the cert generation IN PLACE: no rebind, no
+    /// listener churn, no connection teardown. Rotates BOTH halves of the
+    /// node's ONE identity — the SERVING resolver (new handshakes resolve the
+    /// replacement from the next ClientHello; established connections are
+    /// untouched, rustls never renegotiates) and the DIAL materials (outbound
+    /// mTLS handshakes present the replacement; a half-swapped node would
+    /// serve the new leaf while presenting the retired one, and promoted
+    /// peers refuse it — measured by the scene's beat-5 control). Callers:
+    /// the rotation drill and the N=3 scene — there is NO production caller;
+    /// the production trigger is the operator provisioning act of AC2.0,
+    /// which has no live reload path (AC2.2.d/AC6.5(c)).
+    pub fn swap_serving_cert(
+        &self,
+        chain: Vec<CertificateDer<'static>>,
+        key: PrivateKeyDer<'static>,
+    ) -> Result<(), TcpTransportError> {
+        // §A6 (Edge-5/Blind-5 + close-pass CloseEdge-2): VALIDATE FIRST, then
+        // ACQUIRE BOTH write guards under swap_lock BEFORE writing either —
+        // a poisoned serving lock must not leave the dial half swapped —
+        // then commit. A rejected rotation leaves the node UNCHANGED, and
+        // concurrent swaps publish one generation each.
+        let ck = SwappableServingCert::certified_key(chain.clone(), &key)?;
+        let _guard = self
+            .swap_lock
+            .lock()
+            .map_err(|_| TcpTransportError::Config("swap lock poisoned".into()))?;
+        let mut dial_guard = self.dial_materials.write_guard()?;
+        let mut serve_guard = self.serving_cert.write_guard()?;
+        *dial_guard = (chain, key);
+        *serve_guard = Arc::new(ck);
+        Ok(())
     }
 
     /// A client `ClientConfig` carrying this endpoint's own auth cert + the
@@ -521,17 +594,29 @@ impl TcpA2ATransport {
         rest.parse::<SocketAddr>()
             .map_err(|e| TcpTransportError::Config(format!("bad endpoint addr '{rest}': {e}")))
     }
-
     /// Build a dialing `ClientConfig` whose `ServerCertVerifier` is scoped to the
     /// EXPECTED peer (review patch P1), so a leaf pinned for a different peer
     /// cannot satisfy this dial. Built once per `route_outbound` call.
+    ///
+    /// **Story 14-2 / AC2.4.b — STANDING CONSTRAINT: never cache
+    /// `ClientConfig` per peer.** Every dial MUST remain a full handshake.
+    /// `ServerConfig` defaults issue TLS 1.3 tickets; a resumed handshake
+    /// sends no Certificate message, so a cached `ClientConfig` would resume
+    /// sessions across a cert rotation and NEVER re-run `TofuPinningVerifier`
+    /// — the dialer would keep verifying the PRE-ROTATION leaf indefinitely.
+    /// The next person optimising throughput will reach for exactly that
+    /// cache; this comment is the tripwire.
     fn scoped_client_config(
         &self,
         expected: &PeerId,
     ) -> Result<Arc<ClientConfig>, TcpTransportError> {
+        let (chain, key) = self
+            .dial_materials
+            .snapshot()
+            .ok_or_else(|| TcpTransportError::Config("dial materials lock poisoned".into()))?;
         Ok(Arc::new(build_client_config(
-            &self.own_chain,
-            &self.own_key,
+            &chain,
+            &key,
             self.pins.clone(),
             self.posture.clone(),
             Some(expected.clone()),
@@ -609,10 +694,114 @@ impl TcpA2ATransport {
                 .map_err(|e| TcpTransportError::Protocol(format!("deserialize response: {e}"))),
         }
     }
+
+    /// Route one frame and report whether a decoded ACK/NACK response reached
+    /// the caller. The boolean is the exact conversation-verdict boundary:
+    /// local validation, handshake, timeout, and transport failures are
+    /// `false`; every decoded peer response is `true`, regardless of its typed
+    /// interpretation.
+    pub async fn route_outbound_observed(
+        &self,
+        frame: IacFrame,
+        peer: &HostId,
+    ) -> (Result<(), A2AError>, bool) {
+        let (request, peer_cfg, frame_id) = match self
+            .core
+            .prepare_outbound(frame, peer, self.own_boot_nonce)
+            .await
+        {
+            Ok(prepared) => prepared,
+            Err(error) => return (Err(error), false),
+        };
+        let addr = match self.dial_addr(&peer_cfg).map_err(A2AError::from) {
+            Ok(addr) => addr,
+            Err(error) => return (Err(error), false),
+        };
+        let scoped_cfg = match self
+            .scoped_client_config(&peer_cfg.peer_id)
+            .map_err(A2AError::from)
+        {
+            Ok(config) => config,
+            Err(error) => return (Err(error), false),
+        };
+        let partition =
+            Duration::from_secs(peer_cfg.partition_timeout_secs).min(self.timeouts.idle);
+        let configured = Duration::from_secs(peer_cfg.partition_timeout_secs);
+        if configured > partition {
+            tracing::warn!(
+                peer = %peer.as_str(),
+                configured_secs = peer_cfg.partition_timeout_secs,
+                effective_secs = partition.as_secs(),
+                "partition window exceeds the idle wall — clamped; raise the idle \
+                 timeout or lower the configured window"
+            );
+        }
+
+        let max = self.retry_policy.max_attempts.max(1);
+        let mut attempt: u8 = 1;
+        loop {
+            self.last_dial_attempts
+                .store(attempt as usize, Ordering::SeqCst);
+            match self.dial_once(addr, &request, &scoped_cfg, partition).await {
+                Ok(response) => return (self.core.interpret_response(peer, response), true),
+                Err(last_err) => {
+                    if let TcpTransportError::PartitionTimeout { phase, secs } = &last_err {
+                        tracing::warn!(
+                            peer = %peer.as_str(),
+                            phase = %phase,
+                            timeout_secs = *secs,
+                            "a2a partition timeout — frame NOT delivered, no kernel auto-retry"
+                        );
+                        return (
+                            Err(A2AError::PartitionTimeout {
+                                peer: peer.as_str().to_string(),
+                                frame_id,
+                                timeout_secs: if *secs == 0 {
+                                    peer_cfg.partition_timeout_secs
+                                } else {
+                                    *secs
+                                },
+                            }),
+                            false,
+                        );
+                    }
+                    if last_err.is_tofu_mismatch() {
+                        if let Err(journal_err) = self
+                            .core
+                            .journal_peer_identity_refusal(
+                                PeerRefusalDirection::Dial,
+                                peer.as_str(),
+                                &last_err.to_string(),
+                            )
+                            .await
+                        {
+                            tracing::error!(
+                                "peer-identity refusal was NOT journaled ({journal_err}): {}",
+                                last_err
+                            );
+                        }
+                    }
+                    let a2a = last_err.to_a2a_error();
+                    if attempt >= max || !self.retry_policy.is_retryable(&a2a) {
+                        return (Err(a2a), false);
+                    }
+                    let delay = self
+                        .retry_policy
+                        .delay_for_attempt(attempt + 1, Some(attempt as u64));
+                    if delay > 0 {
+                        tokio::time::sleep(Duration::from_millis(delay)).await;
+                    }
+                    attempt += 1;
+                }
+            }
+        }
+    }
 }
 
-/// The accept loop — one per-connection `tokio::spawn` with its `JoinHandle`
-/// held in the drop-guard registry (H6).
+/// The accept loop — one supervised per-connection `tokio::spawn` with its
+/// `JoinHandle` held in the drop-guard registry (H6). The supervision seam
+/// wraps every connection future so a task panic can no longer be silently
+/// discarded by that registry (Story 14-2a review).
 #[allow(clippy::too_many_arguments)]
 async fn accept_loop(
     listener: TcpListener,
@@ -624,6 +813,7 @@ async fn accept_loop(
     active_connections: Arc<AtomicUsize>,
     last_intake: Arc<Mutex<Option<(u64, u64)>>>,
     conns: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    panic_policy: Arc<Mutex<ConnectionPanicPolicy>>,
 ) {
     loop {
         let (tcp, _peer) = match listener.accept().await {
@@ -644,15 +834,33 @@ async fn accept_loop(
         let active_connections = active_connections.clone();
         let last_intake = last_intake.clone();
 
-        let handle = tokio::spawn(serve_connection(
-            tcp,
-            acceptor,
-            core,
-            pins,
-            timeouts,
-            intake_entered,
-            active_connections,
-            last_intake,
+        // Story 14-2a review — the supervised boundary. The peer hint is
+        // captured BEFORE `tcp` moves into the connection task; it is the
+        // only label available once the task is gone.
+        let peer_addr_hint = tcp
+            .peer_addr()
+            .map(|a| a.to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+        // Read per connection (not once at bind) so a policy installed after
+        // `bind` governs connections accepted from then on; a poisoned lock
+        // fails CLOSED to the production default.
+        let policy = match panic_policy.lock() {
+            Ok(guard) => guard.clone(),
+            Err(_) => ConnectionPanicPolicy::FailStop,
+        };
+        let handle = tokio::spawn(supervise_connection(
+            policy,
+            peer_addr_hint,
+            serve_connection(
+                tcp,
+                acceptor,
+                core,
+                pins,
+                timeouts,
+                intake_entered,
+                active_connections,
+                last_intake,
+            ),
         ));
         if let Ok(mut guard) = conns.lock() {
             guard.retain(|h| !h.is_finished());
@@ -666,6 +874,96 @@ struct ConnGauge(Arc<AtomicUsize>);
 impl Drop for ConnGauge {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Story 14-2a review — what the supervised connection boundary does when a
+/// per-connection task PANICS (e.g. the production I2 audit-write panic
+/// reached by a signed-manifest reissue, or any future bug in the read loop).
+///
+/// Before this seam the per-connection `JoinHandle`s in the drop-guard
+/// registry were never awaited, so a panicking connection task was silently
+/// discarded: the daemon kept serving with a piece of itself dead, and the
+/// audit-write panic policy — fail-stop at DAEMON-PROCESS scope — had no
+/// enforcement point. The boundary below is that enforcement point.
+#[derive(Clone)]
+pub enum ConnectionPanicPolicy {
+    /// Production default: log, then `std::process::abort()` the daemon
+    /// process. Abort (not exit) is deliberate — no destructors, no flushes,
+    /// no further state mutation racing a dying daemon: a panicking
+    /// connection can never leave the daemon serving.
+    FailStop,
+    /// Test/embedding seam: hand the observation to `hook` and keep serving,
+    /// so the boundary is exercisable without aborting the host process
+    /// (e.g. the shared `cargo test` runner). Never install outside tests.
+    Observe(Arc<dyn Fn(&ConnectionPanic) + Send + Sync>),
+}
+
+/// What the supervised boundary reports about one panicking connection task.
+#[derive(Debug, Clone)]
+pub struct ConnectionPanic {
+    /// Best-effort socket label of the connection whose task panicked
+    /// (`"unknown"` when the socket was already gone).
+    pub peer_addr: String,
+    /// Display form of the panic payload. Diagnostics ONLY — the boundary's
+    /// decision is the typed `catch_unwind` boundary itself; nothing parses
+    /// this text.
+    pub message: String,
+}
+
+/// Story 14-2a review — the explicit supervised task boundary around one
+/// per-connection task. `serve_connection` stays panic-transparent; this
+/// wrapper is the ONLY place a connection panic is observed, and the selected
+/// [`ConnectionPanicPolicy`] — and nothing else — decides what it means. A
+/// drop-guard `abort()` is NOT a panic: cancellation never reaches
+/// `catch_unwind`, so the H6 shutdown path is untouched.
+async fn supervise_connection<F>(policy: ConnectionPanicPolicy, peer_addr: String, fut: F)
+where
+    F: Future<Output = ()>,
+{
+    match std::panic::AssertUnwindSafe(fut).catch_unwind().await {
+        Ok(()) => {}
+        Err(payload) => enforce_connection_panic_policy(policy, peer_addr, payload),
+    }
+}
+
+/// Enforce [`ConnectionPanicPolicy`] for one observed connection-task panic.
+fn enforce_connection_panic_policy(
+    policy: ConnectionPanicPolicy,
+    peer_addr: String,
+    payload: Box<dyn std::any::Any + Send>,
+) {
+    let message = panic_payload_message(payload.as_ref());
+    tracing::error!(
+        peer = %peer_addr,
+        panic = %message,
+        "a per-connection task PANICKED — the supervised boundary is enforcing the \
+         connection-panic policy"
+    );
+    match policy {
+        ConnectionPanicPolicy::FailStop => {
+            // stderr as well as tracing: `abort()` must never be the FIRST
+            // someone hears of this, whatever subscriber the daemon runs.
+            eprintln!(
+                "FATAL (fail-stop): connection task to {peer_addr} panicked: {message}; \
+                 aborting the daemon process"
+            );
+            std::process::abort();
+        }
+        ConnectionPanicPolicy::Observe(hook) => hook(&ConnectionPanic { peer_addr, message }),
+    }
+}
+
+/// Best-effort DISPLAY of a panic payload for the log/observation only. This
+/// is the standard `&'static str`/`String` payload downcast, not parsing:
+/// control flow never keys on the text.
+fn panic_payload_message(payload: &dyn std::any::Any) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "<non-string panic payload>".to_string()
     }
 }
 
@@ -705,7 +1003,43 @@ async fn serve_connection(
         Ok(Ok(s)) => s,
         Ok(Err(e)) => {
             let classified = TcpTransportError::classify_handshake(&e.to_string());
-            if classified.is_tofu_mismatch() {
+            // Story 14-2a / AC4.4 — §7.2.1.a requires, verbatim, that the
+            // post-grace rejection be *"logged as `cert_post_grace_reject`"*.
+            // Until this arm it was the ONE failure mode this whole rotation
+            // mechanism exists to produce and the ONLY one that left NO trace at
+            // all: a validity rejection fell through the `is_tofu_mismatch()`
+            // arm and returned bare, so an auditor asking "did anyone keep using
+            // the old certificate?" had nothing to read.
+            //
+            // ⚠ WHICH ARM IS THE POST-GRACE ONE — MEASURED, AND IT IS NOT THE
+            // OBVIOUS ONE. A retired leaf is normally still WITHIN its validity
+            // window (a rotation is not an expiry), so after promotion the
+            // verifier refuses it as `PIN_MISMATCH`, not `CERT_EXPIRED`. The
+            // sentinel therefore rides the MISMATCH arm, and the validity arm
+            // gets its own accurate label instead of being mislabelled a
+            // post-grace refusal — an expired CURRENT certificate is a different
+            // operator problem and must not be filed as a rotation event.
+            //
+            // ⚠ AND THE SENTINEL IS NON-EXCLUSIVE, BY CONSTRUCTION. The store
+            // keeps NO retired-generation history (`TofuPin` has no previous
+            // field and `close_rotation_window` returns the retired value to a
+            // caller that drops it), and a failed handshake surfaces no observed
+            // fingerprint here at all — so "retired leaf after the grace" and
+            // "unknown leaf, i.e. an impersonation attempt" are ONE observable
+            // at this seam. The row says so rather than claiming to know which.
+            // The join an auditor actually uses is the rotation timeline: a
+            // `cert_rotation_window_closed` row for the peer, then this refusal.
+            let refusal = if classified.is_tofu_mismatch() {
+                Some(format!(
+                    "cert_post_grace_reject candidate (or unknown-leaf refusal — this seam \
+                     cannot distinguish them: no retired-generation history exists): {classified}"
+                ))
+            } else if classified.is_cert_validity() {
+                Some(format!("cert_validity_reject: {classified}"))
+            } else {
+                None
+            };
+            if let Some(detail) = refusal {
                 // Best-effort: a journaling failure must not become a way to keep
                 // the listener from refusing — but it must not be SILENT either
                 // (§A6 review 2026-08-18): the Err contract on
@@ -715,14 +1049,14 @@ async fn serve_connection(
                     .journal_peer_identity_refusal(
                         PeerRefusalDirection::Listen,
                         peer_addr_hint.as_str(),
-                        &classified.to_string(),
+                        detail.as_str(),
                     )
                     .await
                 {
                     tracing::error!(
                         "peer-identity refusal was NOT journaled ({}): {}",
                         journal_err,
-                        classified
+                        detail
                     );
                 }
             }
@@ -875,15 +1209,123 @@ fn is_frame_too_large(e: &std::io::Error) -> bool {
     s.contains("frame size too big") || s.contains("too big") || s.contains("max_frame_length")
 }
 
-/// Build the listening-side `ServerConfig` with the `TofuPinningVerifier` as the
-/// `ClientCertVerifier` (mTLS — both directions pin, AC-A3).
+/// Story 14-2 / AC2.4 — the node's DIAL identity (client-auth chain + key),
+/// swappable in place with the serving generation for the same reason the
+/// serving resolver is: rotation is a generation swap of ONE identity, and a
+/// half-swapped node serves the new leaf while still PRESENTING the retired
+/// one on outbound handshakes. Poison fails CLOSED (no materials read → no
+/// dial), matching the file's existing `if let Ok(...)` idiom.
+struct SwappableDialMaterials(
+    std::sync::RwLock<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)>,
+);
+
+impl SwappableDialMaterials {
+    fn new(chain: Vec<CertificateDer<'static>>, key: PrivateKeyDer<'static>) -> Self {
+        Self(std::sync::RwLock::new((chain, key)))
+    }
+
+    /// Clone the current dial materials for one per-dial `ClientConfig`
+    /// build. `None` on poison — callers fail closed.
+    fn snapshot(&self) -> Option<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
+        self.0.read().ok().map(|g| (g.0.clone(), g.1.clone_key()))
+    }
+
+    /// §A6 close-pass (CloseEdge-2): expose the write guard so a generation
+    /// swap can acquire BOTH locks BEFORE writing either half.
+    fn write_guard(
+        &self,
+    ) -> Result<
+        std::sync::RwLockWriteGuard<'_, (Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)>,
+        TcpTransportError,
+    > {
+        self.0
+            .write()
+            .map_err(|_| TcpTransportError::Config("dial materials lock poisoned".into()))
+    }
+}
+
+/// Story 14-2 / AC2.4.a — a swappable serving-cert resolver: interior
+/// mutability behind a `std::sync::RwLock`, so the serving generation can be
+/// rotated IN PLACE. `TlsAcceptor::accept` re-reads the same resolver `Arc`
+/// per connection (tokio-rustls `server.rs`), `resolve` runs exactly once
+/// per ClientHello (rustls `server/hs.rs`), and rustls performs NO
+/// renegotiation at all — so in-flight connections are provably unaffected
+/// by a swap and the accept loop needs ZERO changes. Connection continuity,
+/// not dual-serving, is the reason this exists: the one-generation overlap
+/// (§7.2.1.a) requires old and new cert to be acceptable DURING the swap
+/// window, and a teardown-rebind physically cannot provide it.
+#[derive(Debug)]
+pub struct SwappableServingCert(RwLock<Arc<rustls::sign::CertifiedKey>>);
+
+impl SwappableServingCert {
+    fn new(
+        chain: Vec<CertificateDer<'static>>,
+        key: &PrivateKeyDer<'static>,
+    ) -> Result<Self, TcpTransportError> {
+        Ok(Self(std::sync::RwLock::new(Arc::new(Self::certified_key(
+            chain, key,
+        )?))))
+    }
+
+    /// §A6 mid-story (Blind-4/Edge-4/Acceptance-3): build through
+    /// `CertifiedKey::from_der` — the path `with_single_cert` used — so an
+    /// EMPTY chain or a key that does not match the leaf is refused HERE,
+    /// at build/swap time, instead of succeeding and failing every later
+    /// handshake.
+    fn certified_key(
+        chain: Vec<CertificateDer<'static>>,
+        key: &PrivateKeyDer<'static>,
+    ) -> Result<rustls::sign::CertifiedKey, TcpTransportError> {
+        if chain.is_empty() {
+            return Err(TcpTransportError::Config(
+                "serving chain must carry at least the leaf certificate".into(),
+            ));
+        }
+        let provider = rustls::crypto::ring::default_provider();
+        rustls::sign::CertifiedKey::from_der(chain, clone_key(key), &provider).map_err(|e| {
+            TcpTransportError::Config(format!(
+                "serving cert/key pair unusable (mismatched key or unparseable): {e:?}"
+            ))
+        })
+    }
+
+    /// §A6 close-pass (CloseEdge-2): expose the write guard so a generation
+    /// swap can acquire BOTH locks BEFORE writing either half.
+    fn write_guard(
+        &self,
+    ) -> Result<std::sync::RwLockWriteGuard<'_, Arc<rustls::sign::CertifiedKey>>, TcpTransportError>
+    {
+        self.0
+            .write()
+            .map_err(|_| TcpTransportError::Config("serving cert lock poisoned".into()))
+    }
+}
+
+impl rustls::server::ResolvesServerCert for SwappableServingCert {
+    fn resolve(
+        &self,
+        _client_hello: rustls::server::ClientHello,
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
+        // Poison idiom (the file's existing `if let Ok(...)` shape): a
+        // poisoned lock fails CLOSED — no cert resolved, handshake refused.
+        self.0.read().ok().map(|g| g.clone())
+    }
+}
+/// Build the listening-side `ServerConfig` with the `TofuPinningVerifier` as
+/// the `ClientCertVerifier` (mTLS — both directions pin, AC-A3), serving via
+/// a [`SwappableServingCert`] resolver so Story 14-2's one-generation overlap
+/// can swap the serving cert in place (AC2.4.a). Returns the config AND the
+/// shared resolver handle — `with_cert_resolver` builds the
+/// `rustls::sign::CertifiedKey` itself, which `with_single_cert` used to do
+/// for us. The `?` on protocol versions survives, hence the tuple in a
+/// `Result`, not a bare tuple.
 pub fn build_server_config(
     chain: &[CertificateDer<'static>],
     key: &PrivateKeyDer<'static>,
     pins: Arc<InMemoryTofuPinStore>,
     posture: TrustPosture,
     validation_time: Option<UnixTime>,
-) -> Result<ServerConfig, TcpTransportError> {
+) -> Result<(ServerConfig, Arc<SwappableServingCert>), TcpTransportError> {
     let verifier = Arc::new(TofuPinningVerifier::new(
         pins,
         posture,
@@ -891,13 +1333,14 @@ pub fn build_server_config(
         None, // listen side learns the peer from the cert — flat TOFU lookup
         validation_time,
     ));
+    let resolver = Arc::new(SwappableServingCert::new(chain.to_vec(), key)?);
     let provider = Arc::new(rustls::crypto::ring::default_provider());
-    ServerConfig::builder_with_provider(provider)
+    let config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .map_err(|e| TcpTransportError::Config(format!("protocol versions: {e}")))?
         .with_client_cert_verifier(verifier)
-        .with_single_cert(chain.to_vec(), clone_key(key))
-        .map_err(|e| TcpTransportError::Config(format!("server cert: {e}")))
+        .with_cert_resolver(resolver.clone());
+    Ok((config, resolver))
 }
 
 /// Build the dialing-side `ClientConfig` with the `TofuPinningVerifier` as the
@@ -932,116 +1375,7 @@ pub fn build_client_config(
 #[async_trait]
 impl A2APeerRouter for TcpA2ATransport {
     async fn route_outbound(&self, frame: IacFrame, peer: &HostId) -> Result<(), A2AError> {
-        // Shared steps (1)–(4): allowlist + TOFU verify + clock tick + build
-        // request (carrying THIS Host's boot_nonce — Correction #3 / NFR-Rel-6).
-        let (request, peer_cfg, frame_id) = self
-            .core
-            .prepare_outbound(frame, peer, self.own_boot_nonce)
-            .await?;
-        let addr = self.dial_addr(&peer_cfg).map_err(A2AError::from)?;
-        // Scope the dial-side cert verifier to the peer we INTEND to reach (P1).
-        let scoped_cfg = self
-            .scoped_client_config(&peer_cfg.peer_id)
-            .map_err(A2AError::from)?;
-
-        // `j1-crosshost-2c` AC3.3 — WIRE the operator-configured partition window
-        // to the TCP path. Its only production consumer was
-        // `LoopbackA2ARouter::route_outbound` (`maos-a2a/src/adapter.rs:83`);
-        // `maos-a2a-tcp` read it ZERO times and the wire was bounded by hardcoded
-        // `TcpTimeouts::production()` instead.
-        //
-        // Clamped by `timeouts.idle` for two reasons, neither of them cosmetic:
-        // `TcpTimeouts` is the injected test seam (H5) that keeps this crate's
-        // suite inside its 51x-per-push budget, and the response read below is
-        // ALREADY bounded by `idle` — so a write window longer than the idle wall
-        // could never be observed by a caller anyway.
-        let partition =
-            Duration::from_secs(peer_cfg.partition_timeout_secs).min(self.timeouts.idle);
-
-        // §A6 review 2026-08-18 (P14): the clamp is deliberate (see above) but
-        // it was SILENT — an operator who ratified a 300s window was being
-        // honored at 60s with no trace. Say so, once, at the clamp.
-        let configured = Duration::from_secs(peer_cfg.partition_timeout_secs);
-        if configured > partition {
-            tracing::warn!(
-                peer = %peer.as_str(),
-                configured_secs = peer_cfg.partition_timeout_secs,
-                effective_secs = partition.as_secs(),
-                "partition window exceeds the idle wall — clamped; raise the idle \
-                 timeout or lower the configured window"
-            );
-        }
-
-        // Transport-side retry (AC-T12: the ONLY retrier). Retries fire ONLY on
-        // cert-class failures per `HandshakeRetryPolicy::is_retryable`.
-        let max = self.retry_policy.max_attempts.max(1);
-        let mut attempt: u8 = 1;
-        let mut last_err: TcpTransportError;
-        loop {
-            self.last_dial_attempts
-                .store(attempt as usize, Ordering::SeqCst);
-            match self.dial_once(addr, &request, &scoped_cfg, partition).await {
-                Ok(response) => {
-                    return self.core.interpret_response(peer, response);
-                }
-                Err(e) => {
-                    last_err = e;
-                    // AC3.3 — a partition is NOT a generic transport failure. This
-                    // is the one place that holds both the peer and the frame id,
-                    // so it is the one place that can mint the typed variant the
-                    // §7.2 claim has always described.
-                    if let TcpTransportError::PartitionTimeout { phase, secs } = &last_err {
-                        tracing::warn!(
-                            peer = %peer.as_str(),
-                            phase = %phase,
-                            timeout_secs = *secs,
-                            "a2a partition timeout — frame NOT delivered, no kernel auto-retry"
-                        );
-                        return Err(A2AError::PartitionTimeout {
-                            peer: peer.as_str().to_string(),
-                            frame_id,
-                            timeout_secs: if *secs == 0 {
-                                peer_cfg.partition_timeout_secs
-                            } else {
-                                *secs
-                            },
-                        });
-                    }
-                    // AC3.6 — the DIAL side already surfaced this typed at the
-                    // composition root, but it left no row either. Journal it here
-                    // so both sides of a pin mismatch are queryable, and journal it
-                    // ONCE — before the retry decision, since a pin mismatch is
-                    // never retryable.
-                    if last_err.is_tofu_mismatch() {
-                        if let Err(journal_err) = self
-                            .core
-                            .journal_peer_identity_refusal(
-                                PeerRefusalDirection::Dial,
-                                peer.as_str(),
-                                &last_err.to_string(),
-                            )
-                            .await
-                        {
-                            tracing::error!(
-                                "peer-identity refusal was NOT journaled ({journal_err}): {}",
-                                last_err
-                            );
-                        }
-                    }
-                    let a2a = last_err.to_a2a_error();
-                    if attempt >= max || !self.retry_policy.is_retryable(&a2a) {
-                        return Err(a2a);
-                    }
-                    let delay = self
-                        .retry_policy
-                        .delay_for_attempt(attempt + 1, Some(attempt as u64));
-                    if delay > 0 {
-                        tokio::time::sleep(Duration::from_millis(delay)).await;
-                    }
-                    attempt += 1;
-                }
-            }
-        }
+        self.route_outbound_observed(frame, peer).await.0
     }
 
     async fn handle_intake(&self, request: A2AJsonRpcRequest) -> A2AJsonRpcResponse {

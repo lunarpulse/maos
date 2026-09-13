@@ -343,6 +343,17 @@ owner = "maos-a2a-core"
 kernel_or_spirit = "kernel"
 since_version = "0.5.0"
 
+[[error]]
+code = "EPinMismatch::FingerprintCollision"
+rust_path = "EPinMismatch::FingerprintCollision"
+source_file = "crates/maos-a2a-core/src/tofu.rs"
+description = "Fingerprint insertion refused — another peer already holds the fingerprint as a current pin or open rotation generation"
+severity = "security"
+recovery_class = "escalate"
+owner = "maos-a2a-core"
+kernel_or_spirit = "kernel"
+since_version = "2.2.0"
+
 # ---------------------------------------------------------------------------
 # ESkillSchema — crates/maos-skill/src/errors.rs
 # (E*-prefixed enum; all variants are part of the E* set)

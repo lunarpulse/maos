@@ -95,15 +95,15 @@ fn check_coverage_matrix(
     let mut deferred = Vec::new();
     let mut checked = 0usize;
 
-    if coverage.current_phase != phase_config.current_phase {
-        violations.push(Violation { id: "phase-mismatch".into(), message: format!("NFR-Meta-3 violation: phase mismatch — coverage-matrix.yaml says {}, phase-config.toml says {}", coverage.current_phase, phase_config.current_phase) });
+    if coverage.delivered_phase != phase_config.delivered_phase {
+        violations.push(Violation { id: "phase-mismatch".into(), message: format!("NFR-Meta-3 violation: phase mismatch — coverage-matrix.yaml says {}, phase-config.toml says {}", coverage.delivered_phase, phase_config.delivered_phase) });
     }
-    if !coverage.phase_order.contains(&coverage.current_phase) {
+    if !coverage.phase_order.contains(&coverage.delivered_phase) {
         violations.push(Violation {
             id: "invalid-current-phase".into(),
             message: format!(
-                "NFR-Meta-3 violation: current_phase '{}' not in phase_order",
-                coverage.current_phase
+                "NFR-Meta-3 violation: delivered_phase '{}' not in phase_order",
+                coverage.delivered_phase
             ),
         });
     }
@@ -142,7 +142,7 @@ fn check_coverage_matrix(
                 violations.push(Violation { id: id.clone(), message: format!("NFR-Meta-3 violation: {} references unknown gate '{}' (not in xtask/gate-registry.toml)", id, gate_name) });
             }
         }
-        if phase_le(&row.phase, &coverage.current_phase, &coverage.phase_order) {
+        if phase_le(&row.phase, &coverage.delivered_phase, &coverage.phase_order) {
             if row.gates.is_empty() && row.corpora.is_empty() {
                 violations.push(Violation { id: id.clone(), message: format!("NFR-Meta-3 violation: {} delivered at {} has zero corpus and zero gate coverage", id, row.phase) });
             }

@@ -43,10 +43,12 @@ pub mod halt_receipt;
 pub mod manifest;
 pub mod migration;
 pub mod pin;
+pub mod rotation;
 pub mod state;
 
 pub use audit::{
     CohortAuditEvent, CohortAuditSink, CohortTransparencyLogSink, InMemoryCohortAuditSink,
+    CERT_ROTATION_INTENT,
 };
 pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
 pub use digest::{
@@ -70,4 +72,11 @@ pub use migration::{
     resolve_migration_chain, MigrationCandidate, MigrationChain, MigrationHop, MigrationPlan,
 };
 pub use pin::PinnedAuthorityKeys;
-pub use state::{CohortClock, CohortManifestState, ReissueOutcome};
+pub use rotation::{
+    cold_deployment_t_grace, PeerCertRotation, RotationGraceTimer, RotationOutcome,
+    RotationRefusal, RotationWindow, COLD_DEPLOYMENT_DAYS_OF_HISTORY, COLD_DEPLOYMENT_HANDSHAKE_MS,
+};
+pub use state::{
+    CohortClock, CohortManifestState, PeerConvergence, ReissueOutcome, CONVERGENCE_OBSERVED,
+    CONVERGENCE_RESTARTED, CONVERGENCE_STALE,
+};

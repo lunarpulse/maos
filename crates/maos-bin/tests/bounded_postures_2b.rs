@@ -120,7 +120,7 @@ hex = "0000000000000000000000000000000000000000000000000000000000000000"
 fn cross_host_nonce_path_cannot_inherit_the_loopback_zero_sentinel() {
     let restart_check = code_window_after(ROUTER_SOURCE, "async fn handle_intake_inner(", 85);
     let loopback_route = code_window_after(LOOPBACK_SOURCE, "async fn route_outbound(", 30);
-    let tcp_route = code_window_after(TCP_SOURCE, "async fn route_outbound(", 35);
+    let tcp_route = code_window_after(TCP_SOURCE, "async fn route_outbound_observed(", 35);
 
     assert!(
         restart_check.contains("if request.boot_nonce != 0"),
@@ -130,6 +130,19 @@ fn cross_host_nonce_path_cannot_inherit_the_loopback_zero_sentinel() {
         loopback_route.contains("self.core.prepare_outbound(frame, peer, 0).await?"),
         "only the in-process loopback router may stamp the zero sentinel"
     );
+    // Oracle-shape lesson, filed at the assertion it annotates (story 14-2a
+    // repair): this asserts that two strings sit NEAR EACH OTHER IN A FILE —
+    // not a property of the system. It held only until a refactor moved the
+    // seam: story 14-2 moved the only `prepare_outbound(` call out of the
+    // `route_outbound` forwarder (transport.rs:1243) into
+    // `route_outbound_observed` (transport.rs:680, call at :687), and this
+    // gate went red precisely when it was needed. A stronger oracle asserts
+    // the boot nonce the live transport actually stamps, observed on the
+    // wire — the two-host machinery in `f4_pairing.rs` already drives real
+    // daemons with chosen `MAOS_TEST_BOOT_NONCE` values and reads the nonce
+    // the process publishes (:586-:592, asserted non-zero at :686). This
+    // repair deliberately keeps the cheap source oracle and records its
+    // known blind spot here rather than rewriting it.
     assert!(
         tcp_route.contains(".prepare_outbound(frame, peer, self.own_boot_nonce)"),
         "the live transport must stamp its process boot nonce"

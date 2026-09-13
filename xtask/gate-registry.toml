@@ -67,9 +67,10 @@ gates = [
     # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
     "check-red-team-gate",
     # Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
+    # RETIRED 2026-09-07 by Story 15-3 per ADR-065: "check-cna-registration".
+    # Its two live SECURITY.md controls are re-homed into check-security-md.
     "check-export-control",
     "check-fuzz-targets",
-    "check-cna-registration",
     "check-ko-coverage",
     # Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
@@ -85,9 +86,9 @@ gates = [
     # (`check-rto-gate`) reads the evidence and gates on the threshold.
     "rto-drill",
     "check-rto-gate",
-    # Story 10.4b — live bilateral A2A consent (NFR-Sec-13), rotation real-timing
-    # (NFR-Rel-9), mobile-push-on-halt (operator-facing halt wire), and the J4
-    # §13.1 Mira-Nash colocation-latency gate (Story 10.4c — real in-kernel
+    # Story 10.4b — live bilateral A2A consent (NFR-Sec-13), rotation
+    # real-timing (NFR-Sec-13), mobile-push-on-halt (operator-facing halt
+    # wire), and the J4
     # scalar.tap measurement, replacing the 10.4b proven-RED placeholder).
     "check-live-bilateral-consent",
     "check-rotation-real-timing",
@@ -154,6 +155,22 @@ gates = [
     # mechanical deadline reds, a non-mechanical deadline must declare itself,
     # and an unreadable/empty register is an error rather than a green.
     "check-decision-register",
+    # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
+    # CONTROL is a runtime leg: a live daemon's pin set changes on a signed
+    # manifest reissue, proven-red by unwiring the set-once install. The
+    # method-aware AST probe is the fast second opinion, never the proof.
+    "check-cert-rotation-trigger",
+    # Story 15-3 AC5 — confidence rule 1 made mechanical: every non-`done`
+    # epic's hermetic exit block is tokenised as shell and every
+    # `maos`/`maosctl`/`xtask` verb must exist at HEAD or be owed by a named,
+    # open story that actually claims it. Before this gate nothing read the
+    # exit blocks at all.
+    "check-exit-commands",
+    # Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Before
+    # this, no CI job ran `cargo test --workspace` unscoped: every invocation
+    # was `-p`/`--test`-scoped, so the exit line's final clause was performed
+    # by hand on a developer's box and nowhere else (a gap, not a demotion).
+    "workspace-test-suite",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -207,9 +224,10 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 name = "check-fuzz-targets"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 
-[[ship_gate]]
-name = "check-cna-registration"
-disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking" }
+# RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
+# stanza stood here. Its `blocking-when-present` disposition was never the arm
+# taken — the gate ran its content-validating path, and those two `SECURITY.md`
+# controls now live in `check-security-md` with their own proven-red tests.
 
 [[ship_gate]]
 name = "check-ko-coverage"
@@ -267,11 +285,48 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 name = "check-live-bilateral-consent"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 
-# Story 10.4b (NFR-Rel-9) — rotation real-timing RotationDrillReport gate.
-# Advisory at v1.0; blocking at v1.5.
+# Story 10.4b / 14-2 — rotation real-timing gate. (Mislabel corrected by
+# 14-2: the 30s/90s propagation floors are NFR-Sec-13's rotation-chaos
+# scope; NFR-Rel-9 is the ≤5s p99 token-validation axis.)
+# Advisory at v1.0; blocking from v1.5 onward. Story 14-2 (AC6.3) ADDED
+# explicit v2_0/v2_2 rungs without downgrading the inherited v1_5 blocking
+# posture. The gate hard-errors if any blocking rung is relaxed.
 [[ship_gate]]
 name = "check-rotation-real-timing"
-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 14-2a AC6.3 — the rotation TRIGGER gate (distinct from
+# `check-rotation-real-timing`, which measures 14-2's floors: this one proves
+# the trigger has a PRODUCTION CALLER at all). Blocking from the day it lands,
+# because a green-from-birth production-caller probe is the exact failure this
+# story was created to repair.
+[[ship_gate]]
+name = "check-cert-rotation-trigger"
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 15-3 AC5 — the exit-command check. `v1_5 = "blocking"` is the key that
+# binds at today's `CURRENT_PHASE`, following the 14-2a precedent above rather
+# than architecture `15-full-spectrum-v2-2.md:130`'s "all new gates" clause:
+# that clause governs gates whose SUBJECT is a v2.2 capability (its own tail,
+# "absent-result → BLOCK at the v2.2 ship gate", only parses for
+# evidence-bearing v2.2 gates). A rule-1 gate that cannot red until v2.2 is
+# the thing this story exists to remove. Both readings are recorded (F12).
+[[ship_gate]]
+name = "check-exit-commands"
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 15-1 AC7 / D-3 — the full workspace test suite as a Blocking control.
+# At HEAD before this story NO CI job ran `cargo test --workspace` unscoped
+# (every `cargo test` in discipline.yml was `-p`/`--test`-scoped; both
+# `cargo nextest run` legs in journey-nightly.yml were `-p maos-journey-test`),
+# so the hermetic exit line's final clause was machine-checked by nobody.
+# Cost ruling R-13: one full workspace test run per CI cycle (measured
+# locally: 497 binaries, 4174 tests, ~3 min wall-clock on 32 cores; CI
+# timeout set to 45). Enrolled Blocking-at-every-phase like the other
+# foundation gates — there is no phase at which a red suite should pass.
+[[ship_gate]]
+name = "workspace-test-suite"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
 # scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1
@@ -330,11 +385,23 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-multi-region-slo"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
-# Story 11.3 (AC5, D8) — scale-envelope 25/30-host churn gate.
-# Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
+# Story 11.3 (AC5, D8) + Story 14.1 (AC6.4) — scale-envelope 25/30/100-host
+# churn gate. Advisory at v1.0/v1.5 (dev-time enforcement is BindingClass
+# Blocking, decoupled from this ladder); blocking at v2.0; the v2_2 rung
+# lands with 14.1's N=100 envelope (the ratified §15.7 four-rung idiom —
+# sibling check-cohort-mesh carries the same shape).
+#
+# LADDER DEVIATION (Story 14.1 AC6.4, ratified D3) — the v2_0 rung is
+# deliberately left `blocking`, and a future reader must NOT "align" it to
+# the §15.7 four-rung idiom. The idiom describes gates whose v2_0 was
+# advisory (sibling check-cohort-mesh); Story 11.3's F7 ratified THIS gate
+# as advisory/advisory/blocking, so relaxing v2_0 would un-bind the 30-host
+# claim a phase early AND break check_scale_churn.rs's own registry
+# validation, which hard-errors unless v2_0 == "blocking"
+# (xtask/src/check_scale_churn.rs:447-455).
 [[ship_gate]]
 name = "check-scale-churn"
-disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking", v2_2 = "blocking" }
 # Story 12.1 — N=3/N=8 legs are hard-fail per-commit inside the gate; this
 # disposition controls the v2.2 ship-gate ladder without advancing global phase.
 [[ship_gate]]

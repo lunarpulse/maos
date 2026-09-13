@@ -205,6 +205,16 @@ cargo build -p maos-bin --release      # the `maos` Host executable
 cargo build -p maos-cli --release      # the `maosctl` operator CLI
 ```
 
+The default build excludes the WASM engine. To build the opt-in component host
+and runner for development:
+
+```sh
+cargo build -p maos-bin --release --features wasm-host
+```
+
+WASM-enabled distribution remains subject to
+[`docs/compliance/export-counsel-precondition.md`](docs/compliance/export-counsel-precondition.md).
+
 Initialize a Host and start the runtime daemon:
 
 ```sh

@@ -1,7 +1,10 @@
 use xtask::check_fkcs::{
-    is_blocking_at, parse_inline_disposition, phase_disposition, read_disposition,
-    read_nonempty_lines, FkcsBaseline, FkcsOracle, FkcsSurfaceSnapshot, ForgedSelfReport,
+    parse_inline_disposition, read_disposition, read_nonempty_lines, FkcsBaseline, FkcsOracle,
+    FkcsSurfaceSnapshot, ForgedSelfReport,
 };
+// Story 15-3 AC2(c): `is_blocking_at` / `phase_disposition` were byte-identical
+// private copies in `check_fkcs`; they now resolve to the single shared source.
+use xtask::gate_common::{is_blocking_at, phase_disposition};
 
 #[test]
 fn frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift() {

@@ -84,14 +84,16 @@ jobs:
 
       - name: Re-record journey cassettes (live)
         env:
-          MAOS_JOURNEY_MODE: record
+          MAOS_INFERENCE_MODE: record
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
         run: |
+          # D-15-6-F: do not create `.tier2-first-success` here. That stamp
+          # would arm the 14-day age gate against the intentionally old seed
+          # corpus and make every push fail before this paid refresh can land.
           cargo nextest run \
             -p maos-journey-test \
             --test-threads 1 \
-            --no-fail-fast \
-            --live
+            --no-fail-fast
 
       - name: Upload refreshed cassettes
         uses: actions/upload-artifact@v4

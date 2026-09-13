@@ -1,0 +1,851 @@
+# Story 14-2a review input — tracked-file diff
+
+diff --git a/crates/maos-a2a-core/src/router.rs b/crates/maos-a2a-core/src/router.rs
+index 83b2427e..433f44f4 100644
+--- a/crates/maos-a2a-core/src/router.rs
++++ b/crates/maos-a2a-core/src/router.rs
+@@ -585,6 +585,31 @@ impl A2ARouterCore {
+         }
+     }
+ 
++    /// Story 14-2a / AC2.2 — move plane A's §7.2 trust pin for `host_id` and
++    /// return the fingerprint it replaced (`None` when plane A never declared
++    /// the peer; this never INSERTS one, because a peer the operator never
++    /// declared has no allowlists, no profile and no endpoint, and inventing
++    /// them here would widen the mesh from a config reload).
++    ///
++    /// This is the second half of the two-plane reload. Plane B's rotation
++    /// window MUST already be open on `fingerprint` when this is called, so
++    /// the value written here is always inside the accepted set
++    /// `{pins[p].fingerprint, rotation_next[p]}` that sites 5/6 check — that
++    /// ORDER is what makes the reload observably atomic without a new lock
++    /// (`tofu.rs` documents the writer order: `window_lock` BEFORE any `pins`
++    /// entry lock; plane A is written after both are released).
++    ///
++    /// Additive; changes no frozen signature (epic AC-A6).
++    pub fn set_peer_cert_fingerprint(
++        &self,
++        host_id: &HostId,
++        fingerprint: PeerCertFingerprint,
++    ) -> Option<PeerCertFingerprint> {
++        self.peers
++            .get_mut(host_id.as_str())
++            .map(|mut entry| std::mem::replace(&mut entry.cert_fingerprint, fingerprint))
++    }
++
+     pub fn lookup_peer(&self, host_id: &HostId) -> Result<A2APeerConfig, A2AError> {
+         self.peers
+             .get(host_id.as_str())
+diff --git a/crates/maos-a2a-core/src/tofu.rs b/crates/maos-a2a-core/src/tofu.rs
+index fbc0620d..6ad19d50 100644
+--- a/crates/maos-a2a-core/src/tofu.rs
++++ b/crates/maos-a2a-core/src/tofu.rs
+@@ -369,6 +369,34 @@ impl InMemoryTofuPinStore {
+         Some(retired)
+     }
+ 
++    /// Story 14-2a / AC5.1 — ABORT the window: DISCARD `next` without
++    /// promoting, leaving `pins[peer]` exactly as it was. Returns the
++    /// discarded generation so the caller can audit what it refused.
++    ///
++    /// This is a DIFFERENT transition from [`Self::close_rotation_window`],
++    /// not a variant of it: close is promote-and-retire (14-2 AC2.1.a, which
++    /// this does not reopen), abort is discard-and-keep. Two mechanisms
++    /// wearing one name was 14-2's whole pathology, so they are two methods
++    /// with two names.
++    ///
++    /// It is the ONLY reversible half of a rotation: before promotion the
++    /// retiring fingerprint is still the serving pin, so a reload that fails
++    /// part-way can put the mesh back exactly as it found it. After promotion
++    /// there is no revert — a "rollback" is a NEW rotation back to the old
++    /// fingerprint, subject to the same window, grace and uniqueness guard.
++    ///
++    /// ⚠ Callers restoring a torn reload MUST move plane A
++    /// (`A2ARouterCore.peers[p].cert_fingerprint`) back to the serving pin
++    /// BEFORE calling this: aborting first leaves plane A holding a
++    /// fingerprint plane B no longer accepts, which sites 5/6 report as a
++    /// `PinMismatch` on every frame in both directions.
++    pub fn abort_rotation_window(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
++        let _guard = self.lock_window();
++        self.rotation_next
++            .remove(peer.as_str())
++            .map(|(_, next)| next)
++    }
++
+     /// Story 14-2 / AC2.1 — the window oracle: this peer's open `next`,
+     /// if a rotation window is currently open.
+     pub fn rotation_next(&self, peer: &PeerId) -> Option<PeerCertFingerprint> {
+diff --git a/crates/maos-a2a-tcp/src/transport.rs b/crates/maos-a2a-tcp/src/transport.rs
+index 8cffc75a..fec23f66 100644
+--- a/crates/maos-a2a-tcp/src/transport.rs
++++ b/crates/maos-a2a-tcp/src/transport.rs
+@@ -869,7 +869,27 @@ async fn serve_connection(
+         Ok(Ok(s)) => s,
+         Ok(Err(e)) => {
+             let classified = TcpTransportError::classify_handshake(&e.to_string());
+-            if classified.is_tofu_mismatch() {
++            // Story 14-2a / AC4.4 — §7.2.1.a requires, verbatim, that the
++            // post-grace rejection be *"logged as `cert_post_grace_reject`"*.
++            // Until this line it was the ONE failure mode this whole rotation
++            // mechanism exists to produce and the ONLY one that left no trace: a
++            // peer presenting the RETIRED leaf after the grace closes fails the
++            // handshake as `CertExpired`, which fell through the
++            // `is_tofu_mismatch()` arm and returned bare. An auditor asking
++            // "did anyone keep using the old certificate?" had nothing to read.
++            //
++            // The sentinel is part of the detail string ON PURPOSE: it is what
++            // the spec names and therefore what an operator greps, and it rides
++            // the SAME `ConsentRupture` seam as the mismatch class rather than
++            // inventing a second journal for one branch.
++            let refusal = if classified.is_tofu_mismatch() {
++                Some(classified.to_string())
++            } else if classified.is_cert_validity() {
++                Some(format!("cert_post_grace_reject: {classified}"))
++            } else {
++                None
++            };
++            if let Some(detail) = refusal {
+                 // Best-effort: a journaling failure must not become a way to keep
+                 // the listener from refusing — but it must not be SILENT either
+                 // (§A6 review 2026-08-18): the Err contract on
+@@ -879,14 +899,14 @@ async fn serve_connection(
+                     .journal_peer_identity_refusal(
+                         PeerRefusalDirection::Listen,
+                         peer_addr_hint.as_str(),
+-                        &classified.to_string(),
++                        detail.as_str(),
+                     )
+                     .await
+                 {
+                     tracing::error!(
+                         "peer-identity refusal was NOT journaled ({}): {}",
+                         journal_err,
+-                        classified
++                        detail
+                     );
+                 }
+             }
+diff --git a/crates/maos-bin/src/lib.rs b/crates/maos-bin/src/lib.rs
+index 10edc21b..186c89c6 100644
+--- a/crates/maos-bin/src/lib.rs
++++ b/crates/maos-bin/src/lib.rs
+@@ -1,5 +1,10 @@
+ #![forbid(unsafe_code)]
+ 
++/// Story 14-2a — the production peer-certificate rotation trigger's wiring: the
++/// real `T_grace` deadline and the operator read seam. In the library, not
++/// `main.rs`, so the runtime gate leg can drive the production types.
++#[cfg(feature = "network")]
++pub mod cert_rotation;
+ #[cfg(feature = "network")]
+ pub mod cross_team_consent;
+ #[cfg(feature = "network")]
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 79788fed..90fea5e9 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -2658,41 +2658,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     ));
+     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
+ 
+-    // Story 5.5a — the operator endpoint is an adapter over this exact
+-    // scheduler Arc. It binds loopback by default when an operator bearer is
+-    // configured and never manufactures a one-shot report fallback.
+-    let _operator_http_server = match (
+-        std::env::var("MAOS_OPERATOR_BEARER_TOKEN"),
+-        std::env::var("MAOS_OPERATOR_HTTP_BIND"),
+-    ) {
+-        (Ok(token), bind) => {
+-            let bind = bind.unwrap_or_else(|_| "127.0.0.1:8787".to_owned());
+-            let bind = if bind.is_empty() {
+-                "127.0.0.1:8787".parse()
+-            } else {
+-                bind.parse()
+-            }
+-            .map_err(|error| format!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}"))?;
+-            Some(
+-                maos_control::OperatorHttpServer::bind(
+-                    maos_control::OperatorHttpConfig {
+-                        bind,
+-                        bearer_token: token,
+-                    },
+-                    Arc::clone(&scheduler),
+-                )
+-                .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?,
+-            )
+-        }
+-        (Err(_), Ok(_)) => {
+-            return Err(
+-                "maos: MAOS_OPERATOR_BEARER_TOKEN is required when MAOS_OPERATOR_HTTP_BIND is configured"
+-                    .into(),
+-            )
+-        }
+-        (Err(_), Err(_)) => None,
+-    };
+-
+     // Story 5.2 — Shared journal opened at default path.
+     // Created before CrashDetector so the detector can append lifecycle events.
+     let journal_path = maos_audit::default_journal_path();
+@@ -2733,6 +2698,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         .set_crash_detector(Arc::clone(&crash_detector));
+     eprintln!("maos: CrashDetector wired (Story 5.3)");
+ 
++    // ⚠ Story 14-2a — THE OPERATOR HTTP SURFACE MOVED HERE, AND IT HAD TO.
++    //
++    // It used to bind ~90 lines above, immediately after the scheduler was
++    // constructed and immediately BEFORE `Arc::get_mut(&mut scheduler)`
++    // (`:2697`), which `expect`s `strong_count == 1`. `OperatorHttpServer::bind`
++    // RETAINS its `Arc<SpiritSchedulerAdapter>` clone for the server's
++    // lifetime, so any process that actually configured
++    // `MAOS_OPERATOR_BEARER_TOKEN` panicked at that `expect` a few lines later:
++    // `scheduler Arc strong_count == 1 at composition root`. Measured at
++    // `a22f0c01` by booting the daemon with the surface enabled — it never
++    // reached the listener. The whole Story 5.5a endpoint, and therefore
++    // `maosctl spirit inspect --sandbox` (the ONE `maosctl` verb that reaches a
++    // running daemon), was unreachable in every process that also wires the
++    // CrashDetector, which is every real boot. Binding AFTER the exclusive
++    // mutation is the minimal repair: nothing between the two sites uses the
++    // server, and the surface is now actually reachable — which is what makes
++    // AC1.5's rotation-window route verifiable rather than merely present.
++    // Story 14-2a / AC1.5 — the READ half of the rotation seam, bound HERE
++    // because that is where the operator surface binds, and filled LATER
++    // because the trust planes do not exist yet. `cohort_daemon` was loaded at
++    // `:2038`; its `Arc<CohortManifestState>` is the same one the daemon
++    // dispatch installs the rotation control into ~7,300 lines below, so the
++    // GET and the signed WRITE are one seam with two consumers. `None` in every
++    // process without `MAOS_COHORT_DAEMON_CONFIG`, which answers 404 rather
++    // than an empty list.
++    #[cfg(feature = "network")]
++    let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> =
++        cohort_daemon.as_ref().map(|bootstrap| {
++            Arc::new(maos_bin::cert_rotation::CohortRotationWindows::new(
++                Arc::clone(&bootstrap.state),
++            )) as Arc<dyn maos_control::RotationWindowSource>
++        });
++    #[cfg(not(feature = "network"))]
++    let rotation_windows: Option<Arc<dyn maos_control::RotationWindowSource>> = None;
++    // Story 5.5a — the operator endpoint is an adapter over this exact
++    // scheduler Arc. It binds loopback by default when an operator bearer is
++    // configured and never manufactures a one-shot report fallback.
++    let _operator_http_server = match (
++        std::env::var("MAOS_OPERATOR_BEARER_TOKEN"),
++        std::env::var("MAOS_OPERATOR_HTTP_BIND"),
++    ) {
++        (Ok(token), bind) => {
++            let bind = bind.unwrap_or_else(|_| "127.0.0.1:8787".to_owned());
++            let bind = if bind.is_empty() {
++                "127.0.0.1:8787".parse()
++            } else {
++                bind.parse()
++            }
++            .map_err(|error| format!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}"))?;
++            Some(
++                maos_control::OperatorHttpServer::bind(
++                    maos_control::OperatorHttpConfig {
++                        bind,
++                        bearer_token: token,
++                    },
++                    Arc::clone(&scheduler),
++                    rotation_windows,
++                )
++                .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?,
++            )
++        }
++        (Err(_), Ok(_)) => {
++            return Err(
++                "maos: MAOS_OPERATOR_BEARER_TOKEN is required when MAOS_OPERATOR_HTTP_BIND is configured"
++                    .into(),
++            )
++        }
++        (Err(_), Err(_)) => None,
++    };
++
+     // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
+     // Story 6.5 — trait-based decoupling: ScbTracker wraps the SCB map.
+     let tracker = Arc::new(maos_kernel_core::iac::ScbTracker::new(scheduler.scbs()));
+@@ -9710,6 +9745,12 @@ async fn run_cohort_a2a_daemon(
+         None => None,
+     };
+     let intake_sink = host_b.as_ref().map(|(tx, _, _)| tx.clone());
++    // Story 14-2a / AC1.2 — the rotation control's trust planes are captured
++    // BEFORE `bootstrap` is moved into the builder, and installed AFTER it
++    // returns. Cloning the `Arc` here is not a convenience: this is the ONE
++    // handle the operator read surface already holds (`:2661`), so both
++    // consumers observe the same set-once control.
++    let rotation_state = Arc::clone(&bootstrap.state);
+     let runtime = build_cohort_a2a_daemon_runtime(
+         Arc::clone(&transparency_log),
+         boot_nonce,
+@@ -9720,6 +9761,32 @@ async fn run_cohort_a2a_daemon(
+         intake_sink,
+     )
+     .await?;
++    // ── Story 14-2a / AC1.1+AC1.2 — THE PRODUCTION ROTATION TRIGGER ─────────
++    //
++    // This is the story's deliverable, and it is exactly here for measured
++    // reasons. `MAOS_ONE_SHOT=cohort-a2a-daemon` is the ONLY arm where the
++    // concrete `Arc<TcpA2ATransport>` survives: the `maos run` cross-host arm
++    // (`:2457`) coerces its transport to `Arc<dyn A2ARouter>` in the same
++    // expression at `:2484`, and that trait has one method (`route_outbound`)
++    // and is not `Any`-downcastable, so `pins()` and `core()` are
++    // IRRECOVERABLE there. Daemon-only is a declared boundary, not an
++    // oversight — and widening the frozen `maos_domain` port to smuggle the
++    // methods through would be a `maos-domain` delta against a ceiling that is
++    // already over.
++    //
++    // `pins()` and `core()` return clones of the SAME `Arc`s the accept loop,
++    // both verifiers and the router core hold (`transport.rs:492`, `:503`), so
++    // the signed reissue path now reaches the running mesh's trust planes and
++    // not a copy of them. Delete this call and the daemon still serves, still
++    // accepts signed reissues, and silently stops rotating — which is why the
++    // gate's control leg is a RUNTIME observation of the pin set changing and
++    // its proven-red vector is removing this install.
++    rotation_state.install_cert_rotation(
++        runtime.transport.pins(),
++        runtime.transport.core(),
++        Arc::new(maos_bin::cert_rotation::TokioGraceTimer),
++        maos_cohort::cold_deployment_t_grace(),
++    )?;
+     // Spawned AFTER the bind so the sink is installed before the listener exists,
+     // and BEFORE the readiness line below, so a peer that connects the instant the
+     // daemon announces itself finds a live consumer rather than a full queue with
+diff --git a/crates/maos-cohort/src/audit.rs b/crates/maos-cohort/src/audit.rs
+index cbae78ac..cc808d68 100644
+--- a/crates/maos-cohort/src/audit.rs
++++ b/crates/maos-cohort/src/audit.rs
+@@ -15,6 +15,42 @@ pub trait CohortAuditSink: Send + Sync {
+     fn append(&self, event: &CohortAuditEvent) -> Result<(), CohortError>;
+ }
+ 
++/// Story 14-2a / AC4.6(b) — the ONE stable, greppable intent every certificate
++/// rotation row carries.
++///
++/// `FrameKind::TelemetryEvent` (kind 4) is SHARED with cohort lifecycle and
++/// digest summaries, so the kind alone cannot tell an auditor that live TLS
++/// trust moved. The intent string is therefore load-bearing, not decoration: it
++/// is what makes `maosctl audit query --intent-contains a2a:cert-rotation`
++/// return exactly the rotation timeline and nothing else, and what lets a SIEM
++/// alert on trust-set changes without parsing payloads. Changing it is a
++/// breaking change to an operator surface.
++pub const CERT_ROTATION_INTENT: &str = "a2a:cert-rotation";
++
++/// Story 14-2a — the 8-hex correlation prefix of a `sha256:<hex64>` wire
++/// fingerprint, which is what an auditor can actually read back off disk.
++///
++/// ⚠ **MEASURED, AND IT SURPRISED THIS STORY:** the I2 redaction filter
++/// (`crates/maos-iac/src/adapter/redaction.rs:169-181`) rewrites ANY hex run of
++/// ≥ 32 characters as `<REDACTED:type=capability_token,len=64,hash=XXXX>`, so a
++/// full certificate fingerprint NEVER lands in `payload_redacted` — measured
++/// live against a real daemon's Transparency Log. That is a deliberate
++/// secret-hygiene control and this story does not weaken it (it lives in
++/// `maos-iac`, and a certificate fingerprint is public data, but relaxing a
++/// redaction rule is a security change that is not this story's to make).
++///
++/// The consequence, stated rather than papered over: the durable rotation row
++/// carries the peer, the manifest version, a per-value redaction `hash=` stamp
++/// (so two different generations remain DISTINGUISHABLE on disk) and this
++/// 8-character prefix — which is `PeerCertFingerprint::short()`'s own form,
++/// short enough to survive the filter and long enough to correlate a row with
++/// the certificate an operator minted. The FULL values are readable on the
++/// operator rotation-window surface while the window is open.
++fn fingerprint_short(wire: &str) -> &str {
++    let hex = wire.split_once(':').map(|(_, hex)| hex).unwrap_or(wire);
++    &hex[..hex.len().min(8)]
++}
++
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub enum CohortAuditEvent {
+     AuthorityReissueIssued {
+@@ -44,6 +80,46 @@ pub enum CohortAuditEvent {
+     /// Story 12.4a — a correlated digest-read reply was received + recorded
+     /// (idempotent per `request_id`). Journaled once per distinct reply (AC2).
+     DigestReplyReceived { member: String, request_id: String },
++    /// Story 14-2a / AC4.3 — a one-generation overlap window OPENED for a
++    /// cohort member whose signed fingerprint moved. `retiring` is the
++    /// generation still serving; `next` is the incoming one the manifest now
++    /// declares. Both are wire-form (`sha256:<hex64>`), never raw material.
++    CertRotationWindowOpened {
++        peer: String,
++        retiring: String,
++        next: String,
++        version: u64,
++    },
++    /// Story 14-2a / AC4.3 — the window's TERMINAL row: `T_grace` elapsed and
++    /// `next` was promoted, retiring `retired`. Every opened window ends in
++    /// exactly one terminal row (this variant on promotion, `CertRotationRefused`
++    /// when there was nothing to promote), because a row that says a rotation
++    /// started and never says how it ended is what this event pair prevents.
++    CertRotationWindowClosed {
++        peer: String,
++        retired: String,
++        promoted: String,
++        version: u64,
++    },
++    /// Story 14-2a / AC4.3 — a rotation this node REFUSED, with the reason an
++    /// operator will act on: a `FingerprintCollision` (including the refused
++    /// cross-peer swap), an `Invalidated` pin, a member the live transport peer
++    /// set never declared, or a grace that elapsed with no window left to
++    /// promote. Per-peer: the rest of the reload proceeds.
++    CertRotationRefused {
++        peer: String,
++        reason: String,
++        version: u64,
++    },
++    /// Story 14-2a — plane A's declaration moved for a peer that holds NO pin
++    /// yet, so there was no generation to overlap and no window to close. First
++    /// contact will pin the manifest-declared value.
++    CertRotationDeclarationMoved {
++        peer: String,
++        previous: String,
++        declared: String,
++        version: u64,
++    },
+ }
+ 
+ /// Deterministic in-memory implementation for focused state tests. Production
+@@ -147,6 +223,59 @@ impl CohortAuditSink for CohortTransparencyLogSink {
+                 ),
+                 Some(request_id.as_str()),
+             ),
++            CohortAuditEvent::CertRotationWindowOpened {
++                peer,
++                retiring,
++                next,
++                version,
++            } => (
++                CERT_ROTATION_INTENT,
++                format!(
++                    "{{\"event\":\"cert_rotation_window_opened\",\"peer\":{peer:?},\"retiring\":{retiring:?},\"retiring_short\":{:?},\"next\":{next:?},\"next_short\":{:?},\"version\":{version}}}",
++                    fingerprint_short(retiring),
++                    fingerprint_short(next)
++                ),
++                None,
++            ),
++            CohortAuditEvent::CertRotationWindowClosed {
++                peer,
++                retired,
++                promoted,
++                version,
++            } => (
++                CERT_ROTATION_INTENT,
++                format!(
++                    "{{\"event\":\"cert_rotation_window_closed\",\"peer\":{peer:?},\"retired\":{retired:?},\"retired_short\":{:?},\"promoted\":{promoted:?},\"promoted_short\":{:?},\"version\":{version}}}",
++                    fingerprint_short(retired),
++                    fingerprint_short(promoted)
++                ),
++                None,
++            ),
++            CohortAuditEvent::CertRotationRefused {
++                peer,
++                reason,
++                version,
++            } => (
++                CERT_ROTATION_INTENT,
++                format!(
++                    "{{\"event\":\"cert_rotation_refused\",\"peer\":{peer:?},\"reason\":{reason:?},\"version\":{version}}}"
++                ),
++                None,
++            ),
++            CohortAuditEvent::CertRotationDeclarationMoved {
++                peer,
++                previous,
++                declared,
++                version,
++            } => (
++                CERT_ROTATION_INTENT,
++                format!(
++                    "{{\"event\":\"cert_rotation_declaration_moved\",\"peer\":{peer:?},\"previous\":{previous:?},\"previous_short\":{:?},\"declared\":{declared:?},\"declared_short\":{:?},\"version\":{version}}}",
++                    fingerprint_short(previous),
++                    fingerprint_short(declared)
++                ),
++                None,
++            ),
+         };
+         match correlation {
+             Some(correlation_id) => {
+diff --git a/crates/maos-cohort/src/lib.rs b/crates/maos-cohort/src/lib.rs
+index 273bbc2a..79645c6e 100644
+--- a/crates/maos-cohort/src/lib.rs
++++ b/crates/maos-cohort/src/lib.rs
+@@ -43,10 +43,12 @@ pub mod halt_receipt;
+ pub mod manifest;
+ pub mod migration;
+ pub mod pin;
++pub mod rotation;
+ pub mod state;
+ 
+ pub use audit::{
+     CohortAuditEvent, CohortAuditSink, CohortTransparencyLogSink, InMemoryCohortAuditSink,
++    CERT_ROTATION_INTENT,
+ };
+ pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
+ pub use digest::{
+@@ -70,4 +72,8 @@ pub use migration::{
+     resolve_migration_chain, MigrationCandidate, MigrationChain, MigrationHop, MigrationPlan,
+ };
+ pub use pin::PinnedAuthorityKeys;
++pub use rotation::{
++    cold_deployment_t_grace, PeerCertRotation, RotationGraceTimer, RotationOutcome,
++    RotationRefusal, RotationWindow, COLD_DEPLOYMENT_DAYS_OF_HISTORY, COLD_DEPLOYMENT_HANDSHAKE_MS,
++};
+ pub use state::{CohortClock, CohortManifestState, ReissueOutcome};
+diff --git a/crates/maos-cohort/src/state.rs b/crates/maos-cohort/src/state.rs
+index 15030a50..88e83f71 100644
+--- a/crates/maos-cohort/src/state.rs
++++ b/crates/maos-cohort/src/state.rs
+@@ -20,6 +20,7 @@ use crate::error::{CohortError, CohortManifestForkReason};
+ use crate::halt_receipt::{AbsenceKind, HaltReceiptControl};
+ use crate::manifest::CohortManifest;
+ use crate::pin::PinnedAuthorityKeys;
++use crate::rotation::{PeerCertRotation, RotationGraceTimer, RotationWindow};
+ 
+ pub trait CohortClock: Send + Sync {
+     fn now_secs(&self) -> u64;
+@@ -115,6 +116,26 @@ pub struct CohortManifestState {
+     pending_digest_replies: Mutex<Vec<(String, String, String)>>,
+     /// Reader-side immutable summaries keyed by `(member, request_id)`.
+     received_digest_summaries: Mutex<HashMap<(String, String), DigestSummary>>,
++    /// Story 14-2a / AC1.2 — the SET-ONCE production rotation seam.
++    ///
++    /// This closes an ORDERING INVERSION, and it is the same shape and the same
++    /// reason as `Mailbox::install_a2a_router`
++    /// (`crates/maos-iac/src/adapter/mailbox.rs:131`), whose doc says it exists
++    /// *"because the production composition root wraps the mailbox in an `Arc`
++    /// before the router's peer configs and TOFU store exist"* and whose
++    /// set-once refusal is *"a security property, not an ergonomic."* Here the
++    /// inversion is: this state is loaded at `main.rs:2038`, the only concrete
++    /// `Arc<TcpA2ATransport>` in the workspace is created ~7,900 lines later at
++    /// `main.rs:10000`, and the pin store and router core that the reload must
++    /// move live inside it.
++    ///
++    /// Set-once is load-bearing for the same reason it is on the mailbox: a
++    /// SECOND install would point the signed-manifest trigger at a different
++    /// mesh's trust planes, which is a trust-set redirection dressed as a
++    /// configuration call. `None` until installed means "no rotation trigger in
++    /// this process" — every non-daemon `MAOS_ONE_SHOT` arm, byte-for-byte
++    /// unchanged.
++    cert_rotation: std::sync::OnceLock<Arc<PeerCertRotation>>,
+ }
+ 
+ impl CohortManifestState {
+@@ -162,10 +183,65 @@ impl CohortManifestState {
+             admitted_digest_reads: Mutex::new(HashMap::new()),
+             pending_digest_replies: Mutex::new(Vec::new()),
+             received_digest_summaries: Mutex::new(HashMap::new()),
++            cert_rotation: std::sync::OnceLock::new(),
+             clock,
+         })
+     }
+ 
++    /// Story 14-2a / AC1.1+AC1.2 — install the live trust planes this state's
++    /// signed reissues must move. SET-ONCE: a second call is REFUSED.
++    ///
++    /// `pins` and `core` MUST be the running mesh's own handles
++    /// (`TcpA2ATransport::pins()` / `::core()`, which return clones of the SAME
++    /// `Arc`s the accept loop, both verifiers and the router core hold), or the
++    /// reload silently reloads a copy — which is precisely the failure mode of
++    /// the `MAOS_ONE_SHOT` design this story measured out: a fresh process
++    /// mutating its own in-memory store, passing its own test, and changing
++    /// nothing in the live daemon.
++    ///
++    /// The audit sink is NOT a parameter: the rotation rows are written through
++    /// the SAME `Arc<dyn CohortAuditSink>` this state already journals reissue
++    /// acceptance and rejection through, so the rotation timeline and the
++    /// manifest timeline can never land in different logs.
++    pub fn install_cert_rotation(
++        &self,
++        pins: Arc<maos_a2a_core::InMemoryTofuPinStore>,
++        core: Arc<maos_a2a_core::A2ARouterCore>,
++        timer: Arc<dyn RotationGraceTimer>,
++        grace: std::time::Duration,
++    ) -> Result<(), CohortError> {
++        self.cert_rotation
++            .set(Arc::new(PeerCertRotation::new(
++                pins,
++                core,
++                Arc::clone(&self.audit),
++                timer,
++                grace,
++            )))
++            .map_err(|_| {
++                CohortError::EAuditAppendFailed(
++                    "cohort cert-rotation control is already installed; a second install would \
++                     redirect the signed-manifest trigger at a different mesh's trust planes"
++                        .into(),
++                )
++            })
++    }
++
++    /// Story 14-2a / AC1.5 — the open-window set an operator can read, or empty
++    /// when no rotation control is installed in this process.
++    ///
++    /// This is the READ half of the one seam [`Self::install_cert_rotation`]
++    /// builds; the reissue path is the WRITE half. A verb and a noun, never two
++    /// mechanisms: without it the mechanism would be unobservable between open
++    /// and close, and an operator would have to grep SQLite to find out whether
++    /// a signed rotation took.
++    pub fn open_rotation_windows(&self) -> Vec<RotationWindow> {
++        self.cert_rotation
++            .get()
++            .map(|rotation| rotation.open_windows())
++            .unwrap_or_default()
++    }
++
+     pub fn manifest(&self) -> Result<CohortManifest, CohortError> {
+         Ok(self
+             .cached
+@@ -335,6 +411,47 @@ impl CohortManifestState {
+                 version: candidate.version,
+                 canonical_hash: candidate_hash,
+             })?;
++        // ── Story 14-2a / AC2.1 — THE RUNTIME HALF OF `main.rs:9855` ────────
++        //
++        // `reconcile_transport_identity_with_manifest` enforces
++        // config-vs-manifest certificate agreement exactly ONCE, at boot,
++        // before the transport binds. This line is where that agreement is
++        // re-established when the signed truth moves underneath it.
++        //
++        // Placement is load-bearing on three counts:
++        //   * AFTER every authentication, cohort-id, schema and monotonicity
++        //     check, and after the accepted row — an unsigned, forked or
++        //     regressed manifest can never reach the trust planes;
++        //   * BEFORE `*cached` is replaced — so a reload that cannot write its
++        //     evidence rolls its own planes back and this whole reissue fails
++        //     closed, leaving manifest and planes in agreement rather than a
++        //     half-applied mesh;
++        //   * INSIDE the `cached` guard — two concurrent reissues cannot
++        //     interleave a projection with a commit. `RotationGraceTimer`
++        //     implementations therefore MUST NOT call back into this state.
++        //
++        // The projection is 12.1's `peer_configs_for`, which validates every
++        // fingerprint through `PeerCertFingerprint::parse` (AC2.4). Nothing
++        // here accepts a fingerprint from any other source.
++        if let Some(rotation) = self.cert_rotation.get() {
++            match candidate.peer_configs_for(self.local_host.as_str()) {
++                Ok(peers) => {
++                    rotation.reload(&peers, candidate.version, self.clock.now_secs())?;
++                }
++                // A reissue that REMOVES this host has no position from which
++                // to project edges. Refusing the manifest would let a removed
++                // member ignore its own removal, so the manifest applies and
++                // the roster gate refuses the traffic — but the operator gets a
++                // named row rather than a silent no-op.
++                Err(error) => {
++                    self.audit.append(&CohortAuditEvent::CertRotationRefused {
++                        peer: self.local_host.as_str().to_string(),
++                        reason: error.to_string(),
++                        version: candidate.version,
++                    })?;
++                }
++            }
++        }
+         let version = candidate.version;
+         *cached = CachedManifest {
+             manifest: candidate,
+diff --git a/crates/maos-control/src/lib.rs b/crates/maos-control/src/lib.rs
+index 9a4eeb0f..fdd209b6 100755
+--- a/crates/maos-control/src/lib.rs
++++ b/crates/maos-control/src/lib.rs
+@@ -26,6 +26,42 @@ impl SandboxReportSource for maos_kernel_core::scheduler::SpiritSchedulerAdapter
+     }
+ }
+ 
++/// Story 14-2a / AC1.5 — one open peer-certificate rotation window, as an
++/// operator reads it.
++///
++/// Plain owned scalars ON PURPOSE: this crate depends on `maos-domain` and
++/// `maos-kernel-core` and nothing else, so the rotation read surface adds NO
++/// crate edge to `maos-a2a-core`, `maos-a2a-tcp` or `maos-cohort` — exactly the
++/// shape [`SandboxReportSource`] already uses for the scheduler.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct RotationWindowRow {
++    /// The cohort member whose certificate is rotating.
++    pub peer: String,
++    /// The generation still serving, retired when the grace elapses.
++    pub retiring: String,
++    /// The incoming generation the signed manifest declares.
++    pub next: String,
++    /// The manifest version that opened the window.
++    pub manifest_version: u64,
++    /// Cohort-clock seconds at which it opened.
++    pub opened_at_secs: u64,
++}
++
++/// Story 14-2a / AC1.5 — the live READ seam over the open-window set.
++///
++/// ⚠ **READ-ONLY, and that is a design decision, not an omission.** A MUTATING
++/// rotation verb here was measured out: it would put a POST body through a
++/// hand-rolled GET-only parser, and — decisively — it would invent a SECOND
++/// trust path for certificate identity, which is precisely what
++/// `main.rs:9844-9853` warns against. The WRITE path is the signed cohort
++/// manifest reissue and nothing else. This surface exists because a mechanism
++/// an operator cannot observe between open and close is a mechanism they cannot
++/// operate: without it, confirming that a signed rotation took means grepping
++/// SQLite.
++pub trait RotationWindowSource: Send + Sync + 'static {
++    fn open_rotation_windows(&self) -> Vec<RotationWindowRow>;
++}
++
+ /// Configuration for the authenticated operator endpoint.
+ #[derive(Debug, Clone)]
+ pub struct OperatorHttpConfig {
+@@ -51,9 +87,13 @@ pub struct OperatorHttpServer {
+ }
+ 
+ impl OperatorHttpServer {
++    /// `rotation` is `None` in every process with no cohort daemon config: the
++    /// route then answers 404 rather than an empty list, so "no rotation
++    /// control in this process" and "no windows open" are never confused.
+     pub fn bind<S: SandboxReportSource>(
+         config: OperatorHttpConfig,
+         source: Arc<S>,
++        rotation: Option<Arc<dyn RotationWindowSource>>,
+     ) -> Result<Self, std::io::Error> {
+         if config.bearer_token.is_empty() {
+             return Err(std::io::Error::new(
+@@ -79,6 +119,7 @@ impl OperatorHttpServer {
+                         let _ = handle_connection(
+                             stream,
+                             source.as_ref(),
++                            rotation.as_deref(),
+                             config.bearer_token.as_bytes(),
+                         );
+                     }
+@@ -113,6 +154,7 @@ impl Drop for OperatorHttpServer {
+ fn handle_connection<S: SandboxReportSource>(
+     mut stream: TcpStream,
+     source: &S,
++    rotation: Option<&dyn RotationWindowSource>,
+     expected_token: &[u8],
+ ) -> Result<(), std::io::Error> {
+     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+@@ -141,6 +183,34 @@ fn handle_connection<S: SandboxReportSource>(
+             br#"{\"error\":\"unauthorized\"}"#,
+         );
+     }
++    if request_line == "GET /v1/a2a/rotation-windows HTTP/1.1"
++        || request_line == "GET /v1/a2a/rotation-windows HTTP/1.0"
++    {
++        let Some(rotation) = rotation else {
++            return respond(
++                &mut stream,
++                404,
++                "application/json",
++                br#"{\"error\":\"not_found\"}"#,
++            );
++        };
++        let rows: Vec<serde_json::Value> = rotation
++            .open_rotation_windows()
++            .into_iter()
++            .map(|row| {
++                serde_json::json!({
++                    "peer": row.peer,
++                    "retiring": row.retiring,
++                    "next": row.next,
++                    "manifest_version": row.manifest_version,
++                    "opened_at_secs": row.opened_at_secs,
++                })
++            })
++            .collect();
++        let body = serde_json::to_vec(&serde_json::json!({ "open_windows": rows }))
++            .map_err(std::io::Error::other)?;
++        return respond(&mut stream, 200, "application/json", &body);
++    }
+     let Some(spirit_id) = request_line
+         .strip_prefix("GET /v1/spirits/")
+         .and_then(|path| {
+@@ -233,6 +303,7 @@ mod tests {
+         let server = OperatorHttpServer::bind(
+             OperatorHttpConfig::loopback("correct-token".into()),
+             Arc::new(Source),
++            None,
+         )
+         .unwrap();
+         assert!(request(&server, "wrong-token", "live").starts_with("HTTP/1.1 401"));
+@@ -240,4 +311,78 @@ mod tests {
+         let response = request(&server, "correct-token", "live");
+         assert!(response.contains(r#""spirit_id":"live","pid":42,"runtime":"podman""#));
+     }
++
++    struct Windows;
++
++    impl RotationWindowSource for Windows {
++        fn open_rotation_windows(&self) -> Vec<RotationWindowRow> {
++            vec![RotationWindowRow {
++                peer: "host_b".into(),
++                retiring: format!("sha256:{}", "11".repeat(32)),
++                next: format!("sha256:{}", "22".repeat(32)),
++                manifest_version: 7,
++                opened_at_secs: 12,
++            }]
++        }
++    }
++
++    fn get(server: &OperatorHttpServer, token: &str, path: &str) -> String {
++        let mut stream = TcpStream::connect(server.local_addr()).unwrap();
++        write!(
++            stream,
++            "{path} HTTP/1.1\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
++        )
++        .unwrap();
++        let mut response = String::new();
++        stream.read_to_string(&mut response).unwrap();
++        response
++    }
++
++    /// Story 14-2a / AC1.5 — the open-window set is readable by an authenticated
++    /// operator, and by nobody else.
++    #[test]
++    fn rotation_windows_route_is_authenticated_read_only_and_reports_the_live_set() {
++        let server = OperatorHttpServer::bind(
++            OperatorHttpConfig::loopback("correct-token".into()),
++            Arc::new(Source),
++            Some(Arc::new(Windows)),
++        )
++        .unwrap();
++
++        assert!(
++            get(&server, "wrong-token", "GET /v1/a2a/rotation-windows").starts_with("HTTP/1.1 401"),
++            "the rotation surface is behind the same operator bearer as every other route"
++        );
++        let response = get(&server, "correct-token", "GET /v1/a2a/rotation-windows");
++        assert!(response.starts_with("HTTP/1.1 200"));
++        assert!(
++            response.contains(r#""peer":"host_b""#)
++                && response.contains(r#""manifest_version":7"#)
++                && response.contains(r#""opened_at_secs":12"#),
++            "which peer, which incoming fingerprint, and when the window opened: {response}"
++        );
++        assert!(
++            get(&server, "correct-token", "POST /v1/a2a/rotation-windows")
++                .starts_with("HTTP/1.1 404"),
++            "READ-ONLY: a mutating verb on this surface is the rejected second trust path"
++        );
++    }
++
++    /// A process with no cohort daemon config must answer 404, never an empty
++    /// list: "no rotation control here" and "no windows open" are different
++    /// facts and an operator acts differently on each.
++    #[test]
++    fn rotation_windows_route_is_absent_when_no_rotation_control_is_installed() {
++        let server = OperatorHttpServer::bind(
++            OperatorHttpConfig::loopback("correct-token".into()),
++            Arc::new(Source),
++            None,
++        )
++        .unwrap();
++
++        assert!(
++            get(&server, "correct-token", "GET /v1/a2a/rotation-windows")
++                .starts_with("HTTP/1.1 404")
++        );
++    }
+ }
+
+# NEW FILES (read them directly in the working tree)
+crates/maos-cohort/src/rotation.rs
+crates/maos-bin/src/cert_rotation.rs
+crates/maos-a2a-core/tests/t_14_2a_rotation_reload.rs
+crates/maos-a2a-tcp/tests/t_14_2a_post_grace_journal.rs
+crates/maos-bin/tests/cert_rotation_trigger_14_2a.rs
+crates/maos-cohort/tests/cert_rotation_14_2a.rs

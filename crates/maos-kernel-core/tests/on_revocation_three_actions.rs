@@ -225,7 +225,15 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
     // the paused clock.
     tokio::task::yield_now().await;
     tokio::time::advance(Duration::from_millis(10_001)).await;
-    for _ in 0..4 {
+    for _ in 0..100 {
+        let both_unloaded = {
+            let scbs = fixture.scheduler.scbs();
+            let map = scbs.read().expect("spirits lock poisoned");
+            !map.contains_key(&pids[1]) && !map.contains_key(&pids[2])
+        };
+        if both_unloaded {
+            break;
+        }
         tokio::task::yield_now().await;
     }
     {

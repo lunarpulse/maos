@@ -18,7 +18,7 @@ fn make_yaml(dir: &Path, valid_until: &str) -> PathBuf {
         &path,
         format!(
             r#"schema_version: 1
-current_phase: "v0.1-alpha"
+delivered_phase: "v0.1-alpha"
 mode: "warning"
 phase_order:
   - "v0.1-alpha"
@@ -108,7 +108,7 @@ fn manifest_expired_violates() {
     std::fs::write(
         &yaml,
         r#"schema_version: 1
-current_phase: "v0.1-alpha"
+delivered_phase: "v0.1-alpha"
 mode: "warning"
 phase_order:
   - "v0.1-alpha"

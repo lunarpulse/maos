@@ -128,13 +128,28 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
         let _ = h.await;
     }
 
-    // Give the DRR processor a moment to enqueue all frames
-    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-    // At least one budget warning should have been emitted for spirit "a"
+    // Bounded wait on the condition (Story 15-1 AC6(b)): the original fixed
+    // `sleep(50ms)` was a synchronisation primitive — under load the DRR
+    // processor has not necessarily emitted within 50 ms (measured 3/20 at
+    // default threads, 1/20 even at 1). Wait for the warning itself, bounded.
     let mut found = false;
-    while let Ok(evt) = bw_rx.try_recv() {
-        if evt.spirit_id == "a" && evt.backlog_bytes >= 8 * 1024 {
-            found = true;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        if found {
+            break;
+        }
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match tokio::time::timeout(remaining, bw_rx.recv()).await {
+            Ok(Some(evt)) => {
+                if evt.spirit_id == "a" && evt.backlog_bytes >= 8 * 1024 {
+                    found = true;
+                }
+            }
+            Ok(None) => break,      // channel closed — no further events possible
+            Err(_elapsed) => break, // deadline exhausted without the condition
         }
     }
     assert!(

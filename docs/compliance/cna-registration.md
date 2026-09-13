@@ -6,7 +6,7 @@
 | Story | 10.3 (v1.0 ship gate) |
 | Status | **Application submitted to MITRE (2026-06-22)** |
 | Requested scope | `lunarpulse/maos` (the MAOS substrate + first-party Spirits) |
-| Gate | `cargo run -p xtask -- check-cna-registration` (disposition `v1_0 = "blocking-when-present"`) |
+| Gate | **none — this artifact is no longer gate-validated.** `check-cna-registration` was RETIRED 2026-09-07 by Story 15-3 per **ADR-065**; its two live `SECURITY.md` controls are re-homed into `cargo run -p xtask -- check-security-md` |
 
 ## 1. CNA Registration Status
 
@@ -14,7 +14,9 @@ MAOS submitted a **CVE Numbering Authority (CNA)** registration application to
 MITRE on **2026-06-22** via the MITRE CNA onboarding form
 (https://cve.mitre.org/cve/cna.html). CNA onboarding is a 6–12 week external
 process governed by MITRE; this document is the evidence artifact the
-`check-cna-registration` ship gate binds to.
+`check-security-md` gate binds to (see §5). This document remains the NFR-Ops-4
+evidence artifact; only its *non-emptiness* check was dropped, and ADR-065
+records that as the single declared reduction.
 
 - **Requested CNA scope:** `lunarpulse/maos` — the MAOS substrate and its
   first-party reference Spirits.
@@ -74,12 +76,18 @@ vulnerability was disclosed; the exercise is pipeline verification only (NFR-Ops
 
 ## 5. SECURITY.md Cross-Reference
 
-`check-cna-registration` asserts `SECURITY.md` is consistent with this artifact:
+`check-security-md` asserts `SECURITY.md` is consistent with this artifact. The
+first two assertions were re-homed here from the retired
+`check-cna-registration` gate (ADR-065) and each carries its own proven-red
+test, so no control went dark:
 
 - No `<TO-BE-PUBLISHED>` GPG-key placeholder (resolved to the operator-local
-  trust root per ADR-047 at v1.0).
-- The supported-versions table includes a `1.0.x` row (1-year LTS).
-- CNA status is dated (application submitted 2026-06-22).
+  trust root per ADR-047 at v1.0). — **enforced**
+- The supported-versions table includes a `1.0.x` **row** (1-year LTS), matched
+  as a real table cell rather than a substring, so `11.0.x` cannot satisfy it.
+  — **enforced**
+- CNA status is dated (application submitted 2026-06-22). — *prose only; never
+  machine-checked, by either gate.*
 
 ## 6. Re-classification Triggers
 
@@ -89,4 +97,4 @@ This evidence is invalidated if:
 2. The advisory channel is disabled or reconfigured — re-run the synthetic
    advisory exercise.
 3. `SECURITY.md` regresses (placeholder returns, version table drops `1.0.x`) —
-   the gate fails on the inconsistency.
+   **`check-security-md`** fails on the inconsistency.

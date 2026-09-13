@@ -224,7 +224,7 @@ All four items verified INTACT at HEAD, and the item this preflight's own brief 
   **already exists** (`erasure/proof.rs:22-27`), so the row's claim that this "reopens the AC1
   vocabulary decision" is false. Crates `maos-bin` + `maos-audit`, **both at zero headroom** → one
   measured grant under `kloc.toml:87`. **Scope IN.**
-- **`14-e2-legal-hold-erase-serialization`** — D5.1 alone. KERNEL-TOUCHING. **Routed through AC4.1's
+- **`14-d3-audit-drop-and-legal-hold-serialization (D5.1 merged into D3's vehicle 2026-08-30 — one crate, one ZERO-Δ fence, one moment, as this row itself argued)`** — D5.1 alone. KERNEL-TOUCHING. **Routed through AC4.1's
   ruling, not a second escalation**: same crate, same ZERO-Δ fence, same moment. Two rulings on one
   crate in one afternoon is the single-source defect this project has paid for three times.
 - **`14-e3-mutation-to-audit-reconciliation`** — D5.4 alone; largest (≥4 crates, a persisted intent

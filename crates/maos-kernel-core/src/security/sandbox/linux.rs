@@ -21,6 +21,13 @@ use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
 use super::{Cleanup, SandboxSpec, SandboxedChild, SpawnError};
+#[cfg(target_arch = "x86_64")]
+#[rustfmt::skip]
+const LEGACY_X86_SYSCALLS: &[i64] = &[
+    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access
+];
+#[cfg(not(target_arch = "x86_64"))]
+const LEGACY_X86_SYSCALLS: &[i64] = &[];
 
 /// Spawn a sandboxed child on Linux.
 pub fn spawn_sandboxed(
@@ -225,26 +232,19 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
         libc::SYS_execve,
         libc::SYS_clone,
         libc::SYS_wait4,
-        libc::SYS_pipe,
         libc::SYS_pipe2,
         libc::SYS_dup,
-        libc::SYS_dup2,
         libc::SYS_dup3,
         libc::SYS_fcntl,
         libc::SYS_ioctl,
         libc::SYS_rt_sigprocmask,
         libc::SYS_getrandom,
-        libc::SYS_arch_prctl,
         libc::SYS_set_tid_address,
         libc::SYS_writev,
         libc::SYS_pread64,
         libc::SYS_madvise,
         libc::SYS_sigaltstack,
         libc::SYS_getdents64,
-        libc::SYS_stat,
-        libc::SYS_lstat,
-        libc::SYS_readlink,
-        libc::SYS_access,
         libc::SYS_faccessat,
         libc::SYS_faccessat2,
         libc::SYS_readlinkat,
@@ -266,7 +266,7 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
         libc::SYS_statx,
     ];
 
-    for &syscall in &basic_syscalls {
+    for &syscall in basic_syscalls.iter().chain(LEGACY_X86_SYSCALLS) {
         rules.insert(syscall as i64, vec![]);
     }
 

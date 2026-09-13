@@ -1150,7 +1150,7 @@ checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
 
 [[package]]
 name = "maos-domain"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -1159,27 +1159,28 @@ dependencies = [
  "maos-spirit-abi",
  "serde",
  "serde_json",
+ "sha2",
  "smallvec",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "maos-host"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "maos-spirit-abi"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "maos-wasm-host"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "ciborium",
  "ciborium-io",

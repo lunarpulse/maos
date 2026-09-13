@@ -2,25 +2,53 @@ name: release
 on:
   push:
     tags: ['v*']
+  # Pre-tag build rehearsals. `sign-and-publish` is guarded on
+  # `github.event_name == 'push'`, so NEITHER of these can publish.
+  #
+  #  * workflow_dispatch — rehearse at `main` after a merge.
+  #  * pull_request      — rehearse BEFORE a merge, label-gated (see `build.if`).
+  #    Added 2026-09-12 (Epic-15 retrospective, operator-ratified) so that
+  #    `aarch64-apple-darwin`'s first compile in this project's history happens
+  #    on a PR rather than on `main`. `workflow_dispatch` is unusable until the
+  #    workflow reaches the default branch — GitHub only exposes a dispatch
+  #    trigger for workflows present on it — which is exactly the merge the
+  #    rehearsal is supposed to de-risk. A `pull_request` run uses the workflow
+  #    file from the merge commit, so this trigger works on the PR that adds it.
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
+    # D-15-4-F (amended 2026-09-12, Epic-15 retrospective): macOS bills ~10x and
+    # `aggregate` is the branch-protection check, so macOS stays out of the
+    # discipline matrix and OFF ordinary pull requests. The ruling's own purpose
+    # was to give `aarch64-apple-darwin` a first build BEFORE the tag; this gate
+    # serves that purpose one merge earlier at the same cost — one operator-
+    # triggered run, never a per-PR tax.
+    #
+    # Push (tags) and workflow_dispatch are unaffected. A pull request builds
+    # only when it carries the `release-rehearsal` label.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'release-rehearsal')
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact_name: maos-linux-amd64
+            suffix: linux-amd64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            artifact_name: maos-linux-arm64
+            suffix: linux-arm64
           - target: aarch64-apple-darwin
             os: macos-latest
-            artifact_name: maos-darwin-arm64
+            suffix: darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -37,41 +65,57 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
-      - name: Build release binary
+      - name: Build release binaries
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
-        run: cargo build --release -p maos-bin --locked --target ${{ matrix.target }}
+          MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
+        run: cargo build --release -p maos-bin -p maos-cli --locked --target ${{ matrix.target }}
       - name: Check mock-not-in-release
         run: cargo run -p xtask -- check-mock-not-in-release --binary target/${{ matrix.target }}/release/maos --json
-      - name: Package artifact
+      - name: Package artifacts
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/maos dist/${{ matrix.artifact_name }}
+          cp target/${{ matrix.target }}/release/maos dist/maos-${{ matrix.suffix }}
+          cp target/${{ matrix.target }}/release/maosctl dist/maosctl-${{ matrix.suffix }}
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.artifact_name }}
+          name: maos-${{ matrix.suffix }}
+          path: dist/maos-${{ matrix.suffix }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maosctl-${{ matrix.suffix }}
+          path: dist/maosctl-${{ matrix.suffix }}
 
   sign-and-publish:
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
+      checks: read
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - name: Require successful main discipline aggregate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=aggregate&status=completed&filter=latest" |
+            cargo run --locked -p xtask -- check-release-precondition
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: 'maos*'
+          merge-multiple: true
       - name: Generate SHA256SUMS and sign
         run: |
-          cd dist
-          sha256sum maos-* > SHA256SUMS
-          cargo run -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums SHA256SUMS --output SHA256SUMS.sig
+          cargo run -p xtask -- release-dry-run --manifest-only --dist-dir dist --targets x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu,aarch64-apple-darwin
+          cargo run -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
         env:
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
           MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
@@ -80,15 +124,32 @@ jobs:
           cargo test -p maos-audit production_pubkey_must_differ_from_dev_seed
         env:
           MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
-      - name: Verify artifacts (self-test)
+      - name: Refuse bundled development release key
         run: |
-          cd dist
-          cargo run -p xtask -- release-verify --verify --sha256sums SHA256SUMS --sig SHA256SUMS.sig --artifacts-dir .
+          chmod +x dist/maosctl-linux-amd64
+          embedded_pubkey="$(dist/maosctl-linux-amd64 release-pubkey)"
+          if [[ "$embedded_pubkey" == "bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7" ]]; then
+            echo "release refused: maosctl embeds the documented development release key"
+            exit 1
+          fi
+      - name: Verify artifacts (self-test)
+        run: cargo run -p xtask -- release-verify --verify --sha256sums dist/SHA256SUMS --sig dist/SHA256SUMS.sig --artifacts-dir dist
+        env:
+          MAOS_RELEASE_PUBKEY: ${{ secrets.MAOS_RELEASE_PUBKEY }}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/maos-*
+            dist/maos-linux-amd64
+            dist/maosctl-linux-amd64
+            dist/maos-linux-arm64
+            dist/maosctl-linux-arm64
+            dist/maos-darwin-arm64
+            dist/maosctl-darwin-arm64
             dist/SHA256SUMS
             dist/SHA256SUMS.sig
+          fail_on_unmatched_files: true
           generate_release_notes: true
+          # SemVer: a hyphenated tag (v0.1.0-alpha.1) is a pre-release and must never
+          # be served as `latest`. Derived from the tag so GA needs no edit here.
+          prerelease: ${{ contains(github.ref_name, '-') }}

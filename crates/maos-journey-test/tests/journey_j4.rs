@@ -52,6 +52,9 @@ fn j4_mira_nash_topology_run_once() {
         .args(["run", "spirits/topologies/j4-mira-nash.toml", "--once"])
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
+        // 15-6 §A6 review P1: cassette-free child; never inherit a
+        // job-level MAOS_INFERENCE_MODE (nightly rerecord leg).
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn mira-nash topology");
@@ -129,6 +132,7 @@ fn j4_earned_consent_rupture_typed_oracle_deferred() {
         .args(["run", "spirits/topologies/j4-mira-nash.toml", "--once"])
         .env("XDG_DATA_HOME", audit.path())
         .env("MAOS_HOME", audit.path())
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn mira-nash topology");

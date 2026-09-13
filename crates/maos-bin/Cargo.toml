@@ -111,3 +111,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 tempfile = "3"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test
 tokio-postgres = "0.7"   # Story 13.6c CI remediation — raw physical row oracle for live two-datname tests
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+futures-util = { version = "0.3", features = ["sink"] }
+time = "0.3"

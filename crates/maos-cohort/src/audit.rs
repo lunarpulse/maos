@@ -15,6 +15,50 @@ pub trait CohortAuditSink: Send + Sync {
     fn append(&self, event: &CohortAuditEvent) -> Result<(), CohortError>;
 }
 
+/// Story 14-2a / AC4.6(b) — the ONE stable, greppable intent every certificate
+/// rotation row carries.
+///
+/// `FrameKind::TelemetryEvent` (kind 4) is SHARED with cohort lifecycle and
+/// digest summaries, so the kind alone cannot tell an auditor that live TLS
+/// trust moved. The intent string is therefore load-bearing, not decoration: it
+/// is what makes `maosctl audit query --intent-contains a2a:cert-rotation`
+/// return exactly the rotation timeline and nothing else, and what lets a SIEM
+/// alert on trust-set changes without parsing payloads. Changing it is a
+/// breaking change to an operator surface.
+pub const CERT_ROTATION_INTENT: &str = "a2a:cert-rotation";
+
+/// Story 14-2a — the 8-hex correlation prefix of a `sha256:<hex64>` wire
+/// fingerprint, which is what an auditor can actually read back off disk.
+///
+/// ⚠ **MEASURED, AND IT SURPRISED THIS STORY:** the I2 redaction filter
+/// (`crates/maos-iac/src/adapter/redaction.rs:169-181`) rewrites ANY hex run of
+/// ≥ 32 characters as `<REDACTED:type=capability_token,len=64,hash=XXXX>`, so a
+/// full certificate fingerprint NEVER lands in `payload_redacted` — measured
+/// live against a real daemon's Transparency Log. That is a deliberate
+/// secret-hygiene control and this story does not weaken it (it lives in
+/// `maos-iac`, and a certificate fingerprint is public data, but relaxing a
+/// redaction rule is a security change that is not this story's to make).
+///
+/// The consequence, stated rather than papered over: the durable rotation row
+/// carries the peer, the manifest version, a per-value redaction `hash=` stamp
+/// (so two different generations remain DISTINGUISHABLE on disk) and this
+/// 8-character prefix — which is `PeerCertFingerprint::short()`'s own form,
+/// short enough to survive the filter and long enough to correlate a row with
+/// the certificate an operator minted. The FULL values are readable on the
+/// operator rotation-window surface while the window is open.
+///
+/// ⚠ `chars().take(8)`, not `&hex[..8]`: `PeerCertFingerprint` is directly
+/// deserializable with NO validator and `TcpA2AConfig::build_pin_store` stores
+/// operator pins WITHOUT `parse`, so a pin such as `hex = "€€€"` loads cleanly
+/// and would reach this formatter. A byte slice would then panic mid-code-point
+/// — while `apply_reissue` holds the manifest mutex, poisoning cohort state for
+/// the process lifetime. This mirrors `PeerCertFingerprint::short`, which is
+/// character-based for the same reason.
+fn fingerprint_short(wire: &str) -> String {
+    let hex = wire.split_once(':').map(|(_, hex)| hex).unwrap_or(wire);
+    hex.chars().take(8).collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CohortAuditEvent {
     AuthorityReissueIssued {
@@ -44,6 +88,54 @@ pub enum CohortAuditEvent {
     /// Story 12.4a — a correlated digest-read reply was received + recorded
     /// (idempotent per `request_id`). Journaled once per distinct reply (AC2).
     DigestReplyReceived { member: String, request_id: String },
+    /// Story 14-2a / AC4.3 — a one-generation overlap window OPENED for a
+    /// cohort member whose signed fingerprint moved. `retiring` is the
+    /// generation still serving; `next` is the incoming one the manifest now
+    /// declares. Both are wire-form (`sha256:<hex64>`), never raw material.
+    CertRotationWindowOpened {
+        peer: String,
+        retiring: String,
+        next: String,
+        version: u64,
+    },
+    /// Story 14-2a / AC4.3 — the window's TERMINAL row: `T_grace` elapsed and
+    /// `next` was promoted, retiring `retired`. Every opened window ends in
+    /// exactly one terminal row (this variant on promotion, `CertRotationRefused`
+    /// when there was nothing to promote), because a row that says a rotation
+    /// started and never says how it ended is what this event pair prevents.
+    CertRotationWindowClosed {
+        peer: String,
+        retired: String,
+        promoted: String,
+        version: u64,
+    },
+    /// Story 14-2a / AC4.3 — a rotation this node REFUSED, with the reason an
+    /// operator will act on: a `FingerprintCollision` (including the refused
+    /// cross-peer swap), an `Invalidated` pin, a member the live transport peer
+    /// set never declared, or a grace that elapsed with no window left to
+    /// promote. Per-peer: the rest of the reload proceeds.
+    CertRotationRefused {
+        peer: String,
+        reason: String,
+        version: u64,
+    },
+    /// Story 14-2a — plane A's declaration moved for a peer that holds NO pin
+    /// yet, so there was no generation to overlap and no window to close. First
+    /// contact will pin the manifest-declared value.
+    CertRotationDeclarationMoved {
+        peer: String,
+        previous: String,
+        declared: String,
+        version: u64,
+    },
+    /// Story 14-2c — the signed manifest moved this host's own declaration
+    /// away from the TLS leaf the running transport still serves.
+    LocalLeafDeclarationMoved {
+        host: String,
+        serving: String,
+        declared: String,
+        version: u64,
+    },
 }
 
 /// Deterministic in-memory implementation for focused state tests. Production
@@ -146,6 +238,73 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                     "{{\"event\":\"digest_reply_received\",\"member\":{member:?},\"request_id\":{request_id:?}}}"
                 ),
                 Some(request_id.as_str()),
+            ),
+            CohortAuditEvent::CertRotationWindowOpened {
+                peer,
+                retiring,
+                next,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"cert_rotation_window_opened\",\"peer\":{peer:?},\"retiring\":{retiring:?},\"retiring_short\":{:?},\"next\":{next:?},\"next_short\":{:?},\"version\":{version}}}",
+                    fingerprint_short(retiring),
+                    fingerprint_short(next)
+                ),
+                None,
+            ),
+            CohortAuditEvent::CertRotationWindowClosed {
+                peer,
+                retired,
+                promoted,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"cert_rotation_window_closed\",\"peer\":{peer:?},\"retired\":{retired:?},\"retired_short\":{:?},\"promoted\":{promoted:?},\"promoted_short\":{:?},\"version\":{version}}}",
+                    fingerprint_short(retired),
+                    fingerprint_short(promoted)
+                ),
+                None,
+            ),
+            CohortAuditEvent::CertRotationRefused {
+                peer,
+                reason,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"cert_rotation_refused\",\"peer\":{peer:?},\"reason\":{reason:?},\"version\":{version}}}"
+                ),
+                None,
+            ),
+            CohortAuditEvent::CertRotationDeclarationMoved {
+                peer,
+                previous,
+                declared,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"cert_rotation_declaration_moved\",\"peer\":{peer:?},\"previous\":{previous:?},\"previous_short\":{:?},\"declared\":{declared:?},\"declared_short\":{:?},\"version\":{version}}}",
+                    fingerprint_short(previous),
+                    fingerprint_short(declared)
+                ),
+                None,
+            ),
+            CohortAuditEvent::LocalLeafDeclarationMoved {
+                host,
+                serving,
+                declared,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"local_leaf_declaration_moved\",\"host\":{host:?},\"serving_short\":{:?},\"declared_short\":{:?},\"version\":{version}}}",
+                    fingerprint_short(serving),
+                    fingerprint_short(declared)
+                ),
+                None,
             ),
         };
         match correlation {

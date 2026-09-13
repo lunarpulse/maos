@@ -1,5 +1,14 @@
 #![forbid(unsafe_code)]
 
+/// Story 15-6 — provider-level cassette replay/record adapters shared by every
+/// inference consumer.
+#[cfg(feature = "network")]
+pub mod cassette_replay;
+/// Story 14-2a — the production peer-certificate rotation trigger's wiring: the
+/// real `T_grace` deadline and the operator read seam. In the library, not
+/// `main.rs`, so the runtime gate leg can drive the production types.
+#[cfg(feature = "network")]
+pub mod cert_rotation;
 #[cfg(feature = "network")]
 pub mod cross_team_consent;
 #[cfg(feature = "network")]
@@ -20,6 +29,10 @@ pub mod enterprise_identity;
 /// reads it by `include_str!`.
 #[cfg(feature = "network")]
 pub mod enterprise_pdp_runtime;
+/// Story 15-6 — the one authoritative live/record/replay selector. Public so
+/// integration tests execute the production lattice; an in-`src` test module
+/// would be budget-charged and CI-invisible.
+pub mod inference_mode;
 #[cfg(feature = "network")]
 pub mod tenant_map;
 /// The Worker-CLI **adapter** seam (J1 Tier-2 bridge). In the library, not

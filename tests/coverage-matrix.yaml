@@ -1,5 +1,5 @@
 schema_version: 1
-current_phase: v0.1-alpha
+delivered_phase: v0.1-alpha
 mode: warning
 phase_order:
 - v0.1-alpha
@@ -501,11 +501,36 @@ coverage:
       `warning` and coverage_matrix.rs only hard-fails on "hard", so a misspelled
       gate name in this row reds nothing.
   FR23b:
-    gates: [check-cohort-mesh]
+    gates: [check-cohort-mesh, check-cert-rotation-trigger]
     enforcement: advisory-until-engagement
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
+    notes: >-
+      Story 14-2a (2026-08-30). ⚠ THIS ROW COVERS THE ROTATION THIRD OF FR23b AND
+      NOTHING ELSE. "Operator-managed PKI" is issuance + rotation + revocation:
+      * ROTATION — served, and only its PEER-TRUST half. `check-cert-rotation-trigger`
+        proves a live daemon re-derives its peer trust set from a signed
+        `cohort:manifest-reissue` and moves both runtime declaration surfaces with a
+        one-generation overlap. Its control leg is a RUNTIME observation (a real
+        `maos` daemon, a real signed reissue over real mTLS, the pin-set change read
+        back through the production operator HTTP surface), proven-red by unwiring
+        the set-once install. Rotating THIS host's own leaf is NOT served:
+        `swap_serving_cert` still has no production caller, because a signed manifest
+        carries a fingerprint and never a private key (owner
+        `14-2d-self-identity-rotation`).
+      * REVOCATION — ARCHITECTURALLY OUT. ADR-047 §3/§4 forbid OCSP/CRL under
+        NFR-Ops-12's zero-outbound-network mandate. There is no revocation check to
+        gate and there will not be one; the post-grace refusal of a retired
+        generation is the closest shipped behaviour.
+      * ISSUANCE — ENTIRELY OUT OF BAND. The operator mints certificates with
+        machinery this system never sees; the daemon only ever holds fingerprints and
+        on-disk PEM paths it was told about.
+      Cite those two exclusions with their reasons whenever this row is read: a bare
+      `gates:` list here would let the next reader conclude the whole requirement is
+      served, which is the failure 14-2 found on NFR-Rel-9. ⚠ And note this file
+      CANNOT FAIL — `mode: warning` at :3 and `coverage_matrix.rs` hard-fails only on
+      "hard" — so this row is DOCUMENTATION. The control is the gate named above.
   FR24:
     gates: []
     corpora: []
@@ -1249,13 +1274,15 @@ coverage:
   NFR-Ops-4:
     gates:
     - check-security-md
-    - check-cna-registration
     corpora: []
     phase: v1.0
     valid_until: '2027-05-12'
-    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md; Story 10.3 adds
-      CNA registration evidence + check-cna-registration gate (blocking-when-present).
-      MITRE CNA application submitted 2026-06-22; docs/compliance/cna-registration.md.
+    notes: 1a.4 ships SECURITY.md ship-gate via check-security-md, which since Story
+      15-3 (ADR-065) also carries the two content controls re-homed from the retired
+      check-cna-registration gate — no <TO-BE-PUBLISHED> GPG placeholder, and a real
+      1.0.x supported-versions table row. MITRE CNA application submitted 2026-06-22;
+      docs/compliance/cna-registration.md is KEPT as NFR-Ops-4 evidence and is no
+      longer gate-validated.
   NFR-Ops-5:
     gates: []
     corpora: []
@@ -1396,19 +1423,49 @@ coverage:
   NFR-Rel-7:
     gates: [check-scale-churn]
     corpora: []
-    phase: v2.0+
+    phase: v2.2
     valid_until: '2027-05-12'
     notes: |
       Story 11.3 — PRIMARY row (D10 traceability: this NFR's literal
       detection ≤1h / blast ≤5 / recovery ≤24h floors). The `check-scale-churn`
-      gate (`xtask/src/check_scale_churn.rs`) derives these from a real N=30
-      (floor ≥25) host mTLS mesh drill (`maos-a2a-tcp/tests/t_11_3_scale_churn.rs`),
-      replacing the deleted `chaos::churn::run_scaffold` canned-constant
-      scaffold. Detection is two-surface (handshake `TcpTransportError` +
-      router NACK — F-new). `max_blast_radius`/`recovery_secs` are BINDING at
-      v2.0; the derived `rto_secs` axis is REPORTED/advisory only (F3-ledger),
-      cross-listed under NFR-Scale-2 (the scale/phase anchor — cite BOTH rows,
-      "and/or" traces to nothing).
+      gate (`xtask/src/check_scale_churn.rs`) derives these from real host mTLS
+      mesh drills (`maos-a2a-tcp/tests/t_11_3_scale_churn.rs`), replacing the
+      deleted `chaos::churn::run_scaffold` canned-constant scaffold. Detection
+      is two-surface (handshake `TcpTransportError` + router NACK — F-new).
+      `recovery_secs` is BINDING; the derived `rto_secs` axis is
+      REPORTED/advisory only (F3-ledger), cross-listed under
+      NFR-Scale-2 (the scale/phase anchor — cite BOTH rows, "and/or" traces to
+      nothing). Story 14.1 (2026-08-27) scales the envelope to N=100: the
+      three adversary classes are planted INTO the 100-host mesh, the blast
+      floor becomes a race (adversary offered the full derived peer set;
+      offered == reached REDS), and the gate requires measurement markers
+      carrying the derived host count. Phase updated v2.0+ → v2.2 (14.1 ships
+      the v2.2 half of this NFR).
+      BLAST AXIS — instrument corrected 2026-08-28 (Story 14-1 code review,
+      party-mode UNANIMOUS; PRD amended, see `[DELTA-2026-08-28]` on
+      NFR-Rel-7 in `prd/non-functional-requirements.md:26`). The ratified race
+      MEASURED the absolute `≤5 peers` floor BREACHED at both scales — 6–8 at
+      N=100, 7 at N=30, scale-independent — because the floor was written with
+      no adversary concurrency model and is unsatisfiable alongside the
+      ratified propagation envelope (NFR-Rel-9 ≤ 5 s p99 capability-token
+      revocation; cert-rotation chaos p50 ≤30s / p99 ≤90s per
+      `t_10_4b_rotation_real_timing.rs:338`) [attribution corrected
+      2026-08-28, 14-1 round-2 review: the 30s/90s floors were first
+      misattributed to NFR-Rel-9 here].
+      What BINDS on this substrate is therefore *detection interrupts
+      propagation*, via TWO conjuncts: (i) reach `≤ 4W` (W = `RACE_IN_FLIGHT`
+      = 6) — a CONSTANT that cannot grow with N, sized four in-flight
+      generations so it catches a STRUCTURAL failure to interrupt and not a
+      merely slow detector (slowness binds on the detection-latency axis);
+      and (ii) `reach × 2 < offered`, derived from the run itself. The absolute
+      `max_blast_radius` stays DERIVED + REPORTED on every run and its breach
+      is published as an NFR-Rel-7 RESULT in `RELEASE-HOLDS.md` row 18, never
+      as a met floor. `≤5` is retained unchanged as the serial-adversary floor
+      and promotes with real geo-distribution. Falsifiability preserved and
+      proven live: the `SweepOnly` no-detection leg reds BOTH conjuncts
+      (99 > 24 and 99 × 2 ≥ 99) and the over-reach leg reds the absolute
+      predicate. Measured clean reach: 6–8 isolated, 10 under load, against
+      the 24 constant.
   NFR-Rel-8:
     gates:
       - journal_append_p99_measurement
@@ -1421,18 +1478,23 @@ coverage:
       Story 1b.1 ships the criterion bench for ring-buffer flush P99 < 1ms.
       Raw file + sync_data chosen over SQLite WAL for deterministic latency.
   NFR-Rel-9:
-    gates: [check-rotation-real-timing]
+    gates: []
     corpora: []
     phase: v0.8
     valid_until: '2027-05-12'
     notes: |
-      Revocation-propagation latency under mTLS cert-rotation churn. The
-      `check-rotation-real-timing` gate (Story 10.4b) asserts the
-      `RotationDrillReport` revocation-propagation floors by name (p50 ≤30s /
-      p99 ≤90s) over REAL `AgentRotationTimestamps` from the live 3-host
-      rotation chaos drill — the falsifiable enforcement of this NFR. The same
-      gate is cross-listed under NFR-Sec-13, which owns the chaos structure that
-      produces the revocation events.
+      [RE-BASED by Story 14-2, 2026-08-29 — the pre-14-2 notes conflated this
+      row with NFR-Sec-13's rotation-propagation scope.] The PRD's NFR-Rel-9
+      is `≤ 5s p99 under 10⁴ concurrent capability-token validations`
+      (`non-functional-requirements.md:28`) — the capability-token
+      validation-latency axis, NOT cert-rotation propagation. The 30s/90s
+      propagation floors belong to the NFR-Sec-13 rotation-chaos scope
+      (asserted by `check-rotation-real-timing` via `passes_v15_floors`, which
+      inherits the stricter ratified v0.7/v1.0 floors rather than the looser
+      NFR-Sec-13 literals). No current gate measures the named workload.
+      `check-rotation-real-timing` is mapped only to NFR-Sec-13; NFR-Rel-9
+      remains explicitly uncovered until a dedicated capability-token load
+      leg lands.
   NFR-Scale-1:
     gates: [check-cross-region-consensus, check-multi-region-slo]
     corpora: []
@@ -1441,15 +1503,20 @@ coverage:
   NFR-Scale-2:
     gates: [check-scale-churn]
     corpora: []
-    phase: v2.0+
+    phase: v2.2
     valid_until: '2027-05-12'
     notes: |
-      Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0,
-      100→30 cost-compression target). `check-scale-churn` runs the real
-      drill at N=30 (floor ≥25 distinct-identity-reconciled hosts), a
-      compressed churn schedule (10-20% turnover/wk x 4wk, modeled as 12-24
-      real join/leave events on a co-located loopback mesh). PRIMARY
-      floor-tracing row is NFR-Rel-7 (cite BOTH rows).
+      Story 11.3 — scale/phase ANCHOR row (D10 traceability: 25-host @v2.0
+      compressed scope; the 100-host target below). `check-scale-churn` runs
+      the real drill at N=30 (floor ≥25 distinct-identity-reconciled hosts)
+      AND, since Story 14.1 (2026-08-27), at N=100: identity reconcile, the
+      duplicate-identity negative control (100 clones are not 100 hosts), the
+      ratio-derived churn schedule (10-20% of non-hub slots per round x 4
+      rounds — the absolute 12-24 band was retired), and planted adversaries
+      at both scales. The historical "100→30 cost-compression target" is
+      RETIRED: the 100-host leg landed Binding (measured: 502 fds hub-and-
+      spoke, ~3.3s wall for the five N=100 legs). PRIMARY floor-tracing row
+      is NFR-Rel-7 (cite BOTH rows).
   NFR-Scale-3:
     gates: []
     corpora: []
@@ -1487,15 +1554,45 @@ coverage:
     phase: v0.5
     valid_until: '2027-05-12'
   NFR-Sec-12:
-    gates: []
+    gates: [check-rotation-real-timing]
     corpora: []
     phase: v0.5
     valid_until: '2027-05-12'
+    notes: |
+      Story 14-2's `overlap-pin-closure` leg enforces NFR-Sec-12 at the
+      production pin-store boundary: outsiders remain blocked during the
+      widened window, fingerprint collisions are refused, close retires the
+      old generation, and the promoted generation remains accepted.
   NFR-Sec-13:
     gates: [check-live-bilateral-consent, check-rotation-real-timing]
     corpora: []
     phase: v1.5
     valid_until: '2027-05-12'
+    notes: |
+      [Notes added by Story 14-2, 2026-08-29 — this row never carried any.]
+      PHASE DECISION: the PRD (`:223`) scopes the 10-host half at v2.0; the
+      gate preserves its v1.5 blocking posture at both explicit v2.0 and v2.2
+      rungs. The epic ships the evidence in the v2.2 wave without weakening
+      the earlier ship phase.
+      THE DROP DEFINITION (14-2 AC1.1, complete, verbatim): "A
+      conversation drop is a frame issued before `t_0` that never received
+      a verdict — neither an ACK nor any typed NACK — by `t_2`. It is not a
+      retried dial (retries are internal and a retried-then-succeeded dial
+      returns `Ok`, visible only as `last_dial_attempts()`). It is not an
+      `IntentDeniedAtPeer` (`router.rs:1045`) — that is a completed
+      conversation answered 'no'. It is not a post-rotation reachability
+      failure; that is the existing Phase-2 assertion, already proven-red."
+      SAMPLE-COUNT DISCLOSURE (14-2
+      AC4.2): every percentile publishes `n=` beside it on three surfaces —
+      test stderr, `report_to_markdown`, and the gate's leg JSON — computed
+      from the percentile engine's own filter (per-agent `t_1_ns.is_some()`
+      et al.), never `.len()`; at n ≤ 100 the p99 IS the worst of n.
+      Rotation floors asserted via `passes_v15_floors` (== the ratified
+      v0.7/v1.0 floors; NFR-Sec-13's literal median ≤60s / p99 ≤5min are
+      looser on every axis and are never adopted). The enforcement is the
+      leg-structured `check-rotation-real-timing` gate (14-2 AC5): a
+      10-host test that early-returns emits no `ROTATION_HOSTS_ROTATED`
+      marker and REDS.
   NFR-Sec-14:
     gates: [isolation-framework-tests]
     corpora: []

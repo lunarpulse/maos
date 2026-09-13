@@ -4,11 +4,17 @@ pub mod abi_diff;
 // vector that exercises a parallel copy of the logic proves nothing about the
 // gate CI runs.
 pub mod check_decision_register;
+// Story 15-3 AC5 — the exit-command gate's audit. Exposed for the same reason
+// `check_decision_register` is: `xtask/tests/` must drive the REAL `audit()`
+// over planted corpora, because a vector that exercised a parallel copy of the
+// tokeniser would prove nothing about the gate CI runs (F11).
+pub mod check_exit_commands;
 pub mod check_fkcs;
 pub mod check_host_surface;
 pub mod check_kernel_baseline;
 pub mod check_mock_not_in_release;
 pub mod check_trial_attestation;
+pub mod release_dry_run;
 // corpus_types + gate_common exposed so the lib-compiled gate modules
 // (check_fkcs, check_trial_attestation) can resolve `crate::gate_common`
 // (Option C leg-binding, Epic 12 retro B1). corpus_types is self-contained;

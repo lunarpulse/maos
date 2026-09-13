@@ -6,6 +6,7 @@
 //! directly. `maos-fkcs` remains a dev-only fixture crate for cohort/admission
 //! tests and does not depend on xtask.
 
+use crate::gate_common::{is_blocking_at, CURRENT_PHASE};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -13,8 +14,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 const GATE_NAME: &str = "check-fkcs";
-const CURRENT_PHASE: &str = "v1_5";
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
 const BASELINE_FILE: &str = "xtask/fkcs-baseline.toml";
 
 /// Frozen admission-path baseline (literal AC3). Pins a SHA-256 over the
@@ -362,7 +361,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "oracle_green": oracle_green,
                 "advisory": !oracle_green && gate_passed,
                 "blocking_now": blocking_now,
-                "current_phase": CURRENT_PHASE,
+                "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
                 "legs": legs,
                 "vacuous_leg": vacuous.map(|leg| leg.label),
@@ -820,26 +819,6 @@ pub fn parse_inline_disposition(line: &str) -> Result<HashMap<String, String>, S
         out.insert(k.trim().to_string(), v.trim().trim_matches('"').to_string());
     }
     Ok(out)
-}
-
-pub fn phase_disposition<'a>(
-    disposition: &'a HashMap<String, String>,
-    phase: &str,
-) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
-}
-
-pub fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> bool {
-    matches!(
-        phase_disposition(disposition, phase),
-        Some("blocking") | Some("blocking-when-present")
-    )
 }
 
 pub fn read_nonempty_lines(path: &str) -> Result<BTreeSet<String>, String> {

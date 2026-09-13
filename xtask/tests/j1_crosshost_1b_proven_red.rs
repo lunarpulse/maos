@@ -633,6 +633,54 @@ fn planting_an_unenrolled_j1_test_file_must_red() {
     );
 }
 
+/// A digit in a legitimate J1 stem is not an epic-number segment. The
+/// derivation must still notice and require enrollment for `j1_2a.rs`.
+#[test]
+fn planting_a_numeric_j1_stem_must_red() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-bin/tests/j1_2a.rs",
+            "#[test]\nfn never_run_in_ci() {}\n",
+        );
+    });
+    assert_red(
+        &v,
+        "--test j1_2a",
+        "a numeric J1 stem was added without CI enrollment",
+    );
+}
+
+/// Story 15-1 AC1 / D-2 — the exclusion's twin. An EPIC-NUMBERED stem
+/// (`foo_14_2a.rs`) is a foreign lane's test file: this gate must stay GREEN
+/// with it planted un-enrolled, because the 14-2a lane is executed by
+/// `check_cert_rotation_trigger`'s own `invoke_cargo_test` and enrolling it
+/// here would double-run a real-daemon test on an untimed job. If this reds,
+/// the digit-exclusion in `derive_enrolled_targets` has been lost and the
+/// false positive 15-1 closed is back.
+#[test]
+fn planting_an_epic_numbered_foreign_lane_test_file_stays_green() {
+    let v = run_gate(|root| {
+        write_file(
+            root,
+            "crates/maos-bin/tests/foo_14_2a.rs",
+            "#[test]\nfn foreign_lane_not_mine_to_enroll() {}\n",
+        );
+    });
+    assert!(
+        v.passed,
+        "EXCLUSION FAILURE — the gate went RED for an epic-numbered foreign-lane \
+         test file (`foo_14_2a.rs`); the digit-exclusion of Story 15-1 D-2 is \
+         gone. stdout:\n{}",
+        v.stdout
+    );
+    assert!(
+        v.success,
+        "a Blocking gate must exit 0 when its oracle is green (foo_14_2a.rs)\nstdout:\n{}",
+        v.stdout
+    );
+}
+
 /// Enrollment must live in THIS gate's Blocking job, unchanged from `2a`'s
 /// scoping: the same `--test` lines under an unrelated job are enrollment in name
 /// only.

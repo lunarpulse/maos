@@ -1,74 +1,14 @@
-//! Story 6.3 AC5 — NFR-Sec-13 mTLS cert rotation chaos test harness.
-//!
-//! v0.5 calibration phase per architecture §7.2.1.b — metrics MEASURED and
-//! REPORTED but NOT enforced.
+//! Story 6.3 AC5 → **retired to its surviving halves by Story 14-2 (AC6.1)**:
+//! the synthetic `harness_3_host` drill and `MetricsCollector` are DELETED —
+//! they seeded `t_0/t_1/t_2` from `DrillConfig` constants and asserted their
+//! own floors green. What remains here are the tests that exercise REAL
+//! production logic only: `compute_t_grace` boundary semantics (§7.2.1.a)
+//! and the `HandshakeRetryPolicy` retry-class filter. The live rotation
+//! drill + the `check-rotation-real-timing` gate own NFR-Sec-13 enforcement;
+//! `scenario_5_3`'s post-grace falsifier was ported into the real drill
+//! (`t_10_4b_rotation_proven_red_post_grace_boundary`) BEFORE this deletion.
 
-use maos_a2a::chaos::{
-    harness_3_host::{run_drill, DrillConfig},
-    rotation::compute_t_grace,
-};
-
-#[tokio::test]
-async fn scenario_5_1_3_host_happy_path_calibration_baseline() {
-    // 3-host synthetic chaos drill on a happy path; assert all three timing
-    // distributions pass v0.7 floors AND v1.0 cert_post_grace_reject floor;
-    // passing in calibration mode generates baseline data.
-    let cfg = DrillConfig::default();
-    let report = run_drill(cfg).await;
-    assert!(report.passes_v07_floors);
-    assert!(report.passes_v10_floors);
-    assert_eq!(report.per_agent.len(), 3);
-    // All three p99 distributions populated.
-    assert!(report.revocation_propagation_p99_ms > 0);
-    assert!(report.re_handshake_p99_ms > 0);
-    assert!(report.end_to_end_p99_ms > 0);
-}
-
-#[tokio::test]
-async fn scenario_5_2_one_agent_lagged_60s_breach_in_calibration() {
-    // 3-host drill with one agent's OCSP poll lagged 60s; revocation
-    // propagation p50 still ≤30s but p99 floats above floor; in calibration
-    // mode the test reports the breach without failing.
-    let cfg = DrillConfig {
-        drill_id: "lag-60s".into(),
-        target_propagation_ms_per_agent: vec![10_000, 15_000, 100_000],
-        target_re_handshake_ms_per_agent: vec![5_000, 8_000, 12_000],
-        ..DrillConfig::default()
-    };
-    let report = run_drill(cfg).await;
-    assert!(report.revocation_propagation_p50_ms <= 30_000);
-    assert!(report.revocation_propagation_p99_ms >= 90_000);
-    // Calibration mode: failing the v0.7 floor reports without panic.
-    assert!(!report.passes_v07_floors);
-}
-
-#[tokio::test]
-async fn scenario_5_3_post_grace_reject_increments() {
-    // Per AC5 §5.3 — agent presents old cert AFTER t_revoke + T_grace.
-    // cert_post_grace_reject increments; v1.0 floor breach is reported.
-    let cfg = DrillConfig {
-        drill_id: "post-grace-1".into(),
-        post_grace_reject_count: 1,
-        post_grace_total_count: 1_000,
-        ..DrillConfig::default()
-    };
-    let report = run_drill(cfg).await;
-    // 1/1000 = 0.1% — exactly at the boundary
-    assert!(report.post_grace_reject_rate <= 0.001);
-    // v1.0 floor: ≤0.1% — at the boundary, still passes
-    assert!(report.passes_v10_floors);
-
-    // Above the boundary
-    let cfg_above = DrillConfig {
-        drill_id: "post-grace-2".into(),
-        post_grace_reject_count: 2,
-        post_grace_total_count: 1_000,
-        ..DrillConfig::default()
-    };
-    let report_above = run_drill(cfg_above).await;
-    assert!(report_above.post_grace_reject_rate > 0.001);
-    assert!(!report_above.passes_v10_floors);
-}
+use maos_a2a::chaos::rotation::compute_t_grace;
 
 #[test]
 fn scenario_5_4_t_grace_boundary_semantics() {

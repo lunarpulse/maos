@@ -529,3 +529,53 @@ ADR-054 cohort mesh (E12) · ADR-055 multi-tenant Loom + per-team HKDF weld (E13
 - **External holds (GA ledger, non-gating for v2.2 dev):** external pen-test (NFR-Sec-7), export counsel (NFR-Comp-1).
 
 **v2.2 coverage:** every residual FR/NFR is mapped to a story or explicitly re-deferred with a reason. **FR37 now has a functional home (E13.4) — zero FRs unserved.**
+
+
+## Recovery Coverage Map (R2, 2026-09-04 — Epics 15–21, Fork C)
+
+Source: the 2026-09-04 review and preflight. Each requirement the review classified below LIVE is homed at the story that makes it live from a product binary, under ADR-060's forms-by-trust-tier rule. FRs already LIVE (22) unchanged.
+
+| Requirement (review class) | Home |
+|---|---|
+| FR1 install via package manager / signed release (PARTIAL) | 15-4, 20-2 (+ `ops-brew-tap-and-aur-publication`) |
+| FR2 clean kernel uninstall (PARTIAL) | 16-4 |
+| FR3 providers + endpoint lock (PARTIAL: 3 of 6) | 20-4 (Gemini + pin); `later-bedrock-vertex-and-kms-backends` |
+| FR4/FR47 mediation incl. Worker subprocess (PARTIAL) | 17-1 |
+| FR5 sandbox enforcement (PARTIAL: computed, never applied) | **by form (ADR-060):** Workers 17-1/17-2; third-party WASM 17-3b; first-party in-proc trusted |
+| FR6 cgroups v2 caps (TEST-ONLY) | 17-2 |
+| FR7 telemetry opt-in (ABSENT: no emitter) | explicit non-goal until an emitter exists (recorded in 15-5) |
+| FR9/FR13/FR16/FR24/FR51 verbs reaching a running Spirit (CANNED/PARTIAL) | 16-1 |
+| FR10/FR11/FR49 hot-swap reachability (PARTIAL) | 16-1 |
+| FR12/FR50 subprocess crash (PARTIAL) | 16-3 |
+| FR14/FR19 product task.assign emitters, halt-policy CLI (PARTIAL) | 19-1 |
+| FR15/FR58 halt resolution on the live path, J0 (PARTIAL) | 16-2 |
+| FR17 morning digest on the live path (PARTIAL) | 18-1, 19-4 |
+| FR20 Orchestrator buffering against the daemon (PARTIAL) | 19-2 |
+| FR21/FR25/FR52 real Workers (PARTIAL) | 19-1, 19-3 |
+| FR23b clock skew, partition, revocation (PARTIAL) | 21-3 |
+| FR28 kernel quota enforcement (PARTIAL) | 21-4 |
+| FR29 `log.recall` for a non-Rust form (PARTIAL: in-proc only) | 17-3b (WASM wire) |
+| FR33 per-language templates (PARTIAL: Rust + TS harness) | 17-3b (TS via componentize-js); Python later via componentize-py |
+| FR35/FR36 publish to a real registry, verified install (PARTIAL) | 20-1 |
+| FR37 vetter-side issuance (PARTIAL: zero callers) | 20-1 |
+| FR39/FR57 skill.author.self + revision proposals (CANNED) | follow-on at Epic 18 preflight |
+| FR45 re-distillation trigger (PARTIAL) | 21-4 |
+| FR48 operator-selectable crypto provider (PARTIAL) | later (post-v1.0) |
+| FR54 gateway connectors (CANNED) | parked v2.5 |
+| FR55 hook firers (PARTIAL) | 17-4 |
+| FR59 yank policy (PARTIAL) | 20-1 |
+| FR61 GPG key (documented deviation, ADR-047) | unchanged |
+| FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the WIT extension is the first emitted event) |
+| FR64 cost dimensions (PARTIAL) | later (post-v1.0) |
+| FR65 pending halts + lineage in erasure proof (PARTIAL) | 16-4 |
+| NFR-Test-4 per-class halt-recall (UNMEASURED) | 18-2, 21-1 |
+| NFR-Aud-7 five-metric gate (TAUTOLOGY) | 18-3 |
+| NFR-Rel-1/2 floors (UNMEASURED) | 16-3 |
+| NFR-Sec-5 fuzz ledger, NFR-Ops-9 RTO ledger (EMPTY) | 20-3 |
+| NFR-Onb-1/Test-8 external cohort (NEVER RUN) | `ops-external-cohort-and-pen-test` (honest N via 20-3) |
+| NFR-Sec-13 own-leaf rotation, NFR-Rel-6 durable pins | 21-3 |
+| NFR-Maint-1 one instrument | 21-4 |
+| NFR-Ops-12 air-gap artifact | 20-2 |
+| NFR-Meta-3 coverage matrix generated | 20-3 |
+
+**Journeys:** J0 → 16-2 · J-Butler → 18-1/18-4 · J-Researcher → 18-3 · J1 → 19-4 · J3 → 21-2 · J4 → 21-1 · Reza → 21-2 · J6 (Diego) → 20-1 + `ops-external-cohort-and-pen-test`.
