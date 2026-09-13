@@ -3499,6 +3499,17 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full fetch + tags: the workspace suite runs the tag-anchored
+          # instruments (xtask/tests/kernel_pin_content_hash_16_0.rs AC2
+          # falsifier; xtask/tests/fkcs_oracle.rs annotated-tag
+          # reconciliation), which `git cat-file` the annotated tags
+          # `kernel-pin-falsifier-15-4` / `frozen-kernel-v2.0`. The default
+          # shallow checkout reds exactly those vectors even when the tags
+          # are on the remote (run 34763853953: 22/24 on the pin suite with
+          # only the tag-anchored pair failing, `fatal: Not a valid object
+          # name`).
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
@@ -3509,6 +3520,16 @@ jobs:
         run: cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       - name: Build worker-cli-fixture (maos-bin tests spawn it)
         run: cargo build --locked -p worker --bin worker-cli-fixture
+      - name: Install tokei
+        run: |
+          # kloc_check unit tests measure the real workspace through tokei
+          # (xtask/src/tests/kloc_check_tests.rs shells out and pins the
+          # version); the runner image ships no tokei, which reds all 8
+          # kloc_check unit tests with "failed to read tokei version: No
+          # such file or directory" (runs 34699558533 / 34763853953).
+          # Same cargo-install recipe as the kloc-check job; rust-cache
+          # absorbs the build cost on subsequent runs.
+          cargo install --locked --version ${TOKEI_VERSION} tokei
       - name: Run the full workspace test suite
         run: cargo test --workspace --locked --no-fail-fast
 

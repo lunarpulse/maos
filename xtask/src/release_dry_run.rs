@@ -268,6 +268,12 @@ fn refuse_uncovered_declared_artifacts(
     expected: &BTreeSet<String>,
 ) -> Result<(), String> {
     let all_declared = expected_artifacts(TARGETS);
+    // Name EVERY uncovered declared artifact, sorted: returning on the first
+    // one made the error's contents depend on fs::read_dir order, so the
+    // same dist directory could name `maos-linux-arm64` on one machine and
+    // `maosctl-linux-arm64` on another (CI red, local green — the exact
+    // flake this closes).
+    let mut uncovered: BTreeSet<String> = BTreeSet::new();
     for entry in fs::read_dir(dist_dir)
         .map_err(|error| format!("read dist directory {}: {error}", dist_dir.display()))?
     {
@@ -282,10 +288,14 @@ fn refuse_uncovered_declared_artifacts(
             continue;
         };
         if all_declared.contains(&filename) && !expected.contains(&filename) {
-            return Err(format!(
-                "declared release artifact {filename} is present but not covered by requested targets"
-            ));
+            uncovered.insert(filename);
         }
+    }
+    if !uncovered.is_empty() {
+        return Err(format!(
+            "declared release artifact(s) {} present but not covered by requested targets",
+            uncovered.iter().cloned().collect::<Vec<_>>().join(", ")
+        ));
     }
     Ok(())
 }

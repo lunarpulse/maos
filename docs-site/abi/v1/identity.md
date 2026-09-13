@@ -52,6 +52,8 @@ pub enum FrameKind {
     CapabilityInvocation,
     SandboxBlock,
     InferenceCall,
+    BudgetWarning,
+    BudgetExceeded,
     CliSubprocessOutput,
     ConsentRupture,
     RateLimited,
