@@ -317,7 +317,18 @@ fn run_ceiling_zero_config_leg() -> LegResult {
 
 /// Leg 6: kernel-ABI baseline — the re-pinned 23040 (bounded F2 delta).
 fn run_kernel_abi_leg() -> LegResult {
-    let green = crate::check_kernel_baseline::run(false).is_ok();
+    let kernel = crate::check_kernel_baseline::check();
+    let green = kernel.as_ref().is_ok_and(|report| report.passed);
+    if !green {
+        // `run(false)` carried the diagnosis on stderr; `check()` is silent,
+        // and a red leg whose only record is a constant names nothing
+        // (Story 16-0 review). stderr only — stdout belongs to `--json`.
+        let diagnosis = match &kernel {
+            Ok(report) => crate::check_kernel_baseline::failure_detail(report),
+            Err(error) => format!("kernel baseline check errored: {error}"),
+        };
+        eprintln!("kernel-abi-diff RED — {diagnosis}");
+    }
     LegResult {
         label: "kernel-abi-diff",
         passed: if green { 1 } else { 0 },

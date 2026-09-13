@@ -2083,18 +2083,37 @@ jobs:
         run: cargo test -p maos-bin --test bounded_postures_2b -- --test-threads=1
 
   # Story 8.16 §A4 — kernel-core line-count single source of truth.
+  # Story 16-0 — plus a pinned file set and a per-file content hash, so a kernel
+  # edit that does not move the line count can no longer pass (drift D2).
   check-kernel-baseline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # AC2's falsifier is Story 15-4's REAL seccomp commit, resolved through
+          # the annotated tag `kernel-pin-falsifier-15-4`. A depth-1 clone cannot
+          # resolve it and the test fails LOUD rather than skipping. Precedent:
+          # `check-fkcs` below. `fetch-depth: 5` would "work" today — the commit
+          # is 2 behind HEAD — and would silently break next week; a full-history
+          # checkout also fetches the tag.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          # AC4's reflow vector runs `rustfmt` (the binary, not `cargo fmt` — its
+          # tempdir copy has no Cargo.toml). Without this the vector fails loud;
+          # an absent toolchain component must never be a silent pass.
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-kernel-baseline
         run: cargo run -p xtask -- check-kernel-baseline --json
+      # Named explicitly: no job in this workflow runs `cargo test -p xtask`
+      # unscoped (see the note at the top of the xtask jobs), so a test file that
+      # is not named in its own step is a test nothing runs.
+      - name: Run the Story 16-0 kernel-pin content-hash suite
+        run: cargo test -p xtask --test kernel_pin_content_hash_16_0
 
   # Story 8.16 §A5 — epic-close green gate: fails on ANY `if: false`-disabled
   # workflow job (the meta-fix for the four-epic green-at-HEAD decay pattern).

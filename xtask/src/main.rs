@@ -388,13 +388,20 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 8.16 §A4 — kernel-core line-count single source of truth. Counts
-    /// `crates/maos-kernel-core/src` and compares to `xtask/kernel-core-baseline.toml`;
-    /// hard-fails on drift (so a multi-story phase cannot drift the kernel unsummed).
+    /// Story 8.16 §A4 + Story 16-0 — kernel-core single source of truth. Compares
+    /// `crates/maos-kernel-core/src` against `xtask/kernel-core-baseline.toml` on
+    /// THREE axes: the `src_lines` count, the pinned file set, and a per-file
+    /// content hash (so a line-neutral kernel edit reds the gate and the failing
+    /// file is NAMED). `--emit-pin` prints the paste-ready `[kernel_src]` block.
     #[command(name = "check-kernel-baseline")]
     CheckKernelBaseline {
         #[arg(long)]
         json: bool,
+        /// Print the paste-ready `[kernel_src]` block to stdout for a human to
+        /// commit. There is no in-place rewriter: a gate that heals itself is
+        /// not a gate.
+        #[arg(long)]
+        emit_pin: bool,
     },
     /// Story 8.16 §A5 — epic-close green gate. Fails if ANY workflow job is
     /// disabled with a job-level `if: false` (the Epic-8 fake-green mode). Makes
@@ -1310,7 +1317,9 @@ fn main() {
         Commands::CheckDecisionRegister { json } => check_decision_register::run(json),
         Commands::CheckJ1LoopbackDelegation { json } => check_j1_loopback_delegation::run(json),
         Commands::CheckJ1TwoHostSignedRun { json } => check_j1_two_host_signed_run::run(json),
-        Commands::CheckKernelBaseline { json } => check_kernel_baseline::run(json),
+        Commands::CheckKernelBaseline { json, emit_pin } => {
+            check_kernel_baseline::run(json, emit_pin)
+        }
         Commands::CheckDependencyClosure { json } => check_dependency_closure::run(json),
         Commands::CheckHostSurface { json } => check_host_surface::run(json),
         Commands::CheckRtoGate { evidence, json } => check_rto_gate::run(&evidence, json),

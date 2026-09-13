@@ -26,13 +26,13 @@
 #          additive; no public symbols removed.
 # To change this number you MUST be landing an AUTHORIZED kernel delta (charter
 # amendment + FLAG-Winston), and you update it HERE — nowhere else.
-  21472  Story 9.3b — FR62 GovernanceEvent + FR64 CostAttribution kernel delta
-         (+136, charter-amended kernel delta, jointly re-pinned).
-         FLAG-Winston: authorized per ADR-045/ADR-046. FR64 cost emission at
-         inference/mod.rs (+68), SR-3 forget-cascade extension in memory/mod.rs
-         (+70), AC6 erasure schema-version stamp in memory/mod.rs. All additive;
-         no public symbols removed. Re-pin recorded as the first ratified
-         AbiExtensionProposal (ADR-045 §8 dogfooding).
+#   21472  Story 9.3b — FR62 GovernanceEvent + FR64 CostAttribution kernel delta
+#          (+136, charter-amended kernel delta, jointly re-pinned).
+#          FLAG-Winston: authorized per ADR-045/ADR-046. FR64 cost emission at
+#          inference/mod.rs (+68), SR-3 forget-cascade extension in memory/mod.rs
+#          (+70), AC6 erasure schema-version stamp in memory/mod.rs. All additive;
+#          no public symbols removed. Re-pin recorded as the first ratified
+#          AbiExtensionProposal (ADR-045 §8 dogfooding).
 #   21894  Story 9.4b AC-5/AC-8 — region-pinning (TL-anchored, Option A) +
 #          provider_history bound (+422, charter-amended kernel delta).
 #          FLAG-Winston: authorized 2026-06-15 (re-ratification R2 + tripwire
@@ -479,3 +479,138 @@
 #          permission ("15-1 +2"); the paired kloc row moves 18933 -> 18935 in
 #          the same commit or the two instruments disagree again.
 src_lines = 24474
+
+# ── Story 16-0 — PINNED FILE SET + PER-FILE CONTENT HASH ─────────────────────
+#
+# HISTORY: Story 16-0 (Epic 16, drift D2 / Epic-15 retro action A5), 2026-09-13,
+#          measured at 323ab597: 98 files (97 `.rs` + `security/sandbox/t3-image.lock`),
+#          set_hash 5575b00ad923a2dc95ca16fe82774b9ae04c7b2aec0e494f458c7d69e49bb275.
+#          DRIVER: a line count alone is too weak. Story 15-4's seccomp commit
+#          (843d5365, 8+/8-) edited `security/sandbox/linux.rs` at a CONSTANT
+#          24474 and `check-kernel-baseline` said PASSED on both sides. The
+#          per-file map reds that edit and NAMES the file.
+#
+# ZERO kernel-Δ: this block PINS the tree, it does not change it. `src_lines`
+# above is unmoved at 24474 and keeps its `.rs`-only denominator; the hashed set
+# is every file under the root, any extension (D-16-0-F) — `t3-image.lock` is the
+# signed T3 trust anchor and must not sit unpinned inside the pinned tree.
+#
+# The set is read from the FILESYSTEM, not `git ls-files`: the compiler builds
+# what is on disk, so a `.gitignore`d `mod backdoor;` would compile into the
+# kernel and never appear in the index (D-16-0-F / round-table F-A).
+#
+# RE-PIN with `cargo run -p xtask -- check-kernel-baseline --emit-pin` and paste
+# the output here, recording the measured value, the driver and the story key in
+# the SAME commit. There is no in-place rewriter and NO hold, waiver or
+# known-mismatch constant — `xtask/fkcs-baseline.toml`'s admission hash has been
+# held RED by exactly such a constant since Story 13.4 (D-16-0-G).
+#
+# `set_hash` is DERIVED from the sorted map as a headline and is never the
+# authoritative value; the per-file digests are. Keys carry no `src_lines`
+# prefix and land strictly AFTER the assignment above, because three hand-rolled
+# line scanners take the FIRST `src_lines`-prefixed line and one of them
+# `.expect()`s (D-16-0-C).
+
+[kernel_src]
+root = "crates/maos-kernel-core/src"
+set_hash = "5575b00ad923a2dc95ca16fe82774b9ae04c7b2aec0e494f458c7d69e49bb275"
+
+[kernel_src.files]
+"api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
+"bin/assert-revocation-p99-floor.rs" = "dab2d5ac79c9c5f9b67eedc33350c640d4909715d5eb78aaa0187c2bf7e48432"
+"capability/cap_audit/mod.rs" = "9f253336da1d618808984fef11941929a6af927ef66120d84b43e122ff70decc"
+"capability/cap_audit/writer_task.rs" = "7c90023579458fdb4a3357990a46cb0520d018196b1ffa0f2ed65fa5e7e84ef2"
+"capability/cap_policy/decision.rs" = "be8b2e5a0b08821f55f019ab85b0a91b953dd60f3a8d3f994bd59e087b409e41"
+"capability/cap_policy/mod.rs" = "3ff76e22c2493fca4ef8b61ec37c9ce51aab36ae9fb29fe37f3ae9a590fd51fc"
+"capability/mod.rs" = "9e521407409f41de79955a78407eb4eafb1cdec4479fad1caaa38219280e06e8"
+"capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
+"capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
+"capability/working_memory/policy_runtime.rs" = "199858803e69787c8f981c18f4fa22201c8ad0f47d18638623606462e2e374b5"
+"compliance/mod.rs" = "46782179f13d4796d484317ab9eabad57d0b2e1d3c52a0eeb6a69834d788732a"
+"halt/mod.rs" = "f86931b18ac805fa5925dc187a8eb9ff8ae7edc5ded0dff845d5f645d9d73201"
+"halt/output_markers.rs" = "a320e7614f6b129e21853a5f98be10b8deeeb9f826d48cac829caf8cf236d893"
+"halt/resolver.rs" = "3969404d35f2a4cf56affb863e93d7c1930804f109a019244b1a0faa535d766a"
+"halt/termination.rs" = "13f32e1f6dcca190621a5a47bff8fca181b63d79d10b20e9c6264080722f7a70"
+"hot_swap/archive.rs" = "a6e4ea60193e182b2dad8edeb793d3de366ef95b0be30e8c85756af78aeb7ddb"
+"hot_swap/coordinator.rs" = "a481b1d671cc25a091714f05962bbedf246da2ff9480b46b36949a8fd02ca959"
+"hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
+"hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
+"hot_swap/post_swap_monitor.rs" = "33bf93474c5b9d83012b5b4c9f032e13ff57dfa28c4b4cf03bbb80aa02e42b10"
+"hot_swap/precheck.rs" = "4a447575f94942c43e2784b5b4a6f38610a45ebf511333bc9df7a575446f740f"
+"hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
+"hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
+"iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
+"inference/mod.rs" = "3e61dcfd8d973f952c15ce29a71209b800d31e82809b39c770f2dc0226d52837"
+"inference/router.rs" = "4cd2744273861514bf0989eb43f723380a5caf0801454078bd10a1953a94e8b1"
+"io/mod.rs" = "1c4c5202c33d39de7dd61d36607015dd07dac01922bd82ac6fd40300a8e72bf6"
+"isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
+"isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
+"journal/mod.rs" = "ca710776a2fa838b6a851e134f296ef59ef1404d07db57f9322d7f9c3247764e"
+"lib.rs" = "a4c3708400196b1c97ac614ead31645d77cc5124bfbd30f4b13139bf4c7f9100"
+"lifecycle/cli_wrapper/admission.rs" = "921310672eabc0d40cadfe30ce6de1234ebde779896c9e3f0ea0ca022724e911"
+"lifecycle/cli_wrapper/lifecycle.rs" = "4a3d2e2f631c47195321fc48410efcbc218d69a979195fbc8f741a09ace09599"
+"lifecycle/cli_wrapper/mod.rs" = "c78a43ba26d796315af0ee07f2ce76991c7b0f1785298d49c08ffbdf17c0addc"
+"lifecycle/cli_wrapper/runtime.rs" = "ba8ff534967cc8b23fd5c602fd9648d15ed9f141efeb7eb59ede1da824f1ac44"
+"lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
+"lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
+"mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
+"memory/for_spirit.rs" = "6d58364f78f6026a8fe203f161964eb724bd2fa82f43146c3c3d8b605e1ce95a"
+"memory/mod.rs" = "7259a80691b4dae1ecb1c18eaa3723e2ed74c97e7124bfe74f420163a76b6fcb"
+"memory/principal.rs" = "c99431b9fd3fbe40b758e22dd54091fae4def4b8700717c9767d7ebc67bd9aac"
+"memory/private.rs" = "9b149278ed9128b4edb38601e5f0d0b88948283e10d4fd693aeee50024f40e5c"
+"memory/read_entry_point.rs" = "0528ce87453ef4a10b4bbe4a360f557769be412fc091df4734495482d551dda1"
+"memory/self_telemetry.rs" = "c562094354fe64784e49de7e37754badce6637802f12c17ce3e6d2873e2adcef"
+"memory/shared.rs" = "1df5abe33a685cfb940bc191fe96bc8e0ac6f5c38893ac8792d944504df99d84"
+"memory/spill_test_faults.rs" = "4c385fa2ea48d9439f81950600342d8ef3d46b0f3da5f1d6aa6fc399b14b4fcd"
+"memory/write_entry_point.rs" = "e43e8c2957d0042a13b75e4972c7417b72388316b1c56091f6b417f06509f224"
+"orchestrator/buffer.rs" = "8f3f73b3ce363ca6678774dc83acdb83c9910a04a13487df8d0220ea66ce8f4d"
+"orchestrator/echo_gateway.rs" = "7c5195d3df9e20909d52bf5e04d829377433313667842964de51c1625083ae92"
+"orchestrator/gateway_dispatcher.rs" = "d01ea8018515c42bcb205e23577783cd2f010401339f261eefea88f1071a037a"
+"orchestrator/mod.rs" = "89c7ac62c660f6cb6cee4379571842fdded2264dc6df38ebecda8bf5df60287e"
+"orchestrator/registry.rs" = "d7788571a2a4bc17f3d5835a5764e266e5042036b8447eb4db4296ec11d6b7a4"
+"revocation/applier.rs" = "feed75b01a53f5a5f493f982c730f19a39624dbcbedc130a415471c746e32a3c"
+"revocation/mod.rs" = "272ba459ed2095beff6d7497c62ab0fa47bbe3d2ffb0b47ba2045c406a49998e"
+"revocation/parser.rs" = "f907b4fe7cac52a1e2d1e8496a1b83fee820d4b3779529419215dea6e2dcdca7"
+"revocation/poller.rs" = "ad449a7a206cb42d160afb44c05f17bfbfe39cf4815d6be7996034dfbb51a960"
+"revocation/rules.rs" = "726b27e55d5fff3e1cbd9ca2c1cf38494dfd272fbe586c1a0ed869c760366f44"
+"revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
+"scheduler/control_block.rs" = "039d1138080f60f2a4a52f56e540634cf6590b94c5cd5cc5854623cdad9beed6"
+"scheduler/hook_dispatch.rs" = "6f26d6b147425f8001e1c5d377cf88676329f7cd6402e1e5940e51580ac4d985"
+"scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
+"scheduler/kernel_ctx.rs" = "7baf6a7e15a5ffb62312a02aa19d58b24c8500f277bcc724b2065f4c732963ef"
+"scheduler/mod.rs" = "fa89437053eedadef4662a1f538ad275caa62df69a9ddbbd4dc0a9976a377cf5"
+"scheduler/resource_ceiling.rs" = "becc322aa3700d8f08c10ac443aff2ea80995926a2cc647ddbad49aecfa6b06d"
+"scheduler/schedule_watchdog.rs" = "b50009c32df76c8f99095584a68c1de65d6a4831f84a97061672303dccca70fc"
+"scheduler/scheduler_loop.rs" = "e019bf6023645448629af882b55d86d7f92852769e803dbc88cb1b6e89c36fe8"
+"scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
+"security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
+"security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
+"security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
+"security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
+"security/mod.rs" = "c114297f77f72f30f4111dc6292e7c08c932d6e98d8352a92ccf66daae987c50"
+"security/operator_config.rs" = "9f1087f82c72b84cf880952310710306cc4f8feb5e44406891a916e9a763e236"
+"security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
+"security/sandbox/linux.rs" = "8964be98eb51c34dd4a7ae75d2d60ab90d8e8d6897205f8787f0ae0563ff29f2"
+"security/sandbox/macos.rs" = "e2bcfda0b12bd4d738e0d8f1c4795c26a95cb828cd8a73eec02edc5e9014c2af"
+"security/sandbox/mod.rs" = "1732708673ce3294434b5db9919683008a42e24cada8e8af3795032792b711a1"
+"security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
+"security/sandbox/t3/argv.rs" = "18badaa3d8141e86fb87b852577d1720319a16b765e2dbdc177facad913c5ae0"
+"security/sandbox/t3/cap_audit_bridge.rs" = "666e5d5bf267b9d5383611861800c9317650c1261d658967aa96c8b662f1a5dc"
+"security/sandbox/t3/child.rs" = "b020bc87c673f83e0d49831f564dadbda94d901f68299803cd41c88670d733d6"
+"security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
+"security/sandbox/t3/image_verify.rs" = "2418b6e509a547aecb192ff6e83a12423935599bb9ab5c978b50827d320ee523"
+"security/sandbox/t3/mod.rs" = "f8e44ec0e9bb15005c800ffff127913a13b3f706f7d0224f568142239b1e625e"
+"security/sandbox/t3/quarantine.rs" = "292271a1070a669a800932a525c261edba09c27498dd3c582af67bc70516c31f"
+"security/sandbox/t3/runtime_detect.rs" = "91cba03e8a2a1f7ee03945100f3198bb36601d7008b2fc848f53f10466aeb974"
+"security/sandbox/t3/spawn.rs" = "31658654ff7f6e824dceafc68be06bd3758b6efe1b1097517250d84f28653e95"
+"security/sandbox/unsupported.rs" = "124e2d5baa3a64757cde10dcf7014bd7a77a77312c3ab76609140d060e515894"
+"security/sandbox/windows.rs" = "5f8ff06185984f9f5eb18a457b6f4329d0baf2ced8662db20ea70f5b7f5f2935"
+"supervision/cold_restart.rs" = "2977944d24dc54c28dba02c1d3395fc16225f45a3994b0a53f1a27aca20149b7"
+"supervision/crash_detector.rs" = "500bbbff08a6e44d9d27e032a87793dfd6a0f5990f2fc21fb6ba10d1851f2b5f"
+"supervision/disposition.rs" = "5d8220cafba3e6afb757e3cb9acf23788d458319e093a858b10ed41596640b93"
+"supervision/mod.rs" = "71f3704a2073987a249b601111d03bd7815e1822c8d0cad377234dc0e1ecf518"
+"supervision/progress_watchdog.rs" = "97dbead77b4a9d9546f24767f5f580e4bd8d29a8a1eef742dd5f203365be4097"
+"supervision/silent_failure_detector.rs" = "fb9e4c0e881c08964c02f5372ddb664e294828b670d91f2ef078670f609ccec6"
+"supervision/test_double.rs" = "3162ed1ee1c2835f8a08496aff056d41acf247949c9076cb4fd9cb8a3cec8d5c"
+"supervision/watchdog_common.rs" = "a6f98ea2e799ea8d7b0fbcc9e02ac154625ab9b4e8e95d4508bd173dcde6e23c"
+"telemetry/mod.rs" = "48c1b6401e8806d83ef8899d5341b1d7be64ac91261c42f16578ec720963c70c"

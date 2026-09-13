@@ -693,8 +693,39 @@ pub fn run(json: bool) -> Result<(), String> {
             );
         }
     }
-    if !crate::check_kernel_baseline::check()?.passed {
-        return Err(format!("{GATE_NAME}: kernel-abi-diff RED"));
+    // Story 16-0 / AC5: emit this gate's OWN report BEFORE propagating the red.
+    // `Ok(passed: false)` does not abort at the `?` — the bare `return Err` on
+    // the next line did, and a policy red that produces zero bytes of `--json`
+    // looks like a crash (`deferred-work.md:637`). The kernel report's detail is
+    // forwarded too: it NAMES the files that moved, and "kernel-abi-diff RED"
+    // alone does not.
+    let kernel = match crate::check_kernel_baseline::check() {
+        Ok(report) => report,
+        Err(error) => {
+            // The Err class (missing `[kernel_src]`, hand-edited pin, walk
+            // failure) must not abort this gate before its own JSON exists
+            // either — zero-byte `--json` is the `deferred-work.md:637`
+            // crash-shape (Story 16-0 review).
+            if json {
+                println!(
+                    "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":false,\"ship_phase\":\"{CURRENT_PHASE}\",\"legs\":{},\"error\":true}}",
+                    legs.len() + 1
+                );
+            }
+            return Err(format!("{GATE_NAME}: kernel-abi-diff ERRORED — {error}"));
+        }
+    };
+    if !kernel.passed {
+        if json {
+            println!(
+                "{{\"gate\":\"{GATE_NAME}\",\"oracle_green\":false,\"ship_phase\":\"{CURRENT_PHASE}\",\"legs\":{}}}",
+                legs.len() + 1
+            );
+        }
+        return Err(format!(
+            "{GATE_NAME}: kernel-abi-diff RED — {}",
+            crate::check_kernel_baseline::failure_detail(&kernel)
+        ));
     }
     if json {
         println!(
