@@ -3530,8 +3530,67 @@ jobs:
           # Same cargo-install recipe as the kloc-check job; rust-cache
           # absorbs the build cost on subsequent runs.
           cargo install --locked --version ${TOKEI_VERSION} tokei
+      # ── Story 16-1 / D-16-1-Q — THE DECOY ────────────────────────────────
+      # After Story 16-1 `$HOME/.maos/control.json` names ONE loopback
+      # endpoint and a second root on it fails fast with `EndpointInUse`. A
+      # test that spawns `maos run` while inheriting the runner's `HOME`
+      # therefore passes in a pristine CI image and reds on any developer
+      # machine where `maos init` has ever run — the worst shape of flake,
+      # because CI green is what everyone believes.
+      #
+      # This step makes CI the HOSTILE environment instead: it initialises a
+      # real home and HOLDS a listener on the endpoint that home advertises,
+      # so any test that inherits it collides here, deterministically, on
+      # every push. `crates/maos-bin/tests/root_spawn_home_isolation_16_1.rs`
+      # is the local floor under this step; this step is the control, because
+      # it cannot be satisfied by adding a `HOME` literal to the wrong command.
+      - name: Seed a decoy operator door on HOME (D-16-1-Q control)
+        run: |
+          set -euo pipefail
+          cargo build --locked -p maos-bin --bin maos
+          ./target/debug/maos init
+          python3 - <<'PY'
+          import json, os, pathlib, socket, subprocess, sys
+          control = pathlib.Path(os.environ["HOME"]) / ".maos" / "control.json"
+          record = json.loads(control.read_text())
+          host, port = record["endpoint"].removeprefix("tcp://").rsplit(":", 1)
+          # Hold the port for the rest of the job. A test that inherits this
+          # HOME now meets a taken endpoint instead of a free one.
+          holder = socket.socket()
+          holder.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          holder.bind((host, int(port)))
+          holder.listen(16)
+          pid = os.fork()
+          if pid == 0:
+              os.setsid()
+              while True:
+                  try:
+                      connection, _ = holder.accept()
+                      connection.close()
+                  except OSError:
+                      break
+              sys.exit(0)
+          print(f"decoy door holding {host}:{port} (pid {pid})")
+          PY
       - name: Run the full workspace test suite
         run: cargo test --workspace --locked --no-fail-fast
+
+  # Story 16-1 / AC1 — exit lines 5-6 of the J0 block, named in their own step
+  # so a failure says "the door does not work" rather than being one red line
+  # in a 45-minute workspace run.
+  one-daemon-one-door:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build worker-cli-fixture (maos-bin tests spawn it)
+        run: cargo build --locked -p worker --bin worker-cli-fixture
+      - name: maosctl reaches the live daemon, and the pause is real
+        run: cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 -- --test-threads=1
 
   # explicit result checks to prevent skip-propagation false positives.
   v1-0-ship-gate:
@@ -3584,6 +3643,7 @@ jobs:
       - check-cert-rotation-trigger
       - check-exit-commands
       - workspace-test-suite
+      - one-daemon-one-door
     if: always()
     steps:
       - name: Ship gate results summary
@@ -3625,6 +3685,7 @@ jobs:
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
           echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo test --workspace --locked --no-fail-fast |"
+          echo "| one-daemon-one-door | ${{ needs.one-daemon-one-door.result }} | cargo test -p maos-bin --test one_daemon_one_door_16_1 |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}
@@ -3661,6 +3722,7 @@ jobs:
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
+          echo "  one-daemon-one-door: ${{ needs.one-daemon-one-door.result }}"
           exit 1
 
   aggregate:

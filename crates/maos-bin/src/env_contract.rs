@@ -473,12 +473,12 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_OPERATOR_BEARER_TOKEN",
-        purpose: "Bearer token for the loopback operator HTTP surface; enables the surface when set (read at the main.rs composition root, validated against MAOS_OPERATOR_HTTP_BIND) (Story 15-1 AC5)",
+        purpose: "Bearer token for the loopback operator HTTP surface; with MAOS_OPERATOR_HTTP_BIND it OVERRIDES <MAOS_HOME|HOME/.maos>/control.json for one boot — both-or-neither, half-set is a typed refusal (Story 16-1 AC2)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {
         name: "MAOS_OPERATOR_HTTP_BIND",
-        purpose: "Bind address for the loopback operator HTTP surface (default 127.0.0.1:8787); setting it without the bearer token is a typed refusal (Story 15-1 AC5)",
+        purpose: "Bind address for the loopback operator HTTP surface; with MAOS_OPERATOR_BEARER_TOKEN it OVERRIDES control.json for one boot — no fallback port, no door without either source (Story 16-1 AC2)",
         stability: EnvStability::UserFacing,
     },
 ];

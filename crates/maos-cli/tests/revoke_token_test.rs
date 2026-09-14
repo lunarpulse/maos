@@ -1,168 +1,128 @@
 #![forbid(unsafe_code)]
 
-//! CLI integration tests for `maosctl revoke-token` (Story 3.4, AC4).
+//! Story 16-1 / T9 (AC7) — CONTRACT tests for `maosctl revoke-token`.
 //!
-//! Verifies invalid hex rejection, unknown token rejection, NO_COLOR.
+//! At HEAD the verb opened a FRESH token ring in a one-shot child and could
+//! NEVER succeed — the old tests pinned only the failure paths (§4,
+//! measured). Over the door the daemon's live ring answers, and the
+//! repeated-revoke answer is typed (D-16-1-V):
 //!
-//! Note at v0.3-β: capability tokens are per-process in-memory (CapTokensShardRing
-//! is NOT persisted). A valid-token revoke across separate processes is not
-//! possible until Story 5.4 adds persistent token storage. The surface validation
-//! and not-found path are the v0.3-β contract.
+//! 1. the WIRE: `POST /v1/tokens/{token_id}/revoke` — no body, no
+//!    `--reason` (a flag that changed nothing would be a lie); and
+//! 2. the MAPPING: every typed response maps to its D-16-1-P exit, with a
+//!    second revoke of the same token arriving as the daemon's typed 409
+//!    `revoked` ⇒ exit 1.
 
-use std::path::PathBuf;
-use std::process::Command;
+#[path = "support/fixture_door.rs"]
+mod fixture_door;
 
-use tempfile::TempDir;
+use fixture_door::{assert_discovery_failures, assert_typed_matrix, FixtureDoor};
 
-fn maosctl_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maosctl") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maosctl");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maosctl")
-}
-
-fn maos_bin_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maos")
-}
-
-fn workspace_root() -> PathBuf {
-    std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
-}
+/// 32-char lowercase hex — the wire shape `CapabilityToken::token_id`
+/// renders to.
+const TOKEN_ID: &str = "a1b2c3d4e5f60718a9b0c1d2e3f40516";
+const ROUTE: &str = "/v1/tokens/a1b2c3d4e5f60718a9b0c1d2e3f40516/revoke";
 
 #[test]
-fn revoke_token_rejects_invalid_hex_short() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
+fn revoke_sends_bare_post_to_the_token_route() {
+    let door = FixtureDoor::spawn();
+    let out = door.run(&["revoke-token", TOKEN_ID]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "expected exit 0 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
+    );
+    assert_eq!(out.stdout, b"{}\n", "the 200 body prints verbatim");
+    let requests = door.requests();
+    assert_eq!(requests.len(), 1, "exactly one round trip");
+    assert_eq!(requests[0].method, "POST");
+    assert_eq!(requests[0].path, ROUTE);
+    assert_eq!(
+        requests[0].authorization.as_deref(),
+        Some(format!("Bearer {}", door.token()).as_str()),
+        "the bearer must be the token from control.json"
+    );
+    assert_eq!(
+        requests[0].content_length,
+        Some(0),
+        "the revoke route carries no body (still declares Content-Length: 0)"
+    );
+    assert!(requests[0].body.is_empty());
+}
 
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
+/// Hex validation happens BEFORE any round trip: short, uppercase and
+/// non-hex ids all refuse locally at exit 2.
+#[test]
+fn invalid_token_ids_refused_locally_without_a_round_trip() {
+    let door = FixtureDoor::spawn();
+    for bad in [
+        "a1b2c3d4",
+        "A1B2C3D4E5F60718A9B0C1D2E3F40516",
+        "zzb2c3d4e5f60718a9b0c1d2e3f40516",
+        "a1b2c3d4e5f60718a9b0c1d2e3f405160",
+    ] {
+        let out = door.run(&["revoke-token", bad]);
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "invalid token id {bad:?} must exit 2 — stderr: {}",
+            String::from_utf8_lossy(&out.stderr),
+        );
     }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(["revoke-token", "abc"]);
-    let out = cmd.output().expect("spawn maosctl");
+    assert_eq!(
+        door.request_count(),
+        0,
+        "a locally-refused id must not touch the door"
+    );
+}
 
-    assert!(!out.status.success());
+/// D-16-1-V: revoking an already-revoked token is the daemon's typed 409
+/// `revoked` ⇒ exit 1 — the one-shot's silent second `Ok` is gone.
+#[test]
+fn repeated_revoke_maps_409_revoked_to_exit_1() {
+    let door = FixtureDoor::spawn_replying(409, r#"{"error":"revoked"}"#);
+    let out = door.run(&["revoke-token", TOKEN_ID]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "a repeated revoke must exit 1 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("invalid token_id"),
-        "expected hex-rejection diagnostic, got: {stderr}"
+        stderr.contains("revoked") && stderr.contains("HTTP 409"),
+        "stderr must name the typed error — got: {stderr}"
     );
-    drop(tmp);
+    assert_eq!(door.requests()[0].path, ROUTE);
 }
 
+/// A never-issued id is the daemon's typed 404 `unknown_token` ⇒ exit 1.
 #[test]
-fn revoke_token_rejects_invalid_hex_nonhex() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(["revoke-token", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"]);
-    let out = cmd.output().expect("spawn maosctl");
-
-    assert!(!out.status.success());
+fn unknown_token_maps_404_to_exit_1() {
+    let door = FixtureDoor::spawn_replying(404, r#"{"error":"unknown_token"}"#);
+    let out = door.run(&["revoke-token", TOKEN_ID]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "unknown token must exit 1 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("invalid token_id"),
-        "expected hex-rejection diagnostic, got: {stderr}"
+        stderr.contains("unknown_token"),
+        "stderr must name the typed error — got: {stderr}"
     );
-    drop(tmp);
 }
 
+/// The second half: each typed response maps to its D-16-1-P exit.
 #[test]
-fn revoke_token_unknown_token_exits_nonzero() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    // 32 zeros — no such token ever issued
-    cmd.args(["revoke-token", "00000000000000000000000000000000"]);
-    let out = cmd.output().expect("spawn maosctl");
-
-    assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("not found"),
-        "expected not-found diagnostic, got: {stderr}"
-    );
-    drop(tmp);
+fn revoke_maps_typed_responses_to_d16_1_p_exits() {
+    assert_typed_matrix(&["revoke-token", TOKEN_ID], "POST", ROUTE);
 }
 
+/// Discovery failures (AC5), shared by every door verb.
 #[test]
-fn revoke_token_no_color_zero_ansi() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.env("NO_COLOR", "1");
-    cmd.args(["revoke-token", "00000000000000000000000000000000"]);
-    let out = cmd.output().expect("spawn maosctl");
-
-    let stderr = out.stderr;
-    let esc_count = stderr.iter().filter(|b| **b == 0x1b).count();
-    assert_eq!(esc_count, 0, "NO_COLOR stderr contained ANSI escapes");
-    drop(tmp);
+fn revoke_discovery_failures_map_to_typed_exits() {
+    assert_discovery_failures(&["revoke-token", TOKEN_ID]);
 }

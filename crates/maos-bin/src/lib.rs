@@ -33,6 +33,13 @@ pub mod enterprise_pdp_runtime;
 /// integration tests execute the production lattice; an in-`src` test module
 /// would be budget-charged and CI-invisible.
 pub mod inference_mode;
+/// Story 16-1 (D-16-1-N) — the operator door's port implementation over the
+/// daemon's real kernel objects, plus the store lock set (D-16-1-D). In the
+/// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL
+/// port — a binary-crate `mod` would force its proofs inline, which kloc
+/// charges and CI cannot run.
+#[cfg(feature = "network")]
+pub mod operator_door;
 #[cfg(feature = "network")]
 pub mod tenant_map;
 /// The Worker-CLI **adapter** seam (J1 Tier-2 bridge). In the library, not

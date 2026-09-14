@@ -5,12 +5,18 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 #[test]
 fn smoke_multi_provider_5_exercises_6_surfaces() {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "smoke-multi-provider-5")
         .env("MAOS_SPIRIT_ABI_MOCK", "1")
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" — the floor is file-granular,
+        // and a one-shot that later becomes a root must not regain the hazard.
+        .env("HOME", doorless_home::doorless_home())
         .current_dir(workspace_root)
         .output()
         .expect("failed to execute maos-bin");

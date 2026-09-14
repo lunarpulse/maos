@@ -1,336 +1,225 @@
 #![forbid(unsafe_code)]
 
-//! CLI integration tests for `maosctl halt` (Story 3.3, AC6).
+//! Story 16-1 / T9 (AC7) — CONTRACT tests for `maosctl halt resolve`.
 //!
-//! Each of the three resolution kinds exits 0 AND lands one Approval
-//! Decision Log row whose `capability` / `intent` / `reasoning` columns match
-//! the FR15 contract; the required-arg validation rejects provided-context
-//! without `--text`; `NO_COLOR` suppresses ANSI on `halt list`; and an
-//! unknown Spirit exits with code 2.
+//! At HEAD the verb FABRICATED the halt it resolved (a one-shot planted a
+//! pending halt tagged "test" and journaled its own resolution — §4,
+//! measured; the old tests asserted those invented Approval-Log rows).
+//! Over the door the daemon owns the HaltRegistry, and the contract is:
+//!
+//! 1. the WIRE: `POST /v1/halts/{halt_id}/resolve` with the spirit id in
+//!    the BODY (`spirit_id`/`resolution`/`rationale`) — the flag is
+//!    `--kind`, and its `provided-context`/`authorized-override` payloads
+//!    travel as `rationale`; and
+//! 2. the MAPPING: every typed response maps to its D-16-1-P exit.
 
-use std::path::PathBuf;
-use std::process::Command;
+#[path = "support/fixture_door.rs"]
+mod fixture_door;
 
-use tempfile::TempDir;
+use fixture_door::{assert_discovery_failures, assert_typed_matrix, FixtureDoor};
 
-fn maosctl_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maosctl") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maosctl");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maosctl")
+const HALT_ID: &str = "halt-9f3a2b7c";
+const ROUTE: &str = "/v1/halts/halt-9f3a2b7c/resolve";
+
+/// Run one resolve against a fresh 200 door and hand back what hit it.
+fn resolve(
+    extra_args: &[&str],
+) -> (
+    std::process::Output,
+    Vec<fixture_door::RecordedRequest>,
+    &'static str,
+) {
+    let door = FixtureDoor::spawn();
+    let mut args = vec!["halt", "resolve", HALT_ID, "--spirit", "butler"];
+    args.extend_from_slice(extra_args);
+    let out = door.run(&args);
+    (out, door.requests(), door.token())
 }
 
-fn maos_bin_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maos")
-}
-
-/// Spawn `maosctl` against a throwaway audit DB. The DB is discarded with the
-/// tempdir — use [`run_maosctl_and_inspect_db`] when the row must be read back.
-fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Output {
-    let tmp = TempDir::new().expect("tempdir");
-    let out = spawn_maosctl(tmp.path(), extra_env, args);
-    drop(tmp);
-    out
-}
-
-/// Spawn `maosctl` and hand back a read-only connection to the audit DB it
-/// wrote, so the Approval Decision Log row can be asserted on. Mirrors
-/// `orchestrator_queue_test.rs::run_queue_and_inspect_db` — same capture
-/// pattern, same deliberate tempdir leak to keep the DB alive for the caller.
-fn run_maosctl_and_inspect_db(
-    extra_env: &[(&str, &str)],
-    args: &[&str],
-) -> (std::process::Output, rusqlite::Connection) {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let out = spawn_maosctl(tmp.path(), extra_env, args);
-
-    let conn =
-        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .expect("open audit db for inspection");
-
-    std::mem::forget(tmp);
-    (out, conn)
-}
-
-fn spawn_maosctl(
-    tmp: &std::path::Path,
-    extra_env: &[(&str, &str)],
-    args: &[&str],
-) -> std::process::Output {
-    let db_path = tmp.join("transparency.sqlite");
-    let journal_path = tmp.join("journal.ndjson");
-    let xdg = tmp.join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(path) = std::env::var("PATH") {
-        cmd.env("PATH", path);
-    }
-    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    cmd.current_dir(&workspace_root);
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    for (k, v) in extra_env {
-        cmd.env(k, v);
-    }
-    cmd.args(args);
-    cmd.output().expect("spawn maosctl")
-}
-
-/// The single Approval Decision Log row written by a `halt resolve` run.
-fn only_halt_resolve_row(conn: &rusqlite::Connection) -> (String, String, Option<String>) {
-    let mut stmt = conn
-        .prepare(
-            "SELECT capability, intent, reasoning FROM approval_decision_log \
-             WHERE capability = 'halt.resolve'",
-        )
-        .expect("prepare ADL query");
-    let rows: Vec<(String, String, Option<String>)> = stmt
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-        .expect("query ADL")
-        .map(|r| r.expect("ADL row"))
-        .collect();
+fn assert_accepted(out: &std::process::Output, what: &str) {
     assert_eq!(
-        rows.len(),
-        1,
-        "expected exactly one halt.resolve row, got {rows:?}"
+        out.status.code(),
+        Some(0),
+        "{what}: expected exit 0 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
     );
-    rows.into_iter().next().expect("one row")
 }
 
 #[test]
-fn halt_resolve_accepted_halt_writes_adl_row() {
-    let (out, conn) = run_maosctl_and_inspect_db(
-        &[],
+fn accepted_halt_sends_post_with_spirit_id_in_the_body() {
+    let (out, requests, token) = resolve(&["--kind", "accepted-halt"]);
+    assert_accepted(&out, "accepted-halt");
+    assert_eq!(out.stdout, b"{}\n", "the 200 body prints verbatim");
+    assert_eq!(requests.len(), 1, "exactly one round trip");
+    assert_eq!(requests[0].method, "POST");
+    assert_eq!(requests[0].path, ROUTE);
+    assert_eq!(
+        requests[0].authorization.as_deref(),
+        Some(format!("Bearer {token}").as_str()),
+        "the bearer must be the token from control.json"
+    );
+    assert_eq!(
+        requests[0].content_type.as_deref(),
+        Some("application/json"),
+        "the resolution travels as JSON"
+    );
+    // The spirit id is a BODY field, not a path segment — the route is
+    // keyed by the halt alone.
+    let body = requests[0].json_body();
+    assert_eq!(
+        body.get("spirit_id").and_then(|v| v.as_str()),
+        Some("butler"),
+        "spirit_id must be in the body — got {body}"
+    );
+    assert_eq!(
+        body.get("resolution").and_then(|v| v.as_str()),
+        Some("accepted_halt"),
+        "the clap spelling maps to the wire spelling — got {body}"
+    );
+    assert!(
+        body.get("rationale").is_some_and(|v| v.is_null()),
+        "accepted-halt carries no rationale — got {body}"
+    );
+}
+
+/// `--text` is the rationale for a provided-context resolution.
+#[test]
+fn provided_context_carries_the_text_as_rationale() {
+    let (out, requests, _) = resolve(&[
+        "--kind",
+        "provided-context",
+        "--text",
+        "the missing context",
+    ]);
+    assert_accepted(&out, "provided-context");
+    let body = requests[0].json_body();
+    assert_eq!(
+        body.get("resolution").and_then(|v| v.as_str()),
+        Some("provided_context"),
+        "got {body}"
+    );
+    assert_eq!(
+        body.get("rationale").and_then(|v| v.as_str()),
+        Some("the missing context"),
+        "--text must travel as rationale — got {body}"
+    );
+}
+
+/// `--operator-policy` is the rationale for an authorized override.
+#[test]
+fn authorized_override_carries_the_policy_ref_as_rationale() {
+    let (out, requests, _) = resolve(&[
+        "--kind",
+        "authorized-override",
+        "--operator-policy",
+        "pol-9-operator",
+    ]);
+    assert_accepted(&out, "authorized-override");
+    let body = requests[0].json_body();
+    assert_eq!(
+        body.get("resolution").and_then(|v| v.as_str()),
+        Some("authorized_override"),
+        "got {body}"
+    );
+    assert_eq!(
+        body.get("rationale").and_then(|v| v.as_str()),
+        Some("pol-9-operator"),
+        "--operator-policy must travel as rationale — got {body}"
+    );
+}
+
+/// clap's `required_if_eq` refuses provided-context without `--text`
+/// LOCALLY (exit 2) — the door must never see a half-formed resolution.
+#[test]
+fn provided_context_without_text_refused_before_the_round_trip() {
+    let door = FixtureDoor::spawn();
+    let out = door.run(&[
+        "halt",
+        "resolve",
+        HALT_ID,
+        "--spirit",
+        "butler",
+        "--kind",
+        "provided-context",
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(
+        door.request_count(),
+        0,
+        "a locally-refused resolution must not touch the door"
+    );
+}
+
+/// The second half: each typed response maps to its D-16-1-P exit. The
+/// unknown/already-resolved halt is the DAEMON's typed 404 — the client
+/// preflight that used to fabricate an answer is gone (D-16-1-K).
+#[test]
+fn resolve_maps_typed_responses_to_d16_1_p_exits() {
+    assert_typed_matrix(
         &[
             "halt",
             "resolve",
-            "halt-001",
+            HALT_ID,
             "--spirit",
-            "hello-spirit",
+            "butler",
             "--kind",
             "accepted-halt",
         ],
-    );
-    assert!(
-        out.status.success(),
-        "accepted-halt should exit 0; got {:?}\nstdout: {}\nstderr: {}",
-        out.status.code(),
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr),
-    );
-
-    let (capability, intent, reasoning) = only_halt_resolve_row(&conn);
-    assert_eq!(capability, "halt.resolve");
-    assert_eq!(intent, "accepted_halt");
-    let reasoning = reasoning.expect("reasoning column must be populated");
-    assert!(
-        reasoning.contains("halt=halt-001") && reasoning.contains("accepted_halt"),
-        "reasoning must carry halt_id + kind, got: {reasoning}"
+        "POST",
+        ROUTE,
     );
 }
 
+/// Discovery failures (AC5), shared by every door verb.
 #[test]
-fn halt_resolve_provided_context_writes_adl_row_with_supplied_text() {
-    let (out, conn) = run_maosctl_and_inspect_db(
-        &[],
-        &[
+fn resolve_discovery_failures_map_to_typed_exits() {
+    assert_discovery_failures(&[
+        "halt",
+        "resolve",
+        HALT_ID,
+        "--spirit",
+        "butler",
+        "--kind",
+        "accepted-halt",
+    ]);
+}
+
+/// Ids outside the door's route charset (`[A-Za-z0-9._-]{1,128}`) are
+/// refused locally for BOTH the halt id and the spirit id.
+#[test]
+fn invalid_ids_refused_locally_without_a_round_trip() {
+    let door = FixtureDoor::spawn();
+    for args in [
+        vec![
             "halt",
             "resolve",
-            "halt-002",
+            "bad/id",
             "--spirit",
-            "hello-spirit",
-            "--kind",
-            "provided-context",
-            "--text",
-            "the issue is X",
-        ],
-    );
-    assert!(
-        out.status.success(),
-        "provided-context with --text should exit 0; got {:?}\nstdout: {}\nstderr: {}",
-        out.status.code(),
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr),
-    );
-
-    let (capability, intent, reasoning) = only_halt_resolve_row(&conn);
-    assert_eq!(capability, "halt.resolve");
-    assert_eq!(intent, "provided_context");
-    let reasoning = reasoning.expect("reasoning column must be populated");
-    assert!(
-        reasoning.contains("provided_context: the issue is X"),
-        "reasoning must carry the director-supplied context, got: {reasoning}"
-    );
-}
-
-#[test]
-fn halt_resolve_authorized_override_writes_adl_row_with_operator_policy_ref() {
-    let (out, conn) = run_maosctl_and_inspect_db(
-        &[],
-        &[
-            "halt",
-            "resolve",
-            "halt-003",
-            "--spirit",
-            "hello-spirit",
-            "--kind",
-            "authorized-override",
-            "--operator-policy",
-            "policy://override/2026-05",
-        ],
-    );
-    assert!(
-        out.status.success(),
-        "authorized-override with --operator-policy should exit 0; got {:?}\nstdout: {}\nstderr: {}",
-        out.status.code(),
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr),
-    );
-
-    let (capability, intent, reasoning) = only_halt_resolve_row(&conn);
-    assert_eq!(capability, "halt.resolve");
-    assert_eq!(intent, "authorized_override");
-    let reasoning = reasoning.expect("reasoning column must be populated");
-    assert!(
-        reasoning.contains("authorized_override: operator_policy_ref=policy://override/2026-05"),
-        "reasoning must carry the operator policy reference, got: {reasoning}"
-    );
-}
-
-#[test]
-fn halt_resolve_missing_text_rejected_by_clap() {
-    let out = run_maosctl(
-        &[],
-        &[
-            "halt",
-            "resolve",
-            "halt-004",
-            "--spirit",
-            "hello-spirit",
-            "--kind",
-            "provided-context",
-        ],
-    );
-    assert!(
-        !out.status.success(),
-        "provided-context without --text must be rejected; got {:?}",
-        out.status.code(),
-    );
-    // clap's `required_if_eq` fires before `dispatch_halt` shells out, so the
-    // usage diagnostic — not a maos-bin error — is what the operator sees.
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("--text"),
-        "expected a clap usage error naming --text, got: {stderr}"
-    );
-}
-
-#[test]
-fn halt_resolve_empty_text_rejected() {
-    let out = run_maosctl(
-        &[],
-        &[
-            "halt",
-            "resolve",
-            "halt-007",
-            "--spirit",
-            "hello-spirit",
-            "--kind",
-            "provided-context",
-            "--text",
-            "   ",
-        ],
-    );
-    assert!(
-        !out.status.success(),
-        "a blank --text must not resolve a halt; got {:?}\nstderr: {}",
-        out.status.code(),
-        String::from_utf8_lossy(&out.stderr),
-    );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("provided_context text must be non-empty"),
-        "expected the domain non-empty diagnostic, got: {stderr}"
-    );
-}
-
-#[test]
-fn halt_list_no_color_emits_zero_ansi() {
-    let out = run_maosctl(
-        &[("NO_COLOR", "1")],
-        &["halt", "list", "--spirit", "hello-spirit"],
-    );
-    assert!(
-        out.status.success(),
-        "halt list should exit 0; got {:?}\nstderr: {}",
-        out.status.code(),
-        String::from_utf8_lossy(&out.stderr),
-    );
-    let esc_stdout = out.stdout.iter().filter(|b| **b == 0x1b).count();
-    let esc_stderr = out.stderr.iter().filter(|b| **b == 0x1b).count();
-    assert_eq!(
-        esc_stdout, 0,
-        "NO_COLOR=1: stdout contains {esc_stdout} ANSI escape byte(s)"
-    );
-    assert_eq!(
-        esc_stderr, 0,
-        "NO_COLOR=1: stderr contains {esc_stderr} ANSI escape byte(s)"
-    );
-}
-
-#[test]
-fn halt_resolve_unknown_spirit_exits_two() {
-    let out = run_maosctl(
-        &[],
-        &[
-            "halt",
-            "resolve",
-            "halt-006",
-            "--spirit",
-            "unknown-spirit",
+            "butler",
             "--kind",
             "accepted-halt",
         ],
-    );
+        vec![
+            "halt",
+            "resolve",
+            HALT_ID,
+            "--spirit",
+            "bad/id",
+            "--kind",
+            "accepted-halt",
+        ],
+    ] {
+        let out = door.run(&args);
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "invalid id must exit 2 — args {args:?}, stderr: {}",
+            String::from_utf8_lossy(&out.stderr),
+        );
+    }
     assert_eq!(
-        out.status.code(),
-        Some(2),
-        "unknown spirit must exit 2; stderr: {}",
-        String::from_utf8_lossy(&out.stderr),
-    );
-}
-
-#[test]
-fn halt_list_unknown_spirit_exits_two() {
-    let out = run_maosctl(&[], &["halt", "list", "--spirit", "unknown-spirit"]);
-    assert_eq!(
-        out.status.code(),
-        Some(2),
-        "unknown spirit must exit 2; stderr: {}",
-        String::from_utf8_lossy(&out.stderr),
+        door.request_count(),
+        0,
+        "a locally-refused id must not touch the door"
     );
 }

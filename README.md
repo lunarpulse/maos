@@ -236,6 +236,49 @@ maosctl skills queue | status     # skill-ecosystem admission queue
 maosctl import --offline <bundle> # air-gapped registry import
 ```
 
+Every state-changing verb above reaches one authenticated loopback HTTP door
+owned by the running daemon (`maos run` / `maos shell`): bearer-checked
+requests on `127.0.0.1`, with read routes `/v1/daemon`, `/v1/spirits/{id}`
+and `/v1/spirits/{id}/sandbox`, and verb POSTs such as
+`/v1/spirits/{id}/pause`, `/v1/halts/{id}/resolve`, `/v1/orchestrator/{id}`
+and `/v1/tokens/{id}/revoke`. Anonymous callers get 401 before they can learn
+whether a path accepts writes.
+
+The daemon binds from, and `maosctl` discovers,
+`<home>/control.json` (`MAOS_HOME` if set, else `$HOME/.maos`) with schema
+`{"version":1,"endpoint":"tcp://127.0.0.1:<port>","token":"<64 hex>"}`, mode
+`0600` inside a `0700` home. Only `maos init` writes the file; rotate with
+`rm control.json && maos init`. The environment overrides are both-or-neither:
+`MAOS_OPERATOR_HTTP_ENDPOINT` + `MAOS_OPERATOR_BEARER_TOKEN` for `maosctl`,
+`MAOS_OPERATOR_HTTP_BIND` + `MAOS_OPERATOR_BEARER_TOKEN` for the daemon.
+
+The durable verbs (`forget`, `uninstall`, `legal-hold release`,
+`governance admit`) run through the door when a daemon is live, and offline
+only when the offline child `flock`s the home directory and every durable
+store's directory exclusively — no lock file is ever created; the
+directories' own handles carry the lock. Any lock held ⇒ exit 69
+`StoreInUse`; a live-but-unresponsive door ⇒ 69 `DoorUnresponsive`; neither
+ever falls back to offline writes.
+
+Exit codes:
+
+| code | meaning |
+|---|---|
+| `0` | success |
+| `1` | typed application error (404/409/500) or protocol error (400/405/411/413) |
+| `2` | usage — clap, local validation, the `stop` refusal |
+| `69` | `EX_UNAVAILABLE` — daemon not running, store in use, door unresponsive, offline operation in progress, offline unsupported |
+| `75` | `EX_TEMPFAIL` — retryable 503: `handler_still_running` (stderr names its `operation_id` and the `maosctl audit query --intent-contains <id>` lookup), `spirit_busy`, `busy` |
+| `77` | `EX_NOPERM` — 401, wrong bearer |
+| `78` | `EX_CONFIG` — not initialized, `control.json` invalid, endpoint in use, lock unavailable |
+
+`uninstall` keeps its terminal `0/3/4/5`, `forget` its `3`, and
+`spirit hot-swap-precheck` its `0/2`.
+
+Until Story 17-1 lands, any Worker on this host can read `control.json` and
+inherits an exported operator bearer — the cure is 17-1's `env_clear` plus
+T3 isolation, not this surface.
+
 → [`docs/maos.dev/run-maos.md`](docs/maos.dev/run-maos.md)
 
 ### 🛠️ Write a Spirit

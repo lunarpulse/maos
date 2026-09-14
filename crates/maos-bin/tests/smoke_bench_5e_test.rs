@@ -9,11 +9,17 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 #[test]
 fn smoke_bench_5e_exits_zero_and_outputs_5_json_lines() {
     let bin = env!("CARGO_BIN_EXE_maos");
     let output = Command::new(bin)
         .env("MAOS_ONE_SHOT", "smoke-bench-5e")
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" — the floor is file-granular,
+        // and a one-shot that later becomes a root must not regain the hazard.
+        .env("HOME", doorless_home::doorless_home())
         .output()
         .expect("failed to execute maos-bin");
 

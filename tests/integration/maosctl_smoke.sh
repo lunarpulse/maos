@@ -40,6 +40,17 @@ export MAOS_JOURNAL_PATH="$JOURNAL"
 # resolves predictably even on CI runners that chmod $HOME oddly.
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$(mktemp -d)}"
 
+# ── Story 16-1 / D-16-1-Q + AC7 ──────────────────────────────────────────
+# An EMPTY scratch HOME, deliberately NOT `maos init`-ed. The operator door's
+# endpoint comes from `<home>/control.json`, so inheriting the runner's HOME
+# would make this script's exit codes depend on whether someone had ever run
+# `maos init` on the machine — and the CI decoy step now guarantees that HOME
+# HAS a control.json with a held port.
+#
+# `HOME` and NOT `MAOS_HOME`: `MAOS_HOME` takes precedence over the
+# `MAOS_AUDIT_DB` / `MAOS_JOURNAL_PATH` this script sets and asserts on.
+export HOME="$(mktemp -d)"
+
 cleanup() {
   rm -f "$DB" "$JOURNAL"
 }
@@ -50,14 +61,6 @@ MAOS_BIN="${REPO_ROOT}/target/release/maos"
 # `MAOS_BIN_PATH` lets maosctl find the colocated binary even when the
 # release target dir is non-standard.
 export MAOS_BIN_PATH="$MAOS_BIN"
-
-assert_exit_0() {
-  local label="$1"; shift
-  if ! "$@"; then
-    echo "${label}: FAIL (exit $?)" >&2
-    exit 1
-  fi
-}
 
 # ───────────────────────────────────────────────────────────────
 echo "::group::install hello-spirit"
@@ -78,68 +81,66 @@ echo "$RUN_OUT" | jq -e '
 ' >/dev/null
 echo "::endgroup::"
 
-# ───────────────────────────────────────────────────────────────
-# Lifecycle-journal helper: assert the file has exactly N lines AND the
-# N'th line matches the expected `lifecycle_event` discriminator.
-assert_journal_tail_event() {
-  local expected_count="$1"
-  local expected_event="$2"
-  local actual_count
-  actual_count="$(wc -l < "$JOURNAL")"
-  if [ "$actual_count" != "$expected_count" ]; then
-    echo "journal line count: expected $expected_count, got $actual_count" >&2
-    cat "$JOURNAL" >&2
+# ── Story 16-1 / AC7 — the lifecycle verbs no longer journal offline ─────
+#
+# `start`/`unload` are DOOR verbs now (D-16-1-A). With no daemon and no
+# `control.json` they are a typed configuration refusal, not a journal write:
+# the measured HEAD behaviour was `stop hello-spirit` exiting 0 and appending
+# a `Halt` row while nothing had stopped. So the assertions invert — what this
+# script proves is that the journal does NOT move.
+#
+# `run hello-spirit` above is unchanged: it is the FR58 evaluator turn
+# (D-16-1-M), not an operator verb, and four scripts plus two CI jobs depend
+# on it working with no daemon.
+JOURNAL_BYTES_BEFORE="$(wc -c < "$JOURNAL" | tr -d ' ')"
+
+assert_exit_and_journal_unchanged() {
+  local verb="$1" spirit="$2" want="$3"
+  set +e
+  "${MAOSCTL}" "$verb" "$spirit" >/dev/null 2>"${JOURNAL}.err"
+  local got=$?
+  set -e
+  if [ "$got" != "$want" ]; then
+    echo "$verb $spirit: expected exit $want, got $got — $(cat "${JOURNAL}.err")" >&2
     exit 1
   fi
-  local last
-  last="$(tail -n 1 "$JOURNAL")"
-  echo "$last" | jq -e \
-    --arg ev "$expected_event" \
-    '.lifecycle_event == $ev and .spirit_id == "hello-spirit"' >/dev/null
+  local after
+  after="$(wc -c < "$JOURNAL" | tr -d ' ')"
+  if [ "$JOURNAL_BYTES_BEFORE" != "$after" ]; then
+    echo "$verb $spirit: journal moved from $JOURNAL_BYTES_BEFORE to $after — a refused verb must write nothing" >&2
+    exit 1
+  fi
 }
 
-# NOTE (Story 8.14a): `maosctl run` above is now a kernel-rendered evaluator
-# surface that performs a REAL admission/load, so it journals one `Load` entry
-# (resolved sandbox tier T2) before the start/stop/unload verbs run. Each
-# subsequent verb still writes exactly one entry — the tail-event counts below
-# are therefore offset by +1 from the original v0.1 (pre-`run`-load) sequence:
-#   run → Load(1), start → Start(2), stop → Halt(3), unload → Unload(4).
-echo "::group::start hello-spirit"
-START_ERR="$("${MAOSCTL}" start hello-spirit 2>&1 >/dev/null)"
-echo "$START_ERR" | grep -q "started hello-spirit" || { echo "start: stderr missing 'started hello-spirit' diagnostic — got: $START_ERR" >&2; exit 1; }
-assert_journal_tail_event 2 "Start"
+echo "::group::start hello-spirit with no door (78, journal unchanged)"
+assert_exit_and_journal_unchanged start hello-spirit 78
 echo "::endgroup::"
 
-echo "::group::stop hello-spirit"
-STOP_ERR="$("${MAOSCTL}" stop hello-spirit 2>&1 >/dev/null)"
-echo "$STOP_ERR" | grep -q "stopped hello-spirit" || { echo "stop: stderr missing 'stopped hello-spirit' diagnostic — got: $STOP_ERR" >&2; exit 1; }
-assert_journal_tail_event 3 "Halt"
+echo "::group::unload hello-spirit with no door (78, journal unchanged)"
+assert_exit_and_journal_unchanged unload hello-spirit 78
 echo "::endgroup::"
 
-echo "::group::unload hello-spirit"
-UNLOAD_ERR="$("${MAOSCTL}" unload hello-spirit 2>&1 >/dev/null)"
-echo "$UNLOAD_ERR" | grep -q "unloaded hello-spirit" || { echo "unload: stderr missing 'unloaded hello-spirit' diagnostic — got: $UNLOAD_ERR" >&2; exit 1; }
-assert_journal_tail_event 4 "Unload"
+# `stop` never reaches a door at all: no kernel transition is named stop
+# (D-16-1-I), so it is a local usage refusal, exit 2, whatever the door's
+# state.
+echo "::group::stop hello-spirit (refused client-side, 2)"
+assert_exit_and_journal_unchanged stop hello-spirit 2
+STOP_ERR="$(cat "${JOURNAL}.err")"
+echo "$STOP_ERR" | grep -q "no kernel transition is named stop" || {
+  echo "stop: the refusal must name why — got: $STOP_ERR" >&2; exit 1; }
+echo "$STOP_ERR" | grep -q "maosctl pause" || {
+  echo "stop: the refusal must name the verb that replaces it — got: $STOP_ERR" >&2; exit 1; }
 echo "::endgroup::"
 
 # ───────────────────────────────────────────────────────────────
-# Negative case: unknown spirit MUST exit 2 AND MUST NOT append to journal.
+# Negative case: an unknown spirit must still write nothing. The NAME check
+# moved into the daemon (D-16-1-K deleted maosctl's Transparency-Log
+# preflight, which was what refused a live `butler`), so with no door
+# configured the refusal is the same 78 — and the journal is what matters.
 echo "::group::start unknown-spirit (negative)"
-JOURNAL_BYTES_BEFORE="$(wc -c < "$JOURNAL" | tr -d ' ')"
-set +e
-"${MAOSCTL}" start unknown-spirit
-NEG_EXIT=$?
-set -e
-if [ "$NEG_EXIT" != "2" ]; then
-  echo "negative case: expected exit 2, got $NEG_EXIT" >&2
-  exit 1
-fi
-JOURNAL_BYTES_AFTER="$(wc -c < "$JOURNAL" | tr -d ' ')"
-if [ "$JOURNAL_BYTES_BEFORE" != "$JOURNAL_BYTES_AFTER" ]; then
-  echo "negative case: journal size changed from $JOURNAL_BYTES_BEFORE to $JOURNAL_BYTES_AFTER" >&2
-  exit 1
-fi
+assert_exit_and_journal_unchanged start unknown-spirit 78
 echo "::endgroup::"
+rm -f "${JOURNAL}.err"
 
 END_NS=$(python3 -c 'import time; print(int(time.time()*1e9))' 2>/dev/null || echo "$(date +%s)000000000")
 ELAPSED_MS=$(( (END_NS - START_NS) / 1000000 ))

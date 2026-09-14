@@ -1,0 +1,42 @@
+maos 0.1.0-alpha.1 (v0.1-β scaffold; worker_threads target = 32)
+maos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)
+maos: capability registry initialized (Story 1b.2)
+maos: enterprise PDP not configured — set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)
+maos: enterprise identity/at-rest/SIEM NOT configured — set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)
+maos: orchestrator buffer registry initialized (Story 3.4)
+maos: Transparency Log opened on-disk at /tmp/claude-1000/-home-lunarpulse-dev-ws-maos/4e42f963-4b21-4969-b033-00b910f44c64/scratchpad/runR/maoshome/audit/transparency.sqlite
+maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable
+maos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)
+maos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)
+maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)
+maos: Mailbox TL installer wired (Story 6.4)
+maos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)
+maos: Spirit Scheduler wired (Story 5.1)
+maos: CrashDetector wired (Story 5.3)
+maos: KernelLifecycleResolver wired (Story 5.1)
+maos: HotSwapCoordinator wired (Story 5.2)
+maos: RevocationApplier + RevocationPoller wired (Story 5.4)
+maos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false
+maos: UpgradeOrchestrator wired (Story 5.4)
+maos: Approval Manager initialized (v0.3-β auto-allow)
+maos: Ollama provider registered
+maos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)
+maos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)
+maos run: researcher inference seam wired (Replay { cassette: "crates/maos-journey-test/cassettes/j-researcher/survey-distill.json", strict: false, explicit: true })
+maos run: 'researcher' loaded — entering serving loop
+maos: RevocationPoller spawned (Story 5.4)
+maos: IdleWatchdog spawned (Story 5.1)
+maos: ScheduleWatchdog spawned (Story 6.4)
+maos: ProgressWatchdog spawned (Story 5.3)
+maos: SilentFailureDetector spawned (Story 5.3)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+revocation poller: poll_once failed: I/O error reading offline CRL: read CRL file /tmp/maos/crl/latest.signed.json: No such file or directory (os error 2)
+maos: shutdown reason = sigterm; cancelling root token
+maos: audit writer drain timed out after 10s
+maos: drained 4 cap-audit row(s); exiting cleanly

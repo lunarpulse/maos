@@ -268,22 +268,33 @@ impl CapTokensShardRing {
         shard.get(token_id).map(|s| s.scope)
     }
 
-    /// Revoke a single token. Slow-path (write-lock).
+    /// Revoke a single token. Slow-path (single token, not the verify hot
+    /// path).
+    ///
+    /// D-16-1-V, reason-keyed: only a repeated `Operator` revoke of an
+    /// already-revoked token is typed `Err(Revoked)` and emits no row — the
+    /// operator must distinguish "I revoked it" from "it was already
+    /// revoked", and a no-op state change must not duplicate `cap.revoke`.
+    /// Every other reason keeps `Ok(())` WITH its row: for
+    /// `CliSubprocessExit` (the `worker_spawn.rs` caller discards the
+    /// result) an already-revoked token is the NORMAL case — unload and CRL
+    /// application revoke first — so typing it as an error would silently
+    /// drop the Worker's exit-provenance row for every such token (§17 V-35).
     pub fn revoke(&self, token_id: TokenId, reason: RevokeReason) -> Result<(), CapError> {
         let shard_idx = shard::hash_token_id(&token_id);
         let shard = &self.shards[shard_idx];
 
-        let was_present = shard
-            .set_revoked(&token_id)
-            .map_err(|_| CapError::UnknownToken)?;
-        if was_present {
-            let _ = self
-                .audit
-                .try_send(cap_audit::CapAuditEvent::Revoke { token_id, reason });
-            Ok(())
-        } else {
-            Err(CapError::UnknownToken)
+        let already_revoked = match shard.set_revoked(&token_id) {
+            Some(prior) => prior,
+            None => return Err(CapError::UnknownToken),
+        };
+        if already_revoked && matches!(reason, RevokeReason::Operator) {
+            return Err(CapError::Revoked);
         }
+        let _ = self
+            .audit
+            .try_send(cap_audit::CapAuditEvent::Revoke { token_id, reason });
+        Ok(())
     }
 
     /// Revoke all tokens for a Spirit. Crash-recovery / hot-swap rebind

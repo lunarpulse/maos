@@ -1,0 +1,206 @@
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index d331a277..28efdf1e 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -3043,8 +3043,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+     // Story 5.4 — UpgradeOrchestrator constructed at composition root. The
+     // factory creates a new concrete Spirit for every successor manifest;
+     // upgrade code is never given the predecessor object.
++    let spike_f_orch = Arc::clone(&orchestrator);
++    let spike_f_tl = Arc::clone(&transparency_log);
++    let spike_f_journal = Arc::clone(&shared_journal);
+     let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
+-        |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
++        move |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
+             let class = manifest.class.as_ref().ok_or_else(|| {
+                 maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                     reason: "successor manifest lacks [class]".into(),
+@@ -3071,6 +3074,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                     maos_digest::DigestSpirit::default(),
+                 ),
+                 "smoke-spirit" => maos_kernel_core::scheduler::make_spirit_obj(UpgradeSmokeSpirit),
++                // SPIKE 16-1 (throwaway): bare Butler successor — NO scalar port / scenario.
++                "butler" if std::env::var_os("MAOS_SPIKE_FAITHFUL").is_none() => {
++                    maos_kernel_core::scheduler::make_spirit_obj(butler::Butler::new())
++                }
++                "butler" => {
++                    // SPIKE: faithful successor. Policy side-channel = the target file
++                    // (the bundle carries no [epistemic_policy]).
++                    let path = std::env::var("MAOS_SPIKE_UPGRADE_TO").unwrap();
++                    let root: toml::Value = toml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
++                    let policy = maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
++                        &toml::to_string(root.get("epistemic_policy").unwrap()).unwrap(),
++                    )
++                    .unwrap();
++                    let adapter = Arc::new(ButlerOrchestratorAdapter {
++                        orchestrator: Arc::clone(&spike_f_orch),
++                        tl: Arc::clone(&spike_f_tl),
++                        journal: Arc::clone(&spike_f_journal),
++                        policy,
++                        boot_nonce,
++                        last_receipt: Arc::new(std::sync::Mutex::new(None)),
++                    });
++                    let scenario = butler::ScenarioInput {
++                        calendar: vec![
++                            butler::CalendarEvent { id: "evt-a".into(), title: "Board review".into(), start_min: 540, end_min: 600, status: butler::EventStatus::Confirmed },
++                            butler::CalendarEvent { id: "evt-b".into(), title: "Investor call".into(), start_min: 570, end_min: 630, status: butler::EventStatus::Confirmed },
++                        ],
++                        comms: vec![],
++                        preference_alignment: None,
++                    };
++                    maos_kernel_core::scheduler::make_spirit_obj(
++                        butler::Butler::with_scenario(scenario).with_scalar_port(adapter),
++                    )
++                }
+                 unsupported => {
+                     return Err(
+                         maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+@@ -8349,6 +8385,119 @@ description = "smoke test spirit successor"
+         .spawn(cancel.child_token());
+     eprintln!("maos: SilentFailureDetector spawned (Story 5.3)");
+ 
++    // ── SPIKE 16-1 (throwaway): drive the three AC4 fixtures against live daemon objects ──
++    if std::env::var_os("MAOS_SPIKE_16_1").is_some() {
++        let spike_cap = Arc::clone(&capability);
++        let spike_applier = Arc::clone(&revocation_applier);
++        let spike_upgrade = Arc::clone(&upgrade_orchestrator);
++        let spike_crypto = Arc::clone(&crypto_provider);
++        let spike_sched = Arc::clone(&scheduler);
++        let spike_scbs = scheduler.scbs();
++        tokio::spawn(async move {
++            let t0 = std::time::Instant::now();
++            let state = |label: &str| {
++                let map = spike_scbs.read().unwrap();
++                for (pid, scb) in map.iter() {
++                    let rt = scb.runtime_snapshot();
++                    let ver = rt.manifest.class.as_ref().map(|c| c.version.clone());
++                    eprintln!(
++                        "SPIKE[{:>6}ms] {label}: pid={pid} id={} state={:?} class_version={ver:?} active_tokens={}",
++                        t0.elapsed().as_millis(),
++                        scb.spirit_id,
++                        scb.current_state(),
++                        spike_cap.has_active_tokens_for_pid(*pid)
++                    );
++                }
++                if map.is_empty() {
++                    eprintln!("SPIKE[{:>6}ms] {label}: <no SCBs>", t0.elapsed().as_millis());
++                }
++            };
++            state("boot");
++            // Q1 — token id handed in from OUTSIDE (read from the TL by the harness).
++            if let Some(path) = std::env::var_os("MAOS_SPIKE_TOKEN_FILE") {
++                let mut hexid = None;
++                for _ in 0..400 {
++                    if let Ok(s) = std::fs::read_to_string(&path) {
++                        if s.trim().len() == 32 {
++                            hexid = Some(s.trim().to_string());
++                            break;
++                        }
++                    }
++                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
++                }
++                match hexid {
++                    None => eprintln!("SPIKE Q1: no token id file content"),
++                    Some(h) => {
++                        let bytes = parse_token_id_hex(&h).expect("hex");
++                        let id = maos_domain::invariants::i1::TokenId(bytes);
++                        use maos_domain::ports::CapabilityRegistryPort;
++                        eprintln!("SPIKE Q1: revoke#1 {h} -> {:?}", spike_cap.revoke(id));
++                        state("after revoke#1");
++                        eprintln!("SPIKE Q1: revoke#2 {h} -> {:?}", spike_cap.revoke(id));
++                        let unknown = maos_domain::invariants::i1::TokenId([0xAB; 16]);
++                        eprintln!("SPIKE Q1: revoke(never-issued) -> {:?}", spike_cap.revoke(unknown));
++                    }
++                }
++            }
++            // Q3 — upgrade the running Spirit.
++            if let Ok(to) = std::env::var("MAOS_SPIKE_UPGRADE_TO") {
++                if let Ok(ms) = std::env::var("MAOS_SPIKE_DELAY_MS") {
++                    tokio::time::sleep(std::time::Duration::from_millis(ms.parse().unwrap())).await;
++                    state("before upgrade (delayed)");
++                }
++                let sid = std::env::var("MAOS_SPIKE_UPGRADE_ID").unwrap_or_else(|_| "butler".into());
++                let policy: maos_kernel_core::lifecycle::UpgradePolicy = std::env::var("MAOS_SPIKE_UPGRADE_POLICY")
++                    .unwrap_or_else(|_| "hot-swap".into())
++                    .parse()
++                    .unwrap();
++                let pre = enforce_vetted_upgrade_precondition(
++                    &sid,
++                    std::path::Path::new(&to),
++                    "MAOS_UPGRADE_TO_ATTESTATION",
++                );
++                eprintln!("SPIKE Q3: precondition -> {pre:?}");
++                if pre.is_ok() {
++                    let r = migration_plan::upgrade_with_plan_guard(
++                        &spike_upgrade,
++                        &sid,
++                        std::path::Path::new(&to),
++                        policy,
++                    )
++                    .await;
++                    eprintln!("SPIKE Q3: upgrade -> {}", match &r {
++                        Ok(reports) => serde_json::to_string(reports).unwrap(),
++                        Err(e) => format!("ERR {e}"),
++                    });
++                    eprintln!("SPIKE Q3: resolve_pid({sid}) after -> {:?}", spike_sched.resolve_pid(&sid));
++                }
++                state("after upgrade");
++            }
++            // Q2 — CRL import against the live SCB map.
++            if let Ok(p) = std::env::var("MAOS_SPIKE_CRL") {
++                let bytes = std::fs::read(&p).unwrap();
++                let anchor = hex::decode(std::env::var("MAOS_CRL_TRUST_ANCHOR_PUB_HEX").unwrap()).unwrap();
++                match maos_kernel_core::revocation::parser::parse_signed_crl(&bytes, &anchor, &*spike_crypto) {
++                    Err(e) => eprintln!("SPIKE Q2: parse -> ERR {e}"),
++                    Ok(crl) => {
++                        let r = spike_applier.apply_crl(crl).await;
++                        eprintln!("SPIKE Q2: apply -> {}", match &r {
++                            Ok(rep) => serde_json::to_string(rep).unwrap(),
++                            Err(e) => format!("ERR {e}"),
++                        });
++                        eprintln!("SPIKE Q2: list_applied -> {:?}", spike_applier.list_applied());
++                    }
++                }
++                state("after crl");
++            }
++            if std::env::var_os("MAOS_SPIKE_WATCH").is_some() {
++                for _ in 0..20 {
++                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
++                    state("watch");
++                }
++            }
++        });
++    }
++
+     let shutdown_reason: &'static str = tokio::select! {
+         _ = signal::ctrl_c() => "sigint",
+         _ = shutdown_unix_term() => "sigterm",
+diff --git a/crates/maos-capability/src/cap_tokens/mod.rs b/crates/maos-capability/src/cap_tokens/mod.rs
+index 83f898a8..3f024041 100644
+--- a/crates/maos-capability/src/cap_tokens/mod.rs
++++ b/crates/maos-capability/src/cap_tokens/mod.rs
+@@ -275,7 +275,7 @@ impl CapTokensShardRing {
+ 
+         let was_present = shard
+             .set_revoked(&token_id)
+-            .map_err(|_| CapError::UnknownToken)?;
++            .map_err(|_| CapError::Revoked)?;
+         if was_present {
+             let _ = self
+                 .audit
+diff --git a/crates/maos-capability/src/cap_tokens/shard.rs b/crates/maos-capability/src/cap_tokens/shard.rs
+index babba572..e7306710 100644
+--- a/crates/maos-capability/src/cap_tokens/shard.rs
++++ b/crates/maos-capability/src/cap_tokens/shard.rs
+@@ -44,7 +44,10 @@ impl CapShard {
+     pub fn set_revoked(&self, id: &TokenId) -> Result<bool, ()> {
+         let guard = self.inner.read();
+         if let Some(state) = guard.get(id) {
+-            state.revoked.store(true, Ordering::Release);
++            // SPIKE 16-1: Err(()) = present but ALREADY revoked (swap returns prior value).
++            if state.revoked.swap(true, Ordering::AcqRel) {
++                return Err(());
++            }
+             Ok(true)
+         } else {
+             Ok(false)

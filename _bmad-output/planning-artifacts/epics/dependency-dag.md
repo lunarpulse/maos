@@ -212,7 +212,7 @@ Spine (strict): **15 → 16 → 17 → 18 → 19 → 20 → 21**; each epic's he
 | 15-2 → every 16–21 story | the one-time ceiling re-base is what lets a line land |
 | 15-5 → 15-6 (ADR-064), 16-1 (ADR-062), 17-1 (ADR-061), 17-3b (ADR-060), 21-3 (ADR-063) | one decision per fork, before the epic opens |
 | 15-6 → **16-2**, 18-*, 19-*, **20-1**, 20-4, 21-1 | every "live" story replays in CI through the seam |
-| 16-1 → 16-2, 19-2 | the halt resolve and the enqueue door travel over the POST surface |
+| 16-1 → 16-2, 16-6, 19-2 | the halt resolve and the enqueue door travel over the POST surface |
 | 17-1 → 19-3 | real agent CLIs run only under the egress profile |
 | 17-3a → 17-3b → 20-1, 21-2 | spike, then the WASM form; the registry admits it; J3 recall over the WASM wire |
 | 18-1 → 18-2, 18-4 · 18-1/18-3 → 19-1 | seams before numbers; seams before the Orchestrator loop |

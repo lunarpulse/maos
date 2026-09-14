@@ -41,6 +41,14 @@ tokio-postgres = "0.7"  # Story 10.4a — Postgres client for migration target
 # transitive dependency is not importable.
 maos-cohort = { path = "../maos-cohort" }
 ed25519-dalek = { version = "2", features = ["std"] }
+
+[target.'cfg(unix)'.dependencies]
+# Story 16-1 D-16-1-D — the momentary exclusive home-lock probe behind
+# door-class verbs' connect-refused branch (`rustix::fs::flock` on the home
+# directory's own handle; no lock file is ever created). Unix-gated to match
+# `maos-kernel-core/Cargo.toml`; the probe has no non-unix counterpart.
+rustix = { version = "1.1", features = ["fs"] }
+
 [dev-dependencies]
 # Story 1b.5b — accessibility ANSI test. Both crates are already in the
 # workspace via `maos-audit`, so `Cargo.lock` may grow by maos-iac's transitive deps.

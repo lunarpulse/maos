@@ -22,6 +22,9 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
 }
@@ -149,6 +152,9 @@ fn maos_run_researcher_once_deterministic() {
     let home = isolated_data_home("once");
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/researcher/manifest.toml", "--once"])
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" so this root never reads
+        // the developer's $HOME/.maos/control.json (EndpointInUse collision).
+        .env("HOME", doorless_home::doorless_home())
         .env("XDG_DATA_HOME", home.path.clone())
         .current_dir(workspace_root())
         .output()
@@ -183,6 +189,7 @@ fn maos_run_researcher_live_once_wires_mcp_port() {
             "--live",
             "--once",
         ])
+        .env("HOME", doorless_home::doorless_home())
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_MCP_WEB_URI", "http://localhost:19999")
         .current_dir(workspace_root())
@@ -239,6 +246,7 @@ fn researcher_8_14c_mcp_fanout() {
             "--live",
             "--once",
         ])
+        .env("HOME", doorless_home::doorless_home())
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_MCP_WEB_URI", &web_url)
         .env("MAOS_MCP_ARXIV_URI", &arxiv_url)

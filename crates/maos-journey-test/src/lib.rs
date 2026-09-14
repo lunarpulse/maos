@@ -41,6 +41,9 @@ use std::sync::{
 };
 use std::time::Duration;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 /// The world a journey test drives: a pinned clock, mock MCP endpoints, a replay
 /// LLM provider, and a temp audit DB. Construct via [`JourneyWorld::builder`].
 pub struct JourneyWorld {
@@ -114,6 +117,14 @@ impl JourneyWorldBuilder {
         env.insert(
             "XDG_DATA_HOME".into(),
             audit.path().join("xdg").to_string_lossy().into_owned(),
+        );
+        // Story 16-1 / D-16-1-Q: every Pty child gets an empty scratch "HOME" —
+        // no control.json, so journey roots cannot collide on one endpoint.
+        env.insert(
+            "HOME".into(),
+            doorless_home::doorless_home()
+                .to_string_lossy()
+                .into_owned(),
         );
         if let Some(cassette_path) = llm.cassette_path() {
             env.insert(

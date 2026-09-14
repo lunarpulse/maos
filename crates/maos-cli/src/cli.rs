@@ -787,10 +787,8 @@ pub struct RevokeTokenArgs {
     /// renders to via `format!("{:032x}", ...)` — same shape as
     /// `cap_tokens/body.rs` golden tests).
     pub token_id: String,
-    /// Optional director-supplied reason (free-form). Stored verbatim
-    /// in the Approval Decision Log `reasoning` column per FR42.
-    #[arg(long)]
-    pub reason: Option<String>,
+    // No `--reason`: the door route `POST /v1/tokens/{id}/revoke` carries no
+    // body (Story 16-1), and a flag that changed nothing would be a lie.
 }
 
 /// Story 5.2 — Spirit lifecycle operations.
@@ -808,9 +806,12 @@ pub enum SpiritOp {
     HotSwapPrecheck {
         /// Spirit ID to check (e.g. "butler").
         spirit: String,
-        /// Predecessor version string (e.g. "0.3.1").
+        /// Predecessor version. Over the Story 16-1 door this is DEAD
+        /// WEIGHT: the daemon prechecks the LOADED control block, so the
+        /// loaded version is its own fact, not an operator claim. Accepted
+        /// for CLI compatibility and refused by the door arm when present.
         #[arg(long)]
-        from: String,
+        from: Option<String>,
         /// Path to the successor's manifest TOML file.
         #[arg(long)]
         to: String,
@@ -911,13 +912,12 @@ pub struct RevocationsArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum RevocationsOp {
-    /// Import a signed CRL from offline media (FR60).
+    /// Import a signed CRL from offline media (FR60). Over the Story 16-1
+    /// door the CRL's own BYTES travel as the body (D-16-1-X); the daemon
+    /// owns re-apply policy, so the old `--force` is gone with the one-shot.
     Import {
         /// Path to the signed CRL JSON file.
         file: std::path::PathBuf,
-        /// Re-apply even if this CRL was already imported.
-        #[arg(long)]
-        force: bool,
     },
     /// List already-applied CRLs by id + apply timestamp.
     List,

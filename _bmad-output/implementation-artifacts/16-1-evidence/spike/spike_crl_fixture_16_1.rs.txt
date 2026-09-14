@@ -1,0 +1,55 @@
+#![forbid(unsafe_code)]
+//! SPIKE (throwaway) — produce a real signed CRL for butler's [class] out of process.
+//! Writes `<SPIKE_OUT>/butler.crl.json` and `<SPIKE_OUT>/anchor.hex`.
+
+use maos_domain::ports::crypto::CryptoProvider;
+use maos_domain::revocation::{
+    canonical_entries_bytes, CrlId, RevocationEntry, RevocationOrigin, SignedRevocationList,
+};
+use ring::signature::{Ed25519KeyPair, KeyPair};
+
+#[test]
+fn spike_write_signed_butler_crl() {
+    let out = std::path::PathBuf::from(
+        std::env::var("SPIKE_OUT").unwrap_or_else(|_| std::env::temp_dir().display().to_string()),
+    );
+    std::fs::create_dir_all(&out).unwrap();
+    let seed = [42u8; 32];
+    let kp = Ed25519KeyPair::from_seed_unchecked(&seed).unwrap();
+    let public: [u8; 32] = kp.public_key().as_ref().try_into().unwrap();
+    let entries = vec![RevocationEntry::new(
+        "butler",
+        ">=0.3.0,<0.4.0",
+        "spike-16-1 fixture",
+        None,
+    )
+    .unwrap()];
+    let bytes = canonical_entries_bytes(&entries).unwrap();
+    let signature: [u8; 64] = kp.sign(&bytes).as_ref().try_into().unwrap();
+    let crl = SignedRevocationList::new(
+        CrlId::from_entries(&entries).unwrap(),
+        1,
+        0,
+        RevocationOrigin::Operator,
+        entries,
+        signature,
+        public,
+    )
+    .unwrap();
+    let json = serde_json::to_vec(&crl).unwrap();
+    // In-process self-check through the daemon's parser + the daemon's crypto provider.
+    let parsed = maos_kernel_core::revocation::parser::parse_signed_crl(
+        &json,
+        &public,
+        &maos_kernel_core::security::crypto::RingCryptoProvider,
+    )
+    .expect("daemon parser accepts the fixture");
+    // Sanity: ring provider's signer agrees with raw ring.
+    let via_provider = maos_kernel_core::security::crypto::RingCryptoProvider
+        .sign_capability_token(&seed, &bytes)
+        .unwrap();
+    assert_eq!(via_provider.as_slice(), signature.as_slice());
+    std::fs::write(out.join("butler.crl.json"), &json).unwrap();
+    std::fs::write(out.join("anchor.hex"), hex::encode(public)).unwrap();
+    println!("crl_id={} anchor={} bytes={}", parsed.id, hex::encode(public), json.len());
+}

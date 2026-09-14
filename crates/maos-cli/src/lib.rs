@@ -13,6 +13,7 @@ use std::process::ExitCode;
 pub mod accessibility;
 pub mod backup;
 pub mod cli;
+pub mod door_client;
 pub mod subcommands;
 use clap::Parser;
 

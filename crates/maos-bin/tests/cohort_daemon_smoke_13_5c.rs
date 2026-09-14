@@ -36,6 +36,8 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
 
 use ed25519_dalek::SigningKey;
 use maos_a2a_core::PeerCertFingerprint;
@@ -256,8 +258,15 @@ fn fixture(tag: &str) -> Fixture {
 
 fn maos_command(fixture: &Fixture) -> Command {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    // Story 16-1 (D-16-1-Q) — the daemon is a door ROOT: isolate it from the
+    // developer's home so a real `<home>/control.json` cannot make a second
+    // root here bind (and collide with a live daemon, `EndpointInUse`). HOME,
+    // never MAOS_HOME — the Transparency Log under assertion is routed by
+    // MAOS_AUDIT_DB below and must not move.
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_maos"));
     cmd.current_dir(workspace_root)
+        .env("HOME", doorless_home::doorless_home())
+        .env("XDG_DATA_HOME", doorless_home::doorless_xdg_data_home())
         .env("MAOS_AUDIT_DB", &fixture.audit_db)
         // The daemon runs the full primary root (D24); skip the live LLM probe
         // exactly as `smoke_mira_nash_tcp_8_13.rs` does.
@@ -866,7 +875,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // (no `manifest_scopes`) applies to `verbs.rs` like every other file: it
     // is a pure argv table and must never seed the manifest-derived policy
     // table.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 19] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 20] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -939,6 +948,11 @@ fn composition_root_does_not_seed_manifest_scopes() {
             "inference_mode.rs",
             include_str!("../src/inference_mode.rs"),
         ),
+        // Story 16-1 (D-16-1-N) — the operator door's port implementation and
+        // the store lock set. Listed so the 13.5d negative covers it: the
+        // door reaches the daemon's kernel objects through typed commands and
+        // must never seed the manifest-derived policy table.
+        ("operator_door.rs", include_str!("../src/operator_door.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

@@ -1,208 +1,160 @@
 #![forbid(unsafe_code)]
 
-//! CLI integration tests for `maosctl orchestrator queue/status` (Story 3.4, AC2).
+//! Story 16-1 / T9 (AC7) — CONTRACT tests for
+//! `maosctl orchestrator queue/status`.
 //!
-//! Verifies enqueue exits cleanly, Approval Decision Log rows are written,
-//! unknown spirits are rejected, empty instructions are rejected, and NO_COLOR
-//! suppresses ANSI.
+//! At HEAD both verbs ran against a FRESH in-process registry: status was
+//! ALWAYS `0/32` and queued ids restarted at 1 per process (§4, measured;
+//! the old tests asserted Approval-Log rows from the one-shot). Over the
+//! door the daemon's own buffer answers:
+//!
+//! 1. the WIRE: `POST /v1/orchestrator/{spirit}` with `{"text": ...}` for a
+//!    queue, `GET /v1/orchestrator/{spirit}` for a status; and
+//! 2. the MAPPING: queue maps every typed response to its D-16-1-P exit;
+//!    status renders the door's `pending`/`capacity` as `p/c` — never a
+//!    constant.
 
-use std::path::PathBuf;
-use std::process::Command;
+#[path = "support/fixture_door.rs"]
+mod fixture_door;
 
-use tempfile::TempDir;
+use fixture_door::{assert_discovery_failures, assert_typed_matrix, FixtureDoor};
 
-fn maosctl_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maosctl") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maosctl");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maosctl")
-}
-
-fn maos_bin_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maos")
-}
-
-fn run_maosctl(extra_env: &[(&str, &str)], args: &[&str]) -> std::process::Output {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(path) = std::env::var("PATH") {
-        cmd.env("PATH", path);
-    }
-    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    cmd.current_dir(&workspace_root);
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    for (k, v) in extra_env {
-        cmd.env(k, v);
-    }
-    cmd.args(args);
-    let out = cmd.output().expect("spawn maosctl");
-    drop(tmp);
-    out
-}
-
-fn run_queue_and_inspect_db(args: &[&str]) -> (std::process::Output, rusqlite::Connection) {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(path) = std::env::var("PATH") {
-        cmd.env("PATH", path);
-    }
-    let workspace_root = std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    cmd.current_dir(&workspace_root);
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(args);
-    let out = cmd.output().expect("spawn maosctl");
-
-    let conn =
-        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .expect("open db for inspection");
-
-    std::mem::forget(tmp);
-    (out, conn)
-}
+const ROUTE: &str = "/v1/orchestrator/butler";
 
 #[test]
-fn orchestrator_queue_exits_zero() {
-    let out = run_maosctl(
-        &[],
+fn queue_sends_the_instruction_as_the_text_field() {
+    let door = FixtureDoor::spawn();
+    let out = door.run(&[
+        "orchestrator",
+        "queue",
+        "--spirit",
+        "butler",
+        "water the plants",
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "expected exit 0 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
+    );
+    assert_eq!(out.stdout, b"{}\n", "the 200 body prints verbatim");
+    let requests = door.requests();
+    assert_eq!(requests.len(), 1, "exactly one round trip");
+    assert_eq!(requests[0].method, "POST");
+    assert_eq!(requests[0].path, ROUTE);
+    assert_eq!(
+        requests[0].authorization.as_deref(),
+        Some(format!("Bearer {}", door.token()).as_str()),
+        "the bearer must be the token from control.json"
+    );
+    assert_eq!(
+        requests[0].content_type.as_deref(),
+        Some("application/json"),
+        "the instruction travels as JSON"
+    );
+    let body = requests[0].json_body();
+    assert_eq!(
+        body.get("text").and_then(|v| v.as_str()),
+        Some("water the plants"),
+        "the instruction must travel verbatim as `text` — got {body}"
+    );
+}
+
+/// Status renders the DOOR's numbers: two different payloads must render
+/// two different occupancies, so a registry the test filled and read back
+/// (or a constant) cannot pass.
+#[test]
+fn status_sends_get_and_renders_the_door_occupancy() {
+    for (pending, capacity) in [(1_u64, 32_u64), (7, 64)] {
+        let door = FixtureDoor::spawn_replying(
+            200,
+            &format!(r#"{{"pending":{pending},"capacity":{capacity},"queue":[]}}"#),
+        );
+        let out = door.run(&["orchestrator", "status", "--spirit", "butler"]);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "expected exit 0 — stderr: {}",
+            String::from_utf8_lossy(&out.stderr),
+        );
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            stdout.contains(&format!("{pending}/{capacity}")),
+            "status must render the door's pending/capacity as {pending}/{capacity} — got: {stdout}"
+        );
+        let requests = door.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, "GET", "status is a read");
+        assert_eq!(requests[0].path, ROUTE);
+        assert_eq!(
+            requests[0].authorization.as_deref(),
+            Some(format!("Bearer {}", door.token()).as_str()),
+            "the bearer must be the token from control.json"
+        );
+    }
+}
+
+/// The empty-instruction refusal is LOCAL (clap/dispatch, exit 2) — the
+/// door must never see it.
+#[test]
+fn empty_instruction_refused_locally_without_a_round_trip() {
+    let door = FixtureDoor::spawn();
+    for instruction in ["", "   "] {
+        let out = door.run(&["orchestrator", "queue", "--spirit", "butler", instruction]);
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "empty instruction {instruction:?} must exit 2"
+        );
+    }
+    assert_eq!(
+        door.request_count(),
+        0,
+        "a locally-refused instruction must not touch the door"
+    );
+}
+
+/// The second half: each typed response maps to its D-16-1-P exit. An
+/// unknown spirit is the DAEMON's typed 404 — the client preflight is gone
+/// (D-16-1-K).
+#[test]
+fn queue_maps_typed_responses_to_d16_1_p_exits() {
+    assert_typed_matrix(
         &[
             "orchestrator",
             "queue",
             "--spirit",
-            "hello-spirit",
-            "draft the PR",
+            "butler",
+            "water the plants",
         ],
-    );
-    assert!(
-        out.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
+        "POST",
+        ROUTE,
     );
 }
 
+/// Discovery failures (AC5), shared by every door verb.
 #[test]
-fn orchestrator_queue_rejects_unknown_spirit() {
-    let out = run_maosctl(
-        &[],
-        &["orchestrator", "queue", "--spirit", "unknown-spirit", "x"],
-    );
-    assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("only 'hello-spirit'"),
-        "expected spirit-rejection diagnostic, got: {stderr}"
-    );
-}
-
-#[test]
-fn orchestrator_queue_rejects_empty_instruction() {
-    let out = run_maosctl(
-        &[],
-        &["orchestrator", "queue", "--spirit", "hello-spirit", ""],
-    );
-    assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("must be non-empty"),
-        "expected empty-instruction diagnostic, got: {stderr}"
-    );
-}
-
-#[test]
-fn orchestrator_status_exits_zero() {
-    let out = run_maosctl(&[], &["orchestrator", "status", "--spirit", "hello-spirit"]);
-    assert!(
-        out.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-#[test]
-fn orchestrator_status_no_color_zero_ansi() {
-    let out = run_maosctl(
-        &[("NO_COLOR", "1")],
-        &["orchestrator", "status", "--spirit", "hello-spirit"],
-    );
-    let stderr = out.stderr;
-    let esc_count = stderr.iter().filter(|b| **b == 0x1b).count();
-    assert_eq!(esc_count, 0, "NO_COLOR stderr contained ANSI escapes");
-}
-
-#[test]
-fn orchestrator_queue_writes_adl_row_with_correct_content() {
-    let (out, conn) = run_queue_and_inspect_db(&[
+fn queue_discovery_failures_map_to_typed_exits() {
+    assert_discovery_failures(&[
         "orchestrator",
         "queue",
         "--spirit",
-        "hello-spirit",
-        "draft the PR",
+        "butler",
+        "water the plants",
     ]);
-    assert!(
-        out.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-
-    let mut stmt = conn.prepare(
-        "SELECT capability, intent, reasoning FROM approval_decision_log ORDER BY decision_id DESC LIMIT 1"
-    ).unwrap();
-    let row: (String, String, Option<String>) = stmt
-        .query_row([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-        .unwrap();
-
-    assert_eq!(row.0, "orchestrator.queue", "capability mismatch");
-    assert_eq!(row.1, "queue", "intent mismatch");
-    assert!(
-        row.2.as_ref().map_or(false, |r| r.contains("draft the PR")),
-        "reasoning should contain goal text, got: {:?}",
-        row.2
-    );
 }
 
+/// A spirit id the door's route charset refuses never leaves maosctl.
 #[test]
-fn hex_validation_rejects_uppercase() {
-    let out = run_maosctl(&[], &["revoke-token", "AABBCCDDEEFF00112233445566778899"]);
-    assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("lowercase hex"),
-        "expected lowercase rejection, got: {stderr}"
-    );
+fn invalid_spirit_id_refused_locally_without_a_round_trip() {
+    let door = FixtureDoor::spawn();
+    let out = door.run(&[
+        "orchestrator",
+        "queue",
+        "--spirit",
+        "bad/id",
+        "water the plants",
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(door.request_count(), 0);
 }

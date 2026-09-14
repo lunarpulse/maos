@@ -232,18 +232,26 @@ fn capabilities_fixtures_deserialize_to_their_declared_outcomes() {
 #[test]
 fn production_capability_parsers_are_all_schema_degraded() {
     let main_rs = include_str!("../../maos-bin/src/main.rs");
+    // ⚠ Story 16-1 re-measured these: 5 → 4 and 6 → 5. The parser that went
+    // away is the `posture-shift` one-shot arm's, and its removal is the point
+    // of that story rather than a side effect — the arm re-admitted pid 0 into
+    // a FRESH `PolicyTable` built from a CWD-relative
+    // `spirits/{id}/manifest.toml`, then shifted pid 0's posture, while the
+    // running daemon's Spirit was pid 1. So it degraded a schema it then threw
+    // away. Posture now travels over the operator door to the daemon's own
+    // `PolicyTable`, which needs no manifest parse at all.
     assert_eq!(
         main_rs
             .matches("CapabilitiesRequired::from_toml_str")
             .count(),
-        5,
+        4,
         "a new production capability parser must add schema degradation coverage"
     );
     assert_eq!(
         main_rs
             .matches(".degrade_for_schema_version(class_section.manifest_schema_version)")
             .count(),
-        6,
+        5,
         "every direct parser and both caps_required_or_empty admission paths must degrade loom"
     );
 }

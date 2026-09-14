@@ -217,6 +217,26 @@ fn require_absent(
     }
 }
 
+/// Sibling of `require_contains`, deliberately not a bend of it:
+/// `require_contains` asserts a `context_token` against the Context section AND
+/// an `expected` against an anchor SOURCE file. The Story 16-1 amendment
+/// clauses must instead assert literals against the ADR's OWN body — the
+/// `## Amendment — Story 16-1` heading lies outside `## Context`, so a
+/// context-scoped check can never see it and an unamended ADR would pass.
+fn require_body_contains(
+    number: &str,
+    body: &str,
+    rel: &str,
+    expected: &str,
+    findings: &mut Vec<String>,
+) {
+    if !body.contains(expected) {
+        findings.push(format!(
+            "ADR-{number} body must contain `{expected}`: {rel} reds until the amendment lands"
+        ));
+    }
+}
+
 fn anchor_source(
     root: &Path,
     number: &str,
@@ -327,7 +347,7 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                         findings,
                     );
                 }
-                require_absent(
+                require_contains(
                     number,
                     context,
                     "405",
@@ -337,6 +357,14 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                     findings,
                 );
             }
+            // §17 V-11: these three anchor the ADR's OWN body, not its Context
+            // section — the amendment heading lies outside `## Context`, so
+            // the context-scoped checks above cannot see it. An unamended ADR
+            // must RED here.
+            let adr_rel = "docs/adr/ADR-062-mutating-operator-surface.md";
+            require_body_contains(number, body, adr_rel, "## Amendment — Story 16-1", findings);
+            require_body_contains(number, body, adr_rel, "control.json", findings);
+            require_body_contains(number, body, adr_rel, "cohort-a2a-daemon", findings);
             if let Some(dep_test) = anchor_source(
                 root,
                 number,
@@ -877,8 +905,17 @@ impl Fixture {
             let filler = (0..35)
                 .map(|line| format!("Fixture rationale line {line}.\n"))
                 .collect::<String>();
+            // ADR-062's fixture mirrors the amended contract: the amendment
+            // heading and its two body literals are gate clauses, so the
+            // fixture corpus must satisfy them to stay green before any red
+            // is credited.
+            let amendment = if number == 62 {
+                "\n## Amendment — Story 16-1\n\n`control.json` keeps one writer and `cohort-a2a-daemon` is a door root.\n"
+            } else {
+                ""
+            };
             let adr = format!(
-                "---\nStatus: ACCEPTED — fixture\nGate: fixture\nDecided: 2026-09-08\nAccepted-in-PR: pending\nRevisits: fixture\nSupersedes: nothing\n---\n\n# ADR-{number:03}\n\n## Context\n\n{context}\n\n{filler}\n## Decision\n\nThe fixture decision is binding.\n\n## Consumers\n\n- `{consumer}`\n"
+                "---\nStatus: ACCEPTED — fixture\nGate: fixture\nDecided: 2026-09-08\nAccepted-in-PR: pending\nRevisits: fixture\nSupersedes: nothing\n---\n\n# ADR-{number:03}\n\n## Context\n\n{context}\n\n{filler}{amendment}\n## Decision\n\nThe fixture decision is binding.\n\n## Consumers\n\n- `{consumer}`\n"
             );
             write_file(root, &format!("docs/adr/{name}"), &adr);
             index.push_str(&format!(
@@ -922,7 +959,7 @@ impl Fixture {
         write_file(
             root,
             "crates/maos-control/src/lib.rs",
-            "GET /v1/a2a/rotation-windows\nGET /v1/cohort/peer-versions\nGET /v1/cohort/self-identity\nGET /v1/spirits/\n",
+            "GET /v1/a2a/rotation-windows\nGET /v1/cohort/peer-versions\nGET /v1/cohort/self-identity\nGET /v1/spirits/\n405 => \"Method Not Allowed\"\n",
         );
         write_file(
             root,

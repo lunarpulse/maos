@@ -78,11 +78,7 @@ use maos_director_surface::notification::{NotificationDispatcher, TerminalChanne
 #[cfg(feature = "network")]
 use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope};
 #[cfg(feature = "network")]
-use maos_domain::orchestrator::OrchestratorInstruction;
-#[cfg(feature = "network")]
-use maos_domain::orchestrator::OrchestratorInstructionId;
-#[cfg(feature = "network")]
-use maos_domain::ports::{CapabilityRegistryPort, CryptoProvider};
+use maos_domain::ports::CryptoProvider;
 #[cfg(feature = "network")]
 use maos_kernel_core::api::{
     CapabilityRegistryAdapter, IacBusAdapter, IoSubsystemAdapter, RingCryptoProvider,
@@ -129,11 +125,16 @@ fn resolved_transparency_log_path() -> std::path::PathBuf {
     path
 }
 
+/// Story 16-1 (D-16-1-W(4)) — the vetted-target upgrade precondition, with
+/// the attestation and vetter keyring as PARAMETERS. The daemon's environment
+/// must never be consulted per request: one daemon serves many targets, and
+/// relative paths would resolve in the daemon's cwd, not the operator's.
 #[cfg(feature = "network")]
 fn enforce_vetted_upgrade_precondition(
     spirit_id: &str,
     target_manifest_path: &std::path::Path,
-    attestation_env: &str,
+    attestation: Option<&str>,
+    vetter_keyring: Option<&str>,
 ) -> Result<(), String> {
     let target_manifest = std::fs::read(target_manifest_path).map_err(|error| {
         format!(
@@ -168,16 +169,17 @@ fn enforce_vetted_upgrade_precondition(
         return Ok(());
     }
 
-    let attestation_path = std::env::var(attestation_env)
-        .map_err(|_| format!("{attestation_env} is required for a public-vetted target"))?;
+    let attestation_path = attestation.ok_or_else(|| {
+        "a vetting attestation is required for a public-vetted target".to_string()
+    })?;
     let attestation_bytes = std::fs::read(&attestation_path)
         .map_err(|error| format!("read vetting attestation {attestation_path}: {error}"))?;
     let attestation: maos_compliance::VettingAttestation =
         serde_cbor::from_slice(&attestation_bytes)
             .map_err(|error| format!("decode vetting attestation: {error}"))?;
-    let keyring_path = std::env::var("MAOS_VETTER_KEYRING")
-        .map_err(|_| "MAOS_VETTER_KEYRING is required for a public-vetted target".to_string())?;
-    let keyring_bytes = std::fs::read(&keyring_path)
+    let keyring_path = vetter_keyring
+        .ok_or_else(|| "a vetter keyring is required for a public-vetted target".to_string())?;
+    let keyring_bytes = std::fs::read(keyring_path)
         .map_err(|error| format!("read vetter keyring {keyring_path}: {error}"))?;
     let keyring: maos_compliance::VetterKeyring = serde_cbor::from_slice(&keyring_bytes)
         .map_err(|error| format!("decode vetter keyring: {error}"))?;
@@ -631,6 +633,113 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
     }
 }
 
+/// Story 16-1 (D-16-1-W) — ONE butler construction, shared by the `maos run`
+/// admission path and the upgrade successor factory. Everything that makes a
+/// butler THIS butler — the seeded calendar-conflict scenario (two overlapping
+/// Confirmed events → belief_variance 0.8 against the 0.7 halt threshold), the
+/// JB-5 output channel, and the boot-loud `EpistemicScalarPort` that IS the
+/// halt — lives here exactly once, so a hot-swapped successor is faithful
+/// instead of a bare `Butler::new()` that completes the swap and silently
+/// loses the halt (the measured AC4 root-E falsifier).
+///
+/// `policy == None` is the `MAOS_TEST_ONLY_STRIP_SCALAR_PORT` seam and nothing
+/// else: the receipt handle comes back `None` and every caller that requires a
+/// port (`needs_port`) must fail loudly on it.
+#[cfg(feature = "network")]
+fn construct_butler_core(
+    policy: Option<maos_kernel_core::security::manifest::EpistemicPolicySection>,
+    output_channel: Arc<std::sync::Mutex<Option<serde_json::Value>>>,
+    orchestrator: Arc<
+        maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator,
+    >,
+    tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    journal: Arc<maos_kernel_core::journal::JournalAdapter>,
+    boot_nonce: u64,
+) -> (
+    butler::Butler,
+    Option<Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>>,
+) {
+    let scenario = butler::ScenarioInput {
+        calendar: vec![
+            butler::CalendarEvent {
+                id: "evt-a".into(),
+                title: "Board review".into(),
+                start_min: 540,
+                end_min: 600,
+                status: butler::EventStatus::Confirmed,
+            },
+            butler::CalendarEvent {
+                id: "evt-b".into(),
+                title: "Investor call".into(),
+                start_min: 570,
+                end_min: 630,
+                status: butler::EventStatus::Confirmed,
+            },
+        ],
+        comms: vec![],
+        preference_alignment: None,
+    };
+    let mut butler = butler::Butler::with_scenario(scenario).with_output_channel(output_channel);
+    // ⚠ `with_scalar_port` takes `self` by value, so installing the port
+    // MOVES `butler`. Doing that inside a `policy.map(..)` closure moves it
+    // into the closure and leaves nothing to return; an `if let` keeps the
+    // move local to this scope.
+    let mut last_receipt = None;
+    if let Some(policy) = policy {
+        let receipt = Arc::new(std::sync::Mutex::new(None));
+        let adapter = Arc::new(ButlerOrchestratorAdapter {
+            orchestrator,
+            tl,
+            journal,
+            policy,
+            boot_nonce,
+            last_receipt: Arc::clone(&receipt),
+        });
+        butler =
+            butler.with_scalar_port(adapter as Arc<dyn maos_domain::ports::EpistemicScalarPort>);
+        last_receipt = Some(receipt);
+    }
+    (butler, last_receipt)
+}
+
+/// Story 16-1 (D-16-1-W) — re-parse `[epistemic_policy]` from the TARGET
+/// manifest for the successor factory's butler arm.
+/// `SpiritManifestBundle` carries no such section (widening it is a kernel
+/// byte), so the factory needs the file the door staged.
+#[cfg(feature = "network")]
+fn read_butler_epistemic_policy(
+    path: &std::path::Path,
+) -> Result<
+    maos_kernel_core::security::manifest::EpistemicPolicySection,
+    maos_kernel_core::lifecycle::UpgradeError,
+> {
+    let text = std::fs::read_to_string(path).map_err(|error| {
+        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+            reason: format!("read {}: {error}", path.display()),
+        }
+    })?;
+    let root: toml::Value = toml::from_str(&text).map_err(|error| {
+        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+            reason: format!("parse {}: {error}", path.display()),
+        }
+    })?;
+    let section = root.get("epistemic_policy").ok_or_else(|| {
+        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+            reason: "butler successor manifest lacks [epistemic_policy]".into(),
+        }
+    })?;
+    let serialized = toml::to_string(section).map_err(|error| {
+        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+            reason: format!("serialize [epistemic_policy]: {error}"),
+        }
+    })?;
+    maos_kernel_core::security::manifest::EpistemicPolicySection::from_toml_str(&serialized)
+        .map_err(
+            |error| maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                reason: format!("epistemic_policy parse: {error}"),
+            },
+        )
+}
 #[cfg(feature = "network")]
 /// Story 8.14b — Live MCP port for Butler. Wraps the kernel's
 /// `McpClientAdapter` (capability mediation + audit) with per-tool-type
@@ -1782,6 +1891,72 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     };
+    // Story 16-1 (D-16-1-D) — THE STORE LOCK SET, taken BEFORE any store is
+    // opened: boot opens the TL further down, writes the tenant binding after
+    // that and the Lifecycle Journal later still, so acquiring at the bind or
+    // at the one-shot dispatch would lock stores that are already open. The
+    // set is the store DIRECTORIES' own handles — no lock file is ever
+    // created, because one inside a store directory would change the file
+    // counts `erasure_uninstall_13_5b` asserts. Roots hold `LOCK_SH`; the
+    // offline durable one-shot children (forget/uninstall/legal-hold-release/
+    // governance-admit) hold `LOCK_EX` and write NOTHING unless they acquire
+    // the whole set. The handles are CLOEXEC, so spawned children (Workers,
+    // CLI-wrapper subprocesses) never inherit a lock.
+    let offline_durable_child = matches!(
+        std::env::var("MAOS_ONE_SHOT").as_deref(),
+        Ok("forget" | "uninstall" | "legal-hold-release" | "governance-admit")
+    );
+    let store_locks = {
+        // Pure env read + validation — opens no store, so computing it here
+        // (before the binding below) is safe.
+        let audit_db_for_locks = resolved_transparency_log_path();
+        let role = if offline_durable_child {
+            maos_bin::operator_door::StoreLockRole::OfflineExclusive
+        } else {
+            maos_bin::operator_door::StoreLockRole::RootShared
+        };
+        match maos_bin::operator_door::acquire_store_lock_set(&audit_db_for_locks, role) {
+            Ok(locks) => {
+                if offline_durable_child {
+                    // The CHILD prints it, never maosctl (D-16-1-D) — the
+                    // client cannot know which directories the lock set
+                    // resolved to on this host.
+                    let paths = locks
+                        .locked_paths()
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    eprintln!("maos: no daemon holds {paths}; running offline");
+                }
+                locks
+            }
+            Err(maos_bin::operator_door::StoreLockError::StoreInUse { path }) => {
+                // A neutral refusal: flock cannot tell a door-less daemon
+                // from a second offline child, so the message must not
+                // claim one.
+                eprintln!(
+                    "maos: {} is held by a running MAOS process — StoreInUse, refusing to erase from a live store",
+                    path.display()
+                );
+                std::process::exit(69);
+            }
+            Err(maos_bin::operator_door::StoreLockError::OfflineOperationInProgress { path }) => {
+                eprintln!(
+                    "maos: an offline durable operation holds {} — OfflineOperationInProgress, refusing to boot a root into it",
+                    path.display()
+                );
+                std::process::exit(69);
+            }
+            Err(maos_bin::operator_door::StoreLockError::LockUnavailable { path, source }) => {
+                eprintln!(
+                    "maos: cannot lock store directory {} ({source}) — LockUnavailable",
+                    path.display()
+                );
+                std::process::exit(78);
+            }
+        }
+    };
 
     // Construct the seven adapter shells.
     // Story 5.1 — `_scheduler` replaced with real Arc<SpiritSchedulerAdapter>
@@ -2020,6 +2195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Story 4.2 — HaltRegistry + WorkingMemoryOrchestrator for scalar-write pipeline.
     let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
     let orchestrator = Arc::new(
         maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
             Arc::clone(&capability),
@@ -2695,39 +2871,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     eprintln!("maos: Spirit Scheduler wired (Story 5.1)");
 
-    // Story 5.5a — the operator endpoint is an adapter over this exact scheduler
-    // Arc. ⚠ Story 14-2a: the CONFIG is validated HERE, where it always was, so
-    // a misconfiguration still fails fast with zero side effects and its error
-    // is not masked by the journal-open that follows; the BIND itself moved
-    // below `Arc::get_mut(&mut scheduler)`, which requires `strong_count == 1`
-    // and therefore PANICKED for every process that actually configured this
-    // surface (measured at `a22f0c01`: the daemon never reached its listener).
-    let operator_http_config = match (
-        std::env::var("MAOS_OPERATOR_BEARER_TOKEN"),
-        std::env::var("MAOS_OPERATOR_HTTP_BIND"),
-    ) {
-        (Ok(token), bind) => {
-            let bind = bind.unwrap_or_else(|_| "127.0.0.1:8787".to_owned());
-            let bind = if bind.is_empty() {
-                "127.0.0.1:8787".parse()
-            } else {
-                bind.parse()
-            }
-            .map_err(|error| format!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}"))?;
-            Some(maos_control::OperatorHttpConfig {
-                bind,
-                bearer_token: token,
-            })
-        }
-        (Err(_), Ok(_)) => {
-            return Err(
-                "maos: MAOS_OPERATOR_BEARER_TOKEN is required when MAOS_OPERATOR_HTTP_BIND is configured"
-                    .into(),
-            )
-        }
-        (Err(_), Err(_)) => None,
-    };
-
     // Story 5.2 — Shared journal opened at default path.
     // Created before CrashDetector so the detector can append lifecycle events.
     let journal_path = maos_audit::default_journal_path();
@@ -2824,25 +2967,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     #[cfg(not(feature = "network"))]
     let self_identity: Option<Arc<dyn maos_control::CohortSelfIdentitySource>> = None;
-    let _operator_http_server = match operator_http_config {
-        Some(config) => {
-            let server = maos_control::OperatorHttpServer::bind(
-                config,
-                Arc::clone(&scheduler),
-                rotation_windows,
-                peer_versions,
-                self_identity,
-            )
-            .map_err(|error| format!("maos: operator HTTP bind failed: {error}"))?;
-            // The bound address is announced because it can be ephemeral
-            // (`MAOS_OPERATOR_HTTP_BIND=127.0.0.1:0`), and an operator surface
-            // nobody can find is an operator surface nobody uses.
-            eprintln!("maos: operator HTTP listening on {}", server.local_addr());
-            Some(server)
-        }
-        None => None,
-    };
-
     // Wire SCB map into Mailbox so deliver() updates last_inbound_frame_ns.
     // Story 6.5 — trait-based decoupling: ScbTracker wraps the SCB map.
     let tracker = Arc::new(maos_kernel_core::iac::ScbTracker::new(scheduler.scbs()));
@@ -2894,6 +3018,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|error| format!("maos: invalid MAOS_CRL_TRUST_ANCHOR_PUB_HEX: {error}"))
         })
         .transpose()?;
+    // Story 16-1 (D-16-1-X) — the door's CRL import verifies against the
+    // anchor captured AT BOOT, cloned before the value moves into the registry
+    // client. Re-reading MAOS_CRL_TRUST_ANCHOR_PUB_HEX per request (the
+    // one-shot's habit) would let the anchor change under a running daemon.
+    let door_crl_trust_anchor = revocation_trust_anchor.clone();
     let local_file_registry = Arc::new(maos_domain::revocation::LocalFileRegistryClient::new(
         std::path::PathBuf::from("/tmp").join("maos").join("crl"),
         revocation_trust_anchor,
@@ -3043,8 +3172,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Story 5.4 — UpgradeOrchestrator constructed at composition root. The
     // factory creates a new concrete Spirit for every successor manifest;
     // upgrade code is never given the predecessor object.
+    // Story 16-1 (D-16-1-W) — where the door's upgrade handler stages the
+    // TARGET manifest path for the factory's butler arm: the kernel factory
+    // signature passes only the parsed bundle, which carries no source path,
+    // but a FAITHFUL butler successor must re-parse `[epistemic_policy]` from
+    // the target file. The door stages before the upgrade and clears after.
+    let successor_manifest_slot = maos_bin::operator_door::SuccessorManifestSlot::default();
+    // Moved clones for the factory closure (`SuccessorSpiritFactory` is
+    // 'static; it cannot borrow the composition root).
+    let factory_orchestrator = Arc::clone(&orchestrator);
+    let factory_transparency_log = Arc::clone(&transparency_log);
+    let factory_shared_journal = Arc::clone(&shared_journal);
+    let factory_successor_slot = successor_manifest_slot.clone();
     let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
-        |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
+        move |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
             let class = manifest.class.as_ref().ok_or_else(|| {
                 maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
                     reason: "successor manifest lacks [class]".into(),
@@ -3071,6 +3212,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     maos_digest::DigestSpirit::default(),
                 ),
                 "smoke-spirit" => maos_kernel_core::scheduler::make_spirit_obj(UpgradeSmokeSpirit),
+                // Story 16-1 (D-16-1-W) — a FAITHFUL butler successor, built
+                // by the SAME constructor the `maos run` admission path uses:
+                // scenario, output channel and the boot-loud scalar port that
+                // IS the halt. The policy is re-parsed from the TARGET
+                // manifest (the bundle carries no `[epistemic_policy]`;
+                // widening it is a kernel byte). A bare `Butler::new()`
+                // completes the swap and silently loses the halt — that is
+                // the measured AC4 root-E falsifier.
+                //
+                // ⚠ BEFORE the catch-all: placed after it, this arm compiled
+                // as an unreachable pattern and every butler upgrade answered
+                // "no successor loader registered for class 'butler'".
+                "butler" => {
+                    let staged = factory_successor_slot.peek().ok_or_else(|| {
+                        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                            reason: "butler successor requires a door-staged target manifest"
+                                .into(),
+                        }
+                    })?;
+                    let policy = read_butler_epistemic_policy(&staged)?;
+                    let (butler, _receipt) = construct_butler_core(
+                        Some(policy),
+                        Arc::new(std::sync::Mutex::new(None)),
+                        Arc::clone(&factory_orchestrator),
+                        Arc::clone(&factory_transparency_log),
+                        Arc::clone(&factory_shared_journal),
+                        boot_nonce,
+                    );
+                    maos_kernel_core::scheduler::make_spirit_obj(butler)
+                }
                 unsupported => {
                     return Err(
                         maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
@@ -3110,6 +3281,180 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         audit_rx,
         Arc::clone(&transparency_log),
     );
+    // ─────────────────────────────────────────────────────────────
+    // Story 16-1 (D-16-1-B) — THE OPERATOR DOOR: bind relocated and
+    // ROOT-GATED. Exactly three roots bind — `maos run`, `maos shell`
+    // (a bare `maos` included) and `MAOS_ONE_SHOT=cohort-a2a-daemon` — gated
+    // by ROOT, never by env presence: measured at `f72b557b`, the bind
+    // preceded the `MAOS_ONE_SHOT` dispatch and maosctl spawns do not
+    // `env_clear`, so EVERY one-shot child booted the door and exited 1
+    // `Address already in use` when the token was exported.
+    //
+    // Ordering constraints, each measured:
+    // - `init_monotonic_base()` FIRST — `monotonic_now_ns` has a
+    //   `debug_assert!`, tests run debug, and every handler stamps rows.
+    // - BELOW `Arc::get_mut(&mut scheduler)` — the port retains a scheduler
+    //   clone, and that `expect` needs strong_count 1 (14-2a).
+    // - AFTER `upgrade_orchestrator` — the handlers reach the real hot-swap,
+    //   revocation and upgrade objects, not half-built ones.
+    let is_door_root = shell_mode
+        || run_args.is_some()
+        || std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
+    let mut operator_http_server: Option<maos_control::OperatorHttpServer> = None;
+    let mut operator_door_port: Option<Arc<maos_bin::operator_door::OperatorDoor>> = None;
+    if is_door_root {
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        // Env overrides, BOTH-OR-NEITHER, else `<maos_home()>/control.json`.
+        // The token-only hardcoded fallback port is RETIRED: a port nobody
+        // agreed on is a second trust path, and the real gate was always the
+        // token, never the bind (AC2).
+        let operator_http_config = match (
+            std::env::var("MAOS_OPERATOR_BEARER_TOKEN")
+                .ok()
+                .filter(|token| !token.is_empty()),
+            std::env::var("MAOS_OPERATOR_HTTP_BIND")
+                .ok()
+                .filter(|bind| !bind.is_empty()),
+        ) {
+            (Some(token), Some(bind)) => {
+                let bind: std::net::SocketAddr = match bind.parse() {
+                    Ok(bind) => bind,
+                    Err(error) => {
+                        eprintln!("maos: invalid MAOS_OPERATOR_HTTP_BIND: {error}");
+                        std::process::exit(78);
+                    }
+                };
+                Some(maos_control::OperatorHttpConfig {
+                    bind,
+                    bearer_token: token,
+                })
+            }
+            (Some(_), None) | (None, Some(_)) => {
+                eprintln!(
+                    "maos: MAOS_OPERATOR_HTTP_BIND and MAOS_OPERATOR_BEARER_TOKEN must be set \
+                     together (both-or-neither)"
+                );
+                std::process::exit(78);
+            }
+            (None, None) => match maos_domain::operator_door::maos_home() {
+                Ok(Some(home)) => {
+                    let control_path = maos_domain::operator_door::control_file_path(&home);
+                    match maos_domain::operator_door::ControlFile::load(&control_path) {
+                        Ok(control) => {
+                            let bind = match control.endpoint_addr() {
+                                Ok(bind) => bind,
+                                Err(error) => {
+                                    eprintln!("maos: {error}");
+                                    std::process::exit(78);
+                                }
+                            };
+                            Some(maos_control::OperatorHttpConfig {
+                                bind,
+                                bearer_token: control.token,
+                            })
+                        }
+                        Err(maos_domain::operator_door::ControlFileError::Missing { path }) => {
+                            // No `control.json` and no env pair ⇒ NO door,
+                            // announced once; the root keeps serving its own
+                            // plane. `maos init` is the one writer (D-16-1-C).
+                            eprintln!(
+                                "maos: operator door disabled — no {}; run `maos init`",
+                                path.display()
+                            );
+                            None
+                        }
+                        Err(error) => {
+                            eprintln!("maos: {error}");
+                            std::process::exit(78);
+                        }
+                    }
+                }
+                Ok(None) => {
+                    eprintln!(
+                        "maos: operator door disabled — no control.json (HOME is unset); run `maos init`"
+                    );
+                    None
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    std::process::exit(78);
+                }
+            },
+        };
+        if let Some(config) = operator_http_config {
+            let private_ops = Arc::new(BinPrivateOpsImpl {
+                memory: Arc::clone(&memory),
+                capability: Arc::clone(&capability),
+                transparency_log: Arc::clone(&transparency_log),
+                audit_db_path: audit_db_path.clone(),
+                memory_db_path: memory_db_path.clone(),
+                shared_journal: Arc::clone(&shared_journal),
+                upgrade_orchestrator: Arc::clone(&upgrade_orchestrator),
+            });
+            let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
+                Arc::clone(&scheduler),
+                Arc::clone(&policy),
+                Arc::clone(&halt_registry),
+                Arc::clone(&output_markers),
+                Arc::clone(&orchestrator_registry),
+                Arc::clone(&revocation_applier),
+                Arc::clone(&hot_swap_coordinator),
+                Arc::clone(&capability),
+                Arc::clone(&memory),
+                Arc::clone(&orchestrator),
+                Arc::clone(&mailbox),
+                Arc::clone(&notification_dispatcher),
+                Arc::clone(&transparency_log),
+                Arc::clone(&crypto_provider),
+                door_crl_trust_anchor,
+                boot_nonce,
+                tokio::runtime::Handle::current(),
+                private_ops,
+                successor_manifest_slot,
+            ));
+            let server = match maos_control::OperatorHttpServer::bind_with_commands(
+                config.clone(),
+                Arc::clone(&scheduler),
+                rotation_windows,
+                peer_versions,
+                self_identity,
+                Some(Arc::clone(&door) as Arc<dyn maos_control::OperatorCommandPort>),
+            ) {
+                Ok(server) => server,
+                Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
+                    // A second root on ONE endpoint is the bug the door
+                    // exists to remove: fail fast, typed, exit 78, naming
+                    // the discovery file. No fallback port.
+                    let named = maos_domain::operator_door::maos_home()
+                        .ok()
+                        .flatten()
+                        .map(|home| {
+                            maos_domain::operator_door::control_file_path(&home)
+                                .display()
+                                .to_string()
+                        })
+                        .unwrap_or_else(|| "control.json".to_string());
+                    eprintln!(
+                        "maos: operator endpoint {} is already served by another MAOS root \
+                         ({named}) — EndpointInUse",
+                        config.bind
+                    );
+                    std::process::exit(78);
+                }
+                Err(error) => {
+                    eprintln!("maos: operator HTTP bind failed: {error}");
+                    std::process::exit(78);
+                }
+            };
+            // The bound address is announced because it can be ephemeral
+            // (`MAOS_OPERATOR_HTTP_BIND=127.0.0.1:0`), and an operator surface
+            // nobody can find is an operator surface nobody uses.
+            // `cert_rotation_trigger_14_2a` scrapes this line byte-for-byte.
+            eprintln!("maos: operator HTTP listening on {}", server.local_addr());
+            operator_http_server = Some(server);
+            operator_door_port = Some(door);
+        }
+    }
 
     // Story 1b.4 — Inference Port + Anthropic provider + IAC telemetry.
     // Story 5.5b — Multi-provider router (Anthropic + OpenAI + Ollama).
@@ -3398,6 +3743,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        // Story 16-1 (T7, Trap 16) — the shell root applies the SAME teardown
+        // order as the run root before returning: join the server (accept
+        // thread + every pool worker, each in-flight command bounded by its
+        // route budget, NEVER cancelled), drop the port, release the lock
+        // set. Without it an `operation_id` already handed out could lose its
+        // completion row, and the listener would die unjoined.
+        if let Some(server) = operator_http_server.as_mut() {
+            server.shutdown();
+        }
+        drop(operator_http_server);
+        drop(operator_door_port);
+        drop(store_locks);
         return shell_result;
     }
     // ─────────────────────────────────────────────────────────────
@@ -4135,6 +4492,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // queued CapabilityInvocation exit row reaches SQLite before process exit.
                 // Without this, the writer is `tokio::spawn`-ed and the runtime drops
                 // mid-flush on process exit.
+                if let Some(mut server) = operator_http_server.take() {
+                    server.shutdown();
+                }
+                if let Some(port) = operator_door_port.take() {
+                    port.drain_started_tasks().await;
+                }
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
@@ -4166,6 +4529,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(_) => eprintln!("maos run: audit writer topology drain timed out after 5s"),
                 }
+                drop(store_locks);
                 eprintln!("maos run: topology --once complete — exiting cleanly");
                 return Ok(());
             }
@@ -4348,28 +4712,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Arc::new(std::sync::Mutex::new(None));
             let pid = match kind {
                 LoadedSpiritKind::Butler => {
-                    // Boot-loud: a halt-posture Spirit MUST have a production
-                    // EpistemicScalarPort, or boot fails LOUDLY (the 8.1 None-footgun
-                    // closed — "forgot to wire it" is now un-green).
-                    let scalar_port: Option<Arc<dyn maos_domain::ports::EpistemicScalarPort>> =
+                    // Story 16-1 (D-16-1-W) — ONE butler constructor, shared
+                    // with the upgrade successor factory's butler arm, so a
+                    // hot-swapped successor is FAITHFUL: same seeded
+                    // calendar-conflict scenario, same output channel, same
+                    // boot-loud scalar port (which IS the halt). `strip_port`
+                    // is the MAOS_TEST_ONLY_STRIP_SCALAR_PORT test seam and
+                    // must never silently strip in production boots.
+                    let (mut butler, butler_receipt) = construct_butler_core(
                         if strip_port {
                             None
                         } else {
-                            let last_receipt = Arc::new(std::sync::Mutex::new(None));
-                            halt_receipt_handle = Some(Arc::clone(&last_receipt));
-                            let adapter = Arc::new(ButlerOrchestratorAdapter {
-                                orchestrator: Arc::clone(&orchestrator),
-                                tl: Arc::clone(&transparency_log),
-                                journal: Arc::clone(&journal),
-                                policy: epistemic_policy.clone().ok_or(
-                                    "maos run: butler manifest must declare [epistemic_policy]",
-                                )?,
-                                boot_nonce,
-                                last_receipt,
-                            });
-                            Some(adapter)
-                        };
-                    if needs_port && scalar_port.is_none() {
+                            Some(epistemic_policy.clone().ok_or(
+                                "maos run: butler manifest must declare [epistemic_policy]",
+                            )?)
+                        },
+                        Arc::clone(&butler_output_ch),
+                        Arc::clone(&orchestrator),
+                        Arc::clone(&transparency_log),
+                        Arc::clone(&journal),
+                        boot_nonce,
+                    );
+                    halt_receipt_handle = butler_receipt;
+                    if needs_port && halt_receipt_handle.is_none() {
                         return Err(format!(
                             "maos run: FATAL boot — Spirit '{spirit_id}' declares a self-halting \
                          posture (allowed_max={:?}) but no EpistemicScalarPort could be wired \
@@ -4378,35 +4743,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             posture_section.allowed_max
                         )
                         .into());
-                    }
-                    // Seed a calendar-conflict scenario (the fixture-replay MCP input
-                    // seam): two overlapping Confirmed events → belief_variance 0.8
-                    // (> the 0.7 [epistemic_policy] halt threshold).
-                    let scenario = butler::ScenarioInput {
-                        calendar: vec![
-                            butler::CalendarEvent {
-                                id: "evt-a".into(),
-                                title: "Board review".into(),
-                                start_min: 540,
-                                end_min: 600,
-                                status: butler::EventStatus::Confirmed,
-                            },
-                            butler::CalendarEvent {
-                                id: "evt-b".into(),
-                                title: "Investor call".into(),
-                                start_min: 570,
-                                end_min: 630,
-                                status: butler::EventStatus::Confirmed,
-                            },
-                        ],
-                        comms: vec![],
-                        preference_alignment: None,
-                    };
-                    // JB-5 — output_shape channel already hoisted before match arm.
-                    let mut butler = butler::Butler::with_scenario(scenario)
-                        .with_output_channel(Arc::clone(&butler_output_ch));
-                    if let Some(port) = scalar_port {
-                        butler = butler.with_scalar_port(port);
                     }
                     // Story 8.14b FORK 1 — wire LiveButlerMcpPort when --live.
                     let mut butler_mcp_ref: Option<Arc<LiveButlerMcpPort>> = None;
@@ -5119,6 +5455,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Deterministic drain (mirrors the one-shot arm): signal the yank
                 // poller to exit, then release every cap-audit sender so the writer
                 // task sees channel-close.
+                if let Some(mut server) = operator_http_server.take() {
+                    server.shutdown();
+                }
+                if let Some(port) = operator_door_port.take() {
+                    port.drain_started_tasks().await;
+                }
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
                 drop(journal);
                 drop(audit_tx);
@@ -5134,6 +5476,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(Err(e)) => eprintln!("maos run: audit writer task failed during drain: {e}"),
                     Err(_) => eprintln!("maos run: audit writer drain timed out after 5s"),
                 }
+                drop(store_locks);
                 eprintln!("maos run: --once complete — exiting cleanly");
                 return Ok(());
             }
@@ -5164,17 +5507,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             return Err(format!("unknown MAOS_ONE_SHOT mode: {requested_mode}").into());
         };
-        if mode == "legal-hold-list" {
-            let holds = transparency_log
-                .list_legal_holds()
-                .map_err(|error| format!("legal-hold list failed: {error}"))?;
-            println!(
-                "{}",
-                serde_json::to_string(&holds)
-                    .map_err(|error| format!("legal-hold list encode failed: {error}"))?
-            );
-            return Ok(());
-        }
         if mode == "legal-hold-release" {
             let principal = std::env::var("MAOS_LEGAL_HOLD_PRINCIPAL")
                 .map_err(|_| "MAOS_LEGAL_HOLD_PRINCIPAL is required")?;
@@ -5340,71 +5672,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
-        // Lifecycle verbs are handled first — they're cheap and exit
-        // without engaging the Inference Port / capability registry.
-        if let Some(event) = match mode.as_str() {
-            "start" => Some(maos_domain::invariants::i10::LifecycleEvent::Start),
-            "stop" => Some(maos_domain::invariants::i10::LifecycleEvent::Halt),
-            "unload" => Some(maos_domain::invariants::i10::LifecycleEvent::Unload),
-            "uninstall" => Some(maos_domain::invariants::i10::LifecycleEvent::Uninstall),
-            _ => None,
-        } {
-            // Initialize the monotonic clock so journal timestamps are
-            // comparable to the kernel-side `Load` transitions emitted
-            // by `SecurityManagerAdapter::admit_spirit`.
+        // Story 16-1 (AC6) — the shared lifecycle arm is REDUCED to
+        // `uninstall`: start/stop/unload/pause/resume reach the running
+        // daemon through the door (D-16-1-A), `stop` is refused client-side
+        // (D-16-1-I), and the erasure cascade stays an offline one-shot
+        // child holding LOCK_EX on the store set.
+        if mode == "uninstall" {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
             let spirit_id =
                 std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "hello-spirit".into());
-            if mode == "uninstall" {
-                let mut terminal = run_uninstall_cascade(
-                    &spirit_id,
-                    memory.as_ref(),
-                    capability.as_ref(),
-                    &transparency_log,
-                    &audit_db_path,
-                    &memory_db_path,
-                );
-                // ADR-059 Decision 6 — only a successful erase writes the
-                // uninstall lifecycle success. 13.5b review: a journal failure
-                // on that path becomes the terminal, never a bare exit 1 hiding
-                // behind an already-printed `erased` receipt.
-                if terminal.exit_code() == 0 {
-                    if let Err(error) = append_lifecycle_journal(event, &spirit_id) {
-                        terminal = UninstallCascadeTerminal::Failed {
-                            spirit_id: spirit_id.clone(),
-                            error,
-                        };
-                    }
-                }
-                let exit_code = terminal.exit_code();
-                println!(
-                    "{}",
-                    serde_json::to_string(&terminal)
-                        .map_err(|error| format!("uninstall terminal encode failed: {error}"))?
-                );
-                std::io::Write::flush(&mut std::io::stdout())
-                    .map_err(|error| format!("uninstall terminal flush failed: {error}"))?;
-                // Always exit explicitly: the terminal receipt on stdout and the
-                // process exit code are one contract and must not diverge.
-                std::process::exit(exit_code);
-            }
-
-            let journal_path = append_lifecycle_journal(event, &spirit_id)?;
-
-            // Diagnostic copy mirrors the AC1 table verbatim.
-            let diag = match mode.as_str() {
-                "start" => "started",
-                "stop" => "stopped",
-                "unload" => "unloaded",
-                "uninstall" => unreachable!("uninstall exits above with its terminal receipt"),
-                _ => unreachable!(),
-            };
-            eprintln!(
-                "maos: {diag} {spirit_id} (journal: {})",
-                journal_path.display()
+            let mut terminal = run_uninstall_cascade(
+                &spirit_id,
+                memory.as_ref(),
+                capability.as_ref(),
+                &transparency_log,
+                &audit_db_path,
+                &memory_db_path,
             );
-            return Ok(());
+            // ADR-059 Decision 6 — only a successful erase writes the
+            // uninstall lifecycle success. 13.5b review: a journal failure
+            // on that path becomes the terminal, never a bare exit 1 hiding
+            // behind an already-printed `erased` receipt.
+            if terminal.exit_code() == 0 {
+                if let Err(error) = append_lifecycle_journal(
+                    maos_domain::invariants::i10::LifecycleEvent::Uninstall,
+                    &spirit_id,
+                ) {
+                    terminal = UninstallCascadeTerminal::Failed {
+                        spirit_id: spirit_id.clone(),
+                        error,
+                    };
+                }
+            }
+            let exit_code = terminal.exit_code();
+            println!(
+                "{}",
+                serde_json::to_string(&terminal)
+                    .map_err(|error| format!("uninstall terminal encode failed: {error}"))?
+            );
+            std::io::Write::flush(&mut std::io::stdout())
+                .map_err(|error| format!("uninstall terminal flush failed: {error}"))?;
+            // Always exit explicitly: the terminal receipt on stdout and the
+            // process exit code are one contract and must not diverge.
+            std::process::exit(exit_code);
         }
 
         // Story 9.2 — FR45 forget one-shot path.
@@ -5470,609 +5780,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("maos: admitted schema {schema_id} v{version} (ratified by {ratified_by})");
             return Ok(());
         }
-        if mode == "posture-shift" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
-                .map_err(|_| "MAOS_SPIRIT_ID is required for posture-shift")?;
-            let posture_str = std::env::var("MAOS_POSTURE")
-                .map_err(|_| "MAOS_POSTURE is required for posture-shift")?;
-
-            let new_posture = match posture_str.as_str() {
-                "cautious" => maos_kernel_core::security::manifest::Posture::Cautious,
-                "assistive" => maos_kernel_core::security::manifest::Posture::Assistive,
-                "autonomous-with-halt" => {
-                    maos_kernel_core::security::manifest::Posture::AutonomousWithHalt
-                }
-                other => {
-                    return Err(format!(
-                        "unknown posture '{other}' — expected cautious|assistive|autonomous-with-halt"
-                    )
-                    .into());
-                }
-            };
-
-            // Parse manifest and admit the Spirit to seed PolicyTable state
-            let manifest_path_str = format!("spirits/{spirit_id}/manifest.toml");
-            let manifest_path = std::path::Path::new(&manifest_path_str);
-            let manifest_toml = std::fs::read_to_string(manifest_path).map_err(|e| {
-                format!(
-                    "failed to read spirit manifest at {}: {e}",
-                    manifest_path.display()
-                )
-            })?;
-            let manifest_root: toml::Value = toml::from_str(&manifest_toml)
-                .map_err(|e| format!("manifest TOML parse error: {e}"))?;
-
-            fn extract_section(
-                root: &toml::Value,
-                section: &str,
-            ) -> Result<String, Box<dyn std::error::Error>> {
-                let value = root
-                    .get(section)
-                    .ok_or_else(|| format!("missing manifest section [{section}]"))?;
-                let serialized = toml::to_string(value)
-                    .map_err(|e| format!("failed to serialize [{section}] section: {e}"))?;
-                Ok(serialized)
-            }
-
-            let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
-                &extract_section(&manifest_root, "sandbox")?,
-            )?;
-            let resource_caps = maos_kernel_core::security::ResourceCaps::from_toml_str(
-                &extract_section(&manifest_root, "resources")?,
-            )?;
-            let caps_required = {
-                let caps_required_val = manifest_root
-                    .get("capabilities")
-                    .and_then(|c| c.get("required"));
-                let caps_required_toml = match caps_required_val {
-                    Some(v) => toml::to_string(v)
-                        .map_err(|e| format!("failed to serialize [capabilities.required]: {e}"))?,
-                    None => return Err("missing [capabilities.required]".into()),
-                };
-                maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
-                    &caps_required_toml,
-                )?
-            };
-            let output_shape = maos_kernel_core::security::OutputShape::from_toml_str(
-                &extract_section(&manifest_root, "output_shape")?,
-            )?;
-            let posture_section =
-                maos_kernel_core::security::manifest::PostureSection::from_toml_str(
-                    &extract_section(&manifest_root, "posture")?,
-                )
-                .map_err(|e| format!("posture parse: {e}"))?;
-            let epistemic_policy = manifest_root
-                .get("epistemic_policy")
-                .map(|v| {
-                    let s = toml::to_string(v)
-                        .map_err(|e| format!("epistemic_policy serialize: {e}"))?;
-                    maos_kernel_core::security::EpistemicPolicySection::from_toml_str(&s)
-                        .map_err(|e| format!("epistemic_policy parse: {e}"))
-                })
-                .transpose()?;
-
-            // Open journal for Load event
-            let journal_path = maos_audit::default_journal_path();
-            if let Some(parent) = journal_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("journal parent create failed: {e}"))?;
-            }
-            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
-                .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
-
-            // Story 7.5a — parse the `[class]` section so the ABI Stability
-            // Triple (min_substrate_version + manifest_schema_version) is
-            // enforced on the posture-shift admission path.
-            let class_section = maos_kernel_core::security::ClassSection::from_toml_str(
-                &extract_section(&manifest_root, "class")?,
-            )?;
-            let caps_required =
-                caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
-
-            // Reuse the single composition-root SecurityManagerAdapter (line ~1102).
-            let _spec = security
-                .admit_spirit(
-                    0,
-                    &spirit_id,
-                    &sandbox_cfg,
-                    &resource_caps,
-                    &caps_required,
-                    Some(&output_shape),
-                    &journal,
-                    &posture_section,
-                    epistemic_policy.as_ref(),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(&class_section),
-                )
-                .map_err(|e| {
-                    emit_vetter_key_event(
-                        &transparency_log,
-                        &spirit_id,
-                        &class_section.version,
-                        false,
-                        "N/A",
-                        &format!("posture-shift: re-admission rejected: {e}"),
-                    );
-                    e
-                })?;
-            emit_vetter_key_event(
-                &transparency_log,
-                &spirit_id,
-                &class_section.version,
-                true,
-                &format!("{:?}", _spec.tier),
-                "posture-shift: re-admission granted",
-            );
-
-            // Story 9.4b AC-6 — re-journal the model-provenance governance event
-            // on posture-shift re-admission so the append-only trail stays
-            // complete. The fail-closed gate runs at first load (`maos run`);
-            // here a present-and-valid section re-emits fail-closed.
-            if let Ok(Some(rec)) = maos_registry::admission::validate_model_provenance(
-                manifest_toml.as_bytes(),
-                &resolve_model_provenance_policy(),
-            ) {
-                emit_model_provenance_event(&transparency_log, &rec)
-                    .map_err(|e| format!("posture-shift: {e}"))?;
-            }
-
-            // Perform the posture shift
-            let new_hash = policy
-                .shift_posture(0, new_posture)
-                .map_err(|e| format!("posture shift failed: {e}"))?;
-
-            // Journal to Lifecycle Journal
-            let journal_entry_path = maos_audit::default_journal_path();
-            let journal_adapter =
-                maos_kernel_core::journal::JournalAdapter::open(&journal_entry_path)
-                    .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
-            journal_adapter.append_transition(
-                maos_domain::invariants::i10::JournalEntry::Lifecycle(
-                    maos_domain::invariants::i10::LifecycleEntry {
-                        timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-                        lifecycle_event: maos_domain::invariants::i10::LifecycleEvent::PostureShift,
-                        spirit_id: spirit_id.clone(),
-                        payload: None,
-                        effective_sandbox_tier: None,
-                    },
-                ),
-            );
-            drop(journal_adapter);
-
-            // Journal to Approval Decision Log
-            maos_kernel_core::security::posture::journal_posture_shift(
-                &transparency_log,
-                "director",
-                &spirit_id,
-                posture_section.default,
-                new_posture,
-            )
-            .map_err(|e| format!("approval log write failed: {e}"))?;
-
-            drop(journal);
-
-            // Drain: drop all Arc holders of audit_tx so the channel closes.
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            drop(orchestrator);
-            drop(scheduler);
-            drop(lifecycle_resolver);
-            drop(hot_swap_coordinator);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-
-            let _ = new_hash;
-            eprintln!(
-                "maos: posture shift {} → {:?} (journal: {})",
-                spirit_id,
-                new_posture,
-                journal_entry_path.display()
-            );
-            return Ok(());
-        }
-
-        // Story 3.3 AC7 — halt-list: read Transparency Log for recent halt frames.
-        if mode == "halt-list" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let limit: usize = std::env::var("MAOS_HALT_LIMIT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(20);
-            let spirit_filter = std::env::var("MAOS_HALT_SPIRIT").ok();
-
-            let mut filter = FrameFilter {
-                kind: Some(FrameKind::EpistemicHalt),
-                limit: Some(limit),
-                ..Default::default()
-            };
-
-            // If spirit filter specified, resolve to pid (v0.3-β: only hello-spirit → 0)
-            if let Some(ref s) = spirit_filter {
-                if s == "hello-spirit" {
-                    filter.spirit_pid = Some(0);
-                } else {
-                    return Err(format!(
-                        "unknown spirit '{s}' — only 'hello-spirit' is available at v0.3-β"
-                    )
-                    .into());
-                }
-            }
-
-            let entries = transparency_log
-                .query_frames(filter)
-                .map_err(|e| format!("halt-list query failed: {e}"))?;
-
-            for entry in &entries {
-                let id_prefix: String = entry
-                    .frame_id
-                    .iter()
-                    .map(|b| format!("{b:02x}"))
-                    .collect::<Vec<_>>()
-                    .join("");
-                let id_display: String = id_prefix.chars().take(8).collect();
-                let json_line = match serde_json::to_string(&serde_json::json!({
-                    "frame_id": id_display,
-                    "timestamp_ns": entry.timestamp_ns,
-                    "kind": format!("{:?}", entry.kind),
-                    "intent": entry.intent,
-                })) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("maos: serialization error for frame: {e}");
-                        continue;
-                    }
-                };
-                println!("{json_line}");
-            }
-
-            eprintln!("maos: halt-list — {} halts shown", entries.len());
-            return Ok(());
-        }
-
-        // Story 3.3 AC7 — halt-resolve: write resolution to Approval Decision Log.
-        if mode == "halt-resolve" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let halt_id_str = std::env::var("MAOS_HALT_ID")
-                .map_err(|_| "MAOS_HALT_ID is required for halt-resolve")?;
-            let spirit_id = std::env::var("MAOS_HALT_SPIRIT")
-                .map_err(|_| "MAOS_HALT_SPIRIT is required for halt-resolve")?;
-            let kind_str = std::env::var("MAOS_HALT_KIND")
-                .map_err(|_| "MAOS_HALT_KIND is required for halt-resolve")?;
-
-            // Validate spirit (v0.3-β: only hello-spirit)
-            if spirit_id != "hello-spirit" {
-                return Err(format!(
-                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
-                )
-                .into());
-            }
-
-            let halt_id = maos_domain::halt::HaltId::new(&halt_id_str)
-                .map_err(|e| format!("invalid halt_id: {e}"))?;
-
-            // Seed the halt into the registry so resolution can proceed.
-            // At v0.3-β the halt-resolve one-shot has no preceding invoke_halt
-            // in-process; integration tests seed halt IDs via env.
-            let _ = halt_registry.insert_pending_with_metadata(
-                halt_id.clone(),
-                maos_domain::halt::HaltState::PendingResolution,
-                maos_kernel_core::halt::PendingHaltMetadata {
-                    spirit_pid: 0,
-                    spirit_id: "hello-spirit".into(),
-                    payload: maos_domain::frame::EpistemicHaltPayload {
-                        halt_id: halt_id.as_str().into(),
-                        tag: "test".into(),
-                        value: 0.5,
-                        threshold: None,
-                        policy_id: "test-policy".into(),
-                        derived_from: String::new(),
-                    },
-                    fired_ns: 0,
-                },
-            );
-
-            let resolution = match kind_str.as_str() {
-                "provided_context" => {
-                    let text = std::env::var("MAOS_HALT_TEXT")
-                        .map_err(|_| "MAOS_HALT_TEXT is required for provided_context")?;
-                    maos_domain::halt::Resolution::provided_context(&text)
-                        .map_err(|e| format!("invalid resolution: {e}"))?
-                }
-                "accepted_halt" => maos_domain::halt::Resolution::AcceptedHalt,
-                "authorized_override" => {
-                    let policy_ref = std::env::var("MAOS_HALT_OPERATOR_POLICY").map_err(|_| {
-                        "MAOS_HALT_OPERATOR_POLICY is required for authorized_override"
-                    })?;
-                    maos_domain::halt::Resolution::authorized_override(&policy_ref)
-                        .map_err(|e| format!("invalid resolution: {e}"))?
-                }
-                other => {
-                    return Err(format!(
-                        "unknown halt kind '{other}' — expected provided_context|accepted_halt|authorized_override"
-                    ).into());
-                }
-            };
-
-            // Story 4.1 — production KernelHaltResolver replaces the v0.3-β MockHaltResolver bootstrap.
-            // Composition root owns the shared HaltRegistry + OutputMarkerRegistry so all
-            // invoke_halt callers and the resolver agree on a single source of truth.
-            let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
-            let kernel_resolver = Arc::new(maos_kernel_core::halt::KernelHaltResolver::new(
-                Arc::clone(&halt_registry),
-                Arc::clone(&transparency_log),
-                Arc::clone(&output_markers),
-                Arc::clone(&mailbox),
-                boot_nonce,
-                Arc::clone(&memory),
-                Arc::clone(&orchestrator),
-            ));
-            let halt_flow = maos_director_surface::halt_ui::HaltFlow::new(
-                kernel_resolver,
-                Arc::clone(&notification_dispatcher),
-                Arc::clone(&transparency_log) as Arc<dyn maos_domain::halt::HaltJournal>,
-            );
-
-            halt_flow
-                .submit_resolution(halt_id.clone(), resolution.clone(), &spirit_id)
-                .map_err(|e| format!("halt resolution failed: {e}"))?;
-
-            // Drain: drop all Arc holders of audit_tx so the channel closes.
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            drop(orchestrator);
-            drop(scheduler);
-            drop(lifecycle_resolver);
-            drop(hot_swap_coordinator);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-
-            eprintln!(
-                "maos: halt resolved {} ({})",
-                halt_id.as_str(),
-                resolution.kind_label()
-            );
-            return Ok(());
-        }
-
-        // Story 3.4 AC2 — orchestrator-queue: enqueue an instruction
-        // onto the per-Spirit Orchestrator buffer.
-        if mode == "orchestrator-queue" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let spirit_id = std::env::var("MAOS_ORCHESTRATOR_SPIRIT")
-                .map_err(|_| "MAOS_ORCHESTRATOR_SPIRIT is required for orchestrator-queue")?;
-            let instruction_text = std::env::var("MAOS_ORCHESTRATOR_INSTRUCTION")
-                .map_err(|_| "MAOS_ORCHESTRATOR_INSTRUCTION is required for orchestrator-queue")?;
-
-            // Validate spirit (v0.3-β: only hello-spirit)
-            if spirit_id != "hello-spirit" {
-                return Err(format!(
-                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
-                )
-                .into());
-            }
-
-            // Mint a per-process monotonic instruction ID
-            static INSTRUCTION_COUNTER: std::sync::atomic::AtomicU64 =
-                std::sync::atomic::AtomicU64::new(1);
-            let id = OrchestratorInstructionId(
-                INSTRUCTION_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            );
-            let instruction = OrchestratorInstruction::new(
-                id,
-                &instruction_text,
-                maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-            )
-            .map_err(|e| format!("invalid orchestrator instruction: {e}"))?;
-
-            // Get-or-create the per-Spirit buffer
-            let buffer = orchestrator_registry.get_or_create(
-                &maos_spirit_abi::identity::SpiritId::from(spirit_id.as_str()),
-            );
-            buffer
-                .enqueue(instruction.clone())
-                .map_err(|e| format!("orchestrator queue error: {e}"))?;
-
-            // Journal to Approval Decision Log
-            maos_kernel_core::orchestrator::journal_orchestrator_queue(
-                &transparency_log,
-                "director",
-                &spirit_id,
-                &instruction,
-            )
-            .map_err(|e| format!("approval log write failed: {e}"))?;
-
-            // Drain
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-
-            eprintln!(
-                "maos: queued orchestrator instruction id={} for {}",
-                instruction.id.0, spirit_id,
-            );
-            return Ok(());
-        }
-
-        // Story 3.4 AC2 — orchestrator-status: show pending count for a Spirit.
-        if mode == "orchestrator-status" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let spirit_id = std::env::var("MAOS_ORCHESTRATOR_SPIRIT")
-                .map_err(|_| "MAOS_ORCHESTRATOR_SPIRIT is required for orchestrator-status")?;
-
-            // Validate spirit (v0.3-β: only hello-spirit)
-            if spirit_id != "hello-spirit" {
-                return Err(format!(
-                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
-                )
-                .into());
-            }
-
-            let sid = maos_spirit_abi::identity::SpiritId::from(spirit_id.as_str());
-            let (count, capacity) = match orchestrator_registry.get(&sid) {
-                Some(buf) => (buf.pending_count(), buf.capacity()),
-                None => (0, 32),
-            };
-
-            eprintln!(
-                "maos: orchestrator status {spirit_id}: {count}/{capacity} pending instructions"
-            );
-
-            // No drain needed — read-only path, no audit rows written.
-            return Ok(());
-        }
-
-        // Story 3.4 AC3 — pause: write Lifecycle Journal entry + Approval Decision row.
-        if mode == "pause" || mode == "resume" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
-                .map_err(|_| format!("MAOS_SPIRIT_ID is required for {mode}"))?;
-            if spirit_id != "hello-spirit" {
-                return Err(format!(
-                    "unknown spirit '{spirit_id}' — only 'hello-spirit' is available at v0.3-β"
-                )
-                .into());
-            }
-
-            // 1. Write Lifecycle Journal entry (Pause or Resume)
-            let event = if mode == "pause" {
-                maos_domain::invariants::i10::LifecycleEvent::Pause
-            } else {
-                maos_domain::invariants::i10::LifecycleEvent::Resume
-            };
-            let journal_path = maos_audit::default_journal_path();
-            if let Some(parent) = journal_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("journal parent create failed: {e}"))?;
-            }
-            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
-                .map_err(|e| format!("failed to open Lifecycle Journal: {e}"))?;
-            journal.append_transition(maos_domain::invariants::i10::JournalEntry::Lifecycle(
-                maos_domain::invariants::i10::LifecycleEntry {
-                    timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
-                    lifecycle_event: event,
-                    spirit_id: spirit_id.clone(),
-                    payload: None,
-                    effective_sandbox_tier: None,
-                },
-            ));
-            drop(journal);
-
-            // 2. Journal to Approval Decision Log (director-action audit, FR42)
-            maos_kernel_core::orchestrator::journal_director_lifecycle_action(
-                &transparency_log,
-                "director",
-                &spirit_id,
-                mode.as_str(),
-            )
-            .map_err(|e| format!("approval log write failed: {e}"))?;
-
-            // 3. FR51 c — on resume, recall buffered Orchestrator instructions
-            if mode == "resume" {
-                let sid = maos_spirit_abi::identity::SpiritId::from(spirit_id.as_str());
-                if let Some(buffer) = orchestrator_registry.get(&sid) {
-                    let pending = buffer.recall_all_pending();
-                    eprintln!(
-                        "maos: resume {spirit_id} — recalled {} pending Orchestrator instructions",
-                        pending.len()
-                    );
-                    for instr in pending {
-                        if let Err(e) = buffer.enqueue(instr) {
-                            eprintln!("maos: resume re-enqueue failed: {e}");
-                        }
-                    }
-                }
-            }
-
-            // 4. Drain
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-
-            eprintln!(
-                "maos: {mode} {spirit_id} (journal: {})",
-                journal_path.display()
-            );
-            return Ok(());
-        }
-
-        // Story 3.4 AC4 — revoke-token: revoke a capability token via the
-        // existing CapabilityRegistryAdapter::revoke path, then journal.
-        if mode == "revoke-token" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let token_id_hex = std::env::var("MAOS_REVOKE_TOKEN_ID")
-                .map_err(|_| "MAOS_REVOKE_TOKEN_ID is required for revoke-token")?;
-            let reason_text = std::env::var("MAOS_REVOKE_REASON").ok();
-
-            // Parse 32-char hex into [u8; 16]
-            let token_bytes = parse_token_id_hex(&token_id_hex)
-                .map_err(|e| format!("invalid token_id '{token_id_hex}': {e}"))?;
-            let token_id = maos_domain::invariants::i1::TokenId(token_bytes);
-
-            // Revoke through the canonical CapabilityRegistryAdapter::revoke path.
-            match capability.revoke(token_id) {
-                Ok(()) => {}
-                Err(maos_domain::ports::capability::CapError::UnknownToken) => {
-                    return Err(format!(
-                        "token {token_id_hex} not found (already revoked or never issued)"
-                    )
-                    .into());
-                }
-                Err(e) => {
-                    return Err(format!("revoke failed: {e}").into());
-                }
-            }
-
-            // Journal to Approval Decision Log per FR42 (director identity + reason).
-            maos_kernel_core::orchestrator::journal_token_revocation(
-                &transparency_log,
-                "director",
-                &token_id_hex,
-                reason_text.as_deref(),
-            )
-            .map_err(|e| format!("approval log write failed: {e}"))?;
-
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-
-            eprintln!("maos: revoked token {token_id_hex}");
-            return Ok(());
-        }
 
         // Story 5.1 Task 0 — Epic 4 retro §A1 closure: walk kernel-side
         // Epic 4 dataflow end-to-end.
@@ -6132,8 +5839,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // 2. resolver.resolve(halt_id, Resolution::ProvidedContext { text })
             //    → memory write + marker scalar
-            let output_markers =
-                Arc::new(maos_kernel_core::halt::output_markers::OutputMarkerRegistry::new());
             let resolver = Arc::new(maos_kernel_core::halt::resolver::KernelHaltResolver::new(
                 Arc::clone(&halt_registry),
                 Arc::clone(&transparency_log),
@@ -6439,71 +6144,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
-        if mode == "hot-swap-precheck" {
-            maos_kernel_core::capability::cap_tokens::init_monotonic_base();
-
-            let spirit_id =
-                std::env::var("MAOS_SPIRIT_ID").unwrap_or_else(|_| "hello-spirit".into());
-            let from_version =
-                std::env::var("MAOS_HOTSWAP_FROM_VERSION").unwrap_or_else(|_| "0.3.1".into());
-            let to_manifest = std::env::var("MAOS_HOTSWAP_TO_MANIFEST")
-                .unwrap_or_else(|_| "spirits/hello-spirit/manifest.toml".into());
-
-            if let Err(rejection) = enforce_vetted_upgrade_precondition(
-                &spirit_id,
-                std::path::Path::new(&to_manifest),
-                "MAOS_HOTSWAP_TO_ATTESTATION",
-            ) {
-                let out = serde_json::json!({
-                    "verdict": "VettingPreconditionFailed",
-                    "cause": rejection,
-                });
-                println!("{out}");
-                eprintln!(
-                    "maos: hot-swap-precheck {spirit_id} ({from_version} -> {to_manifest}) — vetting precondition failed: {rejection}"
-                );
-                std::process::exit(2);
-            }
-
-            // Load a minimal placeholder spirit so resolve_pid succeeds.
-            struct PrecheckSpirit;
-            impl maos_spirit_abi::lifecycle::Spirit for PrecheckSpirit {}
-
-            let manifest = maos_kernel_core::scheduler::SpiritManifestBundle::default();
-            let _pid = scheduler
-                .load(&spirit_id, manifest, PrecheckSpirit, boot_nonce)
-                .await
-                .map_err(|e| format!("precheck: failed to load spirit: {e}"))?;
-
-            let verdict = hot_swap_coordinator
-                .precheck(&spirit_id, &to_manifest, &from_version)
-                .map_err(|e| format!("precheck failed: {e}"))?;
-
-            let json = serde_json::to_string(&verdict)
-                .map_err(|e| format!("verdict serialization failed: {e}"))?;
-            println!("{json}");
-
-            // Exit code: 0 for Safe*, 2 for violation (matches maosctl expectation).
-            let exit_code = match verdict.verdict {
-                maos_domain::hot_swap::PrecheckOutcome::SafeDrained
-                | maos_domain::hot_swap::PrecheckOutcome::SafeMigrated => 0,
-                _ => 2,
-            };
-
-            // Drain
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-
-            eprintln!("maos: hot-swap-precheck {spirit_id} ({from_version} -> {to_manifest}) — verdict = {:?}", verdict.verdict);
-            std::process::exit(exit_code);
-        }
-
         // Story 5.3 Task 13 — smoke-supervision-5: walk supervision substrate end-to-end
         if mode == "smoke-supervision-5" {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
@@ -6718,143 +6358,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             eprintln!("maos: smoke-supervision-5 complete — 4 supervision surfaces exercised");
-            return Ok(());
-        }
-
-        if mode == "spirit-upgrade" {
-            let spirit_id = std::env::var("MAOS_SPIRIT_ID")
-                .map_err(|_| "MAOS_SPIRIT_ID is required for spirit-upgrade")?;
-            let manifest_path = std::env::var("MAOS_UPGRADE_TO_MANIFEST")
-                .map_err(|_| "MAOS_UPGRADE_TO_MANIFEST is required for spirit-upgrade")?;
-            let policy_str =
-                std::env::var("MAOS_UPGRADE_POLICY").unwrap_or_else(|_| "hot-swap".into());
-            let policy = policy_str
-                .parse::<maos_kernel_core::lifecycle::UpgradePolicy>()
-                .map_err(|e| format!("invalid upgrade policy: {e}"))?;
-            enforce_vetted_upgrade_precondition(
-                &spirit_id,
-                std::path::Path::new(&manifest_path),
-                "MAOS_UPGRADE_TO_ATTESTATION",
-            )
-            .map_err(|error| format!("upgrade vetting precondition failed: {error}"))?;
-
-            if std::env::var_os("MAOS_UPGRADE_PLAN").is_some() {
-                let from_version = std::env::var("MAOS_UPGRADE_FROM_VERSION")
-                    .map_err(|_| "MAOS_UPGRADE_FROM_VERSION is required with --plan")?;
-                let candidates = std::env::var("MAOS_UPGRADE_CANDIDATES")
-                    .map_err(|_| "MAOS_UPGRADE_CANDIDATES is required with --plan")?;
-                let candidates: Vec<String> = serde_json::from_str(&candidates)
-                    .map_err(|error| format!("invalid MAOS_UPGRADE_CANDIDATES: {error}"))?;
-                let (plan_path, plan) = migration_plan::create_plan(
-                    &spirit_id,
-                    &from_version,
-                    std::path::Path::new(&manifest_path),
-                    &candidates,
-                )?;
-                println!(
-                    "{}",
-                    serde_json::to_string(&plan)
-                        .map_err(|error| format!("serialize migration plan: {error}"))?
-                );
-                eprintln!(
-                    "maos: migration plan persisted at {}; execute the same upgrade command without --plan",
-                    plan_path.display()
-                );
-                drop(audit_tx);
-                drop(inference);
-                drop(capability);
-                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
-                    .await
-                {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                    Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-                }
-                return Ok(());
-            }
-
-            let reports = migration_plan::upgrade_with_plan_guard(
-                &upgrade_orchestrator,
-                &spirit_id,
-                std::path::Path::new(&manifest_path),
-                policy,
-            )
-            .await
-            .map_err(|error| format!("upgrade failed: {error}"))?;
-
-            let rendered = if reports.len() == 1 {
-                serde_json::to_string(&reports[0])
-            } else {
-                serde_json::to_string(&reports)
-            }
-            .map_err(|error| format!("serialize upgrade report: {error}"))?;
-            println!("{rendered}");
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-            eprintln!("maos: spirit-upgrade {spirit_id} (policy: {policy_str}, completed)");
-            return Ok(());
-        }
-
-        if mode == "revocations-import" {
-            let crl_path_str = std::env::var("MAOS_CRL_PATH")
-                .map_err(|_| "MAOS_CRL_PATH is required for revocations-import")?;
-            let crl_path = std::path::Path::new(&crl_path_str);
-            let bytes = std::fs::read(crl_path)
-                .map_err(|e| format!("read CRL file {crl_path_str}: {e}"))?;
-            let trust_anchor_hex = std::env::var("MAOS_CRL_TRUST_ANCHOR_PUB_HEX")
-                .map_err(|_| "MAOS_CRL_TRUST_ANCHOR_PUB_HEX is required for revocations-import")?;
-            let trust_anchor = hex::decode(&trust_anchor_hex)
-                .map_err(|e| format!("invalid MAOS_CRL_TRUST_ANCHOR_PUB_HEX: {e}"))?;
-            let crl = maos_kernel_core::revocation::parser::parse_signed_crl(
-                &bytes,
-                &trust_anchor,
-                &*crypto_provider,
-            )
-            .map_err(|e| format!("CRL parse/verify failed: {e}"))?;
-
-            if std::env::var("MAOS_CRL_FORCE_REAPPLY").is_ok() {
-                revocation_applier.forget(crl.id).await;
-            }
-
-            let report = revocation_applier
-                .apply_crl(crl)
-                .await
-                .map_err(|e| format!("CRL apply failed: {e}"))?;
-
-            println!("{}", serde_json::to_string(&report).unwrap_or_default()); // xtask-serde-allow: best-effort report print; unwrap_or_default already swallows gracefully to ""
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-            eprintln!("maos: revocations-import {crl_path_str} — matched {} spirits, revoked {}, halt_receipts_produced {}",
-                report.matched_count, report.revoked_count, report.halt_receipts_produced);
-            return Ok(());
-        }
-
-        if mode == "revocations-list" {
-            let applied = revocation_applier.list_applied();
-            for id in applied {
-                println!("{{\"crl_id\":\"{id}\"}}");
-            }
-            drop(audit_tx);
-            drop(inference);
-            drop(capability);
-            match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => eprintln!("maos: audit writer task failed during drain: {e}"),
-                Err(_) => eprintln!("maos: audit writer drain timed out after 5s"),
-            }
-            eprintln!("maos: revocations-list complete");
             return Ok(());
         }
 
@@ -7500,12 +7003,11 @@ description = "smoke test spirit successor"
         if mode == "acp-server" {
             maos_kernel_core::capability::cap_tokens::init_monotonic_base();
             use maos_acp::AcpServer;
-            let output_markers = Arc::new(maos_kernel_core::halt::OutputMarkerRegistry::new());
             let halt_resolver: Arc<dyn maos_domain::halt::HaltResolver> =
                 Arc::new(maos_kernel_core::halt::KernelHaltResolver::new(
                     Arc::clone(&halt_registry),
                     Arc::clone(&transparency_log),
-                    output_markers,
+                    Arc::clone(&output_markers),
                     Arc::clone(&mailbox),
                     boot_nonce,
                     Arc::clone(&memory),
@@ -8366,16 +7868,101 @@ description = "smoke test spirit successor"
         Err(error) => eprintln!("maos: RevocationPoller task failed during drain: {error}"),
     }
 
-    // Story 2.5 (A7 / D11) — drain the cap-audit channel deterministically
-    // on graceful shutdown, replicating the one-shot arm's drain pattern
-    // (lines 357–372). `audit_tx` is cloned into `CapabilityRegistryAdapter`
-    // at construction (line ~118) so dropping the local `audit_tx` is not
-    // enough — the adapter's clone must also be released. Drop all owners
-    // in the same sequence as the one-shot path so the writer task sees
-    // channel-close and every in-flight row reaches SQLite.
+    // Story 16-1 (T7, Trap 16) — stop accepting and join every HTTP worker,
+    // then await every operator command that reached the runtime. A response
+    // deadline may detach from a STARTED command, but shutdown never cancels
+    // that mutation or its completion row. The shared store-lock set remains
+    // held through audit-writer drain so no offline child can enter while any
+    // daemon-owned store writer is still alive.
+    if let Some(server) = operator_http_server.as_mut() {
+        server.shutdown();
+    }
+    if let Some(port) = operator_door_port.as_ref() {
+        port.drain_started_tasks().await;
+    }
+    drop(operator_http_server);
+    drop(operator_door_port);
+
+    // ⚠ Story 16-1 (T7) — THE WATCHDOGS COME FIRST, and this was the actual
+    // cause of the measured 10 s exit. Each watchdog task holds its own
+    // `Arc<SpiritSchedulerAdapter>` / `Arc<CapabilityRegistryAdapter>` clone,
+    // and the capability adapter holds an `audit_tx` clone — so awaiting the
+    // audit writer BEFORE these tasks had exited waited for a channel that
+    // four live tasks were still holding open. Dropping the outer handles
+    // below closes nothing while the tasks run. They all observe `cancel`,
+    // so this costs milliseconds, not seconds.
+    for (name, handle) in [
+        ("IdleWatchdog", idle_watchdog),
+        ("ScheduleWatchdog", schedule_watchdog),
+        ("ProgressWatchdog", progress_watchdog),
+        ("SilentFailureDetector", silent_failure_detector),
+    ] {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                eprintln!("maos: {name} task returned error during drain: {error}")
+            }
+            Err(_) => eprintln!("maos: {name} drain timed out after 5s"),
+        }
+    }
+    if let Some(enterprise_pdp_runtime) = enterprise_pdp_runtime {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), enterprise_pdp_runtime).await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("maos: EnterprisePdpRuntime task returned error: {e}"),
+            Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
+        }
+    }
+
+    // Story 2.5 (A7 / D11) + Story 16-1 (T7, §11 row 3) — drain the cap-audit
+    // channel deterministically on graceful shutdown.
+    //
+    // `audit_tx` is cloned exactly once, into `CapabilityRegistryAdapter`, and
+    // the writer task ends only when EVERY sender drops — so a single retained
+    // `Arc<CapabilityRegistryAdapter>` anywhere in this scope costs the whole
+    // 10 s timeout. Measured at HEAD: 10.0 s on every SIGTERM, three runs.
+    //
+    // ⚠ The chain that caused it is NOT obvious from any one line, which is
+    // why it survived four stories. Measured by `Arc::downgrade` + strong
+    // counts at this exact point:
+    //
+    //   delegation_leg → Arc<Mailbox> → ScbTracker → the SCB map
+    //                  → butler's SCB → the butler Spirit object
+    //                  → ButlerOrchestratorAdapter → WorkingMemoryOrchestrator
+    //                  → Arc<CapabilityRegistryAdapter> → audit_tx
+    //
+    // `delegation_leg` is an A2A routing handle. Nothing about it suggests it
+    // pins the capability registry, and dropping the eleven "obvious" owners
+    // left the count at exactly 1. `revocation_poller` (which retains the
+    // applier, which retains the scheduler) was a second such holder.
+    //
+    // After this sequence the count is 0 and the root exits in 11–19 ms with
+    // no drain-timeout line (three runs, AC1 step 5 budget 3 s).
     drop(audit_tx);
     drop(inference);
+    drop(orchestrator);
+    drop(scheduler);
+    drop(revocation_poller);
+    drop(policy);
+    drop(halt_registry);
+    drop(orchestrator_registry);
+    drop(spirit_host);
+    drop(lifecycle_resolver);
+    drop(upgrade_orchestrator);
+    drop(revocation_applier);
+    drop(hot_swap_coordinator);
+    drop(crash_detector);
+    drop(distillate_writer);
+    drop(memory);
     drop(capability);
+    drop(telemetry);
+    drop(self_telemetry);
+    drop(log_recall_adapter);
+    drop(collective_port);
+    drop(delegation_leg);
+    drop(router);
+    drop(rate_limiter);
+    drop(crypto_provider);
     // Story 3.1 — drop the IAC adapter (drops Arc<Mailbox>), then the
     // dispatcher (no async tasks at v0.3-β, but slot future-proofs).
     drop(iac);
@@ -8387,44 +7974,7 @@ description = "smoke test spirit successor"
         Ok(Err(e)) => eprintln!("maos: audit writer task returned error during drain: {e}"),
         Err(_) => eprintln!("maos: audit writer drain timed out after 10s"),
     }
-
-    // Story 5.1 — await IdleWatchdog drain on graceful shutdown.
-    match tokio::time::timeout(std::time::Duration::from_secs(5), idle_watchdog).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => eprintln!("maos: IdleWatchdog task returned error during drain: {e}"),
-        Err(_) => eprintln!("maos: IdleWatchdog drain timed out after 5s"),
-    }
-
-    // Story 6.4 — await ScheduleWatchdog drain on graceful shutdown.
-    match tokio::time::timeout(std::time::Duration::from_secs(5), schedule_watchdog).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => eprintln!("maos: ScheduleWatchdog task returned error during drain: {e}"),
-        Err(_) => eprintln!("maos: ScheduleWatchdog drain timed out after 5s"),
-    }
-
-    // Story 5.3 — await supervision watchdog drains on graceful shutdown.
-    match tokio::time::timeout(std::time::Duration::from_secs(5), progress_watchdog).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => eprintln!("maos: ProgressWatchdog task returned error during drain: {e}"),
-        Err(_) => eprintln!("maos: ProgressWatchdog drain timed out after 5s"),
-    }
-
-    match tokio::time::timeout(std::time::Duration::from_secs(5), silent_failure_detector).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => {
-            eprintln!("maos: SilentFailureDetector task returned error during drain: {e}")
-        }
-        Err(_) => eprintln!("maos: SilentFailureDetector drain timed out after 5s"),
-    }
-
-    if let Some(enterprise_pdp_runtime) = enterprise_pdp_runtime {
-        match tokio::time::timeout(std::time::Duration::from_secs(5), enterprise_pdp_runtime).await
-        {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("maos: EnterprisePdpRuntime task returned error: {e}"),
-            Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
-        }
-    }
+    drop(store_locks);
 
     if let Some(recorder) = cassette_recorder.as_ref() {
         recorder
@@ -8501,6 +8051,117 @@ impl UninstallCascadeTerminal {
             Self::NotFound { .. } => "principal.uninstall.not-found",
             Self::Failed { .. } => "principal.uninstall.failed",
         }
+    }
+}
+/// Story 16-1 (D-16-1-N) — the composition-root implementation of the four
+/// bin-private operations the door's port trait reaches for. It holds the
+/// REAL kernel composites (not re-instantiated copies), which is what makes
+/// `submit` a door into THIS daemon rather than a sibling simulation.
+#[cfg(feature = "network")]
+struct BinPrivateOpsImpl {
+    memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+    capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
+    transparency_log: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
+    audit_db_path: std::path::PathBuf,
+    memory_db_path: std::path::PathBuf,
+    shared_journal: Arc<maos_kernel_core::journal::JournalAdapter>,
+    upgrade_orchestrator: Arc<maos_kernel_core::lifecycle::UpgradeOrchestrator>,
+}
+
+#[cfg(feature = "network")]
+#[async_trait::async_trait]
+impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
+    async fn append_lifecycle_journal(
+        &self,
+        event: maos_domain::invariants::i10::LifecycleEvent,
+        spirit_id: &str,
+    ) -> Result<std::path::PathBuf, String> {
+        // Through the DAEMON-HELD journal adapter (D-16-1-L), not a fresh
+        // open per row: every one-shot opened its own handle, the cross-
+        // process overwrite `JournalAdapter::open` `.write(true)` hazard
+        // routed to 16-5. The daemon path no longer fans that out.
+        self.shared_journal.append_transition(
+            maos_domain::invariants::i10::JournalEntry::Lifecycle(
+                maos_domain::invariants::i10::LifecycleEntry {
+                    timestamp: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                    lifecycle_event: event,
+                    spirit_id: spirit_id.to_string(),
+                    payload: None,
+                    effective_sandbox_tier: None,
+                },
+            ),
+        );
+        Ok(maos_audit::default_journal_path())
+    }
+
+    async fn run_uninstall_cascade(
+        &self,
+        spirit_id: &str,
+    ) -> maos_bin::operator_door::UninstallOutcome {
+        let terminal = run_uninstall_cascade(
+            spirit_id,
+            self.memory.as_ref(),
+            self.capability.as_ref(),
+            &self.transparency_log,
+            &self.audit_db_path,
+            &self.memory_db_path,
+        );
+        let terminal_code = terminal.exit_code();
+        let mut body = serde_json::to_value(&terminal).unwrap_or_else(|error| {
+            serde_json::json!({
+                "outcome": "failed",
+                "spirit_id": spirit_id,
+                "error": format!("terminal encode failed: {error}"),
+            })
+        });
+        body["spirit_id"] = serde_json::json!(spirit_id);
+        body["terminal_code"] = serde_json::json!(terminal_code);
+        maos_bin::operator_door::UninstallOutcome {
+            body,
+            terminal_code,
+        }
+    }
+
+    async fn enforce_vetted_upgrade_precondition(
+        &self,
+        spirit_id: &str,
+        target_manifest: &std::path::Path,
+        attestation: Option<&str>,
+        vetter_keyring: Option<&str>,
+    ) -> Result<(), String> {
+        enforce_vetted_upgrade_precondition(spirit_id, target_manifest, attestation, vetter_keyring)
+    }
+
+    async fn upgrade_with_plan_guard(
+        &self,
+        spirit_id: &str,
+        target_manifest: &std::path::Path,
+        policy: maos_kernel_core::lifecycle::UpgradePolicy,
+    ) -> Result<serde_json::Value, String> {
+        let reports = migration_plan::upgrade_with_plan_guard(
+            &self.upgrade_orchestrator,
+            spirit_id,
+            target_manifest,
+            policy,
+        )
+        .await?;
+        serde_json::to_value(&reports).map_err(|error| format!("serialize upgrade report: {error}"))
+    }
+
+    async fn create_migration_plan(
+        &self,
+        spirit_id: &str,
+        from_version: &str,
+        target_manifest: &std::path::Path,
+        candidates: &[String],
+    ) -> Result<serde_json::Value, String> {
+        let (path, plan) =
+            migration_plan::create_plan(spirit_id, from_version, target_manifest, candidates)?;
+        Ok(serde_json::json!({
+            "path": path.display().to_string(),
+            "plan": serde_json::to_value(&plan)
+                .map_err(|error| format!("serialize migration plan: {error}"))?,
+        }))
     }
 }
 
@@ -8909,28 +8570,6 @@ fn run_uninstall_cascade_inner(
         proof_path: proof_path.to_string_lossy().to_string(),
         erased_principals: all_principal_ids.len() as u64,
     })
-}
-
-#[cfg(feature = "network")]
-/// Parse a 32-char lowercase hex string into a 16-byte TokenId.
-/// Rejects invalid lengths and non-hex characters.
-fn parse_token_id_hex(s: &str) -> Result<[u8; 16], String> {
-    if s.len() != 32 {
-        return Err(format!("expected 32 hex chars, got {}", s.len()));
-    }
-    if !s
-        .chars()
-        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
-    {
-        return Err("non-hex characters in token_id".into());
-    }
-    let mut bytes = [0u8; 16];
-    for i in 0..16 {
-        let byte_str = &s[i * 2..i * 2 + 2];
-        bytes[i] = u8::from_str_radix(byte_str, 16)
-            .map_err(|e| format!("hex decode error at byte {i}: {e}"))?;
-    }
-    Ok(bytes)
 }
 
 #[cfg(feature = "network")]
@@ -10110,7 +9749,16 @@ async fn run_cohort_a2a_daemon(
             base_seed.ok_or("MAOS_CROSS_TEAM_SHARE_PEER requires MAOS_CROSS_TEAM_BASE_SEED")?;
         emit_cross_team_share(&runtime, store, &seed, request, &transparency_log).await?;
     }
-    tokio::signal::ctrl_c().await?;
+    // Story 16-1 (T7, §11 row 4) — the door root must release its lock set
+    // and listener on SIGTERM too, not only on ctrl_c: `maosctl`-managed
+    // deployments stop daemons with SIGTERM, and ignoring it left the store
+    // lock held until SIGKILL.
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = shutdown_unix_term() => {
+            eprintln!("maos: cohort-a2a-daemon received SIGTERM; shutting down");
+        }
+    }
     siem_cancel.cancel();
     let shutdown = runtime.shutdown().await;
     // The drain observes the runtime's cancellation token, so it is already told to

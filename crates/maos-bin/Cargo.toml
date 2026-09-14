@@ -99,6 +99,7 @@ serde_cbor = "0.11"
 tar = { version = "0.4", default-features = false }
 smallvec = { version = "1", features = ["serde"] }
 thiserror = "2"
+semver = "1"
 # Story 11.4c — the out-of-kernel `identity.asserted` (kind 30) write helper
 # (`enterprise_identity::append_identity_asserted`) opens the Transparency Log
 # read-write from the composition root. Moved here from `maos-audit` (Epic-12
@@ -106,6 +107,10 @@ thiserror = "2"
 # the `maos-audit-read-only` gate. Already in maos-bin's link closure transitively
 # via the kernel-core TL adapter — a direct dep just exposes the API.
 rusqlite = { version = "0.31", features = ["bundled"] }
+# Story 16-1 (D-16-1-D) — the store lock set flocks the store DIRECTORIES'
+# own handles. Unix-gated exactly like maos-kernel-core's containment I/O.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1", features = ["fs"] }
 
 [dev-dependencies]
 tempfile = "3"

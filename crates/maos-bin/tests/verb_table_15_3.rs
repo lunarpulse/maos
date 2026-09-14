@@ -28,6 +28,8 @@
 //!   is touched, so this test needs no env lock — the story explicitly forbids
 //!   adding a fifth ad-hoc copy of the env scaffolding to `crates/maos-bin/tests/`.
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
 #[path = "../src/verbs.rs"]
 mod verbs;
 
@@ -65,7 +67,16 @@ const ALL_NAMES: [verbs::VerbName; 7] = [
 ];
 
 fn maos() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_maos"));
+    // Story 16-1 (D-16-1-Q) — a bare `maos` IS the shell root, and the shell
+    // root is a door root: isolate it from the developer's home or a real
+    // `control.json` turns this response-path probe into a live daemon boot
+    // that binds the operator door. `HOME`, never `MAOS_HOME` — these
+    // invocations exit inside `verbs::dispatch` and must touch no stores at
+    // all; the empty home simply configures no door.
+    cmd.env("HOME", doorless_home::doorless_home())
+        .env("XDG_DATA_HOME", doorless_home::doorless_xdg_data_home());
+    cmd
 }
 
 /// Run a CLI response-path assertion under the contract's sub-second bound.
@@ -193,8 +204,8 @@ fn one_shot_mode_table_is_complete_and_frozen() {
     assert!(!verbs::MAOS_ONE_SHOT_MODES.is_empty());
     assert_eq!(
         verbs::MAOS_ONE_SHOT_MODES.len(),
-        48,
-        "exact expected MAOS_ONE_SHOT mode count — re-measure main.rs's one-shot block before bumping"
+        32,
+        "exact expected MAOS_ONE_SHOT mode count — Story 16-1 (D-16-1-A) removed the 16 door/read modes; re-measure main.rs's one-shot block before bumping"
     );
     let mut sorted = verbs::MAOS_ONE_SHOT_MODES.to_vec();
     sorted.sort_unstable();

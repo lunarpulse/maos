@@ -22,6 +22,9 @@ use maos_kernel_core::iac::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_spirit_abi::identity::SpiritRole;
 use orchestrator::{Orchestrator, DELEGATION_CONSENT_INTENT};
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 const LISTEN_TIMEOUT: Duration = Duration::from_secs(90);
 const LISTENING_MARKER: &str = "cohort-a2a-daemon listening on ";
 const NONCE_A: u64 = 0x2B_A;
@@ -296,6 +299,9 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
+        // Story 16-1 / D-16-1-Q: both roots share one log (MAOS_AUDIT_DB) by design,
+        // so only "HOME" moves — no developer control.json endpoint for either.
+        .env("HOME", doorless_home::doorless_home())
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -465,6 +471,7 @@ fn run_host_a(config: &Path, audit_db: &Path) -> std::process::Output {
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
+        .env("HOME", doorless_home::doorless_home())
         // §A6 review D1 — MAOS_DELEGATED_GOAL is required on every cross-host
         // arm. This fixture asserts the delegation MECHANISM (the same frame_id
         // bytes in both logs), never the goal's content, so a dummy goal is

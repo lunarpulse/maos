@@ -1,242 +1,136 @@
 #![forbid(unsafe_code)]
 
-//! CLI integration test: `maosctl revocations import` + `revocations list` (AC7).
+//! Story 16-1 / T9 (AC7) — CONTRACT tests for
+//! `maosctl revocations import/list`.
 //!
-//! Verifies CLI parsing and dispatch wiring for revocation subcommands.
+//! At HEAD the one-shot opened a fresh scheduler (so `matched_count` was
+//! always 0), kept no rules past exit, and `revocations list` was one of
+//! the two VACUOUS tests the story calls out: it spawned the child, killed
+//! it after 500 ms and asserted NOTHING (`revocations_import_test.rs:141-167`
+//! at HEAD). Over the door (D-16-1-X):
+//!
+//! 1. the WIRE: the CRL's own BYTES are the `POST /v1/revocations` body
+//!    (`application/octet-stream`) — never a path, which would resolve in
+//!    the daemon's cwd; `list` is `GET /v1/revocations`; and
+//! 2. the MAPPING: every typed response maps to its D-16-1-P exit.
 
-use std::path::PathBuf;
-use std::process::Command;
+#[path = "support/fixture_door.rs"]
+mod fixture_door;
 
-use tempfile::TempDir;
+use fixture_door::{assert_discovery_failures, assert_typed_matrix, FixtureDoor};
 
-fn maosctl_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maosctl") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maosctl");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maosctl")
-}
-
-fn maos_bin_path() -> PathBuf {
-    if let Some(p) = std::option_env!("CARGO_BIN_EXE_maos") {
-        return PathBuf::from(p);
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.parent()) {
-            let candidate = dir.join("maos");
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    PathBuf::from("maos")
-}
-
-fn workspace_root() -> PathBuf {
-    std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
-}
+/// Deliberately NOT valid JSON or UTF-8: if the client re-encoded, wrapped
+/// or path-ified the CRL, byte equality would catch it.
+const CRL_BYTES: &[u8] =
+    b"--MAOS-CRL-fixture v1\n\x00\x01\x02\xff\xfe revoked-id-1\n\x80\x81\x82\n";
 
 #[test]
-fn revocations_import_parses_and_dispatches() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
+fn import_sends_the_crl_bytes_verbatim() {
+    let door = FixtureDoor::spawn();
+    let crl_path = door.maos_home().join("fixture.crl");
+    std::fs::write(&crl_path, CRL_BYTES).expect("write fixture CRL");
 
-    // Create a minimal synthetic CRL JSON
-    let crl_path = tmp.path().join("test-crl.signed.json");
-    std::fs::write(
-        &crl_path,
-        serde_json::to_string(&serde_json::json!({
-            "id": serde_json::json!([]),
-            "schema_version": 1,
-            "issued_at_ns": 0,
-            "origin": "operator",
-            "entries": [{
-                "spirit_class": "test-spirit",
-                "version_range": "*",
-                "reason": "test"
-            }],
-            "signature": serde_json::json!([]),
-            "signer_pub_key": serde_json::json!([])
-        }))
-        .unwrap(),
-    )
-    .unwrap();
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(["revocations", "import", crl_path.to_str().unwrap()]);
-    let out = cmd.output().expect("spawn maosctl");
-
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    // At v0.3-β without trust anchor configured, this may fail —
-    // the test verifies the CLI parses and dispatches correctly.
-    assert!(
-        stderr.contains("revocations-import")
-            || stderr.contains("trust anchor")
-            || stderr.contains("CRL"),
-        "expected revocation dispatch diagnostic, got stderr: {stderr}"
-    );
-    drop(tmp);
-}
-
-#[test]
-fn revocations_import_with_force_flag_parses() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let crl_path = tmp.path().join("test-crl.signed.json");
-    std::fs::write(&crl_path, "{}").unwrap();
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args([
+    let out = door.run(&[
         "revocations",
         "import",
-        crl_path.to_str().unwrap(),
-        "--force",
+        crl_path.to_str().expect("utf8 crl"),
     ]);
-    let out = cmd.output().expect("spawn maosctl");
-
-    // Force flag should be accepted; actual result depends on backend state
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("revocations-import")
-            || stderr.contains("trust anchor")
-            || stderr.contains("parse"),
-        "expected force-flag dispatch, got stderr: {stderr}"
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "expected exit 0 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
     );
-    drop(tmp);
+    assert_eq!(out.stdout, b"{}\n", "the 200 body prints verbatim");
+
+    let requests = door.requests();
+    assert_eq!(requests.len(), 1, "exactly one round trip");
+    assert_eq!(requests[0].method, "POST");
+    assert_eq!(requests[0].path, "/v1/revocations");
+    assert_eq!(
+        requests[0].authorization.as_deref(),
+        Some(format!("Bearer {}", door.token()).as_str()),
+        "the bearer must be the token from control.json"
+    );
+    assert_eq!(
+        requests[0].content_type.as_deref(),
+        Some("application/octet-stream"),
+        "D-16-1-X: the CRL travels as raw bytes"
+    );
+    assert_eq!(
+        requests[0].content_length,
+        Some(CRL_BYTES.len()),
+        "Content-Length must be the CRL's own size"
+    );
+    // The load-bearing byte assertion: the body IS the file, verbatim.
+    assert_eq!(
+        requests[0].body, CRL_BYTES,
+        "the CRL bytes must reach the door unmodified — a path or a re-encode is a contract break"
+    );
 }
 
+/// `list` is a GET, and its rendered output names the `crl_id` the door
+/// returned (rendered as the hex string D-16-1-X specifies) — not a
+/// constant, not an empty list.
 #[test]
-fn revocations_list_parses_and_dispatches() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(["revocations", "list"]);
-
-    // The revocations-list arm may hang on audit_writer drain in v0.3-β;
-    // spawn and kill after a short timeout.
-    let mut child = cmd.spawn().expect("spawn maosctl");
-    std::thread::sleep(std::time::Duration::from_millis(500));
-    let _ = child.kill();
-
-    // If we got here, the CLI parsed and dispatched successfully.
-    drop(tmp);
+fn list_sends_get_and_renders_the_door_crl_id() {
+    let door = FixtureDoor::spawn_replying(
+        200,
+        r#"{"applied":[{"crl_id":"7d1f0a9c2e5b4831aa06ccd49f12e7b3","applied_at_ns":1719}]}"#,
+    );
+    let out = door.run(&["revocations", "list"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "expected exit 0 — stderr: {}",
+        String::from_utf8_lossy(&out.stderr),
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("7d1f0a9c2e5b4831aa06ccd49f12e7b3"),
+        "the door's crl_id must be rendered — got: {stdout}"
+    );
+    let requests = door.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].method, "GET");
+    assert_eq!(requests[0].path, "/v1/revocations");
+    assert_eq!(
+        requests[0].authorization.as_deref(),
+        Some(format!("Bearer {}", door.token()).as_str()),
+        "the bearer must be the token from control.json"
+    );
 }
 
+/// A missing CRL file is refused locally (exit 1) before any round trip.
 #[test]
-fn revocations_import_missing_file_rejected() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
-
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.args(["revocations", "import", "/nonexistent/crl.json"]);
-    let out = cmd.output().expect("spawn maosctl");
-
-    assert!(
-        !out.status.success(),
-        "missing file should result in non-zero exit"
+fn import_missing_file_refused_locally() {
+    let door = FixtureDoor::spawn();
+    let missing = door.maos_home().join("absent.crl");
+    let out = door.run(&["revocations", "import", missing.to_str().expect("utf8")]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        door.request_count(),
+        0,
+        "a missing file must not touch the door"
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("No such file")
-            || stderr.contains("not found")
-            || stderr.contains("read CRL"),
-        "expected missing-file diagnostic, got: {stderr}"
-    );
-    drop(tmp);
 }
 
+/// The second half: each typed response maps to its D-16-1-P exit.
 #[test]
-fn revocations_no_color_zero_ansi() {
-    let tmp = TempDir::new().expect("tempdir");
-    let db_path = tmp.path().join("transparency.sqlite");
-    let journal_path = tmp.path().join("journal.ndjson");
-    let xdg = tmp.path().join("xdg");
-    std::fs::create_dir_all(&xdg).expect("xdg mkdir");
+fn import_maps_typed_responses_to_d16_1_p_exits() {
+    let door = FixtureDoor::spawn();
+    let crl_path = door.maos_home().join("fixture.crl");
+    std::fs::write(&crl_path, CRL_BYTES).expect("write fixture CRL");
+    let args = [
+        "revocations",
+        "import",
+        crl_path.to_str().expect("utf8 crl"),
+    ];
+    assert_typed_matrix(&args, "POST", "/v1/revocations");
+}
 
-    let mut cmd = Command::new(maosctl_path());
-    cmd.env_clear();
-    if let Ok(p) = std::env::var("PATH") {
-        cmd.env("PATH", p);
-    }
-    cmd.current_dir(&workspace_root());
-    cmd.env("MAOS_AUDIT_DB", &db_path);
-    cmd.env("MAOS_JOURNAL_PATH", &journal_path);
-    cmd.env("XDG_DATA_HOME", &xdg);
-    cmd.env("MAOS_BIN_PATH", maos_bin_path());
-    cmd.env("NO_COLOR", "1");
-    cmd.args(["revocations", "list"]);
-
-    // Spawn and capture output with timeout to avoid hang on audit_writer drain.
-    let mut child = cmd.spawn().expect("spawn maosctl");
-    std::thread::sleep(std::time::Duration::from_millis(500));
-    let _ = child.kill();
-    let out = child
-        .wait_with_output()
-        .unwrap_or_else(|_| std::process::Output {
-            status: std::process::ExitStatus::default(),
-            stdout: vec![],
-            stderr: vec![],
-        });
-
-    let stderr = out.stderr;
-    let esc_count = stderr.iter().filter(|b| **b == 0x1b).count();
-    assert_eq!(esc_count, 0, "NO_COLOR stderr contained ANSI escapes");
-    drop(tmp);
+/// Discovery failures (AC5), shared by every door verb.
+#[test]
+fn revocations_discovery_failures_map_to_typed_exits() {
+    assert_discovery_failures(&["revocations", "list"]);
 }

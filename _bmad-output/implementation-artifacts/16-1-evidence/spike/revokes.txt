@@ -1,0 +1,11 @@
+crates/maos-bin/src/worker_spawn.rs:730:            let _ = cap_for_revoke.revoke_cli_subprocess_exit(tid, 0, exit_code);
+crates/maos-bin/src/main.rs:6042:            match capability.revoke(token_id) {
+crates/maos-capability/src/cap_tokens/mod.rs:423:        ring.revoke(
+crates/maos-capability/src/cap_tokens/mod.rs:500:        ring.revoke(token.token_id, RevokeReason::Operator).unwrap();
+crates/maos-wasm-host/tests/equiv_harness.rs:1387:            adapter.revoke(token.token_id).expect("revoke token");
+crates/maos-kernel-core/tests/cap_registry_integration.rs:72:    adapter.revoke(token.token_id).unwrap();
+crates/maos-kernel-core/tests/revocation_verify_denial.rs:35:    ring.revoke(token.token_id, RevokeReason::Operator).unwrap();
+crates/maos-kernel-core/tests/cap_audit_backpressure.rs:106:            adapter.revoke(token.token_id).unwrap();
+crates/maos-kernel-core/tests/nfr_rel_9_revoke_latency.rs:78:        ring.revoke(token.token_id, RevokeReason::Operator).unwrap();
+crates/maos-kernel-core/src/capability/mod.rs:329:            .revoke(token_id, cap_tokens::RevokeReason::Operator)
+crates/maos-kernel-core/src/capability/mod.rs:374:        self.tokens.revoke(

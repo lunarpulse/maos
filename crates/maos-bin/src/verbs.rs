@@ -138,11 +138,15 @@ pub const HELP_FLAGS: &[&str] = &["--help", "-h", "help"];
 pub const VERSION_FLAGS: &[&str] = &["--version", "-V"];
 
 /// Every `MAOS_ONE_SHOT=<mode>` mode the composition root dispatches (the
-/// one-shot block of `main.rs`'s network `main`). Measured at the story's
-/// baseline commit: the block dispatches **48** distinct modes — the old
-/// unknown-mode diagnostic hardcoded only 28 of them, which is why it was
-/// replaced by a render of this const. This is the list the
-/// `check-exit-commands` gate resolves `MAOS_ONE_SHOT=<mode> maos` against.
+/// one-shot block of `main.rs`'s network `main`). Story 16-1 (D-16-1-A)
+/// removed the 16 door/read modes (pause, resume, start, stop, unload,
+/// posture-shift, halt-list, halt-resolve, orchestrator-queue,
+/// orchestrator-status, revoke-token, revocations-import, revocations-list,
+/// hot-swap-precheck, spirit-upgrade, legal-hold-list): they reach the
+/// running daemon through the operator door or run as in-process maosctl
+/// readers, so `MAOS_ONE_SHOT` dispatches **32** distinct modes — re-measured
+/// against the one-shot block. This is the list the `check-exit-commands`
+/// gate resolves `MAOS_ONE_SHOT=<mode> maos` against.
 pub const MAOS_ONE_SHOT_MODES: &[&str] = &[
     "acp-server",
     "bench-section-13-1",
@@ -150,21 +154,9 @@ pub const MAOS_ONE_SHOT_MODES: &[&str] = &[
     "collective-erase",
     "forget",
     "governance-admit",
-    "halt-list",
-    "halt-resolve",
     "hello-spirit",
-    "hot-swap-precheck",
-    "legal-hold-list",
     "legal-hold-release",
-    "orchestrator-queue",
-    "orchestrator-status",
-    "pause",
-    "posture-shift",
     "registry-server",
-    "resume",
-    "revocations-import",
-    "revocations-list",
-    "revoke-token",
     "smoke-a2a-consent-vocab-8-7",
     "smoke-a2a-fail-closed-8-8",
     "smoke-a2a-loopback-6-3",
@@ -187,11 +179,7 @@ pub const MAOS_ONE_SHOT_MODES: &[&str] = &[
     "smoke-supervision-5",
     "smoke-t3-sandbox-5",
     "smoke-upgrade-revoke-5",
-    "spirit-upgrade",
-    "start",
-    "stop",
     "uninstall",
-    "unload",
 ];
 
 /// A mode resolved through [`MAOS_ONE_SHOT_MODES`].
@@ -204,6 +192,16 @@ pub const MAOS_ONE_SHOT_MODES: &[&str] = &[
 pub struct OneShotMode(&'static str);
 
 impl OneShotMode {
+    /// ⚠ No longer called by the composition root. Story 16-1 deleted the
+    /// twelve fake one-shot arms whose `match mode.as_str()` blocks were its
+    /// only production callers; every SURVIVING arm compares the mode
+    /// directly through [`PartialEq<&str>`] below.
+    ///
+    /// Kept because `crates/maos-bin/tests/verb_table_15_3.rs` includes this
+    /// file with `#[path]` and reads the resolved mode back out as a string —
+    /// the accessor is live there, and `dead_code` cannot see across the
+    /// include.
+    #[allow(dead_code)]
     pub fn as_str(self) -> &'static str {
         self.0
     }

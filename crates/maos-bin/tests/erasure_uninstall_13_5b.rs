@@ -762,21 +762,18 @@ fn legal_hold_list_and_release_are_operable_without_auto_erasure() {
     let fixture = Fixture::new();
     fixture.seed_held_principal();
 
-    let list = fixture
-        .command()
-        .env("MAOS_ONE_SHOT", "legal-hold-list")
-        .output()
-        .expect("list legal holds");
-    assert!(
-        list.status.success(),
-        "list failed: {}",
-        String::from_utf8_lossy(&list.stderr)
-    );
-    let holds: serde_json::Value =
-        serde_json::from_slice(&list.stdout).expect("decode legal hold list");
-    assert_eq!(holds.as_array().map(Vec::len), Some(1));
-    assert_eq!(holds[0]["principal_id"], PRINCIPAL);
-
+    // ⚠ Story 16-1 / AC7 — the list half no longer spawns a one-shot.
+    // `MAOS_ONE_SHOT=legal-hold-list` is one of the two durable READER modes
+    // the story deleted (D-16-1-A): booting a whole composition root to run
+    // one `SELECT` bought nothing, and the write-capable open it performed
+    // could hold the sqlite lock past a live daemon's `busy_timeout` and trip
+    // the Transparency Log's panic-on-write-error (Trap 9). This calls the
+    // SAME read-only reader `maosctl legal-hold list` now uses, so the
+    // assertions below still read the tree through production code.
+    let holds = maos_audit::list_legal_holds_readonly(&fixture.audit_db())
+        .expect("list legal holds read-only");
+    assert_eq!(holds.len(), 1, "the seeded hold must be visible: {holds:?}");
+    assert_eq!(holds[0].principal_id, PRINCIPAL);
     let release = fixture
         .command()
         .env("MAOS_ONE_SHOT", "legal-hold-release")

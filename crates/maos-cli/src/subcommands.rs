@@ -2,7 +2,7 @@
 //! with a real body (Story 1b.1). `run` and `install` land at 1b.5a.
 //! All others remain stubs.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -19,16 +19,19 @@ use crate::cli::{
     HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, MigrateArgs, MigrateOp,
     OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice,
     ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp,
-    SpiritArgs, SpiritOp, Subcommand, UpgradePolicyArg,
+    SpiritArgs, SpiritOp, Subcommand, UninstallArgs, UpgradePolicyArg,
 };
+use crate::door_client::{self, DoorConfig, DoorError, DEFAULT_ROUTE_BUDGET, LONG_ROUTE_BUDGET};
+
+const MAX_DOOR_BODY_BYTES: usize = 64 * 1024;
 
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
         Subcommand::Install(args) => install(args, color),
-        Subcommand::Start(args) => lifecycle_verb("start", args.spirit.as_deref(), color),
-        Subcommand::Stop(args) => lifecycle_verb("stop", args.spirit.as_deref(), color),
-        Subcommand::Unload(args) => lifecycle_verb("unload", args.spirit.as_deref(), color),
-        Subcommand::Uninstall(args) => lifecycle_verb("uninstall", args.spirit.as_deref(), color),
+        Subcommand::Start(args) => lifecycle_door_verb("start", args.spirit.as_deref(), color),
+        Subcommand::Stop(_) => refuse_stop(),
+        Subcommand::Unload(args) => lifecycle_door_verb("unload", args.spirit.as_deref(), color),
+        Subcommand::Uninstall(args) => dispatch_uninstall(args, color),
         Subcommand::Forget(args) => dispatch_forget(args, color),
         Subcommand::LegalHold(args) => dispatch_legal_hold(args, color),
         Subcommand::Run(args) => run(args, color),
@@ -48,6 +51,186 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Migrate(args) => dispatch_migrate(args, color),
         Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
+    }
+}
+
+// ─── Story 16-1 — the door (D-16-1-A): shared client plumbing ───────────
+
+/// D-16-1-I — `stop` is refused client-side BEFORE the accessibility smoke
+/// short-circuit (which would otherwise keep printing "stop smoke ok"):
+/// exit 2, no journal row, no round trip. `ScbLifecycleState` has no stopped
+/// state and FR9 lists load/start/pause/resume/unload — a "stop" could only
+/// mean a resumable pause or a silently destructive unload.
+fn refuse_stop() -> ExitCode {
+    eprintln!(
+        "maosctl: no kernel transition is named stop — use `maosctl pause` (resumable) or `maosctl unload` (terminal)"
+    );
+    ExitCode::from(2)
+}
+
+/// Accessibility cascade short-circuit (Story 1b.5c): deterministic
+/// ANSI-free output without touching the door, the journal or the TL.
+fn smoke_short_circuit(verb: &str, name: &str) -> Option<ExitCode> {
+    if std::env::var_os("MAOS_ACCESSIBILITY_SMOKE").is_some() {
+        eprintln!("maosctl: {verb} smoke ok for {name}");
+        return Some(ExitCode::SUCCESS);
+    }
+    None
+}
+
+/// Local twin of the door's route-segment validation: a request the daemon
+/// must refuse never leaves maosctl. Exit 2 (local validation); the daemon
+/// still re-validates because maosctl is not the only door client.
+fn checked_id(verb: &str, id: &str) -> Option<ExitCode> {
+    door_client::validate_id(id).err().map(|reason| {
+        eprintln!("maosctl: {verb} — {reason}");
+        ExitCode::from(2)
+    })
+}
+
+/// D-16-1-W/X — the door receives a CANONICAL absolute manifest path: the
+/// daemon resolves it in ITS working directory, not the operator's.
+fn canonical_manifest(verb: &str, to: &str) -> Result<PathBuf, ExitCode> {
+    let path = std::path::Path::new(to);
+    if !path.exists() {
+        eprintln!("maosctl: {verb} — manifest file not found: {to}");
+        return Err(ExitCode::from(1));
+    }
+    std::fs::canonicalize(path).map_err(|error| {
+        eprintln!("maosctl: {verb} — cannot canonicalize manifest {to}: {error}");
+        ExitCode::from(1)
+    })
+}
+
+fn canonical_operator_file(verb: &str, label: &str, path: &str) -> Result<PathBuf, ExitCode> {
+    std::fs::canonicalize(path).map_err(|error| {
+        eprintln!("maosctl: {verb} — cannot canonicalize {label} {path}: {error}");
+        ExitCode::from(1)
+    })
+}
+
+/// Door-class verb (D-16-1-A): resolve the door, send, map. On
+/// connect-refused run the momentary home-lock probe — `DaemonNotRunning`
+/// vs `StoreInUse`, both 69 — because door-class verbs have NO offline arm:
+/// their handlers are in-memory scheduler state no child can touch.
+fn door_verb(
+    verb: &str,
+    request: impl FnOnce(&DoorConfig) -> Result<door_client::Response, DoorError>,
+) -> ExitCode {
+    match door_client::resolve_door() {
+        Ok(config) => match request(&config) {
+            Ok(response) => door_client::map_response(verb, response),
+            Err(DoorError::ConnectRefused) => {
+                door_client::door_class_connect_refused(verb, config.endpoint)
+            }
+            Err(error) => door_client::map_error(verb, error),
+        },
+        Err(error) => door_client::map_error(verb, error),
+    }
+}
+
+/// Durable verb (AC5 / D-16-1-D / V-18): the door when it answers, the
+/// offline child ONLY when nothing is configured (erasure never requires
+/// `maos init`) or the connect is refused (the child takes the exclusive
+/// store-lock set, which settles liveness without a race). A connected-but-
+/// silent door (69) and a rejected bearer (77) are terminal — never fall
+/// through to offline, because those are exactly the states in which a
+/// daemon may still hold live memory.
+fn durable_verb(
+    verb: &str,
+    request: impl FnOnce(&DoorConfig) -> Result<door_client::Response, DoorError>,
+    offline: impl FnOnce() -> ExitCode,
+) -> ExitCode {
+    match door_client::resolve_door() {
+        Ok(config) => match request(&config) {
+            Ok(response) => door_client::map_response(verb, response),
+            Err(DoorError::ConnectRefused) => offline(),
+            Err(error) => door_client::map_error(verb, error),
+        },
+        Err(DoorError::NotInitialized(_)) => offline(),
+        Err(error) => door_client::map_error(verb, error),
+    }
+}
+
+/// `start`/`unload` over the door (D-16-1-A): the daemon resolves the name
+/// (an unknown one is its typed 404) and performs the scheduler transition.
+/// The accessibility smoke short-circuit stays; the TL preflight and the
+/// hello-spirit guard are gone — they refused the very Spirits the door can
+/// now name, before any round trip.
+fn lifecycle_door_verb(verb: &str, spirit: Option<&str>, _color: ColorChoice) -> ExitCode {
+    let Some(name) = spirit else {
+        eprintln!("maosctl: {verb} requires a spirit argument, e.g. 'maosctl {verb} hello-spirit'");
+        return ExitCode::from(2);
+    };
+    if let Some(code) = smoke_short_circuit(verb, name) {
+        return code;
+    }
+    if let Some(code) = checked_id(verb, name) {
+        return code;
+    }
+    door_verb(verb, |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/spirits/{name}/{verb}"),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
+}
+
+/// `uninstall` — durable (AC5 / D-16-1-D): the door when it answers, the
+/// offline child when nothing is configured or the connect is refused. The
+/// preserved terminal contract 0/3/4/5 rides the door's `terminal_code`
+/// body field; the offline child's exit codes forward unchanged.
+fn dispatch_uninstall(args: &UninstallArgs, color: ColorChoice) -> ExitCode {
+    let Some(name) = args.spirit.as_deref() else {
+        eprintln!(
+            "maosctl: uninstall requires a spirit argument, e.g. 'maosctl uninstall hello-spirit'"
+        );
+        return ExitCode::from(2);
+    };
+    if let Some(code) = smoke_short_circuit("uninstall", name) {
+        return code;
+    }
+    if let Some(code) = checked_id("uninstall", name) {
+        return code;
+    }
+    durable_verb(
+        "uninstall",
+        |config| {
+            door_client::exchange(
+                config,
+                "POST",
+                &format!("/v1/spirits/{name}/uninstall"),
+                None,
+                LONG_ROUTE_BUDGET,
+            )
+        },
+        || uninstall_offline_arm(name, color),
+    )
+}
+
+/// The offline uninstall one-shot (the surviving lifecycle spawn site): the
+/// CHILD takes the exclusive store-lock set (500 ms retry) and prints its
+/// own `maos: no daemon holds <paths>; running offline` line after
+/// acquiring — never maosctl, which cannot know what the lock will decide.
+fn uninstall_offline_arm(name: &str, color: ColorChoice) -> ExitCode {
+    #[cfg(unix)]
+    {
+        let bin = maos_bin_path();
+        let mut cmd = std::process::Command::new(&bin);
+        cmd.env("MAOS_ONE_SHOT", "uninstall");
+        cmd.env("MAOS_SPIRIT_ID", name);
+        if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+            cmd.env("NO_COLOR", "1");
+        }
+        exec_and_forward(&mut cmd, &bin)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (name, color);
+        door_client::offline_unsupported("uninstall")
     }
 }
 
@@ -564,9 +747,10 @@ fn requests_tls_unsupported_by_notls(conn_str: &str) -> bool {
     })
 }
 
-/// Story 9.3b — `maosctl governance admit` shells to `maos-bin` via the
-/// `MAOS_ONE_SHOT=governance-admit` env channel.  The kernel-side handler
-/// writes the schema-lifecycle registry row + governance event frame.
+/// Story 9.3b — `maosctl governance admit`: a durable verb (D-16-1-A) — the
+/// door when it answers, the one-shot env channel otherwise (the child takes
+/// the exclusive store-lock set; the kernel-side handler writes the
+/// schema-lifecycle registry row + governance event frame either way).
 fn dispatch_governance(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
     match &args.op {
         GovernanceOp::Admit {
@@ -577,25 +761,70 @@ fn dispatch_governance(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
             ratified_by,
             effective_at_ns,
         } => {
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "governance-admit");
-            cmd.env("MAOS_GOVERNANCE_SCHEMA_ID", schema_id);
-            cmd.env("MAOS_GOVERNANCE_VERSION", version.to_string());
-            cmd.env("MAOS_GOVERNANCE_CONTENT_HASH", content_hash);
-            cmd.env("MAOS_GOVERNANCE_RATIFIED_BY", ratified_by);
-            cmd.env(
-                "MAOS_GOVERNANCE_EFFECTIVE_AT_NS",
-                effective_at_ns.to_string(),
-            );
-            if let Some(s) = supersedes {
-                cmd.env("MAOS_GOVERNANCE_SUPERSEDES", s);
-            }
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-            exec_and_forward(&mut cmd, &bin)
+            // Over the door the WHOLE admission request travels as one JSON
+            // value (`AdmitGovernanceSchema{schema}`) — the daemon must not
+            // re-read operator intent from its own environment.
+            let body = serde_json::to_vec(&serde_json::json!({
+                "schema_id": schema_id,
+                "version": version,
+                "content_hash": content_hash,
+                "supersedes": supersedes,
+                "ratified_by": ratified_by,
+                "effective_at_ns": effective_at_ns,
+            }))
+            .expect("serializing a hand-built Value cannot fail");
+            durable_verb(
+                "governance admit",
+                |config| {
+                    door_client::exchange(
+                        config,
+                        "POST",
+                        "/v1/governance/schemas",
+                        Some(("application/json", &body)),
+                        DEFAULT_ROUTE_BUDGET,
+                    )
+                },
+                || governance_offline_arm(args, color),
+            )
         }
+    }
+}
+
+/// The offline governance one-shot: env channel unchanged from Story 9.3b.
+fn governance_offline_arm(args: &GovernanceArgs, color: ColorChoice) -> ExitCode {
+    #[cfg(unix)]
+    {
+        let GovernanceOp::Admit {
+            schema_id,
+            version,
+            content_hash,
+            supersedes,
+            ratified_by,
+            effective_at_ns,
+        } = &args.op;
+        let bin = maos_bin_path();
+        let mut cmd = std::process::Command::new(&bin);
+        cmd.env("MAOS_ONE_SHOT", "governance-admit");
+        cmd.env("MAOS_GOVERNANCE_SCHEMA_ID", schema_id);
+        cmd.env("MAOS_GOVERNANCE_VERSION", version.to_string());
+        cmd.env("MAOS_GOVERNANCE_CONTENT_HASH", content_hash);
+        cmd.env("MAOS_GOVERNANCE_RATIFIED_BY", ratified_by);
+        cmd.env(
+            "MAOS_GOVERNANCE_EFFECTIVE_AT_NS",
+            effective_at_ns.to_string(),
+        );
+        if let Some(s) = supersedes {
+            cmd.env("MAOS_GOVERNANCE_SUPERSEDES", s);
+        }
+        if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+            cmd.env("NO_COLOR", "1");
+        }
+        exec_and_forward(&mut cmd, &bin)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (args, color);
+        door_client::offline_unsupported("governance admit")
     }
 }
 
@@ -1440,154 +1669,188 @@ fn install_spirit(args: &InstallArgs) -> ExitCode {
     }
 }
 
-/// v0.1-β lifecycle dispatch: shell out to `maos-bin` with
-/// `MAOS_ONE_SHOT=<verb>` per Decision Register D2.
-///
-/// At v0.1-β each verb writes exactly one Lifecycle Journal entry and
-/// exits. No supervisor, no mailbox, no `task.orphaned` emission — those
-/// land in Epic 5 (Story 5.1) with a real supervised lifecycle. The
-/// journal entry IS the observable v0.1 side-effect.
-/// Decision Register D3: the shape is `spirit: Option<&str>` — all
-/// three v0.1-β `*Args` structs are identical, but Epic 5 will
-/// differentiate them (Stop will gain `--grace-period`, etc.), so the
-/// distinct struct types in `cli.rs` are preserved.
-///
-/// At v0.1-β only the reference Spirit (`hello-spirit`) is valid; unknown
-/// names are rejected here so the diagnostic is surfaced by the CLI.
-/// When `MAOS_ACCESSIBILITY_SMOKE` is set the verb short-circuits to a
-/// deterministic ASCII-only diagnostic for the accessibility cascade.
-fn lifecycle_verb(verb: &str, spirit: Option<&str>, color: ColorChoice) -> ExitCode {
-    let name = match spirit {
-        Some(s) => s,
-        None => {
-            eprintln!(
-                "maosctl: {verb} requires a spirit argument, e.g. 'maosctl {verb} hello-spirit'"
-            );
-            return ExitCode::from(2);
-        }
-    };
-
-    // v0.1-β only admits the reference Spirit; reject unknown names here so the
-    // diagnostic is surfaced by the CLI instead of the shell-out.
-    if name != "hello-spirit" {
-        eprintln!("maosctl: unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β");
-        return ExitCode::from(2);
-    }
-
-    // Accessibility smoke path (Story 1b.5c): unit tests assert the ANSI-free
-    // cascade without spawning the full composition root.
-    if std::env::var_os("MAOS_ACCESSIBILITY_SMOKE").is_some() {
-        eprintln!("maosctl: {verb} smoke ok for {name}");
-        return ExitCode::SUCCESS;
-    }
-
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
-    cmd.env("MAOS_ONE_SHOT", verb);
-    cmd.env("MAOS_SPIRIT_ID", name);
-
-    // Forward NO_COLOR / --plain through to the child for accessibility
-    // (NFR-Ops-5). Mirror the existing `run` dispatch shape.
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
-    }
-
-    exec_and_forward(&mut cmd, &bin)
-}
-
-/// Story 13.5b — Host-global legal-hold operator surface over the existing
-/// one-shot child contract.
+/// Story 13.5b — host-global legal-hold operator surface (Story 16-1: the
+/// `list` half is an IN-PROCESS durable reader (D-16-1-A); `release` is a
+/// durable verb — door when it answers, the one-shot child otherwise).
 fn dispatch_legal_hold(args: &LegalHoldArgs, color: ColorChoice) -> ExitCode {
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
     match &args.op {
-        LegalHoldOp::List => {
-            cmd.env("MAOS_ONE_SHOT", "legal-hold-list");
-        }
+        LegalHoldOp::List => legal_hold_list_reader(),
         LegalHoldOp::Release { principal } => {
             let principal = principal.trim();
             if principal.is_empty() {
                 eprintln!("maosctl: legal-hold release requires a non-empty --principal");
                 return ExitCode::from(2);
             }
-            cmd.env("MAOS_ONE_SHOT", "legal-hold-release");
-            cmd.env("MAOS_LEGAL_HOLD_PRINCIPAL", principal);
+            let body = serde_json::to_vec(&serde_json::json!({ "principal": principal }))
+                .expect("serializing a hand-built Value cannot fail");
+            durable_verb(
+                "legal-hold release",
+                |config| {
+                    // The principal travels in the BODY, symmetric with
+                    // `forget`: every principal in this tree is email-shaped
+                    // and `@` is outside the door's path-segment charset, so a
+                    // path segment would have cost either a wider charset for
+                    // one route or percent-decoding inside the door.
+                    door_client::exchange(
+                        config,
+                        "POST",
+                        "/v1/legal-holds/release",
+                        Some(("application/json", &body)),
+                        DEFAULT_ROUTE_BUDGET,
+                    )
+                },
+                || legal_hold_release_offline_arm(principal, color),
+            )
         }
     }
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
-    }
-    exec_and_forward(&mut cmd, &bin)
 }
 
-/// Story 9.2 (FR45) — `maosctl forget` shells to `maos-bin` via the
-/// existing `MAOS_ONE_SHOT` env channel.  Principal and optional reason
-/// are forwarded through `MAOS_FORGET_PRINCIPAL` / `MAOS_FORGET_REASON`.
+/// `legal-hold list` — in-process durable reader (D-16-1-A): the holds read
+/// READ-ONLY through `maos_audit`, never the write-capable adapter (Trap 9:
+/// a write-capable open can hold the sqlite lock past the daemon's
+/// `busy_timeout` and trip its panic-on-write-error) and no child spawn.
+/// In tenant mode the holds live in the GLOBAL database while the resolved
+/// path may be a team shard, so both candidates are consulted and merged.
+fn legal_hold_list_reader() -> ExitCode {
+    let resolved = default_transparency_log_path();
+    let global = maos_audit::default_transparency_log_path();
+    let mut paths = vec![resolved];
+    if global != paths[0] {
+        paths.push(global);
+    }
+    let mut holds: Vec<maos_audit::LegalHoldRow> = Vec::new();
+    for path in &paths {
+        match maos_audit::list_legal_holds_readonly(path) {
+            Ok(rows) => holds.extend(rows),
+            Err(error) => {
+                eprintln!(
+                    "maosctl: legal-hold list — failed to read {}: {error}",
+                    path.display()
+                );
+                return ExitCode::from(1);
+            }
+        }
+    }
+    holds.sort_by(|a, b| a.principal_id.cmp(&b.principal_id));
+    holds.dedup_by(|a, b| a.principal_id == b.principal_id);
+    holds.sort_by_key(|hold| (hold.requested_at_ns, hold.principal_id.clone()));
+    match serde_json::to_string(&holds) {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("maosctl: legal-hold list — encode failed: {error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+/// The offline legal-hold-release one-shot: env channel unchanged from
+/// Story 13.5b; the child takes the exclusive store-lock set and prints its
+/// own `running offline` line after acquiring.
+fn legal_hold_release_offline_arm(principal: &str, color: ColorChoice) -> ExitCode {
+    #[cfg(unix)]
+    {
+        let bin = maos_bin_path();
+        let mut cmd = std::process::Command::new(&bin);
+        cmd.env("MAOS_ONE_SHOT", "legal-hold-release");
+        cmd.env("MAOS_LEGAL_HOLD_PRINCIPAL", principal);
+        if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+            cmd.env("NO_COLOR", "1");
+        }
+        exec_and_forward(&mut cmd, &bin)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (principal, color);
+        door_client::offline_unsupported("legal-hold release")
+    }
+}
+
+/// Story 9.2 (FR45) — `maosctl forget`: a durable verb — door when it
+/// answers, the one-shot child otherwise. GDPR erasure (FR45/FR65) must
+/// never require `maos init`: with no door configured the child runs
+/// DIRECTLY (AC5 order 1).
 fn dispatch_forget(args: &ForgetArgs, color: ColorChoice) -> ExitCode {
     let principal = args.principal.trim();
     if principal.is_empty() {
         eprintln!("maosctl: forget requires a non-empty --principal");
         return ExitCode::from(2);
     }
-
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
-    cmd.env("MAOS_ONE_SHOT", "forget");
-    cmd.env("MAOS_FORGET_PRINCIPAL", principal);
-    if let Some(reason) = &args.reason {
-        cmd.env("MAOS_FORGET_REASON", reason);
-    }
-
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
-    }
-
-    exec_and_forward(&mut cmd, &bin)
+    let body = serde_json::to_vec(&serde_json::json!({
+        "principal": principal,
+        "reason": args.reason,
+    }))
+    .expect("serializing a hand-built Value cannot fail");
+    durable_verb(
+        "forget",
+        |config| {
+            door_client::exchange(
+                config,
+                "POST",
+                "/v1/memory/forget",
+                Some(("application/json", &body)),
+                DEFAULT_ROUTE_BUDGET,
+            )
+        },
+        || forget_offline_arm(principal, args.reason.as_deref(), color),
+    )
 }
-fn dispatch_posture(args: &PostureArgs, color: ColorChoice) -> ExitCode {
-    if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
-        eprintln!("maosctl: posture — {diag}");
-        return ExitCode::from(2);
-    }
 
-    let posture_env = match args.shift {
+/// The offline forget one-shot: env channel unchanged from Story 9.2; the
+/// child takes the exclusive store-lock set (500 ms retry) and refuses with
+/// 69 `StoreInUse` when an offline operation or daemon holds any of it.
+fn forget_offline_arm(principal: &str, reason: Option<&str>, color: ColorChoice) -> ExitCode {
+    #[cfg(unix)]
+    {
+        let bin = maos_bin_path();
+        let mut cmd = std::process::Command::new(&bin);
+        cmd.env("MAOS_ONE_SHOT", "forget");
+        cmd.env("MAOS_FORGET_PRINCIPAL", principal);
+        if let Some(reason) = reason {
+            cmd.env("MAOS_FORGET_REASON", reason);
+        }
+        if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
+            cmd.env("NO_COLOR", "1");
+        }
+        exec_and_forward(&mut cmd, &bin)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (principal, reason, color);
+        door_client::offline_unsupported("forget")
+    }
+}
+
+/// `posture --shift` over the door: the daemon shifts the LIVE PolicyTable
+/// of the named Spirit's pid (the one-shot shifted pid 0 in a fresh table —
+/// measured harmless on a running daemon, D-16-1-A).
+fn dispatch_posture(args: &PostureArgs, _color: ColorChoice) -> ExitCode {
+    if let Some(code) = checked_id("posture", &args.spirit) {
+        return code;
+    }
+    let posture = match args.shift {
         PostureChoice::Cautious => "cautious",
         PostureChoice::Assistive => "assistive",
         PostureChoice::AutonomousWithHalt => "autonomous-with-halt",
     };
-
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
-    cmd.env("MAOS_ONE_SHOT", "posture-shift");
-    cmd.env("MAOS_SPIRIT_ID", &args.spirit);
-    cmd.env("MAOS_POSTURE", posture_env);
-
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
-    }
-
-    exec_and_forward(&mut cmd, &bin)
+    let body = serde_json::to_vec(&serde_json::json!({ "posture": posture }))
+        .expect("serializing a hand-built Value cannot fail");
+    door_verb("posture", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/spirits/{}/posture", args.spirit),
+            Some(("application/json", &body)),
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
 }
 
-fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
+fn dispatch_halt(args: &HaltArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
-        HaltOp::List { spirit, limit } => {
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "halt-list");
-            cmd.env("MAOS_HALT_LIMIT", limit.to_string());
-            if let Some(s) = spirit {
-                if let Err(diag) = resolve_spirit_pid(s, &default_transparency_log_path(), false) {
-                    eprintln!("maosctl: halt list — {diag}");
-                    return ExitCode::from(2);
-                }
-                cmd.env("MAOS_HALT_SPIRIT", s);
-            }
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-            exec_and_forward(&mut cmd, &bin)
-        }
+        HaltOp::List { spirit, limit } => halt_list_reader(spirit.as_deref(), *limit),
         HaltOp::Resolve {
             halt_id,
             spirit,
@@ -1595,10 +1858,6 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
             text,
             operator_policy,
         } => {
-            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
-                eprintln!("maosctl: halt resolve — {diag}");
-                return ExitCode::from(2);
-            }
             // Defensive check (clap's required_if_eq handles most cases)
             match kind {
                 ResolutionKindChoice::ProvidedContext if text.is_none() => {
@@ -1611,117 +1870,204 @@ fn dispatch_halt(args: &HaltArgs, color: ColorChoice) -> ExitCode {
                 }
                 _ => {}
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "halt-resolve");
-            cmd.env("MAOS_HALT_ID", halt_id);
-            cmd.env("MAOS_HALT_SPIRIT", spirit);
-            let kind_str = match kind {
+            if let Some(code) = checked_id("halt resolve", halt_id) {
+                return code;
+            }
+            if let Some(code) = checked_id("halt resolve", spirit) {
+                return code;
+            }
+            // The daemon checks the HaltRegistry (an unknown or already-
+            // resolved halt is its typed 404 `HaltNotPending`); the client
+            // preflight is gone with the fabricated-halt one-shot.
+            let resolution = match kind {
                 ResolutionKindChoice::ProvidedContext => "provided_context",
                 ResolutionKindChoice::AcceptedHalt => "accepted_halt",
                 ResolutionKindChoice::AuthorizedOverride => "authorized_override",
             };
-            cmd.env("MAOS_HALT_KIND", kind_str);
-            if let Some(t) = text {
-                cmd.env("MAOS_HALT_TEXT", t);
-            }
-            if let Some(op) = operator_policy {
-                cmd.env("MAOS_HALT_OPERATOR_POLICY", op);
-            }
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-            exec_and_forward(&mut cmd, &bin)
+            // The rationale the door carries: the missing context for a
+            // provided-context resolution, the authorizing policy reference
+            // for an authorized override.
+            let rationale = text.clone().or_else(|| operator_policy.clone());
+            let body = serde_json::to_vec(&serde_json::json!({
+                "spirit_id": spirit,
+                "resolution": resolution,
+                "rationale": rationale,
+            }))
+            .expect("serializing a hand-built Value cannot fail");
+            door_verb("halt resolve", |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    &format!("/v1/halts/{halt_id}/resolve"),
+                    Some(("application/json", &body)),
+                    DEFAULT_ROUTE_BUDGET,
+                )
+            })
         }
     }
 }
 
-fn dispatch_pause(args: &PauseArgs, color: ColorChoice) -> ExitCode {
-    if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
-        eprintln!("maosctl: pause — {diag}");
-        return ExitCode::from(2);
+/// `halt list` — in-process durable reader (D-16-1-A): EpistemicHalt frames
+/// read READ-ONLY through `maos_audit::query`, in the same
+/// timestamp-ascending order and with the same limit semantics the old
+/// child's `query_frames` used. No spawn, and never the write-capable
+/// adapter (Trap 9). The spirit filter keeps the TL preflight — offline
+/// readers have no daemon to resolve the name for them (D-16-1-K).
+fn halt_list_reader(spirit: Option<&str>, limit: u32) -> ExitCode {
+    let db_path = default_transparency_log_path();
+    let mut filter = maos_audit::AuditFilter {
+        kind: Some("epistemic.halt".to_owned()),
+        limit: Some(limit as usize),
+        ..Default::default()
+    };
+    if let Some(name) = spirit {
+        match resolve_spirit_pid(name, &db_path, false) {
+            Ok(pairs) => {
+                if let Some((boot_nonce, pid)) = pairs.first() {
+                    filter.boot_nonce = Some(*boot_nonce);
+                    filter.spirit_pid = Some(*pid);
+                }
+            }
+            Err(diag) => {
+                eprintln!("maosctl: halt list — {diag}");
+                return ExitCode::from(2);
+            }
+        }
     }
-
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
-    cmd.env("MAOS_ONE_SHOT", "pause");
-    cmd.env("MAOS_SPIRIT_ID", &args.spirit);
-
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
+    let entries = match maos_audit::query(&db_path, filter) {
+        Ok(entries) => entries,
+        Err(error) => {
+            eprintln!("maosctl: halt list — query failed: {error}");
+            return ExitCode::from(1);
+        }
+    };
+    for entry in &entries {
+        let id_display: String = entry.frame_id_hex.chars().take(8).collect();
+        let json_line = match serde_json::to_string(&serde_json::json!({
+            "frame_id": id_display,
+            "timestamp_ns": entry.timestamp_ns,
+            "kind": entry.kind,
+            "intent": entry.intent,
+        })) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("maosctl: halt list — serialization error for frame: {e}");
+                continue;
+            }
+        };
+        println!("{json_line}");
     }
-
-    exec_and_forward(&mut cmd, &bin)
+    eprintln!("maosctl: halt list — {} halts shown", entries.len());
+    ExitCode::SUCCESS
 }
 
-fn dispatch_resume(args: &ResumeArgs, color: ColorChoice) -> ExitCode {
-    if let Err(diag) = resolve_spirit_pid(&args.spirit, &default_transparency_log_path(), false) {
-        eprintln!("maosctl: resume — {diag}");
-        return ExitCode::from(2);
+/// `pause`/`resume` over the door: the daemon performs the scheduler
+/// transition FIRST and journals only on success (D-16-1-L) — the one-shot
+/// wrote "Paused" rows while the Spirit kept running (§4, measured).
+fn dispatch_pause(args: &PauseArgs, _color: ColorChoice) -> ExitCode {
+    if let Some(code) = checked_id("pause", &args.spirit) {
+        return code;
     }
-
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
-    cmd.env("MAOS_ONE_SHOT", "resume");
-    cmd.env("MAOS_SPIRIT_ID", &args.spirit);
-
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
-    }
-
-    exec_and_forward(&mut cmd, &bin)
+    door_verb("pause", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/spirits/{}/pause", args.spirit),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
 }
 
-fn dispatch_orchestrator(args: &OrchestratorArgs, color: ColorChoice) -> ExitCode {
+fn dispatch_resume(args: &ResumeArgs, _color: ColorChoice) -> ExitCode {
+    if let Some(code) = checked_id("resume", &args.spirit) {
+        return code;
+    }
+    door_verb("resume", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/spirits/{}/resume", args.spirit),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
+}
+
+fn dispatch_orchestrator(args: &OrchestratorArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
         OrchestratorOp::Queue {
             spirit,
             instruction,
         } => {
-            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
-                eprintln!("maosctl: orchestrator queue — {diag}");
-                return ExitCode::from(2);
-            }
             if instruction.trim().is_empty() {
                 eprintln!("maosctl: orchestrator queue — instruction must be non-empty");
                 return ExitCode::from(2);
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "orchestrator-queue");
-            cmd.env("MAOS_ORCHESTRATOR_SPIRIT", spirit);
-            cmd.env("MAOS_ORCHESTRATOR_INSTRUCTION", instruction);
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
+            if let Some(code) = checked_id("orchestrator queue", spirit) {
+                return code;
             }
-
-            exec_and_forward(&mut cmd, &bin)
+            let body = serde_json::to_vec(&serde_json::json!({ "text": instruction }))
+                .expect("serializing a hand-built Value cannot fail");
+            door_verb("orchestrator queue", |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    &format!("/v1/orchestrator/{spirit}"),
+                    Some(("application/json", &body)),
+                    DEFAULT_ROUTE_BUDGET,
+                )
+            })
         }
         OrchestratorOp::Status { spirit } => {
-            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
-                eprintln!("maosctl: orchestrator status — {diag}");
-                return ExitCode::from(2);
+            if let Some(code) = checked_id("orchestrator status", spirit) {
+                return code;
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "orchestrator-status");
-            cmd.env("MAOS_ORCHESTRATOR_SPIRIT", spirit);
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-
-            exec_and_forward(&mut cmd, &bin)
+            orchestrator_status(spirit)
         }
     }
 }
 
-fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode {
-    // Validate hex format BEFORE shelling out
+/// The occupancy read renders `pending/capacity` in plain text (AC4 names
+/// "reports `1/32`"); the raw door JSON shape is the server's business.
+fn orchestrator_status(spirit: &str) -> ExitCode {
+    match door_client::resolve_door() {
+        Ok(config) => {
+            match door_client::exchange(
+                &config,
+                "GET",
+                &format!("/v1/orchestrator/{spirit}"),
+                None,
+                DEFAULT_ROUTE_BUDGET,
+            ) {
+                Ok(response) if response.status == 200 => {
+                    let body = response.body_json();
+                    let pending = body
+                        .get("pending")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0);
+                    let capacity = body
+                        .get("capacity")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0);
+                    println!(
+                        "maosctl: orchestrator status {spirit}: {pending}/{capacity} pending instructions"
+                    );
+                    ExitCode::SUCCESS
+                }
+                Ok(response) => door_client::map_response("orchestrator status", response),
+                Err(DoorError::ConnectRefused) => {
+                    door_client::door_class_connect_refused("orchestrator status", config.endpoint)
+                }
+                Err(error) => door_client::map_error("orchestrator status", error),
+            }
+        }
+        Err(error) => door_client::map_error("orchestrator status", error),
+    }
+}
+
+fn dispatch_revoke_token(args: &RevokeTokenArgs, _color: ColorChoice) -> ExitCode {
+    // Validate hex format BEFORE the round trip (Trap 18: lowercase only).
     if args.token_id.len() != 32
         || !args
             .token_id
@@ -1734,25 +2080,20 @@ fn dispatch_revoke_token(args: &RevokeTokenArgs, color: ColorChoice) -> ExitCode
         );
         return ExitCode::from(2);
     }
-
-    let bin = maos_bin_path();
-    let mut cmd = std::process::Command::new(&bin);
-    cmd.env("MAOS_ONE_SHOT", "revoke-token");
-    cmd.env("MAOS_REVOKE_TOKEN_ID", &args.token_id);
-    if let Some(ref reason) = args.reason {
-        cmd.env("MAOS_REVOKE_REASON", reason);
-    }
-
-    if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-        cmd.env("NO_COLOR", "1");
-    }
-
-    exec_and_forward(&mut cmd, &bin)
+    door_verb("revoke-token", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/tokens/{}/revoke", args.token_id),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
 }
 
-fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode {
+fn dispatch_revocations(args: &RevocationsArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
-        RevocationsOp::Import { file, force } => {
+        RevocationsOp::Import { file } => {
             if !file.exists() {
                 eprintln!(
                     "maosctl: revocations import — file not found: {}",
@@ -1760,36 +2101,48 @@ fn dispatch_revocations(args: &RevocationsArgs, color: ColorChoice) -> ExitCode 
                 );
                 return ExitCode::from(1);
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "revocations-import");
-            cmd.env("MAOS_CRL_PATH", file.as_os_str());
-            if *force {
-                cmd.env("MAOS_CRL_FORCE_REAPPLY", "1");
+            let mut crl = Vec::with_capacity(MAX_DOOR_BODY_BYTES.min(8192) + 1);
+            let read_result = std::fs::File::open(file).and_then(|opened| {
+                opened
+                    .take((MAX_DOOR_BODY_BYTES + 1) as u64)
+                    .read_to_end(&mut crl)
+            });
+            if let Err(error) = read_result {
+                eprintln!(
+                    "maosctl: revocations import — cannot read {}: {error}",
+                    file.display()
+                );
+                return ExitCode::from(1);
             }
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
+            if crl.len() > MAX_DOOR_BODY_BYTES {
+                eprintln!(
+                    "maosctl: revocations import — {} exceeds the 64 KiB door limit",
+                    file.display()
+                );
+                return ExitCode::from(1);
             }
-
-            exec_and_forward(&mut cmd, &bin)
+            // D-16-1-X: the CRL's own BYTES travel as the body — a path
+            // would resolve in the daemon's cwd, which is not the
+            // operator's. The daemon holds the trust anchor captured at its
+            // boot; the body is opaque to the route. (The `--force` re-apply
+            // flag died with the one-shot: the daemon owns re-apply policy.)
+            door_verb("revocations import", |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    "/v1/revocations",
+                    Some(("application/octet-stream", &crl)),
+                    LONG_ROUTE_BUDGET,
+                )
+            })
         }
-        RevocationsOp::List => {
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "revocations-list");
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-
-            exec_and_forward(&mut cmd, &bin)
-        }
+        RevocationsOp::List => door_verb("revocations list", |config| {
+            door_client::exchange(config, "GET", "/v1/revocations", None, DEFAULT_ROUTE_BUDGET)
+        }),
     }
 }
 
-fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
+fn dispatch_spirit(args: &SpiritArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
         SpiritOp::HotSwapPrecheck {
             spirit,
@@ -1798,39 +2151,44 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
             attestation,
             keyring,
         } => {
-            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
-                eprintln!("maosctl: spirit hot-swap-precheck — {diag}");
-                return ExitCode::from(1);
-            }
-            if from.is_empty() {
-                eprintln!("maosctl: spirit hot-swap-precheck — --from version must be non-empty");
+            // The daemon prechecks the LOADED control block, so the
+            // predecessor version is its own fact — an operator-supplied
+            // `--from` would be a claim about state the daemon can simply
+            // read (D-16-1-W). Vetting artifacts travel with `upgrade` only.
+            if from.is_some() {
+                eprintln!(
+                    "maosctl: spirit hot-swap-precheck — --from is not carried over the door: \
+                     the daemon prechecks the LOADED control block"
+                );
                 return ExitCode::from(2);
             }
-            // Check the --to manifest path exists.
-            let manifest_path = std::path::Path::new(to);
-            if !manifest_path.exists() {
-                eprintln!("maosctl: spirit hot-swap-precheck — manifest file not found: {to}");
-                return ExitCode::from(1);
+            if attestation.is_some() || keyring.is_some() {
+                eprintln!(
+                    "maosctl: spirit hot-swap-precheck — attestation/keyring travel with \
+                     `spirit upgrade`, not the door precheck"
+                );
+                return ExitCode::from(2);
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "hot-swap-precheck");
-            cmd.env("MAOS_SPIRIT_ID", spirit);
-            cmd.env("MAOS_HOTSWAP_FROM_VERSION", from);
-            cmd.env("MAOS_HOTSWAP_TO_MANIFEST", to);
-            if let Some(att_path) = attestation {
-                cmd.env("MAOS_HOTSWAP_TO_ATTESTATION", att_path);
+            if let Some(code) = checked_id("spirit hot-swap-precheck", spirit) {
+                return code;
             }
-            if let Some(kr_path) = keyring {
-                cmd.env("MAOS_VETTER_KEYRING", kr_path);
-            }
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-
-            exec_and_forward(&mut cmd, &bin)
+            let manifest = match canonical_manifest("spirit hot-swap-precheck", to) {
+                Ok(path) => path,
+                Err(code) => return code,
+            };
+            let body = serde_json::to_vec(&serde_json::json!({
+                "target_manifest": manifest.to_string_lossy(),
+            }))
+            .expect("serializing a hand-built Value cannot fail");
+            door_verb("spirit hot-swap-precheck", |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    &format!("/v1/spirits/{spirit}/hot-swap-precheck"),
+                    Some(("application/json", &body)),
+                    LONG_ROUTE_BUDGET,
+                )
+            })
         }
         SpiritOp::Upgrade {
             spirit,
@@ -1842,106 +2200,173 @@ fn dispatch_spirit(args: &SpiritArgs, color: ColorChoice) -> ExitCode {
             keyring,
             policy,
         } => {
-            if let Err(diag) = resolve_spirit_pid(spirit, &default_transparency_log_path(), false) {
-                eprintln!("maosctl: spirit upgrade — {diag}");
-                return ExitCode::from(1);
-            }
-            let manifest_path = std::path::Path::new(to);
-            if !manifest_path.exists() {
-                eprintln!("maosctl: spirit upgrade — manifest file not found: {to}");
-                return ExitCode::from(1);
-            }
-            if *plan && (from.as_deref().is_none_or(str::is_empty) || candidates.is_empty()) {
+            // `--policy migrator` names the kernel's multi-hop executor, which
+            // the door does not expose: D-16-1-W is hot-swap only, because the
+            // cold-swap arm starts an unadmitted successor under a new pid.
+            if policy == &UpgradePolicyArg::Migrator {
                 eprintln!(
-                    "maosctl: spirit upgrade --plan requires non-empty --from and --candidates"
+                    "maosctl: spirit upgrade — --policy migrator is not on the operator \
+                     door surface (hot-swap only, D-16-1-W)"
                 );
                 return ExitCode::from(2);
             }
+            // ⚠ `--plan` IS carried. The execution guard that reads a
+            // persisted plan runs daemon-side either way, so refusing only the
+            // CREATION half would leave a guard nothing could ever arm and a
+            // shipped operator flag with no implementation.
             if !*plan && (from.is_some() || !candidates.is_empty()) {
                 eprintln!("maosctl: spirit upgrade --from/--candidates require --plan");
                 return ExitCode::from(2);
             }
-
-            let bin = maos_bin_path();
-            let mut cmd = std::process::Command::new(&bin);
-            cmd.env("MAOS_ONE_SHOT", "spirit-upgrade");
-            cmd.env("MAOS_SPIRIT_ID", spirit);
-            cmd.env("MAOS_UPGRADE_TO_MANIFEST", to);
-            cmd.env(
-                "MAOS_UPGRADE_POLICY",
-                match policy {
+            if let Some(code) = checked_id("spirit upgrade", spirit) {
+                return code;
+            }
+            // Candidate manifests are canonicalised for the SAME reason `--to`
+            // is: a relative path would resolve in the daemon's working
+            // directory, not the operator's.
+            let mut canonical_candidates = Vec::with_capacity(candidates.len());
+            for candidate in candidates {
+                match canonical_manifest("spirit upgrade --candidates", candidate) {
+                    Ok(path) => canonical_candidates.push(path.to_string_lossy().into_owned()),
+                    Err(code) => return code,
+                }
+            }
+            let manifest = match canonical_manifest("spirit upgrade", to) {
+                Ok(path) => path,
+                Err(code) => return code,
+            };
+            // D-16-1-W: all operator-selected files are canonicalized before
+            // crossing into the daemon's different working directory.
+            let attestation = match attestation {
+                Some(path) => {
+                    match canonical_operator_file("spirit upgrade", "attestation", path) {
+                        Ok(path) => Some(path.to_string_lossy().into_owned()),
+                        Err(code) => return code,
+                    }
+                }
+                None => None,
+            };
+            let keyring = match keyring {
+                Some(path) => match canonical_operator_file("spirit upgrade", "keyring", path) {
+                    Ok(path) => Some(path.to_string_lossy().into_owned()),
+                    Err(code) => return code,
+                },
+                None => None,
+            };
+            let body = serde_json::to_vec(&serde_json::json!({
+                "target_manifest": manifest.to_string_lossy(),
+                "policy": match policy {
                     UpgradePolicyArg::HotSwap => "hot-swap",
                     UpgradePolicyArg::ColdSwap => "cold-swap",
-                    UpgradePolicyArg::Migrator => "migrator",
+                    UpgradePolicyArg::Migrator => unreachable!("refused above"),
                 },
-            );
-            if let Some(attestation_path) = attestation {
-                cmd.env("MAOS_UPGRADE_TO_ATTESTATION", attestation_path);
-            }
-            if let Some(keyring_path) = keyring {
-                cmd.env("MAOS_VETTER_KEYRING", keyring_path);
-            }
-            if *plan {
-                cmd.env("MAOS_UPGRADE_PLAN", "1");
-                cmd.env(
-                    "MAOS_UPGRADE_FROM_VERSION",
-                    from.as_deref().expect("validated --plan --from"),
-                );
-                let candidates_json = match serde_json::to_string(candidates) {
-                    Ok(json) => json,
-                    Err(err) => {
-                        eprintln!("maos: failed to serialize upgrade candidates: {err}");
-                        return ExitCode::FAILURE;
-                    }
-                };
-                cmd.env("MAOS_UPGRADE_CANDIDATES", candidates_json);
-            }
-
-            if std::env::var_os("NO_COLOR").is_some() || color == ColorChoice::Never {
-                cmd.env("NO_COLOR", "1");
-            }
-
-            exec_and_forward(&mut cmd, &bin)
+                "attestation": attestation,
+                "vetter_keyring": keyring,
+                "from_version": from,
+                "candidates": canonical_candidates,
+                "create_plan": plan,
+            }))
+            .expect("serializing a hand-built Value cannot fail");
+            door_verb("spirit upgrade", |config| {
+                door_client::exchange(
+                    config,
+                    "POST",
+                    &format!("/v1/spirits/{spirit}/upgrade"),
+                    Some(("application/json", &body)),
+                    LONG_ROUTE_BUDGET,
+                )
+            })
         }
         SpiritOp::Inspect { spirit, sandbox } => {
-            if !sandbox {
-                eprintln!("maos: spirit inspect requires --sandbox at v0.3-β; full inspect surface arrives at Story 9.x");
-                return ExitCode::SUCCESS;
+            if let Some(code) = checked_id("spirit inspect", spirit) {
+                return code;
             }
-            match fetch_live_sandbox_report(spirit) {
-                Ok(report) => {
-                    println!("{report}");
-                    ExitCode::SUCCESS
+            if *sandbox {
+                // The preserved sandbox surface: HEAD report and exit codes
+                // (4 unauthorized / 5 not found / 1 transport).
+                match fetch_live_sandbox_report(spirit) {
+                    Ok(report) => {
+                        println!("{report}");
+                        ExitCode::SUCCESS
+                    }
+                    Err(SandboxInspectHttpError::Unauthorized) => {
+                        eprintln!(
+                            "maosctl: sandbox inspect unauthorized (operator bearer rejected)"
+                        );
+                        ExitCode::from(4)
+                    }
+                    Err(SandboxInspectHttpError::NotFound) => {
+                        eprintln!("maosctl: sandbox report not found for Spirit '{spirit}'");
+                        ExitCode::from(5)
+                    }
+                    Err(error) => {
+                        eprintln!("maosctl: sandbox inspect failed: {error}");
+                        ExitCode::from(1)
+                    }
                 }
-                Err(SandboxInspectHttpError::Unauthorized) => {
-                    eprintln!("maosctl: sandbox inspect unauthorized (operator bearer rejected)");
-                    ExitCode::from(4)
-                }
-                Err(SandboxInspectHttpError::NotFound) => {
-                    eprintln!("maosctl: sandbox report not found for Spirit '{spirit}'");
-                    ExitCode::from(5)
-                }
-                Err(error) => {
-                    eprintln!("maosctl: sandbox inspect failed: {error}");
-                    ExitCode::from(1)
-                }
+            } else {
+                spirit_status_report(spirit)
             }
         }
     }
 }
 
+/// `spirit inspect <id>` WITHOUT `--sandbox`: the live control-block view
+/// from `GET /v1/spirits/{id}` — lifecycle_state read from
+/// `SpiritControlBlock::current_state` and posture from the PolicyTable the
+/// daemon actually enforces (AC1), replacing the HEAD refusal line.
+fn spirit_status_report(spirit: &str) -> ExitCode {
+    match door_client::resolve_door() {
+        Ok(config) => {
+            match door_client::exchange(
+                &config,
+                "GET",
+                &format!("/v1/spirits/{spirit}"),
+                None,
+                DEFAULT_ROUTE_BUDGET,
+            ) {
+                Ok(response) if response.status == 200 => {
+                    let body = response.body_json();
+                    let field = |name: &str| {
+                        body.get(name)
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or("?")
+                            .to_owned()
+                    };
+                    let pid = body
+                        .get("pid")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0);
+                    println!("spirit_id: {}", field("spirit_id"));
+                    println!("pid: {pid}");
+                    println!("boot_nonce: {}", field("boot_nonce"));
+                    println!("lifecycle_state: {}", field("lifecycle_state"));
+                    println!("posture: {}", field("posture"));
+                    ExitCode::SUCCESS
+                }
+                Ok(response) => door_client::map_response("spirit inspect", response),
+                Err(DoorError::ConnectRefused) => {
+                    door_client::door_class_connect_refused("spirit inspect", config.endpoint)
+                }
+                Err(error) => door_client::map_error("spirit inspect", error),
+            }
+        }
+        Err(error) => door_client::map_error("spirit inspect", error),
+    }
+}
+
+/// The `--sandbox` surface's own error shape: it keeps its HEAD exit codes
+/// (4 unauthorized / 5 not found / 1 everything else), so it does NOT use the
+/// D-16-1-P mapping the mutating verbs share. Discovery now runs through the
+/// door client like every other verb (env pair → `control.json`).
 #[derive(Debug, thiserror::Error)]
 enum SandboxInspectHttpError {
-    #[error("MAOS_OPERATOR_HTTP_ENDPOINT is required for --sandbox")]
-    EndpointMissing,
-    #[error("MAOS_OPERATOR_BEARER_TOKEN is required for --sandbox")]
-    TokenMissing,
-    #[error("operator endpoint must be http://<loopback-host>:<port>")]
-    InvalidEndpoint,
+    #[error("{0}")]
+    Discovery(String),
+    #[error("connection to the operator door failed: {0}")]
+    Connect(String),
     #[error("operator HTTP I/O: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("malformed HTTP response")]
-    MalformedResponse,
+    Io(String),
     #[error("operator returned HTTP {0}")]
     UnexpectedStatus(u16),
     #[error("unauthorized")]
@@ -1958,49 +2383,44 @@ fn fetch_live_sandbox_report(spirit_id: &str) -> Result<String, SandboxInspectHt
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
     {
-        return Err(SandboxInspectHttpError::InvalidEndpoint);
+        return Err(SandboxInspectHttpError::Discovery(
+            "spirit id must match [A-Za-z0-9._-]".to_owned(),
+        ));
     }
-    let endpoint = std::env::var("MAOS_OPERATOR_HTTP_ENDPOINT")
-        .map_err(|_| SandboxInspectHttpError::EndpointMissing)?;
-    let token = std::env::var("MAOS_OPERATOR_BEARER_TOKEN")
-        .map_err(|_| SandboxInspectHttpError::TokenMissing)?;
-    if token.is_empty() {
-        return Err(SandboxInspectHttpError::TokenMissing);
-    }
-    let address = endpoint
-        .strip_prefix("http://")
-        .unwrap_or(&endpoint)
-        .parse::<std::net::SocketAddr>()
-        .map_err(|_| SandboxInspectHttpError::InvalidEndpoint)?;
-    if !address.ip().is_loopback() {
-        return Err(SandboxInspectHttpError::InvalidEndpoint);
-    }
-    let mut stream =
-        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(2))?;
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
-    use std::io::{Read, Write};
-    write!(
-        stream,
-        "GET /v1/spirits/{spirit_id}/sandbox HTTP/1.1\r\nHost: {address}\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
-    )?;
-    let mut response = Vec::new();
-    stream.read_to_end(&mut response)?;
-    let response =
-        String::from_utf8(response).map_err(|_| SandboxInspectHttpError::MalformedResponse)?;
-    let (head, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or(SandboxInspectHttpError::MalformedResponse)?;
-    let status = head
-        .split_whitespace()
-        .nth(1)
-        .ok_or(SandboxInspectHttpError::MalformedResponse)?
-        .parse::<u16>()
-        .map_err(|_| SandboxInspectHttpError::MalformedResponse)?;
-    match status {
-        200 => Ok(body.to_owned()),
+    let config = door_client::resolve_door().map_err(sandbox_door_error)?;
+    let response = door_client::exchange(
+        &config,
+        "GET",
+        &format!("/v1/spirits/{spirit_id}/sandbox"),
+        None,
+        door_client::DEFAULT_ROUTE_BUDGET,
+    )
+    .map_err(|error| match error {
+        DoorError::ConnectRefused => {
+            SandboxInspectHttpError::Connect(format!("{} refused", config.endpoint))
+        }
+        error => sandbox_door_error(error),
+    })?;
+    match response.status {
+        200 => String::from_utf8(response.body)
+            .map_err(|_| SandboxInspectHttpError::Io("report is not UTF-8".to_owned())),
         401 => Err(SandboxInspectHttpError::Unauthorized),
         404 => Err(SandboxInspectHttpError::NotFound),
         other => Err(SandboxInspectHttpError::UnexpectedStatus(other)),
+    }
+}
+
+/// Discovery/validation failures render through the door client's typed
+/// messages; they keep the legacy exit-1 shell around them.
+fn sandbox_door_error(error: DoorError) -> SandboxInspectHttpError {
+    match error {
+        DoorError::NotInitialized(message) | DoorError::Config(message) => {
+            SandboxInspectHttpError::Discovery(message)
+        }
+        DoorError::Unresponsive(detail) => SandboxInspectHttpError::Connect(detail),
+        DoorError::ConnectRefused => {
+            SandboxInspectHttpError::Connect("refused during discovery".to_owned())
+        }
     }
 }
 
@@ -2181,10 +2601,16 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
 
 /// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs.
 ///
-/// Delegates to [`maos_audit::resolve_spirit_name`] which scans the TL for
-/// `lifecycle.admit`/`lifecycle.load` intents. Per Decision E: keyed on
+/// Delegates to [`maos_audit::resolve_spirit_name`], which scans the TL for
+/// SpiritAdmitted (kind 19) and `lifecycle.load` (kind 7) frames — D-16-1-K,
+/// since `maos run` writes only the latter. Per Decision E: keyed on
 /// `(boot_nonce, spirit_pid)` to discriminate pid reuse across boots.
-/// Default: latest boot (max boot_nonce). `all_boots` unions all incarnations.
+/// Default: latest boot by `timestamp_ns` (never `max(boot_nonce)` — the
+/// nonce is random). `all_boots` unions all incarnations.
+///
+/// After Story 16-1 this is NOT a door-verb preflight (the daemon resolves
+/// names; unknown ⇒ typed 404): the remaining callers are the audit read
+/// paths and the offline `halt list` reader, which have no daemon.
 ///
 /// Returns a Vec with 1 element normally, or multiple for `--all-boots`.
 /// Unknown names exit non-zero with a clear diagnostic.
@@ -4977,23 +5403,6 @@ mod tests {
             Subcommand::Unload(args) => assert!(args.spirit.is_none()),
             _ => panic!("expected Unload subcommand"),
         }
-    }
-
-    #[test]
-    fn lifecycle_verb_rejects_unknown_spirit_with_exit_two() {
-        // Drive the helper directly — `resolve_spirit_pid` rejects unknown
-        // names with the exact v0.1-β diagnostic, and the helper translates
-        // that to exit 2 BEFORE spawning the child.
-        let color = ColorChoice::Auto;
-        let code = lifecycle_verb("start", Some("orchestrator"), color);
-        assert_ne!(code, ExitCode::SUCCESS);
-    }
-
-    #[test]
-    fn lifecycle_verb_rejects_missing_spirit_with_exit_two() {
-        let color = ColorChoice::Auto;
-        let code = lifecycle_verb("stop", None, color);
-        assert_ne!(code, ExitCode::SUCCESS);
     }
 
     // ── FR41/FR42/FR43 — new audit query flag parsing tests (Story 9.1) ─────

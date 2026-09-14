@@ -40,12 +40,27 @@ fn transparency_log_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Ok(path)
 }
 
-/// Run `maos init` — scaffold `~/.maos/` if absent.
+/// Run `maos init` — scaffold the MAOS home if absent.
 ///
-/// Idempotent: re-running prints "already initialized" and exits 0.
+/// Idempotent: re-running prints "already initialized" and exits 0, and never
+/// rewrites a byte of `control.json`.
+///
+/// ⚠ Story 16-1 — the directory tree is created FIRST. Until this story the
+/// `create_new(true)` open of `config.toml` ran BEFORE `create_dir_all(&home)`,
+/// so `maos init` exited 1 with `ENOENT` on every machine that did not already
+/// have the home — J0's very first command, on a clean install. All four init
+/// tests passed because all four fixtures pre-created the directory.
 pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Error>> {
-    let home = maos_home();
+    let home = maos_home()?;
     let config_path = home.join("config.toml");
+
+    // Story 16-1 — the home exists BEFORE anything is opened inside it, at
+    // `0700` (D-16-1-D: any uid that can `open()` a store directory can hold a
+    // shared flock on it and keep a root from booting).
+    maos_domain::operator_door::ensure_home_dir(&home)?;
+    for leaf in ["skills", "audit", "journal", "logs"] {
+        std::fs::create_dir_all(home.join(leaf))?;
+    }
 
     // Atomic create-exclusive: fails if config.toml already exists (idempotent guard).
     let mut file = match std::fs::OpenOptions::new()
@@ -58,6 +73,12 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
             // Validate existing config is non-trivial.
             let existing = std::fs::read_to_string(&config_path).unwrap_or_default();
             if existing.contains("[slots]") && existing.contains("[retention]") {
+                // ⚠ The door config is minted even here. A home initialised
+                // before Story 16-1 is complete by this test and has NO
+                // `control.json`; taking the shortcut would leave every such
+                // machine with no operator door and no way to get one short of
+                // deleting `config.toml`.
+                ensure_operator_door(&home, color_choice)?;
                 print_line(
                     color_choice,
                     &format!(
@@ -76,13 +97,6 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
         }
         Err(e) => return Err(e.into()),
     };
-
-    // Create directory tree.
-    std::fs::create_dir_all(&home)?;
-    std::fs::create_dir_all(home.join("skills"))?;
-    std::fs::create_dir_all(home.join("audit"))?;
-    std::fs::create_dir_all(home.join("journal"))?;
-    std::fs::create_dir_all(home.join("logs"))?;
 
     // Write config.toml.
     let config = default_config_toml();
@@ -107,6 +121,7 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
             config_path.display()
         ),
     );
+    ensure_operator_door(&home, color_choice)?;
     let audit_path = transparency_log_path()?;
     print_line(
         color_choice,
@@ -117,6 +132,30 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
         &format!("maos: to remove all data, run:  rm -rf {}", home.display()),
     );
     Ok(())
+}
+
+/// Story 16-1 / ADR-062 — `maos init` is the ONE writer of `control.json`.
+///
+/// The daemon does not write it at bind (that would be a second trust path for
+/// the same token), and neither does `maosctl`. Rotation is
+/// `rm control.json && maos init`.
+fn ensure_operator_door(
+    home: &std::path::Path,
+    color_choice: ColorChoice,
+) -> Result<maos_domain::operator_door::ControlFileState, Box<dyn std::error::Error>> {
+    use maos_domain::operator_door::{ensure_control_file, ControlFileState};
+    let (control, state) = ensure_control_file(home)?;
+    if state == ControlFileState::Minted {
+        print_line(
+            color_choice,
+            &format!(
+                "maos: operator door endpoint {} recorded in {}",
+                control.endpoint,
+                maos_domain::operator_door::control_file_path(home).display()
+            ),
+        );
+    }
+    Ok(state)
 }
 
 /// Run `maos audit query` — thin alias over `maos_audit::query`.
@@ -301,18 +340,19 @@ pub fn run_shell(
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn maos_home() -> PathBuf {
-    std::env::var("MAOS_HOME")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".maos"))
-        })
-        .expect("maos: neither MAOS_HOME nor HOME is set — set one to proceed")
+/// Story 16-1 / D-16-1-C — ONE home rule, owned by `maos-domain`.
+///
+/// This was a private second copy of the rule (`MAOS_HOME`, else
+/// `$HOME/.maos`) that `panicked` when neither was set. `maosctl` cannot depend
+/// on `maos-shell` — the crate edge runs the other way — so the rule had to
+/// move to the one crate `maos init`, every daemon root and `maosctl` all
+/// already depend on.
+fn maos_home() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    maos_domain::operator_door::maos_home()?.ok_or_else(|| {
+        Box::<dyn std::error::Error>::from(
+            "maos: neither MAOS_HOME nor HOME is set — set one to proceed",
+        )
+    })
 }
 
 fn default_config_toml() -> String {

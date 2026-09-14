@@ -10,6 +10,9 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
 }
@@ -39,6 +42,9 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 fn run_once(manifest: &str) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", manifest, "--once"])
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" so this root never reads
+        // the developer's $HOME/.maos/control.json (EndpointInUse collision).
+        .env("HOME", doorless_home::doorless_home())
         .env("XDG_DATA_HOME", isolated_data_home("smoke").path.clone())
         .current_dir(workspace_root())
         .output()

@@ -6,6 +6,10 @@
 #![cfg(feature = "fixture_replay")]
 
 use std::process::Command;
+
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 struct IsolatedDataHome {
     path: std::path::PathBuf,
 }
@@ -37,6 +41,9 @@ fn smoke_registry_5d_exits_zero_and_outputs_7_json_lines() {
     let output = Command::new(bin)
         .env("MAOS_ONE_SHOT", "smoke-registry-5d")
         .env("XDG_DATA_HOME", &data_home.path)
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" — the floor is file-granular,
+        // and a one-shot that later becomes a root must not regain the hazard.
+        .env("HOME", doorless_home::doorless_home())
         .output()
         .expect("failed to execute maos-bin");
 

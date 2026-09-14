@@ -1604,12 +1604,22 @@ pub fn default_erasure_proofs_dir() -> std::path::PathBuf {
     data_home.join("maos").join("erasure-proofs")
 }
 /// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs by
-/// scanning the Transparency Log for SpiritAdmitted (FrameKind 19) frames
-/// whose non-redacted `intent` column carries the Spirit name.
+/// scanning the Transparency Log for SpiritAdmitted (kind 19) and
+/// `lifecycle.load` (kind 7) frames.
+///
+/// D-16-1-K: `maos run` writes ONLY kind-7 `lifecycle.load` rows — the
+/// kind-19 `SpiritAdmitted` frame this resolver used to require never lands
+/// for a `maos run` Spirit, so every non-`hello-spirit` name resolved to
+/// "unknown" before any verb could run. The kind-7 rows carry the Spirit name
+/// in the redacted payload JSON (`spirit_id`), not in `intent`, so both
+/// columns are consulted.
 ///
 /// Per Decision E: keyed on `(boot_nonce, spirit_pid)` to discriminate pid
-/// reuse across boots. Defaults to the LATEST boot (max `boot_nonce`).
-/// Set `all_boots = true` to union all incarnations.
+/// reuse across boots. "Latest boot" is the boot holding the GREATEST
+/// `timestamp_ns`: the previous `max(boot_nonce)` rule ordered boots by a
+/// RANDOM 64-bit value, so "latest boot" was "largest random number" and
+/// could silently switch incarnations across restarts. Set `all_boots = true`
+/// to union all incarnations.
 ///
 /// Returns `Err` if no matching frames exist (unknown spirit name).
 pub fn resolve_spirit_name(
@@ -1617,114 +1627,213 @@ pub fn resolve_spirit_name(
     name: &str,
     all_boots: bool,
 ) -> Result<Vec<(u64, u32)>, String> {
-    // v0.1-β evaluator path: the reference Spirit is the only valid name at
-    // this version. Resolve it without requiring authoritative FrameKind 19
-    // admission rows so that CLI verbs work in fresh harnesses and after
-    // lifecycle entries have been journaled.
+    // v0.1-β evaluator path: the reference Spirit resolves without admission
+    // rows (kept per D-16-1-K — removing it reds the v0.1 evaluator path and
+    // is routed to 16-2), but its "latest boot" pick follows the same
+    // timestamp rule as the main branch below.
     if name == "hello-spirit" {
         if !db_path.exists() {
             return Ok(vec![(0, 0)]);
         }
-        let conn = rusqlite::Connection::open_with_flags(
-            db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(|e| format!("failed to open TL: {e}"))?;
+        let conn = open_transparency_log_readonly(db_path)?;
         let mut stmt = conn
             .prepare(
-                "SELECT DISTINCT boot_nonce, spirit_pid
+                "SELECT boot_nonce, spirit_pid, MAX(timestamp_ns)
                  FROM transparency_log
                  WHERE spirit_pid = 0
-                 ORDER BY boot_nonce ASC",
+                 GROUP BY boot_nonce",
             )
             .map_err(|e| format!("prepare fallback failed: {e}"))?;
         let rows = stmt
             .query_map([], |row| {
                 let boot: i64 = row.get(0)?;
                 let pid: i64 = row.get(1)?;
-                Ok((boot as u64, pid as u32))
+                let latest_ns: i64 = row.get(2)?;
+                Ok((boot as u64, pid as u32, latest_ns as u64))
             })
             .map_err(|e| format!("fallback query failed: {e}"))?;
-        let mut matches: Vec<(u64, u32)> = Vec::new();
+        let mut boots: Vec<(u64, u32, u64)> = Vec::new();
         for row in rows {
-            matches.push(row.map_err(|e| format!("fallback row error: {e}"))?);
+            boots.push(row.map_err(|e| format!("fallback row error: {e}"))?);
         }
-        if matches.is_empty() {
+        if boots.is_empty() {
             return Ok(vec![(0, 0)]);
         }
         if all_boots {
-            Ok(matches)
-        } else {
-            let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
-            Ok(matches
-                .into_iter()
-                .filter(|(b, _)| *b == max_boot)
-                .collect())
+            boots.sort();
+            return Ok(boots.into_iter().map(|(b, p, _)| (b, p)).collect());
         }
-    } else {
-        if !db_path.exists() {
-            return Err(format!(
-                "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
-            ));
-        }
+        let latest_ns = boots.iter().map(|(_, _, ns)| *ns).max().unwrap_or(0);
+        return Ok(boots
+            .into_iter()
+            .filter(|(_, _, ns)| *ns == latest_ns)
+            .map(|(b, p, _)| (b, p))
+            .collect());
+    }
 
-        let conn = rusqlite::Connection::open_with_flags(
-            db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(|e| format!("failed to open TL: {e}"))?;
+    if !db_path.exists() {
+        return Err(format!(
+            "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+        ));
+    }
 
-        // Decision E: scan FrameKind 19 (SpiritAdmitted) TL frames.
-        // The Spirit name is stored in the non-redacted `intent` column.
-        let sql = "SELECT boot_nonce, spirit_pid, intent
-                   FROM transparency_log
-                   WHERE kind = 19
-                   ORDER BY timestamp_ns ASC";
-        let mut stmt = conn
-            .prepare(sql)
-            .map_err(|e| format!("prepare failed: {e}"))?;
-        let rows = stmt
-            .query_map([], |row| {
-                let boot: i64 = row.get(0)?;
-                let pid: i64 = row.get(1)?;
-                let intent: String = row.get(2)?;
-                Ok((boot as u64, pid as u32, intent))
-            })
-            .map_err(|e| format!("query failed: {e}"))?;
+    let conn = open_transparency_log_readonly(db_path)?;
 
-        let mut matches: Vec<(u64, u32)> = Vec::new();
-        for row in rows {
-            let (boot, pid, intent) = row.map_err(|e| format!("row error: {e}"))?;
-            if intent == name {
-                matches.push((boot, pid));
-            }
-        }
+    // D-16-1-K: kind 19 (SpiritAdmitted, name in `intent`) and kind 7
+    // (`lifecycle.load`, name in the payload's `spirit_id`). Timestamp-ordered
+    // so the LAST matching row below is the latest boot.
+    let sql = "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted, timestamp_ns
+               FROM transparency_log
+               WHERE kind IN (7, 19)
+               ORDER BY timestamp_ns ASC, frame_id ASC";
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("prepare failed: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let boot: i64 = row.get(0)?;
+            let pid: i64 = row.get(1)?;
+            let kind: i64 = row.get(2)?;
+            let intent: String = row.get(3)?;
+            let payload: Vec<u8> = row.get(4)?;
+            let timestamp_ns: i64 = row.get(5)?;
+            Ok((
+                boot as u64,
+                pid as u32,
+                kind,
+                intent,
+                payload,
+                timestamp_ns as u64,
+            ))
+        })
+        .map_err(|e| format!("query failed: {e}"))?;
 
-        if matches.is_empty() {
-            return Err(format!(
-                "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
-            ));
-        }
-
-        if all_boots {
-            // Deduplicate by (boot_nonce, spirit_pid)
-            matches.sort();
-            matches.dedup();
-            Ok(matches)
-        } else {
-            // Default: latest boot (max boot_nonce)
-            let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
-            let latest: Vec<(u64, u32)> = matches
-                .into_iter()
-                .filter(|(b, _)| *b == max_boot)
-                .collect();
-            Ok(latest)
+    let mut matches: Vec<(u64, u32, u64)> = Vec::new(); // (boot, pid, timestamp_ns)
+    for row in rows {
+        let (boot, pid, kind, intent, payload, timestamp_ns) =
+            row.map_err(|e| format!("row error: {e}"))?;
+        let name_matches = match kind {
+            19 => intent == name,
+            // `lifecycle.load`: a valid payload is authoritative; use the
+            // legacy intent layout only when the payload has no Spirit id.
+            _ => match payload_spirit_id(&payload) {
+                Some(payload_id) => payload_id == name,
+                None => intent == name,
+            },
+        };
+        if name_matches {
+            matches.push((boot, pid, timestamp_ns));
         }
     }
+
+    if matches.is_empty() {
+        return Err(format!(
+            "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+        ));
+    }
+
+    let latest_boot = (!all_boots).then(|| matches.last().map(|(boot, _, _)| *boot).unwrap_or(0));
+    let mut resolved: Vec<(u64, u32)> = matches
+        .into_iter()
+        .filter(|(boot, _, _)| latest_boot.is_none_or(|latest| *boot == latest))
+        .map(|(boot, pid, _)| (boot, pid))
+        .collect();
+    resolved.sort_unstable();
+    resolved.dedup();
+    Ok(resolved)
+}
+
+/// The `spirit_id` field of a redacted lifecycle payload, when it parses as
+/// JSON and carries one.
+fn payload_spirit_id(payload: &[u8]) -> Option<String> {
+    serde_json::from_slice::<serde_json::Value>(payload)
+        .ok()?
+        .get("spirit_id")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// The one read-only TL open shared by the CLI-side resolvers: `READ_ONLY`
+/// (never the write-capable adapter — a write-capable open can hold the
+/// sqlite lock past the daemon's `busy_timeout` and trip the TL's
+/// panic-on-write-error) plus `NOFOLLOW`.
+fn open_transparency_log_readonly(db_path: &Path) -> Result<rusqlite::Connection, String> {
+    rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(|e| format!("failed to open TL: {e}"))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Story 16-1 — read-only maosctl readers (D-16-1-A: the two durable lists)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One active host-global legal hold, as `maosctl legal-hold list` renders it.
+/// Field-for-field the `maos-iac` adapter's persisted row, re-declared here
+/// because this reader exists precisely to avoid opening the write-capable
+/// adapter that owns the original type.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LegalHoldRow {
+    pub principal_id: String,
+    pub reason: String,
+    pub case_ref: Option<String>,
+    pub requested_at_ns: u64,
+}
+
+/// `maosctl legal-hold list`: read the `legal_holds` table READ-ONLY.
+///
+/// Trap 9 — the write-capable adapter can hold the sqlite lock past the
+/// daemon's `busy_timeout=5000` and trip its panic-on-write-error; a maosctl
+/// reader must never be the process holding that lock. A MISSING table is an
+/// EMPTY list, not an error: a TL written before Story 13.5b simply holds no
+/// holds. Ordering matches the adapter's `list_legal_holds`
+/// (`requested_at_ns, principal_id`).
+pub fn list_legal_holds_readonly(db_path: &Path) -> Result<Vec<LegalHoldRow>, AuditError> {
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(AuditError::Open)?;
+    let present: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'legal_holds'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(AuditError::Read)?;
+    if present == 0 {
+        return Ok(Vec::new());
+    }
+    let mut stmt = conn
+        .prepare(
+            "SELECT principal_id, reason, case_ref, requested_at_ns
+             FROM legal_holds
+             ORDER BY requested_at_ns, principal_id",
+        )
+        .map_err(AuditError::Read)?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(LegalHoldRow {
+                principal_id: row.get(0)?,
+                reason: row.get(1)?,
+                case_ref: row.get(2)?,
+                requested_at_ns: row.get::<_, i64>(3)? as u64,
+            })
+        })
+        .map_err(AuditError::Read)?;
+    let mut holds = Vec::new();
+    for row in rows {
+        holds.push(row.map_err(AuditError::Read)?);
+    }
+    Ok(holds)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

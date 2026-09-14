@@ -111,3 +111,69 @@ new precision from introducing request reflection.
 - Certificate and cohort identity state remain writable only by signed reissue.
 - `MAOS_OPERATOR_HTTP_ENDPOINT` remains an override and must be registered when
   Story 21-4 widens environment-contract scanning to every crate.
+
+## Amendment — Story 16-1
+
+Amended in the same commit as the code it governs: measurement against the
+built binaries disproved premises inside the Context and Decision above. Each
+point below is a decision with its measured reason; sections above are not
+rewritten except where a point says it supersedes them.
+
+- **Door roots.** The daemon binds the door in exactly three roots — `maos run`,
+  `maos shell` (a bare `maos` included) and `MAOS_ONE_SHOT=cohort-a2a-daemon` —
+  gated by root, never by env presence. Measured: the bind preceded the one-shot
+  dispatch and `maosctl` spawns do not `env_clear`, so every one-shot child bound
+  the door and exited 1 `Address already in use`. The root set is static and
+  reviewable; env presence is not a gate, it is data.
+- **The three read-route POST tests are all guards.** The Decision asked that
+  "the generic read-only assertion" be narrowed; measurement says none of the
+  three is generic. All three HEAD `POST → 404` tests become post-auth 405
+  guards — the third guards `self-identity`, which *is* "this host's signed and
+  serving certificate identity", preserved above as a read. Nothing is narrowed;
+  all three keep guarding.
+- **The 405 phrase now exists.** The Context statement that there is "no 405
+  Method Not Allowed phrase today" (`:21-23`) is SUPERSEDED:
+  `crates/maos-control/src/lib.rs` answers 405 with the fixed body
+  `{"error":"method_not_allowed"}` and the wire phrase `405 Method Not Allowed`.
+  The governance-gate clause that asserted `require_absent("Method Not
+  Allowed")` is flipped to `require_contains` in the same commit, so the gate
+  now REDS if the phrase disappears again.
+- **`control.json` keeps one writer: `maos init`.** Liveness is NOT recorded in
+  the file — a file-stamped heartbeat is stale-state by construction. Liveness
+  is the store lock set: `flock` on the home directory's own handle and on every
+  durable store's directory handle. No lock file is ever created — a `.lock`
+  file inside a store directory would change the file counts
+  `erasure_uninstall_13_5b` asserts. Roots hold the set shared.
+- **The durable offline arm.** The four durable verbs (`forget`, `uninstall`,
+  `legal-hold-release`, `governance-admit`) run offline only when the offline
+  child acquires the whole set EXCLUSIVELY; any lock held ⇒ typed `StoreInUse`.
+  Connected-but-unresponsive is `DoorUnresponsive` and NEVER falls back to
+  offline: a live daemon that cannot answer may still hold unflushed state, and
+  writing around it is exactly the split-brain the set exists to prevent.
+- **The 8787 fallback is retired.** The token-only `127.0.0.1:8787` fallback
+  port is gone: configuration is the env overrides (both-or-neither) else
+  `control.json`, and a silent port guess has no third place in that order.
+- **`control.json` schema.** `{"version":1,"endpoint":"tcp://127.0.0.1:<port>",
+  "token":"<64 hex>"}`, file mode `0600`, home `0700`. Every reader refuses an
+  unknown `version` or a non-`tcp://` scheme: the version field is what lets a
+  future transport (a Unix socket dissolves half this threat model) change the
+  shape without old readers guessing.
+- **Residual threat, stated plainly.** Until Story 17-1 lands, a Worker
+  inherits the daemon's environment and runs as the operator uid, so a bare,
+  prompt-injectable agent CLI can read the `0600` `control.json` and use any
+  exported `MAOS_OPERATOR_BEARER_TOKEN`. The cure is 17-1's own `env_clear`
+  plus T3 isolation; naming it here is not a fix and must not read as one.
+- **The `operation_id` contract.** A `503 handler_still_running` carries the
+  id the PORT minted (the port, never the server — the server cannot know what
+  it did not submit); the command runs to completion and writes exactly one
+  Transparency-Log row whose `intent` contains that id, found by
+  `maosctl audit query --intent-contains <id>`. A `503 spirit_busy` carries NO
+  id because the command was withdrawn before it started — there is nothing to
+  look up.
+- **Upgrade over the door is hot-swap only, forward only, faithful
+  successor.** `cold-swap` is refused typed: the kernel's cold-swap arm starts
+  the successor under a new pid without `admit_spirit`, a door success there
+  would report an unadmitted process. A non-increasing successor version is
+  refused typed (measured: 0.3.0 → 0.2.0 reported `completed`). CRL import
+  carries the CRL's own bytes, never a path — the daemon's working directory is
+  not the operator's.
