@@ -220,8 +220,12 @@ Initialize a Host and start the runtime daemon:
 ```sh
 maos init            # scaffold ~/.maos (state home; override with MAOS_HOME)
 maos run             # start the kernel daemon and serving loop
-maos shell           # kernel-rendered REPL — talk to a Spirit with `@<spirit> <msg>`
-maos audit query     # read the Transparency Log
+maos shell           # kernel-rendered REPL — talk to a Spirit with `@<spirit> <msg>`;
+                     #   an ambiguous directive halts the Spirit, and a clarification
+                     #   typed in the REPL (or `maosctl halt resolve`) resolves it —
+                     #   the REPL renders the resolution and the Spirit proceeds
+maos audit query --spirit <name>   # read a Spirit's Transparency Log trail
+                                     #   (calls, halts, operator completions)
 ```
 
 Operate with `maosctl`:

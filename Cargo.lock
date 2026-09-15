@@ -2500,6 +2500,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "toml 0.8.23",
+ "ulid",
  "worker",
 ]
 
@@ -2745,6 +2746,7 @@ dependencies = [
  "maos-domain",
  "maos-kernel-core",
  "maos-mcp",
+ "parking_lot",
  "portable-pty",
  "rusqlite",
  "serde_json",
@@ -2932,6 +2934,7 @@ dependencies = [
  "maos-skill",
  "maos-spirit-abi",
  "maos-spirit-hello",
+ "parking_lot",
  "serde",
  "serde_json",
  "tempfile",

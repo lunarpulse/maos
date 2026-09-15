@@ -1352,21 +1352,41 @@ impl DoorInner {
             .spirit_key()
             .and_then(|spirit_id| self.scheduler.resolve_pid(spirit_id))
             .unwrap_or(0);
+        let spirit_id = command.spirit_key().map(str::to_string).unwrap_or_default();
         let outcome = self.dispatch(command).await;
         // ONE completion TL row per started mutating command, `intent`
         // carrying the `operation_id` so
         // `maosctl audit query --intent-contains <id>` finds it. Written
         // BEFORE the outcome is delivered, so a client that saw the answer
         // can always find the row.
+        //
+        // Story 16-2 / D-16-1-E as ratified (§15 R5): kind
+        // `telemetry.event` — a tokenless `capability.invocation` row at a
+        // Spirit's pid is precisely what FR4's view exists to refuse — and
+        // the intent carries the OUTCOME (`operator.<verb>.<op>:<outcome>`),
+        // prefix-compatible with 16-1's lookups (`starts_with
+        // ("operator.pause.")`, the length check, `--intent-contains
+        // <operation_id>`), so the row SAYS whether it resolved. `Completed`
+        // maps to the literal `completed` (it carries no code); every other
+        // variant maps to its typed code (all `[a-z_]`, none contain `:`).
+        let outcome_label = match &outcome {
+            OperatorOutcome::Completed(_) => "completed".to_string(),
+            OperatorOutcome::NotFound { code, .. }
+            | OperatorOutcome::Conflict { code, .. }
+            | OperatorOutcome::Invalid { code, .. }
+            | OperatorOutcome::Failed { code, .. } => code.clone(),
+        };
         let payload = serde_json::json!({
             "operation_id": operation_id,
             "verb": verb,
+            "spirit_id": spirit_id,
+            "outcome": outcome_label,
         });
         let _ = self.transparency_log.insert_frame_event(
-            maos_kernel_core::iac::transparency_log::FrameKind::CapabilityInvocation,
+            maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
             spirit_pid,
             None,
-            &format!("operator.{verb}.{operation_id}"),
+            &format!("operator.{verb}.{operation_id}:{outcome_label}"),
             payload.to_string().as_bytes(),
             maos_domain::invariants::i3::FrameOrigin::Kernel,
         );

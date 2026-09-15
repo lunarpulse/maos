@@ -76,6 +76,12 @@ pub struct JourneyWorldBuilder {
     mcp: BTreeMap<String, MockMcp>,
     llm: Option<ReplayProvider>,
     audit: Option<AuditDb>,
+    /// Story 16-2 / D-16-2-K — generic env additions. `Pty::spawn` splits
+    /// its command on whitespace and execs it, so env can never ride the
+    /// command string; J0 sets `MAOS_INFERENCE_MODE=replay` here (which also
+    /// overrides a job-wide record mode — J0's seed cassette is not a
+    /// re-record target).
+    extra_env: BTreeMap<String, String>,
 }
 
 impl JourneyWorldBuilder {
@@ -96,6 +102,13 @@ impl JourneyWorldBuilder {
 
     pub fn audit(mut self, audit: AuditDb) -> Self {
         self.audit = Some(audit);
+        self
+    }
+
+    /// Story 16-2 / D-16-2-K — set one environment variable on every child
+    /// the world spawns (generic: no per-journey endpoint on the builder).
+    pub fn env(mut self, key: &str, value: &str) -> Self {
+        self.extra_env.insert(key.to_string(), value.to_string());
         self
     }
 
@@ -131,6 +144,9 @@ impl JourneyWorldBuilder {
                 "MAOS_REPLAY_CASSETTE".into(),
                 cassette_path.to_string_lossy().into_owned(),
             );
+        }
+        for (key, value) in &self.extra_env {
+            env.insert(key.clone(), value.clone());
         }
         for (server_name, mock) in &mcp {
             let env_key = match server_name.as_str() {
@@ -436,6 +452,10 @@ pub struct Pty {
     reader_handle: Mutex<Option<std::thread::JoinHandle<()>>>,
     screen_buf: Arc<Mutex<Vec<u8>>>,
     master: Mutex<Option<Box<dyn portable_pty::MasterPty + Send>>>,
+    /// Story 16-2 / D-16-2-K — the master's writer, taken ONCE at spawn
+    /// (`take_writer` yields the only handle). `send_line` and `send_eof`
+    /// write through it; before 16-2 the harness could only READ a PTY.
+    writer: parking_lot::Mutex<Option<Box<dyn std::io::Write + Send>>>,
 }
 
 impl Pty {
@@ -477,6 +497,11 @@ impl Pty {
         if !world.env().contains_key("MAOS_REPLAY_CASSETTE") {
             cmd.env_remove("MAOS_INFERENCE_MODE");
         }
+        let pty_writer = pair
+            .master
+            .take_writer()
+            .expect("Pty::spawn: failed to take master writer");
+
         let child = pair
             .slave
             .spawn_command(cmd)
@@ -508,7 +533,35 @@ impl Pty {
             reader_handle: Mutex::new(Some(reader_handle)),
             screen_buf,
             master: Mutex::new(Some(pair.master)),
+            writer: parking_lot::Mutex::new(Some(pty_writer)),
         }
+    }
+
+    /// Story 16-2 / D-16-2-K — type a line into the child's stdin:
+    /// CR-terminated (a PTY line ends at CR; LF alone does not submit in
+    /// canonical mode).
+    pub fn send_line(&self, line: &str) {
+        let mut writer = self.writer.lock();
+        let writer = writer
+            .as_mut()
+            .expect("Pty::send_line: writer taken (Pty dropped?)");
+        writer
+            .write_all(format!("{line}\r").as_bytes())
+            .expect("Pty::send_line: write failed");
+        writer.flush().expect("Pty::send_line: flush failed");
+    }
+
+    /// Story 16-2 / D-16-2-K — end the REPL: `0x04` (Ctrl-D) in canonical
+    /// mode delivers EOF. `send_line` cannot end the session.
+    pub fn send_eof(&self) {
+        let mut writer = self.writer.lock();
+        let writer = writer
+            .as_mut()
+            .expect("Pty::send_eof: writer taken (Pty dropped?)");
+        writer
+            .write_all(&[0x04])
+            .expect("Pty::send_eof: write failed");
+        writer.flush().expect("Pty::send_eof: flush failed");
     }
 
     /// The current rendered screen via `vt100::Parser`.
@@ -648,5 +701,83 @@ pub mod guards {
                 }
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 16-2 / D-16-2-K — bounded subprocess helpers (the no-wallclock
+// guard's rule: bounded waits live HERE, never in a test body)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One bounded child run with the WORLD's env only — never the runner's
+/// `HOME` (16-1's decoy door holds the runner's real `control.json`
+/// endpoint inside the workspace suite, so any inherited home collides).
+#[derive(Debug, Clone)]
+pub struct BoundedRun {
+    pub code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Run `program args` against the world's env, bounded by `timeout_secs`.
+/// `extra_env` rides ALONGSIDE the world env (e.g. a cassette copy).
+pub fn run_bounded(
+    world: &JourneyWorld,
+    program: &str,
+    args: &[&str],
+    extra_env: &[(&str, &str)],
+    timeout_secs: u64,
+    label: &str,
+) -> BoundedRun {
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args)
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap_or_default());
+    for (k, v) in world.env() {
+        cmd.env(k, v);
+    }
+    for (k, v) in extra_env {
+        cmd.env(k, v);
+    }
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("{label}: spawn failed: {e}"));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let out = child.wait_with_output().expect("collect output");
+                return BoundedRun {
+                    code: status.code(),
+                    stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+                    stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+                };
+            }
+            Ok(None) if std::time::Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("{label}: did not exit within {timeout_secs}s");
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            Err(e) => panic!("{label}: wait failed: {e}"),
+        }
+    }
+}
+
+/// Poll a condition at 50 ms until it holds or `timeout_secs` elapses.
+/// Returns `true` when it held; `false` on timeout (the caller asserts).
+pub fn wait_until(timeout_secs: u64, label: &str, mut cond: impl FnMut() -> bool) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    loop {
+        if cond() {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            eprintln!("{label}: condition not met within {timeout_secs}s");
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 }

@@ -14,6 +14,8 @@
 //! sealed-export functions.
 
 pub mod erasure;
+pub mod fr4_classifier;
+pub use fr4_classifier::{classify_fr4_row, Fr4RowDisposition, WriterShapeEntry};
 pub mod log_composition;
 pub mod replay;
 
@@ -618,27 +620,49 @@ pub fn project_to_fr4(entry: &AuditEntry) -> Result<Fr4Entry, Fr4SchemaError> {
     })
 }
 
-/// Write entries as FR4 NDJSON — one [`Fr4Entry`] per line.
+/// Write entries as FR4 NDJSON — one CALL [`Fr4Entry`] per line.
 ///
-/// Per AC1 + AC2, stops at the first projection failure and returns
-/// [`AuditError::Fr4SchemaViolation`] naming the offending 1-indexed line and
-/// the missing field. Output is buffered internally so no partial NDJSON lines
-/// reach the writer on violation — the dispatcher must surface the error and
-/// exit non-zero.
+/// Story 16-2 / D-16-2-G: rows the classifier marks non-call kernel events
+/// are OMITTED from the feed (its per-line schema requires a token; emitting
+/// `capability_token: null` would break every line consumer) and counted on
+/// stderr, naming each omitted kind. Call rows keep the exact AC1+AC2
+/// contract: the first projection failure aborts with
+/// [`AuditError::Fr4SchemaViolation`] naming the offending 1-indexed INPUT
+/// ROW — the row index [`to_fr4_plain`] reports, never an output line —
+/// and the missing field; output is buffered so no partial line is written.
 pub fn to_fr4_ndjson<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
 ) -> Result<(), AuditError> {
     let mut buf = Vec::new();
-    for (idx, entry) in entries.into_iter().enumerate() {
+    let mut omitted: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut line_no = 0usize;
+    for mut entry in entries.into_iter() {
+        line_no += 1;
+        if classify_fr4_row(&entry) == Fr4RowDisposition::NonCallKernelEvent {
+            let kind = std::mem::take(&mut entry.kind);
+            *omitted.entry(kind).or_insert(0) += 1;
+            continue;
+        }
         let projected = project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
-            line: idx + 1,
+            line: line_no,
             missing_field: e.missing_field(),
         })?;
         let line = serde_json::to_string(&projected)?;
         writeln!(buf, "{line}")?;
     }
     out.write_all(&buf)?;
+    if !omitted.is_empty() {
+        let summary: Vec<String> = omitted
+            .iter()
+            .map(|(kind, n)| format!("{kind}×{n}"))
+            .collect();
+        eprintln!(
+            "maos: FR4 feed omitted {} non-call kernel row(s): {}",
+            omitted.values().sum::<usize>(),
+            summary.join(", ")
+        );
+    }
     Ok(())
 }
 
@@ -677,6 +701,14 @@ fn kind_to_string(kind: i64) -> String {
         9 => "inference.call",
         10 => "decision",
         11 => "distillate",
+        // Story 16-2 / D-16-2-G — symmetric names for the budget/stall kinds
+        // (set (a) of the FR4 non-call classification needs them; they
+        // rendered `unknown` before, which the classifier would have had to
+        // special-case).
+        12 => "budget.warning",
+        13 => "budget.exceeded",
+        15 => "task.stalled",
+        16 => "silent.failure.suspect",
         17 => "spirit.revoked",
         19 => "spirit.admitted",
         22 => "consent.rupture",
@@ -718,6 +750,10 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "inference.call" | "InferenceCall" => Some(9),
         "decision" | "Decision" => Some(10),
         "distillate" | "Distillate" => Some(11),
+        "budget.warning" | "BudgetWarning" => Some(12),
+        "budget.exceeded" | "BudgetExceeded" => Some(13),
+        "task.stalled" | "TaskStalled" => Some(15),
+        "silent.failure.suspect" | "SilentFailureSuspect" => Some(16),
         "spirit.revoked" | "SpiritRevoked" => Some(17),
         "spirit.admitted" | "SpiritAdmitted" => Some(19),
         // j1-crosshost-1a AC3.11 — the reverse arm. Every other kind in this table
@@ -796,22 +832,31 @@ pub fn to_plain<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
 ) -> Result<(), AuditError> {
+    // Story 16-2 / D-16-2-H — trailing `intent` column (last, so every
+    // existing fixed-width column keeps its offset).
     writeln!(
         out,
-        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}",
-        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "capability_token",
+        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}  {}",
+        "call_id",
+        "boot_nonce",
+        "spirit_pid",
+        "call_type",
+        "timestamp_ns",
+        "capability_token",
+        "intent",
     )?;
     for entry in entries {
         let token = entry.capability_token_hex.as_deref().unwrap_or("<missing>");
         writeln!(
             out,
-            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}  {}",
             truncate(&entry.frame_id_hex, 32),
             entry.boot_nonce,
             entry.spirit_pid,
             truncate(&entry.kind, 22),
             entry.timestamp_ns,
             token,
+            truncate(&entry.intent, 64),
         )?;
     }
     Ok(())
@@ -826,30 +871,45 @@ pub fn to_fr4_plain<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
 ) -> Result<(), AuditError> {
-    let projected: Vec<Fr4Entry> = entries
-        .into_iter()
-        .enumerate()
-        .map(|(idx, entry)| {
-            project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
-                line: idx + 1,
-                missing_field: e.missing_field(),
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    // Story 16-2 / D-16-2-G/H — classify before validating: non-call kernel
+    // events render in the SAME table (which has no token column, so a
+    // non-call row cannot be read as a mediated call); only Call rows must
+    // satisfy the FR4 mandatory-field contract. The trailing `intent`
+    // column makes the halt row and the operator completion row legible.
     writeln!(
         out,
-        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}",
-        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns",
+        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}",
+        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "intent",
     )?;
-    for entry in &projected {
+    let mut line_no = 0usize;
+    for entry in entries.into_iter() {
+        line_no += 1;
+        if classify_fr4_row(&entry) == Fr4RowDisposition::NonCallKernelEvent {
+            writeln!(
+                out,
+                "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+                truncate(&entry.frame_id_hex, 32),
+                entry.boot_nonce,
+                entry.spirit_pid,
+                truncate(&entry.kind, 22),
+                entry.timestamp_ns,
+                truncate(&entry.intent, 64),
+            )?;
+            continue;
+        }
+        let projected = project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
+            line: line_no,
+            missing_field: e.missing_field(),
+        })?;
         writeln!(
             out,
-            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}",
-            truncate(&entry.call_id, 32),
-            entry.boot_nonce,
-            entry.spirit_pid,
-            truncate(&entry.call_type, 22),
-            entry.timestamp_ns,
+            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+            truncate(&projected.call_id, 32),
+            projected.boot_nonce,
+            projected.spirit_pid,
+            truncate(&projected.call_type, 22),
+            projected.timestamp_ns,
+            truncate(&entry.intent, 64),
         )?;
     }
     Ok(())
@@ -1627,53 +1687,15 @@ pub fn resolve_spirit_name(
     name: &str,
     all_boots: bool,
 ) -> Result<Vec<(u64, u32)>, String> {
-    // v0.1-β evaluator path: the reference Spirit resolves without admission
-    // rows (kept per D-16-1-K — removing it reds the v0.1 evaluator path and
-    // is routed to 16-2), but its "latest boot" pick follows the same
-    // timestamp rule as the main branch below.
-    if name == "hello-spirit" {
-        if !db_path.exists() {
-            return Ok(vec![(0, 0)]);
-        }
-        let conn = open_transparency_log_readonly(db_path)?;
-        let mut stmt = conn
-            .prepare(
-                "SELECT boot_nonce, spirit_pid, MAX(timestamp_ns)
-                 FROM transparency_log
-                 WHERE spirit_pid = 0
-                 GROUP BY boot_nonce",
-            )
-            .map_err(|e| format!("prepare fallback failed: {e}"))?;
-        let rows = stmt
-            .query_map([], |row| {
-                let boot: i64 = row.get(0)?;
-                let pid: i64 = row.get(1)?;
-                let latest_ns: i64 = row.get(2)?;
-                Ok((boot as u64, pid as u32, latest_ns as u64))
-            })
-            .map_err(|e| format!("fallback query failed: {e}"))?;
-        let mut boots: Vec<(u64, u32, u64)> = Vec::new();
-        for row in rows {
-            boots.push(row.map_err(|e| format!("fallback row error: {e}"))?);
-        }
-        if boots.is_empty() {
-            return Ok(vec![(0, 0)]);
-        }
-        if all_boots {
-            boots.sort();
-            return Ok(boots.into_iter().map(|(b, p, _)| (b, p)).collect());
-        }
-        let latest_ns = boots.iter().map(|(_, _, ns)| *ns).max().unwrap_or(0);
-        return Ok(boots
-            .into_iter()
-            .filter(|(_, _, ns)| *ns == latest_ns)
-            .map(|(b, p, _)| (b, p))
-            .collect());
-    }
-
+    // Story 16-2 / D-16-2-F — the `hello-spirit → pid 0` wildcard is
+    // DELETED: it answered "every pid-0 kernel row of every boot", which is
+    // the defect `deferred-work.md:926` names. hello-spirit resolves through
+    // the identity rows like every Spirit (the one-shot evaluator run now
+    // writes one; the shell boots load it at a real pid).
     if !db_path.exists() {
         return Err(format!(
-            "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+            "unknown spirit '{name}' — no Transparency Log at {}",
+            db_path.display()
         ));
     }
 
@@ -1727,8 +1749,12 @@ pub fn resolve_spirit_name(
     }
 
     if matches.is_empty() {
+        // Story 16-2 / D-16-2-F — fail-closed by name (never "every pid-0
+        // row"): no identity row names this Spirit in this Transparency Log.
+        // Pre-16-2 hello-spirit rows with no identity row stay reachable by
+        // `--boot <nonce>` and erasable by 16-4's `maos purge`.
         return Err(format!(
-            "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+            "unknown spirit '{name}' — no admission or load row names it in this Transparency Log"
         ));
     }
 

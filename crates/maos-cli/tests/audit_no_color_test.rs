@@ -62,6 +62,25 @@ fn seed_db(path: &PathBuf) {
         )
         .expect("insert seed row");
     }
+    // Story 16-2 / D-16-2-F(4) — the pid-0 wildcard is retired; the
+    // `--spirit hello-spirit` resolution now needs the kind-19 identity row
+    // the one-shot evaluator run writes in production.
+    conn.execute(
+        "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![
+            &[0x19u8; 16] as &[u8],
+            900i64,
+            0i64,
+            0xDEAD_BEEFi64,
+            rusqlite::types::Null,
+            19i64,
+            "hello-spirit",
+            br#"{"spirit_id":"hello-spirit","source":"one-shot"}"# as &[u8],
+            0i64,
+        ],
+    )
+    .expect("insert identity row");
 }
 
 /// Resolve maosctl: prefer `CARGO_BIN_EXE_maosctl` (cargo-injected), then
@@ -232,6 +251,24 @@ fn fr4_schema_violation_exits_two_with_diagnostic() {
         ],
     )
     .unwrap();
+    // Story 16-2 / D-16-2-F(4) — the identity row so the query reaches the
+    // violation row instead of failing name resolution first.
+    conn.execute(
+        "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, kind, intent, payload_redacted, origin) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![
+            &[0x34u8; 16] as &[u8],
+            900i64,
+            0i64,
+            0xDEAD_BEEFi64,
+            rusqlite::types::Null,
+            19i64,
+            "hello-spirit",
+            br#"{"spirit_id":"hello-spirit","source":"one-shot"}"# as &[u8],
+            0i64,
+        ],
+    )
+    .unwrap();
     drop(conn);
 
     let out = run_maosctl(
@@ -287,7 +324,7 @@ fn unknown_spirit_exits_two_with_clear_diagnostic() {
     assert_eq!(out.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("only 'hello-spirit'"),
-        "diagnostic must name the v0.1-β scope; got: {stderr}"
+        stderr.contains("no admission or load row names it"),
+        "diagnostic must state the fail-closed name resolution (D-16-2-F); got: {stderr}"
     );
 }

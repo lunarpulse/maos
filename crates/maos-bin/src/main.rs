@@ -3381,44 +3381,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             },
         };
+        // Story 16-2 / D-16-2-C — the PORT is constructed for EVERY door
+        // root, whether or not a config exists: the REPL's clarification
+        // resolves through it in-process (one mechanism, two surfaces) and
+        // must work with no `maos init` (FR58 zero-config). Only the HTTP
+        // BIND below stays gated on the env pair / `control.json`.
+        let private_ops = Arc::new(BinPrivateOpsImpl {
+            memory: Arc::clone(&memory),
+            capability: Arc::clone(&capability),
+            transparency_log: Arc::clone(&transparency_log),
+            audit_db_path: audit_db_path.clone(),
+            memory_db_path: memory_db_path.clone(),
+            shared_journal: Arc::clone(&shared_journal),
+            upgrade_orchestrator: Arc::clone(&upgrade_orchestrator),
+        });
+        let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
+            Arc::clone(&scheduler),
+            Arc::clone(&policy),
+            Arc::clone(&halt_registry),
+            Arc::clone(&output_markers),
+            Arc::clone(&orchestrator_registry),
+            Arc::clone(&revocation_applier),
+            Arc::clone(&hot_swap_coordinator),
+            Arc::clone(&capability),
+            Arc::clone(&memory),
+            Arc::clone(&orchestrator),
+            Arc::clone(&mailbox),
+            Arc::clone(&notification_dispatcher),
+            Arc::clone(&transparency_log),
+            Arc::clone(&crypto_provider),
+            door_crl_trust_anchor,
+            boot_nonce,
+            tokio::runtime::Handle::current(),
+            private_ops,
+            successor_manifest_slot,
+        ));
+        operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
-            let private_ops = Arc::new(BinPrivateOpsImpl {
-                memory: Arc::clone(&memory),
-                capability: Arc::clone(&capability),
-                transparency_log: Arc::clone(&transparency_log),
-                audit_db_path: audit_db_path.clone(),
-                memory_db_path: memory_db_path.clone(),
-                shared_journal: Arc::clone(&shared_journal),
-                upgrade_orchestrator: Arc::clone(&upgrade_orchestrator),
-            });
-            let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
-                Arc::clone(&scheduler),
-                Arc::clone(&policy),
-                Arc::clone(&halt_registry),
-                Arc::clone(&output_markers),
-                Arc::clone(&orchestrator_registry),
-                Arc::clone(&revocation_applier),
-                Arc::clone(&hot_swap_coordinator),
-                Arc::clone(&capability),
-                Arc::clone(&memory),
-                Arc::clone(&orchestrator),
-                Arc::clone(&mailbox),
-                Arc::clone(&notification_dispatcher),
-                Arc::clone(&transparency_log),
-                Arc::clone(&crypto_provider),
-                door_crl_trust_anchor,
-                boot_nonce,
-                tokio::runtime::Handle::current(),
-                private_ops,
-                successor_manifest_slot,
-            ));
             let server = match maos_control::OperatorHttpServer::bind_with_commands(
                 config.clone(),
                 Arc::clone(&scheduler),
                 rotation_windows,
                 peer_versions,
                 self_identity,
-                Some(Arc::clone(&door) as Arc<dyn maos_control::OperatorCommandPort>),
+                operator_door_port
+                    .clone()
+                    .map(|door| door as Arc<dyn maos_control::OperatorCommandPort>),
             ) {
                 Ok(server) => server,
                 Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
@@ -3452,7 +3460,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // `cert_rotation_trigger_14_2a` scrapes this line byte-for-byte.
             eprintln!("maos: operator HTTP listening on {}", server.local_addr());
             operator_http_server = Some(server);
-            operator_door_port = Some(door);
         }
     }
 
@@ -3624,13 +3631,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &maos_cli::accessibility::RealEnv,
         );
         let default_provider = router.default_id().unwrap_or("anthropic");
-        // Admit hello-spirit through the canonical SecurityManagerAdapter path
-        // (replaces the reverted policy() back-channel per code review consensus).
-        {
-            let manifest_path = std::path::PathBuf::from("spirits/hello-spirit/manifest.toml");
-            let manifest_toml = std::fs::read_to_string(&manifest_path)
-                .map_err(|e| format!("shell: cannot read hello-spirit manifest: {e}"))?;
-            let manifest_root: toml::Value = manifest_toml
+        // Story 16-2 / D-16-2-A — hello-spirit is a scheduler-loaded Spirit,
+        // exactly like `maos run`: load FIRST (the scheduler assigns the real
+        // pid — every process allocates from 1), admit at that pid through the
+        // canonical SecurityManagerAdapter path journaling via the daemon's
+        // shared journal, then start. The manifest is the compile-time
+        // embedded copy in `maos-spirit-hello` — never a CWD read (an
+        // installed `maos` cannot carry `spirits/` with it; FR58 zero-config).
+        //
+        // The whole body runs inside ONE async block assigned to
+        // `shell_result`: every `?` below returns from the block, never from
+        // `main`, so the door teardown in the caller runs on BOTH arms by
+        // construction (Story 16-2 AC2, review obligation (n)).
+        let shell_result: Result<(), Box<dyn std::error::Error>> = async {
+            let manifest_root: toml::Value = maos_spirit_hello::MANIFEST_TOML
                 .parse()
                 .map_err(|e| format!("shell: cannot parse hello-spirit manifest: {e}"))?;
             let sandbox_cfg = maos_kernel_core::security::SandboxConfig::from_toml_str(
@@ -3669,23 +3683,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|e| format!("epistemic_policy parse: {e}"))
                 })
                 .transpose()?;
+            // `maos run`'s bundle shape: scheduling/lifecycle default (the
+            // reference Spirit fires no scheduled hooks), budget parsed from
+            // the manifest, class carried for the ABI-stability admission
+            // check inside `load`.
+            let budget = manifest_root
+                .get("budget")
+                .map(|v| {
+                    let s = toml::to_string(v).map_err(|e| format!("budget serialize: {e}"))?;
+                    maos_kernel_core::security::manifest::Budget::from_toml_str(&s)
+                        .map_err(|e| format!("budget parse: {e}"))
+                })
+                .transpose()?;
+            let bundle = maos_kernel_core::scheduler::SpiritManifestBundle {
+                budget,
+                class: Some(class_section.clone()),
+                ..Default::default()
+            };
 
-            let journal_path = maos_audit::default_journal_path();
-            if let Some(parent) = journal_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
-                .map_err(|e| format!("shell: cannot open journal: {e}"))?;
-
+            // 1. Load — the scheduler assigns the REAL pid. `allocate_pid`
+            //    starts at 1 in every process; pid 0 is not a Spirit pid.
+            let hello_pid = scheduler
+                .load(
+                    "hello-spirit",
+                    bundle,
+                    maos_spirit_hello::HelloSpirit,
+                    boot_nonce,
+                )
+                .await
+                .map_err(|e| format!("shell: scheduler.load failed: {e}"))?;
+            // 2. Admit at the real pid through the canonical path. The
+            //    journal is the daemon's `shared_journal` — the block's own
+            //    `JournalAdapter::open` is deleted (one journal handle per
+            //    path; 16-1 §11 row 1's cross-handle hazard).
             let _shell_spec = security
                 .admit_spirit(
-                    0,
+                    hello_pid,
                     "hello-spirit",
                     &sandbox_cfg,
                     &resource_caps,
                     &caps_required,
                     Some(&output_shape),
-                    &journal,
+                    shared_journal.as_ref(),
                     &posture_section,
                     epistemic_policy.as_ref(),
                     None,
@@ -3714,21 +3753,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &format!("{:?}", _shell_spec.tier),
                 "shell: hello-spirit admitted via canonical path",
             );
-            drop(journal);
-            eprintln!("maos: hello-spirit admitted via canonical path (shell mode)");
+            eprintln!(
+                "maos: hello-spirit admitted via canonical path (shell mode, pid {hello_pid})"
+            );
+            // 3. Start — the `lifecycle.start` row and `on_start` hook.
+            scheduler
+                .start(hello_pid)
+                .await
+                .map_err(|e| format!("shell: scheduler.start failed: {e}"))?;
+            memory.authorize_principal_writes(hello_pid);
+            // The door port exists for every door root (D-16-2-C) — the
+            // shell root IS one, so this cannot be `None`.
+            let door_port: Arc<dyn maos_control::OperatorCommandPort> = operator_door_port
+                .as_ref()
+                .map(|door| Arc::clone(door) as Arc<dyn maos_control::OperatorCommandPort>)
+                .expect("shell root: operator door port constructed above");
+            let host = maos_bin::shell_host::ShellHost::new(
+                hello_pid,
+                boot_nonce,
+                default_provider.to_string(),
+                Arc::clone(&capability),
+                Arc::clone(&transparency_log),
+                Arc::clone(&shared_journal),
+                Arc::clone(&halt_registry),
+                Arc::clone(&memory),
+                door_port,
+            );
+            // D-16-2-B I/O seam: production passes a fresh `BufReader` over
+            // stdin (NOT `stdin().lock()` — a MutexGuard is not `Send` and
+            // the reader moves to its own thread in D-16-2-D) and `stdout()`
+            // unlocked (the REPL thread is the only writer).
+            maos_shell::run_shell(
+                Arc::new(inference)
+                    as Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync>,
+                &host,
+                std::io::BufReader::new(std::io::stdin()),
+                std::io::stdout(),
+                color,
+                default_provider,
+                &audit_db_path.display().to_string(),
+            )
         }
-
-        let inference_arc: Arc<dyn maos_domain::ports::inference::InferencePort + Send + Sync> =
-            Arc::new(inference);
-        let shell_result = maos_shell::run_shell(
-            inference_arc,
-            Arc::clone(&capability),
-            color,
-            default_provider,
-        );
+        .await;
         // Review P13: the causal shell failure wins. A flush error on the
         // failure path is reported, never allowed to mask the real cause;
         // on the success path the flush refusal stays fatal (D-15-6-K).
+        //
+        // Story 16-2 §A6 review — the refusal is DEFERRED, never returned
+        // from here. This point sits BETWEEN the door bind and the teardown
+        // below, so an early return would skip the planned unload (a pending
+        // halt loses its NFR-Rel-11 receipt) and the audit-writer drain
+        // (queued `shell.turn`/`cap.issue` rows lost). AC2's obligation (n)
+        // forbids a `?` OR a `return` here; the refusal is raised after the
+        // teardown has run, so it stays fatal without costing the receipts.
+        let mut deferred_flush_error: Option<Box<dyn std::error::Error>> = None;
         if let Some(recorder) = cassette_recorder.as_ref() {
             match recorder.flush() {
                 Ok(_) => {}
@@ -3738,24 +3816,83 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "maos: record-mode flush failed after shell error: {flush_error}"
                         );
                     } else {
-                        return Err(format!("maos: record-mode flush failed: {flush_error}").into());
+                        deferred_flush_error =
+                            Some(format!("maos: record-mode flush failed: {flush_error}").into());
                     }
                 }
             }
         }
-        // Story 16-1 (T7, Trap 16) — the shell root applies the SAME teardown
-        // order as the run root before returning: join the server (accept
-        // thread + every pool worker, each in-flight command bounded by its
-        // route budget, NEVER cancelled), drop the port, release the lock
-        // set. Without it an `operation_id` already handed out could lose its
-        // completion row, and the listener would die unjoined.
+        // Story 16-1 (T7, Trap 16) + Story 16-2 (D-16-2-C) — the shell root's
+        // teardown, on BOTH arms, in the caller, in ONE order shared with
+        // 16-3 AC4: server shutdown → drain_started_tasks → planned unload
+        // (§15 R6 — AFTER the door is closed, so no `maosctl halt resolve`
+        // races the drain) → port drop → audit-writer drain → locks. The
+        // body above is one async block, so no `?` between the bind and here
+        // can bypass this.
         if let Some(server) = operator_http_server.as_mut() {
             server.shutdown();
         }
+        if let Some(port) = operator_door_port.as_ref() {
+            port.drain_started_tasks().await;
+        }
+        let shell_result = maos_bin::shell_host::finish_shell_session(
+            shell_result,
+            &scheduler,
+            &halt_registry,
+            &mut std::io::stdout(),
+        )
+        .await;
         drop(operator_http_server);
         drop(operator_door_port);
+        // D-16-2-C — the audit drain is an INVARIANT with an ORACLE, not a
+        // list to copy (two successive reads found each copied list wrong):
+        // EVERY owner of `audit_tx` is dropped before the writer is awaited,
+        // proven by the writer completing — no `drain timed out` on the
+        // screen. The reference drop set is the SIGTERM root's block
+        // (`:7941-7970`, incl. the hidden owners `iac` → digest → memory →
+        // capability → audit_tx and `delegation_leg` → Mailbox → ScbTracker
+        // → SCB → Spirit → capability). This arm OMITS `inference` (moved
+        // into the shell body above) and drops the `ShellHost` instead
+        // (already dropped with the async block).
+        drop(audit_tx);
+        drop(orchestrator);
+        drop(scheduler);
+        drop(revocation_poller);
+        drop(policy);
+        drop(halt_registry);
+        drop(orchestrator_registry);
+        drop(spirit_host);
+        drop(lifecycle_resolver);
+        drop(upgrade_orchestrator);
+        drop(revocation_applier);
+        drop(hot_swap_coordinator);
+        drop(crash_detector);
+        drop(distillate_writer);
+        drop(memory);
+        drop(capability);
+        drop(telemetry);
+        drop(self_telemetry);
+        drop(log_recall_adapter);
+        drop(collective_port);
+        drop(delegation_leg);
+        drop(router);
+        drop(rate_limiter);
+        drop(crypto_provider);
+        drop(iac);
+        drop(mailbox);
+        drop(notification_dispatcher);
+        match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("maos shell: audit writer task failed during drain: {e}"),
+            Err(_) => eprintln!("maos shell: audit writer drain timed out after 5s"),
+        }
         drop(store_locks);
-        return shell_result;
+        // The deferred record-mode flush refusal (D-15-6-K) applies only when
+        // the shell itself succeeded — `shell_result` always wins otherwise.
+        return match (shell_result, deferred_flush_error) {
+            (Ok(()), Some(flush_error)) => Err(flush_error),
+            (result, _) => result,
+        };
     }
     // ─────────────────────────────────────────────────────────────
 
@@ -7716,6 +7853,23 @@ description = "smoke test spirit successor"
 
             // Drop the journal adapter (fsync + drain).
             drop(journal);
+
+            // Story 16-2 / D-16-2-F(3) — ONE identity row for this boot: the
+            // one-shot REALLY admits hello-spirit at pid 0, and with the
+            // pid-0 wildcard retired, name resolution needs the kind-19 row
+            // (`spirit.admitted`, matched by `intent == name`) that every
+            // other Spirit's admission produces. `source: "one-shot"` says
+            // which arm wrote it.
+            let _identity = transparency_log.insert_frame_event(
+                maos_kernel_core::iac::transparency_log::FrameKind::SpiritAdmitted,
+                0,
+                None,
+                "hello-spirit",
+                serde_json::json!({"spirit_id": "hello-spirit", "source": "one-shot"})
+                    .to_string()
+                    .as_bytes(),
+                maos_domain::invariants::i3::FrameOrigin::Kernel,
+            );
         }
 
         // Initialize monotonic counter for token issuance
@@ -7747,7 +7901,7 @@ description = "smoke test spirit successor"
         eprintln!("maos: one-shot mode — executing hello-Spirit");
 
         // Call hello-Spirit (sync call on async runtime — fine for one-shot)
-        let resp = maos_spirit_hello::run(&inference, token)
+        let resp = maos_spirit_hello::run(&inference, token, &audit_db_path.display().to_string())
             .map_err(|e| format!("hello-Spirit error: {e}"))?;
         if let Some(recorder) = cassette_recorder.as_ref() {
             recorder
@@ -8264,13 +8418,55 @@ fn run_uninstall_cascade_inner(
         .map_err(|e| format!("failed to read pre-erasure frame ids: {e}"))?;
 
     // Resolve spirit name → pid(s).  Latest boot only matches the CLI default.
-    let incarnations = maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false)
-        .map_err(|e| format!("failed to resolve spirit '{spirit_id}': {e}"))?;
-    if incarnations.is_empty() {
-        return Ok(UninstallCascadeTerminal::NotFound {
-            spirit_id: spirit_id.to_string(),
-        });
-    }
+    // Story 16-2 / D-16-2-F — no Transparency Log AT ALL is `not_found`
+    // (provably nothing to erase), distinct from a resolution failure on a
+    // TL that exists (an unknown Spirit name keeps the failed outcome the
+    // cascade gives it today — never a new `not_found`, which on a legacy TL
+    // holding unidentified hello-spirit rows would sign "nothing to erase"
+    // over data that exists).
+    // Verify Shared before any destructive operation. A second SQLite open can
+    // fail even while the process's long-lived store connection remains usable
+    // (for example after a permission change); failing here preserves the
+    // invariant that every post-erasure exit has a signed proof.
+    let shared_principal_rows = maos_audit::shared_tier_principal_row_count(memory_db_path)
+        .map_err(|e| format!("failed to verify shared-tier principal emptiness: {e}"))?;
+
+    let incarnations =
+        if !audit_db_path.exists() || (pre_frame_ids.is_empty() && shared_principal_rows == 0) {
+            // No Transparency Log AT ALL — or one this boot just created over a
+            // home that never ran a Spirit (the composition root opens the
+            // adapter before the cascade) with no shared principal residue — is
+            // `not_found`: provably nothing to erase. A TL WITH data that names
+            // no such Spirit keeps the failed outcome the cascade gives any
+            // unknown name today — never a new `not_found`, which on a legacy
+            // TL holding unidentified hello-spirit rows would sign "nothing to
+            // erase" over data that exists (the 13.5b false-success shape), and
+            // shared-only pre-partition residue must stay REPORTED, not
+            // disappear behind `not_found`.
+            Vec::new()
+        } else {
+            match maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false) {
+                Ok(v) => v,
+                // Shared pre-partition residue must still be ATTESTED below even
+                // when the name resolves to nothing — the failed partial proof is
+                // the record of the coverage gap (13.5b). Story 16-2 §A6 review:
+                // SAY why per-incarnation enumeration did not run, so the proof's
+                // coverage gap is explicable rather than merely narrow.
+                Err(error) if shared_principal_rows > 0 => {
+                    eprintln!(
+                        "maos: uninstall — spirit '{spirit_id}' resolved to no incarnation \
+                         ({error}); attesting shared-tier residue only"
+                    );
+                    Vec::new()
+                }
+                Err(error) => {
+                    return Err(format!("failed to resolve spirit '{spirit_id}': {error}").into())
+                }
+            }
+        };
+    // An EMPTY incarnation set is decided BELOW, together with the shared
+    // residue check — shared-only pre-partition residue must reach its
+    // failed partial proof, not disappear behind `not_found`.
 
     let mut total_deleted_entries: u64 = 0;
     let mut total_deleted_index_rows: u64 = 0;
@@ -8280,13 +8476,6 @@ fn run_uninstall_cascade_inner(
     let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
     let mut stores_covered = std::collections::BTreeSet::<String>::new();
     let mut held_principal_ids: Vec<String> = Vec::new();
-
-    // Verify Shared before any destructive operation. A second SQLite open can
-    // fail even while the process's long-lived store connection remains usable
-    // (for example after a permission change); failing here preserves the
-    // invariant that every post-erasure exit has a signed proof.
-    let shared_principal_rows = maos_audit::shared_tier_principal_row_count(memory_db_path)
-        .map_err(|e| format!("failed to verify shared-tier principal emptiness: {e}"))?;
 
     for (_boot_nonce, spirit_pid) in &incarnations {
         let spirit_pid = *spirit_pid;

@@ -56,6 +56,7 @@ fn dispatch_directive_ambiguous_halt() {
         &inference,
         token,
         "refactor src/main.rs to be more idiomatic",
+        "/tmp/t/transparency.sqlite",
     );
     match &result {
         Err(maos_spirit_hello::HelloError::Ambiguous { tag, prompt }) => {
@@ -79,6 +80,7 @@ fn dispatch_directive_well_specified_no_halt() {
         &inference,
         token,
         "refactor for better readability and error handling",
+        "/tmp/t/transparency.sqlite",
     );
     // Should succeed because dimensions (readability, error handling) are specified.
     assert!(

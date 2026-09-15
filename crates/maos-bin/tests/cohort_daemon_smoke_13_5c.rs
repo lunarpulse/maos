@@ -875,7 +875,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // (no `manifest_scopes`) applies to `verbs.rs` like every other file: it
     // is a pure argv table and must never seed the manifest-derived policy
     // table.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 20] = [
+    // Story 16-2 (D-16-2-B) — 20 → 21: `shell_host.rs` joins the roster (the
+    // production ShellHost). Ring the doorbell, do not widen the wall.
+    const SCANNED_SOURCE_FILES: [(&str, &str); 21] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -953,6 +955,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // door reaches the daemon's kernel objects through typed commands and
         // must never seed the manifest-derived policy table.
         ("operator_door.rs", include_str!("../src/operator_door.rs")),
+        ("shell_host.rs", include_str!("../src/shell_host.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

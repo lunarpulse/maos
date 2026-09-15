@@ -167,7 +167,7 @@ fn bench_hello_spirit_p95(c: &mut Criterion) {
     group.measurement_time(std::time::Duration::from_secs(30));
     group.bench_function("p95_latency", |b| {
         b.iter(|| {
-            maos_spirit_hello::run(&adapter, token.clone())
+            maos_spirit_hello::run(&adapter, token.clone(), "benches/transparency.sqlite")
                 .expect("hello-Spirit must succeed in bench");
         });
     });

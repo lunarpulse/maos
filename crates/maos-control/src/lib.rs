@@ -1310,11 +1310,65 @@ fn submit<S: SandboxReportSource>(routes: &Routes<'_, S>, command: OperatorComma
     let Some(port) = routes.commands else {
         return Response::new(404, NOT_FOUND_BODY);
     };
+    match submit_and_wait(port, command) {
+        SubmitOutcome::Completed(outcome) => outcome.into_response(),
+        SubmitOutcome::Internal => Response::new(500, INTERNAL_BODY),
+        SubmitOutcome::SpiritBusy => Response::new(503, SPIRIT_BUSY_BODY),
+        SubmitOutcome::HandlerStillRunning { operation_id } => Response::value(
+            503,
+            serde_json::json!({
+                "error": "handler_still_running",
+                "operation_id": operation_id,
+            }),
+        ),
+    }
+}
+
+/// Story 16-2 / §15 R4 — what ONE submit-and-withdraw did, as a typed value.
+///
+/// The HTTP server maps this to its existing responses (byte-for-byte), and
+/// the shell's [`ShellHost`](maos_bin::shell_host::ShellHost) maps it to REPL
+/// lines. Neither re-implements the withdraw CAS — this function is the one
+/// copy.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SubmitOutcome {
+    /// The handler ran and delivered an outcome.
+    Completed(OperatorOutcome),
+    /// The completion channel closed without delivering — the handler died.
+    Internal,
+    /// The budget expired and the withdraw CAS WON: the command never ran.
+    SpiritBusy,
+    /// The budget expired and the withdraw CAS LOST: the port had already
+    /// committed to running, so the task finishes and writes its row — the
+    /// id is findable.
+    HandlerStillRunning { operation_id: String },
+}
+
+/// Story 16-2 / §15 R4 — THE one submit-and-withdraw implementation.
+///
+/// `port.submit`, wait on the completion channel for the command's route
+/// budget, and on timeout perform the `Queued → Withdrawn` CAS that decides
+/// `SpiritBusy` vs `HandlerStillRunning`. The server's route handler and the
+/// shell's in-process resolution both call THIS; before this extraction each
+/// would have had to copy the CAS, and a copied CAS is how "withdrew" and
+/// "still running" start meaning different things on different surfaces.
+pub fn submit_and_wait(port: &dyn OperatorCommandPort, command: OperatorCommand) -> SubmitOutcome {
     let budget = command.route_budget();
+    submit_and_wait_with_deadline(port, command, budget)
+}
+
+/// The same protocol with a caller-chosen deadline — the seam the
+/// `crates/maos-control/tests/` vectors use to drive the timeout arms in
+/// milliseconds instead of the 10 s route budget.
+pub fn submit_and_wait_with_deadline(
+    port: &dyn OperatorCommandPort,
+    command: OperatorCommand,
+    budget: Duration,
+) -> SubmitOutcome {
     let submission = port.submit(command, budget);
     match submission.completion.recv_timeout(budget) {
-        Ok(outcome) => outcome.into_response(),
-        Err(mpsc::RecvTimeoutError::Disconnected) => Response::new(500, INTERNAL_BODY),
+        Ok(outcome) => SubmitOutcome::Completed(outcome),
+        Err(mpsc::RecvTimeoutError::Disconnected) => SubmitOutcome::Internal,
         Err(mpsc::RecvTimeoutError::Timeout) => {
             // ⚠ The shared word decides, never the clock. If this CAS wins the
             // command was still QUEUED and is now WITHDRAWN: it never ran, so
@@ -1331,15 +1385,11 @@ fn submit<S: SandboxReportSource>(routes: &Routes<'_, S>, command: OperatorComma
                 )
                 .is_ok()
             {
-                Response::new(503, SPIRIT_BUSY_BODY)
+                SubmitOutcome::SpiritBusy
             } else {
-                Response::value(
-                    503,
-                    serde_json::json!({
-                        "error": "handler_still_running",
-                        "operation_id": submission.operation_id,
-                    }),
-                )
+                SubmitOutcome::HandlerStillRunning {
+                    operation_id: submission.operation_id,
+                }
             }
         }
     }

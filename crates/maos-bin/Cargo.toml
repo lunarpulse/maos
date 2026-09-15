@@ -39,6 +39,9 @@ escape-fault-inject = ["maos-escape-detector/escape-fault-inject"]
 
 [dependencies]
 maos-shell = { path = "../maos-shell" }
+# Story 16-2 / §15 R9 — halt ids minted as ULIDs, the kernel's halt-id grammar
+# (same spec as maos-kernel-core; Cargo.lock resolves 1.2.1 through it).
+ulid = "1.1"
 maos-cli = { path = "../maos-cli" }
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }

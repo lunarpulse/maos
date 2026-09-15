@@ -131,25 +131,37 @@ JOURNAL_BYTES_BEFORE="$(wc -c < "$JOURNAL" | tr -d ' ')"
 
 assert_refused_ansi_free() {
   local verb="$1" spirit="$2" want="$3"
-  local err
+  # Story 16-2 — capture the exit code DIRECTLY. The previous shape ran the
+  # command inside a `set +e` command substitution whose function always
+  # returned 0, so every refusal read as exit 0 and step (4a) failed even
+  # against a correct binary (measured red at `bb9f0657` in a clean
+  # worktree). The ANSI-free contract is checked on BOTH streams here.
+  local out err got
+  out="$(mktemp)"
+  err="$(mktemp)"
   set +e
-  err="$(assert_no_ansi_stdout "$verb" "${MAOSCTL}" "$verb" "$spirit" 2>&1 >/dev/null)"
-  local got=$?
+  "${MAOSCTL}" "$verb" "$spirit" > "$out" 2> "$err"
+  got=$?
   set -e
   if [ "$got" != "$want" ]; then
-    echo "$verb $spirit: expected exit $want, got $got — $err" >&2
+    echo "$verb $spirit: expected exit $want, got $got — $(cat "$err")" >&2
+    rm -f "$out" "$err"
     exit 1
   fi
-  case "$err" in
-    *$'\033'*) echo "$verb $spirit: refusal carried ANSI bytes — $err" >&2; exit 1 ;;
-  esac
+  if grep -q $'\x1b' "$out" || grep -q $'\x1b' "$err"; then
+    echo "$verb $spirit: refusal carried ANSI bytes" >&2
+    rm -f "$out" "$err"
+    exit 1
+  fi
   local after
   after="$(wc -c < "$JOURNAL" | tr -d ' ')"
   if [ "$JOURNAL_BYTES_BEFORE" != "$after" ]; then
     echo "$verb $spirit: journal moved $JOURNAL_BYTES_BEFORE -> $after; a refused verb writes nothing" >&2
+    rm -f "$out" "$err"
     exit 1
   fi
-  printf '%s' "$err"
+  cat "$err"
+  rm -f "$out" "$err"
 }
 
 echo "::group::(4a) start hello-spirit with no door (78, journal unchanged)"

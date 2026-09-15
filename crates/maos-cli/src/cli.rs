@@ -711,7 +711,10 @@ pub enum HaltOp {
     },
     /// Resolve a halt by ID with one of three documented kinds.
     Resolve {
-        /// HaltId returned by `maosctl halt list`.
+        /// Halt id of the halt to resolve, as printed by the `halt_id`
+        /// field of `maosctl halt list` (rows whose `record` is
+        /// `termination_marker`/`termination_no_pending` carry no raisable
+        /// id — resolving them answers `halt_not_pending`).
         halt_id: String,
         /// Spirit owning the halt (required — Story 4.1 will derive
         /// from halt_id, but at 3.3 the operator supplies it).

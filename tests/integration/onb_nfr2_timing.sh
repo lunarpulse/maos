@@ -67,7 +67,16 @@ build_elapsed=$((build_end - build_start))
 # Step 3: One-shot execution — THIS is the timed product property.
 echo "--- Running hello-Spirit one-shot ---"
 response_start=$(date +%s)
-output=$(MAOS_ONE_SHOT=hello-spirit NO_COLOR=1 ./target/release/maos 2>/dev/null)
+# Story 16-2 / D-16-2-M(1) — the response leg runs under REPLAY against the
+# J0 seed cassette and asserts the introduction EQUALS the cassette text. The
+# old key-presence check passed on the transport/unconfigured fallback string
+# ("provider unreachable") — a budget honest about timing, dishonest about
+# content. Proven red on the assertion: with BOTH env vars unset the boot
+# succeeds, exits 0 and returns the fallback introduction, and this equality
+# reds (recorded in Story 16-2's Debug Log).
+ONB_CASSETTE="crates/maos-journey-test/cassettes/j0/shell-intro.json"
+output=$(MAOS_ONE_SHOT=hello-spirit MAOS_INFERENCE_MODE=replay \
+    MAOS_REPLAY_CASSETTE="$ONB_CASSETTE" NO_COLOR=1 ./target/release/maos 2>/dev/null)
 response_end=$(date +%s)
 response_elapsed=$((response_end - response_start))
 total_elapsed=$((response_end - build_start))
@@ -89,6 +98,17 @@ print('JSON keys validated OK')
 "; then
     echo "ERROR: JSON output missing required keys"
     echo "Output was: $output"
+    exit 1
+fi
+
+# Step 4b: Content equality — the introduction IS the cassette text (blocking).
+echo "--- Validating introduction equals the cassette text ---"
+expected_intro=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["entries"][0]["response"]["text"])' "$ONB_CASSETTE")
+actual_intro=$(echo "$output" | python3 -c 'import json,sys;print(json.load(sys.stdin)["introduction"])')
+if [ "$actual_intro" != "$expected_intro" ]; then
+    echo "ERROR: NFR-Onb-2 violation: introduction mismatch — a fallback/unconfigured"
+    echo "  string reached the evaluator. expected: $expected_intro"
+    echo "  actual:   $actual_intro"
     exit 1
 fi
 

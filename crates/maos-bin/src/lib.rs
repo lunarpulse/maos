@@ -40,6 +40,7 @@ pub mod inference_mode;
 /// charges and CI cannot run.
 #[cfg(feature = "network")]
 pub mod operator_door;
+pub mod shell_host;
 #[cfg(feature = "network")]
 pub mod tenant_map;
 /// The Worker-CLI **adapter** seam (J1 Tier-2 bridge). In the library, not

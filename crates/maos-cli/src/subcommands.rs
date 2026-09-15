@@ -1941,13 +1941,20 @@ fn halt_list_reader(spirit: Option<&str>, limit: u32) -> ExitCode {
             return ExitCode::from(1);
         }
     };
+    let mut unparseable = 0usize;
     for entry in &entries {
         let id_display: String = entry.frame_id_hex.chars().take(8).collect();
+        let (record, halt_id) = classify_halt_record(&entry.payload);
+        if record == "unparseable" {
+            unparseable += 1;
+        }
         let json_line = match serde_json::to_string(&serde_json::json!({
             "frame_id": id_display,
             "timestamp_ns": entry.timestamp_ns,
             "kind": entry.kind,
             "intent": entry.intent,
+            "halt_id": halt_id,
+            "record": record,
         })) {
             Ok(s) => s,
             Err(e) => {
@@ -1958,7 +1965,45 @@ fn halt_list_reader(spirit: Option<&str>, limit: u32) -> ExitCode {
         println!("{json_line}");
     }
     eprintln!("maosctl: halt list — {} halts shown", entries.len());
+    if unparseable > 0 {
+        eprintln!("maosctl: halt list — {unparseable} halt row(s) had an unparseable payload");
+    }
     ExitCode::SUCCESS
+}
+
+/// Story 16-2 / D-16-2-E — classify one `epistemic.halt` row's `record`,
+/// in THIS order (the order is the correctness: a serialized `HaltReceipt`
+/// parses as `EpistemicHaltPayload` too, whose only required field is
+/// `halt_id` — raised-first classification would label every receipt
+/// `raised`; probed against real `maos-domain` in validation round 3):
+///
+/// 1. empty payload                       ⇒ `termination_marker`, id `null`
+///    (the row `terminate_spirit` writes before each receipt);
+/// 2. parses as `HaltReceipt`             ⇒ `termination_receipt` with its
+///    id — EXCEPT a `term-…` id, the kernel's synthetic no-halt form
+///    (written when NOTHING was pending)  ⇒ `termination_no_pending`;
+/// 3. parses as `EpistemicHaltPayload`    ⇒ `raised` with its id;
+/// 4. anything else                       ⇒ `unparseable`, id `null`
+///    (counted on stderr by the caller).
+///
+/// Nothing is filtered: a reader that hides rows lies about the registry
+/// (§15 R6). Every `invoke_halt` caller mints ULIDs (§15 R9), which is what
+/// makes the `term-` prefix sound.
+pub fn classify_halt_record(payload: &str) -> (&'static str, Option<String>) {
+    if payload.is_empty() {
+        return ("termination_marker", None);
+    }
+    if let Ok(receipt) = serde_json::from_str::<maos_domain::halt::HaltReceipt>(payload) {
+        let id = receipt.halt_id.as_str().to_string();
+        if id.starts_with("term-") {
+            return ("termination_no_pending", Some(id));
+        }
+        return ("termination_receipt", Some(id));
+    }
+    if let Ok(raised) = serde_json::from_str::<maos_domain::frame::EpistemicHaltPayload>(payload) {
+        return ("raised", Some(raised.halt_id));
+    }
+    ("unparseable", None)
 }
 
 /// `pause`/`resume` over the door: the daemon performs the scheduler
@@ -2708,7 +2753,7 @@ fn audit_query(
             }
             Err(_) => {
                 eprintln!(
-                    "maosctl: audit query — unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
+                    "maosctl: audit query — unknown spirit '{name}' — no admission or load row names it in this Transparency Log"
                 );
                 return ExitCode::from(2);
             }
