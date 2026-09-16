@@ -14,14 +14,22 @@
 //!
 //! (a) a row whose KIND is never an external call by its `FrameKind`
 //!     definition — `epistemic.halt`, `telemetry.event`, budget warnings,
-//!     stalls, silent-failure suspects, admissions, governance, cost
-//!     attribution — is a non-call kernel event;
-//! (b) a `capability.invocation` row with no token is a non-call kernel
-//!     event iff it matches, EXACTLY, a `NonCall` entry of the writer-shape
-//!     table below — one entry per tokenless kind-7 writer site, carrying
-//!     the intent (or a `:`-terminated prefix) and the payload keys/types
-//!     that writer sets. A prefix match is refused (`lifecycle.bogus` is a
-//!     call). A `Call` entry never exempts.
+//!     stalls, silent-failure suspects, admissions, Worker subprocess
+//!     output, governance, cost attribution, identity assertions — is a
+//!     non-call kernel event, token-bearing or not (16-3 / D-16-3-J (1));
+//! (b) a row that matches, EXACTLY, a `NonCall` entry of the writer-shape
+//!     table below is a non-call kernel event. 16-2 measured one entry per
+//!     tokenless kind-7 writer site, carrying the intent (or a
+//!     `:`-terminated prefix) and the payload keys/types that writer sets.
+//!     16-3 / D-16-3-J (2) adds the kind-1 (`task.complete`) FR50
+//!     dispositions: every entry now pins the writer's KIND discriminator
+//!     and TOKEN column (`kind: 7, token: Absent` stays the default, so
+//!     the 16-2 entries are unchanged), and an entry matches only its own
+//!     kind and the token state its writer permits. A kind-1
+//!     `task.orphaned` row may be token-bearing or tokenless because the task
+//!     record now preserves host-grant token absence; the payload's
+//!     `in_flight_tokens` shape must agree with that state. A prefix match is
+//!     refused (`lifecycle.bogus` is a call). A `Call` entry never exempts.
 //!
 //! Every other row IS a call, and a call with no token is an
 //! `Fr4SchemaViolation` exactly as before — fail-closed: an unknown writer
@@ -56,8 +64,10 @@ pub const NON_CALL_KINDS: &[&str] = &[
     "task.stalled",           // 15
     "silent.failure.suspect", // 16
     "spirit.admitted",        // 19
+    "cli.subprocess.output",  // 21 — a Worker's own subprocess output rows land at its pid (16-3)
     "governance.event",       // 28
     "cost.attribution",       // 29
+    "identity.asserted", // 30 — tokenless, minted at the Worker's real pid under enterprise posture (16-3)
 ];
 
 /// The payload value type a writer-shape entry pins for one key.
@@ -73,6 +83,15 @@ pub enum PayloadType {
     NumOrNull,
     /// A JSON array of numbers (`[u8; N]` serializes as one) or null.
     NumArrayOrNull,
+    /// A JSON string or null (`Option<String>` in the writer) — a crash
+    /// cause's `stderr_tail` (16-3 / D-16-3-J (3)).
+    StrOrNull,
+    /// A JSON array whose every element is itself an array of exactly 16
+    /// numbers — `Vec<TokenId>`, where `TokenId([u8; 16])` serializes as a
+    /// 16-number array (`i1.rs`). It must be empty when the row token is absent
+    /// and non-empty when the row token is present. A flat number array or an
+    /// element of any other length is refused.
+    NumArrayArray,
     /// JSON boolean.
     Bool,
     /// A JSON number equal to the ROW's `spirit_pid` — the writer echoes the
@@ -100,13 +119,37 @@ impl WriterIntent {
     }
 }
 
-/// The disposition of one tokenless kind-7 writer site.
+/// Which token column a writer sets — the second dimension of a
+/// writer-shape entry (16-3 / D-16-3-J (2)).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenColumn {
+    /// The writer passes `None` — the row's token column is NULL.
+    Absent,
+    /// The writer passes a token — the row's token column is populated.
+    Present,
+    /// The writer preserves an optional token from its input record.
+    Optional,
+}
+
+/// The disposition of one writer site, pinned to its KIND discriminator and
+/// TOKEN column (16-3 / D-16-3-J (2)).
 #[derive(Debug, Clone, Copy)]
 pub struct WriterShapeEntry {
     /// The DOORBELL key: (file, enclosing fn, ordinal of this writer call
     /// within that fn). Keyed by call site, never by the intent literal —
     /// one fn can hold two writers with the same intent shape.
     pub site: (&'static str, &'static str, u32),
+    /// The `FrameKind` discriminator the writer passes. `7`
+    /// (`capability.invocation`) is the default — those entries are
+    /// evaluated after the kind-7 gate in [`classify_fr4_row`]; entries
+    /// with any other kind (kind 1 today) are evaluated before it.
+    pub kind: u8,
+    /// The token column the writer sets. Fixed-token entries match only their
+    /// own presence; optional-token entries also pin payload state to token
+    /// presence.
+    pub token: TokenColumn,
+    /// The intent grammar of the site: an exact literal, or a fixed prefix
+    /// ending in `:`.
     pub intent: WriterIntent,
     /// `None` for `Call` entries (a call is never exempt; the payload shape
     /// is irrelevant).
@@ -115,20 +158,26 @@ pub struct WriterShapeEntry {
 
 impl WriterShapeEntry {
     /// A `Call` disposition — deliberately NOT exempt: if the row ever lands
-    /// at a Spirit's pid it is a genuine FR4 finding.
+    /// at a Spirit's pid it is a genuine FR4 finding. Defaults to the
+    /// kind-7 tokenless writer shape the 16-2 table was measured against.
     pub const fn call(file: &'static str, f: &'static str, ordinal: u32) -> Self {
         Self {
             site: (file, f, ordinal),
+            kind: 7,
+            token: TokenColumn::Absent,
             intent: WriterIntent::Exact(""),
             shape: None,
         }
     }
 }
 
-/// THE writer-shape table — every tokenless kind-7 (and variable-kind)
-/// `insert_frame_event*` site in `crates/maos-kernel-core/src`,
-/// `crates/maos-bin/src` and `crates/maos-iac/src`, each measured at T0
-/// against the tree (not inferred from this list).
+/// THE writer-shape table — every `insert_frame_event*` writer site the
+/// doorbell demands a disposition for: the tokenless kind-7 (and
+/// variable-kind) sites (16-2), plus every kind-1 `TaskComplete` site,
+/// token-bearing or not (16-3 / D-16-3-J (4)) — in
+/// `crates/maos-kernel-core/src`, `crates/maos-bin/src` and
+/// `crates/maos-iac/src`, each measured at T0 against the tree (not
+/// inferred from this list).
 ///
 /// The eight lifecycle shapes are NOT uniform: `start`/`pause`/`resume`/
 /// `unload` carry `spirit_pid`, not `spirit_id` (validation round 1).
@@ -136,11 +185,15 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     // ── maos-kernel-core — NonCall ─────────────────────────────────────────
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "load", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.admit"),
         shape: Some(&[("spirit_id", PayloadType::Str)]),
     },
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "load", 1),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.load"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::StrEq("Load")),
@@ -150,6 +203,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "start", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.start"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::StrEq("Start")),
@@ -158,6 +213,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "pause", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.pause"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::StrEq("Pause")),
@@ -166,6 +223,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "resume", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.resume"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::StrEq("Resume")),
@@ -174,6 +233,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "unload", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.unload"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::StrEq("Unload")),
@@ -182,6 +243,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("scheduler_loop.rs", "journal_lifecycle", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.journal"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::Str),
@@ -189,7 +252,28 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
+        // D-16-3-J (4) — kind 1 with an OPTIONAL token: a minted token is
+        // zero-padded into the 32-byte column; host-grant authority keeps the
+        // column NULL. `in_flight_tokens` must be respectively non-empty or
+        // empty, so the row cannot claim a token state its task did not have.
+        site: ("crash_detector.rs", "handle_crash", 0),
+        kind: 1,
+        token: TokenColumn::Optional,
+        intent: WriterIntent::Exact("task.orphaned"),
+        shape: Some(&[
+            ("task_id", PayloadType::Str),
+            ("originator_spirit_id", PayloadType::Str),
+            ("exit_signal", PayloadType::NumOrNull),
+            ("exit_code", PayloadType::NumOrNull),
+            ("stderr_tail", PayloadType::StrOrNull),
+            ("cause", PayloadType::Str),
+            ("in_flight_tokens", PayloadType::NumArrayArray),
+        ]),
+    },
+    WriterShapeEntry {
         site: ("crash_detector.rs", "handle_crash", 1),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.crash"),
         shape: Some(&[
             ("lifecycle_event", PayloadType::StrEq("Crash")),
@@ -201,6 +285,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     WriterShapeEntry {
         // The payload is a plain `format!` STRING, not JSON.
         site: ("self_telemetry.rs", "self_telemetry", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("telemetry.self"),
         shape: Some(&[]),
     },
@@ -210,6 +296,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // side_effect_token_id (TokenId([u8;16]) → array),
         // principal_revocability (bool).
         site: ("schedule_watchdog.rs", "check_and_fire", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Prefix("schedule.fire:"),
         shape: Some(&[
             ("spirit_id", PayloadType::Str),
@@ -225,6 +313,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // (both in set (a)); the site demands an explicit entry regardless
         // (§15 R3: the doorbell's unit is the call site).
         site: ("hook_dispatch.rs", "emit_budget_frame", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Prefix("hook.budget."),
         shape: Some(&[
             ("spirit_pid", PayloadType::SpiritPidEqualsRow),
@@ -236,6 +326,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("applier.rs", "apply_crl", 1),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("spirit.quarantine_requested"),
         shape: Some(&[
             ("spirit_id", PayloadType::Str),
@@ -245,6 +337,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("upgrade.rs", "upgrade", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("spirit.upgrade"),
         shape: Some(&[
             ("spirit_id", PayloadType::Str),
@@ -260,6 +354,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // `cli_wrapper/runtime.rs` — `insert_frame_event_with_sender`,
         // token `None`.
         site: ("runtime.rs", "wait_and_finalize", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("cli.subprocess.exit"),
         shape: Some(&[
             ("event", PayloadType::StrEq("cli_subprocess_exit")),
@@ -268,18 +364,83 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("is_crash", PayloadType::Bool),
         ]),
     },
+    // ── maos-kernel-core — Call (deliberately NOT exempt) ──────────────────
+    // D-16-3-J (4): the SECOND `task.orphaned` writer (`halt/resolver.rs`)
+    // writes a plain `format!` STRING payload (`orphaned: accepted_halt
+    // halt_id=…`) at pid 0 with no token — a raw-bytes payload cannot be
+    // shape-matched, and a pid-0 row reaches a `--spirit` view only on a
+    // `hello-spirit` one-shot boot; if it ever does, it is a genuine FR4
+    // finding (§11 row 12, 16-5).
+    WriterShapeEntry::call("resolver.rs", "emit_task_orphaned", 0),
     // ── maos-bin — NonCall ─────────────────────────────────────────────────
     WriterShapeEntry {
         // The smoke-orchestrator-fanout arm — different keys from the
         // runtime writer above; both entries exist because the doorbell
         // keys the CALL SITE.
         site: ("main.rs", "smoke_orchestrator_fanout_6_2", 3),
+        kind: 7,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("cli.subprocess.exit"),
         shape: Some(&[
             ("cli", PayloadType::Str),
             ("exit_code", PayloadType::Num),
             ("bytes", PayloadType::Num),
             ("duration_ms", PayloadType::Num),
+        ]),
+    },
+    // ── maos-bin — Call (deliberately NOT exempt) ──────────────────────────
+    // D-16-3-J (4): `smoke-distillate-source` seeds a raw source frame for
+    // the smoke distillate write — a smoke seed, never a production row.
+    WriterShapeEntry::call("main.rs", "smoke_orchestrator_fanout_6_2", 0),
+    // ── maos-iac — NonCall (kind-1 FR50 dispositions, D-16-3-J (4)) ────────
+    WriterShapeEntry {
+        site: ("adapter.rs", "emit_task_complete_nack", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.nacked"),
+        shape: Some(&[
+            ("task_id", PayloadType::Str),
+            ("originator_spirit_id", PayloadType::Str),
+            ("capability_token", PayloadType::NumArrayOrNull),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("adapter.rs", "emit_task_complete_escalated", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.escalated"),
+        shape: Some(&[
+            ("task_id", PayloadType::Str),
+            ("originator_spirit_id", PayloadType::Str),
+            ("capability_token", PayloadType::NumArrayOrNull),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("adapter.rs", "reassign_task_to", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.reassigned"),
+        shape: Some(&[
+            ("task_id", PayloadType::Str),
+            ("originator_spirit_id", PayloadType::Str),
+            ("capability_token", PayloadType::NumArrayOrNull),
+            ("replica_spirit_id", PayloadType::Str),
+        ]),
+    },
+    WriterShapeEntry {
+        // Story 9.2's redaction marker — the distillate frame id as a hex
+        // STRING (`format_frame_id_hex`).
+        site: (
+            "transparency_log.rs",
+            "insert_distillate_redaction_marker",
+            0,
+        ),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("principal_id", PayloadType::Str),
+            ("redacted_distillate_frame_id", PayloadType::Str),
         ]),
     },
     // ── maos-iac — Call (deliberately NOT exempt) ──────────────────────────
@@ -297,25 +458,67 @@ pub fn classify_fr4_row(entry: &AuditEntry) -> Fr4RowDisposition {
     if NON_CALL_KINDS.contains(&entry.kind.as_str()) {
         return Fr4RowDisposition::NonCallKernelEvent;
     }
+    let token_present = entry.capability_token_hex.is_some();
+    // (b) kind-dispositioned writer shapes. Entries whose kind is NOT 7 are
+    // evaluated BEFORE the kind-7 gate: their rows are not
+    // `capability.invocation` rows, so the gate would end them as `Call`
+    // before the shape table ever saw them (D-16-3-J (2)). An entry matches
+    // only its own kind — compared through `kind_from_string`, the inverse
+    // of the same `kind_to_string` table the read side renders row kinds
+    // with — and its own token column.
+    for writer in WRITER_SHAPES.iter().filter(|w| w.kind != 7) {
+        if crate::kind_from_string(&entry.kind) != Some(i64::from(writer.kind)) {
+            continue;
+        }
+        if !token_column_matches(writer.token, token_present) {
+            continue;
+        }
+        let Some(shape) = writer.shape else {
+            continue; // Call entries never exempt
+        };
+        if writer.intent.matches(&entry.intent)
+            && payload_matches(shape, &entry.payload, entry.spirit_pid, token_present)
+        {
+            return Fr4RowDisposition::NonCallKernelEvent;
+        }
+    }
     // Only kind 7 reaches the writer-shape exemption.
     if entry.kind != "capability.invocation" {
         return Fr4RowDisposition::Call;
     }
-    if entry.capability_token_hex.is_some() {
+    if token_present {
         return Fr4RowDisposition::Call;
     }
-    for writer in WRITER_SHAPES {
+    for writer in WRITER_SHAPES.iter().filter(|w| w.kind == 7) {
+        if !token_column_matches(writer.token, token_present) {
+            continue;
+        }
         let Some(shape) = writer.shape else {
             continue; // Call entries never exempt
         };
-        if !writer.intent.matches(&entry.intent) {
-            continue;
-        }
-        if payload_matches(shape, &entry.payload, entry.spirit_pid) {
+        if writer.intent.matches(&entry.intent)
+            && payload_matches(
+                shape,
+                &entry.payload,
+                entry.spirit_pid,
+                entry.capability_token_hex.is_some(),
+            )
+        {
             return Fr4RowDisposition::NonCallKernelEvent;
         }
     }
     Fr4RowDisposition::Call
+}
+
+/// Does the entry's pinned token column accept this row's token presence?
+/// An entry matches only rows whose token presence equals its own
+/// (D-16-3-J (2)).
+fn token_column_matches(entry_token: TokenColumn, row_token_present: bool) -> bool {
+    match entry_token {
+        TokenColumn::Absent => !row_token_present,
+        TokenColumn::Present => row_token_present,
+        TokenColumn::Optional => true,
+    }
 }
 
 /// EXACT payload match: parses as a JSON object, every pinned key present
@@ -326,6 +529,7 @@ fn payload_matches(
     shape: &'static [(&'static str, PayloadType)],
     payload: &str,
     row_spirit_pid: u32,
+    row_token_present: bool,
 ) -> bool {
     // An empty shape pins a NON-JSON payload (`telemetry.self` writes a
     // plain string; an empty payload matches nothing here).
@@ -357,6 +561,17 @@ fn payload_matches(
                         .as_array()
                         .is_some_and(|a| a.iter().all(serde_json::Value::is_number))
             }
+            PayloadType::StrOrNull => value.is_string() || value.is_null(),
+            PayloadType::NumArrayArray => value.as_array().is_some_and(|outer| {
+                let presence_matches = (row_token_present && !outer.is_empty())
+                    || (!row_token_present && outer.is_empty());
+                presence_matches
+                    && outer.iter().all(|element| {
+                        element.as_array().is_some_and(|inner| {
+                            inner.len() == 16 && inner.iter().all(serde_json::Value::is_number)
+                        })
+                    })
+            }),
             PayloadType::Bool => value.is_boolean(),
             PayloadType::SpiritPidEqualsRow => value.as_u64() == Some(row_spirit_pid as u64),
         };

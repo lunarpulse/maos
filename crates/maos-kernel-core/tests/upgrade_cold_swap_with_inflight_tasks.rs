@@ -87,7 +87,7 @@ async fn cold_upgrade_factory_failure_preserves_scb_runtime_and_inflight_tasks()
         .expect("task ledger lock poisoned")
         .push(TaskAssignmentRecord {
             task_id: "in-flight-upgrade".into(),
-            capability_token: TokenId([7; 16]),
+            capability_token: Some(TokenId([7; 16])),
             ttl_deadline_ns: u64::MAX,
             intent_class: IntentClass::Standard,
             originator_spirit_id: "caller".into(),

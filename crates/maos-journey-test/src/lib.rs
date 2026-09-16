@@ -719,8 +719,31 @@ pub struct BoundedRun {
     pub stderr: String,
 }
 
+/// Per-stream diagnostic capture ceiling. Readers continue draining after the
+/// ceiling so a noisy child cannot block on a full pipe or grow the harness
+/// without bound.
+const CAPTURE_LIMIT_BYTES: usize = 8 * 1024 * 1024;
+
+fn drain_bounded(mut pipe: impl std::io::Read) -> Vec<u8> {
+    let mut captured = Vec::with_capacity(CAPTURE_LIMIT_BYTES);
+    let mut chunk = [0u8; 16 * 1024];
+    loop {
+        let Ok(read) = pipe.read(&mut chunk) else {
+            break;
+        };
+        if read == 0 {
+            break;
+        }
+        let remaining = CAPTURE_LIMIT_BYTES.saturating_sub(captured.len());
+        captured.extend_from_slice(&chunk[..read.min(remaining)]);
+    }
+    captured
+}
+
 /// Run `program args` against the world's env, bounded by `timeout_secs`.
 /// `extra_env` rides ALONGSIDE the world env (e.g. a cassette copy).
+/// The pipes drain on two threads WHILE the bounded loop runs (D-16-3-O), so
+/// a child that fills either pipe buffer still exits inside the bound.
 pub fn run_bounded(
     world: &JourneyWorld,
     program: &str,
@@ -744,18 +767,35 @@ pub fn run_bounded(
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap_or_else(|e| panic!("{label}: spawn failed: {e}"));
+    // D-16-3-O — drain BOTH pipes WHILE the bounded loop runs, not after it:
+    // a child writing past the OS pipe buffer (~64 KiB) blocks on write
+    // forever when nobody reads, so the old drain-after-exit shape
+    // (`wait_with_output` only once `try_wait` yielded `Some`) never reached
+    // its drain, the deadline fired, and a full-pipe hang was misreported as
+    // a timeout (`deferred-work.md:938`, closed by Story 16-3).
+    let stdout_pipe = child.stdout.take().expect("stdout was piped");
+    let stderr_pipe = child.stderr.take().expect("stderr was piped");
+    let stdout_drain = std::thread::spawn(move || drain_bounded(stdout_pipe));
+    let stderr_drain = std::thread::spawn(move || drain_bounded(stderr_pipe));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
-                let out = child.wait_with_output().expect("collect output");
+                // The child is reaped, so both write ends are closed and the
+                // drainers see EOF; the joins carry the whole capture.
+                let out = stdout_drain.join().expect("stdout drain thread panicked");
+                let err = stderr_drain.join().expect("stderr drain thread panicked");
                 return BoundedRun {
                     code: status.code(),
-                    stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
-                    stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+                    stdout: String::from_utf8_lossy(&out).into_owned(),
+                    stderr: String::from_utf8_lossy(&err).into_owned(),
                 };
             }
             Ok(None) if std::time::Instant::now() >= deadline => {
+                // The drainers are deliberately NOT joined on this path: the
+                // kill closes the child's write ends so they reach EOF on
+                // their own, and a descendant still holding a pipe is 17-1
+                // AC4's tree teardown, not this helper's bound.
                 let _ = child.kill();
                 let _ = child.wait();
                 panic!("{label}: did not exit within {timeout_secs}s");

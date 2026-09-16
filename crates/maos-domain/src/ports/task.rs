@@ -12,8 +12,9 @@ use crate::invariants::i1::TokenId;
 pub struct TaskAssignmentRecord {
     /// Opaque task identifier (Spirit-assigned).
     pub task_id: String,
-    /// Capability token that authorised this task assignment.
-    pub capability_token: TokenId,
+    /// Capability token that authorised this task assignment, or `None` when
+    /// the task runs under host-grant authority without a minted token.
+    pub capability_token: Option<TokenId>,
     /// Monotonic deadline (ns) after which the task is considered stale.
     pub ttl_deadline_ns: u64,
     /// Intent classification (Standard, Epistemic, etc.).
@@ -30,7 +31,7 @@ mod tests {
     fn task_assignment_record_construction() {
         let rec = TaskAssignmentRecord {
             task_id: "task-001".into(),
-            capability_token: TokenId([0u8; 16]),
+            capability_token: Some(TokenId([0u8; 16])),
             ttl_deadline_ns: 1_000_000_000,
             intent_class: crate::invariants::i1::IntentClass::Standard,
             originator_spirit_id: "butler".into(),

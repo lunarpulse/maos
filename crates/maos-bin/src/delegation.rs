@@ -626,6 +626,14 @@ pub struct HostBWorkerContext {
     pub remote_requested: bool,
     pub enterprise_runtime: Option<Arc<crate::enterprise_identity::EnterpriseRuntime>>,
     pub enterprise_pdp_runtime: Option<Arc<crate::enterprise_pdp_runtime::EnterprisePdpRuntime>>,
+    /// Story 16-3 (D-16-3-I) — host B's Workers are supervised by the
+    /// cohort daemon's own `WorkerSupervisor`.
+    ///
+    /// CONCRETE, not `Arc<dyn WorkerSupervision>`: the cohort teardown needs
+    /// this supervisor's scheduler and halt registry to run
+    /// `unload_all_loaded`, and its `shutdown_token()` to wake the daemon's
+    /// `select!`. A trait object could reach neither.
+    pub supervision: Arc<crate::supervision::WorkerSupervisor>,
 }
 
 /// What host B actually did with one inbound frame.
@@ -670,7 +678,12 @@ pub async fn handle_one_inbound(
     // as long as a remote agent CLI takes to finish — on the daemon that also
     // serves the accept loop, the cohort pull ticker and the digest replier.
     // `spawn_blocking` moves it to the blocking pool, which is what that pool is
-    // for. Nothing inside is `async`, so there is no runtime to re-enter.
+    // for.
+    //
+    // Story 16-3 (D-16-3-C) corrects this comment's last clause: the surface it
+    // calls now DOES re-enter the runtime — the supervision port `block_on`s
+    // `load`/`start`/`unload`/`handle_crash`. That is legal here precisely
+    // BECAUSE this runs on the blocking pool and not on a reactor worker.
     let manifest_root = ctx.manifest_root.clone();
     let run = ctx.run.clone();
     let transparency_log = Arc::clone(&ctx.transparency_log);
@@ -679,6 +692,7 @@ pub async fn handle_one_inbound(
     let enterprise_runtime = ctx.enterprise_runtime.clone();
     let enterprise_pdp_runtime = ctx.enterprise_pdp_runtime.clone();
     let remote_requested = ctx.remote_requested;
+    let supervision = Arc::clone(&ctx.supervision);
     let completion = tokio::task::spawn_blocking(move || {
         crate::worker_spawn::run_cli_wrapper_manifest(
             &manifest_root,
@@ -690,6 +704,8 @@ pub async fn handle_one_inbound(
             enterprise_pdp_runtime.as_deref(),
             Some(goal.as_str()),
             remote_requested,
+            supervision.as_ref(),
+            crate::supervision::WorkerTask::Delegation { frame_id },
         )
         // `Box<dyn Error>` is not `Send`, so it cannot cross the join. Flatten to a
         // string INSIDE the blocking closure rather than widening the error type.

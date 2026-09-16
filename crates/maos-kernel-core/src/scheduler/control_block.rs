@@ -662,7 +662,7 @@ mod tests {
             .unwrap()
             .push(TaskAssignmentRecord {
                 task_id: "in-flight".into(),
-                capability_token: maos_domain::invariants::i1::TokenId([0; 16]),
+                capability_token: Some(maos_domain::invariants::i1::TokenId([0; 16])),
                 ttl_deadline_ns: 1,
                 intent_class: maos_domain::invariants::i1::IntentClass::Standard,
                 originator_spirit_id: "origin".into(),
@@ -708,7 +708,7 @@ mod tests {
             let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
             tasks.push(TaskAssignmentRecord {
                 task_id: "task-1".into(),
-                capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                capability_token: Some(maos_domain::invariants::i1::TokenId([0u8; 16])),
                 ttl_deadline_ns: 1_000_000,
                 intent_class: maos_domain::invariants::i1::IntentClass::Standard,
                 originator_spirit_id: "origin-1".into(),

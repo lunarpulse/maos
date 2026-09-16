@@ -41,6 +41,18 @@ pub mod inference_mode;
 #[cfg(feature = "network")]
 pub mod operator_door;
 pub mod shell_host;
+/// Story 16-3 — Worker supervision (the Worker's SCB, its exit observer, its
+/// progress stamp and its task record) and root shutdown (`unload_all_loaded`,
+/// the one unload function every `maos run` root leaves through).
+///
+/// UNGATED, like `shell_host`, because the root-shutdown half must reach every
+/// root including the no-default-features build; the Worker half inside is
+/// `#[cfg(feature = "network")]` exactly like `worker_spawn`. In the library,
+/// not `main.rs`, for the same reason as every module above: the corpora and
+/// `tests/worker_supervision_16_3.rs` must NAME `WorkerSupervisor`,
+/// `BindingPhase` and the port, and drive the real supervisor rather than a
+/// re-implementation of it.
+pub mod supervision;
 #[cfg(feature = "network")]
 pub mod tenant_map;
 /// The Worker-CLI **adapter** seam (J1 Tier-2 bridge). In the library, not

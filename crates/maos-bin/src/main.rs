@@ -585,6 +585,25 @@ fn requires_epistemic_halt_port(
 /// the daemon can render the halt screen-string. `process_scalar_write` is
 /// `&self` (no `Mutex` around the orchestrator).
 #[cfg(feature = "network")]
+enum ButlerPidSource {
+    Fixed(Arc<std::sync::atomic::AtomicU32>),
+    Resolve(Arc<dyn Fn() -> Option<u32> + Send + Sync>),
+}
+
+#[cfg(feature = "network")]
+impl ButlerPidSource {
+    fn get(&self) -> Option<u32> {
+        match self {
+            Self::Fixed(binding) => {
+                let pid = binding.load(std::sync::atomic::Ordering::Acquire);
+                (pid != 0).then_some(pid)
+            }
+            Self::Resolve(resolve) => resolve().filter(|pid| *pid != 0),
+        }
+    }
+}
+
+#[cfg(feature = "network")]
 struct ButlerOrchestratorAdapter {
     orchestrator:
         Arc<maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>,
@@ -595,13 +614,19 @@ struct ButlerOrchestratorAdapter {
     /// The receipt from the most recent halt-firing scalar write (daemon reads
     /// this to render the halt screen-string).
     last_receipt: Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>,
+    /// Story 16-3 (D-16-3-N) — the HOST-SIDE pid source for every scalar this
+    /// adapter writes. Initial loads use a fixed binding set from
+    /// `scheduler.load`; upgrade successors resolve their current scheduler
+    /// identity lazily so cold-swap allocation cannot leave the predecessor pid
+    /// captured in the replacement port.
+    spirit_pid_source: ButlerPidSource,
 }
 
 #[cfg(feature = "network")]
 impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
     fn write_scalar(
         &self,
-        spirit_pid: u32,
+        _spirit_pid: u32,
         spirit_id: &str,
         tag: &str,
         value: f64,
@@ -610,6 +635,16 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
         Option<maos_domain::halt::HaltReceipt>,
         maos_domain::ports::epistemic_scalar::ScalarPortError,
     > {
+        // Story 16-3 (D-16-3-N) — the Spirit-supplied pid is IGNORED. An unset
+        // binding is a refusal returned to the Spirit, never a pid-0 halt: a
+        // halt nobody can list or resolve is worse than a write that failed
+        // loudly.
+        let spirit_pid = self.spirit_pid_source.get().ok_or_else(|| {
+            maos_domain::ports::epistemic_scalar::ScalarPortError::Backend(
+                "scalar port pid binding unset".to_string(),
+            )
+        })?;
+
         let receipt = self
             .orchestrator
             .process_scalar_write(
@@ -655,9 +690,13 @@ fn construct_butler_core(
     tl: Arc<maos_kernel_core::iac::TransparencyLogAdapter>,
     journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     boot_nonce: u64,
+    pid_resolver: Option<Arc<dyn Fn() -> Option<u32> + Send + Sync>>,
 ) -> (
     butler::Butler,
     Option<Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>>,
+    // The fixed pid binding the CALLER must set to `scheduler.load`'s return.
+    // Upgrade successors use the supplied resolver instead and return `None`.
+    Option<Arc<std::sync::atomic::AtomicU32>>,
 ) {
     let scenario = butler::ScenarioInput {
         calendar: vec![
@@ -685,8 +724,16 @@ fn construct_butler_core(
     // into the closure and leaves nothing to return; an `if let` keeps the
     // move local to this scope.
     let mut last_receipt = None;
+    let mut pid_binding = None;
     if let Some(policy) = policy {
         let receipt = Arc::new(std::sync::Mutex::new(None));
+        let pid_source = if let Some(resolve) = pid_resolver {
+            ButlerPidSource::Resolve(resolve)
+        } else {
+            let binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            pid_binding = Some(Arc::clone(&binding));
+            ButlerPidSource::Fixed(binding)
+        };
         let adapter = Arc::new(ButlerOrchestratorAdapter {
             orchestrator,
             tl,
@@ -694,12 +741,13 @@ fn construct_butler_core(
             policy,
             boot_nonce,
             last_receipt: Arc::clone(&receipt),
+            spirit_pid_source: pid_source,
         });
         butler =
             butler.with_scalar_port(adapter as Arc<dyn maos_domain::ports::EpistemicScalarPort>);
         last_receipt = Some(receipt);
     }
-    (butler, last_receipt)
+    (butler, last_receipt, pid_binding)
 }
 
 /// Story 16-1 (D-16-1-W) — re-parse `[epistemic_policy]` from the TARGET
@@ -3184,6 +3232,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let factory_transparency_log = Arc::clone(&transparency_log);
     let factory_shared_journal = Arc::clone(&shared_journal);
     let factory_successor_slot = successor_manifest_slot.clone();
+    // Story 16-3 (D-16-3-N) — the successor factory's butler arm must set the
+    // new adapter's pid binding BEFORE it returns: the factory's signature is
+    // fixed (`create(&SpiritManifestBundle) -> Result<Arc<dyn AnySpiritObj>>`)
+    // so it cannot hand the binding back, and a hot swap resolves the pid
+    // BEFORE `create` and keeps it (`lifecycle/upgrade.rs:103` vs `:130`), so
+    // `resolve_pid(&class.name)` is already the successor's pid. The door
+    // enforces class == id, so that name is the right key. Verified: the
+    // `scbs()` read guard is scoped to `upgrade.rs:113-129` and dropped before
+    // `create`, so this lookup cannot deadlock.
+    let factory_scheduler = Arc::clone(&scheduler);
     let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
         move |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
             let class = manifest.class.as_ref().ok_or_else(|| {
@@ -3232,13 +3290,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     })?;
                     let policy = read_butler_epistemic_policy(&staged)?;
-                    let (butler, _receipt) = construct_butler_core(
+                    let successor_id = class.name.clone();
+                    let resolver_scheduler = Arc::clone(&factory_scheduler);
+                    let pid_resolver: Arc<dyn Fn() -> Option<u32> + Send + Sync> =
+                        Arc::new(move || resolver_scheduler.resolve_pid(&successor_id));
+                    let (butler, _receipt, _fixed_pid_binding) = construct_butler_core(
                         Some(policy),
                         Arc::new(std::sync::Mutex::new(None)),
                         Arc::clone(&factory_orchestrator),
                         Arc::clone(&factory_transparency_log),
                         Arc::clone(&factory_shared_journal),
                         boot_nonce,
+                        Some(pid_resolver),
                     );
                     maos_kernel_core::scheduler::make_spirit_obj(butler)
                 }
@@ -3972,6 +4035,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Story 16-3 (D-16-3-H) — the root's supervision handle, DECLARED HERE and
+    // filled inside the run block below (site 1) or inside the
+    // `cohort-a2a-daemon` arm (site 2). Nothing is spawned at this line.
+    //
+    // Why not inside the run block: its value must SURVIVE the block's end, so
+    // the non-`--once` fall-throughs reach the serving tail still holding it.
+    // Run-block locals are detached when the block ends (a dropped
+    // `JoinHandle` detaches, and a dropped `CancellationToken` cancels
+    // nothing) — the serving root would then run two ProgressWatchdogs, lose
+    // `root_shutdown`, and time its audit-writer drain out on the detached
+    // owners.
+    //
+    // Why not BEFORE this point: every `MAOS_ONE_SHOT` arm lies between the run
+    // block and the serving tail, and an armed listener there would swallow the
+    // SIGTERM the arm is supposed to die from.
+    let mut root_supervision: Option<maos_bin::supervision::RootSupervision> = None;
     // ─────────────────────────────────────────────────────────────
     // Story 8.11 / AC1 — `maos run <manifest> [--live] [--once]`.
     //
@@ -3988,6 +4067,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+
+        // Story 16-3 (D-16-3-M) — `maos run` REFUSES `MAOS_ONE_SHOT`.
+        //
+        // The one-shot dispatch below is gated by the env var ALONE, so a
+        // non-`--once` `maos run` with it set would fall out of this block and
+        // enter a one-shot arm while still holding site 1's `RootSupervision`
+        // — an arm with a SIGTERM listener it never tears down. The
+        // combination has no caller in the tree (no test, script or workflow
+        // sets both), so refusing it costs nothing and closes the hole.
+        if let Ok(mode) = std::env::var("MAOS_ONE_SHOT") {
+            if !mode.is_empty() {
+                // Exit 2, not 1: a returned `Err` exits 1, which is the code
+                // an ordinary run failure already uses. A CONFIGURATION
+                // refusal that is indistinguishable from a failed run is a
+                // refusal an operator cannot act on. Nothing is open yet at
+                // this point — this is the run block's first statement after
+                // `init_monotonic_base` — so there is no teardown to skip.
+                eprintln!(
+                    "maos run: MAOS_ONE_SHOT={mode} is set. `maos run` and the one-shot arms are \
+                     different roots with different teardowns and cannot share a process: unset \
+                     MAOS_ONE_SHOT to run a manifest, or drop the `run` subcommand to use the \
+                     one-shot arm."
+                );
+                std::process::exit(2);
+            }
+        }
+
+        // Story 16-3 (D-16-3-H) site 1 — arm the root: the Worker supervisor,
+        // the ProgressWatchdog (which must run WHILE Workers live, not only in
+        // the serving tail), the Worker progress stamper and the signal
+        // listener. Every input is already in scope, and `set_crash_detector`
+        // — which needs the scheduler's Arc strong count at 1 — is long past.
+        root_supervision = Some(maos_bin::supervision::RootSupervision::arm(
+            Arc::clone(&scheduler),
+            Arc::clone(&crash_detector),
+            Arc::clone(&transparency_log),
+            Arc::clone(&halt_registry),
+            Arc::clone(&iac),
+            Arc::clone(&telemetry),
+            Arc::clone(&notification_dispatcher),
+            boot_nonce,
+        ));
+        let root_worker_supervision = Arc::clone(
+            root_supervision
+                .as_ref()
+                .expect("root supervision was just armed")
+                .supervisor(),
+        );
+        let root_shutdown = root_worker_supervision.shutdown_token();
 
         // 1. Read + parse the manifest.
         let manifest_path = std::path::PathBuf::from(&run.manifest_path);
@@ -4035,7 +4163,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // envelope's granter is compared against `frame.from` at intake.
             let delegation_emitter =
                 orchestrator::Orchestrator::new(maos_bin::delegation::FROM_SPIRIT);
-            for entry in topology_entries {
+            // Story 16-3 (D-16-3-M) — a topology broken off mid-load by a
+            // signal must exit NON-ZERO: the `--once` pass never completed, and
+            // an exit 0 there is the 2a AC1.5 false-success shape.
+            let mut topology_interrupted = false;
+            // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
+            // topology Worker with no `host`; `TopologyEntry` carries only
+            // `{manifest, host}`, so the position is the only stable handle.
+            for (topology_entry_index, entry) in topology_entries.into_iter().enumerate() {
+                // A signal between entries stops the load: no further Spirit or
+                // Worker is admitted, and the teardown below still runs.
+                if root_shutdown.is_cancelled() {
+                    topology_interrupted = true;
+                    break;
+                }
                 let child_path = {
                     let p = std::path::PathBuf::from(&entry.manifest);
                     if p.is_absolute() {
@@ -4090,6 +4231,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // `crossed_the_wire` is set, because the FAR Host runs the worker
                     // — see the skip below.
                     let mut crossed_the_wire = false;
+                    // Story 16-3 (D-16-3-E) — a topology member WITH a `host`
+                    // that rehearses locally IS a delegated Worker, so its task
+                    // record must carry the frame id. `frame.frame_id` is `Copy`
+                    // and is read BEFORE `delegate(&iac, frame)` moves the
+                    // frame; the `SentCrossHost` arm spawns nothing locally.
+                    let mut delegation_frame_id: Option<[u8; 16]> = None;
                     let delegated_task = match &entry.host {
                         None => None,
                         Some(to_host) => {
@@ -4179,6 +4326,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 maos_bin::delegation::FROM_HOST,
                                 intent,
                             )?;
+                            delegation_frame_id = Some(frame.frame_id);
                             delegation_emitter.begin_delegation();
                             // j1-crosshost-2b AC2.1 — the two arms diverge here.
                             // On loopback the frame never left, so THIS Host runs
@@ -4276,18 +4424,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "frame_borne": delegated_task.is_some(),
                         })
                     );
-                    let completion = run_cli_wrapper_manifest(
-                        &child_root,
-                        &run,
-                        Arc::clone(&transparency_log),
-                        Arc::clone(&capability),
-                        spirit_host.clone(),
-                        enterprise_runtime.clone(),
-                        enterprise_pdp_runtime.as_ref(),
-                        delegated_task.as_deref(),
-                        // Local `maos run` path keeps 2a's ratified FORK B posture.
-                        false,
-                    )?;
+                    // Story 16-3 (D-16-3-C) — `block_in_place` so the sync
+                    // supervision port may re-enter the runtime with
+                    // `Handle::block_on`. A direct `block_on` from this reactor
+                    // worker thread panics.
+                    let worker_task = match delegation_frame_id {
+                        Some(frame_id) => {
+                            maos_bin::supervision::WorkerTask::Delegation { frame_id }
+                        }
+                        None => maos_bin::supervision::WorkerTask::TopologyEntry {
+                            index: topology_entry_index,
+                        },
+                    };
+                    let worker_result = tokio::task::block_in_place(|| {
+                        run_cli_wrapper_manifest(
+                            &child_root,
+                            &run,
+                            Arc::clone(&transparency_log),
+                            Arc::clone(&capability),
+                            spirit_host.clone(),
+                            enterprise_runtime.clone(),
+                            enterprise_pdp_runtime.as_ref(),
+                            delegated_task.as_deref(),
+                            // Local `maos run` path keeps 2a's ratified FORK B posture.
+                            false,
+                            root_worker_supervision.as_ref(),
+                            worker_task,
+                        )
+                    });
+                    // Story 16-3 — checked on BOTH arms and BEFORE any `?`: a
+                    // SIGTERM during this Worker returns `Err` from the guard's
+                    // "stopped before spawn" path or leaves a stopped Worker's
+                    // non-completion, and either way the topology's teardown —
+                    // which unloads every Spirit loaded so far — must still run.
+                    if root_shutdown.is_cancelled() {
+                        if let Err(error) = &worker_result {
+                            eprintln!("maos run: topology worker interrupted by signal: {error}");
+                        }
+                        topology_interrupted = true;
+                        break;
+                    }
+                    let completion = worker_result?;
                     // AC3.10 + review 2a-P4 — the verdict is enforced for EVERY
                     // topology `[cli_wrapper]` entry, not only the delegated
                     // ones: an entry without `host` gets `delegated_task =
@@ -4452,6 +4629,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .clone()
                             .ok_or("maos run: Mira manifest must declare [epistemic_policy]")?;
                         let last_receipt = Arc::new(std::sync::Mutex::new(None));
+                        // Story 16-3 (D-16-3-N) — Mira passes `0` through this
+                        // same adapter (`spirits/mira/src/lib.rs`), and it
+                        // DISCARDS the port's error, so an unbound port drops
+                        // its halts silently. The binding is set below, right
+                        // after `load` returns the pid and before `start`;
+                        // Mira only writes scalars from `on_idle`, which
+                        // cannot fire before `start`.
+                        let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
                         let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
                             Arc::new(ButlerOrchestratorAdapter {
                                 orchestrator: Arc::clone(&orchestrator),
@@ -4460,8 +4645,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 policy,
                                 boot_nonce,
                                 last_receipt,
+                                spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(&pid_binding)),
                             });
-                        scheduler
+                        let mira_pid = scheduler
                             .load(
                                 &spirit_id,
                                 bundle,
@@ -4473,7 +4659,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .await
                             .map_err(|e| {
                                 format!("maos run: scheduler.load failed for {spirit_id}: {e}")
-                            })?
+                            })?;
+                        pid_binding.store(mira_pid, std::sync::atomic::Ordering::Release);
+                        mira_pid
                     }
                     LoadedSpiritKind::Nash => scheduler
                         .load(
@@ -4574,6 +4762,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if run.once {
                 let mut fired_pids: Vec<u32> = Vec::with_capacity(loaded_pids.len());
                 for _ in 0..loaded_pids.len() {
+                    // Never cancel an in-flight hook: the check is BETWEEN
+                    // passes. A dropped `fire_on_idle` future leaves its
+                    // `spawn_blocking` hook running anyway.
+                    if root_shutdown.is_cancelled() {
+                        topology_interrupted = true;
+                        break;
+                    }
                     let scbs = {
                         let scbs = scheduler.scbs();
                         let guard = scbs.read().unwrap();
@@ -4605,11 +4800,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                     );
                 }
-                if let Some(recorder) = cassette_recorder.as_ref() {
-                    recorder.flush().map_err(|error| {
+                let topology_flush_error = cassette_recorder.as_ref().and_then(|recorder| {
+                    recorder.flush().err().map(|error| {
                         format!("maos run: topology record-mode flush failed: {error}")
-                    })?;
-                }
+                    })
+                });
                 println!(
                     "{}",
                     serde_json::json!({
@@ -4635,12 +4830,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(port) = operator_door_port.take() {
                     port.drain_started_tasks().await;
                 }
+                // ── Story 16-3 (D-16-3-M) — the ruled teardown order ─────────
+                //
+                // door shutdown → drain_started_tasks → stop Workers and await
+                // every Worker path → cancel and JOIN the root's tasks →
+                // join outstanding crash handlers → unload_all_loaded → drop
+                // every `audit_tx` owner → await the writer → drop the locks.
+                //
+                // The unload comes AFTER the joins, never before: `IdleWatchdog`
+                // sees `cancel` only between ticks and awaits `fire_on_idle`, so
+                // an in-flight `on_idle` can raise a halt after
+                // `terminate_spirit` has already drained — the receipt would
+                // then be missing for a halt that exists.
+                if let Some(supervision) = root_supervision.take() {
+                    supervision.stop_and_join().await;
+                }
+                let unload_report = maos_bin::supervision::unload_all_loaded(
+                    scheduler.as_ref(),
+                    halt_registry.as_ref(),
+                )
+                .await;
+                unload_report.render(&mut std::io::stderr());
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
                 // Story 5.1 — scheduler + orchestrator hold Arc<CapabilityRegistryAdapter>
                 // which holds audit_tx clones; drop them so the channel closes.
                 drop(orchestrator);
+                // Story 16-3 — a NEW `audit_tx` owner: the Worker supervisor
+                // holds the crash detector (which holds the capability
+                // registry) and the IAC bus. Left alive, the writer await below
+                // times out — the exact shape that makes butler `--once` print
+                // `drain timed out` today.
+                drop(root_worker_supervision);
                 drop(scheduler);
                 drop(lifecycle_resolver);
                 // The topology composition root retains additional capability owners:
@@ -4667,6 +4889,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(_) => eprintln!("maos run: audit writer topology drain timed out after 5s"),
                 }
                 drop(store_locks);
+                if topology_interrupted {
+                    return Err(
+                        "maos run: interrupted by signal before the --once pass completed".into(),
+                    );
+                }
+                if let Some(error) = topology_flush_error {
+                    return Err(error.into());
+                }
+                if unload_report.had_failures() {
+                    return Err("maos run: topology planned unload failed".into());
+                }
                 eprintln!("maos run: topology --once complete — exiting cleanly");
                 return Ok(());
             }
@@ -4706,47 +4939,114 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // j1-crosshost-1a AC3.5 — the standalone `[cli_wrapper]` path has
                 // no delegating Orchestrator and no topology `host`, so there is no
                 // frame to drain: `None`, not a default task string.
-                let completion = run_cli_wrapper_manifest(
-                    &manifest_root,
-                    &run,
-                    Arc::clone(&transparency_log),
-                    Arc::clone(&capability),
-                    spirit_host.clone(),
-                    enterprise_runtime.clone(),
-                    enterprise_pdp_runtime.as_ref(),
-                    None,
-                    false,
-                )?;
-                // j1-crosshost-2a AC1.5 — the SECOND false-success surface. This
-                // path used to DISCARD the returned `WorkerCompletion` and
-                // `return Ok(())`, so `maos run <manifest> --once` exited 0 when the
-                // oracle said `completed: false`. The absent *task* (the `None`
-                // above) and the dropped *verdict* are different things, and only
-                // the first one was deliberate.
                 //
-                // Why it is CLOSED rather than documented as tolerable: the signed
-                // run's own runbook sends the operator down this path first, to
-                // sanity-check that the worker actually WRITES. A standalone path
-                // that exits 0 on a refusal is the pre-flight check certifying the
-                // exact defect this story exists to catch.
-                if !completion.is_completed() {
-                    return Err(format!(
-                        "maos run: standalone cli_wrapper worker did not complete ({})",
-                        completion.label()
-                    )
-                    .into());
-                }
-                // Review P5 (15-6 §A6): this early return bypassed every
-                // record-mode drain point — a record run here exited 0 with
-                // no cassette. Route it through the same fallible finalizer.
-                if let Some(recorder) = cassette_recorder.as_ref() {
-                    recorder.flush().map_err(|error| {
-                        format!(
-                            "maos run: standalone cli_wrapper record-mode flush failed: {error}"
+                // Story 16-3 (D-16-3-M, AC4 root (i)) — the whole body moved into
+                // ONE async block whose result the teardown below takes. At
+                // `af96c907` this arm left through `run_cli_wrapper_manifest(…)?`,
+                // the non-completion `return Err`, the flush `?` or `return Ok`
+                // and NONE of them drained the door or the audit writer or
+                // unloaded anything. With the body in a block, every `?` inside
+                // lands here and the teardown cannot be bypassed — including by a
+                // `?` a later edit adds.
+                let standalone_result: Result<(), Box<dyn std::error::Error>> = async {
+                    // Story 16-3 (D-16-3-C) — `block_in_place` so the sync
+                    // supervision port may re-enter the runtime.
+                    let completion = tokio::task::block_in_place(|| {
+                        run_cli_wrapper_manifest(
+                            &manifest_root,
+                            &run,
+                            Arc::clone(&transparency_log),
+                            Arc::clone(&capability),
+                            spirit_host.clone(),
+                            enterprise_runtime.clone(),
+                            enterprise_pdp_runtime.as_ref(),
+                            None,
+                            false,
+                            root_worker_supervision.as_ref(),
+                            maos_bin::supervision::WorkerTask::Standalone,
                         )
                     })?;
+                    // j1-crosshost-2a AC1.5 — the SECOND false-success surface. This
+                    // path used to DISCARD the returned `WorkerCompletion` and
+                    // `return Ok(())`, so `maos run <manifest> --once` exited 0 when the
+                    // oracle said `completed: false`. The absent *task* (the `None`
+                    // above) and the dropped *verdict* are different things, and only
+                    // the first one was deliberate.
+                    //
+                    // Why it is CLOSED rather than documented as tolerable: the signed
+                    // run's own runbook sends the operator down this path first, to
+                    // sanity-check that the worker actually WRITES. A standalone path
+                    // that exits 0 on a refusal is the pre-flight check certifying the
+                    // exact defect this story exists to catch.
+                    if !completion.is_completed() {
+                        return Err(format!(
+                            "maos run: standalone cli_wrapper worker did not complete ({})",
+                            completion.label()
+                        )
+                        .into());
+                    }
+                    // Review P5 (15-6 §A6): this early return bypassed every
+                    // record-mode drain point — a record run here exited 0 with
+                    // no cassette. Route it through the same fallible finalizer.
+                    if let Some(recorder) = cassette_recorder.as_ref() {
+                        recorder.flush().map_err(|error| {
+                            format!(
+                                "maos run: standalone cli_wrapper record-mode flush failed: {error}"
+                            )
+                        })?;
+                    }
+                    Ok(())
                 }
-                return Ok(());
+                .await;
+                // ── Story 16-3 (D-16-3-M) — the ruled teardown order ─────────
+                if let Some(mut server) = operator_http_server.take() {
+                    server.shutdown();
+                }
+                if let Some(port) = operator_door_port.take() {
+                    port.drain_started_tasks().await;
+                }
+                if let Some(supervision) = root_supervision.take() {
+                    supervision.stop_and_join().await;
+                }
+                let unload_report = maos_bin::supervision::unload_all_loaded(
+                    scheduler.as_ref(),
+                    halt_registry.as_ref(),
+                )
+                .await;
+                unload_report.render(&mut std::io::stderr());
+                drop(audit_tx);
+                drop(inference);
+                drop(capability);
+                drop(orchestrator);
+                drop(root_worker_supervision);
+                drop(scheduler);
+                drop(lifecycle_resolver);
+                drop(upgrade_orchestrator);
+                drop(revocation_poller);
+                drop(revocation_applier);
+                drop(hot_swap_coordinator);
+                drop(crash_detector);
+                drop(iac);
+                drop(distillate_writer);
+                drop(memory);
+                match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!(
+                        "maos run: audit writer task failed during standalone worker drain: {e}"
+                    ),
+                    Err(_) => {
+                        eprintln!("maos run: audit writer standalone drain timed out after 5s")
+                    }
+                }
+                drop(store_locks);
+                // Preserve the run's primary failure, but a successful run
+                // cannot report success when planned unload failed.
+                if standalone_result.is_ok() && unload_report.had_failures() {
+                    return Err("maos run: standalone planned unload failed".into());
+                }
+                return standalone_result;
             }
 
             let class_section =
@@ -4856,7 +5156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // boot-loud scalar port (which IS the halt). `strip_port`
                     // is the MAOS_TEST_ONLY_STRIP_SCALAR_PORT test seam and
                     // must never silently strip in production boots.
-                    let (mut butler, butler_receipt) = construct_butler_core(
+                    let (mut butler, butler_receipt, butler_pid_binding) = construct_butler_core(
                         if strip_port {
                             None
                         } else {
@@ -4869,6 +5169,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Arc::clone(&transparency_log),
                         Arc::clone(&journal),
                         boot_nonce,
+                        None,
                     );
                     halt_receipt_handle = butler_receipt;
                     if needs_port && halt_receipt_handle.is_none() {
@@ -5033,9 +5334,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
                     // Patch 4 — update the MCP port's spirit_pid to the real
                     // scheduler-allocated value (was hardcoded 0 at construction time).
-                    if let Some(ref mcp) = butler_mcp_ref {
+                    if let Some(mcp) = &butler_mcp_ref {
                         mcp.spirit_pid
                             .store(pid, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    // Story 16-3 (D-16-3-N) — same pattern for the scalar port's
+                    // pid binding, which decides where butler's `belief_variance`
+                    // halt is RAISED. Safe here: `write_scalar` is only reached
+                    // from `on_idle`, which cannot fire before `start`.
+                    if let Some(binding) = &butler_pid_binding {
+                        binding.store(pid, std::sync::atomic::Ordering::Release);
                     }
                     pid
                 }
@@ -5370,6 +5678,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .ok_or("maos run: Mira manifest must declare [epistemic_policy]")?;
                     let last_receipt = Arc::new(std::sync::Mutex::new(None));
                     halt_receipt_handle = Some(Arc::clone(&last_receipt));
+                    // Story 16-3 (D-16-3-N) — set from the pid `load` returns.
+                    let pid_binding = Arc::new(std::sync::atomic::AtomicU32::new(0));
                     let adapter: Arc<dyn maos_domain::ports::EpistemicScalarPort> =
                         Arc::new(ButlerOrchestratorAdapter {
                             orchestrator: Arc::clone(&orchestrator),
@@ -5378,8 +5688,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             policy,
                             boot_nonce,
                             last_receipt,
+                            spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(&pid_binding)),
                         });
-                    scheduler
+                    let mira_pid = scheduler
                         .load(
                             &spirit_id,
                             bundle,
@@ -5389,7 +5700,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             boot_nonce,
                         )
                         .await
-                        .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?
+                        .map_err(|e| format!("maos run: scheduler.load failed: {e}"))?;
+                    pid_binding.store(mira_pid, std::sync::atomic::Ordering::Release);
+                    mira_pid
                 }
                 LoadedSpiritKind::Nash => scheduler
                     .load(
@@ -5494,104 +5807,140 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
 
             if run.once {
-                // Drive a single on_idle pass through the dispatcher (per-Spirit
-                // budget applies via the SCB bundle), then render the halt + drain.
-                let scb = {
-                    let scbs = scheduler.scbs();
-                    let guard = scbs.read().unwrap();
-                    guard.get(&pid).map(Arc::clone)
-                }
-                .ok_or("maos run: loaded SCB not found")?;
-                let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
-                println!(
-                    "{}",
-                    serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
-                );
-                if let Some(recorder) = cassette_recorder.as_ref() {
-                    recorder.flush().map_err(|error| {
-                        format!("maos run: record-mode flush failed after on_idle: {error}")
-                    })?;
-                }
-                if kind == LoadedSpiritKind::Researcher
-                    && researcher_collective_failure
-                        .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
-                {
-                    return Err(
-                        "maos run: researcher collective readiness round-trip failed".into(),
-                    );
-                }
-                if kind == LoadedSpiritKind::Digest {
-                    let home = std::env::var_os("MAOS_HOME")
-                        .map(std::path::PathBuf::from)
-                        .ok_or("maos run digest: MAOS_HOME is required")?;
-                    let digest = render_j3_digest_scene(
-                        &transparency_log,
-                        distillate_writer.as_ref(),
-                        pid,
-                        &home.join("j3-digest-inputs.json"),
-                    )?;
-                    let output_json = serde_json::to_value(&digest)
-                        .map_err(|error| format!("maos run digest: encode output: {error}"))?;
-                    let predicate =
-                        maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
-                    predicate.check(&output_json).map_err(|error| {
-                        format!("maos run digest: output_shape violation: {error}")
-                    })?;
+                // Story 16-3 (D-16-3-M) — the `--once` tail moved into ONE async
+                // block whose result the teardown below takes. Five post-`start`
+                // early returns live inside it (the researcher round-trip, the
+                // digest `MAOS_HOME` read, the digest encode, the output-shape
+                // check, the record-mode flush) and every one of them used to
+                // skip the drain entirely.
+                let mut once_interrupted = false;
+                let once_result: Result<(), Box<dyn std::error::Error>> = async {
+                    // A signal that arrived BEFORE the pass means the pass never
+                    // ran: the root must not print a completion line or exit 0.
+                    // A signal DURING the pass is different and is deliberately
+                    // not acted on — the pass runs to completion, because
+                    // dropping `fire_on_idle`'s future leaves its
+                    // `spawn_blocking` hook running anyway, and a completed pass
+                    // makes exit 0 true.
+                    if root_shutdown.is_cancelled() {
+                        once_interrupted = true;
+                        return Ok(());
+                    }
+                    // Drive a single on_idle pass through the dispatcher (per-Spirit
+                    // budget applies via the SCB bundle), then render the halt + drain.
+                    let scb = {
+                        let scbs = scheduler.scbs();
+                        let guard = scbs.read().unwrap();
+                        guard.get(&pid).map(Arc::clone)
+                    }
+                    .ok_or("maos run: loaded SCB not found")?;
+                    let outcome = scheduler.dispatcher_arc().fire_on_idle(&scb).await;
                     println!(
                         "{}",
-                        serde_json::json!({
-                            "event": "team_digest",
-                            "render": digest.narrative,
-                            "digest": output_json,
-                        })
+                        serde_json::json!({ "event": "on_idle_fired", "outcome": format!("{outcome:?}") })
                     );
-                }
-                // JB-5 — output_shape enforcement: validate the Spirit's notification
-                // output against the manifest's OutputShapePredicate. The Spirit writes
-                // to the shared output channel during on_idle; the daemon validates here.
-                {
-                    let predicate =
-                        maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
-                    let output_guard = butler_output_ch.lock().unwrap();
-                    if let Some(ref output_json) = *output_guard {
-                        if let Err(violation) = predicate.check(output_json) {
-                            eprintln!("maos run: output_shape violation: {violation}");
-                        }
+                    if let Some(recorder) = cassette_recorder.as_ref() {
+                        recorder.flush().map_err(|error| {
+                            format!("maos run: record-mode flush failed after on_idle: {error}")
+                        })?;
                     }
-                    drop(output_guard);
-                }
-                if let Some(handle) = &halt_receipt_handle {
-                    if let Some(receipt) = handle
-                        .lock()
-                        .unwrap_or_else(|e| {
-                            eprintln!("CRITICAL: halt_receipt Mutex poisoned");
-                            e.into_inner()
-                        })
-                        .clone()
+                    if kind == LoadedSpiritKind::Researcher
+                        && researcher_collective_failure
+                            .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
                     {
-                        // AC5(f) — render the halt screen-string from the SHARED
-                        // constants so production output and the JB-3 assertion can
-                        // never drift (compile-error on rename).
-                        let render = butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+                        return Err(
+                            "maos run: researcher collective readiness round-trip failed".into(),
+                        );
+                    }
+                    if kind == LoadedSpiritKind::Digest {
+                        let home = std::env::var_os("MAOS_HOME")
+                            .map(std::path::PathBuf::from)
+                            .ok_or("maos run digest: MAOS_HOME is required")?;
+                        let digest = render_j3_digest_scene(
+                            &transparency_log,
+                            distillate_writer.as_ref(),
+                            pid,
+                            &home.join("j3-digest-inputs.json"),
+                        )?;
+                        let output_json = serde_json::to_value(&digest)
+                            .map_err(|error| format!("maos run digest: encode output: {error}"))?;
+                        let predicate =
+                            maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
+                        predicate.check(&output_json).map_err(|error| {
+                            format!("maos run digest: output_shape violation: {error}")
+                        })?;
                         println!(
                             "{}",
                             serde_json::json!({
-                                "event": "halt",
-                                "render": render,
-                                "halt_id": format!("{:?}", receipt.halt_id),
-                                "spirit_pid": receipt.spirit_pid,
+                                "event": "team_digest",
+                                "render": digest.narrative,
+                                "digest": output_json,
                             })
                         );
-                        eprintln!("maos run: {render}");
                     }
+                    // JB-5 — output_shape enforcement: validate the Spirit's notification
+                    // output against the manifest's OutputShapePredicate. The Spirit writes
+                    // to the shared output channel during on_idle; the daemon validates here.
+                    {
+                        let predicate =
+                            maos_kernel_core::security::OutputShapePredicate::from(&output_shape);
+                        let output_guard = butler_output_ch.lock().unwrap();
+                        if let Some(output_json) = &*output_guard {
+                            if let Err(violation) = predicate.check(output_json) {
+                                eprintln!("maos run: output_shape violation: {violation}");
+                            }
+                        }
+                        drop(output_guard);
+                    }
+                    if let Some(handle) = &halt_receipt_handle {
+                        if let Some(receipt) = handle
+                            .lock()
+                            .unwrap_or_else(|e| {
+                                eprintln!("CRITICAL: halt_receipt Mutex poisoned");
+                                e.into_inner()
+                            })
+                            .clone()
+                        {
+                            // AC5(f) — render the halt screen-string from the SHARED
+                            // constants so production output and the JB-3 assertion can
+                            // never drift (compile-error on rename).
+                            let render =
+                                butler::halt_screen_line(butler::SCALAR_TAG_BELIEF_VARIANCE);
+                            println!(
+                                "{}",
+                                serde_json::json!({
+                                    "event": "halt",
+                                    "render": render,
+                                    "halt_id": format!("{:?}", receipt.halt_id),
+                                    "spirit_pid": receipt.spirit_pid,
+                                })
+                            );
+                            eprintln!("maos run: {render}");
+                        }
+                    }
+                    println!(
+                        "{}",
+                        serde_json::json!({ "event": "drain", "spirit_id": spirit_id })
+                    );
+                    Ok(())
                 }
-                println!(
-                    "{}",
-                    serde_json::json!({ "event": "drain", "spirit_id": spirit_id })
-                );
-                // Deterministic drain (mirrors the one-shot arm): signal the yank
-                // poller to exit, then release every cap-audit sender so the writer
-                // task sees channel-close.
+                .await;
+                // ── Story 16-3 (D-16-3-M) — the ruled teardown order ─────────
+                //
+                // Deterministic drain: door shutdown → drain_started_tasks →
+                // stop Workers and join the root's tasks → unload_all_loaded
+                // (NFR-Rel-11's planned half: butler's `belief_variance` halt
+                // leaves a receipt carrying its own `halt_id`, never a synthetic
+                // `term-…` one) → drop EVERY `audit_tx` owner → await the writer.
+                //
+                // ⚠ The drop set below is the serving root's, not the seven
+                // owners this arm had at `af96c907`. Those seven left roughly
+                // twenty holders alive — `policy`, `halt_registry`,
+                // `orchestrator_registry`, `spirit_host`, `delegation_leg`,
+                // `revocation_poller` and the rest — which is why butler
+                // `--once` printed `audit writer drain timed out after 5s` on
+                // every run. The missing unload was a second defect, not the
+                // cause of the timeout.
                 if let Some(mut server) = operator_http_server.take() {
                     server.shutdown();
                 }
@@ -5599,13 +5948,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     port.drain_started_tasks().await;
                 }
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
+                if let Some(supervision) = root_supervision.take() {
+                    supervision.stop_and_join().await;
+                }
+                let unload_report = maos_bin::supervision::unload_all_loaded(
+                    scheduler.as_ref(),
+                    halt_registry.as_ref(),
+                )
+                .await;
+                unload_report.render(&mut std::io::stderr());
                 drop(journal);
                 drop(audit_tx);
                 drop(inference);
-                drop(capability);
                 drop(orchestrator);
+                drop(root_worker_supervision);
                 drop(scheduler);
+                drop(revocation_poller);
+                drop(policy);
+                drop(halt_registry);
+                drop(orchestrator_registry);
+                drop(spirit_host);
                 drop(lifecycle_resolver);
+                drop(upgrade_orchestrator);
+                drop(revocation_applier);
+                drop(hot_swap_coordinator);
+                drop(crash_detector);
+                drop(distillate_writer);
+                drop(memory);
+                drop(capability);
+                drop(telemetry);
+                drop(self_telemetry);
+                drop(log_recall_adapter);
+                drop(collective_port);
+                drop(delegation_leg);
+                drop(router);
+                drop(rate_limiter);
+                drop(crypto_provider);
+                drop(iac);
+                drop(mailbox);
+                drop(notification_dispatcher);
                 match tokio::time::timeout(std::time::Duration::from_secs(5), &mut audit_writer)
                     .await
                 {
@@ -5614,6 +5995,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(_) => eprintln!("maos run: audit writer drain timed out after 5s"),
                 }
                 drop(store_locks);
+                once_result?;
+                if unload_report.had_failures() {
+                    return Err("maos run: --once planned unload failed".into());
+                }
+                if once_interrupted {
+                    return Err(
+                        "maos run: interrupted by signal before the --once pass completed".into(),
+                    );
+                }
                 eprintln!("maos run: --once complete — exiting cleanly");
                 return Ok(());
             }
@@ -6373,7 +6763,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
                 tasks.push(maos_domain::ports::task::TaskAssignmentRecord {
                     task_id: "smoke-hung-task-001".into(),
-                    capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                    capability_token: Some(maos_domain::invariants::i1::TokenId([0u8; 16])),
                     ttl_deadline_ns: u64::MAX,
                     intent_class: maos_domain::invariants::i1::IntentClass::Standard,
                     originator_spirit_id: "smoke-supervision-5-hung".into(),
@@ -6426,7 +6816,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
                 tasks.push(maos_domain::ports::task::TaskAssignmentRecord {
                     task_id: "smoke-silent-task-001".into(),
-                    capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                    capability_token: Some(maos_domain::invariants::i1::TokenId([0u8; 16])),
                     ttl_deadline_ns: u64::MAX,
                     intent_class: maos_domain::invariants::i1::IntentClass::Standard,
                     originator_spirit_id: "smoke-supervision-5-silent".into(),
@@ -7630,7 +8020,22 @@ description = "smoke test spirit successor"
                 enterprise_pdp_runtime.as_ref(),
                 cohort_daemon.as_ref(),
             )?;
-            return run_cohort_a2a_daemon(
+            // Story 16-3 (D-16-3-H) site 2 — the cohort daemon is a Worker
+            // root too (host B spawns one per inbound delegation), and at
+            // `af96c907` it held neither a scheduler nor a halt registry, so a
+            // SIGKILLed host-B Worker reached nothing.
+            let cohort_supervision = maos_bin::supervision::RootSupervision::arm(
+                Arc::clone(&scheduler),
+                Arc::clone(&crash_detector),
+                Arc::clone(&transparency_log),
+                Arc::clone(&halt_registry),
+                Arc::clone(&iac),
+                Arc::clone(&telemetry),
+                Arc::clone(&notification_dispatcher),
+                boot_nonce,
+            );
+            let cohort_worker_supervision = Arc::clone(cohort_supervision.supervisor());
+            let cohort_result = run_cohort_a2a_daemon(
                 Arc::clone(&transparency_log),
                 boot_nonce,
                 cohort_daemon,
@@ -7646,8 +8051,71 @@ description = "smoke test spirit successor"
                 Arc::clone(&capability),
                 enterprise_runtime.clone(),
                 enterprise_pdp_runtime.clone().map(Arc::new),
+                Arc::clone(&cohort_worker_supervision),
             )
             .await;
+            // ── Story 16-3 (D-16-3-M), AC4 root (ii) — the cohort teardown.
+            //
+            // At `af96c907` this arm `return`ed the daemon's result directly:
+            // it never awaited its door commands and never awaited the audit
+            // writer, and without that await the channel's rows are
+            // intermittently lost (the writer is `tokio::spawn`-ed and the
+            // runtime drops mid-flush on process exit).
+            if let Some(mut server) = operator_http_server.take() {
+                server.shutdown();
+            }
+            if let Some(port) = operator_door_port.take() {
+                port.drain_started_tasks().await;
+            }
+            cohort_supervision.stop_and_join().await;
+            let unload_report = maos_bin::supervision::unload_all_loaded(
+                scheduler.as_ref(),
+                halt_registry.as_ref(),
+            )
+            .await;
+            unload_report.render(&mut std::io::stderr());
+            drop(audit_tx);
+            drop(inference);
+            drop(orchestrator);
+            drop(cohort_worker_supervision);
+            drop(scheduler);
+            drop(revocation_poller);
+            drop(policy);
+            drop(halt_registry);
+            drop(orchestrator_registry);
+            drop(spirit_host);
+            drop(lifecycle_resolver);
+            drop(upgrade_orchestrator);
+            drop(revocation_applier);
+            drop(hot_swap_coordinator);
+            drop(crash_detector);
+            drop(distillate_writer);
+            drop(memory);
+            drop(capability);
+            drop(telemetry);
+            drop(self_telemetry);
+            drop(log_recall_adapter);
+            drop(collective_port);
+            drop(router);
+            drop(rate_limiter);
+            drop(crypto_provider);
+            drop(iac);
+            drop(mailbox);
+            drop(notification_dispatcher);
+            match tokio::time::timeout(std::time::Duration::from_secs(10), audit_writer).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    eprintln!("maos: audit writer task returned error during cohort drain: {e}")
+                }
+                Err(_) => eprintln!("maos: audit writer cohort drain timed out after 10s"),
+            }
+            drop(store_locks);
+            // Preserve the daemon's primary failure, but never turn a failed
+            // planned unload into a successful root exit.
+            if cohort_result.is_ok() && unload_report.had_failures() {
+                return Err("maos: cohort planned unload failed".into());
+            }
+            return cohort_result;
         }
         // Story 8.6 AC-T13/AC-A7 — `smoke-a2a-tcp-8-6`: live cross-Host
         // Mira(host_a) → Nash(host_b) advisory over a REAL TCP/mTLS socket
@@ -7986,14 +8454,29 @@ description = "smoke test spirit successor"
     eprintln!("maos: ScheduleWatchdog spawned (Story 6.4)");
 
     // Story 5.3 — ProgressWatchdog + SilentFailureDetector spawned.
-    let progress_watchdog = Arc::new(maos_kernel_core::supervision::ProgressWatchdog::new(
-        scheduler.scbs(),
-        Arc::clone(&transparency_log),
-        Arc::clone(&telemetry),
-        Arc::clone(&notification_dispatcher),
-    ))
-    .spawn(cancel.child_token());
-    eprintln!("maos: ProgressWatchdog spawned (Story 5.3)");
+    //
+    // ⚠ Story 16-3 (D-16-3-H) — CONDITIONAL. When the run block armed a
+    // `RootSupervision` it already spawned a ProgressWatchdog over the SAME SCB
+    // map, and it had to: at `af96c907` the only ProgressWatchdog in the
+    // process was this one, spawned in the serving tail, i.e. AFTER every
+    // Worker-bearing root had finished — so nothing could ever emit
+    // `task.stalled` for a Worker. Spawning a second one here would double
+    // every stall emit's race and give the teardown two handles for one job.
+    // Bare `maos` and any path that never entered the run block still get one.
+    let progress_watchdog = if root_supervision.is_none() {
+        let handle = Arc::new(maos_kernel_core::supervision::ProgressWatchdog::new(
+            scheduler.scbs(),
+            Arc::clone(&transparency_log),
+            Arc::clone(&telemetry),
+            Arc::clone(&notification_dispatcher),
+        ))
+        .spawn(cancel.child_token());
+        eprintln!("maos: ProgressWatchdog spawned (Story 5.3)");
+        Some(handle)
+    } else {
+        eprintln!("maos: ProgressWatchdog already running under root supervision (Story 16-3)");
+        None
+    };
 
     let silent_failure_detector =
         Arc::new(maos_kernel_core::supervision::SilentFailureDetector::new(
@@ -8005,10 +8488,24 @@ description = "smoke test spirit successor"
         .spawn(cancel.child_token());
     eprintln!("maos: SilentFailureDetector spawned (Story 5.3)");
 
+    // Story 16-3 (D-16-3-H/M) — the serving loop also wakes on the root
+    // listener's `root_shutdown`. It cannot wait for a SECOND signal: tokio's
+    // delivery is a `watch` broadcast and a registration never restores the
+    // default disposition, so the listener's streams and these are all fed by
+    // the same one signal — and the listener is the thing that stops Workers.
+    let root_shutdown_tail = root_supervision.as_ref().map(|rs| rs.shutdown_token());
     let shutdown_reason: &'static str = tokio::select! {
         _ = signal::ctrl_c() => "sigint",
         _ = shutdown_unix_term() => "sigterm",
         _ = cancel.cancelled() => "internal-cancel",
+        _ = async {
+            match &root_shutdown_tail {
+                Some(token) => token.cancelled().await,
+                // `pending()` so the arm is inert, rather than a `select!`
+                // branch that completes instantly and busy-exits the loop.
+                None => std::future::pending::<()>().await,
+            }
+        } => "root-supervision-shutdown",
     };
     eprintln!("maos: shutdown reason = {shutdown_reason}; cancelling root token");
     // Signal yank poller to exit gracefully.
@@ -8046,11 +8543,14 @@ description = "smoke test spirit successor"
     // below closes nothing while the tasks run. They all observe `cancel`,
     // so this costs milliseconds, not seconds.
     for (name, handle) in [
-        ("IdleWatchdog", idle_watchdog),
-        ("ScheduleWatchdog", schedule_watchdog),
+        ("IdleWatchdog", Some(idle_watchdog)),
+        ("ScheduleWatchdog", Some(schedule_watchdog)),
         ("ProgressWatchdog", progress_watchdog),
-        ("SilentFailureDetector", silent_failure_detector),
+        ("SilentFailureDetector", Some(silent_failure_detector)),
     ] {
+        // `None` only for the ProgressWatchdog under root supervision, whose
+        // handle `stop_and_join` below owns.
+        let Some(handle) = handle else { continue };
         match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
             Ok(Ok(())) => {}
             Ok(Err(error)) => {
@@ -8067,6 +8567,23 @@ description = "smoke test spirit successor"
             Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
         }
     }
+    // ── Story 16-3 (D-16-3-M) — the root's own supervision, in the ruled
+    // order: stop Workers and await their call paths, cancel and JOIN the
+    // ProgressWatchdog / progress stamper / signal listener, join any parked
+    // crash handler, and only THEN unload.
+    //
+    // `unload_all_loaded` comes after the joins on purpose: `IdleWatchdog`
+    // sees `cancel` only between ticks and awaits `fire_on_idle`, and a dropped
+    // `fire_on_idle` future leaves its `spawn_blocking` hook running — so an
+    // in-flight `on_idle` can raise a halt AFTER `terminate_spirit` drained,
+    // and the halt would exist with no receipt.
+    if let Some(supervision) = root_supervision.take() {
+        supervision.stop_and_join().await;
+    }
+    drop(root_shutdown_tail);
+    let unload_report =
+        maos_bin::supervision::unload_all_loaded(scheduler.as_ref(), halt_registry.as_ref()).await;
+    unload_report.render(&mut std::io::stderr());
 
     // Story 2.5 (A7 / D11) + Story 16-1 (T7, §11 row 3) — drain the cap-audit
     // channel deterministically on graceful shutdown.
@@ -8146,6 +8663,9 @@ description = "smoke test spirit successor"
             0
         }
     };
+    if unload_report.had_failures() {
+        return Err("maos: serving-root planned unload failed".into());
+    }
     eprintln!("maos: drained {cap_audit_rows} cap-audit row(s); exiting cleanly");
     Ok(())
 }
@@ -9652,6 +10172,11 @@ fn host_b_worker_context(
     capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
+    // Story 16-3 (D-16-3-I) — APPENDED after the existing parameters on
+    // purpose: `enterprise_daemon_seam_13_5a.rs`'s signature scan stops at the
+    // first `)`, so inserting anywhere else reds it for a reason that has
+    // nothing to do with this story.
+    supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
 ) -> Result<Option<maos_bin::delegation::HostBWorkerContext>, Box<dyn std::error::Error>> {
     let Some(path) = bootstrap.worker_manifest.as_ref() else {
         return Ok(None);
@@ -9703,6 +10228,11 @@ fn host_b_worker_context(
         // place the trust boundary is.
         enterprise_runtime,
         enterprise_pdp_runtime,
+        // Story 16-3 (D-16-3-I) — host B's Workers get a real SCB, a real pid
+        // and an exit observer, exactly like `maos run`'s. Before this the
+        // cohort daemon held neither a scheduler nor a halt registry, so a
+        // SIGKILLed host-B Worker reached nothing at all.
+        supervision,
     }))
 }
 
@@ -9731,6 +10261,19 @@ async fn run_cohort_a2a_daemon(
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
     host_b_enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     host_b_enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
+    // Story 16-3 (D-16-3-I) — APPENDED after every existing parameter on
+    // purpose: `enterprise_daemon_seam_13_5a.rs`'s signature scan stops at the
+    // first `)`, so inserting anywhere else reds it for a reason that has
+    // nothing to do with this story.
+    //
+    // Concrete, not `Arc<dyn WorkerSupervision>`: this fn needs
+    // `shutdown_token()` for its own `select!` (a SIGTERM during daemon
+    // startup is consumed by the site-2 listener before that `select!`'s own
+    // streams exist, and tokio never restores the default disposition — so
+    // without the token the daemon would serve forever), and the caller needs
+    // the same supervisor's scheduler and halt registry for
+    // `unload_all_loaded`.
+    worker_supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport as _;
     // The state is loaded at the composition root when the config is present;
@@ -9823,6 +10366,7 @@ async fn run_cohort_a2a_daemon(
         &capability,
         host_b_enterprise_runtime,
         host_b_enterprise_pdp_runtime,
+        Arc::clone(&worker_supervision),
     )? {
         Some(context) => {
             // §A6 review P17 (decision D2, ratified) — BOUNDED, and the bound is
@@ -9942,18 +10486,43 @@ async fn run_cohort_a2a_daemon(
     // and listener on SIGTERM too, not only on ctrl_c: `maosctl`-managed
     // deployments stop daemons with SIGTERM, and ignoring it left the store
     // lock held until SIGKILL.
+    //
+    // ⚠ Story 16-3 (D-16-3-M) — `biased;` with the `root_shutdown` arm FIRST.
+    // A SIGTERM delivered during `build_cohort_a2a_daemon_runtime`,
+    // `install_cert_rotation` or `emit_cross_team_share` above is consumed by
+    // the site-2 listener, whose streams were installed before this `select!`
+    // existed — and tokio never restores the default disposition, so without
+    // this arm the daemon would serve forever after its own startup swallowed
+    // the signal. Biased order also makes the `root_shutdown` wake
+    // OBSERVABLE: a vector that signals during startup counts only runs whose
+    // stderr LACKS the SIGTERM line below, i.e. runs the arm actually served.
+    let root_shutdown = worker_supervision.shutdown_token();
     tokio::select! {
+        biased;
+        _ = root_shutdown.cancelled() => {}
         _ = tokio::signal::ctrl_c() => {}
         _ = shutdown_unix_term() => {
             eprintln!("maos: cohort-a2a-daemon received SIGTERM; shutting down");
         }
     }
+    // Ruled order for this root, because its Worker drain lives inside this fn
+    // while its door lives in `main`: stop intake → stop Workers → await the
+    // drain → return, and let `main` run the door shutdown, the joins, the
+    // unload and the writer await on the result.
     siem_cancel.cancel();
     let shutdown = runtime.shutdown().await;
+    worker_supervision.stop_workers();
     // The drain observes the runtime's cancellation token, so it is already told to
     // stop; awaiting it means an in-flight worker's outcome row is journaled before
     // the process exits rather than being lost to a `Drop`. A join error is
     // reported, never swallowed and never fatal — the daemon is already going down.
+    //
+    // ⚠ UNBOUNDED, deliberately. A bound that "proceeded" would leave an
+    // uncancellable `spawn_blocking` Worker thread holding `Arc` clones of the
+    // capability registry and the supervisor, so the writer await in `main`
+    // could never finish — and tokio's blocking-pool drop joins every blocking
+    // thread with NO timeout, i.e. a root that never exits at all. The site-2
+    // listener's grace exit is the sole arbiter here.
     if let Some(handle) = host_b_drain {
         if let Err(error) = handle.await {
             eprintln!("host B intake drain did not shut down cleanly: {error}");
@@ -13858,11 +14427,26 @@ mod story_13_5a_enterprise_daemon_seam {
         // masked regression the fail-fast workspace tally could not see. The
         // tokens still must appear promptly: if they drift beyond THIS window,
         // the dispatch has grown something that needs a human look.
+        //
+        // ⚠ Story 16-3 — 2_600 -> 3_300, and this IS the human look the comment
+        // above asks for. D-16-3-H site 2 arms a `RootSupervision` for the
+        // cohort root (host B spawns a Worker per inbound delegation and, at
+        // `af96c907`, held neither a scheduler nor a halt registry, so a
+        // SIGKILLed host-B Worker reached nothing at all) and then threads its
+        // supervisor into `run_cohort_a2a_daemon` as an appended argument. That
+        // block sits between `build_enterprise_daemon_governance(` and the
+        // dispatch call, so it moved the two argument tokens from +2_2xx to
+        // MEASURED +3_151 and +3_196. The window is set to 3_300 — the
+        // measurement plus ~100 chars, NOT a round number chosen to be safe —
+        // so the next unexplained growth still reds this leg. The twin in
+        // `tests/enterprise_daemon_seam_13_5a.rs` was re-run and is green
+        // (1 passed): its signature scan stops at the first `)`, which is why
+        // D-16-3-I appends the parameter rather than inserting it.
         let source = include_str!("main.rs");
         let dispatch_start = source
             .find(r#"if mode == "cohort-a2a-daemon""#)
             .expect("cohort daemon dispatch");
-        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 2_600)];
+        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 3_300)];
         assert!(
             dispatch.contains("build_enterprise_daemon_governance(")
                 && dispatch.contains("enterprise_posture_required,")

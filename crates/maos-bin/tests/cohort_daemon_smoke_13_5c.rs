@@ -876,8 +876,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // is a pure argv table and must never seed the manifest-derived policy
     // table.
     // Story 16-2 (D-16-2-B) — 20 → 21: `shell_host.rs` joins the roster (the
-    // production ShellHost). Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 21] = [
+    // production ShellHost). Story 16-3 — 21 → 22: `supervision.rs` joins it.
+    // Ring the doorbell, do not widen the wall.
+    const SCANNED_SOURCE_FILES: [(&str, &str); 22] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -956,6 +957,11 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // must never seed the manifest-derived policy table.
         ("operator_door.rs", include_str!("../src/operator_door.rs")),
         ("shell_host.rs", include_str!("../src/shell_host.rs")),
+        // Story 16-3 (D-16-3-C/M) — Worker supervision and root shutdown.
+        // Listed so the 13.5d negative covers it: the supervisor receives
+        // already-constructed kernel handles and a host-granted tier, and must
+        // never seed the manifest-derived policy table.
+        ("supervision.rs", include_str!("../src/supervision.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

@@ -83,7 +83,7 @@ async fn silent_failure_detector_emits_suspect() {
         let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
         tasks.push(maos_domain::ports::task::TaskAssignmentRecord {
             task_id: "silent-task-001".into(),
-            capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+            capability_token: Some(maos_domain::invariants::i1::TokenId([0u8; 16])),
             ttl_deadline_ns: u64::MAX,
             intent_class: maos_domain::invariants::i1::IntentClass::Standard,
             originator_spirit_id: "silent-failure-test".into(),

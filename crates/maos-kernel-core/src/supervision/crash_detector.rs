@@ -156,14 +156,17 @@ impl CrashDetector {
                 "exit_code": cause.exit_code(),
                 "stderr_tail": cause.stderr_tail(),
                 "cause": cause.as_str(),
-                "in_flight_tokens": [task.capability_token],
+                "in_flight_tokens": task.capability_token.as_ref().into_iter().collect::<Vec<_>>(),
             });
-            let mut padded_token = [0u8; 32];
-            padded_token[..16].copy_from_slice(&task.capability_token.0);
+            let padded_token = task.capability_token.as_ref().map(|token| {
+                let mut padded = [0u8; 32];
+                padded[..16].copy_from_slice(&token.0);
+                padded
+            });
             self.tl.insert_frame_event(
                 FrameKind::TaskComplete,
                 spirit_pid,
-                Some(&padded_token),
+                padded_token.as_ref(),
                 "task.orphaned",
                 &serde_json::to_vec(&payload).unwrap_or_default(),
                 FrameOrigin::Kernel,

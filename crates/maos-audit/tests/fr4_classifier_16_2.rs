@@ -8,7 +8,7 @@
 //! would have written, classified the way the audit read renders it.
 
 use maos_audit::fr4_classifier::{
-    classify_fr4_row, Fr4RowDisposition, NON_CALL_KINDS, WRITER_SHAPES,
+    classify_fr4_row, Fr4RowDisposition, TokenColumn, NON_CALL_KINDS, WRITER_SHAPES,
 };
 use maos_audit::{to_fr4_ndjson, to_fr4_plain, to_plain, AuditEntry, Fr4SchemaError};
 
@@ -130,97 +130,173 @@ fn every_never_call_kind_is_a_non_call() {
 /// (T0) — not read back from the table's own shape list.
 #[test]
 fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
-    // (intent, payload, row pid) per entry, in WRITER_SHAPES order.
-    let measured: &[(&str, &str, u32, &str)] = &[
+    // (kind, token, intent, payload, row pid) per entry, in WRITER_SHAPES
+    // order. Kind 7 / tokenless is the historical default; the kind-1 FR50
+    // dispositions (D-16-3-J (4)) pin their own kind and token column.
+    let measured: &[(&str, Option<&str>, &str, &str, u32, &str)] = &[
         (
+            "capability.invocation",
+            None,
             "lifecycle.admit",
             r#"{"spirit_id":"hello-spirit"}"#,
             1,
             "scheduler load ord0",
         ),
         (
+            "capability.invocation",
+            None,
             "lifecycle.load",
             r#"{"lifecycle_event":"Load","spirit_id":"hello-spirit","spirit_pid":1}"#,
             1,
             "scheduler load ord1",
         ),
         (
+            "capability.invocation",
+            None,
             "lifecycle.start",
             r#"{"lifecycle_event":"Start","spirit_pid":1}"#,
             1,
             "start",
         ),
         (
+            "capability.invocation",
+            None,
             "lifecycle.pause",
             r#"{"lifecycle_event":"Pause","spirit_pid":1}"#,
             1,
             "pause",
         ),
         (
+            "capability.invocation",
+            None,
             "lifecycle.resume",
             r#"{"lifecycle_event":"Resume","spirit_pid":1}"#,
             1,
             "resume",
         ),
         (
+            "capability.invocation",
+            None,
             "lifecycle.unload",
             r#"{"lifecycle_event":"Unload","spirit_pid":1}"#,
             1,
             "unload",
         ),
         (
+            "capability.invocation",
+            None,
             "lifecycle.journal",
             r#"{"lifecycle_event":"Load","spirit_id":"hello-spirit"}"#,
             0,
             "journal_lifecycle",
         ),
         (
+            // D-16-3-J (4) — the crash detector's kind-1 orphan row carries
+            // the record's capability token zero-padded into the 32-byte
+            // token column; `in_flight_tokens` is a `Vec<TokenId>`.
+            "task.complete",
+            Some("1111111111111111111111111111111100000000000000000000000000000000"),
+            "task.orphaned",
+            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]]}"#,
+            4242,
+            "crash task.orphaned (kind 1)",
+        ),
+        (
+            "capability.invocation",
+            None,
             "lifecycle.crash",
             r#"{"lifecycle_event":"Crash","spirit_id":"hello-spirit","spirit_pid":1,"cause":"hang"}"#,
             1,
             "crash",
         ),
         (
+            "capability.invocation",
+            None,
             "telemetry.self",
             "self_telemetry: pid=1 window=[0,1]",
             1,
             "self telemetry (non-JSON)",
         ),
         (
+            "capability.invocation",
+            None,
             "schedule.fire:daily-9",
             r#"{"spirit_id":"butler","schedule_id":"daily-9","fired_at_ns":42,"compliance_claim_ref":null,"side_effect_token_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"principal_revocability":false}"#,
             1,
             "schedule fire",
         ),
         (
+            "capability.invocation",
+            None,
             "hook.budget.on_idle",
             r#"{"spirit_pid":1,"hook_name":"on_idle","wall_ns":5,"cap_seconds":10,"ratio_breached":0.5}"#,
             1,
             "hook budget",
         ),
         (
+            "capability.invocation",
+            None,
             "spirit.quarantine_requested",
             r#"{"spirit_id":"hello-spirit","spirit_pid":1,"quarantine_requested":true}"#,
             1,
             "quarantine",
         ),
         (
+            "capability.invocation",
+            None,
             "spirit.upgrade",
             r#"{"spirit_id":"butler","predecessor_version":"1","successor_version":"2","policy":"forward-only","outcome":"completed","latency_ns":5,"halt_receipts_produced":0}"#,
             1,
             "upgrade",
         ),
         (
+            "capability.invocation",
+            None,
             "cli.subprocess.exit",
             r#"{"event":"cli_subprocess_exit","cli_child_pid":4242,"exit_cause":"exit","is_crash":false}"#,
             1,
             "cli runtime",
         ),
         (
+            "capability.invocation",
+            None,
             "cli.subprocess.exit",
             r#"{"cli":"echo","exit_code":0,"bytes":12,"duration_ms":4}"#,
             0,
             "cli smoke arm",
+        ),
+        (
+            // D-16-3-J (4) — the tokenless kind-1 FR50 dispositions at pid 0.
+            "task.complete",
+            None,
+            "task.nacked",
+            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","capability_token":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]}"#,
+            0,
+            "task.nacked (kind 1)",
+        ),
+        (
+            "task.complete",
+            None,
+            "task.escalated",
+            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","capability_token":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3]}"#,
+            0,
+            "task.escalated (kind 1)",
+        ),
+        (
+            "task.complete",
+            None,
+            "task.reassigned",
+            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","capability_token":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],"replica_spirit_id":"butler-replica"}"#,
+            0,
+            "task.reassigned (kind 1)",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redacted",
+            r#"{"principal_id":"operator","redacted_distillate_frame_id":"01ab01ab01ab01ab01ab01ab01ab01ab"}"#,
+            0,
+            "distillate.redacted (kind 1)",
         ),
     ];
     let noncall_entries: Vec<&maos_audit::fr4_classifier::WriterShapeEntry> =
@@ -230,14 +306,23 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         measured.len(),
         "the table and the measured fixtures must stay 1:1 — update both together"
     );
-    for (writer, (intent, payload, pid, label)) in noncall_entries.iter().zip(measured) {
+    for (writer, (kind, token, intent, payload, pid, label)) in noncall_entries.iter().zip(measured)
+    {
         // The intent grammar must accept the measured intent.
         assert!(
             writer.intent.matches(intent),
             "{label}: table intent {:?} must match measured {intent:?}",
             writer.intent
         );
-        let row = tokenless("capability.invocation", intent, *pid, payload);
+        // The pinned token column must accept the measured token presence.
+        assert_eq!(
+            writer.token == TokenColumn::Present,
+            token.is_some(),
+            "{label}: the entry's token column must pin the measured token presence"
+        );
+        // The row is built with the MEASURED kind, so a NonCall verdict
+        // proves the entry's kind path — not just the shape.
+        let row = entry(kind, intent, *pid, *token, payload);
         assert_eq!(
             classify_fr4_row(&row),
             Fr4RowDisposition::NonCallKernelEvent,
@@ -342,8 +427,8 @@ fn plain_table_gains_the_trailing_intent_column() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// THE INVENTORY DOORBELL — every tokenless kind-7 / variable-kind writer
-// site in the tree has a disposition
+// THE INVENTORY DOORBELL — every tokenless kind-7 / variable-kind / kind-1
+// writer site in the tree has a disposition
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A writer call site the scanner derived from source. `file` is the file
@@ -373,8 +458,10 @@ fn token_arg_position(method: &str) -> Option<usize> {
 /// Scan one file's source for `insert_frame_event*` call sites: paren-
 /// balanced argument extraction, enclosing-fn resolution, `#[cfg(test)]`
 /// spans skipped. Returns every site whose kind is literal
-/// `CapabilityInvocation` with a literal `None` token, or whose KIND is a
-/// variable — the sites that demand a disposition.
+/// `CapabilityInvocation` with a literal `None` token, whose KIND is a
+/// variable, or whose kind is literal `TaskComplete` (kind 1 —
+/// D-16-3-J (5), token-bearing included) — the sites that demand a
+/// disposition.
 fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
     // Compute #[cfg(test)] line spans (item start to its closing brace, approximated
     // by the next top-level closing brace at column 0).
@@ -546,9 +633,16 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             .rsplit("::")
             .next()
             .is_some_and(|last| last.starts_with("CapabilityInvocation"));
+        // D-16-3-J (5) — kind-1 `TaskComplete` sites demand a disposition
+        // too, token-bearing or not: kind-1 rows carry their own entries
+        // now, with the token presence pinned per entry.
+        let kind_is_task_complete = kind_arg
+            .rsplit("::")
+            .next()
+            .is_some_and(|last| last.starts_with("TaskComplete"));
         let kind_is_variable = !kind_arg.contains("::");
-        if !kind_is_capability_invocation && !kind_is_variable {
-            continue; // a literal kind that is not 7 — set (a) or another kind
+        if !kind_is_capability_invocation && !kind_is_variable && !kind_is_task_complete {
+            continue; // a literal kind that is neither 7 nor 1 — set (a) or another kind
         }
         let tokenless = token_arg == "None";
         if kind_is_capability_invocation && !tokenless {
@@ -616,11 +710,13 @@ fn scan_tree() -> Vec<ScannedSite> {
     sites
 }
 
-/// Every tokenless kind-7 (and variable-kind) writer site in the tree has a
-/// DISPOSITION. Proven red: adding an unlisted site to a scratch copy of a
-/// scanned file reds the scanner (below).
+/// Every writer site the doorbell demands a disposition for — tokenless
+/// kind-7, variable-kind, and kind-1 `TaskComplete` (16-3 / D-16-3-J (5))
+/// — has one. Proven red: adding an unlisted tokenless kind-7 site to a
+/// scratch copy of a scanned file reds the scanner (below); adding a
+/// kind-1 `TaskComplete` site with no entry reds it the same way.
 #[test]
-fn every_tokenless_kind7_writer_site_has_a_disposition() {
+fn every_writer_site_demanding_a_disposition_has_one() {
     let sites = scan_tree();
     assert!(
         !sites.is_empty(),
@@ -663,9 +759,10 @@ fn every_tokenless_kind7_writer_site_has_a_disposition() {
         });
         assert!(
             listed,
-            "tokenless kind-7/variable-kind writer site ({}, {}, ord {}) has NO \
-             disposition — classify it in WRITER_SHAPES (NonCall with its measured \
-             payload shape, or Call) or give it a token",
+            "writer site demanding a disposition (tokenless kind-7, variable-kind, \
+             or kind-1 TaskComplete) ({}, {}, ord {}) has NO disposition — classify \
+             it in WRITER_SHAPES (NonCall with its measured kind, token column and \
+             payload shape, or Call)",
             site.file, site.f, site.ordinal
         );
     }

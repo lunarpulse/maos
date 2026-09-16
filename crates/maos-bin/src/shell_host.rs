@@ -211,6 +211,11 @@ impl maos_shell::ShellHost for ShellHost {
 /// result `main` exits with, so the Err-arm exit contract is provable
 /// in-process (`shell_host_16_2.rs`).
 ///
+/// Story 16-3 (D-16-3-M) — the loop that used to live here is now
+/// [`crate::supervision::unload_all_loaded`], the ONE unload function every
+/// `maos run` root leaves through. The generalisation is a delegation, not a
+/// rewrite: this function keeps its whole contract.
+///
 /// 1. Dry-run the Spirit's STILL-PENDING halts from the registry
 ///    (`drain_for_spirit_dry_run` — non-draining; the registry is the
 ///    evidence, no id has to survive a failed REPL).
@@ -227,10 +232,10 @@ pub async fn finish_shell_session(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // If the shell never loaded the Spirit (pre-load error), there is nothing
     // to unload — the caller's result stands.
-    let Some(pid) = scheduler.resolve_pid("hello-spirit") else {
+    if scheduler.resolve_pid("hello-spirit").is_none() {
         return shell_result;
-    };
-    let pending_before = halt_registry.drain_for_spirit_dry_run(pid);
+    }
+    let report = crate::supervision::unload_all_loaded(scheduler, halt_registry).await;
     // Story 16-2 §A6 review — the unload failure is REPORTED, never returned:
     // `shell_result` decides the exit, exactly as `main`'s own P13 invariant
     // demands ("the causal shell failure wins … never allowed to mask the
@@ -240,21 +245,20 @@ pub async fn finish_shell_session(
     // this unload ALWAYS fails — returning its error would replace the real
     // admission rejection with "invalid state transition" on precisely the
     // path where the operator needs the cause.
-    if let Err(error) = scheduler.unload(pid).await {
-        eprintln!("maos shell: planned unload failed: {error}");
+    for (pid, error) in &report.failed {
+        eprintln!("maos shell: planned unload failed for pid {pid}: {error}");
+    }
+    if report.had_failures() {
         return shell_result;
     }
-    for (halt_id, _) in &pending_before {
-        if halt_registry.lookup_state(halt_id).is_none() {
-            // Best-effort, like every other write on this seam: a closed
-            // stdout (`maos shell | head`) must not panic out of the caller
-            // and skip the audit-writer drain that follows.
-            let _ = writeln!(
-                out,
-                "halt {} closed by planned unload (no resolution)",
-                halt_id.as_str()
-            );
-        }
+    for halt_id in &report.closed_halts {
+        // Best-effort, like every other write on this seam: a closed
+        // stdout (`maos shell | head`) must not panic out of the caller
+        // and skip the audit-writer drain that follows.
+        let _ = writeln!(
+            out,
+            "halt {halt_id} closed by planned unload (no resolution)"
+        );
     }
     shell_result
 }

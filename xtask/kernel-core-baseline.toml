@@ -478,7 +478,14 @@
 #          reason <= 63 chars so check-fmt keeps the line at one. D-F standing
 #          permission ("15-1 +2"); the paired kloc row moves 18933 -> 18935 in
 #          the same commit or the two instruments disagree again.
-src_lines = 24474
+# HISTORY: Story 16-3 code-review closure (2026-09-16): 24474 -> 24477
+#          physical lines (+3), operator-authorized with all review patches.
+#          DRIVER: TaskAssignmentRecord.capability_token now represents absence
+#          as Option<TokenId>; CrashDetector preserves None as SQL NULL and an
+#          empty in_flight_tokens array instead of fabricating TokenId([0; 16]).
+#          Changed files: scheduler/control_block.rs and
+#          supervision/crash_detector.rs. No new public API or transition.
+src_lines = 24477
 
 # ── Story 16-0 — PINNED FILE SET + PER-FILE CONTENT HASH ─────────────────────
 #
@@ -513,7 +520,7 @@ src_lines = 24474
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "5575b00ad923a2dc95ca16fe82774b9ae04c7b2aec0e494f458c7d69e49bb275"
+set_hash = "a031a2e753181fde3ada16f8548fd5ab7d30248ab7453f7f6a1de0b1a2c643f2"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -574,7 +581,7 @@ set_hash = "5575b00ad923a2dc95ca16fe82774b9ae04c7b2aec0e494f458c7d69e49bb275"
 "revocation/poller.rs" = "ad449a7a206cb42d160afb44c05f17bfbfe39cf4815d6be7996034dfbb51a960"
 "revocation/rules.rs" = "726b27e55d5fff3e1cbd9ca2c1cf38494dfd272fbe586c1a0ed869c760366f44"
 "revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
-"scheduler/control_block.rs" = "039d1138080f60f2a4a52f56e540634cf6590b94c5cd5cc5854623cdad9beed6"
+"scheduler/control_block.rs" = "d0b216677842b73b788df8e969cc5ec42e4cdd8c94b11f5917c9e1a5b01bcf6a"
 "scheduler/hook_dispatch.rs" = "6f26d6b147425f8001e1c5d377cf88676329f7cd6402e1e5940e51580ac4d985"
 "scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
 "scheduler/kernel_ctx.rs" = "7baf6a7e15a5ffb62312a02aa19d58b24c8500f277bcc724b2065f4c732963ef"
@@ -606,7 +613,7 @@ set_hash = "5575b00ad923a2dc95ca16fe82774b9ae04c7b2aec0e494f458c7d69e49bb275"
 "security/sandbox/unsupported.rs" = "124e2d5baa3a64757cde10dcf7014bd7a77a77312c3ab76609140d060e515894"
 "security/sandbox/windows.rs" = "5f8ff06185984f9f5eb18a457b6f4329d0baf2ced8662db20ea70f5b7f5f2935"
 "supervision/cold_restart.rs" = "2977944d24dc54c28dba02c1d3395fc16225f45a3994b0a53f1a27aca20149b7"
-"supervision/crash_detector.rs" = "500bbbff08a6e44d9d27e032a87793dfd6a0f5990f2fc21fb6ba10d1851f2b5f"
+"supervision/crash_detector.rs" = "f1446119e6b49474d1614ac227c33a64e9c31a0a2f41b22b85a15e038a037613"
 "supervision/disposition.rs" = "5d8220cafba3e6afb757e3cb9acf23788d458319e093a858b10ed41596640b93"
 "supervision/mod.rs" = "71f3704a2073987a249b601111d03bd7815e1822c8d0cad377234dc0e1ecf518"
 "supervision/progress_watchdog.rs" = "97dbead77b4a9d9546f24767f5f580e4bd8d29a8a1eef742dd5f203365be4097"

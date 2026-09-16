@@ -1205,6 +1205,28 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run crash detector in-process panic test
         run: cargo test -p maos-kernel-core --test crash_detector_in_process_panic --release
+      - name: Build worker CLI fixture
+        run: cargo build --release -p worker --bin worker-cli-fixture
+      - name: Run crash corpus (exactly one passing test)
+        run: |
+          run_corpus() {
+            local log status
+            log="$(mktemp)"
+            set +e
+            cargo test -p maos-bin --release --test worker_crash_corpus_16_3 -- --ignored 2>&1 | tee "$log"
+            status=${PIPESTATUS[0]}
+            set -e
+            if [ "$status" -eq 0 ] && ! grep -Eq '^test result: ok\. 1 passed;' "$log"; then
+              echo "worker crash corpus did not report exactly 1 passed" >&2
+              status=1
+            fi
+            rm -f "$log"
+            return "$status"
+          }
+          if ! run_corpus; then
+            echo "::warning::worker crash corpus failed; retrying once"
+            run_corpus
+          fi
 
   # Story 5.3 — NFR-Rel-2 hung-Spirit detection ≤60s
   nfr-rel-2-hang-detection-60s:
@@ -1219,6 +1241,28 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run progress watchdog smoke test
         run: cargo test -p maos-kernel-core --test progress_watchdog_smoke --release
+      - name: Build worker CLI fixture
+        run: cargo build --release -p worker --bin worker-cli-fixture
+      - name: Run hang corpus (exactly one passing test)
+        run: |
+          run_corpus() {
+            local log status
+            log="$(mktemp)"
+            set +e
+            cargo test -p maos-bin --release --test worker_hang_corpus_16_3 -- --ignored 2>&1 | tee "$log"
+            status=${PIPESTATUS[0]}
+            set -e
+            if [ "$status" -eq 0 ] && ! grep -Eq '^test result: ok\. 1 passed;' "$log"; then
+              echo "worker hang corpus did not report exactly 1 passed" >&2
+              status=1
+            fi
+            rm -f "$log"
+            return "$status"
+          }
+          if ! run_corpus; then
+            echo "::warning::worker hang corpus failed; retrying once"
+            run_corpus
+          fi
 
   # Story 5.3 — NFR-Rel-4 silent-failure detection
   nfr-rel-4-silent-failure-detection:
@@ -1261,6 +1305,23 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run halt receipt production rate test
         run: cargo test -p maos-kernel-core --test halt_receipt_production_rate --release
+      # Story 16-3 (AC4) — NFR-Rel-11's PLANNED half, at every `maos run` root.
+      # The kernel test above drives `terminate_spirit` directly; this second
+      # step drives the real roots, where the receipt was actually missing.
+      #
+      # All three binaries are built with the SAME `--release` profile as the
+      # test run: `maosctl` is resolved as the `maos` binary's SIBLING and the
+      # fixture as a sibling/parent of the running exe, so a debug-profile
+      # build of either is invisible to a release test.
+      - name: Build release binaries for the root-shutdown suite
+        run: |
+          cargo build --release -p maos-bin --bin maos
+          cargo build --release -p maos-cli --bin maosctl
+          cargo build --release -p worker --bin worker-cli-fixture
+      # `--test-threads=1` is REQUIRED: these vectors spawn real roots with
+      # scratch doors and scan `/proc`, and assume sequential execution.
+      - name: Run root shutdown unload suite
+        run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1
 
   # Story 5.4 — NFR-Rel-9 revocation propagation ≤5s p99
   nfr-rel-9-revocation-5s-p99:

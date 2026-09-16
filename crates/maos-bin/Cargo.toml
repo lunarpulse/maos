@@ -112,8 +112,12 @@ semver = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 # Story 16-1 (D-16-1-D) — the store lock set flocks the store DIRECTORIES'
 # own handles. Unix-gated exactly like maos-kernel-core's containment I/O.
+# Story 16-3 (D-16-3-B) — `process` adds the Linux pidfd surface the Worker
+# exit observer needs: `pidfd_open`, `pidfd_send_signal`, and
+# `waitid(WaitId::PidFd, EXITED|NOWAIT)`. Feature-only: no new crate, no new
+# lockfile entry.
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1.1", features = ["fs"] }
+rustix = { version = "1.1", features = ["fs", "process"] }
 
 [dev-dependencies]
 tempfile = "3"

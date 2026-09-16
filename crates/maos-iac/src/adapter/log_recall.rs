@@ -323,6 +323,9 @@ impl LogRecallAdapter {
                 .as_ref()
                 .map(|cursor| cursor.last_timestamp_ns),
             cursor_frame_id: filter.cursor.as_ref().map(|cursor| cursor.last_frame_id),
+            cursor_insertion_id: None,
+            order_by_insertion: false,
+            descending: false,
         };
         let mut entries = transparency_log
             .query_frames(kernel_filter)
