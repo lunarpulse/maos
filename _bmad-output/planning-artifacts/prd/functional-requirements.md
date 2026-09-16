@@ -4,7 +4,7 @@
 
 ## Kernel Non-Goals (preface; mirrors §4.0.7 of architecture-maos.md)
 
-**The kernel's value comes from what it deliberately refuses to do as much as from what it provides.** The 65 FRs below describe what MAOS *delivers*. This Non-Goals subsection — load-bearing for the §4.0.7 principle and the hermes-tenant positioning sentence — names what the kernel *refuses to become*:
+**The kernel's value comes from what it deliberately refuses to do as much as from what it provides.** The 66 FRs below describe what MAOS *delivers*. This Non-Goals subsection — load-bearing for the §4.0.7 principle and the hermes-tenant positioning sentence — names what the kernel *refuses to become*:
 
 - **The kernel does NOT interpret tag semantics.** Tagged scalars (FR27) and tagged frames carry meaning the kernel transports without reading. Variance, entropy, EFE, KL, ensemble disagreement, calibration, similarity, derivatives, statistical tests, contradiction detection — all Spirit-side computations. The kernel does universal arithmetic comparison only.
 - **The kernel does NOT author cognitive content.** Distillation, summarization, planning, reasoning, dialectic update, hypothesis generation, posture inference — all Spirit-side. The kernel provides storage, lineage, namespacing, and the Inference Port; cognitive work belongs to actors.
@@ -17,9 +17,9 @@ These non-goals make the substrate's *restraint* legible. Without them, the FR l
 
 ---
 
-The 65 functional requirements below are organized into seven capability areas reflecting the substrate's grand-theater architecture. The metaphor: **theater (kernel)** provides invariant infrastructure; **actors (Spirits)** perform; **director (user)** controls the production with autonomy spectrum from hands-off to scene-by-scene. Each FR is a testable capability stated implementation-agnostically; numeric ship-gate floors are promoted into FR text where applicable (per Murat's discipline).
+The 66 functional requirements below are organized into seven capability areas reflecting the substrate's grand-theater architecture. The metaphor: **theater (kernel)** provides invariant infrastructure; **actors (Spirits)** perform; **director (user)** controls the production with autonomy spectrum from hands-off to scene-by-scene. Each FR is a testable capability stated implementation-agnostically; numeric ship-gate floors are promoted into FR text where applicable (per Murat's discipline).
 
-## A. Kernel Substrate Operations (9 FRs)
+## A. Kernel Substrate Operations (10 FRs)
 
 - **FR1:** User can install MAOS kernel via OS package manager (Homebrew/AUR/deb/rpm), `cargo install`, or signed GitHub Releases binary with mandatory Ed25519 signature verification.
 - **FR2:** User can uninstall MAOS kernel cleanly, removing all installed Spirits, capability tokens, sandbox mounts, ACP sockets, and operator caches without leaving orphaned state.
@@ -30,6 +30,7 @@ The 65 functional requirements below are organized into seven capability areas r
 - **FR7:** Operator can disable anonymous telemetry; default is opt-in with published schema and redaction layer.
 - **FR47:** Spirit obtains all model inference exclusively via the kernel-provided Inference Port; the kernel routes to the configured provider driver and records the call in the Transparency Log. Spirit binaries do not import vendor LLM SDKs directly. (Closes ADR-005 coverage gap.)
 - **FR48:** Operator can configure pluggable cryptographic provider for kernel signature verification, sealed-export encryption, and capability-token signing — enabling FIPS-validated, hardware-backed, or post-quantum implementations without recompiling Spirits. (FIPS / NIAP / export-control readiness.)
+- **FR66** [AMENDED, Story 16-4 / ADR-051]: Operator can source Anthropic and OpenAI provider credentials from the platform credential store through the out-of-kernel `SecretStore` port: Linux Secret Service, macOS Keychain, or Windows Credential Manager. The platform store is the default; a bounded unavailable/absent attempt falls back to composition-root-captured environment values and journals the downgrade without credential material. An encrypted-file backend seals values through the existing `KeyManagementPort`. Credentials are materialized at provider construction in v0.1; just-in-time materialization and bounded in-memory lifetime remain open.
 
 ## B. Spirit Lifecycle Management (8 FRs)
 
