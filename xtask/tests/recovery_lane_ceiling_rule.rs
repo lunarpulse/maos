@@ -265,7 +265,7 @@ fn the_tree_bound_inputs_exist() {
 /// half — that no one silently raised the row while the easing was in force.
 #[test]
 fn kernel_core_ceiling_has_not_moved_under_the_easing() {
-    const RATIFIED_AT_EASING: i64 = 18_935; // Epic-15 retro, 2026-09-12
+    const RATIFIED_AT_EASING: i64 = 18_938; // Story 16-3 operator grant, 2026-09-16
     let budgets = real_kloc_toml();
     let actual = budgets
         .get("maos-kernel-core")
