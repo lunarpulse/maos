@@ -252,13 +252,23 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     WriterShapeEntry {
-        // D-16-3-J (4) — kind 1 with an OPTIONAL token: a minted token is
-        // zero-padded into the 32-byte column; host-grant authority keeps the
-        // column NULL. `in_flight_tokens` must be respectively non-empty or
-        // empty, so the row cannot claim a token state its task did not have.
+        site: ("verb_resolver.rs", "resolve_verb", 0),
+        kind: 2,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Prefix("lifecycle."),
+        shape: Some(&[
+            ("director", PayloadType::Str),
+            ("spirit_id", PayloadType::Str),
+            ("verb", PayloadType::Str),
+        ]),
+    },
+    WriterShapeEntry {
+        // Story 16-5: task IDs remain in the payload as 16-byte arrays; the
+        // capability-token column stays NULL rather than padding them into
+        // false 32-byte capability evidence.
         site: ("crash_detector.rs", "handle_crash", 0),
         kind: 1,
-        token: TokenColumn::Optional,
+        token: TokenColumn::Absent,
         intent: WriterIntent::Exact("task.orphaned"),
         shape: Some(&[
             ("task_id", PayloadType::Str),
@@ -268,6 +278,7 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("stderr_tail", PayloadType::StrOrNull),
             ("cause", PayloadType::Str),
             ("in_flight_tokens", PayloadType::NumArrayArray),
+            ("disposition", PayloadType::Str),
         ]),
     },
     WriterShapeEntry {
@@ -529,7 +540,7 @@ fn payload_matches(
     shape: &'static [(&'static str, PayloadType)],
     payload: &str,
     row_spirit_pid: u32,
-    row_token_present: bool,
+    _row_token_present: bool,
 ) -> bool {
     // An empty shape pins a NON-JSON payload (`telemetry.self` writes a
     // plain string; an empty payload matches nothing here).
@@ -563,14 +574,11 @@ fn payload_matches(
             }
             PayloadType::StrOrNull => value.is_string() || value.is_null(),
             PayloadType::NumArrayArray => value.as_array().is_some_and(|outer| {
-                let presence_matches = (row_token_present && !outer.is_empty())
-                    || (!row_token_present && outer.is_empty());
-                presence_matches
-                    && outer.iter().all(|element| {
-                        element.as_array().is_some_and(|inner| {
-                            inner.len() == 16 && inner.iter().all(serde_json::Value::is_number)
-                        })
+                outer.iter().all(|element| {
+                    element.as_array().is_some_and(|inner| {
+                        inner.len() == 16 && inner.iter().all(serde_json::Value::is_number)
                     })
+                })
             }),
             PayloadType::Bool => value.is_boolean(),
             PayloadType::SpiritPidEqualsRow => value.as_u64() == Some(row_spirit_pid as u64),

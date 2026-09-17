@@ -2000,6 +2000,18 @@ pub fn classify_halt_record(payload: &str) -> (&'static str, Option<String>) {
         }
         return ("termination_receipt", Some(id));
     }
+    if let Ok(serde_json::Value::Object(object)) =
+        serde_json::from_str::<serde_json::Value>(payload)
+    {
+        if object
+            .get("error")
+            .is_some_and(serde_json::Value::is_string)
+        {
+            if let Some(halt_id) = object.get("halt_id").and_then(serde_json::Value::as_str) {
+                return ("termination_receipt", Some(halt_id.to_string()));
+            }
+        }
+    }
     if let Ok(raised) = serde_json::from_str::<maos_domain::frame::EpistemicHaltPayload>(payload) {
         return ("raised", Some(raised.halt_id));
     }

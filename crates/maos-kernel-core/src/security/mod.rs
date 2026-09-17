@@ -504,9 +504,9 @@ impl SecurityManagerAdapter {
             attempted_syscall: attempted_syscall.into(),
             sandbox_tier,
         };
-        // Non-blocking; drop if channel saturated (ADR-030).
-        if sender.try_send(event).is_err() {
-            cap_audit::record_drop();
+        // Non-blocking; record the named site if the bounded send fails.
+        if let Err(error) = sender.try_send(event) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::SandboxBlock, &error);
         }
     }
 }

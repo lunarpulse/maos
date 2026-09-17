@@ -200,6 +200,27 @@ pub fn run_audit_query(
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
 
+    let audit_health = maos_kernel_core::capability::cap_audit::audit_health_snapshot();
+    if audit_health.degraded {
+        if format == "ndjson" {
+            writeln!(
+                lock,
+                "{}",
+                serde_json::json!({
+                    "kind": "audit.health",
+                    "degraded": true,
+                    "dropped_events": audit_health.total_drops,
+                })
+            )?;
+        } else {
+            writeln!(
+                lock,
+                "WARNING audit.health degraded=true dropped_events={}",
+                audit_health.total_drops
+            )?;
+        }
+    }
+
     let fr4_mode = spirit.is_some();
     match (fr4_mode, format) {
         (true, "ndjson") => maos_audit::to_fr4_ndjson(entries, &mut lock)?,
@@ -389,6 +410,7 @@ const REPL_TICK: std::time::Duration = std::time::Duration::from_millis(100);
 /// `take_context` for a bounded number of ticks and NEVER proceeds with an
 /// empty context.
 const CONTEXT_WAIT_TICKS: u32 = 50; // 50 × 100 ms = 5 s
+const MAX_CLARIFICATION_BYTES: usize = 64 * 1024;
 
 /// The REPL's pending-halt state machine.
 struct PendingHalt {
@@ -423,6 +445,15 @@ fn handle_line(
                  resolve it first (or: maosctl halt resolve {} --spirit hello-spirit \
                  --kind provided-context --text \"…\")",
                 p.id, p.id
+            )?;
+            return Ok(());
+        }
+        if trimmed.len() > MAX_CLARIFICATION_BYTES {
+            writeln!(
+                output,
+                "maos: clarification refused — {} bytes exceeds the {}-byte limit",
+                trimmed.len(),
+                MAX_CLARIFICATION_BYTES
             )?;
             return Ok(());
         }
@@ -508,7 +539,7 @@ fn handle_line(
     match response {
         Ok(resp) => {
             render_turn(output, msg, &resp)?;
-            record_turn_row(host, &token_for_audit, msg, &resp);
+            record_turn_row(host, &token_for_audit, msg, &resp)?;
         }
         Err(maos_spirit_hello::HelloError::Ambiguous { tag, prompt }) => {
             // D-16-2-B — the halt goes through the kernel's `invoke_halt`
@@ -660,7 +691,7 @@ fn proceed_with(
         Some(text) => format!("{directive} [clarification: {text}]"),
         None => format!("{directive} [authorized override]"),
     };
-    record_turn_row(host, &token_for_audit, &summary, &response);
+    record_turn_row(host, &token_for_audit, &summary, &response)?;
     Ok(())
 }
 
@@ -686,16 +717,16 @@ fn record_turn_row(
     token: &CapabilityToken,
     msg: &str,
     resp: &maos_spirit_hello::HelloResponse,
-) {
+) -> Result<(), CapError> {
     let payload = serde_json::json!({
         "user": msg,
         "response": resp.introduction,
     })
     .to_string();
-    // The ONE `record_invocation` swallow left in the shell (Story 16-5
-    // AC1's cite): `record_turn` passes the error through unchanged and
-    // this call site decides to drop it.
-    let _ = host.record_turn(token, payload.as_bytes());
+    // The response is already rendered, so this site cannot undo the
+    // invocation. Propagating the typed failure makes the incomplete audit
+    // visible and leaves the class-wide send-site counter as the single count.
+    host.record_turn(token, payload.as_bytes())
 }
 
 /// The resolution kind name the renders use — the door's vocabulary.

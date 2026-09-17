@@ -181,6 +181,19 @@ impl CapTokensShardRing {
             maos_domain::ports::crypto::CryptoError::OperationFailed("signature must be 64 bytes")
         })?;
 
+        // The token does not become active unless its issue event is accepted
+        // by the bounded audit sink. Closed and saturated sinks are explicit
+        // availability failures, never successful unaudited issuance.
+        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Issue {
+            token_id,
+            spirit_pid,
+            scope: scope.clone(),
+            ttl_secs: effective_ttl,
+        }) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Issue, &error);
+            return Err(CapError::AuditSinkUnavailable);
+        }
+
         let shard_idx = shard::hash_token_id(&token_id);
         let shard = &self.shards[shard_idx];
         shard.insert(
@@ -190,25 +203,11 @@ impl CapTokensShardRing {
                 expiry_ns,
                 posture_hash: posture_snapshot_hash,
                 intent_class,
-                scope: scope.clone(),
+                scope,
                 spirit_pid,
                 revoked: std::sync::atomic::AtomicBool::new(false),
             },
         );
-
-        // Audit (try_send, never block)
-        if self
-            .audit
-            .try_send(cap_audit::CapAuditEvent::Issue {
-                token_id,
-                spirit_pid,
-                scope,
-                ttl_secs: effective_ttl,
-            })
-            .is_err()
-        {
-            cap_audit::record_drop();
-        }
 
         Ok(CapabilityToken::new(
             token_id, spirit_pid, expiry_ns, signature,
@@ -291,30 +290,31 @@ impl CapTokensShardRing {
         if already_revoked && matches!(reason, RevokeReason::Operator) {
             return Err(CapError::Revoked);
         }
-        let _ = self
+        if let Err(error) = self
             .audit
-            .try_send(cap_audit::CapAuditEvent::Revoke { token_id, reason });
+            .try_send(cap_audit::CapAuditEvent::Revoke { token_id, reason })
+        {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Revoke, &error);
+            return Err(CapError::AuditSinkUnavailable);
+        }
         Ok(())
     }
 
     /// Revoke all tokens for a Spirit. Crash-recovery / hot-swap rebind
     /// surface. Slow-path (iterates all shards).
-    pub fn revoke_all(&self, spirit_pid: u32) -> usize {
+    pub fn revoke_all(&self, spirit_pid: u32) -> Result<usize, CapError> {
         let mut count = 0;
         for shard in self.shards.iter() {
             count += shard.revoke_for_spirit(spirit_pid);
         }
-        if self
-            .audit
-            .try_send(cap_audit::CapAuditEvent::Revoke {
-                token_id: TokenId::ZERO,
-                reason: RevokeReason::SpiritUnload { spirit_pid, count },
-            })
-            .is_err()
-        {
-            cap_audit::record_drop();
+        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Revoke {
+            token_id: TokenId::ZERO,
+            reason: RevokeReason::SpiritUnload { spirit_pid, count },
+        }) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::RevokeAll, &error);
+            return Err(CapError::AuditSinkUnavailable);
         }
-        count
+        Ok(count)
     }
 
     /// Return `true` if the given `spirit_pid` holds at least one
@@ -383,8 +383,32 @@ mod tests {
     fn test_ring() -> CapTokensShardRing {
         let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);
         let signing_key = Ed25519SigningKey::new([0u8; 32]);
-        let (audit_tx, _audit_rx) = cap_audit::channel();
+        let (audit_tx, mut audit_rx) = cap_audit::channel();
+        std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
         CapTokensShardRing::new(crypto, signing_key, 0xDEAD_BEEF, audit_tx)
+    }
+
+    #[test]
+    fn issue_fails_closed_when_audit_sink_is_closed() {
+        init_monotonic_base();
+        let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);
+        let signing_key = Ed25519SigningKey::new([0u8; 32]);
+        let (audit_tx, audit_rx) = cap_audit::channel();
+        drop(audit_rx);
+        let ring = CapTokensShardRing::new(crypto, signing_key, 0xDEAD_BEEF, audit_tx);
+
+        let result = ring.issue(
+            7,
+            Scope::FsRead {
+                subtree: "/tmp".into(),
+            },
+            60,
+            [1u8; 32],
+            IntentClass::Standard,
+        );
+
+        assert_eq!(result, Err(CapError::AuditSinkUnavailable));
+        assert!(ring.list_active().is_empty());
     }
 
     #[test]

@@ -799,7 +799,7 @@ fn no_key_before_src_lines_begins_with_src_lines() {
 fn the_three_other_readers_still_resolve_the_pin() {
     assert_eq!(
         read_pinned(&baseline_toml()).expect("read_pinned"),
-        24477,
+        24591,
         "the xtask reader"
     );
 
@@ -817,7 +817,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .map(str::trim)
         .and_then(|v| v.parse().ok())
         .expect("the a2a-tcp guard's parse still resolves");
-    assert_eq!(a2a, 24477, "the a2a-tcp reader");
+    assert_eq!(a2a, 24591, "the a2a-tcp reader");
 
     // `fkcs_oracle.rs:170` — exact `strip_prefix("src_lines = ")`.
     let oracle: usize = text
@@ -826,7 +826,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .expect("the fkcs oracle's parse still resolves")
         .parse()
         .expect("parses");
-    assert_eq!(oracle, 24477, "the fkcs oracle reader");
+    assert_eq!(oracle, 24591, "the fkcs oracle reader");
 }
 
 #[test]
@@ -834,10 +834,10 @@ fn the_pin_is_readable_by_a_real_toml_parser() {
     // AC1's precondition. The file was invalid TOML at line 29 for three epics
     // (seven HISTORY lines that lost their `#`), so `[kernel_src]` was
     // unimplementable until Story 16-0 repaired them. The repair was
-    // line-count-neutral; Story 16-3's ratification ledger now places it at line 488.
+    // line-count-neutral; Story 16-5's ratification ledger now places it at line 496.
     let text = std::fs::read_to_string(baseline_toml()).expect("read baseline");
     let parsed: toml::Value = toml::from_str(&text).expect("the baseline file must be valid TOML");
-    assert_eq!(parsed["src_lines"].as_integer(), Some(24477));
+    assert_eq!(parsed["src_lines"].as_integer(), Some(24591));
 
     let numbered = text
         .lines()
@@ -845,8 +845,8 @@ fn the_pin_is_readable_by_a_real_toml_parser() {
         .expect("src_lines assignment exists");
     assert_eq!(
         numbered + 1,
-        488,
-        "`src_lines` moved off line 488 — every `kernel-core-baseline.toml:488` citation \
+        496,
+        "`src_lines` moved off line 496 — every `kernel-core-baseline.toml:496` citation \
          in the tree resolves against that line"
     );
 

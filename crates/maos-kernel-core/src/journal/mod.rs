@@ -98,7 +98,7 @@ impl JournalAdapter {
         let file = OpenOptions::new()
             .create(true)
             .read(true)
-            .write(true)
+            .append(true)
             .open(path)
             .map_err(JournalError::Open)?;
 
@@ -176,8 +176,10 @@ impl JournalAdapter {
 
     pub fn append_transition(&self, entry: JournalEntry) {
         let mut file = self.writer.lock().expect("Journal writer lock poisoned");
-        let line = serde_json::to_string(&entry).expect("JournalEntry serialization is infallible"); // xtask-serde-allow: infallible; fn panics-on-journal-failure by kernel design
-        if let Err(e) = write!(file, "{line}\n") {
+        let mut line =
+            serde_json::to_string(&entry).expect("JournalEntry serialization is infallible"); // xtask-serde-allow: infallible; fn panics-on-journal-failure by kernel design
+        line.push('\n');
+        if let Err(e) = file.write_all(line.as_bytes()) {
             panic!(
                 "MAOS kernel panic — Journal append failed: {e}. \
                  I10 durability binding broken; kernel halts."

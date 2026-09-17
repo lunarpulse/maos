@@ -18,16 +18,11 @@ use maos_audit::fr4_classifier::{classify_fr4_row, Fr4RowDisposition};
 use maos_audit::{query, AuditEntry, AuditFilter};
 use rusqlite::Connection;
 
-/// The crash detector's token column when a capability was minted: the
-/// record's 16-byte token zero-padded into the 32-byte field.
-const ORPHAN_TOKEN_HEX: &str = "1111111111111111111111111111111100000000000000000000000000000000";
+/// The crash detector's measured `task.orphaned` payload. The 16-byte task
+/// token stays in the payload and is never padded into the capability column.
+const ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,1]],"disposition":"nack"}"#;
 
-/// The crash detector's measured `task.orphaned` payload with a minted token.
-const ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]]}"#;
-
-/// The same writer under host-grant authority: no token column, no invented
-/// token in the payload.
-const TOKENLESS_ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[]}"#;
+const TOKENLESS_ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[],"disposition":"nack"}"#;
 
 fn entry(kind: &str, intent: &str, pid: u32, token: Option<&str>, payload: &str) -> AuditEntry {
     AuditEntry {
@@ -75,22 +70,19 @@ fn kind21_subprocess_output_is_a_non_call_token_or_not() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Kind 1 — task.orphaned: preserves optional task-token state
+// Kind 1 — task.orphaned: task IDs never masquerade as capability tokens
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
-fn token_bearing_kind1_task_orphaned_is_a_non_call() {
+fn padded_task_id_in_capability_column_fails_closed() {
     let row = entry(
         "task.complete",
         "task.orphaned",
         4242,
-        Some(ORPHAN_TOKEN_HEX),
+        Some("1111111111111111111111111111111100000000000000000000000000000000"),
         ORPHAN_PAYLOAD,
     );
-    assert_eq!(
-        classify_fr4_row(&row),
-        Fr4RowDisposition::NonCallKernelEvent
-    );
+    assert_eq!(classify_fr4_row(&row), Fr4RowDisposition::Call);
 }
 
 #[test]
@@ -121,29 +113,21 @@ fn kind7_row_with_the_orphan_intent_stays_a_call() {
     assert_eq!(classify_fr4_row(&row), Fr4RowDisposition::Call);
 }
 
-/// `in_flight_tokens` is pinned to a NON-empty array of 16-number arrays:
-/// a flat number array, an empty array, or a 15-number element is refused
-/// and the otherwise-genuine token-bearing row falls back to `Call`
-/// (fail-closed).
+/// `in_flight_tokens` is pinned to an array of 16-number arrays. A flat
+/// number array or a 15-number element is refused; an empty array is valid
+/// when the crashed task used host-grant authority.
 #[test]
 fn broken_in_flight_tokens_fail_closed() {
     for (tokens, label) in [
         (r#"[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]"#, "flat array"),
-        (r#"[]"#, "empty array"),
         (r#"[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]"#, "15-number element"),
     ] {
         let payload = ORPHAN_PAYLOAD.replace("[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]]", tokens);
-        let row = entry(
-            "task.complete",
-            "task.orphaned",
-            4242,
-            Some(ORPHAN_TOKEN_HEX),
-            &payload,
-        );
+        let row = tokenless("task.complete", "task.orphaned", 4242, &payload);
         assert_eq!(
             classify_fr4_row(&row),
             Fr4RowDisposition::Call,
-            "{label}: in_flight_tokens must pin a non-empty array of 16-number arrays"
+            "{label}: in_flight_tokens must be an array of 16-number arrays"
         );
     }
 }

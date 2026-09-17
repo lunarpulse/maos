@@ -49,8 +49,8 @@ pub fn quarantine_spirit(
             attempted_syscall: "quarantine.requested.deferred".into(),
             sandbox_tier: SandboxTier::T3,
         };
-        if sender.try_send(event).is_err() {
-            cap_audit::record_drop();
+        if let Err(error) = sender.try_send(event) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Quarantine, &error);
         }
     }
 

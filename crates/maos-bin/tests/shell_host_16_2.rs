@@ -120,7 +120,8 @@ fn kernel_world(boot_nonce: u64) -> KernelWorld {
         },
     );
     policy.update(policy_inner);
-    let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let (audit_tx, mut audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(RingCryptoProvider),
         Ed25519SigningKey::new([0x16; 32]),

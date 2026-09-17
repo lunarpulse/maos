@@ -932,11 +932,7 @@ mod tests {
     fn erase_provenance_requires_the_complete_applied_share_locator() {
         let audit = TransparencyLogAdapter::open_in_memory(13_600);
         let digest = erase_locator_digest("team-a", "team-b", 7, "default", "k");
-        audit.insert_kernel_event_returning_id(
-            7,
-            "collective.host.cross-team-share",
-            br#"{"from_team":"team-a","to_team":"team-b","op_id":"0123456789abcdef0123456789abcdef","locator_digest":"wrong","source_ts":1,"source_region":"r","status":"crossing_applied"}"#,
-        );
+        audit.insert_kernel_event_returning_id(7, maos_iac::adapter::transparency_log::FrameKind::Decision, None, "collective.host.cross-team-share", br#"{"from_team":"team-a","to_team":"team-b","op_id":"0123456789abcdef0123456789abcdef","locator_digest":"wrong","source_ts":1,"source_region":"r","status":"crossing_applied"}"#);
         assert_eq!(
             CrossTeamCrossingAdapter::share_provenance(
                 &audit,
@@ -961,6 +957,8 @@ mod tests {
         });
         audit.insert_kernel_event_returning_id(
             7,
+            maos_iac::adapter::transparency_log::FrameKind::Decision,
+            None,
             "collective.host.cross-team-share",
             payload.to_string().as_bytes(),
         );

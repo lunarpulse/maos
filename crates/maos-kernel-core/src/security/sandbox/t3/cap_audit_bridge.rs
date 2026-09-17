@@ -5,7 +5,7 @@
 //! `CapAuditEvent` forwarding), this bridge emits a
 //! `CapAuditEvent::SandboxBlock` → Transparency Log `FrameKind::SandboxBlock = 8`.
 //!
-//! Uses `try_send` + `cap_audit::record_drop()` on saturation per
+//! Uses `try_send` + the class-wide named drop instrument on saturation per
 //! ADR-030: NEVER block on the audit channel.
 
 use crate::capability::cap_audit::{self, CapAuditEvent};
@@ -22,8 +22,8 @@ pub fn emit_t3_escape_block(
         attempted_syscall: format!("container.escape.{category}.{vector}"),
         sandbox_tier: SandboxTier::T3,
     };
-    if sender.try_send(event).is_err() {
-        cap_audit::record_drop();
+    if let Err(error) = sender.try_send(event) {
+        cap_audit::record_send_error(cap_audit::AuditDropSite::T3EscapeBlock, &error);
     }
 }
 

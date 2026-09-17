@@ -434,6 +434,8 @@ pub struct DaemonStatusRow {
     pub boot_nonce: String,
     pub version: String,
     pub spirit_ids: Vec<String>,
+    pub audit_degraded: bool,
+    pub audit_drop_count: u64,
 }
 
 /// One Spirit's Orchestrator buffer occupancy.
@@ -986,6 +988,8 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                         "boot_nonce": daemon.boot_nonce,
                         "version": daemon.version,
                         "spirit_ids": daemon.spirit_ids,
+                        "audit_degraded": daemon.audit_degraded,
+                        "audit_drop_count": daemon.audit_drop_count,
                     }),
                 )
             }

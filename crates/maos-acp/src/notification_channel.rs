@@ -5,6 +5,7 @@
 //! sessions.  The `NotificationChannel` trait impl lives in
 //! `maos-director-surface` (avoiding a circular dep).
 
+use maos_capability::cap_audit::{self, AuditDropReason, AuditDropSite};
 use std::sync::{Arc, Mutex};
 
 use crate::frame::AcpFrameOut;
@@ -59,11 +60,10 @@ impl AcpEditorChannelImpl {
             match session.outbound.try_send(frame.clone()) {
                 Ok(()) => delivered += 1,
                 Err(crossbeam_channel::TrySendError::Full(_)) => {
-                    // TODO: integrate cap_audit::record_drop when cross-crate audit bridge is available
-                    // For now, the caller (AcpEditorChannel in maos-director-surface) should check
-                    // the return count and log accordingly.
+                    cap_audit::record_drop(AuditDropSite::AcpNotification, AuditDropReason::Full);
                 }
                 Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
+                    cap_audit::record_drop(AuditDropSite::AcpNotification, AuditDropReason::Closed);
                     // session dead — GC'd on next session.end
                 }
             }

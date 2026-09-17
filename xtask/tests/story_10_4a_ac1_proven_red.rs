@@ -955,7 +955,9 @@ fn make_capability_for_with_audit(
 }
 
 fn make_capability_for(spirit_pid: u32) -> Arc<CapabilityRegistryAdapter> {
-    make_capability_for_with_audit(spirit_pid).0
+    let (adapter, mut audit_rx) = make_capability_for_with_audit(spirit_pid);
+    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
+    adapter
 }
 
 fn make_capability() -> Arc<CapabilityRegistryAdapter> {

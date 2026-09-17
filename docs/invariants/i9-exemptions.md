@@ -257,10 +257,12 @@ state. FR56 surface for Spirit-side calibration without per-read operator admiss
 
 **Reason:** memory manager adapter (Story 4.3) — composite dispatcher holding `Arc`
 references to the three tier stores (PrivateMemoryStore, SharedMemoryStore,
-PrincipalNamespaceIndex) and TransparencyLogAdapter. Does NOT retain mutable state
-across calls; delegates to the already-exempt sub-modules. The `next_frame_counter`
-is a monotonic ULID counter for audit-frame IDs, not learned state. Bounded by
-per-Spirit budget + principal forget-cascade per §4.0.7.
+PrincipalNamespaceIndex) and TransparencyLogAdapter. The bounded
+`forget_serialization` mutex makes the durable legal-hold check atomic with one
+principal's complete forget action; it is synchronization state, not learned
+state, and deliberately does not span a multi-principal uninstall cascade. The
+`next_frame_counter` is a monotonic ULID counter for audit-frame IDs, not learned
+state. Bounded by per-Spirit budget + principal forget-cascade per §4.0.7.
 
 ### `IsolationCorpusReport` — `crates/maos-kernel-core/src/isolation/runner.rs`
 

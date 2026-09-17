@@ -137,23 +137,14 @@ impl HaltResolver for KernelHaltResolver {
             Resolution::AuthorizedOverride { .. } => HaltState::Overridden,
         };
 
-        // Story 4.3 — metadata is cleaned up by resolve(), so look it up first.
+        match self.registry.lookup_state(halt_id) {
+            Some(HaltState::PendingResolution) => {}
+            Some(_) => return Err(ResolveError::AlreadyResolved(halt_id.as_str().into())),
+            None => return Err(ResolveError::UnknownHalt(halt_id.as_str().into())),
+        }
+        // Metadata is removed by the terminal transition, so capture it before
+        // durable side effects and commit the transition only after they pass.
         let pending_opt = self.registry.lookup_pending_metadata(halt_id);
-
-        let pre = self
-            .registry
-            .resolve(halt_id, terminal)
-            .map_err(|e| match e {
-                crate::halt::ResolveStateError::NotPending(s) => ResolveError::UnknownHalt(s),
-                crate::halt::ResolveStateError::AlreadyTerminal(s) => {
-                    ResolveError::AlreadyResolved(s)
-                }
-            })?;
-        assert_eq!(
-            pre,
-            HaltState::PendingResolution,
-            "registry must only transition from PendingResolution"
-        );
 
         // 2. Per-variant side-effects (kernel-side, not Spirit-side)
         match &resolution {
@@ -191,9 +182,8 @@ impl HaltResolver for KernelHaltResolver {
                     })?;
             }
             Resolution::AcceptedHalt => {
-                // FR12 — emit task.orphaned via Transparency Log
-                // v0.3-β shape: FrameKind::TaskComplete carrying
-                // "orphaned: accepted_halt halt_id=..."
+                // FR12 — emit a typed JSON task.orphaned row carrying the
+                // terminal disposition selected by this resolution.
                 self.emit_task_orphaned(halt_id);
             }
             Resolution::AuthorizedOverride {
@@ -210,15 +200,34 @@ impl HaltResolver for KernelHaltResolver {
             }
         }
 
+        let pre = self
+            .registry
+            .resolve(halt_id, terminal)
+            .map_err(|e| match e {
+                crate::halt::ResolveStateError::NotPending(s) => ResolveError::UnknownHalt(s),
+                crate::halt::ResolveStateError::AlreadyTerminal(s) => {
+                    ResolveError::AlreadyResolved(s)
+                }
+            })?;
+        assert_eq!(
+            pre,
+            HaltState::PendingResolution,
+            "registry must only transition from PendingResolution"
+        );
+
         Ok(())
     }
 }
 
 impl KernelHaltResolver {
     fn emit_task_orphaned(&self, halt_id: &HaltId) {
-        // Construct a FrameKind::TaskComplete frame with the orphan payload.
-        // v0.3-β writes directly to the Transparency Log.
-        let payload = format!("orphaned: accepted_halt halt_id={}", halt_id.as_str());
+        // Kernel-side accepted halts have no task ledger, but their orphan row
+        // still records the terminal disposition as structured JSON.
+        let payload = serde_json::json!({
+            "halt_id": halt_id.as_str(),
+            "disposition": "accepted_halt",
+        })
+        .to_string();
         self.tl.insert_frame_event(
             FrameKind::TaskComplete,
             0, // spirit_pid — v0.3-β uses 0 for kernel-side orphan events

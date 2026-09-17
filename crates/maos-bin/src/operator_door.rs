@@ -946,12 +946,19 @@ impl DoorInner {
             Arc::clone(&self.memory),
             Arc::clone(&self.orchestrator),
         ));
+        let rollback_metadata = self.halt_registry.lookup_pending_metadata(&halt_id);
         let halt_flow = HaltFlow::new(
-            kernel_resolver,
+            Arc::clone(&kernel_resolver),
             Arc::clone(&self.notification_dispatcher),
             Arc::clone(&self.transparency_log) as Arc<dyn maos_domain::halt::HaltJournal>,
         );
-        match halt_flow.submit_resolution(halt_id.clone(), resolution.clone(), spirit_id) {
+        let resolution_result =
+            halt_flow.submit_resolution(halt_id.clone(), resolution.clone(), spirit_id);
+        if matches!(&resolution_result, Err(HaltUiError::Audit(_))) {
+            self.halt_registry
+                .rollback_resolution(&halt_id, rollback_metadata);
+        }
+        match resolution_result {
             Err(HaltUiError::Resolver(ResolveError::UnknownHalt(error))) => {
                 Self::not_found("halt_not_pending", error)
             }
@@ -1461,11 +1468,14 @@ impl OperatorCommandPort for OperatorDoor {
         let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
         let mut spirit_ids: Vec<String> = guard.values().map(|scb| scb.spirit_id.clone()).collect();
         spirit_ids.sort();
+        let audit_health = maos_kernel_core::capability::cap_audit::audit_health_snapshot();
         maos_control::DaemonStatusRow {
             pid: self.0.daemon_pid,
             boot_nonce: self.0.boot_nonce.to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             spirit_ids,
+            audit_degraded: audit_health.degraded,
+            audit_drop_count: audit_health.total_drops,
         }
     }
 

@@ -191,13 +191,20 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "journal_lifecycle",
         ),
         (
-            // D-16-3-J (4) — the crash detector's kind-1 orphan row carries
-            // the record's capability token zero-padded into the 32-byte
-            // token column; `in_flight_tokens` is a `Vec<TokenId>`.
+            "decision.dispatch",
+            None,
+            "lifecycle.Load",
+            r#"{"director":"operator","spirit_id":"hello-spirit","verb":"Load"}"#,
+            1,
+            "verb resolver decision dispatch",
+        ),
+        (
+            // Story 16-5: the task's 16-byte token remains in the payload;
+            // the 32-byte capability-token column stays NULL.
             "task.complete",
-            Some("1111111111111111111111111111111100000000000000000000000000000000"),
+            None,
             "task.orphaned",
-            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]]}"#,
+            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]],"disposition":"nack"}"#,
             4242,
             "crash task.orphaned (kind 1)",
         ),
@@ -349,12 +356,10 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "{label}: the measured payload must classify as a non-call"
         );
     }
-    // The set of Optional rows is itself pinned: a table row silently
-    // flipping to (or from) Optional must red, not escape.
-    assert_eq!(
-        optional_rows,
-        vec![(("crash_detector.rs", "handle_crash", 0), true)],
-        "the Optional-token rows are exactly the enumerated expected ones"
+    // Story 16-5 leaves no ambiguous optional-token writer shape.
+    assert!(
+        optional_rows.is_empty(),
+        "all non-call token columns must be pinned present or absent"
     );
 }
 
@@ -453,9 +458,9 @@ fn plain_table_gains_the_trailing_intent_column() {
     assert!(text.contains("some.intent:here"));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // THE INVENTORY DOORBELL — every tokenless kind-7 / variable-kind / kind-1
-// writer site in the tree has a disposition
+// writer site, plus the lifecycle DecisionDispatch writer, in the tree has a
+// disposition
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A writer call site the scanner derived from source. `file` is the file
@@ -486,9 +491,9 @@ fn token_arg_position(method: &str) -> Option<usize> {
 /// balanced argument extraction, enclosing-fn resolution, `#[cfg(test)]`
 /// spans skipped. Returns every site whose kind is literal
 /// `CapabilityInvocation` with a literal `None` token, whose KIND is a
-/// variable, or whose kind is literal `TaskComplete` (kind 1 —
-/// D-16-3-J (5), token-bearing included) — the sites that demand a
-/// disposition.
+/// variable, whose kind is literal `TaskComplete` (kind 1 — D-16-3-J (5),
+/// token-bearing included), or the lifecycle `DecisionDispatch` writer — the
+/// sites that demand a disposition.
 fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
     // Compute #[cfg(test)] line spans (item start to its closing brace, approximated
     // by the next top-level closing brace at column 0).
@@ -667,9 +672,17 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             .rsplit("::")
             .next()
             .is_some_and(|last| last.starts_with("TaskComplete"));
+        let kind_is_decision_dispatch = kind_arg
+            .rsplit("::")
+            .next()
+            .is_some_and(|last| last.starts_with("DecisionDispatch"));
         let kind_is_variable = !kind_arg.contains("::");
-        if !kind_is_capability_invocation && !kind_is_variable && !kind_is_task_complete {
-            continue; // a literal kind that is neither 7 nor 1 — set (a) or another kind
+        if !kind_is_capability_invocation
+            && !kind_is_variable
+            && !kind_is_task_complete
+            && !kind_is_decision_dispatch
+        {
+            continue;
         }
         let tokenless = token_arg == "None";
         if kind_is_capability_invocation && !tokenless {

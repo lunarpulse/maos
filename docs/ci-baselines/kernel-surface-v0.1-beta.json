@@ -675,7 +675,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::memory::MemoryManagerAdapter",
-      "signature_hash": "fa13b9a1a93f1b30677e7a1944e78e266d6cfdff86bc88e23ba2079be02fb5bc"
+      "signature_hash": "2ff3f30ff49492d5a52b5d9cdfdcde22c2b6a27b738d056c9444899df39225b5"
     },
     {
       "kind": "struct",

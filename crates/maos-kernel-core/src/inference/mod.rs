@@ -499,7 +499,8 @@ mod tests {
             );
             policy.update(inner);
         }
-        let (audit_tx, _audit_rx) = crate::capability::cap_audit::channel();
+        let (audit_tx, mut audit_rx) = crate::capability::cap_audit::channel();
+        std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
         let quota = CapQuotaTracker::new();
         let working_memory = Arc::new(WorkingMemoryStore::new());
         let telemetry = Arc::new(crate::telemetry::TelemetryStreamAdapter::default());

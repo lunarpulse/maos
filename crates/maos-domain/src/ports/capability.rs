@@ -138,6 +138,9 @@ pub enum CapError {
     /// Policy denied capability.
     #[error("policy denied capability")]
     PolicyDenied,
+    /// The capability invocation could not be recorded by the audit sink.
+    #[error("audit sink unavailable")]
+    AuditSinkUnavailable,
 }
 
 #[cfg(test)]

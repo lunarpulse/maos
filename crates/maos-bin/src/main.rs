@@ -1272,7 +1272,7 @@ impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
             "collective.write".to_owned(),
             payload.as_bytes(),
         )
-        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
         self.memory
             .collective_write(
                 spirit_pid,
@@ -1301,7 +1301,7 @@ impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
             "collective.read".to_owned(),
             payload.as_bytes(),
         )
-        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
         self.memory
             .collective_read(
                 spirit_pid,
@@ -1329,7 +1329,7 @@ impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
             "collective.scan".to_owned(),
             payload.as_bytes(),
         )
-        .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))?;
+        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
         self.memory
             .collective_scan(
                 spirit_pid,
@@ -2626,17 +2626,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Ok(());
             }
             Err(error) => {
-                let outcome = matches!(
-                    &error,
-                    maos_domain::log_recall::LogRecallError::ECrossWallRecallDenied { .. }
-                )
-                .then_some("refused")
-                .unwrap_or("error");
+                let (outcome, refusal_code) = match &error {
+                    maos_domain::log_recall::LogRecallError::ECrossWallRecallDenied {
+                        reason,
+                        ..
+                    } => (reason.outcome(), Some(reason.code())),
+                    _ => ("error", None),
+                };
                 eprintln!(
                     "{}",
                     serde_json::json!({
                         "surface": "cross_wall_traceback",
                         "outcome": outcome,
+                        "refusal_code": refusal_code,
                         "remote_team": remote_team,
                         "spirit_pid": spirit_pid,
                         "error": error.to_string(),
@@ -6349,6 +6351,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             let audit_frame_id = transparency_log.insert_kernel_event_returning_id(
                 spirit_pid,
+                maos_iac::adapter::transparency_log::FrameKind::Decision,
+                None,
                 "collective.operator.erase",
                 audit_payload.to_string().as_bytes(),
             );
@@ -9073,7 +9077,13 @@ fn run_uninstall_cascade(
     // Trap 4: this append remains a fail-fast audit commit point. The adapter
     // panics on durable journal failure; catching unwind after partial erasure
     // would falsely imply a safely recoverable transaction.
-    transparency_log.insert_kernel_event_returning_id(0, terminal.intent(), &payload);
+    transparency_log.insert_kernel_event_returning_id(
+        0,
+        maos_iac::adapter::transparency_log::FrameKind::Decision,
+        None,
+        terminal.intent(),
+        &payload,
+    );
     terminal
 }
 
@@ -9114,40 +9124,31 @@ fn run_uninstall_cascade_inner(
     // invariant that every post-erasure exit has a signed proof.
     let shared_principal_rows = maos_audit::shared_tier_principal_row_count(memory_db_path)
         .map_err(|e| format!("failed to verify shared-tier principal emptiness: {e}"))?;
+    let memory_root = maos_audit::default_memory_root();
+    let private_principal_rows = maos_audit::private_tier_principal_row_count(&memory_root)
+        .map_err(|e| format!("failed to verify private-tier principal emptiness: {e}"))?;
 
-    let incarnations =
-        if !audit_db_path.exists() || (pre_frame_ids.is_empty() && shared_principal_rows == 0) {
-            // No Transparency Log AT ALL — or one this boot just created over a
-            // home that never ran a Spirit (the composition root opens the
-            // adapter before the cascade) with no shared principal residue — is
-            // `not_found`: provably nothing to erase. A TL WITH data that names
-            // no such Spirit keeps the failed outcome the cascade gives any
-            // unknown name today — never a new `not_found`, which on a legacy
-            // TL holding unidentified hello-spirit rows would sign "nothing to
-            // erase" over data that exists (the 13.5b false-success shape), and
-            // shared-only pre-partition residue must stay REPORTED, not
-            // disappear behind `not_found`.
-            Vec::new()
-        } else {
-            match maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false) {
-                Ok(v) => v,
-                // Shared pre-partition residue must still be ATTESTED below even
-                // when the name resolves to nothing — the failed partial proof is
-                // the record of the coverage gap (13.5b). Story 16-2 §A6 review:
-                // SAY why per-incarnation enumeration did not run, so the proof's
-                // coverage gap is explicable rather than merely narrow.
-                Err(error) if shared_principal_rows > 0 => {
-                    eprintln!(
-                        "maos: uninstall — spirit '{spirit_id}' resolved to no incarnation \
-                         ({error}); attesting shared-tier residue only"
-                    );
-                    Vec::new()
-                }
-                Err(error) => {
-                    return Err(format!("failed to resolve spirit '{spirit_id}': {error}").into())
-                }
+    let incarnations = if !audit_db_path.exists()
+        || (pre_frame_ids.is_empty() && shared_principal_rows == 0 && private_principal_rows == 0)
+    {
+        // A new/empty TL is `not_found` only if both memory tiers are also
+        // empty. Residue in either tier must reach the signed proof path.
+        Vec::new()
+    } else {
+        match maos_audit::resolve_spirit_name(audit_db_path, spirit_id, false) {
+            Ok(v) => v,
+            Err(error) if shared_principal_rows > 0 || private_principal_rows > 0 => {
+                eprintln!(
+                    "maos: uninstall — spirit '{spirit_id}' resolved to no incarnation \
+                     ({error}); attesting shared/private-tier residue only"
+                );
+                Vec::new()
             }
-        };
+            Err(error) => {
+                return Err(format!("failed to resolve spirit '{spirit_id}': {error}").into())
+            }
+        }
+    };
     // An EMPTY incarnation set is decided BELOW, together with the shared
     // residue check — shared-only pre-partition residue must reach its
     // failed partial proof, not disappear behind `not_found`.
@@ -9224,7 +9225,7 @@ fn run_uninstall_cascade_inner(
         total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid).unwrap_or(0);
     }
 
-    if all_principal_ids.is_empty() && shared_principal_rows == 0 {
+    if all_principal_ids.is_empty() && shared_principal_rows == 0 && private_principal_rows == 0 {
         if held_principal_ids.is_empty() {
             return Ok(UninstallCascadeTerminal::NotFound {
                 spirit_id: spirit_id.to_string(),
@@ -9265,6 +9266,24 @@ fn run_uninstall_cascade_inner(
                  Story 9.1); cannot sign proof-of-erasure: {e}"
             )
         })?;
+    let remaining_private_principal_rows =
+        maos_audit::private_tier_principal_row_count(&memory_root)
+            .map_err(|e| format!("failed to verify post-erasure private tier: {e}"))?;
+    let (private_status, private_failure) = if remaining_private_principal_rows == 0 {
+        stores_covered.insert("private".into());
+        (CategoryStatus::VerifiedEmpty, None)
+    } else {
+        let reason = format!(
+            "private tier still holds {remaining_private_principal_rows} principal value(s); \
+             they were not reachable through the principal index and are NOT erased"
+        );
+        (
+            CategoryStatus::CoverageGap {
+                reason: reason.clone(),
+            },
+            Some(reason),
+        )
+    };
 
     // The Shared partition stops new principal rows from entering; this
     // preflight count distinguishes that future guarantee from pre-existing
@@ -9308,6 +9327,10 @@ fn run_uninstall_cascade_inner(
         ErasureCategory {
             name: "shared".into(),
             status: shared_status,
+        },
+        ErasureCategory {
+            name: "private".into(),
+            status: private_status,
         },
         ErasureCategory {
             name: "principal_frames".into(),
@@ -9369,10 +9392,14 @@ fn run_uninstall_cascade_inner(
     let proof_path = write_proof_bundle(&proof, &proof_dir)
         .map_err(|e| format!("failed to write erasure proof: {e}"))?;
 
-    // Shared residue is an incomplete uninstall on every deployment shape, not
-    // only when regional receipt construction happens to consume
-    // `stores_covered`. The signed partial proof remains available for recovery.
-    if let Some(reason) = shared_failure {
+    // Residue in either memory tier is an incomplete uninstall on every
+    // deployment shape. The signed partial proof remains available for recovery.
+    if shared_failure.is_some() || private_failure.is_some() {
+        let reason = [shared_failure, private_failure]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join("; ");
         return Ok(UninstallCascadeTerminal::Failed {
             spirit_id: spirit_id.to_string(),
             error: format!("{reason}; partial erasure proof: {}", proof_path.display()),
@@ -11143,6 +11170,8 @@ async fn emit_cross_team_share(
     });
     let audit_frame_id = transparency_log.insert_kernel_event_returning_id(
         request.spirit_pid,
+        maos_iac::adapter::transparency_log::FrameKind::Decision,
+        None,
         "collective.host.cross-team-share",
         audit_payload.to_string().as_bytes(),
     );
@@ -11245,6 +11274,8 @@ async fn emit_collective_erase_reconciliation(
     };
     transparency_log.insert_kernel_event_returning_id(
         spirit_pid,
+        maos_iac::adapter::transparency_log::FrameKind::Decision,
+        None,
         "collective.host.cross-team-erase",
         audit_payload.to_string().as_bytes(),
     );

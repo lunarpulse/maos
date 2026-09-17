@@ -1365,14 +1365,15 @@ impl TransparencyLogAdapter {
             .map_err(AuditError::SqliteRead)
     }
 
-    /// Story 9.2 (P7) — journal a kernel `TaskComplete` frame and return its
-    /// frame_id, both under one lock acquisition so a concurrent insert cannot
-    /// steal `last_frame_id`.  Panics on write failure per the I2 binding,
-    /// exactly like `insert_frame_event`.  Used by the forget cascade where the
-    /// receipt must name the frame that was just written.
+    /// Journal a caller-classified kernel frame and return its frame id under
+    /// the same lock acquisition. The caller supplies both the semantic kind
+    /// and complete 32-byte capability token; this path never invents either.
+    /// Panics on write failure per the I2 binding, like `insert_frame_event`.
     pub fn insert_kernel_event_returning_id(
         &self,
         spirit_pid: u32,
+        kind: FrameKind,
+        capability_token: Option<[u8; 32]>,
         intent: &str,
         payload: &[u8],
     ) -> [u8; 16] {
@@ -1396,8 +1397,8 @@ impl TransparencyLogAdapter {
                 "",
                 "",
                 inner.boot_nonce as i64,
-                None::<&[u8]>,
-                FrameKind::TaskComplete as i64,
+                capability_token.as_ref().map(|token| &token[..]),
+                kind as i64,
                 intent,
                 &redacted[..],
                 FrameOrigin::Kernel as i64,

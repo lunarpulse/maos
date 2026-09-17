@@ -11,6 +11,7 @@ use crate::invariants::i3::FrameOrigin;
 
 /// Typed error for IAC bus operations.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum IacBusError {
     #[error("spirit {0} is not registered — call register_spirit first")]
     UnknownSpirit(String),
@@ -61,6 +62,71 @@ pub enum IacBusError {
     /// Story 6.3 — cross-host transport failure (serialization / I/O / framing).
     #[error("cross-host transport failure for peer {peer}: {detail}")]
     CrossHostTransportFailure { peer: String, detail: String },
+    #[error("peer {peer} reported an internal failure: {message}")]
+    CrossHostPeerInternalFailure { peer: String, message: String },
+    #[error("peer {peer} reported an intake timeout: {message}")]
+    CrossHostPeerIntakeTimeout { peer: String, message: String },
+    #[error("cross-host configuration invalid: {detail}")]
+    CrossHostConfigInvalid { detail: String },
+    #[error(
+        "spirit restart detected on peer {peer}: prior={prior_boot_nonce} observed={observed_boot_nonce}"
+    )]
+    CrossHostSpiritRestartDetected {
+        peer: String,
+        prior_boot_nonce: u64,
+        observed_boot_nonce: u64,
+    },
+    #[error("peer identity mismatch: expected {expected}, asserted {asserted}")]
+    CrossHostPeerIdentityMismatch { expected: String, asserted: String },
+    #[error("consent granter mismatch: granter {granter}, frame from {frame_from}")]
+    CrossHostConsentGranterMismatch { granter: String, frame_from: String },
+    #[error("cohort consent denied ({direction:?}) for peer {peer}: {reason:?}")]
+    CrossHostCohortConsentDenied {
+        peer: String,
+        direction: CrossHostIntentDirection,
+        reason: CrossHostCohortConsentDenial,
+    },
+    #[error(
+        "cohort team identity refused ({direction:?}) on host {host}: claimed {claimed_team:?}, declared {declared:?}"
+    )]
+    CrossHostCohortTeamIdentityRefused {
+        peer: String,
+        direction: CrossHostIntentDirection,
+        host: String,
+        claimed_team: Option<String>,
+        declared: Option<String>,
+    },
+    #[error(
+        "crossing source team unbound for peer {peer}: envelope {envelope_team}, payload {payload_team}"
+    )]
+    CrossHostCrossingSourceTeamUnbound {
+        peer: String,
+        envelope_team: String,
+        payload_team: String,
+    },
+    #[error(
+        "cross-team crossing refused at peer {peer} ({reason}): {from_team} -> {to_team} for {intent}: {detail}"
+    )]
+    CrossHostCrossTeamCrossingRefused {
+        peer: String,
+        reason: String,
+        detail: String,
+        from_team: String,
+        to_team: String,
+        intent: String,
+    },
+    #[error("cross-host consent unclassified ({reason:?}) for peer {peer}")]
+    CrossHostConsentUnclassified {
+        peer: String,
+        reason: CrossHostUnclassifiedReason,
+    },
+    #[error("cross-host consent unclassified at peer {peer} ({reason:?})")]
+    CrossHostConsentUnclassifiedAtPeer {
+        peer: String,
+        reason: CrossHostUnclassifiedReason,
+    },
+    #[error("cross-host intent denied at peer {peer}: {message}")]
+    CrossHostIntentDeniedAtPeer { peer: String, message: String },
     /// Story 6.3 — the A2A router returned a failure when routing a
     /// cross-host frame (intent denied / TOFU mismatch / partition / etc.).
     /// String-bearing per ADR-010 hexagonal layering (maos-domain MUST NOT
@@ -113,6 +179,28 @@ pub enum IacBusError {
 pub enum CrossHostIntentDirection {
     Send,
     Accept,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CrossHostUnclassifiedReason {
+    Absent,
+    NonCanonical,
+    Oversized,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrossHostCohortConsentDenial {
+    ActingRoleAbsent,
+    ManifestVersionAbsent,
+    RoleNotEntitled,
+    NoGrant,
+    ManifestSkew {
+        sender_version: u64,
+        receiver_version: u64,
+        delta: u64,
+    },
+    StateUnavailable,
+    CrossingDeferRefused,
 }
 
 /// Outcome of a `retract` operation — Story 6.1.

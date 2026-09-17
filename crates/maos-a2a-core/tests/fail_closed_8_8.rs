@@ -299,51 +299,39 @@ async fn nack_round_trips_to_consent_unclassified_at_peer() {
     }
 }
 
-// ── (h) map_a2a_error_to_iac_bus: ConsentUnclassified / ConsentUnclassifiedAtPeer
-// both map to CrossHostRouteFailure ─────────────────────────────────────────────
+// ── (h) map_a2a_error_to_iac_bus preserves local/peer reason types ───────────
 
 #[test]
 fn map_a2a_error_to_iac_bus_consent_unclassified() {
-    // Send-side unclassified → CrossHostRouteFailure.
-    let err = A2AError::ConsentUnclassified {
-        direction: IntentDirection::Send,
-        reason: UnclassifiedReason::Absent,
-    };
-    let bus = map_a2a_error_to_iac_bus(err, "peer-a");
-    match bus {
-        IacBusError::CrossHostRouteFailure(msg) => {
-            assert!(
-                msg.contains("absent"),
-                "message must carry the reason: {msg}"
-            );
-            assert!(
-                msg.contains("Send"),
-                "message must carry the direction: {msg}"
-            );
-            assert!(msg.contains("peer-a"), "message must carry the peer: {msg}");
-        }
-        other => panic!("expected CrossHostRouteFailure, got {other:?}"),
-    }
+    let local = map_a2a_error_to_iac_bus(
+        A2AError::ConsentUnclassified {
+            direction: IntentDirection::Send,
+            reason: UnclassifiedReason::Absent,
+        },
+        "peer-a",
+    );
+    assert!(matches!(
+        local,
+        IacBusError::CrossHostConsentUnclassified {
+            peer,
+            reason: maos_domain::iac_bus_types::CrossHostUnclassifiedReason::Absent,
+        } if peer == "peer-a"
+    ));
 
-    // Receiver-side mirror: ConsentUnclassifiedAtPeer.
-    let err = A2AError::ConsentUnclassifiedAtPeer {
-        peer: "test".to_string(),
-        reason: UnclassifiedReason::NonCanonical,
-    };
-    let bus = map_a2a_error_to_iac_bus(err, "caller");
-    match bus {
-        IacBusError::CrossHostRouteFailure(msg) => {
-            assert!(
-                msg.contains("non_canonical"),
-                "message must carry the reason: {msg}"
-            );
-            assert!(
-                msg.contains("test"),
-                "message must carry the denied peer: {msg}"
-            );
-        }
-        other => panic!("expected CrossHostRouteFailure, got {other:?}"),
-    }
+    let remote = map_a2a_error_to_iac_bus(
+        A2AError::ConsentUnclassifiedAtPeer {
+            peer: "test".to_string(),
+            reason: UnclassifiedReason::NonCanonical,
+        },
+        "caller",
+    );
+    assert!(matches!(
+        remote,
+        IacBusError::CrossHostConsentUnclassifiedAtPeer {
+            peer,
+            reason: maos_domain::iac_bus_types::CrossHostUnclassifiedReason::NonCanonical,
+        } if peer == "test"
+    ));
 }
 
 // ── (i) interpret_response malformed NACK falls back to Absent ────────────────

@@ -2658,6 +2658,7 @@ name = "maos-acp"
 version = "0.1.0-alpha.1"
 dependencies = [
  "crossbeam-channel",
+ "maos-capability",
  "maos-domain",
  "serde",
  "serde_json",

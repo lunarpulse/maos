@@ -100,14 +100,20 @@ impl LogRecallAdapter {
         outcome: &str,
         refusal: Option<&CrossWallRecallRefusal>,
     ) {
-        let consent_granted = outcome != "refused";
+        let outcome = refusal
+            .map(CrossWallRecallRefusal::outcome)
+            .unwrap_or(outcome);
+        let consent_granted = refusal.is_none();
         let crossed = outcome == "disclosed";
         let payload = serde_json::json!({
             "remote_team": remote_team.as_str(),
             "outcome": outcome,
             "consent_grant": consent_granted.then_some(CROSS_WALL_RECALL_CONSENT_INTENT),
             "crossed_team_boundary": crossed,
-            "refusal": refusal.map(ToString::to_string),
+            "refusal": refusal.map(|reason| serde_json::json!({
+                "code": reason.code(),
+                "detail": reason.to_string(),
+            })),
         });
         self.transparency_log.insert_frame_event(
             FrameKind::CapabilityInvocation,
@@ -986,10 +992,11 @@ mod tests {
         assert_eq!(rows.len(), 1);
         let payload: serde_json::Value = serde_json::from_slice(&rows[0].payload_redacted).unwrap();
         assert_eq!(payload["remote_team"], "team-a");
-        assert_eq!(payload["outcome"], "refused");
+        assert_eq!(payload["outcome"], "refused_no_grant");
         assert_eq!(payload["consent_grant"], serde_json::Value::Null);
         assert_eq!(payload["crossed_team_boundary"], false);
-        assert_eq!(payload["refusal"], "no directional grant");
+        assert_eq!(payload["refusal"]["code"], "no_grant");
+        assert_eq!(payload["refusal"]["detail"], "no directional grant");
     }
 
     #[test]

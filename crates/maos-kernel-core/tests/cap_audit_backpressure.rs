@@ -89,21 +89,27 @@ async fn hot_path_never_blocks_under_audit_saturation() {
     let posture = [1u8; 32];
 
     let start = Instant::now();
+    let mut audit_failures = 0usize;
     for i in 0..100_000 {
-        let token = adapter
-            .issue(
-                7,
-                Scope::FsRead {
-                    subtree: "/tmp".into(),
-                },
-                60,
-                posture,
-                IntentClass::Standard,
-            )
-            .unwrap();
-        adapter.verify(&token, posture, SandboxTier(2)).unwrap();
-        if i % 1000 == 0 {
-            adapter.revoke(token.token_id).unwrap();
+        match adapter.issue(
+            7,
+            Scope::FsRead {
+                subtree: "/tmp".into(),
+            },
+            60,
+            posture,
+            IntentClass::Standard,
+        ) {
+            Ok(token) => {
+                adapter.verify(&token, posture, SandboxTier(2)).unwrap();
+                if i % 1000 == 0 {
+                    let _ = adapter.revoke(token.token_id);
+                }
+            }
+            Err(maos_domain::ports::capability::CapError::AuditSinkUnavailable) => {
+                audit_failures += 1;
+            }
+            Err(error) => panic!("unexpected capability error under audit load: {error}"),
         }
     }
     let elapsed = start.elapsed();
@@ -115,9 +121,12 @@ async fn hot_path_never_blocks_under_audit_saturation() {
         elapsed
     );
 
-    // Audit drop counter must be > 0 — the bounded channel (8192 depth)
-    // cannot absorb 200K+ events without drops under this load.
-    let drops = cap_audit::audit_drop_count();
+    assert!(
+        audit_failures > 0,
+        "a saturated audit sink must fail token issuance closed"
+    );
+    // The class-wide instrument must report bounded-channel pressure.
+    let drops = cap_audit::audit_health_snapshot().total_drops;
     assert!(
         drops > 0,
         "expected audit drops under 100K load (channel depth = 8192), got 0 drops — hot path may be blocking"

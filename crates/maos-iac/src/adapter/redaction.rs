@@ -138,9 +138,21 @@ fn is_hex_byte(b: u8) -> bool {
 
 /// Minimum length of a hex-encoded token to be considered a secret.
 const TOKEN_HEX_MIN_LEN: usize = 32;
+fn prefix_matches_at(bytes: &[u8], index: usize, prefix: &[u8]) -> bool {
+    if index + prefix.len() > bytes.len() || &bytes[index..index + prefix.len()] != prefix {
+        return false;
+    }
+    prefix != b"sk-"
+        || index == 0
+        || !matches!(bytes[index - 1], b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-')
+}
+
+fn contains_rule(bytes: &[u8], prefix: &[u8]) -> bool {
+    (0..bytes.len()).any(|index| prefix_matches_at(bytes, index, prefix))
+}
 
 fn redact_unscoped<'a>(bytes: &'a [u8]) -> Cow<'a, [u8]> {
-    let has_match = RULES.iter().any(|rule| contains_prefix(bytes, rule.prefix));
+    let has_match = RULES.iter().any(|rule| contains_rule(bytes, rule.prefix));
     if !has_match && !contains_hex_token(bytes) {
         return Cow::Borrowed(bytes);
     }
@@ -151,7 +163,7 @@ fn redact_unscoped<'a>(bytes: &'a [u8]) -> Cow<'a, [u8]> {
         let mut matched = false;
         for rule in RULES {
             let prefix_len = rule.prefix.len();
-            if i + prefix_len <= bytes.len() && &bytes[i..i + prefix_len] == rule.prefix {
+            if prefix_matches_at(bytes, i, rule.prefix) {
                 let end = find_secret_end(bytes, i + prefix_len);
                 let secret_len = end - i;
                 let hash_prefix = simple_hash(&bytes[i..end]);

@@ -449,7 +449,7 @@ fn cross_wall_recall_refusals_and_disclosures_are_journaled() {
     // once the read succeeded.
     let team = TeamId::new("team-a").unwrap();
 
-    // Refusal: no consent provider → NoConsentProvider, journaled "refused".
+    // Refusal: no consent provider → NoConsentProvider, journaled with its typed outcome.
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x13_6D));
     let error = LogRecallAdapter::new(Arc::clone(&tl))
         .recall_cross_wall(7, &team, LogRecallFilter::default())
@@ -461,7 +461,7 @@ fn cross_wall_recall_refusals_and_disclosures_are_journaled() {
     let rows = cross_wall_capability_rows(&tl);
     assert_eq!(rows.len(), 1, "a refused recall journals one audit row");
     let payload: serde_json::Value = serde_json::from_slice(&rows[0].payload_redacted).unwrap();
-    assert_eq!(payload["outcome"], "refused");
+    assert_eq!(payload["outcome"], "refused_no_consent_provider");
     assert_eq!(payload["crossed_team_boundary"], false);
 
     // Disclosure: consent granted + succeeding read → "disclosing" then

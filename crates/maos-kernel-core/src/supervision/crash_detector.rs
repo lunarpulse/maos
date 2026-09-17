@@ -147,6 +147,7 @@ impl CrashDetector {
             std::mem::take(&mut *tasks)
         };
         let tokens_revoked = actual_tokens_revoked;
+        let runtime = scb.runtime_snapshot();
         let task_orphaned_emitted_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
         for task in &drained_tasks {
             let payload = serde_json::json!({
@@ -157,16 +158,12 @@ impl CrashDetector {
                 "stderr_tail": cause.stderr_tail(),
                 "cause": cause.as_str(),
                 "in_flight_tokens": task.capability_token.as_ref().into_iter().collect::<Vec<_>>(),
-            });
-            let padded_token = task.capability_token.as_ref().map(|token| {
-                let mut padded = [0u8; 32];
-                padded[..16].copy_from_slice(&token.0);
-                padded
+                "disposition": runtime.on_crash_action.to_string(),
             });
             self.tl.insert_frame_event(
                 FrameKind::TaskComplete,
                 spirit_pid,
-                padded_token.as_ref(),
+                None,
                 "task.orphaned",
                 &serde_json::to_vec(&payload).unwrap_or_default(),
                 FrameOrigin::Kernel,
@@ -174,7 +171,6 @@ impl CrashDetector {
         }
 
         // Step 6: Apply FR50 disposition
-        let runtime = scb.runtime_snapshot();
         let disposition_outcome = crate::supervision::disposition::enforce_disposition(
             runtime.on_crash_action.clone(),
             &drained_tasks,

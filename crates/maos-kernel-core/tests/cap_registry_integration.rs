@@ -33,7 +33,8 @@ fn make_adapter() -> CapabilityRegistryAdapter {
         );
         policy.update(inner);
     }
-    let (audit_tx, _audit_rx) = cap_audit::channel();
+    let (audit_tx, mut audit_rx) = cap_audit::channel();
+    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let quota = cap_quota::CapQuotaTracker::new();
     let working_memory = Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new());
     let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::default());

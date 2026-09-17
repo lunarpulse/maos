@@ -45,7 +45,8 @@ impl CryptoProvider for MockCryptoProvider {
 fn make_test_ring() -> CapTokensShardRing {
     let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);
     let signing_key = Ed25519SigningKey::new([0u8; 32]);
-    let (audit_tx, _audit_rx) = cap_audit::channel();
+    let (audit_tx, mut audit_rx) = cap_audit::channel();
+    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     CapTokensShardRing::new(crypto, signing_key, 0xDEAD_BEEF, audit_tx)
 }
 

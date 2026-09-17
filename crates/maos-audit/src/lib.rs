@@ -1895,6 +1895,59 @@ pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, Aud
     Ok(u64::try_from(count).unwrap_or(0))
 }
 
+/// Count persisted Private-tier values stored under a `Principal` namespace.
+///
+/// The Private store lays values out as
+/// `<memory_root>/<spirit_pid>/<hex-encoded-namespace>/<key>.<kind>`. Missing
+/// roots and non-store files are zero; unreadable directories fail closed so
+/// an emptiness proof cannot be minted from a partial scan.
+pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, AuditError> {
+    if !memory_root.exists() {
+        return Ok(0);
+    }
+
+    let mut count = 0_u64;
+    for spirit_dir in std::fs::read_dir(memory_root)? {
+        let spirit_dir = spirit_dir?;
+        if !spirit_dir.file_type()?.is_dir() {
+            continue;
+        }
+        for namespace_dir in std::fs::read_dir(spirit_dir.path())? {
+            let namespace_dir = namespace_dir?;
+            if !namespace_dir.file_type()?.is_dir() {
+                continue;
+            }
+            let Ok(namespace_bytes) =
+                hex::decode(namespace_dir.file_name().to_string_lossy().as_bytes())
+            else {
+                continue;
+            };
+            let Ok(maos_domain::memory::MemoryNamespace::Principal { .. }) =
+                serde_json::from_slice::<maos_domain::memory::MemoryNamespace>(&namespace_bytes)
+            else {
+                continue;
+            };
+            for value in std::fs::read_dir(namespace_dir.path())? {
+                let value = value?;
+                if !value.file_type()?.is_file() {
+                    continue;
+                }
+                let name = value.file_name();
+                let name = name.to_string_lossy();
+                if [".json", ".md", ".bin", ".txt"]
+                    .iter()
+                    .any(|extension| name.ends_with(extension))
+                {
+                    count = count.checked_add(1).ok_or_else(|| {
+                        AuditError::Row("private-tier principal row count overflow".to_string())
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(count)
+}
+
 /// Provenance type for subject-access enrichment (Decision D: Direct/Distilled).
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "provenance_type")]
