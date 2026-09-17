@@ -12,7 +12,7 @@ review: "§A6 full-layer net **BINDING and NON-DEGRADABLE** — the epic marks t
 
 # 16-5 — When MAOS records that something happened, it happened
 
-Status: ready-for-dev
+Status: review
 
 > **The capability:** *An audit record that MAOS wrote can be trusted to mean what it says. When the audit sink
 > cannot take an event, the mediated call is refused instead of silently proceeding — and every place in the
@@ -889,12 +889,12 @@ the working tree (epic-16 by +2, or +4 below `:180`). Re-derive against the comm
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — re-measure; trust nothing in this file** (all ACs)
-  - [ ] `git status --short` clean; record HEAD. Run `kloc-check --json`, `check-kernel-baseline`,
+- [x] **T0 — re-measure; trust nothing in this file** (all ACs)
+  - [x] `git status --short` clean; record HEAD. Run `kloc-check --json`, `check-kernel-baseline`,
         `check-decision-register --json`, `check-empty-kernel`, `cargo test -p xtask --test
         recovery_lane_ceiling_rule --test kernel_pin_content_hash_16_0 --test decision_register_gate`. **All are
         green at HEAD** — any red after your first commit is yours.
-  - [ ] Re-derive every cite in §1–§6 and the Decisions table. **Re-measure this counts box first — every number
+  - [x] Re-derive every cite in §1–§6 and the Decisions table. **Re-measure this counts box first — every number
         in it is load-bearing and each is asserted somewhere below:** `record_invocation` production call sites
         **4** (a loose grep returns ~10 hits: 4 calls, 3 comments, 2 defs, 1 `#[cfg(test)]` double at
         `capability/working_memory/policy_runtime.rs:203`) · `CapAuditEvent` drop sites **9** · audit-writer
@@ -906,40 +906,40 @@ the working tree (epic-16 by +2, or +4 below `:180`). Re-derive against the comm
         names itself "WithAudit", never calls `record_drop()`, and counts into `PumpOutcome::dropped` instead —
         a reviewer counting *silent drops* gets **ten**. Dispose of it explicitly in AC1 rather than letting
         obligation (c) red on a boundary question.
-  - [ ] Re-run the three runtime probes on this host: the `LD_PRELOAD` syscall count, the staggered-vs-overlapped
+  - [x] Re-run the three runtime probes on this host: the `LD_PRELOAD` syscall count, the staggered-vs-overlapped
         journal harness, and the real-redactor `task-worker-1` vector. Record each HEAD red **before** any repair.
-  - [ ] Confirm `maos-domain`'s remaining headroom against the joint `16-4`/`16-5` ledger (`kloc.toml:394`) —
+  - [x] Confirm `maos-domain`'s remaining headroom against the joint `16-4`/`16-5` ledger (`kloc.toml:394`) —
         **a grant is a global, not a reservation.**
-  - [ ] Confirm at HEAD that `main.rs:1275` and `:1286` both construct `ResearcherCollectiveError::Denied`, and
+  - [x] Confirm at HEAD that `main.rs:1275` and `:1286` both construct `ResearcherCollectiveError::Denied`, and
         record that transcript — it is D-16-5-K's proven-red baseline and the reason AC1 does not reuse it.
-  - [ ] Confirm `check-kernel-baseline --emit-pin` still round-trips byte-identical against
+  - [x] Confirm `check-kernel-baseline --emit-pin` still round-trips byte-identical against
         `xtask/kernel-core-baseline.toml:521-623` **before** writing any kernel line — AC6 depends on it entirely,
         and a drifted emitter would be discovered at the end of the story instead of the start.
-- [ ] **T1 — the register edits, as their own commit, BEFORE any code** (§6a, D-16-5-H) — re-anchor D3, D7 and
+- [x] **T1 — the register edits, as their own commit, BEFORE any code** (§6a, D-16-5-H) — re-anchor D3, D7 and
       D18 by **replacing** the `leaves backlog` clause with `reaches done`; record D3's ruling text against its
       ID; repair the `:91` prose mis-pointer; flip `sprint-status.yaml:251` to `ready-for-dev`. Then run
       `check-decision-register` and paste the PASSED transcript. **This commit is what makes story creation
       lawful; it must land with the story file, not after it.**
-- [ ] **T2 — the drop class, its cause, and the last-resort path** (AC1, D-16-5-B/D/E/K/L) — the **distinct
+- [x] **T2 — the drop class, its cause, and the last-resort path** (AC1, D-16-5-B/D/E/K/L) — the **distinct
       refusal cause** at all three `main.rs` sites (never `Denied`); the latched degraded state, its
       `GET /v1/daemon` field and its `maos audit query` disclosure, set from the `Closed` path; then the `maos-capability` instrument with a named reader on the
       `otel_gates` pattern; site 8's missing `record_drop()`; site 9's `TODO` closed; the shell swallow becomes a
       counted named drop; then the `+1` propagate at `capability/mod.rs:349-351` and the `CapError` variant at
       `ports/capability.rs:141` (append point; `:140` is the last variant's ident). `record_verification` untouched.
-- [ ] **T3 — the audit record's claims** (AC2, D-16-5-C/I/J) — `insert_kernel_event_returning_id`'s caller-supplied
+- [x] **T3 — the audit record's claims** (AC2, D-16-5-C/I/J) — `insert_kernel_event_returning_id`'s caller-supplied
       kind + token across all nine sites; `emit_task_orphaned`'s JSON payload and its `WriterShapeEntry`
       re-disposition; the `verb_resolver` writer's disposition **and** the doorbell's `DecisionDispatch` filter;
       the token-padding fix; the private-tier count in both cascade gates; the redactor's token-boundary rule.
       **Write the re-kind decline and its priced cost into the story, not a commit message.**
-- [ ] **T4 — legal-hold serialization** (AC3, D-16-5-F/M) — the serializer field, `new()` init, the guard at the
+- [x] **T4 — legal-hold serialization** (AC3, D-16-5-F/M) — the serializer field, `new()` init, the guard at the
       top of `forget_with_reason`; the `#[i9_exempt]` reason amendment in both places; **the race test, run red at
       HEAD first**; **and the cascade-interleave vector** (hold placed between principals) asserting per-principal
       atomicity and the mixed terminal — the granularity is stated in AC3, never left to inference.
-- [ ] **T5 — the journal and the halt** (AC4, AC5, D-16-5-G) — `.append(true)` + one `write_all`; the
+- [x] **T5 — the journal and the halt** (AC4, AC5, D-16-5-G) — `.append(true)` + one `write_all`; the
       `recover_in_flight_with_tasks` falsifier and the intra-process pair; the two false comments; the P99 re-run;
       the REPL size cap. Then AC5's three rows: the resolver ordering, the door's approval-row honesty, and
       `classify_halt_record`.
-- [ ] **T5b — the deny vocabulary** (AC7, AC8) — **FR63 measured FIRST: name nothing `E…` before checking
+- [x] **T5b — the deny vocabulary** (AC7, AC8) — **FR63 measured FIRST: name nothing `E…` before checking
       `check_error_catalog.rs:8-14`.** D7: typed refusal at both surfaces — `fn journal_cross_wall_recall`
       (`maos-iac/src/adapter/log_recall.rs:96-119`) and the `maos traceback` render (`main.rs:2611-2646`, the
       `.then_some("refused")` at `:2633`); assert ADR-058:52 conformance six ways. D18: the mirror enums in
@@ -948,11 +948,11 @@ the working tree (epic-16 by +2, or +4 below `:180`). Re-derive against the comm
       and `transport.rs:602-603`. **Rewrite `fail_closed_8_8.rs:305-348` — capture its pre-rewrite GREEN first**,
       it is the assertion that pins the collapse as correct; then `consent_refusal_1b.rs:17-56`'s rationale and
       its stale `:1671-1783` cite.
-- [ ] **T6 — the grant and the pin, LAST** (AC6) — `cargo fmt --all`; measure; then in **one** commit:
+- [x] **T6 — the grant and the pin, LAST** (AC6) — `cargo fmt --all`; measure; then in **one** commit:
       `--emit-pin` block + `src_lines` + HISTORY; `kloc.toml:247`; `RATIFIED_AT_EASING:268`;
       `kernel_pin_content_hash_16_0.rs`'s four literals **and** the `:846-851` line-position assert; the four
       non-kernel measured raises each citing the bare token `16-5`.
-- [ ] **T7 — sweep** — `deferred-work.md` dispositions for all ten rows closed here and rows for §11 items 1, 2,
+- [x] **T7 — sweep** — `deferred-work.md` dispositions for all ten rows closed here and rows for §11 items 1, 2,
       6; epic + `sprint-status.yaml` edits verified present (§12); `cargo fmt --all -- --check`; every gate;
       `cargo test --workspace --no-fail-fast`; the new aggregate stated against alarm and hardfail; every
       proven-red run recorded and reverted; `graphify update .`.
@@ -1041,16 +1041,112 @@ summoned. Two rulings were taken by the operator; three were settled on measurem
 
 ### Agent Model Used
 
+openai-codex/gpt-5.6-sol
+
 ### Debug Log References
+
+- Baseline and runtime probes: `kloc-check --json`, kernel pin round-trip, decision-register/empty-kernel gates,
+  syscall-count and concurrent-journal falsifiers, real redactor vector, and pre-rewrite A2A collapse assertion.
+- Red→green coverage: closed audit sink, all nine audit-drop sites, private-tier cascade counts, legal-hold
+  interleaving, journal append/recovery concurrency, halt durability/classification, and typed local/peer A2A
+  refusals.
+- Final gates: `check-kernel-baseline` passed at 24,591 lines/98 files; `kloc-check` passed at aggregate 167,112
+  with the alarm acknowledged and no over-budget crate; decision-register and pin/ratchet suites passed 64 tests.
+- Final regression: `cargo test --workspace --no-fail-fast` passed 4,467 tests across 542 suites
+  (121 ignored, 67 filtered); `cargo fmt --all -- --check` passed.
 
 ### Completion Notes List
 
+- Audit delivery now exposes nine named drop sites, a latched degraded state, daemon/CLI disclosure, and a
+  distinct fail-closed `AuditSinkUnavailable` cause instead of reporting a capability action that was not
+  durably auditable.
+- Audit rows preserve caller-supplied kind/token truth; task-orphan, lifecycle, redaction, and private-tier
+  classification/counting defects are covered by behavioral regressions.
+- Per-principal forget serialization closes the legal-hold check/erase race while preserving mixed-cascade
+  outcomes and durable hold evidence.
+- Lifecycle journal appends are single-record append writes; halt resolution commits durable state before
+  side effects and reports failed completion honestly.
+- Cross-wall and cross-host denials retain machine-readable typed causes through domain, A2A, IAC, transport,
+  journal, traceback, and operator surfaces.
+- Kernel pin and KLOC ceilings were re-ratified in implementation commit `f461f23a`; charter/register edits are
+  isolated in `925d2ffe`.
+
 ### File List
+
+- `Cargo.lock`
+- `_bmad-output/implementation-artifacts/16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/intent-lineage-coverage-report.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/party-mode/memories/installed/.memlog.md`
+- `_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md`
+- `_bmad-output/planning-artifacts/epics/epic-16-one-daemon-one-door-j0-w1.md`
+- `crates/maos-a2a-core/src/router.rs`
+- `crates/maos-a2a-core/tests/fail_closed_8_8.rs`
+- `crates/maos-a2a-tcp/src/transport.rs`
+- `crates/maos-acp/Cargo.toml`
+- `crates/maos-acp/src/notification_channel.rs`
+- `crates/maos-audit/src/fr4_classifier.rs`
+- `crates/maos-audit/src/lib.rs`
+- `crates/maos-audit/tests/fr4_classifier_16_2.rs`
+- `crates/maos-audit/tests/fr4_worker_rows_16_3.rs`
+- `crates/maos-audit/tests/gdpr_cascade_test.rs`
+- `crates/maos-audit/tests/private_tier_count_16_5.rs`
+- `crates/maos-bin/src/cross_team_crossing.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/src/operator_door.rs`
+- `crates/maos-bin/tests/cross_team_consent_13_3.rs`
+- `crates/maos-bin/tests/shell_host_16_2.rs`
+- `crates/maos-capability/src/cap_audit/mod.rs`
+- `crates/maos-capability/src/cap_tokens/mod.rs`
+- `crates/maos-cli/src/subcommands.rs`
+- `crates/maos-cli/tests/halt_record_16_5.rs`
+- `crates/maos-control/src/lib.rs`
+- `crates/maos-control/tests/post_surface_16_1.rs`
+- `crates/maos-control/tests/submit_and_wait_16_2.rs`
+- `crates/maos-domain/src/iac_bus_types.rs`
+- `crates/maos-domain/src/log_recall.rs`
+- `crates/maos-domain/src/ports/capability.rs`
+- `crates/maos-iac/src/adapter/log_recall.rs`
+- `crates/maos-iac/src/adapter/redaction.rs`
+- `crates/maos-iac/src/adapter/transparency_log.rs`
+- `crates/maos-iac/tests/audit_truth_16_5.rs`
+- `crates/maos-kernel-core/src/capability/mod.rs`
+- `crates/maos-kernel-core/src/halt/mod.rs`
+- `crates/maos-kernel-core/src/halt/resolver.rs`
+- `crates/maos-kernel-core/src/inference/mod.rs`
+- `crates/maos-kernel-core/src/journal/mod.rs`
+- `crates/maos-kernel-core/src/memory/mod.rs`
+- `crates/maos-kernel-core/src/security/mod.rs`
+- `crates/maos-kernel-core/src/security/sandbox/t3/cap_audit_bridge.rs`
+- `crates/maos-kernel-core/src/security/sandbox/t3/quarantine.rs`
+- `crates/maos-kernel-core/src/supervision/crash_detector.rs`
+- `crates/maos-kernel-core/tests/audit_sink_truth_16_5.rs`
+- `crates/maos-kernel-core/tests/cap_audit_backpressure.rs`
+- `crates/maos-kernel-core/tests/cap_registry_integration.rs`
+- `crates/maos-kernel-core/tests/cap_token_verify_assertion.rs`
+- `crates/maos-kernel-core/tests/halt_invoke_test.rs`
+- `crates/maos-kernel-core/tests/journal_append_16_5.rs`
+- `crates/maos-kernel-core/tests/nfr_rel_9_revoke_latency.rs`
+- `crates/maos-kernel-core/tests/on_revocation_three_actions.rs`
+- `crates/maos-kernel-core/tests/revocation_applier_pipeline.rs`
+- `crates/maos-shell/src/lib.rs`
+- `crates/maos-wasm-host/tests/equiv_harness.rs`
+- `docs/ci-baselines/kernel-surface-v0.1-beta.json`
+- `docs/invariants/i9-exemptions.md`
+- `spirits/researcher/src/lib.rs`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/kloc.toml`
+- `xtask/tests/kernel_pin_content_hash_16_0.rs`
+- `xtask/tests/recovery_lane_ceiling_rule.rs`
+- `xtask/tests/story_10_4a_ac1_proven_red.rs`
 
 ### Change Log
 
 - 2026-09-17: Story created from six scouts at `df45c609`; premises disproved in all five epic ACs; §12 edits
   applied to `epic-16-…md`, `epic-14-preflight-decisions.md` and `sprint-status.yaml` in the same commit;
   `check-decision-register` re-run green after the re-anchor. Moved to `ready-for-dev`.
+- 2026-09-17: Implemented AC1–AC8, closed T0–T7, re-pinned the 24,591-line/98-file kernel
+  surface, ratified the 19,040 KLOC ceiling, passed the complete workspace regression suite, and moved to review.
 
 ### Review Findings
