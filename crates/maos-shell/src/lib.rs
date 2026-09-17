@@ -3,7 +3,7 @@
 //! `maos-shell` — J0 evaluator surface.
 //!
 //! Provides:
-//! - `init`    — scaffold `~/.maos/` (config, slots, skills, logs)
+//! - `init`    — scaffold `~/.maos/` (config, slots, skills)
 //! - `shell`   — kernel-rendered REPL (`@<spirit> <msg>`)
 //! - `audit`   — thin read-side alias over `maos_audit::query`
 
@@ -62,7 +62,7 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
     // `0700` (D-16-1-D: any uid that can `open()` a store directory can hold a
     // shared flock on it and keep a root from booting).
     maos_domain::operator_door::ensure_home_dir(&home)?;
-    for leaf in ["skills", "audit", "journal", "logs"] {
+    for leaf in ["skills", "audit", "journal"] {
         std::fs::create_dir_all(home.join(leaf))?;
     }
 
@@ -138,7 +138,7 @@ pub fn run_init(color_choice: ColorChoice) -> Result<(), Box<dyn std::error::Err
     print_line(
         &mut out,
         color_choice,
-        &format!("maos: to remove all data, run:  rm -rf {}", home.display()),
+        "maos: to remove all data, run:  maos purge --yes",
     )?;
     Ok(())
 }
@@ -736,13 +736,12 @@ orchestrator = ["orch1"]
 
 [retention]
 default = "persist"
-# Set to "ephemeral" to remove ~/.maos/ on `cargo uninstall maos` (manual).
+# `maos purge --yes` removes local state regardless of this runtime policy.
 
 [paths]
 home = "~/.maos"
 audit = "~/.maos/audit"
 journal = "~/.maos/journal"
-logs = "~/.maos/logs"
 "#
     .to_string()
 }

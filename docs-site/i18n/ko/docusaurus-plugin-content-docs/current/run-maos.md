@@ -71,9 +71,39 @@ MAOS_INFERENCE_MODE=live    maos shell
 
 ### 프로바이더 키 (현재)
 
-라이브 추론은 환경변수에서 프로바이더 키를 읽습니다:
-`MAOS_ANTHROPIC_API_KEY` 또는 `MAOS_OPENAI_API_KEY`. OS 키링 저장은 계획
-중입니다(Story 16-4). 그 전까지는 환경변수가 유일한 공급원입니다.
+라이브 추론은 기본적으로 OS 키링을 통해 `MAOS_ANTHROPIC_API_KEY`와
+`MAOS_OPENAI_API_KEY`를 확인합니다. 제한 시간 내에 키링을 사용할 수 없거나
+지정된 항목이 없으면, MAOS는 composition root에서 한 번 캡처한 환경변수 값으로
+대체하고 키 내용 없이 `secret.source.fallback` 감사 이벤트를 기록합니다.
+헤드리스 CI에서는 `MAOS_SECRETS_BACKEND=env`를, 봉인된 파일 저장소에서는
+`MAOS_SECRETS_BACKEND=encrypted-file`과 `MAOS_KMS_MASTER_KEY`를 설정하십시오.
+키는 프로바이더 생성 시 확인됩니다. 요청 직전 materialization과 제한된 메모리
+수명은 아직 구현되지 않았습니다.
+
+키링이 정상이고 지정된 항목이 없으면, MAOS는 부팅 시 캡처한 환경변수 credential을
+키링으로 승격하고 이후 부팅은 키링에서 확인합니다. 승격은 키 내용 없이 저널에
+기록됩니다. 이후의 `maos purge`는 이 승격으로 생성된 항목을 포함해 MAOS의
+네임스페이스 아래 키링 항목을 삭제합니다.
+
+키링은 저장 중인 시크릿을 더 안전하게 보호하고 프로세스 환경 목록에서
+제외합니다. 같은 호스트에서 동일한 사용자로 실행되는 다른 프로세스로부터 키를
+보호하지는 않습니다.
+
+### MAOS 상태 제거
+
+`maos purge`는 `--yes`가 없으면 dry run입니다. 제거 전에 MAOS 소유 root와
+credential을 각각 표시하고, 운영자가 만든 서명 및 설정 파일은 남기며, 실행 중인
+daemon이나 offline durable operation이 store를 점유하면 거부하고, 삭제되는 root
+밖에 JSON receipt를 기록합니다. purge 성공 후 Cargo 소유 binary는
+`cargo uninstall maos`로 제거하십시오.
+
+`maos purge --keep-log --yes`는 Transparency Log를 checkpoint한 뒤 보존합니다.
+같은 데이터베이스를 공유할 때 shared-memory row와 principal namespace index도
+보존되며, capability-token row와 기존 `shell.turn` 텍스트도 포함됩니다. dry run은
+삭제 전에 보존되는 범주와 실제 개수를 표시합니다.
+tenant 모드에서는 확인된 팀의 로그만이 아니라 `teams/` 하위 트리 전체가 보존되며,
+dry run과 receipt는 각 형제 팀 로그를 row 개수와 함께 표시합니다. 이 보존은 FR2의
+전체 제거 보장에 대한 운영자가 선택한 문서화된 예외이며, 삭제가 기본 동작입니다.
 
 ## 운영
 

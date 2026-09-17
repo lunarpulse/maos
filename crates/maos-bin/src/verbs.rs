@@ -64,6 +64,7 @@ pub enum VerbName {
     Traceback,
     Backup,
     Install,
+    Purge,
 }
 
 /// One row of the verb table.
@@ -75,7 +76,7 @@ pub struct Verb {
     pub argv: &'static str,
     /// The builds whose binary dispatches this verb (F6). A build not listed
     /// here rejects the token as unknown: `backup`/`install` are air-gap-only,
-    /// `shell`/`traceback` are network-only.
+    /// `shell`/`traceback` are network-only, and `purge` ships in both.
     pub builds: &'static [Build],
     /// One-line summary rendered in the help table.
     pub summary: &'static str,
@@ -126,6 +127,12 @@ pub const VERBS: &[Verb] = &[
         argv: "install",
         builds: &[Build::AirGap],
         summary: "Install a verified release artifact",
+    },
+    Verb {
+        name: VerbName::Purge,
+        argv: "purge",
+        builds: &[Build::AirGap, Build::Network],
+        summary: "Remove MAOS-owned local state",
     },
 ];
 

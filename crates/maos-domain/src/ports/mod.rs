@@ -47,6 +47,7 @@ pub mod memory;
 pub mod policy_decision; // NEW — Story 11.4a PolicyDecisionPort per ADR-050 / NFR-Sec-17
 pub mod registry; // NEW — Story 5.5d SpiritRegistryClient port + domain types
 pub mod scheduler;
+pub mod secret_store; // Story 16-4 SecretStore port per ADR-051 / NFR-Sec-19
 pub mod security;
 pub mod self_telemetry; // NEW — Story 4.3 SelfTelemetryPort per FR56
 pub mod siem_projection; // NEW — Story 11.4c SiemProjectionPort per ADR-051 / NFR-Aud-11
@@ -85,6 +86,7 @@ pub use registry::{
     YankReceipt,
 }; // NEW — Story 5.5d
 pub use scheduler::SpiritSchedulerPort;
+pub use secret_store::{SecretDeleteStatus, SecretKey, SecretStore, SecretStoreError}; // Story 16-4
 pub use security::SecurityManagerPort;
 pub use self_telemetry::SelfTelemetryPort; // NEW — Story 4.3
 pub use siem_projection::{SiemProjectionError, SiemProjectionPort}; // NEW — Story 11.4c

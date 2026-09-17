@@ -11,6 +11,7 @@ env:
   TOKEI_VERSION: "14.0.0"
   CARGO_DENY_VERSION: "0.19.4"
   CARGO_PUBLIC_API_VERSION: "0.51.0"
+  MAOS_SECRETS_BACKEND: env
   # Best-effort hardening against transient crates.io network flakes, which
   # spuriously failed many cargo jobs in one run (orchestrator-tests died
   # downloading the locked `chrono` crate). CARGO_NET_RETRY (cargo net.retry)

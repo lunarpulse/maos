@@ -38,8 +38,9 @@ pub mod inference_mode;
 /// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL
 /// port — a binary-crate `mod` would force its proofs inline, which kloc
 /// charges and CI cannot run.
-#[cfg(feature = "network")]
 pub mod operator_door;
+/// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
+pub mod purge;
 pub mod shell_host;
 /// Story 16-3 — Worker supervision (the Worker's SCB, its exit observer, its
 /// progress stamp and its task record) and root shutdown (`unload_all_loaded`,

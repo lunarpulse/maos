@@ -877,8 +877,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // table.
     // Story 16-2 (D-16-2-B) — 20 → 21: `shell_host.rs` joins the roster (the
     // production ShellHost). Story 16-3 — 21 → 22: `supervision.rs` joins it.
+    // Story 16-4 — 22 → 23: `purge.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 22] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 23] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
@@ -962,6 +963,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // already-constructed kernel handles and a host-granted tier, and must
         // never seed the manifest-derived policy table.
         ("supervision.rs", include_str!("../src/supervision.rs")),
+        // Story 16-4 — authoritative typed MAOS-footprint enumeration and
+        // offline purge. It must not seed manifest-derived policy scopes.
+        ("purge.rs", include_str!("../src/purge.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

@@ -51,12 +51,13 @@ fn expected_argv(name: verbs::VerbName) -> &'static str {
         verbs::VerbName::Traceback => "traceback",
         verbs::VerbName::Backup => "backup",
         verbs::VerbName::Install => "install",
+        verbs::VerbName::Purge => "purge",
     }
 }
 
 /// Every variant, spelled out — kept in sync with [`expected_argv`] (the
 /// compiler enforces both against the enum).
-const ALL_NAMES: [verbs::VerbName; 7] = [
+const ALL_NAMES: [verbs::VerbName; 8] = [
     verbs::VerbName::Init,
     verbs::VerbName::Run,
     verbs::VerbName::Shell,
@@ -64,6 +65,7 @@ const ALL_NAMES: [verbs::VerbName; 7] = [
     verbs::VerbName::Traceback,
     verbs::VerbName::Backup,
     verbs::VerbName::Install,
+    verbs::VerbName::Purge,
 ];
 
 fn maos() -> Command {
@@ -132,7 +134,7 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
         !verbs::VERBS.is_empty(),
         "the verb table must not be empty — a vacuous green is the failure mode"
     );
-    assert_eq!(verbs::VERBS.len(), 7, "exact expected verb count");
+    assert_eq!(verbs::VERBS.len(), 8, "exact expected verb count");
     for name in ALL_NAMES {
         let rows: Vec<&verbs::Verb> = verbs::VERBS
             .iter()
@@ -158,12 +160,12 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
     // either compilation of this test.
     assert_eq!(
         verbs_of_build(verbs::Build::AirGap),
-        vec!["audit", "backup", "init", "install", "run"],
+        vec!["audit", "backup", "init", "install", "purge", "run"],
         "air-gap build surface"
     );
     assert_eq!(
         verbs_of_build(verbs::Build::Network),
-        vec!["audit", "init", "run", "shell", "traceback"],
+        vec!["audit", "init", "purge", "run", "shell", "traceback"],
         "network build surface"
     );
 }

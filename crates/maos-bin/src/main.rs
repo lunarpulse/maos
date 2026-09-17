@@ -1476,6 +1476,12 @@ fn emit_model_provenance_event(
     );
     Ok(())
 }
+fn run_purge(args: &[String]) {
+    if let Err(error) = maos_bin::purge::run(args) {
+        eprintln!("maos: {error}");
+        std::process::exit(error.exit_code());
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Air-gap build: minimal main with no network surface (R-AG2).
@@ -1514,6 +1520,7 @@ fn main() {
             verbs::VerbName::Backup => air_gap_backup(&argv[1..]),
             verbs::VerbName::Audit => air_gap_audit(&argv[1..]),
             verbs::VerbName::Install => air_gap_install(&argv[1..]),
+            verbs::VerbName::Purge => run_purge(&argv[1..]),
             verbs::VerbName::Shell | verbs::VerbName::Traceback => {
                 unreachable!("shell and traceback are not rows of the air-gap table")
             }
@@ -1899,6 +1906,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &maos_cli::accessibility::RealEnv,
                 );
                 return maos_shell::run_audit_query(audit_spirit.as_deref(), &audit_format, color);
+            }
+            verbs::VerbName::Purge => {
+                run_purge(&argv[1..]);
+                return Ok(());
             }
             verbs::VerbName::Shell => {
                 plain_flag = argv.iter().skip(1).any(|a| a == "--plain");
@@ -3072,7 +3083,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // one-shot's habit) would let the anchor change under a running daemon.
     let door_crl_trust_anchor = revocation_trust_anchor.clone();
     let local_file_registry = Arc::new(maos_domain::revocation::LocalFileRegistryClient::new(
-        std::path::PathBuf::from("/tmp").join("maos").join("crl"),
+        maos_domain::revocation::default_crl_dir(),
         revocation_trust_anchor,
     ));
     let crypto_provider: Arc<dyn maos_domain::ports::crypto::CryptoProvider> =
@@ -3526,41 +3537,194 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Story 1b.4 — Inference Port + Anthropic provider + IAC telemetry.
-    // Story 5.5b — Multi-provider router (Anthropic + OpenAI + Ollama).
-    // FIXME(secrets): API key read from env; real secret materialization via
-    // maos-secrets / OS keyring is a later story.
+    // Story 1b.4 — Inference Port + provider adapters + IAC telemetry.
+    // Story 16-4 — credentials resolve through one injected SecretStore. The
+    // environment is captured once here; providers never read it directly.
+    let env_secrets: Arc<dyn maos_domain::ports::SecretStore> =
+        Arc::new(maos_secrets::EnvSecretStore::new(
+            maos_domain::ports::SecretKey::ALL
+                .into_iter()
+                .filter_map(|key| {
+                    std::env::var(key.environment_variable())
+                        .ok()
+                        .filter(|value| !value.trim().is_empty())
+                        .map(|value| (key, value))
+                }),
+        ));
+    // Story 16-4 (D2/D3) — the OS keyring stack is compiled out of non-unix
+    // builds, so the default backend follows the build.
+    let default_secrets_backend = if cfg!(unix) { "keyring" } else { "env" };
+    let secret_backend = std::env::var("MAOS_SECRETS_BACKEND")
+        .unwrap_or_else(|_| default_secrets_backend.to_string())
+        .parse::<maos_secrets::Backend>()
+        .unwrap_or_else(|error| {
+            eprintln!("maos: invalid MAOS_SECRETS_BACKEND: {error}");
+            std::process::exit(78);
+        });
+    #[cfg(unix)]
+    let secret_fallback_log = Arc::clone(&transparency_log);
+    #[cfg(unix)]
+    let record_secret_fallback: maos_secrets::FallbackObserver = Arc::new(move |key, reason| {
+        let payload = serde_json::json!({
+            "credential": key.as_str(),
+            "reason": reason,
+        });
+        if let Ok(bytes) = serde_json::to_vec(&payload) {
+            let _ = secret_fallback_log.insert_frame_event(
+                maos_kernel_core::iac::transparency_log::FrameKind::TelemetryEvent,
+                0,
+                None,
+                "secret.source.fallback",
+                &bytes,
+                maos_domain::invariants::i3::FrameOrigin::HumanAuthored,
+            );
+        }
+        eprintln!(
+            "maos: credential source fallback for {} ({reason})",
+            key.as_str()
+        );
+    });
+    let resolve_secret_home = || {
+        maos_domain::operator_door::maos_home().unwrap_or_else(|error| {
+            eprintln!("maos: cannot resolve MAOS home for secret storage: {error}");
+            std::process::exit(78);
+        })
+    };
+    let secret_store: Arc<dyn maos_domain::ports::SecretStore> = match secret_backend {
+        maos_secrets::Backend::Env => Arc::clone(&env_secrets),
+        maos_secrets::Backend::EncryptedFile => {
+            let home = resolve_secret_home().unwrap_or_else(|| {
+                eprintln!("maos: MAOS_SECRETS_BACKEND=encrypted-file requires MAOS_HOME or HOME");
+                std::process::exit(78);
+            });
+            let kms = maos_bin::enterprise_identity::build_local_kms().unwrap_or_else(|error| {
+                eprintln!(
+                    "maos: MAOS_SECRETS_BACKEND=encrypted-file requires a healthy \
+                     MAOS_KMS_MASTER_KEY: {error}"
+                );
+                std::process::exit(78);
+            });
+            Arc::new(maos_secrets::EncryptedFileSecretStore::new(
+                home.join("secrets"),
+                Arc::new(kms),
+                Arc::clone(&crypto_provider),
+            ))
+        }
+        #[cfg(unix)]
+        maos_secrets::Backend::Keyring => match resolve_secret_home() {
+            Some(home) => {
+                let keyring = Arc::new(maos_secrets::KeyringSecretStore::for_home(&home));
+                if maos_domain::ports::SecretStore::is_healthy(keyring.as_ref()) {
+                    for key in maos_domain::ports::SecretKey::ALL {
+                        // Story 16-4 review — the probe decides the move. A
+                        // probe ERROR is journaled and never promotes: writing
+                        // into a store we cannot read back would strand the
+                        // credential where the fallback cannot see it.
+                        match maos_domain::ports::SecretStore::get(keyring.as_ref(), key) {
+                            Ok(None) => {
+                                if let Ok(Some(value)) =
+                                    maos_domain::ports::SecretStore::get(env_secrets.as_ref(), key)
+                                {
+                                    match maos_domain::ports::SecretStore::put(
+                                        keyring.as_ref(),
+                                        key,
+                                        &value,
+                                    ) {
+                                        Ok(()) => record_secret_fallback(
+                                            key,
+                                            "promoted environment credential to OS keyring",
+                                        ),
+                                        Err(error) => record_secret_fallback(
+                                            key,
+                                            &format!("keyring provisioning failed: {error}"),
+                                        ),
+                                    }
+                                }
+                            }
+                            Ok(Some(_)) => {}
+                            Err(error) => record_secret_fallback(
+                                key,
+                                &format!("keyring probe failed: {error}"),
+                            ),
+                        }
+                    }
+                    Arc::new(maos_secrets::FallbackSecretStore::new(
+                        keyring,
+                        Arc::clone(&env_secrets),
+                        Arc::clone(&record_secret_fallback),
+                    ))
+                } else {
+                    for key in maos_domain::ports::SecretKey::ALL {
+                        if matches!(
+                            maos_domain::ports::SecretStore::get(env_secrets.as_ref(), key),
+                            Ok(Some(_))
+                        ) {
+                            record_secret_fallback(key, "keyring initialization failed");
+                        }
+                    }
+                    Arc::clone(&env_secrets)
+                }
+            }
+            None => {
+                for key in maos_domain::ports::SecretKey::ALL {
+                    if matches!(
+                        maos_domain::ports::SecretStore::get(env_secrets.as_ref(), key),
+                        Ok(Some(_))
+                    ) {
+                        record_secret_fallback(key, "MAOS_HOME and HOME are unavailable");
+                    }
+                }
+                Arc::clone(&env_secrets)
+            }
+        },
+        #[cfg(not(unix))]
+        maos_secrets::Backend::Keyring => {
+            eprintln!("maos: MAOS_SECRETS_BACKEND=keyring is not available in this build");
+            std::process::exit(78);
+        }
+    };
+
     let mut providers_map: std::collections::BTreeMap<String, Arc<dyn maos_providers::Provider>> =
         std::collections::BTreeMap::new();
     let mut live_provider_available = false;
     let mut default_id: Option<String> = None;
 
-    // Review P2 (15-6 §A6): an empty credential string is not a configured
-    // provider — registration stays (unset-mode compatibility), but it must
-    // not satisfy the explicit-live predicate.
-    let anthropic_key_usable = std::env::var("MAOS_ANTHROPIC_API_KEY")
-        .map(|key| !key.trim().is_empty())
-        .unwrap_or(false);
-    if let Ok(provider) = AnthropicProvider::new(
+    match AnthropicProvider::new(
         Arc::clone(&io_arc),
         "https://api.anthropic.com".into(),
         "claude-haiku-4-5-20251001".into(),
+        Some(Arc::clone(&secret_store)),
     ) {
-        providers_map.insert("anthropic".into(), Arc::new(provider));
-        live_provider_available |= anthropic_key_usable;
-        default_id.get_or_insert_with(|| "anthropic".into());
-        eprintln!("maos: Anthropic provider registered");
+        Ok(provider) => {
+            providers_map.insert("anthropic".into(), Arc::new(provider));
+            live_provider_available = true;
+            default_id.get_or_insert_with(|| "anthropic".into());
+            eprintln!("maos: Anthropic provider registered");
+        }
+        Err(maos_providers::ProviderError::Unconfigured) => {}
+        Err(error) => {
+            eprintln!("maos: Anthropic provider configuration failed: {error}");
+            std::process::exit(78);
+        }
     }
 
-    if let Ok(provider) = maos_providers::OpenAiProvider::new(
+    match maos_providers::OpenAiProvider::new(
         Arc::clone(&io_arc),
         "https://api.openai.com".into(),
         "gpt-4o-mini".into(),
+        Some(Arc::clone(&secret_store)),
     ) {
-        providers_map.insert("openai".into(), Arc::new(provider));
-        live_provider_available = true;
-        default_id.get_or_insert_with(|| "openai".into());
-        eprintln!("maos: OpenAI provider registered");
+        Ok(provider) => {
+            providers_map.insert("openai".into(), Arc::new(provider));
+            live_provider_available = true;
+            default_id.get_or_insert_with(|| "openai".into());
+            eprintln!("maos: OpenAI provider registered");
+        }
+        Err(maos_providers::ProviderError::Unconfigured) => {}
+        Err(error) => {
+            eprintln!("maos: OpenAI provider configuration failed: {error}");
+            std::process::exit(78);
+        }
     }
 
     {

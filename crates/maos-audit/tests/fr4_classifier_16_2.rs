@@ -306,6 +306,7 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
         measured.len(),
         "the table and the measured fixtures must stay 1:1 — update both together"
     );
+    let mut optional_rows: Vec<((&str, &str, u32), bool)> = Vec::new();
     for (writer, (kind, token, intent, payload, pid, label)) in noncall_entries.iter().zip(measured)
     {
         // The intent grammar must accept the measured intent.
@@ -315,11 +316,30 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             writer.intent
         );
         // The pinned token column must accept the measured token presence.
-        assert_eq!(
-            writer.token == TokenColumn::Present,
-            token.is_some(),
-            "{label}: the entry's token column must pin the measured token presence"
+        // `Optional` means production MAY emit either shape — but the measured
+        // fixture is still pinned exactly, so a production change that flips
+        // the measured presence reds here instead of passing silently.
+        assert!(
+            match writer.token {
+                TokenColumn::Absent => token.is_none(),
+                TokenColumn::Present => token.is_some(),
+                TokenColumn::Optional => true,
+            },
+            "{label}: the entry's token column must accept the measured token presence"
         );
+        if writer.token == TokenColumn::Optional {
+            // D-16-3-J (4): the Optional column is not unpinned — the measured
+            // fixture's presence is recorded, and the payload must pair it
+            // with a matching `in_flight_tokens` state, so a production flip
+            // of either reds here.
+            optional_rows.push((writer.site, token.is_some()));
+            assert_eq!(
+                token.is_some(),
+                !payload.contains("\"in_flight_tokens\":[]"),
+                "{label}: an Optional-token row must pair token presence with \
+                 a non-empty in_flight_tokens payload"
+            );
+        }
         // The row is built with the MEASURED kind, so a NonCall verdict
         // proves the entry's kind path — not just the shape.
         let row = entry(kind, intent, *pid, *token, payload);
@@ -329,6 +349,13 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "{label}: the measured payload must classify as a non-call"
         );
     }
+    // The set of Optional rows is itself pinned: a table row silently
+    // flipping to (or from) Optional must red, not escape.
+    assert_eq!(
+        optional_rows,
+        vec![(("crash_detector.rs", "handle_crash", 0), true)],
+        "the Optional-token rows are exactly the enumerated expected ones"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

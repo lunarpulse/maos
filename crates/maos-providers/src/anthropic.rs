@@ -3,14 +3,14 @@
 //! Translates `InferenceRequest` / `InferenceResponse` to/from the Anthropic
 //! REST wire format. The Anthropic JSON shapes never escape this module.
 //!
-//! Environment-gated: `MAOS_ANTHROPIC_API_KEY` must be set; otherwise
-//! construction returns `ProviderError::Unconfigured`.
+//! Secret-store-gated: the injected store must carry an Anthropic credential;
+//! otherwise construction returns `ProviderError::Unconfigured`.
 
 use maos_domain::ports::inference::{
     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::ports::IoSubsystemPort;
+use maos_domain::ports::{IoSubsystemPort, SecretKey, SecretStore};
 
 use crate::provider::{Provider, ProviderError};
 
@@ -23,24 +23,31 @@ pub struct AnthropicProvider {
 }
 
 impl AnthropicProvider {
-    /// Create a new Anthropic provider.
-    ///
-    /// Reads the API key from `MAOS_ANTHROPIC_API_KEY` env var.
-    /// `FIXME(secrets)`: real secret materialization via `maos-secrets` / OS
-    /// keyring is a later story (mirrors `main.rs:93` signing-key pattern).
+    /// Create an Anthropic provider from an injected secret store.
     pub fn new(
         transport: std::sync::Arc<dyn IoSubsystemPort>,
         endpoint_url: String,
         model_id: String,
+        secret_store: Option<std::sync::Arc<dyn SecretStore>>,
     ) -> Result<Self, ProviderError> {
-        let api_key =
-            std::env::var("MAOS_ANTHROPIC_API_KEY").map_err(|_| ProviderError::Unconfigured)?;
-        Ok(Self {
-            api_key,
+        let Some(secret_store) = secret_store else {
+            return Err(ProviderError::Unconfigured);
+        };
+        let api_key = secret_store
+            .get(SecretKey::AnthropicApiKey)
+            // Story 16-4 review — a credential-store `get` failure is NOT a
+            // transport failure: the fallback store has already journaled the
+            // store-level telemetry, and the composition root degrades to a
+            // provider-less boot instead of exiting 78.
+            .map_err(|_| ProviderError::Unconfigured)?
+            .filter(|key| !key.trim().is_empty())
+            .ok_or(ProviderError::Unconfigured)?;
+        Ok(Self::with_api_key(
+            transport,
             endpoint_url,
             model_id,
-            transport,
-        })
+            api_key,
+        ))
     }
 
     /// Create from an explicit API key (for tests).
@@ -177,6 +184,80 @@ mod tests {
         }
     }
 
+    struct StaticSecretStore(String);
+
+    impl SecretStore for StaticSecretStore {
+        fn get(
+            &self,
+            _key: SecretKey,
+        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
+            Ok(Some(self.0.clone()))
+        }
+        fn put(
+            &self,
+            _key: SecretKey,
+            _value: &str,
+        ) -> Result<(), maos_domain::ports::SecretStoreError> {
+            Ok(())
+        }
+
+        fn delete(
+            &self,
+            _key: SecretKey,
+        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
+        {
+            Ok(maos_domain::ports::SecretDeleteStatus::Absent)
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    struct ErrorSecretStore;
+
+    impl SecretStore for ErrorSecretStore {
+        fn get(
+            &self,
+            _key: SecretKey,
+        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
+            Err(maos_domain::ports::SecretStoreError::Access(
+                "credential ciphertext is corrupt".to_string(),
+            ))
+        }
+
+        fn put(
+            &self,
+            _key: SecretKey,
+            _value: &str,
+        ) -> Result<(), maos_domain::ports::SecretStoreError> {
+            Ok(())
+        }
+
+        fn delete(
+            &self,
+            _key: SecretKey,
+        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
+        {
+            Ok(maos_domain::ports::SecretDeleteStatus::Absent)
+        }
+
+        fn is_healthy(&self) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn credential_store_failures_degrade_to_unconfigured() {
+        let result = AnthropicProvider::new(
+            std::sync::Arc::new(MockTransport(Vec::new())),
+            "https://example.test".to_string(),
+            "test-model".to_string(),
+            Some(std::sync::Arc::new(ErrorSecretStore)),
+        );
+        assert!(matches!(result, Err(ProviderError::Unconfigured)));
+    }
+
     fn sample_request() -> InferenceRequest {
         InferenceRequest::new(
             42,
@@ -268,13 +349,12 @@ mod tests {
 
     #[test]
     fn provider_missing_api_key_is_unconfigured() {
-        // Ensure MAOS_ANTHROPIC_API_KEY is unset for this test.
-        std::env::remove_var("MAOS_ANTHROPIC_API_KEY");
         let transport = std::sync::Arc::new(MockTransport(vec![]));
         let result = AnthropicProvider::new(
             transport,
             "https://api.anthropic.com".into(),
             "claude-3-haiku-20240307".into(),
+            None,
         );
         assert!(matches!(result, Err(ProviderError::Unconfigured)));
     }
@@ -294,10 +374,13 @@ mod tests {
         });
         let transport =
             std::sync::Arc::new(MockTransport(serde_json::to_vec(&response_json).unwrap()));
+        let key =
+            std::env::var("MAOS_ANTHROPIC_API_KEY").expect("MAOS_ANTHROPIC_API_KEY must be set");
         let provider = AnthropicProvider::new(
             transport,
             "https://api.anthropic.com".into(),
             "claude-3-haiku-20240307".into(),
+            Some(std::sync::Arc::new(StaticSecretStore(key))),
         )
         .expect("MAOS_ANTHROPIC_API_KEY must be set");
         let req = sample_request();

@@ -292,7 +292,7 @@ A `claude` process spawns inside a T2 sandbox, with `developer` + `maos-bridge` 
 
 **Rising action.** They try a bigger task: `@hello-spirit refactor src/main.rs to be more idiomatic`. The Spirit halts immediately on `task.acceptance_criterion.ambiguous` — *"'more idiomatic' is undefined; please specify the dimensions you care about."* They laugh, type a clarification, the Spirit proceeds. Four file edits, 9 IAC frames, all logged. They `maos audit query` to read their own Transparency Log. The audit trail is queryable from minute 6.
 
-**Climax.** They uninstall: `cargo uninstall maos`. The kernel removes itself cleanly. The user's Transparency Log persists in `~/.maos/logs/` for review (configurable retention). They reinstall the next morning. They tell their tech-lead about it.
+**Climax.** They inspect `maos purge --keep-log`, see the retained categories and counts, then confirm with `maos purge --keep-log --yes`. MAOS checkpoints and preserves the Transparency Log in its resolved XDG data location, together with the shared-memory rows and principal namespace index stored in that database. The independent purge receipt names every removed or retained root. They finish with `cargo uninstall maos` to remove the Cargo-owned binary, reinstall the next morning, and tell their tech lead about it.
 
 **Resolution.** First-time installer who didn't bounce — because the substrate set expectations honestly within 6 minutes (capability scope visible; halt visible; audit visible) and was reversible.
 

@@ -91,7 +91,7 @@ fn init_creates_a_home_that_does_not_exist() {
         home.join("config.toml").exists(),
         "config.toml should exist"
     );
-    for dir in ["skills", "audit", "journal", "logs"] {
+    for dir in ["skills", "audit", "journal"] {
         assert!(home.join(dir).is_dir(), "{dir} dir should exist");
     }
     let _ = std::fs::remove_dir_all(&home);
@@ -228,7 +228,6 @@ fn init_creates_config_and_dirs() {
     assert!(home.join("skills").is_dir(), "skills dir should exist");
     assert!(home.join("audit").is_dir(), "audit dir should exist");
     assert!(home.join("journal").is_dir(), "journal dir should exist");
-    assert!(home.join("logs").is_dir(), "logs dir should exist");
     let cfg = std::fs::read_to_string(home.join("config.toml")).unwrap();
     assert!(cfg.contains("[slots]"), "config should declare slots");
     assert!(

@@ -495,7 +495,7 @@ fn any_env_with_prefix(prefix: &str) -> bool {
 }
 
 /// Decode the hex-encoded 32-byte org master key from `MAOS_KMS_MASTER_KEY`.
-fn build_local_kms() -> Result<LocalMasterKeyKms, String> {
+pub fn build_local_kms() -> Result<LocalMasterKeyKms, String> {
     let raw = std::env::var("MAOS_KMS_MASTER_KEY").map_err(|_| "MAOS_KMS_MASTER_KEY absent")?;
     let bytes =
         hex::decode(raw.trim()).map_err(|e| format!("master key hex decode failed: {e}"))?;

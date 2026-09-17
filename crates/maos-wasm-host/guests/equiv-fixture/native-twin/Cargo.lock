@@ -1157,6 +1157,7 @@ dependencies = [
  "getrandom 0.3.4",
  "hex",
  "maos-spirit-abi",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",

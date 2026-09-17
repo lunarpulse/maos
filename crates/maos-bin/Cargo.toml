@@ -23,7 +23,6 @@ network = [
     "dep:rcgen",
     "dep:maos-a2a",
     "dep:maos-sso",
-    "dep:maos-secrets",
     "dep:maos-siem",
 ]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
@@ -53,7 +52,7 @@ maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
 maos-escape-detector = { path = "../maos-escape-detector" }   # Story 11.4b — out-of-kernel sandbox-escape detector (ADR-024); read-only TL consumer wired at the composition root (NOT a kernel-core adapter; stays out of api.rs)
 maos-sso = { path = "../maos-sso", optional = true }   # Story 11.4c — OIDC verify adapter (network-gated; composed at the root)
-maos-secrets = { path = "../maos-secrets", optional = true }   # Story 11.4c — at-rest envelope AEAD (network-gated; composed at the root)
+maos-secrets = { path = "../maos-secrets", default-features = false, features = ["encrypted-file"] }   # Story 16-4 — env/encrypted-file secret stores in every build; the keyring stack is unix-only (below) so non-unix targets compile it OUT (air-gap D2/D3)
 maos-siem = { path = "../maos-siem", optional = true }   # Story 11.4c — read-only TL projection + localhost SIEM sink (network-gated; composed at the root, stays out of api.rs)
 maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait types (needed even without wasmtime; the host abstraction is engine-agnostic)
 maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
@@ -118,6 +117,10 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 # lockfile entry.
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1.1", features = ["fs", "process"] }
+# Story 16-4 (D2/D3) — unix builds keep today's keyring-backed composition.
+# Non-unix builds never see the keyring stack: the default backend is `env`
+# and MAOS_SECRETS_BACKEND=keyring exits 78 at boot.
+maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 
 [dev-dependencies]
 tempfile = "3"

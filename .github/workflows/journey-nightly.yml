@@ -8,6 +8,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NEXTEST_VERSION: "0.9.89"
+  MAOS_SECRETS_BACKEND: env
 
 jobs:
   tier-2-journey:

@@ -106,3 +106,151 @@ fn wrong_key_open_fails() {
          would succeed — the carried wrong-key-fails falsifier"
     );
 }
+
+#[test]
+fn environment_store_materializes_and_deletes_known_names_only() {
+    use maos_domain::ports::{SecretDeleteStatus, SecretKey, SecretStore};
+
+    let store = maos_secrets::EnvSecretStore::new([(
+        SecretKey::AnthropicApiKey,
+        "sk-ant-canary".to_string(),
+    )]);
+    assert_eq!(
+        store.get(SecretKey::AnthropicApiKey).unwrap().as_deref(),
+        Some("sk-ant-canary")
+    );
+    assert_eq!(
+        store.delete(SecretKey::AnthropicApiKey).unwrap(),
+        SecretDeleteStatus::Removed
+    );
+    assert_eq!(store.get(SecretKey::AnthropicApiKey).unwrap(), None);
+    store
+        .put(SecretKey::OpenAiApiKey, "sk-openai-canary")
+        .expect("store environment credential");
+    assert_eq!(
+        store.get(SecretKey::OpenAiApiKey).unwrap().as_deref(),
+        Some("sk-openai-canary")
+    );
+    assert_eq!(
+        store.delete(SecretKey::OpenAiApiKey).unwrap(),
+        SecretDeleteStatus::Removed
+    );
+}
+
+#[test]
+fn fallback_store_reports_downgrade_without_secret_material() {
+    use maos_domain::ports::{SecretKey, SecretStore};
+    use std::sync::{Arc, Mutex};
+
+    let primary = Arc::new(maos_secrets::EnvSecretStore::new([(
+        SecretKey::OpenAiApiKey,
+        "   ".to_string(),
+    )]));
+    let fallback = Arc::new(maos_secrets::EnvSecretStore::new([(
+        SecretKey::OpenAiApiKey,
+        "sk-proj-never-log-this".to_string(),
+    )]));
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let observed = Arc::clone(&events);
+    let store = maos_secrets::FallbackSecretStore::new(
+        primary,
+        fallback,
+        Arc::new(move |key, reason| {
+            observed
+                .lock()
+                .unwrap()
+                .push(format!("{}:{reason}", key.as_str()));
+        }),
+    );
+
+    assert_eq!(
+        store.get(SecretKey::OpenAiApiKey).unwrap().as_deref(),
+        Some("sk-proj-never-log-this")
+    );
+    let journal = events.lock().unwrap().join("\n");
+    assert!(journal.contains("openai-api-key:primary entry present but blank"));
+    assert!(!journal.contains("sk-proj-"));
+}
+
+#[test]
+fn fallback_delete_attempts_the_fallback_after_a_primary_failure() {
+    use maos_domain::ports::{SecretDeleteStatus, SecretKey, SecretStore, SecretStoreError};
+    use std::sync::Arc;
+
+    struct FailingPrimary;
+    impl SecretStore for FailingPrimary {
+        fn get(&self, _key: SecretKey) -> Result<Option<String>, SecretStoreError> {
+            Ok(None)
+        }
+
+        fn put(&self, _key: SecretKey, _value: &str) -> Result<(), SecretStoreError> {
+            Err(SecretStoreError::Unavailable("offline".to_string()))
+        }
+
+        fn delete(&self, _key: SecretKey) -> Result<SecretDeleteStatus, SecretStoreError> {
+            Err(SecretStoreError::Unavailable("offline".to_string()))
+        }
+
+        fn is_healthy(&self) -> bool {
+            false
+        }
+    }
+
+    let fallback = Arc::new(maos_secrets::EnvSecretStore::new([(
+        SecretKey::AnthropicApiKey,
+        "captured-environment-key".to_string(),
+    )]));
+    let store = maos_secrets::FallbackSecretStore::new(
+        Arc::new(FailingPrimary),
+        Arc::clone(&fallback) as Arc<dyn SecretStore>,
+        Arc::new(|_, _| {}),
+    );
+    assert!(store.delete(SecretKey::AnthropicApiKey).is_err());
+    assert_eq!(
+        fallback.get(SecretKey::AnthropicApiKey).unwrap(),
+        None,
+        "fallback deletion must still run after the primary fails"
+    );
+}
+
+#[cfg(feature = "encrypted-file")]
+#[test]
+fn encrypted_file_store_round_trips_ciphertext_and_deletes() {
+    use maos_domain::ports::{SecretDeleteStatus, SecretKey, SecretStore};
+    use std::sync::Arc;
+
+    let directory = tempfile::tempdir().expect("encrypted secret fixture");
+    let root = directory.path().join("vault");
+    let store = maos_secrets::EncryptedFileSecretStore::new(
+        root.clone(),
+        Arc::new(kms_from(&MASTER_KEY_A)),
+        Arc::new(crypto()),
+    );
+    store
+        .store(SecretKey::AnthropicApiKey, "sk-ant-sealed")
+        .expect("seal credential");
+    let on_disk =
+        std::fs::read(root.join("anthropic-api-key.sealed")).expect("read sealed credential");
+    assert!(
+        !on_disk
+            .windows(b"sk-ant-sealed".len())
+            .any(|window| window == b"sk-ant-sealed"),
+        "encrypted backend must not persist plaintext"
+    );
+    assert_eq!(
+        store.get(SecretKey::AnthropicApiKey).unwrap().as_deref(),
+        Some("sk-ant-sealed")
+    );
+    store
+        .store(SecretKey::AnthropicApiKey, "sk-ant-replaced")
+        .expect("replace sealed credential");
+    assert_eq!(
+        store.get(SecretKey::AnthropicApiKey).unwrap().as_deref(),
+        Some("sk-ant-replaced")
+    );
+    assert_eq!(
+        store.delete(SecretKey::AnthropicApiKey).unwrap(),
+        SecretDeleteStatus::Removed
+    );
+    assert_eq!(store.get(SecretKey::AnthropicApiKey).unwrap(), None);
+}

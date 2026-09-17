@@ -1742,6 +1742,28 @@ pub fn acquire_store_lock_set(
             })?;
             resolved.push(canonical);
         }
+        // Lock up to two ancestor levels as stable guards. Purge removes store
+        // directories while it runs; their flock handles then refer to
+        // unlinked inodes. Every root boot takes these same shared guards, so
+        // the exclusive purge remains authoritative until process exit even
+        // after a store path has been removed. Never lock the process-wide
+        // temporary directory itself: independent homes created beneath it
+        // must not serialize or report false StoreInUse contention.
+        let temp_root = std::fs::canonicalize(std::env::temp_dir()).ok();
+        let mut guards = Vec::new();
+        for path in &resolved {
+            let mut ancestor = path.parent();
+            for _ in 0..2 {
+                let Some(path) = ancestor.filter(|path| {
+                    path != &Path::new("/") && temp_root.as_deref().is_none_or(|temp| path != &temp)
+                }) else {
+                    break;
+                };
+                guards.push(path.to_path_buf());
+                ancestor = path.parent();
+            }
+        }
+        resolved.extend(guards);
         resolved.sort();
         resolved.dedup();
 
