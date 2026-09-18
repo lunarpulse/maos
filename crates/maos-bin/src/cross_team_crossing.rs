@@ -1002,3 +1002,150 @@ mod tests {
         ));
     }
 }
+
+// ── Story 13.5d — Researcher's synchronous collective port (moved from the
+// composition root by the 2026-09-17 code review, AC1: the audit-before-store
+// ordering must be integration-testable; this module is the cross-team
+// collective surface, so the port lives beside its subject) ──
+
+use maos_domain::invariants::i1::CapabilityToken;
+use maos_domain::invariants::i1::{IntentClass, Scope};
+use maos_kernel_core::capability::CapabilityRegistryAdapter;
+use maos_kernel_core::memory::MemoryManagerAdapter;
+
+#[cfg(feature = "network")]
+/// Story 13.5d — Researcher's synchronous collective port. One atomic binding
+/// supplies the registered, token-issued, and kernel-call pid.
+pub struct LiveResearcherCollectivePort {
+    pub spirit_pid: std::sync::atomic::AtomicU32,
+    memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+    capability: Arc<CapabilityRegistryAdapter>,
+    enterprise_runtime: Option<Arc<crate::enterprise_identity::EnterpriseRuntime>>,
+    enterprise_pdp_runtime: Option<crate::enterprise_pdp_runtime::EnterprisePdpRuntime>,
+}
+
+#[cfg(feature = "network")]
+impl LiveResearcherCollectivePort {
+    pub fn new(
+        memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
+        capability: Arc<CapabilityRegistryAdapter>,
+        enterprise_runtime: Option<Arc<crate::enterprise_identity::EnterpriseRuntime>>,
+        enterprise_pdp_runtime: Option<crate::enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    ) -> Self {
+        Self {
+            spirit_pid: std::sync::atomic::AtomicU32::new(0),
+            memory,
+            capability,
+            enterprise_runtime,
+            enterprise_pdp_runtime,
+        }
+    }
+
+    fn issue(
+        &self,
+        spirit_pid: u32,
+        scope: Scope,
+        intent_class: IntentClass,
+    ) -> Result<CapabilityToken, researcher::ResearcherCollectiveError> {
+        crate::worker_spawn::issue_enterprise_governed_capability(
+            self.capability.as_ref(),
+            self.enterprise_runtime.as_deref(),
+            self.enterprise_pdp_runtime.as_ref(),
+            spirit_pid,
+            scope,
+            60,
+            [0u8; 32],
+            intent_class,
+        )
+        .map_err(|e| researcher::ResearcherCollectiveError::Denied(e.to_string()))
+    }
+}
+
+#[cfg(feature = "network")]
+impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
+    fn collective_write(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        key: &str,
+        value: maos_domain::memory::MemoryValue,
+    ) -> Result<(), researcher::ResearcherCollectiveError> {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomWrite, IntentClass::HighPrivilege)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.write".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
+        self.memory
+            .collective_write(
+                spirit_pid,
+                namespace,
+                key,
+                value,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+
+    fn collective_read(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        key: &str,
+    ) -> Result<Option<maos_domain::memory::MemoryValue>, researcher::ResearcherCollectiveError>
+    {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomRead, IntentClass::Readonly)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.read".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
+        self.memory
+            .collective_read(
+                spirit_pid,
+                namespace,
+                key,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+
+    fn collective_scan(
+        &self,
+        namespace: &maos_domain::memory::MemoryNamespace,
+        prefix: &str,
+        limit: usize,
+    ) -> Result<Vec<maos_domain::memory::MemoryEntry>, researcher::ResearcherCollectiveError> {
+        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
+        let token = self.issue(spirit_pid, Scope::LoomScan, IntentClass::Readonly)?;
+        let payload = serde_json::json!({"namespace": namespace, "key": prefix}).to_string();
+        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
+            self.capability.as_ref(),
+            &token,
+            "collective.scan".to_owned(),
+            payload.as_bytes(),
+        )
+        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
+        self.memory
+            .collective_scan(
+                spirit_pid,
+                namespace,
+                prefix,
+                limit,
+                &token,
+                [0u8; 32],
+                maos_domain::invariants::i9::SandboxTier(0),
+            )
+            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
+    }
+}

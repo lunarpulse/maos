@@ -12,7 +12,7 @@ review: "§A6 full-layer net **BINDING and NON-DEGRADABLE** — the epic marks t
 
 # 16-5 — When MAOS records that something happened, it happened
 
-Status: review
+Status: done
 
 > **The capability:** *An audit record that MAOS wrote can be trusted to mean what it says. When the audit sink
 > cannot take an event, the mediated call is refused instead of silently proceeding — and every place in the
@@ -1047,6 +1047,8 @@ openai-codex/gpt-5.6-sol
 
 - Baseline and runtime probes: `kloc-check --json`, kernel pin round-trip, decision-register/empty-kernel gates,
   syscall-count and concurrent-journal falsifiers, real redactor vector, and pre-rewrite A2A collapse assertion.
+- Review round 2026-09-17, obligation (t): `journal_fsync` P99 = 16µs / P50 = 5µs over 10 000 appends
+  (budget 1500µs; NFR-Rel-8) — re-run with `MAOS_ENFORCE_NFR=1` after the review patches; no regression.
 - Red→green coverage: closed audit sink, all nine audit-drop sites, private-tier cascade counts, legal-hold
   interleaving, journal append/recovery concurrency, halt durability/classification, and typed local/peer A2A
   refusals.
@@ -1148,5 +1150,42 @@ openai-codex/gpt-5.6-sol
   `check-decision-register` re-run green after the re-anchor. Moved to `ready-for-dev`.
 - 2026-09-17: Implemented AC1–AC8, closed T0–T7, re-pinned the 24,591-line/98-file kernel
   surface, ratified the 19,040 KLOC ceiling, passed the complete workspace regression suite, and moved to review.
+- 2026-09-17 (review round): 4-layer adversarial + acceptance + test-infra review + non-author runtime
+  re-execution; 3 decisions ruled by the operator (D-16-5-B compliance, kernel grant retroactive
+  ratification, shell drop+disclose), 30 patches applied, 2 items deferred. Review kernel delta re-pinned
+  (24628 lines/98 files, kernel-core 19053), flaky healthy-sink control restructured, AC1 seam falsifier
+  added, AC2(b)/(f)/(g) and AC5 coverage completed. Moved to done.
 
 ### Review Findings
+- [x] [Review][Patch] **RULING (operator, 2026-09-17): COMPLY with D-16-5-B.** Revert fail-closed propagation at issue/revoke/revoke_all (sites 1/2/8) to counted-drop (`record_send_error`, no `Err`); restore `cap_audit_backpressure.rs`'s hot-path-survival semantics (site 8 observable, not propagated); propagate stays at `record_invocation` only. Subsumes the issue→Denied collapse and the unwrap_or(0) undercount findings — with no `Err` path, counts stay honest — but AC1's three-site falsifier and its distinct cause remain required [crates/maos-capability/src/cap_tokens/mod.rs:185-192,297-320; crates/maos-kernel-core/tests/cap_audit_backpressure.rs:106,124-126]
+- [x] [Review][Patch] **RULING (operator, 2026-09-17): RATIFIED retroactively.** Record the grant in `kloc.toml`'s 16-5 row with the "(operator-authorized 2026-09-17)" marker every precedent row carries, plus a register note naming +102 KLOC / +114 src_lines / 10 kernel files; ratchet stays at 19_040 [xtask/kloc.toml:247; xtask/kernel-core-baseline.toml]
+- [x] [Review][Patch] **RULING (operator, 2026-09-17): COMPLY — drop + disclose.** `record_turn_row` returns to a counted, named drop: keep the counter increment, emit a one-line degraded-audit warning, return `Ok(())` — the session survives; AC1/D-16-5-D text stands unamended [crates/maos-shell/src/lib.rs:539-542,691-694,717-737]
+- [x] [Review][Patch] issue() audit failure still maps to `ResearcherCollectiveError::Denied` — D-16-5-K's forbidden collapse on the fourth audit path; with the sink down, issue fails first and the operator reads "denied" [crates/maos-bin/src/main.rs:1254]
+- [x] [Review][Patch] revoke/revoke_all mutate revocation state first, then report `Err(AuditSinkUnavailable)`; callers `unwrap_or(0)` undercount the signed uninstall proof total and the task.orphaned receipt while every token WAS revoked [crates/maos-capability/src/cap_tokens/mod.rs:291; crates/maos-bin/src/main.rs:9225; crates/maos-kernel-core/src/supervision/crash_detector.rs:128]
+- [x] [Review][Patch] `maos audit query` reads its own process's health snapshot — structurally cannot disclose the daemon's latched degraded state; plumb it through the door (GET /v1/daemon already carries it) [crates/maos-shell/src/lib.rs:203; crates/maos-bin/src/main.rs:1908]
+- [x] [Review][Patch] ACP notification `Disconnected` (routine session GC) latches daemon-wide AUDIT_DEGRADED permanently with no un-latch, and frame drops conflate into the CapAuditEvent drop class [crates/maos-acp/src/notification_channel.rs:66; crates/maos-capability/src/cap_audit/mod.rs:72]
+- [x] [Review][Patch] AC2(b) half-done: WRITER_SHAPES entry for emit_task_orphaned is still `call(...)` with the stale format!-payload comment; the JSON payload landed so the pid-0 row still classifies as an FR4 violation [crates/maos-audit/src/fr4_classifier.rs:378-386]
+- [x] [Review][Patch] AC2(d) undelivered: no determination recorded for the three pid-0 tokenless kind-1 writers; sites untouched, story record empty — the "undecided semantic defect" the AC exists to stop [crates/maos-iac/src/adapter.rs:239,258,280]
+- [x] [Review][Patch] AC5(a) reorder reintroduced check-then-act: concurrent door resolves both pass `lookup_state(PendingResolution)`, both run side effects, the loser answers AlreadyResolved after writing duplicate orphan rows/context [crates/maos-kernel-core/src/halt/resolver.rs:140-216]
+- [x] [Review][Patch] AC5(b) patched at the door, not in `HaltFlow::submit_resolution` — the documented wire producer still resolves before journaling; the door's rollback also races concurrent resolvers [crates/maos-director-surface/src/halt_ui.rs:81; crates/maos-bin/src/operator_door.rs:953-959]
+- [x] [Review][Patch] AC3's required vectors missing: no Barrier(2) ≥200-iteration free-threaded race (obligation (n) is structurally unsatisfiable against the shipped cfg(test) hook), and no mid-cascade hold interleave vector (obligation (af)) [crates/maos-kernel-core/src/memory/mod.rs:1122]
+- [x] [Review][Patch] `private_tier_principal_row_count` skips undecodable namespace dirs (`else { continue }`) contradicting its own fail-closed doc — emptiness provable over residue neither count nor forget ever reads [crates/maos-audit/src/lib.rs:1918-1926]
+- [x] [Review][Patch] Redactor token-boundary guard is keyed to the literal `sk-` rule only — `sk-ant-`/`sk-proj-`/`ghp_` still substring-match mid-token (`desk-proj-9`, `risk-ant-1` are scrubbed); the shipped test covers only bare `sk-` [crates/maos-iac/src/adapter/redaction.rs:145-149]
+- [x] [Review][Patch] ORPHAN_PAYLOAD carries 14 token bytes against its own "16-byte" comment and `broken_in_flight_tokens_fail_closed`'s replace target does not exist in it — both fail-closed cases pass vacuously; the token-presence pin (`_row_token_present`) is dead [crates/maos-audit/tests/fr4_worker_rows_16_3.rs:21,64-79; crates/maos-audit/src/fr4_classifier.rs:543]
+- [x] [Review][Patch] The healthy-sink control flakes 1/8 under cargo's parallel test threads (global AUDIT_DEGRADED + counters; measured, serialized always green) [crates/maos-kernel-core/tests/audit_sink_truth_16_5.rs:102-128]
+- [x] [Review][Patch] AC1's headline falsifier is not implemented: no test drives collective_write/read/scan with a dead sink, nothing asserts the store was not written, zero test files reference AuditUnavailable, and only the Invocation drop site is asserted of nine [crates/maos-bin/src/main.rs:1269-1335; crates/maos-kernel-core/tests/audit_sink_truth_16_5.rs:85-97]
+- [x] [Review][Patch] AC7 surface coverage partial: only NoConsentProvider is driven at the TL-journal and traceback surfaces; six-way distinctness is pinned only at the domain unit level and no test cites ADR-058:52 (obligation (ah)) [crates/maos-bin/tests/cross_team_consent_13_3.rs:452-465]
+- [x] [Review][Patch] AC8 arm coverage: the rewritten test asserts only the ConsentUnclassified pair; ConfigInvalid, restart, peer-identity, consent-granter, peer-internal and intake-timeout arms can regress to CrossHostRouteFailure unobserved [crates/maos-a2a-core/tests/fail_closed_8_8.rs:305-335]
+- [x] [Review][Patch] AC5 failure-injection vectors absent: rollback_resolution and the door's rollback wiring have zero test coverage; no memory.write/journal failure is injected, so neither the HEAD-red baseline nor repaired retryability is demonstrated [crates/maos-bin/src/operator_door.rs:953; crates/maos-kernel-core/src/halt/mod.rs:272]
+- [x] [Review][Patch] AC4's two mandated comment corrections are missing: the false "file-append is atomic for small writes on POSIX" and the stale `.write(true)` hazard comment that 16-5 was routed to fix [crates/maos-bin/src/main.rs:3049,8921-8924]
+- [x] [Review][Patch] The journal concurrency test never forces write overlap (no barrier, independent loops) — a regression to the 2-syscall `write!` shape can pass with non-overlapping writers [crates/maos-kernel-core/tests/journal_append_16_5.rs:13-24]
+- [x] [Review][Patch] AC2(g)'s end-to-end vector absent: empty shared tier + populated private tier ⇒ cascade must NOT return NotFound is exercised only at the helper, never through the gates [crates/maos-audit/tests/private_tier_count_16_5.rs:4-21]
+- [x] [Review][Patch] A hold placed after a principal's erase completed reports Suspended{hold} / "NOT ERASED — SUSPENDED" over data that is gone — the hold branch has no existence check [crates/maos-kernel-core/src/memory/mod.rs:457-497]
+- [x] [Review][Patch] release_legal_hold does not take forget_serialization — a stale release can delete a fresher hold, after which the next erase destroys data under active litigation [crates/maos-kernel-core/src/memory/mod.rs:656-660]
+- [x] [Review][Patch] T0's tenth drop shape (`Backpressure::DropWithAudit`) is checked off as explicitly disposed but appears in no AC text, no AuditDropSite variant, and no record [crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:417-421]
+- [x] [Review][Patch] Obligation (ak) unaddressed: the dead `IntentDirection::Accept` arm is neither pinned by a test nor retired, and no choice is stated (T5b claims "ruled" without a record) [crates/maos-a2a-core/src/router.rs:1933-1943]
+- [x] [Review][Patch] AC2(a) migrated callers unexercised: the only vector calls insert_kernel_event_returning_id directly; none of the nine migrated production callers (incl. the four pid-0 sites) is driven [crates/maos-iac/tests/audit_truth_16_5.rs:8-25]
+- [x] [Review][Patch] Obligation (t): the journal_fsync P99 re-run (MAOS_ENFORCE_NFR=1) is reported nowhere in the story record [crates/maos-kernel-core/tests/journal_fsync_assertion.rs]
+- [x] [Review][Patch] New maos-acp→maos-capability dependency edge contradicts the frontmatter "no lockfile entry" line; the constraint's intent (workspace shape, SCANNED_SOURCE_FILES=23) holds — amend the story's Dependencies note [crates/maos-acp/Cargo.toml:12]
+- [x] [Review][Defer] Journal open fails hard on a torn multibyte line (strict read_to_string); a torn write can leave the daemon unable to boot instead of skipping the line [crates/maos-kernel-core/src/journal/mod.rs:110-111] — deferred, pre-existing
+- [x] [Review][Defer] CapError::AuditSinkUnavailable reaches operators as Display prose only — no door code, exit code, or JSON-RPC mapping distinguishes it (the ADR-058 "distinguishable without string matching" principle, one story after AC7) [crates/maos-bin/src/main.rs:1275] — deferred, pre-existing doctrine debt

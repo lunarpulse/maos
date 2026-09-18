@@ -181,19 +181,6 @@ impl CapTokensShardRing {
             maos_domain::ports::crypto::CryptoError::OperationFailed("signature must be 64 bytes")
         })?;
 
-        // The token does not become active unless its issue event is accepted
-        // by the bounded audit sink. Closed and saturated sinks are explicit
-        // availability failures, never successful unaudited issuance.
-        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Issue {
-            token_id,
-            spirit_pid,
-            scope: scope.clone(),
-            ttl_secs: effective_ttl,
-        }) {
-            cap_audit::record_send_error(cap_audit::AuditDropSite::Issue, &error);
-            return Err(CapError::AuditSinkUnavailable);
-        }
-
         let shard_idx = shard::hash_token_id(&token_id);
         let shard = &self.shards[shard_idx];
         shard.insert(
@@ -203,11 +190,23 @@ impl CapTokensShardRing {
                 expiry_ns,
                 posture_hash: posture_snapshot_hash,
                 intent_class,
-                scope,
+                scope: scope.clone(),
                 spirit_pid,
                 revoked: std::sync::atomic::AtomicBool::new(false),
             },
         );
+
+        // Audit (try_send, never block). D-16-5-B: the drop is OBSERVED, not
+        // propagated — issuance proceeds and the class-wide instrument (with
+        // the daemon's degraded latch on `Closed`) carries the failure.
+        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Issue {
+            token_id,
+            spirit_pid,
+            scope,
+            ttl_secs: effective_ttl,
+        }) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Issue, &error);
+        }
 
         Ok(CapabilityToken::new(
             token_id, spirit_pid, expiry_ns, signature,
@@ -290,19 +289,21 @@ impl CapTokensShardRing {
         if already_revoked && matches!(reason, RevokeReason::Operator) {
             return Err(CapError::Revoked);
         }
+        // D-16-5-B, site 8: the drop is OBSERVED, never propagated — a
+        // completed revocation must not report failure, and a saturated
+        // sink must not turn `revoke` into an error the applier swallows.
         if let Err(error) = self
             .audit
             .try_send(cap_audit::CapAuditEvent::Revoke { token_id, reason })
         {
             cap_audit::record_send_error(cap_audit::AuditDropSite::Revoke, &error);
-            return Err(CapError::AuditSinkUnavailable);
         }
         Ok(())
     }
 
     /// Revoke all tokens for a Spirit. Crash-recovery / hot-swap rebind
     /// surface. Slow-path (iterates all shards).
-    pub fn revoke_all(&self, spirit_pid: u32) -> Result<usize, CapError> {
+    pub fn revoke_all(&self, spirit_pid: u32) -> usize {
         let mut count = 0;
         for shard in self.shards.iter() {
             count += shard.revoke_for_spirit(spirit_pid);
@@ -312,9 +313,8 @@ impl CapTokensShardRing {
             reason: RevokeReason::SpiritUnload { spirit_pid, count },
         }) {
             cap_audit::record_send_error(cap_audit::AuditDropSite::RevokeAll, &error);
-            return Err(CapError::AuditSinkUnavailable);
         }
-        Ok(count)
+        count
     }
 
     /// Return `true` if the given `spirit_pid` holds at least one
@@ -389,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn issue_fails_closed_when_audit_sink_is_closed() {
+    fn issue_survives_closed_sink_and_counts_the_drop() {
         init_monotonic_base();
         let crypto: Arc<dyn CryptoProvider> = Arc::new(MockCryptoProvider);
         let signing_key = Ed25519SigningKey::new([0u8; 32]);
@@ -397,6 +397,7 @@ mod tests {
         drop(audit_rx);
         let ring = CapTokensShardRing::new(crypto, signing_key, 0xDEAD_BEEF, audit_tx);
 
+        let before = cap_audit::audit_health_snapshot();
         let result = ring.issue(
             7,
             Scope::FsRead {
@@ -407,8 +408,20 @@ mod tests {
             IntentClass::Standard,
         );
 
-        assert_eq!(result, Err(CapError::AuditSinkUnavailable));
-        assert!(ring.list_active().is_empty());
+        // D-16-5-B (operator ruling 2026-09-17): issuance SURVIVES a dead
+        // audit sink — the drop is observed by the class-wide instrument and
+        // the writer-death latch carries the failure. Propagating here was
+        // the review finding (a saturated sink must not fail the hot path).
+        let token = result.expect("issue proceeds under a dead sink (D-16-5-B)");
+        assert!(!ring.list_active().is_empty(), "the token is active");
+        let after = cap_audit::audit_health_snapshot();
+        assert_eq!(
+            after.count(cap_audit::AuditDropSite::Issue),
+            before.count(cap_audit::AuditDropSite::Issue) + 1,
+            "the Issue drop must be counted exactly once"
+        );
+        assert!(after.degraded, "writer death latches degraded");
+        let _ = token;
     }
 
     #[test]

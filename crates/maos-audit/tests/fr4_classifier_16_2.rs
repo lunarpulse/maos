@@ -265,6 +265,15 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "cli runtime",
         ),
         (
+            // AC2(b) — the resolver's structured orphan row at pid 0.
+            "task.complete",
+            None,
+            "task.orphaned",
+            r#"{"halt_id":"01HALT","disposition":"accepted_halt"}"#,
+            0,
+            "resolver orphan (kind 1)",
+        ),
+        (
             "capability.invocation",
             None,
             "cli.subprocess.exit",

@@ -455,6 +455,12 @@ impl MemoryManagerAdapter {
             .unwrap_or(false);
 
         if is_legal_hold {
+            // Review 2026-09-17: a hold requested over a principal a
+            // concurrent forget already erased must never claim the data is
+            // preserved. The durable hold is still recorded (P29 consults
+            // every later forget/uninstall); the returned record says what
+            // is actually true about the data.
+            let principal_present = !self.principal_index.lookup(principal_id)?.is_empty();
             // P29: place a DURABLE hold consulted by every later forget/uninstall.
             let requested_at_ns = Self::now_ns();
             let reason_str = reason.unwrap_or("legal-hold").to_string();
@@ -491,7 +497,11 @@ impl MemoryManagerAdapter {
                 reason: reason_str,
                 case_ref,
                 requested_at_ns,
-                status: "NOT ERASED — SUSPENDED UNDER LEGAL HOLD".to_string(),
+                status: if principal_present {
+                    "NOT ERASED — SUSPENDED UNDER LEGAL HOLD".to_string()
+                } else {
+                    "PRINCIPAL NOT PRESENT — NOTHING TO ERASE; HOLD RECORDED".to_string()
+                },
             };
             return Ok(ForgetOutcome::Suspended { hold });
         }
@@ -653,7 +663,17 @@ impl MemoryManagerAdapter {
 
     /// Story 9.2 (P29) — release a durable legal hold so the principal may be
     /// erased again.  Returns whether a hold was actually removed.
+    ///
+    /// Review 2026-09-17: release takes the same per-principal serializer as
+    /// [`Self::forget_with_reason`], so a release can never interleave with a
+    /// hold being placed — a stale release that lands after a fresh
+    /// `place_legal_hold` commits would delete the new hold and expose the
+    /// principal to the next erase while litigation believed it held.
     pub fn release_legal_hold(&self, principal_id: &str) -> Result<bool, MemoryError> {
+        let _forget_guard = self
+            .forget_serialization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         self.transparency_log
             .release_legal_hold(principal_id)
             .map_err(|e| MemoryError::Storage(e.to_string()))

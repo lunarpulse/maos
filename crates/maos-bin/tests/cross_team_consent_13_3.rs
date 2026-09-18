@@ -447,6 +447,13 @@ fn cross_wall_recall_refusals_and_disclosures_are_journaled() {
     // refusal and a disclosure each journal a CapabilityInvocation row, never
     // folded into an empty page; a disclosure claims crossed_team_boundary only
     // once the read succeeded.
+    // ADR-058:52 (`docs/adr/ADR-058-cross-wall-provenance-and-consented-recall.md:52`)
+    // — refusals must be distinguishable WITHOUT string matching: the journaled
+    // `outcome` token is the typed `CrossWallRecallRefusal::outcome()` mapping
+    // (all six pinned distinct in
+    // `maos-iac/src/adapter/log_recall.rs::cross_wall_recall_has_five_distinguishable_outcomes`),
+    // and this behavioral row proves the production journaling path surfaces
+    // it verbatim.
     let team = TeamId::new("team-a").unwrap();
 
     // Refusal: no consent provider → NoConsentProvider, journaled with its typed outcome.

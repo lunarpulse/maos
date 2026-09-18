@@ -57,8 +57,9 @@ mod verbs;
 #[cfg(feature = "network")]
 use maos_bin::cassette_replay;
 #[cfg(feature = "network")]
-use maos_bin::enterprise_pdp_runtime;
+use maos_bin::cross_team_crossing::LiveResearcherCollectivePort;
 #[cfg(feature = "network")]
+use maos_bin::enterprise_pdp_runtime;
 use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
 #[cfg(feature = "network")]
 use maos_bin::worker_spawn::{
@@ -1204,143 +1205,6 @@ impl LiveResearcherMcpPort {
             claims.push(claim);
         }
         Ok(claims)
-    }
-}
-
-#[cfg(feature = "network")]
-/// Story 13.5d — Researcher's synchronous collective port. One atomic binding
-/// supplies the registered, token-issued, and kernel-call pid.
-struct LiveResearcherCollectivePort {
-    spirit_pid: std::sync::atomic::AtomicU32,
-    memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
-    capability: Arc<CapabilityRegistryAdapter>,
-    enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
-    enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
-}
-
-#[cfg(feature = "network")]
-impl LiveResearcherCollectivePort {
-    fn new(
-        memory: Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
-        capability: Arc<CapabilityRegistryAdapter>,
-        enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
-        enterprise_pdp_runtime: Option<enterprise_pdp_runtime::EnterprisePdpRuntime>,
-    ) -> Self {
-        Self {
-            spirit_pid: std::sync::atomic::AtomicU32::new(0),
-            memory,
-            capability,
-            enterprise_runtime,
-            enterprise_pdp_runtime,
-        }
-    }
-
-    fn issue(
-        &self,
-        spirit_pid: u32,
-        scope: Scope,
-        intent_class: IntentClass,
-    ) -> Result<CapabilityToken, researcher::ResearcherCollectiveError> {
-        issue_enterprise_governed_capability(
-            self.capability.as_ref(),
-            self.enterprise_runtime.as_deref(),
-            self.enterprise_pdp_runtime.as_ref(),
-            spirit_pid,
-            scope,
-            60,
-            [0u8; 32],
-            intent_class,
-        )
-        .map_err(|e| researcher::ResearcherCollectiveError::Denied(e.to_string()))
-    }
-}
-
-#[cfg(feature = "network")]
-impl researcher::ResearcherCollectivePort for LiveResearcherCollectivePort {
-    fn collective_write(
-        &self,
-        namespace: &maos_domain::memory::MemoryNamespace,
-        key: &str,
-        value: maos_domain::memory::MemoryValue,
-    ) -> Result<(), researcher::ResearcherCollectiveError> {
-        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
-        let token = self.issue(spirit_pid, Scope::LoomWrite, IntentClass::HighPrivilege)?;
-        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
-        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
-            self.capability.as_ref(),
-            &token,
-            "collective.write".to_owned(),
-            payload.as_bytes(),
-        )
-        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
-        self.memory
-            .collective_write(
-                spirit_pid,
-                namespace,
-                key,
-                value,
-                &token,
-                [0u8; 32],
-                maos_domain::invariants::i9::SandboxTier(0),
-            )
-            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
-    }
-
-    fn collective_read(
-        &self,
-        namespace: &maos_domain::memory::MemoryNamespace,
-        key: &str,
-    ) -> Result<Option<maos_domain::memory::MemoryValue>, researcher::ResearcherCollectiveError>
-    {
-        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
-        let token = self.issue(spirit_pid, Scope::LoomRead, IntentClass::Readonly)?;
-        let payload = serde_json::json!({"namespace": namespace, "key": key}).to_string();
-        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
-            self.capability.as_ref(),
-            &token,
-            "collective.read".to_owned(),
-            payload.as_bytes(),
-        )
-        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
-        self.memory
-            .collective_read(
-                spirit_pid,
-                namespace,
-                key,
-                &token,
-                [0u8; 32],
-                maos_domain::invariants::i9::SandboxTier(0),
-            )
-            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
-    }
-
-    fn collective_scan(
-        &self,
-        namespace: &maos_domain::memory::MemoryNamespace,
-        prefix: &str,
-        limit: usize,
-    ) -> Result<Vec<maos_domain::memory::MemoryEntry>, researcher::ResearcherCollectiveError> {
-        let spirit_pid = self.spirit_pid.load(std::sync::atomic::Ordering::SeqCst);
-        let token = self.issue(spirit_pid, Scope::LoomScan, IntentClass::Readonly)?;
-        let payload = serde_json::json!({"namespace": namespace, "key": prefix}).to_string();
-        maos_domain::ports::capability::CapabilityRegistryPort::record_invocation(
-            self.capability.as_ref(),
-            &token,
-            "collective.scan".to_owned(),
-            payload.as_bytes(),
-        )
-        .map_err(|_| researcher::ResearcherCollectiveError::AuditUnavailable)?;
-        self.memory
-            .collective_scan(
-                spirit_pid,
-                namespace,
-                prefix,
-                limit,
-                &token,
-                [0u8; 32],
-                maos_domain::invariants::i9::SandboxTier(0),
-            )
-            .map_err(|error| researcher::ResearcherCollectiveError::Denied(error.to_string()))
     }
 }
 
@@ -3046,7 +2910,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Story 5.2 — HotSwapCoordinator constructed exactly once at composition root.
     // One-shot arms that also journal use separate JournalAdapter instances
-    // (acceptable at v0.3-β — file-append is atomic for small writes on POSIX).
+    // (v0.3-β — NOT safe in general: POSIX append atomicity is per-write(2)
+    // and O_APPEND is what makes it non-overwriting; AC4 fixed `open`).
     let archive_dir = maos_audit::default_archive_dir();
     let hot_swap_coordinator = Arc::new(HotSwapCoordinator::new(
         scheduler.scbs(),
@@ -8919,9 +8784,10 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         spirit_id: &str,
     ) -> Result<std::path::PathBuf, String> {
         // Through the DAEMON-HELD journal adapter (D-16-1-L), not a fresh
-        // open per row: every one-shot opened its own handle, the cross-
+        // open per row: every one-shot opened its own handle, and the cross-
         // process overwrite `JournalAdapter::open` `.write(true)` hazard
-        // routed to 16-5. The daemon path no longer fans that out.
+        // routed to 16-5 (now fixed: `open` is `.append(true)` + one
+        // `write_all` per record). The daemon path no longer fans that out.
         self.shared_journal.append_transition(
             maos_domain::invariants::i10::JournalEntry::Lifecycle(
                 maos_domain::invariants::i10::LifecycleEntry {
@@ -9222,7 +9088,7 @@ fn run_uninstall_cascade_inner(
         }
 
         // Revoke all capability tokens for the spirit.
-        total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid).unwrap_or(0);
+        total_revoked_tokens += capability.revoke_all_for_pid(spirit_pid);
     }
 
     if all_principal_ids.is_empty() && shared_principal_rows == 0 && private_principal_rows == 0 {

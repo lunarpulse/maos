@@ -65,42 +65,17 @@ fn adapter_with_audit_sender(audit: cap_audit::Sender) -> CapabilityRegistryAdap
     )
 }
 
+/// AC1 / E15-A6: one SEQUENTIAL test owns the process-global audit-health
+/// atomics end to end. The healthy-sink phase and the closed-sink phase run
+/// in a fixed order inside one thread, so cargo's parallel test threads can
+/// never interleave the global latch between a `before` snapshot and its
+/// assertion (the two-test version flaked 1/8 under the default runner).
+///
+/// D-16-5-B: `record_invocation` propagates (`AuditSinkUnavailable`);
+/// issue/revoke/revoke_all observe their drops through the class-wide
+/// instrument and proceed.
 #[test]
-fn closed_audit_sink_refuses_invocation_and_latches_degraded_health() {
-    cap_tokens::init_monotonic_base();
-    let (audit, receiver) = cap_audit::channel();
-    let adapter = adapter_with_audit_sender(audit);
-    let token = adapter
-        .issue(
-            7,
-            Scope::LoomWrite,
-            60,
-            [1u8; 32],
-            IntentClass::HighPrivilege,
-        )
-        .expect("issue while the audit receiver is healthy");
-    let before = cap_audit::audit_health_snapshot();
-    drop(receiver);
-
-    let error = adapter
-        .record_invocation(&token, "collective.write".into(), br#"{"key":"k"}"#)
-        .expect_err("a closed audit sink must refuse a mediated invocation");
-
-    assert_eq!(error, CapError::AuditSinkUnavailable);
-    let after = cap_audit::audit_health_snapshot();
-    assert_eq!(after.total_drops, before.total_drops + 1);
-    assert_eq!(
-        after.count(cap_audit::AuditDropSite::Invocation),
-        before.count(cap_audit::AuditDropSite::Invocation) + 1
-    );
-    assert!(
-        after.degraded,
-        "writer death is process-lifetime degradation"
-    );
-}
-
-#[test]
-fn healthy_audit_sink_accepts_invocation_without_counting_a_drop() {
+fn audit_sink_truth_lifecycle_healthy_then_closed() {
     cap_tokens::init_monotonic_base();
     let (audit, mut receiver) = cap_audit::channel();
     let adapter = adapter_with_audit_sender(audit);
@@ -112,17 +87,101 @@ fn healthy_audit_sink_accepts_invocation_without_counting_a_drop() {
             [2u8; 32],
             IntentClass::HighPrivilege,
         )
-        .expect("issue");
+        .expect("issue against a healthy sink");
     let _ = receiver.try_recv().expect("issue event");
-    let before = cap_audit::audit_health_snapshot();
+    let healthy = cap_audit::audit_health_snapshot();
 
+    // ── Healthy sink: the invocation is audited, nothing is counted ──
     adapter
         .record_invocation(&token, "collective.write".into(), br#"{"key":"k"}"#)
-        .expect("healthy sink");
-
+        .expect("healthy sink must accept a mediated invocation");
     assert!(matches!(
         receiver.try_recv(),
         Ok(cap_audit::CapAuditEvent::Invocation { .. })
     ));
-    assert_eq!(cap_audit::audit_health_snapshot(), before);
+    assert_eq!(
+        cap_audit::audit_health_snapshot(),
+        healthy,
+        "a healthy sink counts zero drops and latches nothing"
+    );
+
+    // ── Writer death: every audit send drops; record_invocation refuses ──
+    drop(receiver);
+    let after_death = cap_audit::audit_health_snapshot();
+
+    // Sites 1 (issue) and 2 (revoke_all): proceeds, drop observed.
+    let survivor = adapter
+        .issue(
+            7,
+            Scope::LoomWrite,
+            60,
+            [3u8; 32],
+            IntentClass::HighPrivilege,
+        )
+        .expect("issue proceeds under a dead sink (D-16-5-B)");
+    assert_eq!(adapter.revoke_all_for_pid(7), 2);
+
+    // record_invocation: the one propagating site (D3).
+    let error = adapter
+        .record_invocation(&survivor, "collective.write".into(), br#"{"key":"k"}"#)
+        .expect_err("a closed audit sink must refuse a mediated invocation");
+    assert_eq!(error, CapError::AuditSinkUnavailable);
+
+    let final_health = cap_audit::audit_health_snapshot();
+    assert_eq!(
+        final_health.count(cap_audit::AuditDropSite::Issue),
+        after_death.count(cap_audit::AuditDropSite::Issue) + 1
+    );
+    assert_eq!(
+        final_health.count(cap_audit::AuditDropSite::RevokeAll),
+        after_death.count(cap_audit::AuditDropSite::RevokeAll) + 1
+    );
+    assert_eq!(
+        final_health.count(cap_audit::AuditDropSite::Invocation),
+        after_death.count(cap_audit::AuditDropSite::Invocation) + 1
+    );
+    assert_eq!(final_health.total_drops, after_death.total_drops + 3);
+    assert!(
+        final_health.degraded,
+        "writer death is process-lifetime degradation"
+    );
+}
+
+/// AC1's class-wide counter wiring: every `AuditDropSite` variant increments
+/// its own per-site counter and the aggregate through `record_drop`, so a
+/// site wired to the wrong variant (or not wired at all) cannot hide.
+#[test]
+fn every_audit_drop_site_counts_into_its_own_counter() {
+    cap_tokens::init_monotonic_base();
+    let sites = [
+        cap_audit::AuditDropSite::Issue,
+        cap_audit::AuditDropSite::Revoke,
+        cap_audit::AuditDropSite::RevokeAll,
+        cap_audit::AuditDropSite::Invocation,
+        cap_audit::AuditDropSite::Verification,
+        cap_audit::AuditDropSite::SandboxBlock,
+        cap_audit::AuditDropSite::T3EscapeBlock,
+        cap_audit::AuditDropSite::Quarantine,
+        cap_audit::AuditDropSite::AcpNotification,
+    ];
+    assert_eq!(
+        sites.len(),
+        9,
+        "the nine-site class is exhaustively enumerated here"
+    );
+    let before = cap_audit::audit_health_snapshot();
+    for site in &sites {
+        // `Full` keeps the degraded-latch assertion in the lifecycle test.
+        cap_audit::record_drop(*site, cap_audit::AuditDropReason::Full);
+        let snapshot = cap_audit::audit_health_snapshot();
+        assert_eq!(
+            snapshot.count(*site),
+            before.count(*site) + 1,
+            "each site must count into its own counter"
+        );
+    }
+    assert_eq!(
+        cap_audit::audit_health_snapshot().total_drops,
+        before.total_drops + sites.len() as u64
+    );
 }

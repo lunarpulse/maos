@@ -348,7 +348,7 @@ impl CapabilityRegistryPort for CapabilityRegistryAdapter {
 impl CapabilityRegistryAdapter {
     /// Story 5.1 — revoke all capability tokens for a given spirit_pid.
     /// Called by `SpiritSchedulerAdapter::unload` during graceful teardown.
-    pub fn revoke_all_for_pid(&self, spirit_pid: u32) -> Result<usize, CapError> {
+    pub fn revoke_all_for_pid(&self, spirit_pid: u32) -> usize {
         self.tokens.revoke_all(spirit_pid)
     }
 

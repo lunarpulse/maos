@@ -922,54 +922,108 @@ mod tests {
             ]
         );
 
-        let denied = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
-            FixedCrossWallConsent(Ok(CrossWallRecallConsentDecision::NoGrant)),
-        ));
+        // ADR-058:52 (`docs/adr/ADR-058-cross-wall-provenance-and-consented-recall.md:52`)
+        // — all six typed refusals (missing provider, no grant, reverse-only,
+        // stale state, unavailable state, missing read port) must stay
+        // distinguishable WITHOUT string matching. Drive all six here and pin
+        // their `outcome()` strings distinct in one place. (The test name's
+        // "five" predates the read-port refusal; it is kept verbatim because
+        // the xtask hermetic legs address this test by exact name.)
+        let refusal_reason =
+            |result: Result<LogRecallPage, LogRecallError>| -> CrossWallRecallRefusal {
+                match result {
+                    Err(LogRecallError::ECrossWallRecallDenied { reason, .. }) => reason,
+                    Err(_) => panic!("expected a typed cross-wall refusal, got a different error"),
+                    Ok(_) => panic!("expected a typed cross-wall refusal, got a page"),
+                }
+            };
+
+        let no_grant = refusal_reason(
+            LogRecallAdapter::new(Arc::clone(&tl))
+                .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Ok(
+                    CrossWallRecallConsentDecision::NoGrant,
+                ))))
+                .recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+        );
+        assert!(matches!(no_grant, CrossWallRecallRefusal::NoGrant));
+
+        let wrong_direction = refusal_reason(
+            LogRecallAdapter::new(Arc::clone(&tl))
+                .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Ok(
+                    CrossWallRecallConsentDecision::WrongDirection,
+                ))))
+                .recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+        );
         assert!(matches!(
-            denied.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
-            Err(LogRecallError::ECrossWallRecallDenied {
-                reason: CrossWallRecallRefusal::NoGrant,
-                ..
-            })
+            wrong_direction,
+            CrossWallRecallRefusal::WrongDirection
         ));
 
-        let wrong_direction =
-            LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
-                FixedCrossWallConsent(Ok(CrossWallRecallConsentDecision::WrongDirection)),
-            ));
+        let stale = refusal_reason(
+            LogRecallAdapter::new(Arc::clone(&tl))
+                .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Err(
+                    CrossWallRecallConsentError::Stale {
+                        reason: "expired".into(),
+                    },
+                ))))
+                .recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+        );
         assert!(matches!(
-            wrong_direction.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
-            Err(LogRecallError::ECrossWallRecallDenied {
-                reason: CrossWallRecallRefusal::WrongDirection,
-                ..
-            })
+            stale,
+            CrossWallRecallRefusal::ConsentStateStale(_)
         ));
 
-        let stale = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
-            FixedCrossWallConsent(Err(CrossWallRecallConsentError::Stale {
-                reason: "expired".into(),
-            })),
-        ));
+        let unavailable = refusal_reason(
+            LogRecallAdapter::new(Arc::clone(&tl))
+                .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Err(
+                    CrossWallRecallConsentError::StateUnavailable {
+                        reason: "manifest store offline".into(),
+                    },
+                ))))
+                .recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+        );
         assert!(matches!(
-            stale.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
-            Err(LogRecallError::ECrossWallRecallDenied {
-                reason: CrossWallRecallRefusal::ConsentStateStale(_),
-                ..
-            })
+            unavailable,
+            CrossWallRecallRefusal::ConsentStateUnavailable(_)
         ));
 
-        let unavailable = LogRecallAdapter::new(Arc::clone(&tl)).with_cross_wall_consent(Arc::new(
-            FixedCrossWallConsent(Err(CrossWallRecallConsentError::StateUnavailable {
-                reason: "manifest store offline".into(),
-            })),
+        // Missing consent provider: no consent port wired at all.
+        let no_provider = refusal_reason(LogRecallAdapter::new(Arc::clone(&tl)).recall_cross_wall(
+            10,
+            &remote_team,
+            LogRecallFilter::default(),
         ));
         assert!(matches!(
-            unavailable.recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
-            Err(LogRecallError::ECrossWallRecallDenied {
-                reason: CrossWallRecallRefusal::ConsentStateUnavailable(_),
-                ..
-            })
+            no_provider,
+            CrossWallRecallRefusal::NoConsentProvider
         ));
+
+        // Missing read port: consent granted but the remote reader was never wired.
+        let no_read_port = refusal_reason(
+            LogRecallAdapter::new(Arc::clone(&tl))
+                .with_cross_wall_consent(Arc::new(FixedCrossWallConsent(Ok(
+                    CrossWallRecallConsentDecision::Granted,
+                ))))
+                .recall_cross_wall(10, &remote_team, LogRecallFilter::default()),
+        );
+        assert!(matches!(
+            no_read_port,
+            CrossWallRecallRefusal::ReadPortUnavailable
+        ));
+
+        let outcomes = std::collections::HashSet::from([
+            no_grant.outcome(),
+            wrong_direction.outcome(),
+            stale.outcome(),
+            unavailable.outcome(),
+            no_provider.outcome(),
+            no_read_port.outcome(),
+        ]);
+        assert_eq!(
+            outcomes.len(),
+            6,
+            "ADR-058:52 — all six refusals must be distinguishable without string matching; got {outcomes:?}"
+        );
 
         assert!(matches!(
             granted.fetch(20, frame_id),

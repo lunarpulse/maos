@@ -124,8 +124,7 @@ impl CrashDetector {
         );
 
         // Step 3: Revoke all capability tokens for the PID
-        let actual_tokens_revoked =
-            self.capability.revoke_all_for_pid(spirit_pid).unwrap_or(0) as usize;
+        let actual_tokens_revoked = self.capability.revoke_all_for_pid(spirit_pid);
 
         // Step 4: Produce halt-receipts via terminate_spirit
         let receipts = terminate_spirit(

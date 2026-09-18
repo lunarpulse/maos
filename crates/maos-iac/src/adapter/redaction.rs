@@ -142,9 +142,12 @@ fn prefix_matches_at(bytes: &[u8], index: usize, prefix: &[u8]) -> bool {
     if index + prefix.len() > bytes.len() || &bytes[index..index + prefix.len()] != prefix {
         return false;
     }
-    prefix != b"sk-"
-        || index == 0
-        || !matches!(bytes[index - 1], b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-')
+    // AC2(f) / D-16-5-J: the token-boundary semantic belongs to the RULE, not
+    // to one hand-picked prefix. Every secret prefix matches only at
+    // start-of-input or after a non-[A-Za-z0-9_-] byte, so audit ids like
+    // `desk-proj-9` (contains `sk-proj-`) or `risk-ant-1` (contains
+    // `sk-ant-`) survive while `"key":"sk-…"` still redacts.
+    index == 0 || !matches!(bytes[index - 1], b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-')
 }
 
 fn contains_rule(bytes: &[u8], prefix: &[u8]) -> bool {

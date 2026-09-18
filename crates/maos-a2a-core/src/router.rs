@@ -1930,6 +1930,13 @@ impl A2ARouterCore {
 /// `pub` so every `A2ATransport` impl (loopback in `maos-a2a`, TCP in
 /// `maos-a2a-tcp`) maps its `A2AError` to the kernel's `IacBusError` port type
 /// identically (Story 8.6 extraction — was a private fn in `maos-a2a::adapter`).
+///
+/// Review 2026-09-17: the `IntentDirection::Accept` arm is currently dead in
+/// production (the sole production `IntentDenied` constructor is send-side;
+/// the receiver answers with a typed NACK instead), but it is PINNED — not
+/// retired — by `accept_direction_maps_and_is_send_only_in_production`
+/// (`crates/maos-a2a-core/tests/fail_closed_8_8.rs`): the mirror enum keeps
+/// `Accept` for wire symmetry.
 fn cross_host_direction(
     direction: IntentDirection,
 ) -> maos_domain::iac_bus_types::CrossHostIntentDirection {

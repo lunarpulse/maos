@@ -89,27 +89,23 @@ async fn hot_path_never_blocks_under_audit_saturation() {
     let posture = [1u8; 32];
 
     let start = Instant::now();
-    let mut audit_failures = 0usize;
     for i in 0..100_000 {
-        match adapter.issue(
-            7,
-            Scope::FsRead {
-                subtree: "/tmp".into(),
-            },
-            60,
-            posture,
-            IntentClass::Standard,
-        ) {
-            Ok(token) => {
-                adapter.verify(&token, posture, SandboxTier(2)).unwrap();
-                if i % 1000 == 0 {
-                    let _ = adapter.revoke(token.token_id);
-                }
-            }
-            Err(maos_domain::ports::capability::CapError::AuditSinkUnavailable) => {
-                audit_failures += 1;
-            }
-            Err(error) => panic!("unexpected capability error under audit load: {error}"),
+        // D-16-5-B: the hot path SURVIVES audit saturation — issue/revoke
+        // never fail for audit reasons; drops are observed, not propagated.
+        let token = adapter
+            .issue(
+                7,
+                Scope::FsRead {
+                    subtree: "/tmp".into(),
+                },
+                60,
+                posture,
+                IntentClass::Standard,
+            )
+            .unwrap();
+        adapter.verify(&token, posture, SandboxTier(2)).unwrap();
+        if i % 1000 == 0 {
+            adapter.revoke(token.token_id).unwrap();
         }
     }
     let elapsed = start.elapsed();
@@ -121,10 +117,6 @@ async fn hot_path_never_blocks_under_audit_saturation() {
         elapsed
     );
 
-    assert!(
-        audit_failures > 0,
-        "a saturated audit sink must fail token issuance closed"
-    );
     // The class-wide instrument must report bounded-channel pressure.
     let drops = cap_audit::audit_health_snapshot().total_drops;
     assert!(

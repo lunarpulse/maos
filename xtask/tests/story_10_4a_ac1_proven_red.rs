@@ -1476,7 +1476,10 @@ fn story_13_5d_request_route_row_audit_correlation() {
         "the kernel's verify_and_audit frame must carry the store row token id"
     );
 
-    let source = include_str!("../../crates/maos-bin/src/main.rs");
+    // Review 2026-09-17: the port moved from the composition root to the
+    // cross-team module so AC1's ordering is integration-testable; the
+    // proven-red source scan follows it.
+    let source = include_str!("../../crates/maos-bin/src/cross_team_crossing.rs");
     let write_body = live_researcher_collective_method_body(source, "collective_write");
     let audit_call = write_body
         .find("record_invocation(")

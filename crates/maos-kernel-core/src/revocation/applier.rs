@@ -121,9 +121,8 @@ impl RevocationApplier {
                 }
                 matched_count += 1;
                 revoked_count += 1;
-                let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid).map_err(|_| {
-                    RevocationError::Io(format!("capability revocation failed for spirit pid={}", scb.pid))
-                })?;
+                let tokens_revoked =
+                    self.capability.revoke_all_for_pid(scb.pid);
                 tokens_revoked_total += tokens_revoked;
                 let in_flight_token_count = scb
                     .task_assignments_in_flight

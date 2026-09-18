@@ -26,15 +26,33 @@ fn kernel_event_insertion_preserves_caller_supplied_kind_and_token() {
 }
 
 #[test]
-fn generic_sk_rule_requires_a_token_boundary() {
+fn secret_prefixes_require_a_token_boundary() {
     let policy = CorpusBackedRedactionPolicy::new();
 
-    let task_id = policy.redact(br#"{"task_id":"task-worker-1"}"#);
-    assert_eq!(task_id.as_ref(), br#"{"task_id":"task-worker-1"}"#);
+    // Task ids survive: none of their secret-prefix substrings sits at a
+    // token boundary (AC2(f) — the exact defect class, per prefix).
+    for id in [
+        br#"{"task_id":"task-worker-1"}"#.as_slice(),
+        br#"{"task_id":"desk-proj-9"}"#.as_slice(),
+        br#"{"task_id":"risk-ant-1"}"#.as_slice(),
+    ] {
+        let redacted = policy.redact(id);
+        assert_eq!(
+            redacted.as_ref(),
+            id,
+            "an id containing a secret-shaped substring must survive"
+        );
+    }
 
+    // Real credentials still redact at a token boundary.
     let credential = policy.redact(br#"{"key":"sk-abcdef"}"#);
     assert!(
         String::from_utf8_lossy(credential.as_ref()).contains("<REDACTED:type=api_key_generic"),
         "a real sk- credential must remain redacted"
+    );
+    let credential = policy.redact(br#"{"key":"sk-proj-9x8y"}"#);
+    assert!(
+        String::from_utf8_lossy(credential.as_ref()).contains("<REDACTED:type=api_key_openai"),
+        "a real sk-proj- credential must remain redacted"
     );
 }

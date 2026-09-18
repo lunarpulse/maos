@@ -1009,3 +1009,29 @@ fn private_tier_markdown_is_erased_by_the_forget_cascade() {
     )
     .expect("the signed bundle must verify now that it claims a real removal");
 }
+
+/// AC2(g) / D-16-5-I review vector (proven-red shape): private-tier residue
+/// must keep the cascade away from the `not-found` terminal. Before the
+/// repair the gates proved emptiness from the shared tier alone and signed
+/// "provably nothing to erase" over existing private data.
+#[test]
+fn private_tier_residue_prevents_not_found() {
+    const NAMESPACE_HEX: &str = "7b225072696e636970616c223a7b227072696e636970616c5f6964223a22616c696365222c22736368656d61223a2270726f66696c65227d7d";
+
+    let fixture = Fixture::new();
+    // Seed ONLY the private tier: one Principal namespace with one value.
+    // The shared tier and the audit TL stay empty — at the pre-repair tree
+    // this is exactly the false `not-found` shape.
+    let principal_dir = fixture.memory_root.join("42").join(NAMESPACE_HEX);
+    std::fs::create_dir_all(&principal_dir).expect("principal namespace");
+    std::fs::write(principal_dir.join("note.txt"), b"private data").expect("private value");
+
+    let output = fixture.run_uninstall(Some("eu-west"));
+    let terminal = terminal(&output);
+    assert_ne!(
+        terminal["outcome"],
+        "not-found",
+        "private-tier residue must prevent the NotFound terminal (AC2(g)); stdout={}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}

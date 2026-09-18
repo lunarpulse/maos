@@ -20,7 +20,7 @@ use rusqlite::Connection;
 
 /// The crash detector's measured `task.orphaned` payload. The 16-byte task
 /// token stays in the payload and is never padded into the capability column.
-const ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,1]],"disposition":"nack"}"#;
+const ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]],"disposition":"nack"}"#;
 
 const TOKENLESS_ORPHAN_PAYLOAD: &str = r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":9,"exit_code":null,"stderr_tail":null,"cause":"fault.signaled","in_flight_tokens":[],"disposition":"nack"}"#;
 

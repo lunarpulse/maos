@@ -375,14 +375,22 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("is_crash", PayloadType::Bool),
         ]),
     },
-    // ── maos-kernel-core — Call (deliberately NOT exempt) ──────────────────
-    // D-16-3-J (4): the SECOND `task.orphaned` writer (`halt/resolver.rs`)
-    // writes a plain `format!` STRING payload (`orphaned: accepted_halt
-    // halt_id=…`) at pid 0 with no token — a raw-bytes payload cannot be
-    // shape-matched, and a pid-0 row reaches a `--spirit` view only on a
-    // `hello-spirit` one-shot boot; if it ever does, it is a genuine FR4
-    // finding (§11 row 12, 16-5).
-    WriterShapeEntry::call("resolver.rs", "emit_task_orphaned", 0),
+    // ── maos-kernel-core — NonCall ────────────────────────────────────────
+    // AC2(b) / D-16-3-J (4): the SECOND `task.orphaned` writer
+    // (`halt/resolver.rs`) writes structured JSON (`{"halt_id":…,
+    // "disposition":"accepted_halt"}`) at pid 0 with no token — exactly
+    // shape-matched, so the row is an honest kernel event, never a
+    // mediated `Call`. A shape drift still fails closed to `Call`.
+    WriterShapeEntry {
+        site: ("resolver.rs", "emit_task_orphaned", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.orphaned"),
+        shape: Some(&[
+            ("halt_id", PayloadType::Str),
+            ("disposition", PayloadType::StrEq("accepted_halt")),
+        ]),
+    },
     // ── maos-bin — NonCall ─────────────────────────────────────────────────
     WriterShapeEntry {
         // The smoke-orchestrator-fanout arm — different keys from the

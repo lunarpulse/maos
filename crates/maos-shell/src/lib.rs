@@ -539,7 +539,10 @@ fn handle_line(
     match response {
         Ok(resp) => {
             render_turn(output, msg, &resp)?;
-            record_turn_row(host, &token_for_audit, msg, &resp)?;
+            // Operator ruling 2026-09-17 (D-16-5-D): drop + disclose — the
+            // session survives; the counted drop and the daemon's degraded
+            // latch carry the failure.
+            record_turn_row(host, &token_for_audit, msg, &resp);
         }
         Err(maos_spirit_hello::HelloError::Ambiguous { tag, prompt }) => {
             // D-16-2-B — the halt goes through the kernel's `invoke_halt`
@@ -691,7 +694,7 @@ fn proceed_with(
         Some(text) => format!("{directive} [clarification: {text}]"),
         None => format!("{directive} [authorized override]"),
     };
-    record_turn_row(host, &token_for_audit, &summary, &response)?;
+    record_turn_row(host, &token_for_audit, &summary, &response);
     Ok(())
 }
 
@@ -717,16 +720,22 @@ fn record_turn_row(
     token: &CapabilityToken,
     msg: &str,
     resp: &maos_spirit_hello::HelloResponse,
-) -> Result<(), CapError> {
+) {
     let payload = serde_json::json!({
         "user": msg,
         "response": resp.introduction,
     })
     .to_string();
-    // The response is already rendered, so this site cannot undo the
-    // invocation. Propagating the typed failure makes the incomplete audit
-    // visible and leaves the class-wide send-site counter as the single count.
-    host.record_turn(token, payload.as_bytes())
+    // D-16-5-D / AC1: the response is already rendered, so this site cannot
+    // undo the invocation and is NOT converted to a refusal. The drop is
+    // counted by the class-wide instrument (the port's send error) and the
+    // operator gets one honest line; the turn and the session survive.
+    if let Err(error) = host.record_turn(token, payload.as_bytes()) {
+        eprintln!(
+            "maos: WARNING audit row for this turn was dropped (audit sink unavailable: {error}); \
+             the session log for this turn is incomplete"
+        );
+    }
 }
 
 /// The resolution kind name the renders use — the door's vocabulary.

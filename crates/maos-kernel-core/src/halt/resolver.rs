@@ -99,6 +99,12 @@ pub struct KernelHaltResolver {
     #[allow(dead_code)]
     mailbox: Arc<Mailbox>,
     boot_nonce: u64,
+    /// Review 2026-09-17 (AC5): serializes resolve() so two concurrent door
+    /// resolves of one halt can never both pass the PendingResolution check
+    /// and double-execute side effects (duplicate task.orphaned rows, double
+    /// context writes). Resolution is rare and operator-paced; a process-wide
+    /// guard is the boring, sound claim.
+    resolve_serialization: std::sync::Mutex<()>,
     /// Story 4.3 — Memory Manager for `ProvidedContext` working-memory writes.
     memory: Arc<MemoryManagerAdapter>,
     /// Story 4.3 — WorkingMemoryOrchestrator for marker-scalar publication
@@ -122,6 +128,7 @@ impl KernelHaltResolver {
             output_markers,
             mailbox,
             boot_nonce,
+            resolve_serialization: std::sync::Mutex::new(()),
             memory,
             orchestrator,
         }
@@ -130,6 +137,14 @@ impl KernelHaltResolver {
 
 impl HaltResolver for KernelHaltResolver {
     fn resolve(&self, halt_id: &HaltId, resolution: Resolution) -> Result<(), ResolveError> {
+        // Review 2026-09-17 (AC5): claim the resolver before the
+        // check/side-effects/transition sequence (check-then-act whose
+        // reordering for durability exposed the duplicate-side-effect
+        // window; see AC5(a)).
+        let _resolve_guard = self
+            .resolve_serialization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         resolution.validate()?; // fail-closed: no state transition on an invalid payload
         let terminal = match &resolution {
             Resolution::ProvidedContext { .. } => HaltState::Resumed,
