@@ -52,7 +52,6 @@ pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
 
-
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::scheduler::SpiritSchedulerPort;

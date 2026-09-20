@@ -716,7 +716,7 @@ impl SpiritSchedulerAdapter {
                 scb.pid,
                 None,
                 "task.orphaned",
-                &serde_json::to_vec(&payload).unwrap_or_default(),
+                &serde_json::to_vec(&payload).unwrap_or_default(), // xtask-serde-allow: journal payload mirrors crash_detector.rs:167, a frozen site; see 20-3c member (12)
                 FrameOrigin::Kernel,
             );
         }

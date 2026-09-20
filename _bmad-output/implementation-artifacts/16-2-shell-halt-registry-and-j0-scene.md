@@ -729,11 +729,53 @@ glm-5.3 (zai/glm-5.3) — 2026-09-14, full T0–T8 pass.
 
 ### File List
 
-**New (7):** `crates/maos-bin/src/shell_host.rs`, `crates/maos-bin/tests/shell_host_16_2.rs`, `crates/maos-shell/tests/shell_halt_repl_16_2.rs`, `crates/maos-audit/src/fr4_classifier.rs`, `crates/maos-audit/tests/fr4_classifier_16_2.rs`, `crates/maos-control/tests/submit_and_wait_16_2.rs`, `crates/maos-spirit-hello/tests/hello_spirit_16_2.rs` (the last added by the §A6 review, moving the inline trait-bound test out of the charged `#[cfg(test)]` module per Trap 11)
-**Modified — production:** `crates/maos-spirit-hello/src/lib.rs`, `crates/maos-shell/src/lib.rs`, `crates/maos-bin/src/main.rs`, `crates/maos-bin/src/lib.rs`, `crates/maos-bin/src/operator_door.rs`, `crates/maos-control/src/lib.rs`, `crates/maos-audit/src/lib.rs`, `crates/maos-cli/src/subcommands.rs`, `crates/maos-cli/src/cli.rs`, `crates/maos-journey-test/src/lib.rs`, `crates/maos-kernel-core/benches/hello_spirit_p95.rs`
-**Modified — build/deps:** `crates/maos-bin/Cargo.toml`, `crates/maos-shell/Cargo.toml`, `crates/maos-journey-test/Cargo.toml`, `Cargo.lock`
-**Modified — tests/gates:** `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs`, `crates/maos-bin/tests/erasure_uninstall_13_5b.rs`, `crates/maos-shell/tests/shell_test.rs`, `crates/maos-cli/tests/audit_no_color_test.rs`, `crates/maos-journey-test/tests/journey_j0.rs`, `.github/workflows/discipline.yml`, `tests/integration/onb_nfr2_timing.sh`, `tests/integration/v01_evaluator_path.sh`, `xtask/kloc.toml`
-**Modified — docs/spec:** `docs-site/docs/run-maos.md`, `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md`, `docs/maos.dev/run-maos.md`, `README.md`, `_bmad-output/implementation-artifacts/deferred-work.md`
+**New (7)**
+- `crates/maos-bin/src/shell_host.rs`
+- `crates/maos-bin/tests/shell_host_16_2.rs`
+- `crates/maos-shell/tests/shell_halt_repl_16_2.rs`
+- `crates/maos-audit/src/fr4_classifier.rs`
+- `crates/maos-audit/tests/fr4_classifier_16_2.rs`
+- `crates/maos-control/tests/submit_and_wait_16_2.rs`
+- `crates/maos-spirit-hello/tests/hello_spirit_16_2.rs` — added by the §A6 review, moving the inline trait-bound test out of the charged `#[cfg(test)]` module per Trap 11
+
+**Modified — production (11)**
+- `crates/maos-spirit-hello/src/lib.rs`
+- `crates/maos-shell/src/lib.rs`
+- `crates/maos-bin/src/main.rs`
+- `crates/maos-bin/src/lib.rs`
+- `crates/maos-bin/src/operator_door.rs`
+- `crates/maos-control/src/lib.rs`
+- `crates/maos-audit/src/lib.rs`
+- `crates/maos-cli/src/subcommands.rs`
+- `crates/maos-cli/src/cli.rs`
+- `crates/maos-journey-test/src/lib.rs`
+- `crates/maos-kernel-core/benches/hello_spirit_p95.rs`
+
+**Modified — build/deps (4)**
+- `crates/maos-bin/Cargo.toml`
+- `crates/maos-shell/Cargo.toml`
+- `crates/maos-journey-test/Cargo.toml`
+- `Cargo.lock`
+
+**Modified — tests/gates (9)**
+- `crates/maos-bin/tests/cohort_daemon_smoke_13_5c.rs`
+- `crates/maos-bin/tests/erasure_uninstall_13_5b.rs`
+- `crates/maos-shell/tests/shell_test.rs`
+- `crates/maos-cli/tests/audit_no_color_test.rs`
+- `crates/maos-journey-test/tests/journey_j0.rs`
+- `.github/workflows/discipline.yml`
+- `tests/integration/onb_nfr2_timing.sh`
+- `tests/integration/v01_evaluator_path.sh`
+- `xtask/kloc.toml`
+
+**Modified — docs/spec (5)**
+- `docs-site/docs/run-maos.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/run-maos.md`
+- `docs/maos.dev/run-maos.md`
+- `README.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+
+> Reshaped 2026-09-20 (Epic-16 retrospective). Same 36 paths and the same Trap-11 note as the prose form this replaces; `check_dev_record_completeness.rs:432-448` only extracts bullet-marked paths, so the prose runs read as an empty File List.
 
 ### Change Log
 

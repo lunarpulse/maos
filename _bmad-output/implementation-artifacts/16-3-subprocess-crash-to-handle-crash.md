@@ -7,6 +7,7 @@ split_from: "Not a split. Authored from `epics/epic-16-one-daemon-one-door-j0-w1
 kernel_grant: "**REVIEW-AMENDED 2026-09-16:** narrow authorized kernel delta. `TaskAssignmentRecord.capability_token` is now `Option<TokenId>`, and `CrashDetector` preserves a missing token as SQL NULL plus an empty `in_flight_tokens` array instead of fabricating `TokenId([0;16])`. No new kernel API or lifecycle transition."
 kloc_grant: "**REVIEW-AMENDED 2026-09-16, FORMATTED MEASUREMENT:** maos-bin 21048, maos-audit 7341, and maos-kernel-core 18938 are pinned as exact zero-headroom ceilings; kernel physical lines 24474 → 24477 with both changed-file hashes and the derived set hash re-pinned. All remain within the operator-authorized story bounds; no unmeasured raise."
 model: "frontier-class allowlist {opus-4-6, opus-4-7, opus-4-8, gpt-5.5, gpt-5.6, glm-5.1, glm-5.2, glm-5.3, opus-5, equiv}. `FRONTIER_FAMILIES` (`xtask/src/check_dev_model_tier.rs`) is the machine-checked set; `equiv` is prose, NOT a match token. Keep the literal `allowlist {`."
+dev_model_used: "anthropic/claude-opus-5"
 review: "§A6 full-layer net BINDING (Blind + Edge Case + Acceptance + Test-Infra + non-author runtime). Not marked ◆ in the epic, but this story **edits the FR4 row classifier** (a control whose failure mode is a silent false-green — 16-2 §15 R2 precedent), **makes the crash floor the first NFR-Rel-1/2 measurement the project has ever run** (a corpus that passes vacuously certifies an unmeasured floor), and **installs a process signal listener and a per-Worker state machine** ⇒ **NON-DEGRADABLE — OPERATOR-RATIFIED 2026-09-15 (§15 Q5)**. E15-A6 binding by name — *does this test read the tree, or only what it set itself?* Obligations (a)–(t) under **Review obligations**."
 ---
 
@@ -638,7 +639,9 @@ Verbatim: *"1. one story. 2. observer. use design patterns. 3. yes. 4. yes both.
 
 ### Agent Model Used
 
-anthropic/claude-opus-5 (frontier-class allowlist {opus-4-6, opus-4-7, opus-4-8, gpt-5.5, gpt-5.6, glm-5.1, glm-5.2, glm-5.3, opus-5, equiv}).
+`anthropic/claude-opus-5` (frontier-class).
+
+> Repaired 2026-09-20 (Epic-16 retrospective). This line previously repeated the enumerated family list from the `model:` frontmatter key, which carries the `allowlist`-plus-brace literal that `check_dev_model_used_populated.rs:302` treats as boilerplate and skips — so `check-dev-model-used-populated` and `check-dev-model-tier`, both in `aggregate.needs`, read this story as having no recorded model. The model itself was never in doubt; only its extractability was.
 
 ### Debug Log References
 

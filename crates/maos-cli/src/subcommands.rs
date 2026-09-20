@@ -1713,7 +1713,7 @@ fn dispatch_legal_hold(args: &LegalHoldArgs, color: ColorChoice) -> ExitCode {
                 eprintln!("maosctl: legal-hold release requires a non-empty --principal");
                 return ExitCode::from(2);
             }
-            let body = serde_json::to_vec(&serde_json::json!({ "principal": principal }))
+            let body = serde_json::to_vec(&serde_json::json!({ "principal": principal })) // xtask-serde-allow: hand-built Value of owned Strings: serialization is infallible, and the .expect on the next line states that invariant; propagation would add an unreachable error arm
                 .expect("serializing a hand-built Value cannot fail");
             durable_verb(
                 "legal-hold release",
@@ -1867,7 +1867,7 @@ fn dispatch_posture(args: &PostureArgs, _color: ColorChoice) -> ExitCode {
         PostureChoice::Assistive => "assistive",
         PostureChoice::AutonomousWithHalt => "autonomous-with-halt",
     };
-    let body = serde_json::to_vec(&serde_json::json!({ "posture": posture }))
+    let body = serde_json::to_vec(&serde_json::json!({ "posture": posture })) // xtask-serde-allow: same: hand-built Value over a &'static str posture label
         .expect("serializing a hand-built Value cannot fail");
     door_verb("posture", |config| {
         door_client::exchange(
@@ -2096,7 +2096,7 @@ fn dispatch_orchestrator(args: &OrchestratorArgs, _color: ColorChoice) -> ExitCo
             if let Some(code) = checked_id("orchestrator queue", spirit) {
                 return code;
             }
-            let body = serde_json::to_vec(&serde_json::json!({ "text": instruction }))
+            let body = serde_json::to_vec(&serde_json::json!({ "text": instruction })) // xtask-serde-allow: same: hand-built Value over an owned instruction String
                 .expect("serializing a hand-built Value cannot fail");
             door_verb("orchestrator queue", |config| {
                 door_client::exchange(

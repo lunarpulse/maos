@@ -25,39 +25,7 @@
 #          hold, REGISTERED_ERASURE_BACKENDS const + release_legal_hold. All
 #          additive; no public symbols removed.
 # To change this number you MUST be landing an AUTHORIZED kernel delta (charter
-# amendment + FLAG-Winston), and you update THIS number HERE — nowhere else.
-#
-# ── BOTH KERNEL PINS (E16-A1, Epic-16 retrospective 2026-09-20) ──────────────
-# "nowhere else" applies to the LINE COUNT only. There are TWO kernel pins and
-# an authorized delta moves both:
-#
-#   (1) LINE-COUNT pin  — `src_lines` in this file   (gate: check-kernel-baseline)
-#   (2) SURFACE pin     — docs/ci-baselines/kernel-surface-v0.1-beta.json
-#                         + xtask/kernel-api-classes.toml
-#                                                    (gate: check-service-boundary)
-#
-# Epic 16 re-derived (1) five times (24474 → 24477 → 24628 → 24796 → 24923) and
-# left (2) inconsistent: `check-service-boundary` was RED at the epic's closing
-# HEAD e868ff28 with two "removed public kernel symbol" violations and three
-# unclassified new symbols. A line-count pin protects only the axis it measures.
-#
-# The trap is specific and it is NOT a discipline failure — it is the gate's own
-# shape: `check_service_boundary` class-checks ONLY items ABSENT from the
-# baseline. Regenerate the baseline in the same commit that moves a symbol and
-# the symbol is never "new" again, so its missing class row is never demanded.
-# That is how `scheduler::scheduler_loop::SpiritSchedulerAdapter` reached the
-# pin unclassified.
-#
-# FLAG-Winston obligation, in order, when a story touches kernel-core:
-#   a. Add or verify the class row in `xtask/kernel-api-classes.toml` FIRST, for
-#      every symbol the story adds, renames, or MOVES to a new module path.
-#   b. Only then regenerate the surface pin, and ENUMERATE the diff in the story
-#      record: every removal and every addition, each named. A removal that is
-#      really a private-field reshape must SAY SO (the public shape is unchanged
-#      — struct hashing covers private fields, which are not ABI).
-#   c. Re-pin `src_lines` here with the HISTORY entry.
-#   d. Run `check-service-boundary` AND `check-kernel-baseline`. Both, at HEAD.
-# ─────────────────────────────────────────────────────────────────────────────
+# amendment + FLAG-Winston) — and BOTH kernel pins move; see the block at EOF.
 #   21472  Story 9.3b — FR62 GovernanceEvent + FR64 CostAttribution kernel delta
 #          (+136, charter-amended kernel delta, jointly re-pinned).
 #          FLAG-Winston: authorized per ADR-045/ADR-046. FR64 cost emission at
@@ -534,7 +502,37 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 24923
+src_lines = 24922
+# HISTORY: Epic-16 retrospective, E16-A1 follow-through (2026-09-20): 24923 ->
+#          24922 physical lines (-1). OPERATOR-RATIFIED FLAG-Winston, and the
+#          FIRST re-pin taken under the BOTH-KERNEL-PINS obligation recorded at
+#          the end of this file. DRIVER, two named surfaces, neither a feature:
+#          (a) security/mod.rs -- ONE stray double blank line after
+#              `use std::sync::Arc;`. `cargo fmt --all --check` was RED at
+#              e868ff28 and at 2f488614, so `check-fmt` (in `aggregate.needs`)
+#              could not pass without deleting a kernel line. This is the 10.5
+#              R3 "cargo fmt reflow outside a named surface" case, disclosed
+#              here rather than taken silently. -1 line.
+#          (b) scheduler/scheduler_loop.rs:719 -- a `// xtask-serde-allow`
+#              marker on the existing `to_vec(&payload).unwrap_or_default()`
+#              line. 16-6 copied a pattern whose twin at
+#              supervision/crash_detector.rs:167 is FROZEN-allowlisted; the
+#              allowlist header forbids new entries, so the intent is recorded
+#              in code instead. Line-neutral; the file HASH moves, not the count.
+#              The underlying defect -- an empty journal payload on a
+#              `task.orphaned` row is evidence loss -- is NOT fixed here: it is
+#              member (12) of `20-3c-audit-truth-and-halt-receipt-residuals`.
+#          SURFACE PIN: re-derived and UNCHANGED. A blank line and a comment
+#          move no public symbol; `check-service-boundary` stayed green at 379
+#          items with zero baseline edits. Both pins verified at HEAD.
+#          No kernel file was added or removed; 98 files, set hash re-minted.
+#
+# ⚠ This entry sits BELOW `src_lines`, breaking the chronological-above
+#   convention every entry before it follows. Reason, not preference:
+#   `kernel_pin_content_hash_16_0.rs` pins `src_lines` to line 505 because
+#   `kernel-core-baseline.toml:505` is cited across the tree, so NOTHING may
+#   be inserted above it. The next re-pin has the same constraint.
+
 
 # HISTORY: Story 16-6 (2026-09-19): 24628 -> 24796 physical lines (+168).
 #          ◆ FLAG-Winston, operator-granted 2026-09-19 (§14 Q1 as re-scoped,
@@ -608,7 +606,7 @@ src_lines = 24923
 #          clamp helper extraction. No kernel file was added or removed.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "326a6a19afa35918adbf604b1bbe986fce072c762fa47bc510518bdee0462c39"
+set_hash = "ba4d06f550a78cefa39a68e2a324f9aa1abd1b412a6a14b3911c2c2fbb05612d"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -676,13 +674,13 @@ set_hash = "326a6a19afa35918adbf604b1bbe986fce072c762fa47bc510518bdee0462c39"
 "scheduler/mod.rs" = "fa89437053eedadef4662a1f538ad275caa62df69a9ddbbd4dc0a9976a377cf5"
 "scheduler/resource_ceiling.rs" = "becc322aa3700d8f08c10ac443aff2ea80995926a2cc647ddbad49aecfa6b06d"
 "scheduler/schedule_watchdog.rs" = "b50009c32df76c8f99095584a68c1de65d6a4831f84a97061672303dccca70fc"
-"scheduler/scheduler_loop.rs" = "49f4d0876a0eb01c649e4ef964216db3b3bf9297efda86793af8d1c4e255ee19"
+"scheduler/scheduler_loop.rs" = "48cc3e524a15aad9eda382b985b90cb6170b2e4667dce56831d60c87d351ea5b"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
 "security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
 "security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
-"security/mod.rs" = "607554f9e2241311e9f0d9417805a9cdbf417b574608eb8ac5df83da5cf456ac"
+"security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "8964be98eb51c34dd4a7ae75d2d60ab90d8e8d6897205f8787f0ae0563ff29f2"
@@ -709,3 +707,40 @@ set_hash = "326a6a19afa35918adbf604b1bbe986fce072c762fa47bc510518bdee0462c39"
 "supervision/test_double.rs" = "3162ed1ee1c2835f8a08496aff056d41acf247949c9076cb4fd9cb8a3cec8d5c"
 "supervision/watchdog_common.rs" = "a6f98ea2e799ea8d7b0fbcc9e02ac154625ab9b4e8e95d4508bd173dcde6e23c"
 "telemetry/mod.rs" = "48c1b6401e8806d83ef8899d5341b1d7be64ac91261c42f16578ec720963c70c"
+
+# ── BOTH KERNEL PINS (E16-A1, Epic-16 retrospective 2026-09-20) ──────────────
+# The header's "update THIS number HERE" applies to the LINE COUNT only. There
+# are TWO kernel pins and an authorized delta moves both:
+#
+#   (1) LINE-COUNT pin  — `src_lines` in this file   (gate: check-kernel-baseline)
+#   (2) SURFACE pin     — docs/ci-baselines/kernel-surface-v0.1-beta.json
+#                         + xtask/kernel-api-classes.toml
+#                                                    (gate: check-service-boundary)
+#
+# Epic 16 re-derived (1) five times (24474 -> 24477 -> 24628 -> 24796 -> 24923)
+# and left (2) inconsistent: `check-service-boundary` was RED at the epic's
+# closing HEAD e868ff28 with two "removed public kernel symbol" violations and
+# three unclassified new symbols. A pin protects only the axis it measures.
+#
+# The trap is specific and it is NOT a discipline failure — it is the gate's own
+# shape: `check_service_boundary` class-checks ONLY items ABSENT from the
+# baseline. Regenerate the baseline in the same commit that moves a symbol and
+# the symbol is never "new" again, so its missing class row is never demanded.
+# That is how `scheduler::scheduler_loop::SpiritSchedulerAdapter` reached the
+# pin unclassified.
+#
+# FLAG-Winston obligation, in order, when a story touches kernel-core:
+#   a. Add or verify the class row in `xtask/kernel-api-classes.toml` FIRST, for
+#      every symbol the story adds, renames, or MOVES to a new module path.
+#   b. Only then regenerate the surface pin, and ENUMERATE the diff in the story
+#      record: every removal and every addition, each named. A removal that is
+#      really a private-field reshape must SAY SO (the public shape is unchanged
+#      — struct hashing covers private fields, which are not ABI).
+#   c. Re-pin `src_lines` above with the HISTORY entry.
+#   d. Run `check-service-boundary` AND `check-kernel-baseline`. Both, at HEAD.
+#
+# This block lives at EOF, not beside the header clause it corrects, because
+# `kernel_pin_content_hash_16_0.rs:846` pins `src_lines` to line 505 — every
+# `kernel-core-baseline.toml:505` citation in the tree resolves against it, so
+# nothing may be inserted above it.
+# ─────────────────────────────────────────────────────────────────────────────

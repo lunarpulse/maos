@@ -8522,7 +8522,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             &self.memory_db_path,
         );
         let terminal_code = terminal.exit_code();
-        let mut body = serde_json::to_value(&terminal).unwrap_or_else(|error| {
+        let mut body = /* // xtask-serde-allow: error handled, closure builds the failure body */ serde_json::to_value(&terminal).unwrap_or_else(|error| {
             serde_json::json!({
                 "outcome": "failed",
                 "spirit_id": spirit_id,

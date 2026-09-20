@@ -147,7 +147,7 @@ impl Response {
     /// carry only `{"error":<code>}`; typed outcomes add `detail`.
     pub fn error_parts(&self) -> (String, String) {
         let parsed: serde_json::Value =
-            serde_json::from_slice(&self.body).unwrap_or(serde_json::Value::Null);
+            serde_json::from_slice(&self.body).unwrap_or(serde_json::Value::Null); // xtask-serde-allow: foreign door body on an error-reporting path; a non-JSON body is expected input and Null is the documented sentinel, so propagating would replace the real error with a parse error
         let code = parsed
             .get("error")
             .and_then(serde_json::Value::as_str)
@@ -164,7 +164,7 @@ impl Response {
     /// The 200 body as JSON (Null when it is not — callers that only look for
     /// `terminal_code` treat Null as "no terminal code").
     pub fn body_json(&self) -> serde_json::Value {
-        serde_json::from_slice(&self.body).unwrap_or(serde_json::Value::Null)
+        serde_json::from_slice(&self.body).unwrap_or(serde_json::Value::Null) // xtask-serde-allow: same fail-soft as error_parts; the doc comment above states callers treat Null as no terminal code
     }
 }
 
@@ -410,7 +410,7 @@ pub fn map_response(verb: &str, response: Response) -> ExitCode {
 /// route budget but WILL complete (`handler_still_running`, whose
 /// `operation_id` is the lookup key into the Transparency Log).
 fn map_retryable_503(verb: &str, body: &[u8]) -> ExitCode {
-    let parsed: serde_json::Value = serde_json::from_slice(body).unwrap_or(serde_json::Value::Null);
+    let parsed: serde_json::Value = serde_json::from_slice(body).unwrap_or(serde_json::Value::Null); // xtask-serde-allow: foreign 503 body; retry classification must survive a non-JSON payload
     let code = parsed
         .get("error")
         .and_then(serde_json::Value::as_str)
