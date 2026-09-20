@@ -267,7 +267,11 @@ pub trait Spirit {
     /// §5.3.9 — Resume
     fn on_resume(&self, ctx: &mut Ctx) {}
 
-    /// Fired when the Spirit receives an `Unload` lifecycle verb.
+    /// Fired after the kernel has released the Spirit: it has flipped lifecycle
+    /// state, written the receipt, revoked capabilities, and removed the SCB.
+    /// During this hook, `KernelCtx` capability and heartbeat calls fail with
+    /// `ScbNotFound` or denial; clean up only resources that need no live
+    /// tokens. The kernel owns release. Story 16-6 review 2026-09-20.
     /// §5.3.10 — Unload
     fn on_unload(&self, ctx: &mut Ctx) {}
 

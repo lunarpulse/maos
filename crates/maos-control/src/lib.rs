@@ -334,6 +334,20 @@ pub enum OperatorCommand {
     AdmitGovernanceSchema {
         schema: serde_json::Value,
     },
+    /// Story 16-6 — admit a Spirit into the running daemon from a manifest.
+    ///
+    /// The manifest travels as a CANONICAL ABSOLUTE PATH, canonicalised by
+    /// the client. D-16-1-X's reason for `ImportRevocations` carrying bytes
+    /// is that a relative path resolves in the DAEMON's working directory,
+    /// not the operator's; canonicalising client-side answers the same
+    /// objection while keeping the daemon the only reader of the file, which
+    /// is what lets the same gates `maos run` applies apply here.
+    ///
+    /// It carries no `spirit_id`: the id IS the manifest's `[class].name` and
+    /// is not known until the daemon has parsed it. See `spirit_key`.
+    Load {
+        manifest: String,
+    },
 }
 
 impl OperatorCommand {
@@ -354,22 +368,40 @@ impl OperatorCommand {
             | Self::Uninstall { spirit_id }
             | Self::ResolveHalt { spirit_id, .. }
             | Self::OrchestratorEnqueue { spirit_id, .. } => Some(spirit_id),
+            // `Load` is `None` BY CONSTRUCTION, not by omission: the id it
+            // will create lives inside a file the daemon has not opened yet,
+            // so no port-level key exists at enqueue time. The handler takes
+            // the per-Spirit lock ITSELF once the parse yields the id
+            // (D-16-6-D) — without it, two concurrent loads of the same id
+            // both pass the kernel's `resolve_pid` check and both insert,
+            // because that check and the insert are separate lock
+            // acquisitions with the whole of `admit_spirit` between them.
             Self::RevokeToken { .. }
             | Self::ImportRevocations { .. }
             | Self::ForgetMemory { .. }
             | Self::ReleaseLegalHold { .. }
-            | Self::AdmitGovernanceSchema { .. } => None,
+            | Self::AdmitGovernanceSchema { .. }
+            | Self::Load { .. } => None,
         }
     }
 
     /// How long the route waits before withdrawing or reporting
     /// `handler_still_running`.
+    ///
+    /// ⚠ This match ends in `_`, so a missing arm COMPILES and silently
+    /// inherits `DEFAULT_ROUTE_BUDGET`. It is the one `OperatorCommand`
+    /// match the compiler does not police; the control is obligation (l).
     pub fn route_budget(&self) -> Duration {
         match self {
             Self::Upgrade { .. }
             | Self::Uninstall { .. }
             | Self::ImportRevocations { .. }
-            | Self::HotSwapPrecheck { .. } => LONG_ROUTE_BUDGET,
+            | Self::HotSwapPrecheck { .. }
+            // Story 16-6 — `Load` runs the whole load → admit → start triple,
+            // which dispatches the Spirit's `on_load` and `on_start` hooks;
+            // each carries its own manifest `[budget]` cap, and two of them
+            // do not fit inside a 10 s route.
+            | Self::Load { .. } => LONG_ROUTE_BUDGET,
             _ => DEFAULT_ROUTE_BUDGET,
         }
     }
@@ -425,6 +457,16 @@ pub struct SpiritStatusRow {
     pub lifecycle_state: String,
     /// Read from the same `PolicyTable` snapshot `evaluate_with_posture` reads.
     pub posture: String,
+    /// Story 16-6 (R23(i)) — the posture ceiling actually in force.
+    ///
+    /// `posture` above is only `state.current`. Without this key, an operator
+    /// who configures `operator_posture_ceiling` has no surface anywhere that
+    /// shows the clamp took effect: `admit_spirit` writes a `LifecycleEntry`
+    /// with no posture field, so a clamped admission is indistinguishable
+    /// from an unclamped one. §16a requires BOTH the requested and the
+    /// effective ceiling to be readable, and a requirement with no surface is
+    /// a claim standing in for a control.
+    pub posture_ceiling: String,
 }
 
 /// The daemon itself, for "is this the root that holds my home's stores".
@@ -436,6 +478,18 @@ pub struct DaemonStatusRow {
     pub spirit_ids: Vec<String>,
     pub audit_degraded: bool,
     pub audit_drop_count: u64,
+    /// Story 16-6 (R2) — each id's lifecycle state, positionally aligned with
+    /// `spirit_ids`.
+    ///
+    /// A NEW SIBLING KEY, never a reshape of `spirit_ids` into objects:
+    /// `post_surface_16_1.rs` asserts `daemon["spirit_ids"][0] == "butler"`.
+    ///
+    /// Why it exists: `maosctl load` creates a Spirit that nothing supervises
+    /// — the DRR picker selects only `Running` — so a loaded-and-forgotten
+    /// Spirit was indistinguishable from a working one on the only surface
+    /// that enumerates the daemon. Observability is the contract; it is the
+    /// operator's cue to `start` it or `unload` it.
+    pub lifecycle_states: Vec<String>,
 }
 
 /// One Spirit's Orchestrator buffer occupancy.
@@ -988,6 +1042,7 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                         "boot_nonce": daemon.boot_nonce,
                         "version": daemon.version,
                         "spirit_ids": daemon.spirit_ids,
+                        "lifecycle_states": daemon.lifecycle_states,
                         "audit_degraded": daemon.audit_degraded,
                         "audit_drop_count": daemon.audit_drop_count,
                     }),
@@ -998,6 +1053,30 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
         ["v1", "a2a", "rotation-windows"] => get_only(method, || rotation_windows(routes)),
         ["v1", "cohort", "peer-versions"] => get_only(method, || peer_versions(routes)),
         ["v1", "cohort", "self-identity"] => get_only(method, || self_identity(routes)),
+        // Story 16-6 (D-16-6-E) — the COLLECTION route. `["v1","spirits"]`
+        // fell to the `_ => 404` below until now, so a new arm here has no
+        // ordering conflict with the delicate `{id}` / `{id}/sandbox`
+        // disambiguation above.
+        //
+        // A load cannot travel on `POST /v1/spirits/{id}/{verb}`: `validate_id`
+        // permits `[A-Za-z0-9._-]{1,128}`, so a filesystem path can never be a
+        // path segment; the id does not exist until the manifest is parsed;
+        // and `lifecycle_command` answers `spirit_not_loaded` from
+        // `resolve_pid` BEFORE doing anything, which is the exact inverse of
+        // what a load needs.
+        ["v1", "spirits"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            match required_str(&body, "manifest") {
+                Ok(manifest) => submit(routes, OperatorCommand::Load { manifest }),
+                Err(response) => response,
+            }
+        }
         ["v1", "spirits", id, "sandbox"] => {
             let id = match validate_id(id) {
                 Ok(id) => id,
@@ -1026,6 +1105,7 @@ fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<
                             "boot_nonce": row.boot_nonce,
                             "lifecycle_state": row.lifecycle_state,
                             "posture": row.posture,
+                            "posture_ceiling": row.posture_ceiling,
                         }),
                     ),
                     None => Response::new(404, NOT_FOUND_BODY),

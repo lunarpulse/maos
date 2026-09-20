@@ -495,7 +495,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::capability::cap_policy::OperatorPolicyConfig",
-      "signature_hash": "7ba7c38c89a80d49685c7184cd2ded5390ee94279ce5778ad054ba69df20f310"
+      "signature_hash": "21bbe125452572de93af78f8c1f61791453dbee1133baf51cf9d0d3f592406da"
     },
     {
       "kind": "struct",

@@ -8,7 +8,7 @@
 //! would have written, classified the way the audit read renders it.
 
 use maos_audit::fr4_classifier::{
-    classify_fr4_row, Fr4RowDisposition, TokenColumn, NON_CALL_KINDS, WRITER_SHAPES,
+    classify_fr4_row, Fr4RowDisposition, TokenColumn, WriterIntent, NON_CALL_KINDS, WRITER_SHAPES,
 };
 use maos_audit::{to_fr4_ndjson, to_fr4_plain, to_plain, AuditEntry, Fr4SchemaError};
 
@@ -209,6 +209,18 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "crash task.orphaned (kind 1)",
         ),
         (
+            // Story 16-6 (AC2(g)(ii)) — `unload`'s inline FR50 orphan row.
+            // `exit_signal`/`exit_code` are null and `cause` names the hook,
+            // not an OS fault: a failed `on_unload` is not a process death
+            // and must not be logged as one.
+            "task.complete",
+            None,
+            "task.orphaned",
+            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","exit_signal":null,"exit_code":null,"stderr_tail":"hook on_unload panicked","cause":"on_unload_hook_failure","in_flight_tokens":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]],"disposition":"nack"}"#,
+            4242,
+            "unload task.orphaned (kind 1)",
+        ),
+        (
             "capability.invocation",
             None,
             "lifecycle.crash",
@@ -317,6 +329,25 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
     ];
     let noncall_entries: Vec<&maos_audit::fr4_classifier::WriterShapeEntry> =
         WRITER_SHAPES.iter().filter(|w| w.shape.is_some()).collect();
+    // Story 16-6 review 2026-09-20 — these same-shaped rows have distinct
+    // teardown writers. Pin both doorbell sites so removing unload's writer
+    // cannot still pass by classifying crash-detector's row.
+    let task_orphan_sites: Vec<_> = noncall_entries
+        .iter()
+        .filter(|writer| writer.intent == WriterIntent::Exact("task.orphaned"))
+        .map(|writer| writer.site)
+        .collect();
+    assert_eq!(
+        task_orphan_sites.len(),
+        3,
+        "the crash, unload, and resolver task.orphaned writers are all required"
+    );
+    assert!(
+        task_orphan_sites.contains(&("crash_detector.rs", "handle_crash", 0))
+            && task_orphan_sites.contains(&("scheduler_loop.rs", "orphan_in_flight_tasks", 0,)),
+        "the crash and unload task.orphaned writer sites must both remain classified: \
+         {task_orphan_sites:?}"
+    );
     assert_eq!(
         noncall_entries.len(),
         measured.len(),

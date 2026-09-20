@@ -100,6 +100,9 @@ pub enum LifecycleError {
         cap_seconds: u64,
     },
 
+    #[error("hook {hook_name} panicked: {preview}")]
+    HookPanicked { hook_name: String, preview: String },
+
     #[error("internal: {0}")]
     Internal(String),
 }

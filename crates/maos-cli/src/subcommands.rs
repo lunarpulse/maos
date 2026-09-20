@@ -16,10 +16,10 @@ use std::collections::{HashMap, HashSet};
 use crate::accessibility::ColorChoice;
 use crate::cli::{
     AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs, GovernanceOp,
-    HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, MigrateArgs, MigrateOp,
-    OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice, ResolutionKindChoice,
-    ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp,
-    SpiritArgs, SpiritOp, Subcommand, UninstallArgs, UpgradePolicyArg,
+    HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, LoadArgs, MigrateArgs,
+    MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs, PostureChoice,
+    ResolutionKindChoice, ResumeArgs, RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs,
+    SkillsArgs, SkillsOp, SpiritArgs, SpiritOp, Subcommand, UninstallArgs, UpgradePolicyArg,
 };
 use crate::door_client::{self, DoorConfig, DoorError, DEFAULT_ROUTE_BUDGET, LONG_ROUTE_BUDGET};
 
@@ -28,6 +28,7 @@ const MAX_DOOR_BODY_BYTES: usize = 64 * 1024;
 pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
     match cmd {
         Subcommand::Install(args) => install(args, color),
+        Subcommand::Load(args) => dispatch_load(args, color),
         Subcommand::Start(args) => lifecycle_door_verb("start", args.spirit.as_deref(), color),
         Subcommand::Stop(_) => refuse_stop(),
         Subcommand::Unload(args) => lifecycle_door_verb("unload", args.spirit.as_deref(), color),
@@ -99,6 +100,37 @@ fn canonical_manifest(verb: &str, to: &str) -> Result<PathBuf, ExitCode> {
     std::fs::canonicalize(path).map_err(|error| {
         eprintln!("maosctl: {verb} — cannot canonicalize manifest {to}: {error}");
         ExitCode::from(1)
+    })
+}
+/// Story 16-6 — `maosctl load <manifest>` (FR9's `load`).
+///
+/// `POST /v1/spirits` with `{"manifest": "<canonical absolute path>"}`: a
+/// COLLECTION route, because `/v1/spirits/{id}/{verb}` cannot carry a load —
+/// a filesystem path is not a legal path segment, and the id does not exist
+/// until the daemon has parsed the manifest.
+///
+/// `LONG_ROUTE_BUDGET` because the daemon runs the whole `load → admit`
+/// sequence inside the request, dispatching the Spirit's `on_load` hook with
+/// its own manifest `[budget]` cap.
+///
+/// There is no `checked_id` here: the operator names a FILE, not an id.
+fn dispatch_load(args: &LoadArgs, _color: ColorChoice) -> ExitCode {
+    let manifest = match canonical_manifest("load", &args.manifest) {
+        Ok(path) => path,
+        Err(code) => return code,
+    };
+    let body = serde_json::to_vec(&serde_json::json!({
+        "manifest": manifest.to_string_lossy(),
+    }))
+    .expect("serializing a hand-built Value cannot fail");
+    door_verb("load", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            "/v1/spirits",
+            Some(("application/json", &body)),
+            LONG_ROUTE_BUDGET,
+        )
     })
 }
 
@@ -2399,6 +2431,7 @@ fn spirit_status_report(spirit: &str) -> ExitCode {
                     println!("boot_nonce: {}", field("boot_nonce"));
                     println!("lifecycle_state: {}", field("lifecycle_state"));
                     println!("posture: {}", field("posture"));
+                    println!("posture_ceiling: {}", field("posture_ceiling"));
                     ExitCode::SUCCESS
                 }
                 Ok(response) => door_client::map_response("spirit inspect", response),

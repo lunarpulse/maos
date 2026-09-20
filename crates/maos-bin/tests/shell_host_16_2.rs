@@ -542,9 +542,13 @@ fn scheduler_with_hello(world: &KernelWorld, boot_nonce: u64) -> Arc<SpiritSched
         );
         world.policy.update(policy_inner);
         // The shell block's exact sequence: load → admit (security, not
-        // wired in the kernel-object world) → start. Without start the
-        // transition table refuses Unload from Loaded — the residual the
-        // epic-16 retro row names.
+        // wired in the kernel-object world) → start.
+        //
+        // ⚠ Story 16-6 — this used to add "without start the transition
+        // table refuses Unload from Loaded, the residual the epic-16 retro
+        // row names". That arm now exists, so the refusal is gone and the
+        // residual is closed; `start` stays because this fixture is
+        // reproducing the shell's sequence, not working around a defect.
         scheduler.start(pid).await.expect("start hello-spirit");
         pid
     });
@@ -895,6 +899,13 @@ impl BinPrivateOps for UnwiredBinOps {
         _event: maos_domain::invariants::i10::LifecycleEvent,
         _spirit_id: &str,
     ) -> Result<PathBuf, String> {
+        unreachable!("the halt-resolve race never touches the bin-private ops");
+    }
+    async fn load_spirit(
+        &self,
+        _manifest: &std::path::Path,
+        _pread: Option<std::sync::Arc<String>>,
+    ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
         unreachable!("the halt-resolve race never touches the bin-private ops");
     }
 

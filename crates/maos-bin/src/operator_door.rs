@@ -103,6 +103,26 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         target_manifest: &Path,
         candidates: &[String],
     ) -> Result<serde_json::Value, String>;
+
+    /// Story 16-6 — the `load → admit → start` triple over the daemon's real
+    /// kernel composites.
+    ///
+    /// It enters through this seam for the reason every other method does:
+    /// `DoorInner` holds neither `security` (the `SecurityManagerAdapter`
+    /// that applies every gate that matters) nor `pid_by_spirit_id` (the map
+    /// every id-resolving surface reads) nor the class-construction switch,
+    /// and widening the library surface to reach them would put the
+    /// composition root inside the door.
+    ///
+    /// ⚠ NOT `SpiritSchedulerAdapter::load`. The daemon constructs its
+    /// scheduler with `security_manager: None`, so the kernel's own internal
+    /// `admit_spirit` never runs here — calling it directly would admit the
+    /// Spirit not at a lower sandbox tier but with no admission at all.
+    async fn load_spirit(
+        &self,
+        manifest: &Path,
+        pread: Option<Arc<String>>,
+    ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
 }
 
 /// The uninstall terminal as the door renders it: the serialized
@@ -325,7 +345,11 @@ impl DoorInner {
 
     /// Dispatch one STARTED command to its handler. Called only after the
     /// per-Spirit lock is held and the `QUEUED → STARTED` CAS won.
-    async fn dispatch(&self, command: OperatorCommand) -> OperatorOutcome {
+    async fn dispatch(
+        &self,
+        command: OperatorCommand,
+        pread: Option<Arc<String>>,
+    ) -> OperatorOutcome {
         match command {
             OperatorCommand::Start { spirit_id } => {
                 self.lifecycle_command(
@@ -417,6 +441,7 @@ impl DoorInner {
             OperatorCommand::AdmitGovernanceSchema { schema } => {
                 self.admit_governance_schema_command(schema).await
             }
+            OperatorCommand::Load { manifest } => self.load_command(&manifest, pread).await,
         }
     }
 
@@ -529,6 +554,100 @@ impl DoorInner {
             "verb": verb,
             "lifecycle_state": lifecycle_state,
         }))
+    }
+    /// Story 16-6 — `POST /v1/spirits`: admit a Spirit into the running
+    /// daemon and leave it in `Loaded`.
+    ///
+    /// It does NOT start the Spirit. `load` and `start` are two of FR9's five
+    /// verbs, and collapsing them would leave `maosctl start` with no
+    /// operator-creatable subject — which is the state it has been in since
+    /// 16-1 shipped it, because every root loads, admits and starts in one
+    /// unbroken run before the serving loop this door answers from.
+    ///
+    /// Serialization: the per-Spirit lock for this id was taken by
+    /// `run_command` BEFORE the `QUEUED → STARTED` CAS, using the id peeked
+    /// out of the manifest — so a contended pair behaves exactly like every
+    /// other verb (the loser is withdrawn as `spirit_busy` within
+    /// `lock_wait`), and the kernel's own non-atomic `AlreadyLoaded` guard
+    /// (a `resolve_pid` read and an `insert` in separate acquisitions, with
+    /// the whole of `admit_spirit` between them) cannot be raced through this
+    /// door.
+    async fn load_command(&self, manifest: &str, pread: Option<Arc<String>>) -> OperatorOutcome {
+        use crate::admission::AdmissionRefusal;
+
+        let path = Path::new(manifest);
+        // D-16-1-X — the client canonicalises; the daemon refuses to guess.
+        // A relative path here would resolve in the DAEMON's working
+        // directory, which is not the operator's.
+        if !path.is_absolute() {
+            return OperatorOutcome::Invalid {
+                code: "manifest_not_canonical".into(),
+                detail: format!(
+                    "manifest path '{manifest}' is not absolute; the client canonicalises \
+                     before sending because the daemon's working directory is not yours"
+                ),
+            };
+        }
+
+        let admitted = match self.private_ops.load_spirit(path, pread).await {
+            Ok(admitted) => admitted,
+            Err(refusal) => {
+                let code = refusal.code().to_owned();
+                let detail = refusal.to_string();
+                // An id already in the scheduler is a STATE conflict (409);
+                // every other refusal is a bad request (400). A load that is
+                // refused has left nothing behind either way — the triple
+                // rolls back its own partial admission.
+                return if refusal.is_already_loaded() {
+                    OperatorOutcome::Conflict { code, detail }
+                } else {
+                    match refusal {
+                        AdmissionRefusal::Start { .. } => OperatorOutcome::Failed { code, detail },
+                        _ => OperatorOutcome::Invalid { code, detail },
+                    }
+                };
+            }
+        };
+
+        let mut payload = serde_json::json!({
+            "spirit_id": admitted.spirit_id,
+            "verb": "load",
+            "pid": admitted.pid,
+            "lifecycle_state": self
+                .scb_state(&admitted.spirit_id)
+                .map(|state| format!("{state:?}"))
+                .unwrap_or_else(|| "Unloaded".into()),
+            "effective_sandbox_tier": format!("{:?}", admitted.effective_sandbox_tier),
+            "requested_posture_ceiling": format!("{:?}", admitted.requested_posture_ceiling),
+            "effective_posture_ceiling": format!("{:?}", admitted.effective_posture_ceiling),
+        });
+        if let Err(error) = self
+            .private_ops
+            .append_lifecycle_journal(
+                maos_domain::invariants::i10::LifecycleEvent::Load,
+                &admitted.spirit_id,
+            )
+            .await
+        {
+            eprintln!(
+                "maos: WARNING — load for '{}' admitted but lifecycle journal failed: {error}",
+                admitted.spirit_id
+            );
+            payload["journal_error"] = serde_json::Value::String(error);
+        }
+        if let Err(error) = maos_kernel_core::orchestrator::journal_director_lifecycle_action(
+            &self.transparency_log,
+            DIRECTOR,
+            &admitted.spirit_id,
+            "load",
+        ) {
+            eprintln!(
+                "maos: WARNING — load for '{}' admitted but approval log failed: {error}",
+                admitted.spirit_id
+            );
+            payload["approval_log_error"] = serde_json::Value::String(error.to_string());
+        }
+        OperatorOutcome::Completed(payload)
     }
 
     /// Posture shift (D-16-1-L): resolve → `policy.shift_posture` → journal
@@ -1317,23 +1436,48 @@ impl DoorInner {
         completion_tx: std::sync::mpsc::Sender<OperatorOutcome>,
     ) {
         let withdrawal_deadline = tokio::time::Instant::now() + deadline;
-        // The wait for THIS Spirit's lock happens inside the command's own
-        // route budget (D-16-1-R). Budget − 250 ms keeps a margin so the
-        // server's CAS to WITHDRAWN — not a timer race — decides the answer.
-        let lock_wait = deadline
-            .checked_sub(Duration::from_millis(250))
-            .unwrap_or(Duration::ZERO);
+        // A command which finds its Spirit lock held has not started. Leave
+        // the shared submit-and-withdraw protocol to classify it as
+        // `spirit_busy`, rather than waiting until the first command finishes
+        // and misreporting a duplicate-load conflict.
         // ⚠ The `Arc` is bound BEFORE the guard so it outlives it. Taking it
         // inside the `if let` made the guard borrow a temporary that dropped
         // at the end of the block, one line before the guard itself.
-        let spirit_lock = command.spirit_key().map(|key| self.spirit_lock(key));
+        //
+        // Story 16-6 (D-16-6-D, §17 R12) — `Load` has no direct
+        // `spirit_key`, but it still needs the per-Spirit critical section.
+        // Read its bounded regular manifest on a blocking worker, then use
+        // that same text both for the serialization key and admission.
+        let pread = match &command {
+            OperatorCommand::Load { manifest } => {
+                let path = PathBuf::from(manifest);
+                tokio::task::spawn_blocking(move || crate::admission::read_manifest(&path))
+                    .await
+                    .ok()
+                    .and_then(Result::ok)
+                    .map(Arc::new)
+            }
+            _ => None,
+        };
+        let lock_key = match (&command, &pread) {
+            (OperatorCommand::Load { .. }, Some(text)) => {
+                crate::admission::peek_spirit_id_from_str(text)
+            }
+            (OperatorCommand::Load { .. }, None) => None,
+            (other, _) => other.spirit_key().map(str::to_owned),
+        };
+        // D-16-6-D as ratified (§17 R12): the wait for the Spirit's lock is
+        // the route budget minus a 250 ms margin, so a loser still inside
+        // `lock_wait` keeps the sender alive and answers `spirit_busy`, and
+        // a winner at the edge can still finish inside the budget.
+        let lock_wait = deadline.saturating_sub(Duration::from_millis(250));
+        let spirit_lock = lock_key.as_deref().map(|key| self.spirit_lock(key));
         let _permit = match spirit_lock.as_ref() {
             Some(lock) => match tokio::time::timeout(lock_wait, lock.lock()).await {
                 Ok(guard) => Some(guard),
                 Err(_elapsed) => {
-                    // Keep the sender alive until after the server's timeout
-                    // so it can win QUEUED → WITHDRAWN and return SpiritBusy
-                    // instead of observing a disconnected channel as 500.
+                    // Keep the sender alive until the server's route-budget
+                    // CAS withdraws this still-QUEUED command as spirit_busy.
                     tokio::time::sleep_until(withdrawal_deadline + Duration::from_millis(50)).await;
                     return;
                 }
@@ -1355,12 +1499,13 @@ impl DoorInner {
             return;
         }
         let verb = command_verb(&command);
-        let spirit_pid = command
+        let spirit_id = command
             .spirit_key()
-            .and_then(|spirit_id| self.scheduler.resolve_pid(spirit_id))
-            .unwrap_or(0);
-        let spirit_id = command.spirit_key().map(str::to_string).unwrap_or_default();
-        let outcome = self.dispatch(command).await;
+            .map(str::to_string)
+            .or_else(|| lock_key.clone())
+            .unwrap_or_default();
+        let spirit_pid = self.scheduler.resolve_pid(&spirit_id).unwrap_or(0);
+        let outcome = self.dispatch(command, pread).await;
         // ONE completion TL row per started mutating command, `intent`
         // carrying the `operation_id` so
         // `maosctl audit query --intent-contains <id>` finds it. Written
@@ -1445,14 +1590,16 @@ impl OperatorCommandPort for OperatorDoor {
         let scbs = self.0.scheduler.scbs();
         let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
         let scb = guard.get(&pid)?;
-        let posture = self
-            .0
-            .policy
-            .inner()
-            .load_full()
-            .spirit_postures
-            .get(&pid)
+        let postures = self.0.policy.inner().load_full();
+        let state = postures.spirit_postures.get(&pid);
+        let posture = state
             .map(|state| format!("{:?}", state.current))
+            .unwrap_or_else(|| "Unknown".into());
+        // Story 16-6 (R23(i)) — the EFFECTIVE ceiling, read from the same
+        // `PolicyTable` snapshot as `posture`, so a clamped admission is
+        // distinguishable from an unclamped one on a real surface.
+        let posture_ceiling = state
+            .map(|state| format!("{:?}", state.allowed_max))
             .unwrap_or_else(|| "Unknown".into());
         Some(maos_control::SpiritStatusRow {
             spirit_id: spirit_id.to_string(),
@@ -1460,20 +1607,30 @@ impl OperatorCommandPort for OperatorDoor {
             boot_nonce: scb.boot_nonce.to_string(),
             lifecycle_state: format!("{:?}", scb.current_state()),
             posture,
+            posture_ceiling,
         })
     }
 
     fn daemon_status(&self) -> maos_control::DaemonStatusRow {
         let scbs = self.0.scheduler.scbs();
         let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
-        let mut spirit_ids: Vec<String> = guard.values().map(|scb| scb.spirit_id.clone()).collect();
-        spirit_ids.sort();
+        // Story 16-6 (R2/R18) — ids and states are built from ONE sorted
+        // pass so the two arrays are positionally aligned. Sorting the ids
+        // separately and reading states afterwards would silently mismatch
+        // them the moment two Spirits share a prefix ordering.
+        let mut rows: Vec<(String, String)> = guard
+            .values()
+            .map(|scb| (scb.spirit_id.clone(), format!("{:?}", scb.current_state())))
+            .collect();
+        rows.sort();
+        let (spirit_ids, lifecycle_states): (Vec<String>, Vec<String>) = rows.into_iter().unzip();
         let audit_health = maos_kernel_core::capability::cap_audit::audit_health_snapshot();
         maos_control::DaemonStatusRow {
             pid: self.0.daemon_pid,
             boot_nonce: self.0.boot_nonce.to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             spirit_ids,
+            lifecycle_states,
             audit_degraded: audit_health.degraded,
             audit_drop_count: audit_health.total_drops,
         }
@@ -1539,6 +1696,13 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::ForgetMemory { .. } => "forget",
         OperatorCommand::ReleaseLegalHold { .. } => "legal-hold-release",
         OperatorCommand::AdmitGovernanceSchema { .. } => "governance-admit",
+        // ⚠ Not cosmetic. This is the machine label written into the
+        // completion TL row's intent as
+        // `operator.{verb}.{operation_id}:{outcome}` — it is what the audit
+        // record says the operator did. The compiler proves the arm exists;
+        // nothing proves the label is right, so AC4 asserts the row reads
+        // `operator.load.<operation_id>:completed`.
+        OperatorCommand::Load { .. } => "load",
     }
 }
 

@@ -52,14 +52,16 @@ pub use posture::{PostureError, PostureState};
 
 use std::sync::Arc;
 
-use maos_domain::invariants::i1::Scope;
+
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
 use tokio::sync::mpsc;
 
 use crate::capability::cap_audit::{self, CapAuditEvent};
-use crate::capability::cap_policy::{decision::TrustTier, ManifestCapabilityScope, PolicyTable};
+use crate::capability::cap_policy::{
+    clamp_posture_state, decision::TrustTier, ManifestCapabilityScope, PolicyTable,
+};
 
 /// Security error raised during admission or enforcement.
 #[derive(Debug, thiserror::Error)]
@@ -354,16 +356,24 @@ impl SecurityManagerAdapter {
                     trust_tier,
                 },
             );
-            new_inner.spirit_postures.insert(
-                spirit_pid,
-                crate::security::posture::PostureState {
-                    current: posture_section.default,
-                    allowed_max: posture_section.allowed_max,
-                    epistemic_policy: epistemic_policy
-                        .cloned()
-                        .unwrap_or_else(EpistemicPolicySection::default_open_fail),
-                },
+            // Story 16-6 (§16a R3, §17 R10) — clamp BOTH fields, not just
+            // the ceiling. `RawPostureSection::validate` enforces only
+            // `allowed_max >= default`, so clamping `allowed_max` alone
+            // stores `current > allowed_max` for any class whose declared
+            // default outranks the operator ceiling. `Posture: Ord` is
+            // least-privilege-first, so `min()` is the clamp.
+            let mut posture_state = crate::security::posture::PostureState {
+                current: posture_section.default,
+                allowed_max: posture_section.allowed_max,
+                epistemic_policy: epistemic_policy
+                    .cloned()
+                    .unwrap_or_else(EpistemicPolicySection::default_open_fail),
+            };
+            clamp_posture_state(
+                &mut posture_state,
+                inner.operator_policy.operator_posture_ceiling,
             );
+            new_inner.spirit_postures.insert(spirit_pid, posture_state);
             self.policy.update(new_inner);
         }
 

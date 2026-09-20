@@ -3654,6 +3654,35 @@ jobs:
       - name: maosctl reaches the live daemon, and the pause is real
         run: cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 -- --test-threads=1
 
+  # Story 16-6 / AC6 — exit line 5b of the J0 block: an operator adds a
+  # Spirit to a running daemon and takes it away again. Named, like
+  # one-daemon-one-door, so a failure says "load is broken" rather than being
+  # one red line in a 45-minute workspace run. NOT added to aggregate.needs
+  # or EXPECTED_GATES (16-1's enrolment precedent).
+  #
+  # ⚠ This job does NOT copy one-daemon-one-door verbatim: that template
+  # builds only `worker-cli-fixture`, while the test resolves `maosctl`
+  # beside CARGO_BIN_EXE_maos and hard-asserts it exists. `maos-cli` is a
+  # plain `[dependencies]` entry of maos-bin, so cargo builds its LIB and
+  # never its `[[bin]] maosctl` — the 16-1 job is green only because
+  # Swatinem/rust-cache restores a target/ some other job populated, which
+  # means it would panic on a cold runner. The explicit build step below is
+  # the fix; the 16-1 job carries the same latent defect and it is reported
+  # to the Epic-16 retrospective rather than inherited here.
+  maosctl-load-over-the-door:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build maosctl (the test resolves it beside the maos binary)
+        run: cargo build --locked -p maos-cli --bin maosctl
+      - name: An operator adds a Spirit to a running daemon, and takes it away
+        run: cargo test --locked -p maos-bin --test maosctl_load_16_6 -- --test-threads=1
+
   # Story 16-2 / D-16-2-L — the J0 scene in its own job (one-daemon-one-door
   # shape): the halt -> resolve -> proceed journey must fail as ITSELF, not
   # as one line in the workspace suite. NOT added to aggregate.needs or
@@ -3726,6 +3755,7 @@ jobs:
       - workspace-test-suite
       - one-daemon-one-door
       - j0-scene
+      - maosctl-load-over-the-door
     if: always()
     steps:
       - name: Ship gate results summary
@@ -3769,6 +3799,7 @@ jobs:
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo test --workspace --locked --no-fail-fast |"
           echo "| one-daemon-one-door | ${{ needs.one-daemon-one-door.result }} | cargo test -p maos-bin --test one_daemon_one_door_16_1 |"
           echo "| j0-scene | ${{ needs.j0-scene.result }} | cargo test -p maos-journey-test --test journey_j0 |"
+          echo "| maosctl-load-over-the-door | ${{ needs.maosctl-load-over-the-door.result }} | cargo test -p maos-bin --test maosctl_load_16_6 |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled') }}

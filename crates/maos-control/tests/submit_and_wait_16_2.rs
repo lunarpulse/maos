@@ -51,6 +51,7 @@ impl OperatorCommandPort for RiggedPort {
             boot_nonce: "0".into(),
             version: "test".into(),
             spirit_ids: Vec::new(),
+            lifecycle_states: Vec::new(),
             audit_degraded: false,
             audit_drop_count: 0,
         }

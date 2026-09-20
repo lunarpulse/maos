@@ -4,6 +4,7 @@
 //! env-vars (MAOS_REGISTRY_* / MAOS_REGION_*) → ~/.config/maos/operator.toml →
 //! built-in defaults.
 
+use crate::security::manifest::Posture;
 use maos_domain::region::Region;
 use maos_spirit_abi::compliance::TrustTier;
 
@@ -218,6 +219,60 @@ impl RegionSection {
     }
 }
 
+/// Story 16-6 — operator posture ceiling resolver. It is a namespace rather
+/// than persisted configuration because the sole effective value is optional.
+pub struct PostureSection;
+
+impl PostureSection {
+    /// Resolve `MAOS_POSTURE_CEILING` before `[posture].ceiling`; invalid
+    /// values disable the ceiling rather than silently widening authority.
+    pub fn resolve_from_env_and_disk() -> Option<Posture> {
+        let mut ceiling = None;
+
+        // 1. operator.toml `[posture]` section.
+        if let Ok(home) = std::env::var("HOME") {
+            let path = std::path::PathBuf::from(home)
+                .join(".config")
+                .join("maos")
+                .join("operator.toml");
+            if path.exists() {
+                if let Ok(contents) = std::fs::read_to_string(&path) {
+                    if let Ok(toml_val) = contents.parse::<toml::Value>() {
+                        if let Some(value) = toml_val
+                            .get("posture")
+                            .and_then(|section| section.get("ceiling"))
+                            .and_then(toml::Value::as_str)
+                        {
+                            ceiling = parse_posture_ceiling_or_warn(value);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. env override (highest priority).
+        if let Ok(value) = std::env::var("MAOS_POSTURE_CEILING") {
+            ceiling = parse_posture_ceiling_or_warn(&value);
+        }
+
+        ceiling
+    }
+}
+
+/// Parse with the manifest's serde spelling, then reject the non-runtime
+/// `Autonomous` variant because it does not constrain admission.
+fn parse_posture_ceiling_or_warn(value: &str) -> Option<Posture> {
+    match toml::Value::String(value.to_owned()).try_into::<Posture>() {
+        Ok(posture @ (Posture::Cautious | Posture::Assistive | Posture::AutonomousWithHalt)) => {
+            Some(posture)
+        }
+        Ok(Posture::Autonomous) | Err(_) => {
+            eprintln!("maos: warning: invalid posture ceiling '{value}'; posture ceiling DISABLED");
+            None
+        }
+    }
+}
+
 /// Canonicalize a region tag, warning (and disabling) on an invalid tag rather
 /// than silently binding to a wrong-or-unrecoverable region (AC-12 fail-safe).
 fn canonicalize_or_warn(tag: &str) -> Option<Region> {
@@ -249,7 +304,7 @@ fn parse_tier(s: &str) -> TrustTier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
+    use parking_lot::Mutex;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -265,7 +320,7 @@ mod tests {
 
     #[test]
     fn resolve_from_defaults_when_no_env() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK.lock();
         let section = RegistrySection::resolve_from_env_and_disk();
         assert!(section.allow_unsigned_local);
     }
@@ -281,7 +336,7 @@ mod tests {
 
     #[test]
     fn env_overrides_disk_config() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK.lock();
         std::env::set_var("MAOS_REGISTRY_URI", "env://override");
         std::env::set_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED", "true");
         std::env::set_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL", "false");
@@ -298,7 +353,7 @@ mod tests {
 
     #[test]
     fn env_allows_negating_bools() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK.lock();
         std::env::set_var("MAOS_REGISTRY_T3_FOR_PUBLIC_UNTRUSTED", "false");
         std::env::set_var("MAOS_REGISTRY_ALLOW_UNSIGNED_LOCAL", "true");
 
@@ -320,7 +375,7 @@ mod tests {
 
     #[test]
     fn region_env_sets_and_canonicalizes() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK.lock();
         std::env::set_var("MAOS_REGION_HOME", "US-EAST-1");
         let s = RegionSection::resolve_from_env_and_disk();
         assert_eq!(
@@ -332,7 +387,7 @@ mod tests {
 
     #[test]
     fn region_env_empty_disables() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK.lock();
         std::env::set_var("MAOS_REGION_HOME", "  ");
         let s = RegionSection::resolve_from_env_and_disk();
         assert!(s.home_region.is_none());
@@ -341,11 +396,35 @@ mod tests {
 
     #[test]
     fn region_env_invalid_tag_disables_with_warning() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = ENV_LOCK.lock();
         std::env::set_var("MAOS_REGION_HOME", "eu_west"); // underscore invalid
         let s = RegionSection::resolve_from_env_and_disk();
         // Fail-safe: invalid tag DISABLES pinning rather than binding wrongly.
         assert!(s.home_region.is_none());
         std::env::remove_var("MAOS_REGION_HOME");
+    }
+
+    #[test]
+    fn posture_ceiling_env_accepts_the_runtime_posture_spellings() {
+        let _guard = ENV_LOCK.lock();
+        for (value, expected) in [
+            ("cautious", Posture::Cautious),
+            ("assistive", Posture::Assistive),
+            ("autonomous-with-halt", Posture::AutonomousWithHalt),
+        ] {
+            std::env::set_var("MAOS_POSTURE_CEILING", value);
+            assert_eq!(PostureSection::resolve_from_env_and_disk(), Some(expected));
+        }
+        std::env::remove_var("MAOS_POSTURE_CEILING");
+    }
+
+    #[test]
+    fn posture_ceiling_env_rejects_non_runtime_and_invalid_values() {
+        let _guard = ENV_LOCK.lock();
+        for value in ["autonomous", "not-a-posture"] {
+            std::env::set_var("MAOS_POSTURE_CEILING", value);
+            assert_eq!(PostureSection::resolve_from_env_and_disk(), None);
+        }
+        std::env::remove_var("MAOS_POSTURE_CEILING");
     }
 }

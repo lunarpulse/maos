@@ -806,19 +806,36 @@ fn tenant_mode_boots_on_live_substrate() {
 
 #[test]
 fn production_collective_calls_share_one_atomic_pid_binding() {
+    // ⚠ Story 16-6 — the whole test read `../src/main.rs` and had been a
+    // NULL CONTROL since the three `collective_*` methods were relocated to
+    // `cross_team_crossing.rs`: `find("fn collective_write(")` was `None`,
+    // so it panicked on its first iteration and asserted NOTHING about the
+    // shared binding it exists to protect. Measured at HEAD:
+    // `fn collective_write(` occurs 0 times in main.rs and 3 times
+    // (write/read/scan) in cross_team_crossing.rs, and
+    // `CapabilityRegistryPort::record_invocation` is 0 / 3 the same way.
+    //
+    // The invariant genuinely spans TWO files, so each half now reads the
+    // file that owns it: the cap-gated collective calls and their
+    // correlation audits live in `cross_team_crossing.rs`, while the tenant
+    // registration that must reuse the same reloaded pid is in `main.rs`'s
+    // composition root.
+    const COLLECTIVE: &str = include_str!("../src/cross_team_crossing.rs");
     const MAIN: &str = include_str!("../src/main.rs");
     for method in ["write", "read", "scan"] {
         let signature = format!("fn collective_{method}(");
-        let start = MAIN
+        let start = COLLECTIVE
             .find(&signature)
             .unwrap_or_else(|| panic!("missing production {signature}"));
-        let tail = &MAIN[start..];
+        let tail = &COLLECTIVE[start..];
         let end = tail
             .find("\n    }\n")
             .unwrap_or_else(|| panic!("unterminated production {signature}"));
         let body = &tail[..end];
         assert_eq!(
-            MAIN.matches(&format!(".collective_{method}(")).count(),
+            COLLECTIVE
+                .matches(&format!(".collective_{method}("))
+                .count(),
             1,
             "collective_{method} must have exactly one production kernel call site"
         );
@@ -860,7 +877,8 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
         "registration must use the pid reloaded from the shared AtomicU32"
     );
     assert_eq!(
-        MAIN.matches("CapabilityRegistryPort::record_invocation")
+        COLLECTIVE
+            .matches("CapabilityRegistryPort::record_invocation")
             .count(),
         3,
         "production collective write, read, and scan must each persist one correlation audit"
@@ -878,9 +896,15 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 16-2 (D-16-2-B) — 20 → 21: `shell_host.rs` joins the roster (the
     // production ShellHost). Story 16-3 — 21 → 22: `supervision.rs` joins it.
     // Story 16-4 — 22 → 23: `purge.rs` joins it.
+    // Story 16-6 — 23 → 24: `admission.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 23] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 24] = [
         ("main.rs", include_str!("../src/main.rs")),
+        // Story 16-6 — the extracted `load → admit → start` path. Enrolled
+        // deliberately and NOT whitelisted below: the door's load must never
+        // seed or consume `manifest_scopes` — that table is `admit_spirit`'s
+        // to write — and this negative is what says so.
+        ("admission.rs", include_str!("../src/admission.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
             "cross_team_consent.rs",

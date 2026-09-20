@@ -502,8 +502,34 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 24628
+src_lines = 24923
 
+# HISTORY: Story 16-6 (2026-09-19): 24628 -> 24796 physical lines (+168).
+#          ◆ FLAG-Winston, operator-granted 2026-09-19 (§14 Q1 as re-scoped,
+#          widened by Q4 = Shape A). FOUR kernel-core files, FOUR per-file
+#          digests. This row sits BELOW `src_lines` on purpose: every prior
+#          re-pin prepended its block, and one more would push the assignment
+#          off line 505 and red `kernel_pin_content_hash_16_0.rs`'s position
+#          assert. Line-count-neutral above the assignment, by construction.
+#          DRIVER: (1) `scheduler/control_block.rs` — the `(Loaded, Unloaded)`
+#          arm, so a Spirit `maosctl load` created and never started has an
+#          exit at all, plus the `loaded_to_unloaded_rejected` unit test
+#          rewritten as `loaded_to_unloaded_allowed` (it asserted the
+#          behaviour this story inverts). (2) `scheduler/scheduler_loop.rs` —
+#          `unload` cleanup (receipt, revoke, drain, map removal) moved AHEAD
+#          of the fallible `on_unload` dispatch; `check_hook_outcome` no
+#          longer spawns `handle_crash` for `on_unload` (double teardown:
+#          `terminate_spirit` is not idempotent); FR50 disposition and
+#          `task.orphaned` performed inline on that path; and `load` split
+#          into a type-erased `load_obj` primitive so ONE extracted
+#          admission function can serve the door and both `maos run` arms.
+#          (3) `capability/cap_policy/mod.rs` — `operator_posture_ceiling`,
+#          the operator floor posture was the only one of five leash axes to
+#          lack. (4) `security/mod.rs` — that ceiling applied as TWO `min()`s
+#          at admission; clamping `allowed_max` alone leaves a Spirit whose
+#          declared default outranks the ceiling running above its own.
+#          No kernel file was added or removed; `PINNED_ENTRIES` stays 98.
+#
 # ── Story 16-0 — PINNED FILE SET + PER-FILE CONTENT HASH ─────────────────────
 #
 # HISTORY: Story 16-0 (Epic 16, drift D2 / Epic-15 retro action A5), 2026-09-13,
@@ -535,9 +561,22 @@ src_lines = 24628
 # line scanners take the FIRST `src_lines`-prefixed line and one of them
 # `.expect()`s (D-16-0-C).
 
+# HISTORY: Story 16-6 review patch batch (2026-09-20): 24796 -> 24923
+#          physical lines (+122), team-consensus review rulings D1-D3 (code
+#          review of the uncommitted 16-6 diff; operator adopted 2026-09-20).
+#          DRIVER: (1) `security/operator_config.rs` — `PostureSection`
+#          parser (env MAOS_POSTURE_CEILING -> operator.toml [posture]) so
+#          `operator_posture_ceiling` has the writer its doc always claimed.
+#          (2) `capability/cap_policy/mod.rs` — `PolicyTable::
+#          set_operator_posture_ceiling` with re-clamp of existing
+#          `spirit_postures`; shared two-min() clamp helper with
+#          `security/mod.rs`. (3) `scheduler/scheduler_loop.rs` — honest
+#          receipt comment (subprocess Worker has a child), replica resolver
+#          plumbing to the inline FR50 disposition. (4) `security/mod.rs` —
+#          clamp helper extraction. No kernel file was added or removed.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "66ee5370de033e2a09b1570fd6525a6d75bdb8af2fca142664a1f826cb08a6ca"
+set_hash = "326a6a19afa35918adbf604b1bbe986fce072c762fa47bc510518bdee0462c39"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -545,7 +584,7 @@ set_hash = "66ee5370de033e2a09b1570fd6525a6d75bdb8af2fca142664a1f826cb08a6ca"
 "capability/cap_audit/mod.rs" = "9f253336da1d618808984fef11941929a6af927ef66120d84b43e122ff70decc"
 "capability/cap_audit/writer_task.rs" = "7c90023579458fdb4a3357990a46cb0520d018196b1ffa0f2ed65fa5e7e84ef2"
 "capability/cap_policy/decision.rs" = "be8b2e5a0b08821f55f019ab85b0a91b953dd60f3a8d3f994bd59e087b409e41"
-"capability/cap_policy/mod.rs" = "3ff76e22c2493fca4ef8b61ec37c9ce51aab36ae9fb29fe37f3ae9a590fd51fc"
+"capability/cap_policy/mod.rs" = "6deb125b813c2f291cfa4519f299244889090f47ee5f08e352acd82222790acb"
 "capability/mod.rs" = "ea09b10768bc9cc99821ed0ba6bcb109fa0618cab08526930167c4e24edc067b"
 "capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
@@ -598,21 +637,21 @@ set_hash = "66ee5370de033e2a09b1570fd6525a6d75bdb8af2fca142664a1f826cb08a6ca"
 "revocation/poller.rs" = "ad449a7a206cb42d160afb44c05f17bfbfe39cf4815d6be7996034dfbb51a960"
 "revocation/rules.rs" = "726b27e55d5fff3e1cbd9ca2c1cf38494dfd272fbe586c1a0ed869c760366f44"
 "revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
-"scheduler/control_block.rs" = "d0b216677842b73b788df8e969cc5ec42e4cdd8c94b11f5917c9e1a5b01bcf6a"
+"scheduler/control_block.rs" = "f7e6e26447ecf9822244956dbd341e96472f7d81edc0c644732d414c3d4c6ed5"
 "scheduler/hook_dispatch.rs" = "6f26d6b147425f8001e1c5d377cf88676329f7cd6402e1e5940e51580ac4d985"
 "scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
 "scheduler/kernel_ctx.rs" = "7baf6a7e15a5ffb62312a02aa19d58b24c8500f277bcc724b2065f4c732963ef"
 "scheduler/mod.rs" = "fa89437053eedadef4662a1f538ad275caa62df69a9ddbbd4dc0a9976a377cf5"
 "scheduler/resource_ceiling.rs" = "becc322aa3700d8f08c10ac443aff2ea80995926a2cc647ddbad49aecfa6b06d"
 "scheduler/schedule_watchdog.rs" = "b50009c32df76c8f99095584a68c1de65d6a4831f84a97061672303dccca70fc"
-"scheduler/scheduler_loop.rs" = "6e1ba841af1d4420d74150360939ca39deed3d5b53ae86b0caf16023e3762478"
+"scheduler/scheduler_loop.rs" = "49f4d0876a0eb01c649e4ef964216db3b3bf9297efda86793af8d1c4e255ee19"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
 "security/drift.rs" = "875b2c652bc10ca1aa2f4dc1f4b6bd410e5c91ef37750b98fceb6058fb926328"
 "security/manifest.rs" = "d2e02fe45059446d55437e9d9e03893c96945741ec7d9ca4b13882d2bc5a4e85"
-"security/mod.rs" = "c5e014d38ff053bee721218e94843628882da6bb8242c8008185aaf21fd1f4f1"
-"security/operator_config.rs" = "9f1087f82c72b84cf880952310710306cc4f8feb5e44406891a916e9a763e236"
+"security/mod.rs" = "607554f9e2241311e9f0d9417805a9cdbf417b574608eb8ac5df83da5cf456ac"
+"security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "8964be98eb51c34dd4a7ae75d2d60ab90d8e8d6897205f8787f0ae0563ff29f2"
 "security/sandbox/macos.rs" = "e2bcfda0b12bd4d738e0d8f1c4795c26a95cb828cd8a73eec02edc5e9014c2af"

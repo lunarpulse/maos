@@ -184,14 +184,18 @@ impl WriterShapeEntry {
 pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     // ── maos-kernel-core — NonCall ─────────────────────────────────────────
     WriterShapeEntry {
-        site: ("scheduler_loop.rs", "load", 0),
+        // Story 16-6 — `load` split into a type-erased `load_obj` primitive
+        // so ONE extracted admission function can serve the operator door
+        // and both `maos run` file-manifest arms. The rows are unchanged;
+        // only the enclosing function's name moved.
+        site: ("scheduler_loop.rs", "load_obj", 0),
         kind: 7,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.admit"),
         shape: Some(&[("spirit_id", PayloadType::Str)]),
     },
     WriterShapeEntry {
-        site: ("scheduler_loop.rs", "load", 1),
+        site: ("scheduler_loop.rs", "load_obj", 1),
         kind: 7,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("lifecycle.load"),
@@ -267,6 +271,33 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // capability-token column stays NULL rather than padding them into
         // false 32-byte capability evidence.
         site: ("crash_detector.rs", "handle_crash", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.orphaned"),
+        shape: Some(&[
+            ("task_id", PayloadType::Str),
+            ("originator_spirit_id", PayloadType::Str),
+            ("exit_signal", PayloadType::NumOrNull),
+            ("exit_code", PayloadType::NumOrNull),
+            ("stderr_tail", PayloadType::StrOrNull),
+            ("cause", PayloadType::Str),
+            ("in_flight_tokens", PayloadType::NumArrayArray),
+            ("disposition", PayloadType::Str),
+        ]),
+    },
+    WriterShapeEntry {
+        // Story 16-6 (AC2(g)(ii)) — `unload`'s own FR50 orphan rows.
+        //
+        // `unload` now performs the teardown ahead of the fallible
+        // `on_unload` dispatch and does NOT spawn `handle_crash` for that
+        // hook (two teardowns of one pid mint two `HaltId`s, because
+        // `terminate_spirit` is not idempotent). The disposition and orphan
+        // frames that the spawned handler used to emit are therefore
+        // emitted here instead — same shape, different writer.
+        //
+        // `exit_signal`/`exit_code` are always null: a hook failure is not
+        // an OS exit, and inventing one would be false evidence.
+        site: ("scheduler_loop.rs", "orphan_in_flight_tasks", 0),
         kind: 1,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("task.orphaned"),

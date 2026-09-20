@@ -14,7 +14,7 @@ use arc_swap::ArcSwap;
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
-use decision::{ApprovalClass, Capability, Intent, PolicyDecision, TrustTier};
+use decision::{ApprovalClass, Capability, Intent, PolicyDecision};
 
 /// Operator policy configuration.
 #[derive(Debug, Clone, Default)]
@@ -40,6 +40,30 @@ pub struct OperatorPolicyConfig {
     /// This preserves Cedar's principal-specific policy semantics without
     /// letting PDP permits raise the manifest ceiling.
     pub per_spirit_capability_deny: HashMap<u32, std::collections::HashSet<String>>,
+    /// Story 16-6 (§16a R3) — the operator's ceiling on a Spirit's runtime
+    /// posture, and the fifth axis of the leash to get one.
+    ///
+    /// `admit_spirit` stored `[posture] default` and `[posture] allowed_max`
+    /// VERBATIM from the manifest, so a bearer holder who could put a
+    /// manifest into a running daemon chose their own ceiling and then
+    /// passed `shift_posture`'s check against it. Every other axis already
+    /// had an operator floor (`global_sandbox_floor`, `spirit_tier_floor`,
+    /// `resource_cap_floor`, and the two subtract-only deny sets).
+    ///
+    /// ⚠ NAMED `ceiling`, NOT `floor`, because it is implemented as `min()`.
+    /// `Posture` derives `Ord` least-privilege-first
+    /// (`Cautious < Assistive < AutonomousWithHalt < Autonomous`), so `min()`
+    /// is monotone-DOWN and is a real clamp. A later "fix" to `max()` would
+    /// brick every Spirit at `Posture::Autonomous`, which `shift_posture`
+    /// refuses as `NonRuntimePosture`.
+    ///
+    /// `None` (the forced default — `Posture` derives no `Default` while
+    /// this struct derives it) ⇒ no clamp, so `maos run` is provably
+    /// unchanged unless an operator sets one. Legal values are bounded to
+    /// `{cautious, assistive, autonomous-with-halt}` by
+    /// [`crate::security::operator_config::PostureSection::resolve_from_env_and_disk`];
+    /// `Autonomous` is a no-op ceiling by construction.
+    pub operator_posture_ceiling: Option<crate::security::manifest::Posture>,
 }
 
 /// Manifest capability scope per Spirit.
@@ -228,6 +252,22 @@ impl PolicyTable {
         self.inner.store(Arc::new(new_policy));
     }
 
+    /// Replace the operator posture ceiling and immediately re-clamp every
+    /// admitted Spirit so a live policy change cannot leave stale authority.
+    /// Story 16-6 review 2026-09-20.
+    pub fn set_operator_posture_ceiling(
+        &self,
+        ceiling: Option<crate::security::manifest::Posture>,
+    ) {
+        let inner = self.inner.load_full();
+        let mut new_inner = (*inner).clone();
+        new_inner.operator_policy.operator_posture_ceiling = ceiling;
+        for state in new_inner.spirit_postures.values_mut() {
+            clamp_posture_state(state, ceiling);
+        }
+        self.update(new_inner);
+    }
+
     /// Atomically shift a Spirit's posture under the ceiling constraint
     /// (Story 3.2, AC4).
     pub fn shift_posture(
@@ -320,6 +360,20 @@ impl PolicyTable {
     }
 }
 
+/// Clamp both persisted runtime posture fields under the operator's ceiling.
+///
+/// Admission and a live operator-policy update must share this rule: clamping
+/// only `allowed_max` can leave `current` above its own ceiling.
+pub(crate) fn clamp_posture_state(
+    state: &mut crate::security::posture::PostureState,
+    ceiling: Option<crate::security::manifest::Posture>,
+) {
+    if let Some(limit) = ceiling {
+        state.current = state.current.min(limit);
+        state.allowed_max = state.allowed_max.min(limit);
+    }
+}
+
 /// Strictest of three sandbox tiers.
 pub fn strictest_of(a: SandboxTier, b: SandboxTier, c: SandboxTier) -> SandboxTier {
     SandboxTier(a.0.max(b.0).max(c.0))
@@ -374,6 +428,11 @@ fn intent_action_key(intent: &Intent) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Production code no longer names `TrustTier` directly (the shared
+    // posture-clamp helper takes `Posture`), but these tests assert tier
+    // plumbing end to end. `decision` re-exports the registry-side tier type
+    // these tests have always used — NOT `maos_spirit_abi::compliance`.
+    use super::decision::TrustTier;
     use std::sync::Arc;
     use std::thread;
 

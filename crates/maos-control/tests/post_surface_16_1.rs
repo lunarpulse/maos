@@ -287,6 +287,7 @@ impl OperatorCommandPort for FakePort {
             boot_nonce: "cafe".into(),
             lifecycle_state: "Running".into(),
             posture: "Routine".into(),
+            posture_ceiling: "AutonomousWithHalt".into(),
         })
     }
 
@@ -296,6 +297,7 @@ impl OperatorCommandPort for FakePort {
             boot_nonce: "cafe".into(),
             version: "0.1.0".into(),
             spirit_ids: vec!["butler".into()],
+            lifecycle_states: vec!["Running".into()],
             audit_degraded: false,
             audit_drop_count: 0,
         }
@@ -535,6 +537,52 @@ fn no_post_route_exists_under_the_cohort_or_a2a_namespaces() {
     assert_eq!(
         status_of(&post(&server, "/v1/spirits/butler/pause", "{}")),
         200
+    );
+}
+#[test]
+fn spirit_collection_load_route_has_the_standard_post_guards() {
+    let server = server_with(Arc::new(FakePort::new(PortBehaviour::Complete)));
+
+    let response = request(&server, "GET", "/v1/spirits", TOKEN);
+    assert_eq!(status_of(&response), 405, "{response}");
+    assert_eq!(body_of(&response).as_bytes(), METHOD_NOT_ALLOWED_BODY);
+
+    let response = exchange(
+        &server,
+        &format!(
+            "POST /v1/spirits HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert_eq!(status_of(&response), 411, "{response}");
+
+    // Declare 64 KiB + 1 without sending it: rejection must use the header,
+    // rather than wait for a body that never arrives.
+    let response = exchange(
+        &server,
+        &format!(
+            "POST /v1/spirits HTTP/1.1\r\nAuthorization: Bearer {TOKEN}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            MAX_BODY_BYTES + 1
+        ),
+    );
+    assert_eq!(status_of(&response), 413, "{response}");
+
+    for (case, body) in [
+        ("malformed JSON", "{not json"),
+        ("missing manifest", r#"{"other":1}"#),
+        ("wrong-typed manifest", r#"{"manifest":[]}"#),
+    ] {
+        let response = post(&server, "/v1/spirits", body);
+        assert_eq!(
+            status_of(&response),
+            400,
+            "{case} must be refused, never silently defaulted: {response}"
+        );
+    }
+
+    assert_eq!(
+        status_of(&post(&server, "/v1/spirits", r#"{"manifest":"/m"}"#)),
+        200,
+        "a bounded, well-formed request reaches the command port"
     );
 }
 
@@ -1183,8 +1231,6 @@ fn self_identity_route_reports_an_unhealthy_source_as_503() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Story 16-1's own read routes
-// ─────────────────────────────────────────────────────────────────────────────
-
 #[test]
 fn the_mutating_routes_answer_404_when_no_command_port_is_installed() {
     // The convention every read source in this crate already uses: absent
@@ -1192,6 +1238,7 @@ fn the_mutating_routes_answer_404_when_no_command_port_is_installed() {
     // the door installed must not appear to accept `pause`.
     let read_only = read_only_server();
     for (method, path) in [
+        ("POST", "/v1/spirits"),
         ("POST", "/v1/spirits/butler/pause"),
         ("POST", "/v1/halts/h1/resolve"),
         ("POST", "/v1/tokens/abc/revoke"),
@@ -1206,7 +1253,11 @@ fn the_mutating_routes_answer_404_when_no_command_port_is_installed() {
             post(
                 &read_only,
                 path,
-                r#"{"spirit_id":"butler","resolution":"ack","text":"x","principal":"p"}"#,
+                if path == "/v1/spirits" {
+                    r#"{"manifest":"/m"}"#
+                } else {
+                    r#"{"spirit_id":"butler","resolution":"ack","text":"x","principal":"p"}"#
+                },
             )
         } else {
             request(&read_only, method, path, TOKEN)
@@ -1245,10 +1296,14 @@ fn the_daemon_and_orchestrator_and_revocations_reads_report_the_ports_values() {
         orchestrator["capacity"], 32,
         "the occupancy an operator reads is the buffer's, not a constant"
     );
+    let spirit = json_of(&request(&server, "GET", "/v1/spirits/butler", TOKEN));
+    assert_eq!(spirit["lifecycle_state"], "Running");
     assert_eq!(
-        status_of(&request(&server, "GET", "/v1/orchestrator/ghost", TOKEN)),
-        404,
-        "a Spirit with no buffer is absent, never 0/32"
+        spirit
+            .get("posture_ceiling")
+            .and_then(serde_json::Value::as_str),
+        Some("AutonomousWithHalt"),
+        "the live-status row must preserve its posture ceiling"
     );
 
     let revocations = json_of(&request(&server, "GET", "/v1/revocations", TOKEN));

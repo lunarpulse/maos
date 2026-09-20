@@ -239,12 +239,16 @@ pub async fn finish_shell_session(
     // Story 16-2 §A6 review — the unload failure is REPORTED, never returned:
     // `shell_result` decides the exit, exactly as `main`'s own P13 invariant
     // demands ("the causal shell failure wins … never allowed to mask the
-    // real cause"). This is not hypothetical: `is_transition_allowed` has no
-    // `(Loaded, Unloaded)` arm (`scheduler/control_block.rs`), so when `load`
-    // succeeded but `admit_spirit` did not, the SCB is still `Loaded` and
-    // this unload ALWAYS fails — returning its error would replace the real
-    // admission rejection with "invalid state transition" on precisely the
-    // path where the operator needs the cause.
+    // real cause").
+    //
+    // ⚠ Story 16-6 CORRECTED the reason. This used to say the unload ALWAYS
+    // fails when `load` succeeded but `admit_spirit` did not, because
+    // `is_transition_allowed` had no `(Loaded, Unloaded)` arm. It has one
+    // now, so a `Loaded` SCB unloads cleanly and stops landing in
+    // `report.failed` at all — and the extracted admission path rolls its
+    // own partial load back before this sweep ever sees it. The rule stands
+    // for the case it was really written for: a unload failure that IS real
+    // (a failing `on_unload` hook) must not replace the causal shell error.
     for (pid, error) in &report.failed {
         eprintln!("maos shell: planned unload failed for pid {pid}: {error}");
     }

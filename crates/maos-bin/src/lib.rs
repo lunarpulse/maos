@@ -1,5 +1,12 @@
 #![forbid(unsafe_code)]
 
+/// Story 16-6 — the ONE `load → admit → start` admission path, shared by
+/// `maos run`'s standalone and topology arms and by the operator door's
+/// `load` verb. In the library, not `main.rs`, because the door's port lives
+/// here and because `crates/maos-bin/tests/` must drive the real gates rather
+/// than a re-implementation of them.
+#[cfg(feature = "network")]
+pub mod admission;
 /// Story 15-6 — provider-level cassette replay/record adapters shared by every
 /// inference consumer.
 #[cfg(feature = "network")]

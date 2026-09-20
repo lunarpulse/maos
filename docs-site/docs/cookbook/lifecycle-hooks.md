@@ -63,12 +63,19 @@ impl Spirit for AnalyticsSpirit {
         // Re-acquire resources, restart background loops.
     }
 
-    /// Called when the Spirit receives an Unload verb — clean up.
-    fn on_unload(&self, ctx: &mut Ctx) {
+    /// Called after the kernel has released this Spirit. State is already
+    /// flipped, the receipt written, capabilities revoked, and the SCB removed.
+    /// KernelCtx capability and heartbeat calls fail (ScbNotFound or denied);
+    /// clean up only resources that do not require live tokens.
+    fn on_unload(&self, _ctx: &mut Ctx) {
         // Flush pending writes, close connections, release resources.
     }
 }
 ```
+
+The kernel owns release: `on_unload` is a post-release cleanup hook, not a
+teardown transaction. Do not depend on a live SCB, capability tokens, or
+heartbeats while it runs. Story 16-6 review 2026-09-20.
 
 Declare which hooks you use in the manifest so the kernel skips the rest:
 

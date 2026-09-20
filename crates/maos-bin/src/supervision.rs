@@ -1337,9 +1337,13 @@ mod worker {
             core.spirit_pid.store(pid, Ordering::Release);
 
             if let Err(e) = self.exec.handle.block_on(self.exec.scheduler.start(pid)) {
-                // The SCB is `Loaded` and there is no `Loaded → Unloaded`
-                // transition, so it cannot be unloaded and gets no receipt —
-                // the declared residual on the `epic-16-retrospective` row.
+                // Story 16-6 — this used to read "the SCB is `Loaded` and
+                // there is no `Loaded → Unloaded` transition, so it cannot
+                // be unloaded and gets no receipt". The kernel gained that
+                // arm, so the Worker's stranded SCB is now recoverable:
+                // `unload_all_loaded` reaps it on the way out and it gets
+                // its NFR-Rel-11 receipt like any other Spirit. The declared
+                // residual on the `epic-16-retrospective` row is CLOSED.
                 return Err(WorkerSupervisionError::Start(e.to_string()));
             }
 

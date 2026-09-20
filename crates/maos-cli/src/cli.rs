@@ -42,6 +42,11 @@ pub enum Subcommand {
     /// Supports legacy spirit install, local release verification (`--from-local`),
     /// and remote fetch stub (source = release tag like "v0.5.0").
     Install(InstallArgs),
+    /// Load a Spirit into the running daemon from a manifest (Story 16-6,
+    /// FR9 `load`). Admits it through the same gates `maos run` applies and
+    /// leaves it in `Loaded` — `maosctl start <id>` runs it, `maosctl unload
+    /// <id>` removes it.
+    Load(LoadArgs),
     /// Start a Spirit — writes one `LifecycleEvent::Start` Lifecycle Journal
     /// entry and exits (v0.1-β, Story 1b.5c). Supervised lifecycle with
     /// process spawn + mailbox lands at Epic 5 (Story 5.1).
@@ -362,6 +367,18 @@ pub struct InstallArgs {
     /// Installation prefix directory. Default: parent of the current executable.
     #[arg(long)]
     pub prefix: Option<std::path::PathBuf>,
+}
+
+/// Story 16-6 — `maosctl load <manifest>`.
+///
+/// A `String`, not a `PathBuf`: `canonical_manifest` takes `&str`, and the
+/// path is canonicalised HERE before it crosses the door, because the daemon
+/// resolves relative paths in ITS working directory, not the operator's
+/// (D-16-1-X).
+#[derive(clap::Args, Debug)]
+pub struct LoadArgs {
+    /// Path to the Spirit manifest TOML.
+    pub manifest: String,
 }
 
 #[derive(clap::Args, Debug)]

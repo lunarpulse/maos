@@ -441,11 +441,21 @@ impl SpiritControlBlock {
     }
 
     /// Check if a transition is allowed by the state machine.
+    ///
+    /// Story 16-6 — `(Loaded, Unloaded)` exists because `maosctl load` makes
+    /// `Loaded` a durable, operator-visible state for the first time. Before
+    /// it, every Spirit was loaded and started in one unbroken `maos run`, so
+    /// a `Loaded` SCB was a sub-second transient. The verb that creates a
+    /// state owns that state's exit: without this arm a door-loaded Spirit
+    /// can never be unloaded, gets no NFR-Rel-11 receipt, keeps its
+    /// capability tokens live, and burns its `spirit_id` forever (the SCB
+    /// stays in the map, so `resolve_pid`'s linear scan keeps matching it).
     pub fn is_transition_allowed(from: ScbLifecycleState, to: ScbLifecycleState) -> bool {
         use ScbLifecycleState::*;
         matches!(
             (from, to),
             (Loaded, Running)
+                | (Loaded, Unloaded)
                 | (Running, Paused)
                 | (Paused, Running)
                 | (Running, Unloaded)
@@ -564,12 +574,20 @@ mod tests {
         ));
     }
 
+    /// Story 16-6 — this test asserted the OPPOSITE until the
+    /// `(Loaded, Unloaded)` arm landed. Rewritten in the shape of its five
+    /// allowed siblings: it now drives a real CAS, so deleting the arm reds
+    /// it on `is_transition_allowed` and deleting the CAS reds it on state.
     #[test]
-    fn loaded_to_unloaded_rejected() {
-        assert!(!SpiritControlBlock::is_transition_allowed(
-            ScbLifecycleState::Loaded,
+    fn loaded_to_unloaded_allowed() {
+        let scb = make_scb(ScbLifecycleState::Loaded);
+        assert!(SpiritControlBlock::is_transition_allowed(
+            scb.current_state(),
             ScbLifecycleState::Unloaded
         ));
+        let result = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Unloaded);
+        assert!(result.is_ok());
+        assert_eq!(scb.current_state(), ScbLifecycleState::Unloaded);
     }
 
     #[test]
