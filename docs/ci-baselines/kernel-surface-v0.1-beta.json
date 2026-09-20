@@ -269,6 +269,11 @@
     },
     {
       "kind": "fn",
+      "path": "maos_kernel_core::hot_swap::state_codec::validate_logical_envelope",
+      "signature_hash": "39bdd04898eaf1d5a21dca0fccf922c3fb6ecc9fdbb3e73cb64adda1ab164502"
+    },
+    {
+      "kind": "fn",
       "path": "maos_kernel_core::io::take_io_journal",
       "signature_hash": "43c304bc963e388b2eb6856ace6895e4417272e750ad3946d10529f9f863ec4c"
     },
@@ -424,8 +429,18 @@
     },
     {
       "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock_at",
+      "signature_hash": "a09f04d7d1d1d7bb2be458f5a3b0c1d28ab7d43a783fe467dc1f95f9592ea9e9"
+    },
+    {
+      "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::t3::image_verify::inspect_image_sha",
       "signature_hash": "61002ea21ea35b9cbd45bef65832b3c8617194562e2f4a83b4b50a95ee23a9c3"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::image_verify::normalize_repository",
+      "signature_hash": "46fdb73786162a96689ecaea1c3cb0ec37684e6e782526114799e81e1e93996b"
     },
     {
       "kind": "fn",
@@ -451,6 +466,11 @@
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime",
       "signature_hash": "5bfb00e3a73ebf284e863291e2faf335972a2ce3fd5a4912b5f545462a64e617"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::security::sandbox::t3::spawn::commit_spawn_report",
+      "signature_hash": "f2d8d03ab6b0b2c66d974365cc898003692cf1f0532e0b8ee221ef4c61e60f56"
     },
     {
       "kind": "fn",
@@ -540,7 +560,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::halt::resolver::KernelHaltResolver",
-      "signature_hash": "189b0cfb623a74c5531f77ceaa28a9632848a6c1c836dbd85e53e874a2691790"
+      "signature_hash": "ce111965e3bf973b60563b49f2072be6480c596d4582e29e1e9dd363466808d4"
     },
     {
       "kind": "struct",
@@ -754,6 +774,11 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::scheduler::control_block::ScbRuntimeSnapshot",
+      "signature_hash": "56d4e501f4defbac5838de9f6bcf3d490d498e1b66bfa2f5d0ef5b0073050889"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::scheduler::control_block::SpiritControlBlock",
       "signature_hash": "f9c34e1e02fc97676db362a4d81e89affcafe81fad57ececa147a61ba0d82b93"
     },
@@ -790,7 +815,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter",
-      "signature_hash": "fc37d43abd4c83273d3542dec18c8c081217da2ca56cebcca12ff291a5e983c7"
+      "signature_hash": "2daf34b24f2563ac0d1861c9736e1d4f7a7231e7d616e18cc8df6b3dd4b0e40c"
     },
     {
       "kind": "struct",
@@ -816,6 +841,11 @@
       "kind": "struct",
       "path": "maos_kernel_core::security::crypto::RingCryptoProvider",
       "signature_hash": "b628913cb54299d09fb98d5755d182781646642d8dfe89b1d9bf45b0354cbe0b"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::operator_config::PostureSection",
+      "signature_hash": "2b67e8d53e4df3efe0ff6901661f14893921b7fe9a95bfbd5eb21cc6be775c7e"
     },
     {
       "kind": "struct",
@@ -856,6 +886,16 @@
       "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::t3::image_lock::T3ImageLock",
       "signature_hash": "925f272f12f47083416fc84094072d2ddf6e63d042c709c82289c9703e8cab38"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::image_lock::VerifiedImageAttestation",
+      "signature_hash": "1a01117aecaf67683df3c3eca8501a6bf1beb2278f79831dd30263c87e8563fb"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::security::sandbox::t3::image_lock::VerifiedImageLock",
+      "signature_hash": "7035f53799a1e450df5ab2c712e9580ca8212c40cf1d11e4c4ecc44182928387"
     },
     {
       "kind": "struct",
@@ -906,6 +946,11 @@
       "kind": "struct",
       "path": "maos_kernel_core::telemetry::TelemetryStreamAdapter",
       "signature_hash": "9dda87eb44623f7736610674795a6f589e303f1805a500f2a27f4e53880ae50d"
+    },
+    {
+      "kind": "trait",
+      "path": "maos_kernel_core::lifecycle::upgrade::SuccessorSpiritFactory",
+      "signature_hash": "ecad49e15efcf5c5b4a82e37e6d3f20cfddad1fea9ee16afa4ab587a0cf0e1ee"
     },
     {
       "kind": "trait",
@@ -1366,6 +1411,11 @@
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_and_bridge",
       "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::upgrade::SuccessorSpiritFactory",
+      "signature_hash": "e9a7845aa102a539ac76e648cfc4f274d3901ee6d81f47b8f8a791920efc266e"
     },
     {
       "kind": "use",

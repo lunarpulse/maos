@@ -25,7 +25,39 @@
 #          hold, REGISTERED_ERASURE_BACKENDS const + release_legal_hold. All
 #          additive; no public symbols removed.
 # To change this number you MUST be landing an AUTHORIZED kernel delta (charter
-# amendment + FLAG-Winston), and you update it HERE — nowhere else.
+# amendment + FLAG-Winston), and you update THIS number HERE — nowhere else.
+#
+# ── BOTH KERNEL PINS (E16-A1, Epic-16 retrospective 2026-09-20) ──────────────
+# "nowhere else" applies to the LINE COUNT only. There are TWO kernel pins and
+# an authorized delta moves both:
+#
+#   (1) LINE-COUNT pin  — `src_lines` in this file   (gate: check-kernel-baseline)
+#   (2) SURFACE pin     — docs/ci-baselines/kernel-surface-v0.1-beta.json
+#                         + xtask/kernel-api-classes.toml
+#                                                    (gate: check-service-boundary)
+#
+# Epic 16 re-derived (1) five times (24474 → 24477 → 24628 → 24796 → 24923) and
+# left (2) inconsistent: `check-service-boundary` was RED at the epic's closing
+# HEAD e868ff28 with two "removed public kernel symbol" violations and three
+# unclassified new symbols. A line-count pin protects only the axis it measures.
+#
+# The trap is specific and it is NOT a discipline failure — it is the gate's own
+# shape: `check_service_boundary` class-checks ONLY items ABSENT from the
+# baseline. Regenerate the baseline in the same commit that moves a symbol and
+# the symbol is never "new" again, so its missing class row is never demanded.
+# That is how `scheduler::scheduler_loop::SpiritSchedulerAdapter` reached the
+# pin unclassified.
+#
+# FLAG-Winston obligation, in order, when a story touches kernel-core:
+#   a. Add or verify the class row in `xtask/kernel-api-classes.toml` FIRST, for
+#      every symbol the story adds, renames, or MOVES to a new module path.
+#   b. Only then regenerate the surface pin, and ENUMERATE the diff in the story
+#      record: every removal and every addition, each named. A removal that is
+#      really a private-field reshape must SAY SO (the public shape is unchanged
+#      — struct hashing covers private fields, which are not ABI).
+#   c. Re-pin `src_lines` here with the HISTORY entry.
+#   d. Run `check-service-boundary` AND `check-kernel-baseline`. Both, at HEAD.
+# ─────────────────────────────────────────────────────────────────────────────
 #   21472  Story 9.3b — FR62 GovernanceEvent + FR64 CostAttribution kernel delta
 #          (+136, charter-amended kernel delta, jointly re-pinned).
 #          FLAG-Winston: authorized per ADR-045/ADR-046. FR64 cost emission at

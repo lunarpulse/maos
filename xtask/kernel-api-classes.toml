@@ -38,6 +38,27 @@
 "maos_kernel_core::io::IoSubsystemAdapter"                      = "data-movement"
 "maos_kernel_core::telemetry::TelemetryStreamAdapter"           = "data-movement"
 
+# E16-A1 (Epic-16 retrospective, 2026-09-20) — three symbols the Epic-16
+# baseline regeneration admitted without a class row.
+#
+# `check_service_boundary` only class-checks items ABSENT from the baseline,
+# so regenerating the baseline in the same commit that moves a symbol hides
+# the classification requirement: the symbol lands in the pin, is therefore
+# never "new" again, and is never classified. All three rows below are that
+# hole, found by running the gate at HEAD e868ff28 rather than by reading it.
+#
+# Classes are inherited from the pre-move sibling rows, not invented:
+#   - scheduler_loop::SpiritSchedulerAdapter  <- line 33 (same type, deeper
+#     module path after 16-5 moved it into `scheduler_loop`).
+#   - halt::resolver::KernelHaltResolver      <- lines 314-318, the
+#     Mock/Failing resolvers beside it; lifecycle control over a child +
+#     kernel-managed audit log = supervision.
+#   - security::operator_config::PostureSection <- line 206
+#     (`security::manifest::PostureSection`), genuinely new in 16-6.
+"maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter" = "supervision"
+"maos_kernel_core::halt::resolver::KernelHaltResolver"                = "supervision"
+"maos_kernel_core::security::operator_config::PostureSection"         = "supervision"
+
 # Story 1a.3 — CryptoProvider port + RingCryptoProvider adapter.
 "maos_kernel_core::security::crypto::RingCryptoProvider"              = "data-movement"
 "maos_kernel_core::api::security::RingCryptoProvider"          = "data-movement"
