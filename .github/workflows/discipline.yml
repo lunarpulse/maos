@@ -1214,6 +1214,27 @@ jobs:
   # Story 5.3 — NFR-Rel-1 crash detection ≤2s
   nfr-rel-1-crash-detection-2s:
     runs-on: ubuntu-latest
+    # ⚠ BOUNDED 2026-09-21 (Epic-16 retrospective). This job had NO
+    # `timeout-minutes`, so it inherited GitHub's 6-HOUR default — and it has
+    # been spending all six of them on every push since Epic 16:
+    #   38c52811 (main, 2026-08-28) success in 2m01s
+    #   ddb7441b  cancelled 09:52:03 -> 15:52:47  (6h)
+    #   07873d5c  cancelled 12:57:34 -> 18:58:21  (6h)
+    #   79fc910e  cancelled 15:33:37 -> 21:33:54  (6h)
+    # It wedges in `hundred_sigkilled_workers_meet_both_floors_half_holding_a_
+    # grandchild` AFTER printing a fully-green summary, so it looks healthy
+    # right up to the kill. Six hours of runner time per push also starved the
+    # queue for every other job in the run.
+    #
+    # 20 is 10x the 2m01s healthy time. This does NOT fix the hang — the cause
+    # is a real kernel defect (SpawnedBridge::drop joins the stdout/stderr
+    # bridge readers unboundedly, and a SIGKILLed worker's surviving GRANDCHILD
+    # still holds the pipe write end, so `read()` never EOFs; measured with 10
+    # `cli-bridge-stdout`/`cli-bridge-stderr` threads parked in `anon_pipe_read`
+    # and 10 live fixtures). It makes the hang a FAST RED instead of a silent
+    # six-hour burn, which is the only half of this that does not require a
+    # kernel grant.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
