@@ -112,21 +112,63 @@ if [ "$actual_intro" != "$expected_intro" ]; then
     exit 1
 fi
 
-# Step 5: Binary size gate — stripped maos-bin ≤28MiB (AC4) — blocking, deterministic
+# Step 5: Binary size gate — stripped maos-bin ≤32MiB (AC4) — blocking, deterministic
 echo "--- Checking binary size ---"
 strip target/release/maos
 bin_size=$(stat -c%s target/release/maos)
 # Limit raised 10MiB → 16MiB (2026-06-11), 16MiB → 24MiB (Epic-12 retro
-# 2026-07-14), then 24MiB → 28MiB (Story 15-1 review, 2026-09-08).
+# 2026-07-14), 24MiB → 28MiB (Story 15-1 review, 2026-09-08), then
+# 28MiB → 32MiB (Epic-16 retrospective, 2026-09-20 — MEASURED re-base, below).
 # The single `maos` binary now statically links the full Epic-8 surface (6 reference
 # Spirits, 4 MCP driver sets, and the a2a TCP/mTLS stack) plus the v2.0/v2.2 additions
 # from the Epic 11+12 line: the wasmtime WASM host closure, the enterprise SSO/KMS/SIEM
 # adapters (maos-sso/secrets/siem), the cohort A2A mesh, and Postgres/pgvector
 # Loom-lite. Story 15-1 measured 26,473,608 bytes (25.25MiB) with the repository's
-# pinned stable toolchain; 28MiB restores 2.75MiB of explicit growth headroom.
+# pinned stable toolchain; 28MiB restored 2.75MiB of explicit growth headroom.
+#
+# ── 2026-09-20 RE-BASE 28MiB → 32MiB. Measured at both ends, same toolchain,
+#    same --release profile, `strip` then `stat -c%s`:
+#      843d5365 (Epic-15 close) = 26,222,192 B (25.01 MiB)
+#      cc3e7089 (Epic-16 close) = 30,574,448 B (29.16 MiB)   ← breaches 28MiB
+#    Epic 16 spent +4,352,256 B (+16.6%). This is a re-base and NOT a shrink
+#    because the growth was ATTRIBUTED before the number moved, and what it
+#    bought is a shipped capability rather than bloat. Attribution by ELF
+#    section (`size -A`) and by symbol (`nm -C --print-size`, aggregated on the
+#    demangled crate root):
+#
+#      .text  +3,143,008 · .gcc_except_table +442,816 · .eh_frame +370,016
+#      .rodata +128,568 · .rela.dyn +125,520 · .data.rel.ro +87,368 · rest <56K
+#
+#      crates present at HEAD and ABSENT at Epic-15 close — 1,372,591 B total:
+#        zbus 636,949 · zvariant 352,354 · num_bigint 45,496 · secret_service
+#        41,690 · async_task 37,998 · zvariant_utils 32,400 · async_broadcast
+#        24,770 · ordered_stream 23,943 · zbus_secret_service_keyring_store
+#        23,450 · aes 22,136 · async_executor 18,599 · async_io 18,060
+#      core+std+alloc monomorphisation  +1,044,083  (driven by that same
+#        async/D-Bus generic closure; .eh_frame and .gcc_except_table track it)
+#      maos_bin's own code                +321,436  (Epic 16's five new modules:
+#        admission.rs, supervision.rs, purge.rs, operator_door.rs, shell_host.rs)
+#      maos_kernel_core                    −106,763  (it SHRANK, despite +449
+#        physical lines — pin 24474 → 24922)
+#
+#    So the dominant cost is ONE ratified feature: Story 16-4's OS-keyring
+#    secret store pulls the whole D-Bus stack (`zbus_secret_service_keyring_store`
+#    names it). ~2.3–2.4 MiB of the 4.15 MiB is that closure and its
+#    monomorphisation. Refusing it is refusing the keyring, which is an
+#    operator-facing security posture, not a size decision.
+#
+#    New ceiling follows the SAME rule the 28MiB re-base used: measured value
+#    plus explicit growth headroom of ~2.75–3 MiB. 29.16 + 2.84 = 32 MiB exactly.
+#    33,554,432 − 30,574,448 = 2,979,984 B (2.84 MiB) of headroom for Epics
+#    17–21, whose only new default-on binary surface is `maos-egress` (17-1);
+#    `wasm-host` stays OFF by default (export-control precondition).
+#
+#    ⚠ The next story to breach this MUST attribute before it re-bases. A raise
+#    with no `nm`/`size` attribution is the silent raise this comment chain has
+#    refused four times.
 # Slimming still requires opt-level="z"/fat-LTO (which regresses the §13.1 latency
 # benches) or splitting reference Spirits out of the default binary.
-max_size=29360128  # 28 MiB — Story 15-1 measured re-baseline
+max_size=33554432  # 32 MiB — Epic-16 retrospective measured re-baseline (2026-09-20)
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then
     echo "ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit"
