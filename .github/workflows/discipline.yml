@@ -2973,13 +2973,40 @@ jobs:
       # kills an over-budget child; low-integrity label actually applies). Run
       # single-threaded: each memory test commits ~1 GiB and the tests spawn
       # restricted-token child processes, so serialize for determinism.
+      #
+      # ⚠ DIAGNOSTIC WRAPPER (Epic-16 retrospective, 2026-09-21). These three
+      # steps used to be bare `cargo test` lines, so a Windows-only failure
+      # produced exactly one readable byte of evidence: "Process completed with
+      # exit code 1". Reading the step log requires an `actions`-scoped token,
+      # which is a strictly larger grant than reading checks — so a
+      # Windows-only regression was effectively undiagnosable from the API this
+      # project can actually authenticate against. `::error::` writes the tail
+      # into a CHECK-RUN ANNOTATION, readable with `repo:status`. The failing
+      # step is windows-check #8 (`jetbrains_acp_server`); the next run will say
+      # WHY instead of merely that. `%25`-then-`%0A` escaping order matters, and
+      # `shell: bash` is required because windows-latest defaults to pwsh.
       - name: Run Windows sandbox enforcement tests
-        run: cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1 2>&1 | tee win-sandbox.log && exit 0
+          echo "::error::windows-check: sandbox_enforcement_windows FAILED. Tail:%0A$(tail -80 win-sandbox.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
+          exit 1
       # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
       - name: Run ACP JetBrains bridge test
-        run: cargo test -p maos-acp --test jetbrains_bridge_test
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p maos-acp --test jetbrains_bridge_test 2>&1 | tee win-acp-bridge.log && exit 0
+          echo "::error::windows-check: jetbrains_bridge_test FAILED. Tail:%0A$(tail -80 win-acp-bridge.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
+          exit 1
       - name: Run JetBrains ACP server e2e
-        run: cargo test -p maos-bin --test jetbrains_acp_server
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p maos-bin --test jetbrains_acp_server -- --nocapture 2>&1 | tee win-acp-server.log && exit 0
+          echo "::error::windows-check: jetbrains_acp_server FAILED (this is the step that reds today). Tail:%0A$(tail -80 win-acp-server.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
+          exit 1
       # ⚠ This step tested NOTHING until 2026-09-21 (Epic-16 retrospective).
       # `-- --exact` makes libtest match the FULL test path, and the test lives
       # at `subcommands::tests::install_verify_local_release_artifact`

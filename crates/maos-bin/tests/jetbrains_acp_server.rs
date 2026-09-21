@@ -23,7 +23,22 @@ fn jetbrains_acp_server_binary_routes_real_resolvers() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "acp-server")
         .env("MAOS_OLLAMA_URL", "skip")
+        // ⚠ HOME alone does NOT isolate the child on Windows. `HOME` is a
+        // POSIX convention; Windows home resolution reads `USERPROFILE` (and
+        // `HOMEDRIVE`+`HOMEPATH`), so on windows-latest this test handed the
+        // child the RUNNER'S REAL PROFILE while believing it had given it a
+        // fresh temp dir. Every env key that can name a home is pointed at the
+        // temp dir so the isolation the test claims is the isolation it gets on
+        // every platform. `windows-check` step #8 is the job that fails here
+        // (Epic-16 retrospective, 2026-09-21); whether this is THE cause is
+        // unconfirmed, because reading that step's log needs an `actions`-scoped
+        // token — but an unisolated HOME is a defect either way, and the
+        // diagnostic wrapper added to the job in the same commit makes the next
+        // run say so out loud instead of exiting 1 in silence.
         .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("HOMEDRIVE", "")
+        .env("HOMEPATH", &home)
         .current_dir(workspace_root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
