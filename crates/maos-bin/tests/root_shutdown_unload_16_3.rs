@@ -1469,6 +1469,31 @@ fn scratch_dir(label: &str) -> PathBuf {
 // network build (maos-bin's DEFAULT), so an air-gap build still compiles this
 // file — with these three vectors absent, and nothing else.
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// ⚠ THESE THREE VECTORS REQUIRE A **DEBUG** PROFILE. Do not "fix" the CI job by
+// folding them back into the `--release` run; they were RED from the day this
+// file was created and the Epic-16 retrospective (2026-09-21) measured why.
+//
+// `NONCE_A`/`NONCE_B` below are pre-paired into each host's `[tcp] peer_pins`
+// row because `PinnedFingerprint.boot_nonce` is REQUIRED with no serde default
+// (`maos-a2a-tcp/src/config.rs:31-36`) and `verify_pinned_sync` returns
+// `NotPinned` rather than TOFU-pinning on first contact
+// (`maos-a2a-core/src/tofu.rs:457-466`) — the config IS the pre-pairing
+// mechanism, so the harness cannot omit the nonce. The daemon honours
+// `MAOS_TEST_BOOT_NONCE` only under `cfg!(debug_assertions)`
+// (`crates/maos-bin/src/main.rs:1948`), which is deliberate and stays: a shipped
+// release binary that accepts an env-supplied boot nonce has no NFR-Rel-6
+// restart detection. Under `--release` both hosts mint random nonces
+// (`main.rs:1956-1959`), the receiver fires `CODE_SPIRIT_RESTART_DETECTED`
+// (`maos-a2a-core/src/router.rs:1372-1380`) and the sender reports
+// `CrossHostPinMismatch`. Measured: release 9/11 with these three red; debug
+// 3/3 green. `.github/workflows/discipline.yml` runs the suite in both profiles
+// and asserts 8 + 3 == 11 so the split cannot silently drop a vector.
+//
+// NOT covered here, and deliberately so: the designed `re-pin` recovery.
+// `TofuPinStore::await_repin_consent` has ZERO production callers and its
+// default hook returns `TimedOut` (`router.rs:1235-1236`), so the recovery
+// cannot be driven end to end at HEAD. Filed as a precondition on `19-4`.
 
 #[cfg(feature = "network")]
 mod cohort {

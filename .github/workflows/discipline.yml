@@ -1321,8 +1321,70 @@ jobs:
           cargo build --release -p worker --bin worker-cli-fixture
       # `--test-threads=1` is REQUIRED: these vectors spawn real roots with
       # scratch doors and scan `/proc`, and assume sequential execution.
-      - name: Run root shutdown unload suite
-        run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1
+      #
+      # ── PROFILE SPLIT (Epic-16 retrospective, 2026-09-21) ──────────────────
+      # The suite is run in TWO profiles because two correct decisions collide
+      # on the `cohort::*` vectors, and they were RED from the day Story 16-3
+      # created this file:
+      #
+      #   * `crates/maos-bin/src/main.rs:1948` gates the `MAOS_TEST_BOOT_NONCE`
+      #     override on `cfg!(debug_assertions)`. That is deliberate and stays:
+      #     a shipped release binary that accepts an env-supplied boot nonce has
+      #     no NFR-Rel-6 restart detection at all.
+      #   * The cohort vectors pre-pair `boot_nonce` in each host's
+      #     `[tcp] peer_pins` row (`root_shutdown_unload_16_3.rs:1670`), because
+      #     `PinnedFingerprint.boot_nonce` is a REQUIRED field with no serde
+      #     default (`maos-a2a-tcp/src/config.rs:31-36`) and
+      #     `TofuPinStore::verify_pinned_sync` returns `NotPinned` rather than
+      #     TOFU-pinning on first contact (`maos-a2a-core/src/tofu.rs:457-466`).
+      #     So the config IS the pre-pairing mechanism; there is no way for the
+      #     harness to omit the nonce.
+      #
+      # Under `--release` both hosts therefore mint RANDOM nonces from
+      # `getrandom` (`main.rs:1956-1959`), neither matches the pinned
+      # `NONCE_A`/`NONCE_B`, the receiver fires `CODE_SPIRIT_RESTART_DETECTED`
+      # (`maos-a2a-core/src/router.rs:1372-1380`) and the sender reports
+      # `CrossHostPinMismatch`. Measured: 9 of 11 vectors pass in release; the
+      # 3 `cohort::*` vectors pass 3/3 in debug.
+      #
+      # REJECTED at the 2026-09-21 round-table (unanimous): a `test-boot-nonce`
+      # cargo feature — all four fault-inject precedents guard
+      # `not(debug_assertions)` with `compile_error!`, so it would need
+      # `--release` AND the feature, inverting the house rule on a security
+      # path; loosening the `cfg!`; and `#[ignore]`, which is E16-A2 in disguise.
+      # Also unimplementable at HEAD: driving the designed `re-pin` recovery —
+      # `TofuPinStore::await_repin_consent` has ZERO production callers and its
+      # default hook returns `TimedOut` (`router.rs:1235-1236`). That gap is
+      # filed as a precondition on `19-4`.
+      #
+      # The profile split keeps each run INTERNALLY consistent, which is what
+      # the note above actually requires: `maosctl` and the fixture are resolved
+      # as siblings of the running `maos`, so a release test needs release
+      # siblings and a debug test needs debug siblings. Both hold below.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Run root shutdown unload suite (release — 8 vectors)
+        run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort
+      # The debug siblings, for the debug half. Same sibling-consistency rule.
+      - name: Build debug binaries for the cohort vectors
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: Run root shutdown unload cohort vectors (debug — boot-nonce override live)
+        run: cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort
+      # Coverage guard: the split MUST NOT silently drop a vector. 8 + 3 = 11.
+      # A renamed module makes `--skip cohort` match nothing, the release run
+      # then executes all 11 and fails LOUD on the cohort three — never silent.
+      - name: Assert the two halves still sum to the whole suite
+        run: |
+          set -euo pipefail
+          rel=$(cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
+          dbg=$(cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
+          echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
+          if [ "$(( rel + dbg ))" -ne 11 ]; then
+            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 11"
+            exit 1
+          fi
 
   # Story 5.4 — NFR-Rel-9 revocation propagation ≤5s p99
   nfr-rel-9-revocation-5s-p99:
