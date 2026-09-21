@@ -36,18 +36,10 @@
 //! blocking at v2.0 (a RED oracle BLOCKS ship). The current phase is read from
 //! the registry disposition, not hardcoded magic.
 
-use crate::gate_common::emit_command;
+use crate::gate_common::{emit_command, is_blocking_at, CURRENT_PHASE};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
-
-/// Phase graduation order — matches the `gate-registry.toml` `disposition` keys.
-/// Absent phases inherit the nearest prior declared phase (corpus_types.rs:82).
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
-
-/// Current release phase. The equivalence binding graduates to blocking at
-/// v2.0; v1.0/v1.5 are the advisory WOULD-HAVE-BLOCKED window.
-const CURRENT_PHASE: &str = "v1_5";
 
 /// Read the full phase-disposition map for this gate from the registry.
 fn read_disposition() -> Result<HashMap<String, String>, String> {
@@ -64,27 +56,6 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
         }
     }
     Err("check-wasm-form-equiv not found in gate-registry.toml".into())
-}
-
-/// Resolve the disposition for `phase`, inheriting the nearest prior declared
-/// phase when `phase` itself is absent from the map.
-fn phase_disposition<'a>(disposition: &'a HashMap<String, String>, phase: &str) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
-}
-
-/// True iff the gate BLOCKS ship at `phase` (the v2.0 cutover). At v1.0/v1.5 a
-/// RED oracle is advisory (WOULD-HAVE-BLOCKED banner, non-failing).
-fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> bool {
-    matches!(
-        phase_disposition(disposition, phase),
-        Some("blocking") | Some("blocking-when-present")
-    )
 }
 
 fn write_step_summary(text: &str) {
@@ -269,7 +240,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "passed": true,
                     "oracle_green": true,
                     "blocking_now": blocking_now,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "base_passed": base.passed,
                     "base_failed": base.failed,
@@ -339,7 +310,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "oracle_green": false,
                 "advisory": true,
                 "blocking_now": false,
-                "current_phase": CURRENT_PHASE,
+                "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
                 "base_passed": base.passed,
                 "base_failed": base.failed,

@@ -7,7 +7,7 @@ fn stdio_transport_spawn_and_exchange() {
     let response = r#"{"jsonrpc":"2.0","id":1,"result":{"name":"echo","content":[{"type":"text","text":"hello"}]}}"#;
     let transport = StdioTransport::new(
         "sh".into(),
-        vec!["-c".into(), format!("echo '{}'", response)],
+        vec!["-c".into(), format!("cat >/dev/null; echo '{}'", response)],
     )
     .unwrap();
 
@@ -35,7 +35,16 @@ fn stdio_transport_nonexistent_binary_returns_transport_error() {
 fn stdio_transport_malformed_output_returns_transport_error() {
     let transport = StdioTransport::new(
         "sh".into(),
-        vec!["-c".into(), "echo 'not json at all'".into()],
+        vec![
+            "-c".into(),
+            // Story 15-1 AC6(c): the child must consume its request before
+            // answering. A bare `echo` never reads stdin, so when the child
+            // wins the scheduling race the request write returns EPIPE and
+            // the test observes the wrong error class (measured 7/20; the
+            // mechanism reproduced 300/300 with a 2 ms delay standing in for
+            // load). Draining stdin first removes the race deterministically.
+            "cat >/dev/null; echo 'not json at all'".into(),
+        ],
     )
     .unwrap();
 

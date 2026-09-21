@@ -2,6 +2,9 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 #[test]
 fn smoke_mira_nash_tcp_8_13_runs_with_isolated_xdg() {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
@@ -16,6 +19,9 @@ fn smoke_mira_nash_tcp_8_13_runs_with_isolated_xdg() {
         .args(["run", "spirits/topologies/j4-mira-nash.toml", "--once"])
         .env("XDG_DATA_HOME", &xdg)
         .env("MAOS_OLLAMA_URL", "skip")
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" so this root never reads
+        // the developer's $HOME/.maos/control.json (EndpointInUse collision).
+        .env("HOME", doorless_home::doorless_home())
         .current_dir(workspace_root)
         .output()
         .expect("failed to execute maos-bin");

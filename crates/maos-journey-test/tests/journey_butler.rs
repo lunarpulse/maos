@@ -35,6 +35,8 @@ fn jb1_halt_screen_render_via_pty() {
     let world = JourneyWorld::builder().audit(audit).build();
 
     let manifest = workspace_root().join("spirits/butler/manifest.toml");
+    // Story 16-1 / D-16-1-Q: Pty children get their "HOME" from the JourneyWorld
+    // builder env (harness doorless_home) — no developer control.json endpoint.
     let cmd = format!("{} run {} --once", maos_bin(), manifest.display());
     let pty = Pty::spawn(&cmd, &world);
 

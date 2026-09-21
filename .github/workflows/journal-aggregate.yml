@@ -45,7 +45,7 @@ permissions:
   contents: read
 
 jobs:
-  aggregate:
+  journal-aggregate:
     runs-on: ubuntu-latest
 
     steps:

@@ -266,6 +266,32 @@ impl HaltRegistry {
         }
     }
 
+    /// Roll a terminal resolution back to pending when its approval-decision
+    /// journal commit fails. Restores metadata removed by `resolve` so a retry
+    /// can execute the same kernel-side resolution path.
+    pub fn rollback_resolution(
+        &self,
+        halt_id: &HaltId,
+        metadata: Option<PendingHaltMetadata>,
+    ) -> bool {
+        let mut map = self.pending.write().expect("HaltRegistry lock poisoned");
+        let Some(state) = map.get_mut(halt_id) else {
+            return false;
+        };
+        if *state == HaltState::PendingResolution {
+            return false;
+        }
+        *state = HaltState::PendingResolution;
+        drop(map);
+        if let Some(metadata) = metadata {
+            self.metadata
+                .write()
+                .expect("HaltRegistry metadata lock poisoned")
+                .insert(halt_id.clone(), metadata);
+        }
+        true
+    }
+
     /// Read-only inspection — used by `validate_halt_set` (AC5) and
     /// by `maosctl halt-list` (Story 3.3 AC7 already wired).
     pub fn pending_halt_ids(&self) -> Vec<HaltId> {

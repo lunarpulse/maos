@@ -229,7 +229,7 @@ fn legal_hold_blocks_erasure_and_journals_request() {
     // Request journaled.
     let entries = tl
         .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
-            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete),
+            kind: Some(maos_kernel_core::iac::transparency_log::FrameKind::Decision),
             ..Default::default()
         })
         .unwrap();

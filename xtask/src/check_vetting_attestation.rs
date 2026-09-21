@@ -243,7 +243,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "passed": true,
                     "oracle_green": true,
                     "blocking_now": blocking_now,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "legs": legs_json(&legs),
                 })

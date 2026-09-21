@@ -72,6 +72,16 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_ANTHROPIC_API_KEY",
+        purpose: "Anthropic credential; a present non-empty value marks the live provider eligible (15-6 §A6 review)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_OPENAI_API_KEY",
+        purpose: "OpenAI credential; a present non-empty value marks the live provider eligible (15-6 §A6 review)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_MCP_CALENDAR_URI",
         purpose: "Butler MCP calendar server URI",
         stability: EnvStability::UserFacing,
@@ -238,7 +248,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_CRL_PATH",
-        purpose: "Certificate Revocation List file path",
+        purpose: "Certificate Revocation List directory",
         stability: EnvStability::UserFacing,
     },
     EnvVar {
@@ -252,14 +262,14 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
-        name: "MAOS_REPLAY_CASSETTE",
-        purpose: "Path to cassette file for replay InferencePort (journey-test harness)",
-        stability: EnvStability::HarnessOnly,
+        name: "MAOS_INFERENCE_MODE",
+        purpose: "Authoritative inference mode: live, record, or replay",
+        stability: EnvStability::UserFacing,
     },
     EnvVar {
-        name: "MAOS_JOURNEY_MODE",
-        purpose: "Journey test mode: 'record' appends live responses to cassette",
-        stability: EnvStability::HarnessOnly,
+        name: "MAOS_REPLAY_CASSETTE",
+        purpose: "Cassette path for authoritative inference record or replay",
+        stability: EnvStability::UserFacing,
     },
     EnvVar {
         name: "MAOS_REPLAY_STRICT",
@@ -464,6 +474,36 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     EnvVar {
         name: "MAOS_HOST_GRANTS",
         purpose: "Path to an operator TOML file of host-managed CliWrapper grants ([[grant]] attested_image/signing_key_id/permitted_tier/permitted_egress_destinations); replaces the v0.9 self-grant. Absent → built-in fixture grant only, real agent CLIs fail closed (j1-tier2-live-agent-signed-bridge)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_OPERATOR_BEARER_TOKEN",
+        purpose: "Bearer token for the loopback operator HTTP surface; with MAOS_OPERATOR_HTTP_BIND it OVERRIDES <MAOS_HOME|HOME/.maos>/control.json for one boot — both-or-neither, half-set is a typed refusal (Story 16-1 AC2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_OPERATOR_HTTP_BIND",
+        purpose: "Bind address for the loopback operator HTTP surface; with MAOS_OPERATOR_BEARER_TOKEN it OVERRIDES control.json for one boot — no fallback port, no door without either source (Story 16-1 AC2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_REGISTRY_YANK_CURSOR_PATH",
+        purpose: "Override the durable registry yank-cursor file; maos purge enumerates the same path so the cursor is not orphaned (Story 16-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_IMPORT_SCRATCH_ROOT",
+        purpose: "Override the registry import-bundle scratch directory that maos purge enumerates (default $HOME/.cache/maos/import) (Story 16-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_AUDIT_DB",
+        purpose: "Relocated audit database; when it sits outside every aggregated purge root, the database and its MAOS-written sidecars are enumerated so no Transparency Log copy is left unnamed (Story 16-4)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SECRETS_BACKEND",
+        purpose: "Credential source selected at the composition root: keyring (default, with bounded env fallback), env (CI), or encrypted-file (requires MAOS_KMS_MASTER_KEY) (Story 16-4)",
         stability: EnvStability::UserFacing,
     },
 ];

@@ -408,7 +408,18 @@ fn derive_ignored_churn_tests() -> Result<Vec<(String, String, bool)>, String> {
 
 /// Leg 4: kernel-ABI baseline (no PG) — ZERO kernel-Δ at 24472.
 fn run_kernel_abi_leg() -> LegResult {
-    let green = crate::check_kernel_baseline::run(false).is_ok();
+    let kernel = crate::check_kernel_baseline::check();
+    let green = kernel.as_ref().is_ok_and(|report| report.passed);
+    if !green {
+        // `run(false)` carried the diagnosis on stderr; `check()` is silent,
+        // and a red leg whose only record is a constant names nothing
+        // (Story 16-0 review). stderr only — stdout belongs to `--json`.
+        let diagnosis = match &kernel {
+            Ok(report) => crate::check_kernel_baseline::failure_detail(report),
+            Err(error) => format!("kernel baseline check errored: {error}"),
+        };
+        eprintln!("kernel-abi-diff RED — {diagnosis}");
+    }
     LegResult {
         label: "kernel-abi-diff",
         passed: if green { 1 } else { 0 },
@@ -548,7 +559,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "oracle_green": true,
                     "blocking_now": blocking_now,
                     "dev_blocks": dev_blocks,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "enrolled_churn_tests": derived.len(),
                     "legs": legs_json(&legs),

@@ -23,7 +23,6 @@ network = [
     "dep:rcgen",
     "dep:maos-a2a",
     "dep:maos-sso",
-    "dep:maos-secrets",
     "dep:maos-siem",
 ]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
@@ -39,6 +38,9 @@ escape-fault-inject = ["maos-escape-detector/escape-fault-inject"]
 
 [dependencies]
 maos-shell = { path = "../maos-shell" }
+# Story 16-2 / §15 R9 — halt ids minted as ULIDs, the kernel's halt-id grammar
+# (same spec as maos-kernel-core; Cargo.lock resolves 1.2.1 through it).
+ulid = "1.1"
 maos-cli = { path = "../maos-cli" }
 maos-audit = { path = "../maos-audit" }
 maos-director-surface = { path = "../maos-director-surface" }
@@ -50,7 +52,7 @@ maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
 maos-escape-detector = { path = "../maos-escape-detector" }   # Story 11.4b — out-of-kernel sandbox-escape detector (ADR-024); read-only TL consumer wired at the composition root (NOT a kernel-core adapter; stays out of api.rs)
 maos-sso = { path = "../maos-sso", optional = true }   # Story 11.4c — OIDC verify adapter (network-gated; composed at the root)
-maos-secrets = { path = "../maos-secrets", optional = true }   # Story 11.4c — at-rest envelope AEAD (network-gated; composed at the root)
+maos-secrets = { path = "../maos-secrets", default-features = false, features = ["encrypted-file"] }   # Story 16-4 — env/encrypted-file secret stores in every build; the keyring stack is unix-only (below) so non-unix targets compile it OUT (air-gap D2/D3)
 maos-siem = { path = "../maos-siem", optional = true }   # Story 11.4c — read-only TL projection + localhost SIEM sink (network-gated; composed at the root, stays out of api.rs)
 maos-host = { path = "../maos-host" }   # Story 11.1a — Spirit Host Port trait types (needed even without wasmtime; the host abstraction is engine-agnostic)
 maos-wasm-host = { path = "../maos-wasm-host", optional = true }   # Story 11.1a — wasmtime component adapter, behind `wasm-host` feature (export-control OFF-by-default, AC6)
@@ -99,6 +101,7 @@ serde_cbor = "0.11"
 tar = { version = "0.4", default-features = false }
 smallvec = { version = "1", features = ["serde"] }
 thiserror = "2"
+semver = "1"
 # Story 11.4c — the out-of-kernel `identity.asserted` (kind 30) write helper
 # (`enterprise_identity::append_identity_asserted`) opens the Transparency Log
 # read-write from the composition root. Moved here from `maos-audit` (Epic-12
@@ -106,6 +109,18 @@ thiserror = "2"
 # the `maos-audit-read-only` gate. Already in maos-bin's link closure transitively
 # via the kernel-core TL adapter — a direct dep just exposes the API.
 rusqlite = { version = "0.31", features = ["bundled"] }
+# Story 16-1 (D-16-1-D) — the store lock set flocks the store DIRECTORIES'
+# own handles. Unix-gated exactly like maos-kernel-core's containment I/O.
+# Story 16-3 (D-16-3-B) — `process` adds the Linux pidfd surface the Worker
+# exit observer needs: `pidfd_open`, `pidfd_send_signal`, and
+# `waitid(WaitId::PidFd, EXITED|NOWAIT)`. Feature-only: no new crate, no new
+# lockfile entry.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1", features = ["fs", "process"] }
+# Story 16-4 (D2/D3) — unix builds keep today's keyring-backed composition.
+# Non-unix builds never see the keyring stack: the default backend is `env`
+# and MAOS_SECRETS_BACKEND=keyring exits 78 at boot.
+maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 
 [dev-dependencies]
 tempfile = "3"

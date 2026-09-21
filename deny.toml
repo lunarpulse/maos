@@ -121,6 +121,14 @@ skip = [
     { name = "wasm-encoder" },
     { name = "wast" },
     { name = "winnow" },
+    # Story 16-4 OS keyring — keyring 4.2's Linux secret-service backend
+    # brings zbus 5.19. zbus currently needs the newer hkdf 0.13, syn 3, and
+    # toml_edit 0.25 macro stack beside the workspace's established
+    # hkdf 0.12, syn 2, and toml_edit 0.22 graph. The backend is isolated in
+    # maos-secrets; unification requires upstream convergence.
+    { name = "hkdf" },
+    { name = "syn" },
+    { name = "toml_edit" },
 ]
 skip-tree = []
 

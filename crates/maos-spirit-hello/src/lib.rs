@@ -15,6 +15,24 @@ use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::ports::inference::{
     InferenceError, InferenceOptions, InferencePort, InferenceRequest,
 };
+use maos_spirit_abi::lifecycle::Spirit;
+
+/// Story 16-2 / D-16-2-A — the hello-spirit manifest, embedded at compile
+/// time so `maos shell` never reads the working directory (FR58 zero-config
+/// path from install). The on-disk file under `spirits/hello-spirit/` is the
+/// single source; this constant is the shipped copy.
+pub const MANIFEST_TOML: &str = include_str!("../../../spirits/hello-spirit/manifest.toml");
+
+/// Story 16-2 / D-16-2-A — hello-spirit as a scheduler-loadable Spirit.
+///
+/// All eleven lifecycle hooks keep their default (no-op) implementations:
+/// the J0 scene's behaviour lives in the free functions (`run`,
+/// `dispatch_directive`, `say_hi`) the shell drives directly; the `Spirit`
+/// impl exists so the scheduler can own the Spirit's identity, pid, SCB and
+/// lifecycle rows exactly like every other loaded Spirit.
+pub struct HelloSpirit;
+
+impl Spirit for HelloSpirit {}
 
 /// Structured response for the hello-Spirit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -51,22 +69,46 @@ impl std::error::Error for HelloError {}
 /// `token` is the capability token proving the Spirit is authorized to call
 /// the Inference Port. In the kernel's in-process one-shot path, `maos-bin`
 /// issues this token through the Capability Registry before calling `run`.
+///
+/// Story 16-2 / D-16-2-M — `transparency_log` is the path the CALLING
+/// process actually writes (the resolved TL path), so the honest-disclosure
+/// field never names a file that does not exist; and the inference request
+/// carries the TOKEN's pid (not a literal 0), so the loaded Spirit's
+/// `inference.call` and cost rows land at its pid — the one thing FR4's
+/// `--spirit` view is for.
 pub fn run(
     inference: &dyn InferencePort,
     token: CapabilityToken,
+    transparency_log: &str,
+) -> Result<HelloResponse, HelloError> {
+    run_prompt(
+        inference,
+        token,
+        "Introduce yourself as the MAOS hello-Spirit. \
+                 State your capability scope, expected halt tags, \
+                 and transparency log endpoint.",
+        transparency_log,
+    )
+}
+
+/// One inference turn with a caller-chosen prompt — the shared body of
+/// `run` and [`proceed_with_context`].
+fn run_prompt(
+    inference: &dyn InferencePort,
+    token: CapabilityToken,
+    prompt: &str,
+    transparency_log: &str,
 ) -> Result<HelloResponse, HelloError> {
     let capability_scope = capability_scope_default();
     let posture = posture_default();
     let halt_tags = halt_tags_default();
-    let transparency_log = transparency_log_default();
 
+    // D-16-2-M(3): the request carries the token's pid — never a literal.
+    let spirit_pid = token.spirit_pid;
     let req = InferenceRequest::new(
-        0,
+        spirit_pid,
         token,
-        "Introduce yourself as the MAOS hello-Spirit. \
-                 State your capability scope, expected halt tags, \
-                 and transparency log endpoint."
-            .into(),
+        prompt.to_string(),
         InferenceOptions {
             max_tokens: 256,
             temperature: None,
@@ -82,7 +124,7 @@ pub fn run(
             capability_scope,
             posture,
             halt_tags,
-            transparency_log,
+            transparency_log: transparency_log.to_string(),
         }),
         Err(InferenceError::Unconfigured) => {
             let introduction = String::from(
@@ -95,7 +137,7 @@ pub fn run(
                 capability_scope,
                 posture,
                 halt_tags,
-                transparency_log,
+                transparency_log: transparency_log.to_string(),
             })
         }
         Err(InferenceError::ProviderTransport(_)) => {
@@ -108,7 +150,7 @@ pub fn run(
                 capability_scope,
                 posture,
                 halt_tags,
-                transparency_log,
+                transparency_log: transparency_log.to_string(),
             })
         }
         Err(e) => Err(HelloError::Inference(e)),
@@ -163,13 +205,14 @@ fn is_ambiguous(directive: &str) -> Option<(&'static str, String)> {
 pub fn say_hi(
     inference: &dyn InferencePort,
     token: CapabilityToken,
+    transparency_log: &str,
 ) -> Result<HelloResponse, HelloError> {
     // Ambiguity check (FORK 6).
     // The `say_hi` path is normally for greetings, but the shell may route
     // arbitrary messages here. We check the directive for ambiguity.
     // In practice, `say hi` itself is not ambiguous; this guard is for the
     // `@hello-spirit refactor ... more idiomatic` path.
-    run(inference, token)
+    run(inference, token, transparency_log)
 }
 
 /// Dispatch a directive, detecting ambiguity before inference.
@@ -177,6 +220,7 @@ pub fn dispatch_directive(
     inference: &dyn InferencePort,
     token: CapabilityToken,
     directive: &str,
+    transparency_log: &str,
 ) -> Result<HelloResponse, HelloError> {
     if let Some((tag, prompt)) = is_ambiguous(directive) {
         return Err(HelloError::Ambiguous {
@@ -184,15 +228,40 @@ pub fn dispatch_directive(
             prompt,
         });
     }
-    run(inference, token)
+    run(inference, token, transparency_log)
+}
+
+/// Story 16-2 / D-16-2-D — the proceeding turn.
+///
+/// Runs the ORIGINAL directive with the operator's clarification appended,
+/// with **no ambiguity re-check**: the operator just answered the ambiguity,
+/// and `is_ambiguous` still matches the same words ("more idiomatic" is in
+/// the directive), so re-checking would halt forever. This is the J0 beat —
+/// "type a clarification, the Spirit proceeds".
+pub fn proceed_with_context(
+    inference: &dyn InferencePort,
+    token: CapabilityToken,
+    directive: &str,
+    context: Option<&str>,
+    transparency_log: &str,
+) -> Result<HelloResponse, HelloError> {
+    let prompt = match context {
+        Some(text) => format!(
+            "{directive}\n\nClarification from the operator: {text}\n\
+                 Proceed with the task under this clarification."
+        ),
+        // `authorized_override` — the operator waved the Spirit on without a
+        // clarification (D-16-2-D: "proceeds without context").
+        None => format!(
+            "{directive}\n\nProceeding under an authorized override — no \
+                 clarification was provided."
+        ),
+    };
+    run_prompt(inference, token, &prompt, transparency_log)
 }
 
 fn halt_tags_default() -> Vec<String> {
     vec!["assistive".into()]
-}
-
-fn transparency_log_default() -> String {
-    "xdg:maos/audit/transparency.sqlite".into()
 }
 
 #[cfg(test)]
@@ -248,7 +317,7 @@ mod tests {
             should_fail_capability: false,
         };
         let token = zero_token();
-        let resp = run(&port, token).unwrap();
+        let resp = run(&port, token, "/tmp/t/transparency.sqlite").unwrap();
         assert!(resp.introduction.contains("MAOS hello-Spirit"));
         assert!(!resp.capability_scope.is_empty());
         assert!(!resp.halt_tags.is_empty());
@@ -263,7 +332,7 @@ mod tests {
             should_fail_capability: false,
         };
         let token = zero_token();
-        let resp = run(&port, token).unwrap();
+        let resp = run(&port, token, "/tmp/t/transparency.sqlite").unwrap();
         assert!(resp.introduction.contains("Inference is unconfigured"));
         assert!(resp.introduction.contains("MAOS_ANTHROPIC_API_KEY"));
         assert!(!resp.capability_scope.is_empty());
@@ -294,7 +363,7 @@ mod tests {
             should_fail_capability: true,
         };
         let token = zero_token();
-        let err = run(&port, token).unwrap_err();
+        let err = run(&port, token, "/tmp/t/transparency.sqlite").unwrap_err();
         assert!(matches!(
             &err,
             HelloError::Inference(InferenceError::CapabilityDenied)
@@ -309,7 +378,7 @@ mod tests {
             should_fail_capability: false,
         };
         let token = zero_token();
-        let resp = run(&port, token).unwrap();
+        let resp = run(&port, token, "/tmp/t/transparency.sqlite").unwrap();
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"introduction\""));
         assert!(json.contains("\"capability_scope\""));
@@ -320,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_manifest_validates() {
-        let manifest_raw = include_str!("../../../spirits/hello-spirit/manifest.toml");
+        let manifest_raw = MANIFEST_TOML;
         let manifest: toml::Value =
             toml::from_str(manifest_raw).expect("manifest.toml must be valid TOML");
 

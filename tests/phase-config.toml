@@ -1,8 +1,8 @@
-# Phase configuration — single source of truth for current phase.
-# The coverage-matrix.yaml current_phase field MUST match this value.
+# Phase configuration — single source of truth for delivered phase.
+# The coverage-matrix.yaml delivered_phase field MUST match this value.
 # Changing phase requires updating both files.
 
-current_phase = "v0.1-alpha"
+delivered_phase = "v0.1-alpha"
 phase_order = [
     "v0.1-alpha",
     "v0.1-alpha-surface-diff-stub",

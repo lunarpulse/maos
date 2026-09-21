@@ -1,7 +1,7 @@
 {
-  "run_id": "maos-bench-1786639842983470905",
-  "started_at_ns": 671,
-  "git_sha": "2688c6d0",
+  "run_id": "maos-bench-1789580315191538142",
+  "started_at_ns": 391,
+  "git_sha": "e485bcb6",
   "journeys": [
     {
       "name": "J1",

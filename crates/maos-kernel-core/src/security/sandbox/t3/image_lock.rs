@@ -23,6 +23,7 @@ const DEFAULT_LOCK_PATH: &str = concat!(
 /// The inner attestations deliberately cannot be constructed by callers.  T3
 /// spawning accepts only an image selected from this type, preventing a caller
 /// from bypassing admission with deserialized lock material.
+#[maos_attrs::i9_exempt(reason = "verified T3 image lock; immutable structural state per I9")]
 #[derive(Debug, Clone)]
 pub struct VerifiedImageLock {
     attestations: Vec<T3ImageAttestation>,

@@ -192,6 +192,8 @@ impl DistillateWriteToken {
 /// A single Transparency Log row — what `query_frames` returns.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransparencyLogEntry {
+    /// SQLite insertion order. Stable under wall-clock corrections.
+    pub insertion_id: i64,
     pub frame_id: [u8; 16], // ULID bytes
     pub timestamp_ns: u64,
     pub spirit_pid: u32,
@@ -217,12 +219,19 @@ pub struct FrameFilter {
     pub since_ns: Option<u64>,
     pub until_ns: Option<u64>,
     pub limit: Option<usize>,
+    /// Return newest rows first. Cursors remain lower-bound cursors; callers
+    /// combining them with descending order own that pagination contract.
+    pub descending: bool,
+    /// Order by SQLite insertion order instead of wall-clock timestamp.
+    pub order_by_insertion: bool,
     /// Story 6.1 — filter by exact frame_id (for retract authority lookup).
     pub frame_id: Option<[u8; 16]>,
     /// Keyset-pagination cursor — exclusive lower bound on `(timestamp_ns, frame_id)`.
     /// When both are `Some`, the query adds `WHERE (timestamp_ns, frame_id) > (?cursor_ts, ?cursor_id)`.
     pub cursor_timestamp_ns: Option<u64>,
     pub cursor_frame_id: Option<[u8; 16]>,
+    /// Exclusive insertion-order cursor (`rowid > cursor_insertion_id`).
+    pub cursor_insertion_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -1356,14 +1365,15 @@ impl TransparencyLogAdapter {
             .map_err(AuditError::SqliteRead)
     }
 
-    /// Story 9.2 (P7) — journal a kernel `TaskComplete` frame and return its
-    /// frame_id, both under one lock acquisition so a concurrent insert cannot
-    /// steal `last_frame_id`.  Panics on write failure per the I2 binding,
-    /// exactly like `insert_frame_event`.  Used by the forget cascade where the
-    /// receipt must name the frame that was just written.
+    /// Journal a caller-classified kernel frame and return its frame id under
+    /// the same lock acquisition. The caller supplies both the semantic kind
+    /// and complete 32-byte capability token; this path never invents either.
+    /// Panics on write failure per the I2 binding, like `insert_frame_event`.
     pub fn insert_kernel_event_returning_id(
         &self,
         spirit_pid: u32,
+        kind: FrameKind,
+        capability_token: Option<[u8; 32]>,
         intent: &str,
         payload: &[u8],
     ) -> [u8; 16] {
@@ -1387,8 +1397,8 @@ impl TransparencyLogAdapter {
                 "",
                 "",
                 inner.boot_nonce as i64,
-                None::<&[u8]>,
-                FrameKind::TaskComplete as i64,
+                capability_token.as_ref().map(|token| &token[..]),
+                kind as i64,
                 intent,
                 &redacted[..],
                 FrameOrigin::Kernel as i64,
@@ -1444,7 +1454,8 @@ impl TransparencyLogAdapter {
     }
 
     /// Read-side: query frame events for `maosctl audit query`.
-    /// Returns entries in `(timestamp_ns ASC, frame_id ASC)` order.
+    /// Returns entries in `(timestamp_ns, frame_id)` order, ascending by
+    /// default and descending when [`FrameFilter::descending`] is set.
     pub fn query_frames(
         &self,
         filter: FrameFilter,
@@ -1454,9 +1465,9 @@ impl TransparencyLogAdapter {
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
         let mut sql = String::from(
-            "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
-                    capability_token, kind, intent, correlation_id, payload_redacted, origin
-             FROM transparency_log",
+            "SELECT rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
+                    boot_nonce, capability_token, kind, intent, correlation_id, payload_redacted,
+                    origin FROM transparency_log",
         );
         let mut where_clauses: Vec<String> = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -1492,12 +1503,25 @@ impl TransparencyLogAdapter {
             params.push(Box::new(cursor_ts as i64));
             params.push(Box::new(cursor_fid.to_vec()));
         }
+        if let Some(cursor) = filter.cursor_insertion_id {
+            where_clauses.push("rowid > ?".to_string());
+            params.push(Box::new(cursor));
+        }
 
         if !where_clauses.is_empty() {
             sql.push_str(" WHERE ");
             sql.push_str(&where_clauses.join(" AND "));
         }
-        sql.push_str(" ORDER BY timestamp_ns ASC, frame_id ASC");
+        let order_key = if filter.order_by_insertion {
+            "rowid"
+        } else {
+            "timestamp_ns, frame_id"
+        };
+        if filter.descending {
+            sql.push_str(&format!(" ORDER BY {order_key} DESC"));
+        } else {
+            sql.push_str(&format!(" ORDER BY {order_key} ASC"));
+        }
         if let Some(limit) = filter.limit {
             sql.push_str(&format!(" LIMIT {limit}"));
         }
@@ -1507,12 +1531,12 @@ impl TransparencyLogAdapter {
             params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt
             .query_map(params_refs.as_slice(), |row| {
-                let frame_id_blob: Vec<u8> = row.get(0)?;
+                let frame_id_blob: Vec<u8> = row.get(1)?;
                 let mut frame_id = [0u8; 16];
                 if frame_id_blob.len() == 16 {
                     frame_id.copy_from_slice(&frame_id_blob);
                 }
-                let cap_blob: Option<Vec<u8>> = row.get(6)?;
+                let cap_blob: Option<Vec<u8>> = row.get(7)?;
                 let mut cap_token = None;
                 if let Some(ref blob) = cap_blob {
                     if blob.len() == 32 {
@@ -1522,15 +1546,16 @@ impl TransparencyLogAdapter {
                     }
                 }
                 Ok(TransparencyLogEntry {
+                    insertion_id: row.get(0)?,
                     frame_id,
-                    timestamp_ns: row.get::<_, i64>(1)? as u64,
-                    spirit_pid: row.get::<_, i64>(2)? as u32,
-                    from_spirit_id: row.get(3)?,
-                    to_spirit_id: row.get(4)?,
-                    boot_nonce: row.get::<_, i64>(5)? as u64,
+                    timestamp_ns: row.get::<_, i64>(2)? as u64,
+                    spirit_pid: row.get::<_, i64>(3)? as u32,
+                    from_spirit_id: row.get(4)?,
+                    to_spirit_id: row.get(5)?,
+                    boot_nonce: row.get::<_, i64>(6)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?).unwrap_or_else(|| {
-                        let disc = row.get::<_, i64>(7).unwrap_or(-1);
+                    kind: FrameKind::from_i64(row.get::<_, i64>(8)?).unwrap_or_else(|| {
+                        let disc = row.get::<_, i64>(8).unwrap_or(-1);
                         eprintln!(
                             "TL query: unrecognized FrameKind discriminant ({disc}); \
                                  mapping to TaskAssign as best-effort fallback \
@@ -1538,10 +1563,10 @@ impl TransparencyLogAdapter {
                         );
                         FrameKind::TaskAssign
                     }),
-                    intent: row.get(8)?,
-                    correlation_id: row.get(9)?,
-                    payload_redacted: row.get(10)?,
-                    origin: match row.get::<_, i64>(11)? {
+                    intent: row.get(9)?,
+                    correlation_id: row.get(10)?,
+                    payload_redacted: row.get(11)?,
+                    origin: match row.get::<_, i64>(12)? {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
@@ -1572,9 +1597,9 @@ impl TransparencyLogAdapter {
         let mut stmt = inner
             .conn
             .prepare(
-                "SELECT frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id, boot_nonce,
-                        capability_token, kind, intent, correlation_id, payload_redacted, origin
-                 FROM transparency_log
+                "SELECT rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
+                        boot_nonce, capability_token, kind, intent, correlation_id,
+                        payload_redacted, origin FROM transparency_log
                  WHERE frame_id = ?1
                  LIMIT 1",
             )
@@ -1582,12 +1607,12 @@ impl TransparencyLogAdapter {
 
         let row = stmt
             .query_row(rusqlite::params![&frame_id[..]], |row| {
-                let frame_id_blob: Vec<u8> = row.get(0)?;
+                let frame_id_blob: Vec<u8> = row.get(1)?;
                 let mut fid = [0u8; 16];
                 if frame_id_blob.len() == 16 {
                     fid.copy_from_slice(&frame_id_blob);
                 }
-                let cap_blob: Option<Vec<u8>> = row.get(6)?;
+                let cap_blob: Option<Vec<u8>> = row.get(7)?;
                 let mut cap_token = None;
                 if let Some(ref blob) = cap_blob {
                     if blob.len() == 32 {
@@ -1597,15 +1622,16 @@ impl TransparencyLogAdapter {
                     }
                 }
                 Ok(TransparencyLogEntry {
+                    insertion_id: row.get(0)?,
                     frame_id: fid,
-                    timestamp_ns: row.get::<_, i64>(1)? as u64,
-                    spirit_pid: row.get::<_, i64>(2)? as u32,
-                    from_spirit_id: row.get(3)?,
-                    to_spirit_id: row.get(4)?,
-                    boot_nonce: row.get::<_, i64>(5)? as u64,
+                    timestamp_ns: row.get::<_, i64>(2)? as u64,
+                    spirit_pid: row.get::<_, i64>(3)? as u32,
+                    from_spirit_id: row.get(4)?,
+                    to_spirit_id: row.get(5)?,
+                    boot_nonce: row.get::<_, i64>(6)? as u64,
                     capability_token: cap_token,
-                    kind: FrameKind::from_i64(row.get::<_, i64>(7)?).unwrap_or_else(|| {
-                        let disc = row.get::<_, i64>(7).unwrap_or(-1);
+                    kind: FrameKind::from_i64(row.get::<_, i64>(8)?).unwrap_or_else(|| {
+                        let disc = row.get::<_, i64>(8).unwrap_or(-1);
                         eprintln!(
                             "TL query: unrecognized FrameKind discriminant ({disc}); \
                                  mapping to TaskAssign as best-effort fallback \
@@ -1613,10 +1639,10 @@ impl TransparencyLogAdapter {
                         );
                         FrameKind::TaskAssign
                     }),
-                    intent: row.get(8)?,
-                    correlation_id: row.get(9)?,
-                    payload_redacted: row.get(10)?,
-                    origin: match row.get::<_, i64>(11)? {
+                    intent: row.get(9)?,
+                    correlation_id: row.get(10)?,
+                    payload_redacted: row.get(11)?,
+                    origin: match row.get::<_, i64>(12)? {
                         0 => FrameOrigin::HumanAuthored,
                         1 => FrameOrigin::SpiritAuto,
                         2 => FrameOrigin::SpiritDraftedHumanApproved,
@@ -2328,6 +2354,51 @@ mod tests {
                 window[1].timestamp_ns,
             );
         }
+    }
+
+    #[test]
+    fn insertion_cursor_does_not_skip_a_later_row_after_clock_rollback() {
+        let log = TransparencyLogAdapter::open_in_memory(0x1);
+        let _ = log.insert_frame_event(
+            FrameKind::CliSubprocessOutput,
+            1,
+            None,
+            "first",
+            b"{}",
+            FrameOrigin::Kernel,
+        );
+        let first = log.query_frames(FrameFilter::default()).unwrap().remove(0);
+        let _ = log.insert_frame_event(
+            FrameKind::CliSubprocessOutput,
+            2,
+            None,
+            "second",
+            b"{}",
+            FrameOrigin::Kernel,
+        );
+        log.inner
+            .lock()
+            .unwrap()
+            .conn
+            .execute(
+                "UPDATE transparency_log SET timestamp_ns = 0 WHERE spirit_pid = 2",
+                [],
+            )
+            .unwrap();
+
+        let rows = log
+            .query_frames(FrameFilter {
+                kind: Some(FrameKind::CliSubprocessOutput),
+                cursor_insertion_id: Some(first.insertion_id),
+                order_by_insertion: true,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            rows.iter().map(|row| row.spirit_pid).collect::<Vec<_>>(),
+            vec![2],
+            "a later insert remains visible even when its wall clock moved backward"
+        );
     }
 
     #[test]

@@ -240,6 +240,7 @@ impl Default for SpiritManifestBundle {
 /// Mutable execution snapshot held inside the stable SCB allocation.
 /// Identity, lifecycle atomics, DRR deficit, watchdog clocks, task ledger and
 /// boot nonce deliberately remain outside this cell across hot swaps.
+#[maos_attrs::i9_exempt(reason = "SCB runtime snapshot; per-Spirit structural state per I9")]
 #[derive(Clone)]
 pub struct ScbRuntimeSnapshot {
     pub manifest: SpiritManifestBundle,
@@ -440,11 +441,21 @@ impl SpiritControlBlock {
     }
 
     /// Check if a transition is allowed by the state machine.
+    ///
+    /// Story 16-6 — `(Loaded, Unloaded)` exists because `maosctl load` makes
+    /// `Loaded` a durable, operator-visible state for the first time. Before
+    /// it, every Spirit was loaded and started in one unbroken `maos run`, so
+    /// a `Loaded` SCB was a sub-second transient. The verb that creates a
+    /// state owns that state's exit: without this arm a door-loaded Spirit
+    /// can never be unloaded, gets no NFR-Rel-11 receipt, keeps its
+    /// capability tokens live, and burns its `spirit_id` forever (the SCB
+    /// stays in the map, so `resolve_pid`'s linear scan keeps matching it).
     pub fn is_transition_allowed(from: ScbLifecycleState, to: ScbLifecycleState) -> bool {
         use ScbLifecycleState::*;
         matches!(
             (from, to),
             (Loaded, Running)
+                | (Loaded, Unloaded)
                 | (Running, Paused)
                 | (Paused, Running)
                 | (Running, Unloaded)
@@ -563,12 +574,20 @@ mod tests {
         ));
     }
 
+    /// Story 16-6 — this test asserted the OPPOSITE until the
+    /// `(Loaded, Unloaded)` arm landed. Rewritten in the shape of its five
+    /// allowed siblings: it now drives a real CAS, so deleting the arm reds
+    /// it on `is_transition_allowed` and deleting the CAS reds it on state.
     #[test]
-    fn loaded_to_unloaded_rejected() {
-        assert!(!SpiritControlBlock::is_transition_allowed(
-            ScbLifecycleState::Loaded,
+    fn loaded_to_unloaded_allowed() {
+        let scb = make_scb(ScbLifecycleState::Loaded);
+        assert!(SpiritControlBlock::is_transition_allowed(
+            scb.current_state(),
             ScbLifecycleState::Unloaded
         ));
+        let result = scb.try_transition(ScbLifecycleState::Loaded, ScbLifecycleState::Unloaded);
+        assert!(result.is_ok());
+        assert_eq!(scb.current_state(), ScbLifecycleState::Unloaded);
     }
 
     #[test]
@@ -661,7 +680,7 @@ mod tests {
             .unwrap()
             .push(TaskAssignmentRecord {
                 task_id: "in-flight".into(),
-                capability_token: maos_domain::invariants::i1::TokenId([0; 16]),
+                capability_token: Some(maos_domain::invariants::i1::TokenId([0; 16])),
                 ttl_deadline_ns: 1,
                 intent_class: maos_domain::invariants::i1::IntentClass::Standard,
                 originator_spirit_id: "origin".into(),
@@ -707,7 +726,7 @@ mod tests {
             let mut tasks = scb.task_assignments_in_flight.lock().unwrap();
             tasks.push(TaskAssignmentRecord {
                 task_id: "task-1".into(),
-                capability_token: maos_domain::invariants::i1::TokenId([0u8; 16]),
+                capability_token: Some(maos_domain::invariants::i1::TokenId([0u8; 16])),
                 ttl_deadline_ns: 1_000_000,
                 intent_class: maos_domain::invariants::i1::IntentClass::Standard,
                 originator_spirit_id: "origin-1".into(),

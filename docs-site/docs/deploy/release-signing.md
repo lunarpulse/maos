@@ -31,20 +31,22 @@ maosctl audit keygen --output /tmp/release-signing.key
 
 ## Signing flow (automated — CI)
 
-1. Tag a release: `git tag v0.5.0 && git push --tags`
-2. CI builds `maos-linux-amd64`, `maos-linux-arm64`, `maos-darwin-arm64`
-3. CI runs `check-mock-not-in-release` on each (native) binary
-4. CI generates `SHA256SUMS` via `sha256sum maos-*`
-5. CI signs `SHA256SUMS` via `xtask release-verify --sign`
-6. CI publishes to GitHub Releases with `.sig` attached
+1. Tag the pre-release: `git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1`
+2. CI builds `maos` and `maosctl` for `linux-amd64`, `linux-arm64`, and `darwin-arm64` (six binaries total)
+   (`maos-linux-amd64`, `maosctl-linux-amd64`, `maos-linux-arm64`, `maosctl-linux-arm64`, `maos-darwin-arm64`, `maosctl-darwin-arm64`)
+3. CI runs `check-mock-not-in-release` on each `maos` binary
+4. CI flattens the per-binary artifacts into `dist/`
+5. CI generates `SHA256SUMS` for the explicit six-binary set via `xtask release-dry-run --manifest-only`
+6. CI signs `SHA256SUMS` via `xtask release-verify --sign`
 7. CI self-verifies via `xtask release-verify --verify`
+8. CI publishes the six binaries, `SHA256SUMS`, and `SHA256SUMS.sig`
 
 ## Verification flow (operator)
 
 ```bash
 # Download release artifacts to a local directory
-mkdir maos-v0.5.0 && cd maos-v0.5.0
-# Download: maos-linux-amd64, SHA256SUMS, SHA256SUMS.sig
+mkdir maos-v0.1.0-alpha.1 && cd maos-v0.1.0-alpha.1
+# Download all six binaries, SHA256SUMS, and SHA256SUMS.sig
 
 # Verify with the bundled public key (offline-capable)
 maosctl install --from-local . --verify-only

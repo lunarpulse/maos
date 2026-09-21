@@ -1886,25 +1886,35 @@ pub fn run(json: bool) -> Result<(), String> {
         })
         .collect();
 
-    let kernel_report = crate::check_kernel_baseline::check()?;
+    // A kernel-baseline `Err` (broken baseline, walk failure) must not abort
+    // this gate before it emits its own report: it becomes a named red leg and
+    // `finish_ledger_gate` reports it like any other — the
+    // `deferred-work.md:637` crash-shape, extended to the Err class by the
+    // Story 16-0 review. On the red path the detail carries
+    // `failure_detail`, which NAMES the moved files; line numbers alone read
+    // as "actual=24474, pinned=24474" while red and adjudicate nothing.
+    let (kernel_green, kernel_detail) = match crate::check_kernel_baseline::check() {
+        Ok(report) if report.passed => (
+            true,
+            format!("kernel baseline actual=pinned={}", report.actual_lines),
+        ),
+        Ok(report) => (
+            false,
+            format!(
+                "kernel baseline mismatch: {}",
+                crate::check_kernel_baseline::failure_detail(&report)
+            ),
+        ),
+        Err(error) => (false, format!("kernel baseline check ERRORED — {error}")),
+    };
     legs.push(EvidenceLeg::observe(
         LegObservation {
             name: KERNEL_BASELINE_LEG,
             class: BindingClass::Blocking,
             attempted: true,
             substrate_present: true,
-            green: kernel_report.passed,
-            detail: if kernel_report.passed {
-                format!(
-                    "kernel baseline actual=pinned={}",
-                    kernel_report.actual_lines
-                )
-            } else {
-                format!(
-                    "kernel baseline mismatch: actual={}, pinned={}",
-                    kernel_report.actual_lines, kernel_report.pinned_lines
-                )
-            },
+            green: kernel_green,
+            detail: kernel_detail,
             signature: SignatureCheck::unverified(format!(
                 "in-process baseline check ({})",
                 class_name(BindingClass::Blocking)

@@ -28,7 +28,7 @@ This restructure addresses three concerns from Step 8 party mode:
 
 | Phase | Effort | Team | Key skills added |
 |---|---|---|---|
-| v0.1 (foundational) | ~6–8 weeks | 1 founder | Rust + Tokio, kernel design, capability systems, Spirit ABI specification, single-Spirit subprocess |
+| v0.1 (foundational) | ~6–8 weeks | 1 founder | Rust + Tokio, kernel design, capability systems, Spirit ABI specification, native-subprocess Spirit form specification (the placeholder implementation is currently in-process, not evidence that this form shipped) |
 | v0.3 (Butler) | ~10–12 weeks total | 1 founder + advisor council formed | Active Inference / POMDP cognitive modeling, MCP integrations (Calendar/Slack/Linear/Figma), `on_idle` lifecycle hook, narrow Telemetry Stream subscription |
 | v0.5 (Researcher + Observer + foundational hardening) | ~14–16 weeks total | 2 implementers (founder + contributor #2) + 3-person advisor council | Broad MCP capabilities, parallelism in tool dispatch, output_shape predicate enforcement, T2/T3 sandbox, distillation pattern (single-Spirit opt-in), v0.5 onboarding artifacts |
 | v0.8 (Founder loop wedge demo) | ~22–24 weeks total | 2–3 implementers + community contributors | Multi-Spirit IAC bus, A2A loopback-only, Orchestrator+Worker coordination, ADR-022 failure-semantics floor, full distillation pattern, multi-CLI Worker parallelism |
@@ -40,7 +40,7 @@ This restructure addresses three concerns from Step 8 party mode:
 
 ## Phase v0.1 — Foundational Kernel + Placeholder Spirit (~6–8 weeks)
 
-**Validation milestone:** Kernel boots; loads a placeholder `hello-spirit` (subprocess form, single Spirit instance); receives a trivial `task.assign` IAC frame from the user via `maosctl`; returns a response; clean install + clean uninstall both work. Audit trail captures every step. **No founder-loop ambition; no multi-Spirit; no A2A.** Foundational proof-of-life demonstrating the kernel's big-picture readiness.
+**Validation milestone:** Kernel boots; loads the current placeholder `hello-spirit` (single in-process implementation instance; the native-subprocess form remains specified but was not built in this milestone); receives a trivial `task.assign` IAC frame from the user via `maosctl`; returns a response; clean install + clean uninstall both work. Audit trail captures every step. **No founder-loop ambition; no multi-Spirit; no A2A.** Foundational proof-of-life demonstrating the kernel's big-picture readiness.
 
 **Core User Journeys Supported (v0.1):** J0 evaluator (5-minute install + first Spirit + clean uninstall).
 

@@ -1,5 +1,6 @@
 {
   "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
   "recorded_at": "2026-06-11T00:00:00Z",
   "model_id": "hand-authored-seed",
   "spirit_id": "researcher",

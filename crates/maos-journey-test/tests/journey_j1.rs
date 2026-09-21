@@ -41,6 +41,9 @@ fn j1_founder_loop_topology_run_once() {
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
+        // 15-6 §A6 review P1: cassette-free child; never inherit a
+        // job-level MAOS_INFERENCE_MODE (nightly rerecord leg).
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn founder-loop topology");
@@ -188,6 +191,7 @@ fn j1_founder_class_standalone_load_succeeds() {
         .args(["run", "spirits/orchestrator/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn maos run for founder-class");
@@ -229,6 +233,7 @@ fn j1_resume_continuity_ref_identity_oracle() {
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home1.path())
         .env("MAOS_HOME", home1.path())
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn founder-loop topology (run 1)");
@@ -252,6 +257,7 @@ fn j1_resume_continuity_ref_identity_oracle() {
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home2.path())
         .env("MAOS_HOME", home2.path())
+        .env_remove("MAOS_INFERENCE_MODE")
         .current_dir(workspace_root())
         .output()
         .expect("failed to spawn founder-loop topology (run 2)");

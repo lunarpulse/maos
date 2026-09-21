@@ -7,6 +7,9 @@
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 #[test]
 fn one_shot_hello_spirit_produces_valid_json() {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
@@ -14,6 +17,9 @@ fn one_shot_hello_spirit_produces_valid_json() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_ONE_SHOT", "hello-spirit")
         .env("MAOS_OLLAMA_URL", "skip")
+        // Story 16-1 / D-16-1-Q: empty scratch "HOME" — the floor is file-granular,
+        // and a one-shot that later becomes a root must not regain the hazard.
+        .env("HOME", doorless_home::doorless_home())
         .current_dir(workspace_root)
         .output()
         .expect("failed to execute maos-bin");

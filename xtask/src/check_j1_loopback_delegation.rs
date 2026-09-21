@@ -111,6 +111,13 @@ const MAOS_BIN_TESTS_DIR: &str = "crates/maos-bin/tests";
 /// `crates/maos-bin/tests/*_2b.rs` file exists, because `derive_enrolled_targets`
 /// reads this list: a `_2b.rs` file written first would be invisible to the
 /// derivation, un-enrolled in CI, and therefore a suggestion rather than a control.
+///
+/// Story 15-1 AC1 / D-2 — an underscore-delimited decimal segment immediately
+/// before the J1 suffix marks an epic-numbered foreign lane. For example,
+/// `cert_rotation_trigger_14_2a.rs` is already executed by
+/// `check_cert_rotation_trigger`'s own `invoke_cargo_test`; enrolling it here
+/// would double-run a real-daemon test on an untimed job. Numeric J1 names such
+/// as `j1_2a.rs` have no preceding decimal segment and remain derived.
 const J1_TEST_SUFFIXES: &[&str] = &["_1a.rs", "_1b.rs", "_2a.rs", "_2b.rs"];
 
 /// j1-crosshost-1b AC1 — the refusal proofs themselves, the gate's TENTH governed
@@ -785,7 +792,19 @@ fn derive_enrolled_targets(
     let mut targets: Vec<String> = entries
         .filter_map(Result::ok)
         .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| J1_TEST_SUFFIXES.iter().any(|suffix| name.ends_with(suffix)))
+        .filter(|name| {
+            // Story 15-1 AC1 / D-2: an underscore-delimited decimal segment
+            // immediately before the J1 suffix is an epic-numbered foreign lane.
+            // `cert_rotation_trigger_14_2a` is executed by the cert-rotation gate;
+            // `j1_2a` has no such segment and remains in the derived set.
+            J1_TEST_SUFFIXES.iter().any(|suffix| {
+                name.strip_suffix(suffix).is_some_and(|stem| {
+                    !stem.rsplit_once('_').is_some_and(|(_, segment)| {
+                        !segment.is_empty() && segment.bytes().all(|b| b.is_ascii_digit())
+                    })
+                })
+            })
+        })
         .filter_map(|name| name.strip_suffix(".rs").map(str::to_string))
         .collect();
     targets.sort();

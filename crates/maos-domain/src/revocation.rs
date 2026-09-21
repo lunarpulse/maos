@@ -416,6 +416,41 @@ pub enum RevocationError {
     CrlIdMismatch { expected: String, actual: String },
 }
 
+/// Resolve the local CRL directory from the user-facing environment contract.
+///
+/// `MAOS_CRL_PATH` wins; otherwise CRLs live in the same XDG data tree as the
+/// other MAOS durable stores. Empty values fall through rather than selecting
+/// the current directory.
+pub fn default_crl_dir() -> PathBuf {
+    let explicit = std::env::var_os("MAOS_CRL_PATH");
+    let xdg_data_home = std::env::var_os("XDG_DATA_HOME");
+    let home = std::env::var_os("HOME");
+    resolve_crl_dir(
+        explicit.as_deref(),
+        xdg_data_home.as_deref(),
+        home.as_deref(),
+    )
+}
+
+fn resolve_crl_dir(
+    explicit: Option<&std::ffi::OsStr>,
+    xdg_data_home: Option<&std::ffi::OsStr>,
+    home: Option<&std::ffi::OsStr>,
+) -> PathBuf {
+    if let Some(path) = explicit.filter(|path| !path.is_empty()) {
+        return PathBuf::from(path);
+    }
+    let data_home = xdg_data_home
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            home.filter(|path| !path.is_empty())
+                .map(|path| PathBuf::from(path).join(".local").join("share"))
+        })
+        .unwrap_or_else(|| PathBuf::from("/var/lib"));
+    data_home.join("maos").join("crl")
+}
+
 // ---------------------------------------------------------------------------
 // RegistryClient trait
 // ---------------------------------------------------------------------------
@@ -809,5 +844,36 @@ mod tests {
         assert_eq!(RevocationOrigin::Operator.as_str(), "operator");
         assert_eq!(RevocationOrigin::Publisher.as_str(), "publisher");
         assert_eq!(RevocationOrigin::RegistryYank.as_str(), "registry_yank");
+    }
+    #[test]
+    fn crl_directory_prefers_explicit_override() {
+        assert_eq!(
+            super::resolve_crl_dir(
+                Some(std::ffi::OsStr::new("/srv/maos-crl")),
+                Some(std::ffi::OsStr::new("/xdg")),
+                Some(std::ffi::OsStr::new("/home/operator")),
+            ),
+            std::path::PathBuf::from("/srv/maos-crl")
+        );
+    }
+
+    #[test]
+    fn crl_directory_defaults_to_xdg_data_home() {
+        assert_eq!(
+            super::resolve_crl_dir(
+                None,
+                Some(std::ffi::OsStr::new("/xdg")),
+                Some(std::ffi::OsStr::new("/home/operator")),
+            ),
+            std::path::PathBuf::from("/xdg/maos/crl")
+        );
+    }
+
+    #[test]
+    fn crl_directory_falls_back_to_home_data_tree() {
+        assert_eq!(
+            super::resolve_crl_dir(None, None, Some(std::ffi::OsStr::new("/home/operator"))),
+            std::path::PathBuf::from("/home/operator/.local/share/maos/crl")
+        );
     }
 }

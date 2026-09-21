@@ -14,6 +14,8 @@
 //! sealed-export functions.
 
 pub mod erasure;
+pub mod fr4_classifier;
+pub use fr4_classifier::{classify_fr4_row, Fr4RowDisposition, WriterShapeEntry};
 pub mod log_composition;
 pub mod replay;
 
@@ -618,27 +620,49 @@ pub fn project_to_fr4(entry: &AuditEntry) -> Result<Fr4Entry, Fr4SchemaError> {
     })
 }
 
-/// Write entries as FR4 NDJSON — one [`Fr4Entry`] per line.
+/// Write entries as FR4 NDJSON — one CALL [`Fr4Entry`] per line.
 ///
-/// Per AC1 + AC2, stops at the first projection failure and returns
-/// [`AuditError::Fr4SchemaViolation`] naming the offending 1-indexed line and
-/// the missing field. Output is buffered internally so no partial NDJSON lines
-/// reach the writer on violation — the dispatcher must surface the error and
-/// exit non-zero.
+/// Story 16-2 / D-16-2-G: rows the classifier marks non-call kernel events
+/// are OMITTED from the feed (its per-line schema requires a token; emitting
+/// `capability_token: null` would break every line consumer) and counted on
+/// stderr, naming each omitted kind. Call rows keep the exact AC1+AC2
+/// contract: the first projection failure aborts with
+/// [`AuditError::Fr4SchemaViolation`] naming the offending 1-indexed INPUT
+/// ROW — the row index [`to_fr4_plain`] reports, never an output line —
+/// and the missing field; output is buffered so no partial line is written.
 pub fn to_fr4_ndjson<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
 ) -> Result<(), AuditError> {
     let mut buf = Vec::new();
-    for (idx, entry) in entries.into_iter().enumerate() {
+    let mut omitted: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut line_no = 0usize;
+    for mut entry in entries.into_iter() {
+        line_no += 1;
+        if classify_fr4_row(&entry) == Fr4RowDisposition::NonCallKernelEvent {
+            let kind = std::mem::take(&mut entry.kind);
+            *omitted.entry(kind).or_insert(0) += 1;
+            continue;
+        }
         let projected = project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
-            line: idx + 1,
+            line: line_no,
             missing_field: e.missing_field(),
         })?;
         let line = serde_json::to_string(&projected)?;
         writeln!(buf, "{line}")?;
     }
     out.write_all(&buf)?;
+    if !omitted.is_empty() {
+        let summary: Vec<String> = omitted
+            .iter()
+            .map(|(kind, n)| format!("{kind}×{n}"))
+            .collect();
+        eprintln!(
+            "maos: FR4 feed omitted {} non-call kernel row(s): {}",
+            omitted.values().sum::<usize>(),
+            summary.join(", ")
+        );
+    }
     Ok(())
 }
 
@@ -677,6 +701,14 @@ fn kind_to_string(kind: i64) -> String {
         9 => "inference.call",
         10 => "decision",
         11 => "distillate",
+        // Story 16-2 / D-16-2-G — symmetric names for the budget/stall kinds
+        // (set (a) of the FR4 non-call classification needs them; they
+        // rendered `unknown` before, which the classifier would have had to
+        // special-case).
+        12 => "budget.warning",
+        13 => "budget.exceeded",
+        15 => "task.stalled",
+        16 => "silent.failure.suspect",
         17 => "spirit.revoked",
         19 => "spirit.admitted",
         22 => "consent.rupture",
@@ -718,6 +750,10 @@ fn kind_from_string(s: &str) -> Option<i64> {
         "inference.call" | "InferenceCall" => Some(9),
         "decision" | "Decision" => Some(10),
         "distillate" | "Distillate" => Some(11),
+        "budget.warning" | "BudgetWarning" => Some(12),
+        "budget.exceeded" | "BudgetExceeded" => Some(13),
+        "task.stalled" | "TaskStalled" => Some(15),
+        "silent.failure.suspect" | "SilentFailureSuspect" => Some(16),
         "spirit.revoked" | "SpiritRevoked" => Some(17),
         "spirit.admitted" | "SpiritAdmitted" => Some(19),
         // j1-crosshost-1a AC3.11 — the reverse arm. Every other kind in this table
@@ -796,22 +832,31 @@ pub fn to_plain<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
 ) -> Result<(), AuditError> {
+    // Story 16-2 / D-16-2-H — trailing `intent` column (last, so every
+    // existing fixed-width column keeps its offset).
     writeln!(
         out,
-        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}",
-        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "capability_token",
+        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}  {}",
+        "call_id",
+        "boot_nonce",
+        "spirit_pid",
+        "call_type",
+        "timestamp_ns",
+        "capability_token",
+        "intent",
     )?;
     for entry in entries {
         let token = entry.capability_token_hex.as_deref().unwrap_or("<missing>");
         writeln!(
             out,
-            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}  {}",
             truncate(&entry.frame_id_hex, 32),
             entry.boot_nonce,
             entry.spirit_pid,
             truncate(&entry.kind, 22),
             entry.timestamp_ns,
             token,
+            truncate(&entry.intent, 64),
         )?;
     }
     Ok(())
@@ -826,30 +871,45 @@ pub fn to_fr4_plain<W: Write>(
     entries: impl IntoIterator<Item = AuditEntry>,
     mut out: W,
 ) -> Result<(), AuditError> {
-    let projected: Vec<Fr4Entry> = entries
-        .into_iter()
-        .enumerate()
-        .map(|(idx, entry)| {
-            project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
-                line: idx + 1,
-                missing_field: e.missing_field(),
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    // Story 16-2 / D-16-2-G/H — classify before validating: non-call kernel
+    // events render in the SAME table (which has no token column, so a
+    // non-call row cannot be read as a mediated call); only Call rows must
+    // satisfy the FR4 mandatory-field contract. The trailing `intent`
+    // column makes the halt row and the operator completion row legible.
     writeln!(
         out,
-        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}",
-        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns",
+        "{:<32}  {:<16}  {:<10}  {:<22}  {:<20}  {}",
+        "call_id", "boot_nonce", "spirit_pid", "call_type", "timestamp_ns", "intent",
     )?;
-    for entry in &projected {
+    let mut line_no = 0usize;
+    for entry in entries.into_iter() {
+        line_no += 1;
+        if classify_fr4_row(&entry) == Fr4RowDisposition::NonCallKernelEvent {
+            writeln!(
+                out,
+                "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+                truncate(&entry.frame_id_hex, 32),
+                entry.boot_nonce,
+                entry.spirit_pid,
+                truncate(&entry.kind, 22),
+                entry.timestamp_ns,
+                truncate(&entry.intent, 64),
+            )?;
+            continue;
+        }
+        let projected = project_to_fr4(&entry).map_err(|e| AuditError::Fr4SchemaViolation {
+            line: line_no,
+            missing_field: e.missing_field(),
+        })?;
         writeln!(
             out,
-            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}",
-            truncate(&entry.call_id, 32),
-            entry.boot_nonce,
-            entry.spirit_pid,
-            truncate(&entry.call_type, 22),
-            entry.timestamp_ns,
+            "{:<32}  {:016x}  {:<10}  {:<22}  {:<20}  {}",
+            truncate(&projected.call_id, 32),
+            projected.boot_nonce,
+            projected.spirit_pid,
+            truncate(&projected.call_type, 22),
+            projected.timestamp_ns,
+            truncate(&entry.intent, 64),
         )?;
     }
     Ok(())
@@ -1475,76 +1535,6 @@ pub fn default_memory_root() -> std::path::PathBuf {
     data_home.join("maos").join("memory")
 }
 
-/// Resolve the default Distillate Corpus root directory.
-///
-/// Forward-shaped helper for v0.5+ when the corpus may live in operator-supplied
-/// data directories outside the repo. Precedence (highest → lowest):
-///   1. `MAOS_DISTILLATE_CORPUS_ROOT` env var
-///   2. `$XDG_DATA_HOME/maos/distillate-corpus`
-///   3. `$HOME/.local/share/maos/distillate-corpus`
-///   4. `/var/lib/maos/distillate-corpus` (last-resort fallback)
-///
-/// # Note
-///
-/// The kernel does NOT consume this function itself; the harness in
-/// `maos-eval/tests/` reads from a relative fixture path
-/// (`fixtures/distillate-corpus-v0/`) consistent with the existing
-/// `halt-corpus-v0` test pattern. This function exists for v0.5+.
-pub fn default_distillate_corpus_root() -> std::path::PathBuf {
-    use std::path::PathBuf;
-    if let Ok(p) = std::env::var("MAOS_DISTILLATE_CORPUS_ROOT") {
-        if !p.is_empty() {
-            return PathBuf::from(p);
-        }
-        eprintln!(
-            "maos: MAOS_DISTILLATE_CORPUS_ROOT is set but empty — falling through to default path"
-        );
-    }
-    let data_home = std::env::var("XDG_DATA_HOME")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("distillate-corpus")
-}
-
-/// Resolve the default Isolation Corpus root directory (Story 4.5).
-///
-/// Mirrors [`default_distillate_corpus_root`]. Precedence:
-///   1. `MAOS_ISOLATION_CORPUS_ROOT` env var
-///   2. `$XDG_DATA_HOME/maos/isolation-corpus`
-///   3. `$HOME/.local/share/maos/isolation-corpus`
-///   4. `/var/lib/maos/isolation-corpus`
-pub fn default_isolation_corpus_root() -> std::path::PathBuf {
-    use std::path::PathBuf;
-    if let Ok(p) = std::env::var("MAOS_ISOLATION_CORPUS_ROOT") {
-        if !p.is_empty() {
-            return PathBuf::from(p);
-        }
-        eprintln!(
-            "maos: MAOS_ISOLATION_CORPUS_ROOT is set but empty — falling through to default path"
-        );
-    }
-    let data_home = std::env::var("XDG_DATA_HOME")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var("HOME")
-                .ok()
-                .filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("isolation-corpus")
-}
-
 /// Resolve the default Spirit Archive root directory (Story 5.2).
 ///
 /// Precedence (highest → lowest):
@@ -1604,12 +1594,22 @@ pub fn default_erasure_proofs_dir() -> std::path::PathBuf {
     data_home.join("maos").join("erasure-proofs")
 }
 /// Resolve a Spirit name to one or more `(boot_nonce, spirit_pid)` pairs by
-/// scanning the Transparency Log for SpiritAdmitted (FrameKind 19) frames
-/// whose non-redacted `intent` column carries the Spirit name.
+/// scanning the Transparency Log for SpiritAdmitted (kind 19) and
+/// `lifecycle.load` (kind 7) frames.
+///
+/// D-16-1-K: `maos run` writes ONLY kind-7 `lifecycle.load` rows — the
+/// kind-19 `SpiritAdmitted` frame this resolver used to require never lands
+/// for a `maos run` Spirit, so every non-`hello-spirit` name resolved to
+/// "unknown" before any verb could run. The kind-7 rows carry the Spirit name
+/// in the redacted payload JSON (`spirit_id`), not in `intent`, so both
+/// columns are consulted.
 ///
 /// Per Decision E: keyed on `(boot_nonce, spirit_pid)` to discriminate pid
-/// reuse across boots. Defaults to the LATEST boot (max `boot_nonce`).
-/// Set `all_boots = true` to union all incarnations.
+/// reuse across boots. "Latest boot" is the boot holding the GREATEST
+/// `timestamp_ns`: the previous `max(boot_nonce)` rule ordered boots by a
+/// RANDOM 64-bit value, so "latest boot" was "largest random number" and
+/// could silently switch incarnations across restarts. Set `all_boots = true`
+/// to union all incarnations.
 ///
 /// Returns `Err` if no matching frames exist (unknown spirit name).
 pub fn resolve_spirit_name(
@@ -1617,114 +1617,179 @@ pub fn resolve_spirit_name(
     name: &str,
     all_boots: bool,
 ) -> Result<Vec<(u64, u32)>, String> {
-    // v0.1-β evaluator path: the reference Spirit is the only valid name at
-    // this version. Resolve it without requiring authoritative FrameKind 19
-    // admission rows so that CLI verbs work in fresh harnesses and after
-    // lifecycle entries have been journaled.
-    if name == "hello-spirit" {
-        if !db_path.exists() {
-            return Ok(vec![(0, 0)]);
-        }
-        let conn = rusqlite::Connection::open_with_flags(
-            db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(|e| format!("failed to open TL: {e}"))?;
-        let mut stmt = conn
-            .prepare(
-                "SELECT DISTINCT boot_nonce, spirit_pid
-                 FROM transparency_log
-                 WHERE spirit_pid = 0
-                 ORDER BY boot_nonce ASC",
-            )
-            .map_err(|e| format!("prepare fallback failed: {e}"))?;
-        let rows = stmt
-            .query_map([], |row| {
-                let boot: i64 = row.get(0)?;
-                let pid: i64 = row.get(1)?;
-                Ok((boot as u64, pid as u32))
-            })
-            .map_err(|e| format!("fallback query failed: {e}"))?;
-        let mut matches: Vec<(u64, u32)> = Vec::new();
-        for row in rows {
-            matches.push(row.map_err(|e| format!("fallback row error: {e}"))?);
-        }
-        if matches.is_empty() {
-            return Ok(vec![(0, 0)]);
-        }
-        if all_boots {
-            Ok(matches)
-        } else {
-            let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
-            Ok(matches
-                .into_iter()
-                .filter(|(b, _)| *b == max_boot)
-                .collect())
-        }
-    } else {
-        if !db_path.exists() {
-            return Err(format!(
-                "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
-            ));
-        }
+    // Story 16-2 / D-16-2-F — the `hello-spirit → pid 0` wildcard is
+    // DELETED: it answered "every pid-0 kernel row of every boot", which is
+    // the defect `deferred-work.md:926` names. hello-spirit resolves through
+    // the identity rows like every Spirit (the one-shot evaluator run now
+    // writes one; the shell boots load it at a real pid).
+    if !db_path.exists() {
+        return Err(format!(
+            "unknown spirit '{name}' — no Transparency Log at {}",
+            db_path.display()
+        ));
+    }
 
-        let conn = rusqlite::Connection::open_with_flags(
-            db_path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(|e| format!("failed to open TL: {e}"))?;
+    let conn = open_transparency_log_readonly(db_path)?;
 
-        // Decision E: scan FrameKind 19 (SpiritAdmitted) TL frames.
-        // The Spirit name is stored in the non-redacted `intent` column.
-        let sql = "SELECT boot_nonce, spirit_pid, intent
-                   FROM transparency_log
-                   WHERE kind = 19
-                   ORDER BY timestamp_ns ASC";
-        let mut stmt = conn
-            .prepare(sql)
-            .map_err(|e| format!("prepare failed: {e}"))?;
-        let rows = stmt
-            .query_map([], |row| {
-                let boot: i64 = row.get(0)?;
-                let pid: i64 = row.get(1)?;
-                let intent: String = row.get(2)?;
-                Ok((boot as u64, pid as u32, intent))
-            })
-            .map_err(|e| format!("query failed: {e}"))?;
+    // D-16-1-K: kind 19 (SpiritAdmitted, name in `intent`) and kind 7
+    // (`lifecycle.load`, name in the payload's `spirit_id`). Timestamp-ordered
+    // so the LAST matching row below is the latest boot.
+    let sql = "SELECT boot_nonce, spirit_pid, kind, intent, payload_redacted, timestamp_ns
+               FROM transparency_log
+               WHERE kind IN (7, 19)
+               ORDER BY timestamp_ns ASC, frame_id ASC";
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("prepare failed: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let boot: i64 = row.get(0)?;
+            let pid: i64 = row.get(1)?;
+            let kind: i64 = row.get(2)?;
+            let intent: String = row.get(3)?;
+            let payload: Vec<u8> = row.get(4)?;
+            let timestamp_ns: i64 = row.get(5)?;
+            Ok((
+                boot as u64,
+                pid as u32,
+                kind,
+                intent,
+                payload,
+                timestamp_ns as u64,
+            ))
+        })
+        .map_err(|e| format!("query failed: {e}"))?;
 
-        let mut matches: Vec<(u64, u32)> = Vec::new();
-        for row in rows {
-            let (boot, pid, intent) = row.map_err(|e| format!("row error: {e}"))?;
-            if intent == name {
-                matches.push((boot, pid));
-            }
-        }
-
-        if matches.is_empty() {
-            return Err(format!(
-                "unknown spirit '{name}' — only 'hello-spirit' is available at v0.1-β"
-            ));
-        }
-
-        if all_boots {
-            // Deduplicate by (boot_nonce, spirit_pid)
-            matches.sort();
-            matches.dedup();
-            Ok(matches)
-        } else {
-            // Default: latest boot (max boot_nonce)
-            let max_boot = matches.iter().map(|(b, _)| *b).max().unwrap();
-            let latest: Vec<(u64, u32)> = matches
-                .into_iter()
-                .filter(|(b, _)| *b == max_boot)
-                .collect();
-            Ok(latest)
+    let mut matches: Vec<(u64, u32, u64)> = Vec::new(); // (boot, pid, timestamp_ns)
+    for row in rows {
+        let (boot, pid, kind, intent, payload, timestamp_ns) =
+            row.map_err(|e| format!("row error: {e}"))?;
+        let name_matches = match kind {
+            19 => intent == name,
+            // `lifecycle.load`: a valid payload is authoritative; use the
+            // legacy intent layout only when the payload has no Spirit id.
+            _ => match payload_spirit_id(&payload) {
+                Some(payload_id) => payload_id == name,
+                None => intent == name,
+            },
+        };
+        if name_matches {
+            matches.push((boot, pid, timestamp_ns));
         }
     }
+
+    if matches.is_empty() {
+        // Story 16-2 / D-16-2-F — fail-closed by name (never "every pid-0
+        // row"): no identity row names this Spirit in this Transparency Log.
+        // Pre-16-2 hello-spirit rows with no identity row stay reachable by
+        // `--boot <nonce>` and erasable by 16-4's `maos purge`.
+        return Err(format!(
+            "unknown spirit '{name}' — no admission or load row names it in this Transparency Log"
+        ));
+    }
+
+    let latest_boot = (!all_boots).then(|| matches.last().map(|(boot, _, _)| *boot).unwrap_or(0));
+    let mut resolved: Vec<(u64, u32)> = matches
+        .into_iter()
+        .filter(|(boot, _, _)| latest_boot.is_none_or(|latest| *boot == latest))
+        .map(|(boot, pid, _)| (boot, pid))
+        .collect();
+    resolved.sort_unstable();
+    resolved.dedup();
+    Ok(resolved)
+}
+
+/// The `spirit_id` field of a redacted lifecycle payload, when it parses as
+/// JSON and carries one.
+fn payload_spirit_id(payload: &[u8]) -> Option<String> {
+    serde_json::from_slice::<serde_json::Value>(payload)
+        .ok()?
+        .get("spirit_id")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// The one read-only TL open shared by the CLI-side resolvers: `READ_ONLY`
+/// (never the write-capable adapter — a write-capable open can hold the
+/// sqlite lock past the daemon's `busy_timeout` and trip the TL's
+/// panic-on-write-error) plus `NOFOLLOW`.
+fn open_transparency_log_readonly(db_path: &Path) -> Result<rusqlite::Connection, String> {
+    rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(|e| format!("failed to open TL: {e}"))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Story 16-1 — read-only maosctl readers (D-16-1-A: the two durable lists)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One active host-global legal hold, as `maosctl legal-hold list` renders it.
+/// Field-for-field the `maos-iac` adapter's persisted row, re-declared here
+/// because this reader exists precisely to avoid opening the write-capable
+/// adapter that owns the original type.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LegalHoldRow {
+    pub principal_id: String,
+    pub reason: String,
+    pub case_ref: Option<String>,
+    pub requested_at_ns: u64,
+}
+
+/// `maosctl legal-hold list`: read the `legal_holds` table READ-ONLY.
+///
+/// Trap 9 — the write-capable adapter can hold the sqlite lock past the
+/// daemon's `busy_timeout=5000` and trip its panic-on-write-error; a maosctl
+/// reader must never be the process holding that lock. A MISSING table is an
+/// EMPTY list, not an error: a TL written before Story 13.5b simply holds no
+/// holds. Ordering matches the adapter's `list_legal_holds`
+/// (`requested_at_ns, principal_id`).
+pub fn list_legal_holds_readonly(db_path: &Path) -> Result<Vec<LegalHoldRow>, AuditError> {
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(AuditError::Open)?;
+    let present: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'legal_holds'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(AuditError::Read)?;
+    if present == 0 {
+        return Ok(Vec::new());
+    }
+    let mut stmt = conn
+        .prepare(
+            "SELECT principal_id, reason, case_ref, requested_at_ns
+             FROM legal_holds
+             ORDER BY requested_at_ns, principal_id",
+        )
+        .map_err(AuditError::Read)?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(LegalHoldRow {
+                principal_id: row.get(0)?,
+                reason: row.get(1)?,
+                case_ref: row.get(2)?,
+                requested_at_ns: row.get::<_, i64>(3)? as u64,
+            })
+        })
+        .map_err(AuditError::Read)?;
+    let mut holds = Vec::new();
+    for row in rows {
+        holds.push(row.map_err(AuditError::Read)?);
+    }
+    Ok(holds)
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1828,6 +1893,59 @@ pub fn shared_tier_principal_row_count(memory_db_path: &Path) -> Result<u64, Aud
         )
         .map_err(AuditError::Read)?;
     Ok(u64::try_from(count).unwrap_or(0))
+}
+
+/// Count persisted Private-tier values stored under a `Principal` namespace.
+///
+/// The Private store lays values out as
+/// `<memory_root>/<spirit_pid>/<hex-encoded-namespace>/<key>.<kind>`. Missing
+/// roots and non-store files are zero; unreadable directories fail closed so
+/// an emptiness proof cannot be minted from a partial scan.
+pub fn private_tier_principal_row_count(memory_root: &Path) -> Result<u64, AuditError> {
+    if !memory_root.exists() {
+        return Ok(0);
+    }
+
+    let mut count = 0_u64;
+    for spirit_dir in std::fs::read_dir(memory_root)? {
+        let spirit_dir = spirit_dir?;
+        if !spirit_dir.file_type()?.is_dir() {
+            continue;
+        }
+        for namespace_dir in std::fs::read_dir(spirit_dir.path())? {
+            let namespace_dir = namespace_dir?;
+            if !namespace_dir.file_type()?.is_dir() {
+                continue;
+            }
+            let Ok(namespace_bytes) =
+                hex::decode(namespace_dir.file_name().to_string_lossy().as_bytes())
+            else {
+                continue;
+            };
+            let Ok(maos_domain::memory::MemoryNamespace::Principal { .. }) =
+                serde_json::from_slice::<maos_domain::memory::MemoryNamespace>(&namespace_bytes)
+            else {
+                continue;
+            };
+            for value in std::fs::read_dir(namespace_dir.path())? {
+                let value = value?;
+                if !value.file_type()?.is_file() {
+                    continue;
+                }
+                let name = value.file_name();
+                let name = name.to_string_lossy();
+                if [".json", ".md", ".bin", ".txt"]
+                    .iter()
+                    .any(|extension| name.ends_with(extension))
+                {
+                    count = count.checked_add(1).ok_or_else(|| {
+                        AuditError::Row("private-tier principal row count overflow".to_string())
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(count)
 }
 
 /// Provenance type for subject-access enrichment (Decision D: Direct/Distilled).
@@ -2043,56 +2161,6 @@ fn resolve_memory_root_from_env_internal(
         })
         .unwrap_or_else(|| PathBuf::from("/var/lib"));
     data_home.join("maos").join("memory")
-}
-
-/// Pure-function form of the distillate-corpus-root precedence cascade for testing.
-#[cfg(test)]
-fn resolve_distillate_corpus_root_from_env_internal(
-    maos_corpus_root: Option<&str>,
-    xdg_data_home: Option<&str>,
-    home: Option<&str>,
-) -> std::path::PathBuf {
-    use std::path::PathBuf;
-    if let Some(p) = maos_corpus_root {
-        if p.is_empty() {
-            panic!("empty MAOS_DISTILLATE_CORPUS_ROOT");
-        }
-        return PathBuf::from(p);
-    }
-    let data_home = xdg_data_home
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            home.filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("distillate-corpus")
-}
-
-/// Pure-function form of the isolation-corpus-root precedence cascade for testing.
-#[cfg(test)]
-fn resolve_isolation_corpus_root_from_env_internal(
-    maos_corpus_root: Option<&str>,
-    xdg_data_home: Option<&str>,
-    home: Option<&str>,
-) -> std::path::PathBuf {
-    use std::path::PathBuf;
-    if let Some(p) = maos_corpus_root {
-        if p.is_empty() {
-            panic!("empty MAOS_ISOLATION_CORPUS_ROOT");
-        }
-        return PathBuf::from(p);
-    }
-    let data_home = xdg_data_home
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            home.filter(|h| !h.is_empty())
-                .map(|h| PathBuf::from(h).join(".local").join("share"))
-        })
-        .unwrap_or_else(|| PathBuf::from("/var/lib"));
-    data_home.join("maos").join("isolation-corpus")
 }
 
 #[cfg(test)]
@@ -2864,103 +2932,6 @@ mod tests {
     fn default_memory_root_last_resort_var_lib() {
         let p = super::resolve_memory_root_from_env_internal(None, None, None);
         assert_eq!(p, std::path::PathBuf::from("/var/lib/maos/memory"));
-    }
-
-    // ── default_distillate_corpus_root tests (Story 4.4) ────────────────────
-
-    #[test]
-    fn default_distillate_corpus_root_respects_env_override() {
-        let p = super::resolve_distillate_corpus_root_from_env_internal(
-            Some("/tmp/maos-test-distillate-corpus"),
-            None,
-            None,
-        );
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/tmp/maos-test-distillate-corpus")
-        );
-    }
-
-    #[test]
-    fn default_distillate_corpus_root_falls_through_to_xdg() {
-        let p = super::resolve_distillate_corpus_root_from_env_internal(
-            None,
-            Some("/tmp/xdgtest"),
-            None,
-        );
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/tmp/xdgtest/maos/distillate-corpus")
-        );
-    }
-
-    #[test]
-    fn default_distillate_corpus_root_falls_through_to_home_when_xdg_unset() {
-        let p = super::resolve_distillate_corpus_root_from_env_internal(
-            None,
-            None,
-            Some("/tmp/hometest"),
-        );
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/tmp/hometest/.local/share/maos/distillate-corpus")
-        );
-    }
-
-    #[test]
-    fn default_distillate_corpus_root_last_resort_var_lib() {
-        let p = super::resolve_distillate_corpus_root_from_env_internal(None, None, None);
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/var/lib/maos/distillate-corpus")
-        );
-    }
-
-    // ── default_isolation_corpus_root tests (Story 4.5) ────────────────────────
-
-    #[test]
-    fn default_isolation_corpus_root_respects_env_override() {
-        let p = super::resolve_isolation_corpus_root_from_env_internal(
-            Some("/tmp/isolation-corpus"),
-            None,
-            None,
-        );
-        assert_eq!(p, std::path::PathBuf::from("/tmp/isolation-corpus"));
-    }
-
-    #[test]
-    fn default_isolation_corpus_root_falls_through_to_xdg() {
-        let p = super::resolve_isolation_corpus_root_from_env_internal(
-            None,
-            Some("/tmp/xdgtest"),
-            None,
-        );
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/tmp/xdgtest/maos/isolation-corpus")
-        );
-    }
-
-    #[test]
-    fn default_isolation_corpus_root_falls_through_to_home_when_xdg_unset() {
-        let p = super::resolve_isolation_corpus_root_from_env_internal(
-            None,
-            None,
-            Some("/tmp/hometest"),
-        );
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/tmp/hometest/.local/share/maos/isolation-corpus")
-        );
-    }
-
-    #[test]
-    fn default_isolation_corpus_root_last_resort_var_lib() {
-        let p = super::resolve_isolation_corpus_root_from_env_internal(None, None, None);
-        assert_eq!(
-            p,
-            std::path::PathBuf::from("/var/lib/maos/isolation-corpus")
-        );
     }
 
     // ── FR41 SQLi-inert test ─────────────────────────────────────────

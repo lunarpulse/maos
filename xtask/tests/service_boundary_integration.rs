@@ -328,3 +328,78 @@ fn p4_violation_fixture_fails_with_message_containing_p4_violation_and_denylist_
         "expected denylist pattern in stderr, got:\n{stderr}"
     );
 }
+
+/// Story 15-1 AC3 residual control (§10) — closes the `--baseline /dev/null`
+/// hole: 9 of the 10 tests here pass `/dev/null` as the baseline, so the
+/// entire baseline-diff branch is skipped and deleting, emptying, or
+/// wholesale re-emitting the SHIPPED baseline breaks no test. This test runs
+/// the gate against a fixture whose surface contains none of the shipped
+/// baseline's symbols, so every baseline item is `removed` and the gate must
+/// red on exactly that leg.
+#[test]
+fn shipped_baseline_symbol_absent_from_surface_reds() {
+    let output = xtask()
+        .args([
+            "check-service-boundary",
+            "--path",
+            "xtask/tests/fixtures/clean-service-boundary",
+            "--baseline",
+            "docs/ci-baselines/kernel-surface-v0.1-beta.json",
+            "--classes",
+            "xtask/kernel-api-classes.toml",
+        ])
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
+        .output()
+        .expect("xtask should run");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "expected failure: the fixture surface has none of the shipped baseline's symbols"
+    );
+    assert!(
+        stderr.contains("removed public kernel symbol"),
+        "expected the monotonicity violation, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("maos_kernel_core::"),
+        "expected a real shipped-baseline path in the violation, got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("kernel-surface-v0.1-beta.json"),
+        "expected the shipped baseline to be the diff source, got:\n{stderr}"
+    );
+}
+
+/// Story 15-1 AC3 residual control (§10), the GREEN twin: the SHIPPED baseline
+/// must match the live kernel surface item-for-item. Before this, no test in
+/// the repository referenced `kernel-surface-v0.1-beta.json` at all — a stale
+/// re-emit or a truncated file was invisible. If this reds, the baseline and
+/// the surface have drifted and the surgical-edit discipline of ADR-066 has
+/// been violated by someone.
+#[test]
+fn shipped_baseline_matches_live_kernel_surface() {
+    let output = xtask()
+        .args([
+            "check-service-boundary",
+            "--baseline",
+            "docs/ci-baselines/kernel-surface-v0.1-beta.json",
+            "--classes",
+            "xtask/kernel-api-classes.toml",
+        ])
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/.."))
+        .output()
+        .expect("xtask should run");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "expected the shipped baseline to match the live surface; if this reds, the \
+         baseline↔surface agreement recorded by Story 15-1 AC3 has drifted. stderr:\n{stderr}"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("PASSED"),
+        "expected PASSED in stdout, got:\n{stdout}"
+    );
+}

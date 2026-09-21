@@ -42,6 +42,11 @@ pub enum Subcommand {
     /// Supports legacy spirit install, local release verification (`--from-local`),
     /// and remote fetch stub (source = release tag like "v0.5.0").
     Install(InstallArgs),
+    /// Load a Spirit into the running daemon from a manifest (Story 16-6,
+    /// FR9 `load`). Admits it through the same gates `maos run` applies and
+    /// leaves it in `Loaded` — `maosctl start <id>` runs it, `maosctl unload
+    /// <id>` removes it.
+    Load(LoadArgs),
     /// Start a Spirit — writes one `LifecycleEvent::Start` Lifecycle Journal
     /// entry and exits (v0.1-β, Story 1b.5c). Supervised lifecycle with
     /// process spawn + mailbox lands at Epic 5 (Story 5.1).
@@ -122,6 +127,8 @@ pub enum Subcommand {
     /// oracle, row count). The source MUST be quiesced (no active writers)
     /// before invoking — the migration engine does not take a write lock.
     Migrate(MigrateArgs),
+    /// Print the release-verification public key embedded in this binary.
+    ReleasePubkey,
     /// `j1-crosshost-2e` AC2 (F1) — cohort-manifest operator surface.
     ///
     /// `sign` is the ONLY thing in the workspace that can produce a signed
@@ -360,6 +367,18 @@ pub struct InstallArgs {
     /// Installation prefix directory. Default: parent of the current executable.
     #[arg(long)]
     pub prefix: Option<std::path::PathBuf>,
+}
+
+/// Story 16-6 — `maosctl load <manifest>`.
+///
+/// A `String`, not a `PathBuf`: `canonical_manifest` takes `&str`, and the
+/// path is canonicalised HERE before it crosses the door, because the daemon
+/// resolves relative paths in ITS working directory, not the operator's
+/// (D-16-1-X).
+#[derive(clap::Args, Debug)]
+pub struct LoadArgs {
+    /// Path to the Spirit manifest TOML.
+    pub manifest: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -709,7 +728,10 @@ pub enum HaltOp {
     },
     /// Resolve a halt by ID with one of three documented kinds.
     Resolve {
-        /// HaltId returned by `maosctl halt list`.
+        /// Halt id of the halt to resolve, as printed by the `halt_id`
+        /// field of `maosctl halt list` (rows whose `record` is
+        /// `termination_marker`/`termination_no_pending` carry no raisable
+        /// id — resolving them answers `halt_not_pending`).
         halt_id: String,
         /// Spirit owning the halt (required — Story 4.1 will derive
         /// from halt_id, but at 3.3 the operator supplies it).
@@ -785,10 +807,8 @@ pub struct RevokeTokenArgs {
     /// renders to via `format!("{:032x}", ...)` — same shape as
     /// `cap_tokens/body.rs` golden tests).
     pub token_id: String,
-    /// Optional director-supplied reason (free-form). Stored verbatim
-    /// in the Approval Decision Log `reasoning` column per FR42.
-    #[arg(long)]
-    pub reason: Option<String>,
+    // No `--reason`: the door route `POST /v1/tokens/{id}/revoke` carries no
+    // body (Story 16-1), and a flag that changed nothing would be a lie.
 }
 
 /// Story 5.2 — Spirit lifecycle operations.
@@ -806,9 +826,12 @@ pub enum SpiritOp {
     HotSwapPrecheck {
         /// Spirit ID to check (e.g. "butler").
         spirit: String,
-        /// Predecessor version string (e.g. "0.3.1").
+        /// Predecessor version. Over the Story 16-1 door this is DEAD
+        /// WEIGHT: the daemon prechecks the LOADED control block, so the
+        /// loaded version is its own fact, not an operator claim. Accepted
+        /// for CLI compatibility and refused by the door arm when present.
         #[arg(long)]
-        from: String,
+        from: Option<String>,
         /// Path to the successor's manifest TOML file.
         #[arg(long)]
         to: String,
@@ -909,13 +932,12 @@ pub struct RevocationsArgs {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum RevocationsOp {
-    /// Import a signed CRL from offline media (FR60).
+    /// Import a signed CRL from offline media (FR60). Over the Story 16-1
+    /// door the CRL's own BYTES travel as the body (D-16-1-X); the daemon
+    /// owns re-apply policy, so the old `--force` is gone with the one-shot.
     Import {
         /// Path to the signed CRL JSON file.
         file: std::path::PathBuf,
-        /// Re-apply even if this CRL was already imported.
-        #[arg(long)]
-        force: bool,
     },
     /// List already-applied CRLs by id + apply timestamp.
     List,

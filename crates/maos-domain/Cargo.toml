@@ -22,4 +22,8 @@ getrandom = "0.3"
 # `IacBusPort::deliver` (Story 6.1 broke the sync-only constraint).
 async-trait = "0.1"
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1", features = ["process"] }
+
 [dev-dependencies]
+tempfile = "3"

@@ -41,14 +41,16 @@ impl CapShard {
         })
     }
 
-    pub fn set_revoked(&self, id: &TokenId) -> Result<bool, ()> {
+    /// Commit revocation atomically. Returns the PRIOR flag as a value —
+    /// `Some(prior)` when the id is present, `None` when absent. Absent and
+    /// already-revoked are different facts (D-16-1-V), so absence keeps its
+    /// own channel instead of overloading an error type that cannot carry
+    /// the prior flag; the caller decides which of the two is an error.
+    pub fn set_revoked(&self, id: &TokenId) -> Option<bool> {
         let guard = self.inner.read();
-        if let Some(state) = guard.get(id) {
-            state.revoked.store(true, Ordering::Release);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        guard
+            .get(id)
+            .map(|state| state.revoked.swap(true, Ordering::AcqRel))
     }
 
     pub fn revoke_for_spirit(&self, spirit_pid: u32) -> usize {

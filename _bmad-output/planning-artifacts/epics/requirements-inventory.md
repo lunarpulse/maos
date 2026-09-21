@@ -434,7 +434,7 @@ _N/A — this is a kernel/infrastructure project with no UX design document. Dir
 | FR6 | E1b (basic cgroups) + E5 (full resource caps) | Per-Spirit resource caps |
 | FR7 | E1a | Telemetry opt-in |
 | FR8 | E1a | Manifest schema frozen v0.1 |
-| FR9 | E1a (basic load/start/unload) + E5 (full pause/resume + lifecycle verbs) | Lifecycle verbs |
+| FR9 | ⚠ **R10 (Story 16-6, 2026-09-18): re-homed to Epic 16** — `start`/`pause`/`resume`/`unload` by `16-1` (`done`), **`load` by `16-6`**. The E1a+E5 homing below predates the 2026-09-13 FR9 split (`epic-16-…md:21`) and was never updated. FR9 is `prd/functional-requirements.md:38`, not `:37` (that is FR8). Stale: E1a (basic load/start/unload) + E5 (full pause/resume + lifecycle verbs) | Lifecycle verbs |
 | FR10 | E5 | Hot-swap |
 | FR11 | E5 | Cross-major migration (`migrates_from`) |
 | FR12 | E5 | Crash detection ≤2s |
@@ -544,7 +544,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR5 sandbox enforcement (PARTIAL: computed, never applied) | **by form (ADR-060):** Workers 17-1/17-2; third-party WASM 17-3b; first-party in-proc trusted |
 | FR6 cgroups v2 caps (TEST-ONLY) | 17-2 |
 | FR7 telemetry opt-in (ABSENT: no emitter) | explicit non-goal until an emitter exists (recorded in 15-5) |
-| FR9/FR13/FR16/FR24/FR51 verbs reaching a running Spirit (CANNED/PARTIAL) | 16-1 |
+| FR9/FR13/FR16/FR24/FR51 verbs reaching a running Spirit (CANNED/PARTIAL) | 16-1 — ⚠ **R10 (Story 16-6): except FR9's `load`, which is `16-6`.** 16-1 shipped four of FR9's five verbs; the fifth has no verb in the tree, and 16-1's own round-table (F-B) split it out |
 | FR10/FR11/FR49 hot-swap reachability (PARTIAL) | 16-1 |
 | FR12/FR50 subprocess crash (PARTIAL) | 16-3 |
 | FR14/FR19 product task.assign emitters, halt-policy CLI (PARTIAL) | 19-1 |

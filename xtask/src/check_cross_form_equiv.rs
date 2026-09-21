@@ -259,8 +259,8 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     let mut advisory = false;
-    let mut consistency_ok = true;
-    let mut u_recomputed: Option<f64> = None;
+    let consistency_ok = true;
+    let u_recomputed: Option<f64>;
     let degenerate = false; // D5: deterministic output — ERRORs below (routes to check-wasm-form-equiv).
 
     // D15b default-deny + §A7 derive-and-reconcile: a PRESENT artifact MUST
@@ -321,10 +321,8 @@ pub fn run(json: bool) -> Result<(), String> {
     let tolerance = (0.05 * (n1 * n2) as f64).max(2.0);
     let matches_u1 = (u1 - u_reported).abs() <= tolerance;
     let matches_u2 = (u2 - u_reported).abs() <= tolerance;
-    // Report U1 as the canonical recomputed value.
     u_recomputed = Some(u1);
     if !matches_u1 && !matches_u2 {
-        consistency_ok = false;
         // D2 (consensus A): detected divergence is axis-1 integrity failure
         // (tampering/corruption), NOT an advisory verdict. Fail hard.
         let msg = format!(

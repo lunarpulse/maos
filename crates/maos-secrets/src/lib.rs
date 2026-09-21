@@ -9,8 +9,410 @@
 #[cfg(all(feature = "kms-fault-inject", not(debug_assertions)))]
 compile_error!("kms-fault-inject is dev/CI-only and MUST NOT ship in release builds");
 
-use maos_domain::ports::{CryptoProvider, KeyManagementPort, KmsError};
+use maos_domain::ports::{
+    CryptoProvider, KeyManagementPort, KmsError, SecretDeleteStatus, SecretKey, SecretStore,
+    SecretStoreError,
+};
 use ring::aead;
+use std::collections::HashMap;
+use std::path::Path;
+#[cfg(feature = "encrypted-file")]
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Backend {
+    Keyring,
+    Env,
+    EncryptedFile,
+}
+
+impl std::str::FromStr for Backend {
+    type Err = SecretStoreError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "keyring" => Ok(Self::Keyring),
+            "env" => Ok(Self::Env),
+            "encrypted-file" => Ok(Self::EncryptedFile),
+            other => Err(SecretStoreError::Unavailable(format!(
+                "unknown secret backend '{other}'"
+            ))),
+        }
+    }
+}
+
+/// Process-environment values captured at the composition root.
+///
+/// This adapter deliberately performs no environment reads of its own.
+pub struct EnvSecretStore {
+    values: Mutex<HashMap<SecretKey, String>>,
+}
+
+impl EnvSecretStore {
+    pub fn new(values: impl IntoIterator<Item = (SecretKey, String)>) -> Self {
+        Self {
+            values: Mutex::new(values.into_iter().collect()),
+        }
+    }
+}
+
+impl SecretStore for EnvSecretStore {
+    fn get(&self, key: SecretKey) -> Result<Option<String>, SecretStoreError> {
+        Ok(self
+            .values
+            .lock()
+            .map_err(|_| SecretStoreError::Access("environment store lock poisoned".to_string()))?
+            .get(&key)
+            .cloned())
+    }
+    fn put(&self, key: SecretKey, value: &str) -> Result<(), SecretStoreError> {
+        self.values
+            .lock()
+            .map_err(|_| SecretStoreError::Access("environment store lock poisoned".to_string()))?
+            .insert(key, value.to_string());
+        Ok(())
+    }
+
+    fn delete(&self, key: SecretKey) -> Result<SecretDeleteStatus, SecretStoreError> {
+        let removed = self
+            .values
+            .lock()
+            .map_err(|_| SecretStoreError::Access("environment store lock poisoned".to_string()))?
+            .remove(&key)
+            .is_some();
+        Ok(if removed {
+            SecretDeleteStatus::Removed
+        } else {
+            SecretDeleteStatus::Absent
+        })
+    }
+
+    fn is_healthy(&self) -> bool {
+        self.values.lock().is_ok()
+    }
+}
+
+pub type FallbackObserver = Arc<dyn Fn(SecretKey, &str) + Send + Sync>;
+
+/// Resolve a primary store first, then a composition-root-captured fallback.
+pub struct FallbackSecretStore {
+    primary: Arc<dyn SecretStore>,
+    fallback: Arc<dyn SecretStore>,
+    on_fallback: FallbackObserver,
+}
+
+impl FallbackSecretStore {
+    pub fn new(
+        primary: Arc<dyn SecretStore>,
+        fallback: Arc<dyn SecretStore>,
+        on_fallback: FallbackObserver,
+    ) -> Self {
+        Self {
+            primary,
+            fallback,
+            on_fallback,
+        }
+    }
+}
+
+impl SecretStore for FallbackSecretStore {
+    fn get(&self, key: SecretKey) -> Result<Option<String>, SecretStoreError> {
+        let (reason, primary_error) = match self.primary.get(key) {
+            Ok(Some(value)) if !value.trim().is_empty() => return Ok(Some(value)),
+            Ok(Some(_)) => ("primary entry present but blank".to_string(), None),
+            Ok(None) => ("primary entry absent".to_string(), None),
+            Err(error) => (error.to_string(), Some(error)),
+        };
+        match self.fallback.get(key) {
+            Ok(Some(value)) if !value.trim().is_empty() => {
+                (self.on_fallback)(key, &reason);
+                Ok(Some(value))
+            }
+            Ok(_) => match primary_error {
+                Some(error) => Err(error),
+                None => Ok(None),
+            },
+            Err(fallback_error) => match primary_error {
+                Some(primary_error) => {
+                    // Both stores failed: this is the one terminal path where
+                    // the observer has not yet journaled the primary failure,
+                    // so record it before surfacing an error that still
+                    // carries the primary's cause (the composition root turns
+                    // it into a provider-less boot, never an exit).
+                    (self.on_fallback)(key, &reason);
+                    Err(SecretStoreError::Access(format!(
+                        "primary lookup failed: {primary_error}; \
+                         fallback lookup failed: {fallback_error}"
+                    )))
+                }
+                None => Err(fallback_error),
+            },
+        }
+    }
+
+    fn put(&self, key: SecretKey, value: &str) -> Result<(), SecretStoreError> {
+        self.primary.put(key, value)
+    }
+
+    fn delete(&self, key: SecretKey) -> Result<SecretDeleteStatus, SecretStoreError> {
+        let primary = self.primary.delete(key);
+        let fallback = self.fallback.delete(key);
+        match (primary, fallback) {
+            (Ok(primary), Ok(fallback)) => Ok(
+                if primary == SecretDeleteStatus::Removed || fallback == SecretDeleteStatus::Removed
+                {
+                    SecretDeleteStatus::Removed
+                } else {
+                    SecretDeleteStatus::Absent
+                },
+            ),
+            (Err(primary), Ok(_)) => Err(primary),
+            (Ok(_), Err(fallback)) => Err(fallback),
+            (Err(primary), Err(fallback)) => Err(SecretStoreError::Access(format!(
+                "primary deletion failed: {primary}; fallback deletion failed: {fallback}"
+            ))),
+        }
+    }
+
+    fn is_healthy(&self) -> bool {
+        self.primary.is_healthy() || self.fallback.is_healthy()
+    }
+}
+
+#[cfg(feature = "keyring")]
+pub struct KeyringSecretStore {
+    namespace: String,
+    timeout: std::time::Duration,
+}
+
+#[cfg(feature = "keyring")]
+impl KeyringSecretStore {
+    pub fn for_home(home: &Path) -> Self {
+        use sha2::{Digest, Sha256};
+        #[cfg(unix)]
+        let digest = {
+            use std::os::unix::ffi::OsStrExt;
+            Sha256::digest(home.as_os_str().as_bytes())
+        };
+        #[cfg(windows)]
+        let digest = {
+            use std::os::windows::ffi::OsStrExt;
+            let native: Vec<u8> = home
+                .as_os_str()
+                .encode_wide()
+                .flat_map(u16::to_le_bytes)
+                .collect();
+            Sha256::digest(&native)
+        };
+        #[cfg(not(any(unix, windows)))]
+        let digest = Sha256::digest(home.as_os_str().to_string_lossy().as_bytes());
+        Self {
+            namespace: hex_digest(&digest[..16]),
+            timeout: std::time::Duration::from_millis(500),
+        }
+    }
+
+    fn username(&self, key: SecretKey) -> String {
+        format!("{}:{}", self.namespace, key.as_str())
+    }
+
+    fn bounded<T: Send + 'static>(
+        &self,
+        operation: impl FnOnce() -> Result<T, SecretStoreError> + Send + 'static,
+    ) -> Result<T, SecretStoreError> {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        std::thread::Builder::new()
+            .name("maos-keyring".to_string())
+            .spawn(move || {
+                let _ = sender.send(operation());
+            })
+            .map_err(|error| SecretStoreError::Unavailable(error.to_string()))?;
+        match receiver.recv_timeout(self.timeout) {
+            Ok(result) => result,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(SecretStoreError::Unavailable(
+                "credential-store operation timed out".to_string(),
+            )),
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(SecretStoreError::Access(
+                "credential-store worker terminated".to_string(),
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "keyring")]
+impl SecretStore for KeyringSecretStore {
+    fn get(&self, key: SecretKey) -> Result<Option<String>, SecretStoreError> {
+        let username = self.username(key);
+        self.bounded(move || {
+            let entry = keyring::Entry::new("dev.maos.credentials", &username)
+                .map_err(|error| SecretStoreError::Unavailable(error.to_string()))?;
+            match entry.get_password() {
+                Ok(value) => Ok(Some(value)),
+                Err(keyring::Error::NoEntry) => Ok(None),
+                Err(keyring::Error::BadEncoding(_)) => Err(SecretStoreError::InvalidEncoding),
+                Err(error) => Err(SecretStoreError::Access(error.to_string())),
+            }
+        })
+    }
+    fn put(&self, key: SecretKey, value: &str) -> Result<(), SecretStoreError> {
+        let username = self.username(key);
+        let value = value.to_string();
+        self.bounded(move || {
+            let entry = keyring::Entry::new("dev.maos.credentials", &username)
+                .map_err(|error| SecretStoreError::Unavailable(error.to_string()))?;
+            entry
+                .set_password(&value)
+                .map_err(|error| SecretStoreError::Access(error.to_string()))
+        })
+    }
+
+    fn delete(&self, key: SecretKey) -> Result<SecretDeleteStatus, SecretStoreError> {
+        let username = self.username(key);
+        self.bounded(move || {
+            let entry = keyring::Entry::new("dev.maos.credentials", &username)
+                .map_err(|error| SecretStoreError::Unavailable(error.to_string()))?;
+            match entry.delete_credential() {
+                Ok(()) => Ok(SecretDeleteStatus::Removed),
+                Err(keyring::Error::NoEntry) => Ok(SecretDeleteStatus::Absent),
+                Err(error) => Err(SecretStoreError::Access(error.to_string())),
+            }
+        })
+    }
+
+    fn is_healthy(&self) -> bool {
+        self.bounded(|| {
+            keyring::Entry::store_status()
+                .as_ref()
+                .map(|()| true)
+                .map_err(|error| SecretStoreError::Unavailable(error.to_string()))
+        })
+        .unwrap_or(false)
+    }
+}
+
+#[cfg(feature = "encrypted-file")]
+pub struct EncryptedFileSecretStore {
+    root: PathBuf,
+    kms: Arc<dyn KeyManagementPort>,
+    crypto: Arc<dyn CryptoProvider>,
+}
+
+#[cfg(feature = "encrypted-file")]
+impl EncryptedFileSecretStore {
+    pub fn new(
+        root: PathBuf,
+        kms: Arc<dyn KeyManagementPort>,
+        crypto: Arc<dyn CryptoProvider>,
+    ) -> Self {
+        Self { root, kms, crypto }
+    }
+
+    pub fn store(&self, key: SecretKey, value: &str) -> Result<(), SecretStoreError> {
+        use std::io::Write;
+        create_private_directory(&self.root)?;
+        let path = self.path(key);
+        let sealed = seal_at_rest(self.kms.as_ref(), self.crypto.as_ref(), value.as_bytes())
+            .map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        let mut temporary = tempfile::Builder::new()
+            .prefix(".maos-secret-")
+            .tempfile_in(&self.root)
+            .map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        temporary
+            .write_all(&sealed)
+            .and_then(|()| temporary.as_file().sync_all())
+            .map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        temporary
+            .persist(&path)
+            .map_err(|error| SecretStoreError::Access(error.error.to_string()))?;
+        sync_directory(&self.root)
+    }
+
+    fn path(&self, key: SecretKey) -> PathBuf {
+        self.root.join(format!("{}.sealed", key.as_str()))
+    }
+}
+
+#[cfg(feature = "encrypted-file")]
+impl SecretStore for EncryptedFileSecretStore {
+    fn get(&self, key: SecretKey) -> Result<Option<String>, SecretStoreError> {
+        let path = self.path(key);
+        match std::fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(SecretStoreError::Access(error.to_string())),
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(SecretStoreError::Access(
+                    "encrypted secret path is a symbolic link".to_string(),
+                ));
+            }
+            Ok(_) => {}
+        }
+        let sealed =
+            std::fs::read(&path).map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        let plaintext = open_at_rest(self.kms.as_ref(), &sealed)
+            .map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        String::from_utf8(plaintext)
+            .map(Some)
+            .map_err(|_| SecretStoreError::InvalidEncoding)
+    }
+    fn put(&self, key: SecretKey, value: &str) -> Result<(), SecretStoreError> {
+        self.store(key, value)
+    }
+
+    fn delete(&self, key: SecretKey) -> Result<SecretDeleteStatus, SecretStoreError> {
+        let path = self.path(key);
+        match std::fs::remove_file(&path) {
+            Ok(()) => Ok(SecretDeleteStatus::Removed),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Ok(SecretDeleteStatus::Absent)
+            }
+            Err(error) => Err(SecretStoreError::Access(error.to_string())),
+        }
+    }
+
+    fn is_healthy(&self) -> bool {
+        self.kms.is_healthy()
+    }
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+#[cfg(feature = "encrypted-file")]
+fn create_private_directory(path: &Path) -> Result<(), SecretStoreError> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+            .map_err(|error| SecretStoreError::Access(error.to_string()))
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(path).map_err(|error| SecretStoreError::Access(error.to_string()))
+    }
+}
+
+#[cfg(all(feature = "encrypted-file", unix))]
+fn sync_directory(path: &Path) -> Result<(), SecretStoreError> {
+    std::fs::File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| SecretStoreError::Access(error.to_string()))
+}
+
+#[cfg(all(feature = "encrypted-file", not(unix)))]
+fn sync_directory(_path: &Path) -> Result<(), SecretStoreError> {
+    Ok(())
+}
 
 const MAGIC: &[u8; 8] = b"MAOSKMS1";
 const NONCE_LEN: usize = 12;
@@ -202,4 +604,21 @@ fn open_aead(key: &[u8], nonce: &[u8], aad: &[u8], ciphertext: &[u8]) -> Result<
         .open_in_place(nonce, aead::Aad::from(aad), &mut in_out)
         .map_err(|_| KmsError::Crypto("AES-GCM open failed".to_string()))?;
     Ok(plaintext.to_vec())
+}
+
+#[cfg(all(test, feature = "keyring", unix))]
+mod tests {
+    use super::KeyringSecretStore;
+    use std::os::unix::ffi::OsStringExt;
+    use std::path::PathBuf;
+
+    #[test]
+    fn keyring_namespace_hashes_native_non_utf8_home_bytes() {
+        let first = PathBuf::from(std::ffi::OsString::from_vec(b"/tmp/maos-\xff".to_vec()));
+        let second = PathBuf::from(std::ffi::OsString::from_vec(b"/tmp/maos-\xfe".to_vec()));
+        assert_ne!(
+            KeyringSecretStore::for_home(&first).namespace,
+            KeyringSecretStore::for_home(&second).namespace
+        );
+    }
 }

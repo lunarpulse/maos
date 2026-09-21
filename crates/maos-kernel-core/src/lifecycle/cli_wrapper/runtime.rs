@@ -414,6 +414,10 @@ fn run_reader<R: BufRead>(
                             return;
                         }
                     }
+                    // Story 16-5 T0 disposal: these drops are SUBPROCESS
+                    // OUTPUT LINES on the bridge channel, never CapAuditEvent
+                    // sends — they are counted in PumpOutcome::dropped and
+                    // are out of the audit-drop class (T0's tenth shape).
                     Backpressure::DropWithAudit => match tx.try_send(msg) {
                         Ok(()) => {}
                         Err(TrySendError::Full(_)) => {

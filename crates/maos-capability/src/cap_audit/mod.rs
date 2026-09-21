@@ -10,24 +10,90 @@
 //! in `maos-kernel-core` because it depends on `crate::iac::transparency_log`.
 //! This module provides only the types and channel factory.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use maos_domain::invariants::i1::{Scope, TokenId};
-
 /// Audit channel depth — load-bearing per ADR-030.
 pub const AUDIT_CHANNEL_DEPTH: usize = 8192;
 
-/// Global counter of dropped audit events due to channel saturation.
-static AUDIT_DROP_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// Record one dropped audit event.
-pub fn record_drop() {
-    AUDIT_DROP_COUNTER.fetch_add(1, Ordering::Relaxed);
+/// Audit-event send sites. The fixed list is the class-wide instrument:
+/// callers must name the site whose event could not reach the writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(usize)]
+pub enum AuditDropSite {
+    Issue,
+    Revoke,
+    RevokeAll,
+    Verification,
+    Invocation,
+    SandboxBlock,
+    T3EscapeBlock,
+    Quarantine,
+    AcpNotification,
 }
 
-/// Return the total number of dropped audit events since boot.
-pub fn audit_drop_count() -> u64 {
-    AUDIT_DROP_COUNTER.load(Ordering::Relaxed)
+impl AuditDropSite {
+    const COUNT: usize = 9;
+}
+
+/// Why an audit event did not reach the writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditDropReason {
+    /// The bounded queue was full. A later event may still succeed.
+    Full,
+    /// The receiver was dropped. The process cannot recover its audit writer.
+    Closed,
+}
+
+/// Process-wide audit health, readable without the failed audit channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuditHealthSnapshot {
+    pub total_drops: u64,
+    pub degraded: bool,
+    by_site: [u64; AuditDropSite::COUNT],
+}
+
+impl AuditHealthSnapshot {
+    pub fn count(self, site: AuditDropSite) -> u64 {
+        self.by_site[site as usize]
+    }
+}
+
+static AUDIT_DROP_COUNTERS: [AtomicU64; AuditDropSite::COUNT] =
+    [const { AtomicU64::new(0) }; AuditDropSite::COUNT];
+static AUDIT_DEGRADED: AtomicBool = AtomicBool::new(false);
+
+/// Record one audit event that did not reach the writer.
+pub fn record_drop(site: AuditDropSite, reason: AuditDropReason) {
+    AUDIT_DROP_COUNTERS[site as usize].fetch_add(1, Ordering::Relaxed);
+    if reason == AuditDropReason::Closed {
+        AUDIT_DEGRADED.store(true, Ordering::Release);
+    }
+}
+
+/// Return the out-of-band audit health snapshot.
+pub fn audit_health_snapshot() -> AuditHealthSnapshot {
+    let mut by_site = [0; AuditDropSite::COUNT];
+    for (count, value) in AUDIT_DROP_COUNTERS.iter().zip(&mut by_site) {
+        *value = count.load(Ordering::Relaxed);
+    }
+    AuditHealthSnapshot {
+        total_drops: by_site.iter().sum(),
+        degraded: AUDIT_DEGRADED.load(Ordering::Acquire),
+        by_site,
+    }
+}
+
+/// Record a failed bounded-channel send with its permanent/transient cause.
+pub fn record_send_error(
+    site: AuditDropSite,
+    error: &tokio::sync::mpsc::error::TrySendError<CapAuditEvent>,
+) {
+    let reason = match error {
+        tokio::sync::mpsc::error::TrySendError::Full(_) => AuditDropReason::Full,
+        tokio::sync::mpsc::error::TrySendError::Closed(_) => AuditDropReason::Closed,
+    };
+    record_drop(site, reason);
 }
 
 /// Outcome of a token verification — structured per AC3.
@@ -123,9 +189,15 @@ mod tests {
     }
 
     #[test]
-    fn drop_counter_increments() {
-        let before = audit_drop_count();
-        record_drop();
-        assert_eq!(audit_drop_count(), before + 1);
+    fn drop_instrument_names_site_and_latches_closed_writer() {
+        let before = audit_health_snapshot();
+        record_drop(AuditDropSite::Invocation, AuditDropReason::Closed);
+        let after = audit_health_snapshot();
+        assert_eq!(after.total_drops, before.total_drops + 1);
+        assert_eq!(
+            after.count(AuditDropSite::Invocation),
+            before.count(AuditDropSite::Invocation) + 1
+        );
+        assert!(after.degraded);
     }
 }

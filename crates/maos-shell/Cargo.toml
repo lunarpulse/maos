@@ -25,4 +25,5 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [dev-dependencies]
+parking_lot = "0.12"
 tempfile = "3"

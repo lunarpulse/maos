@@ -67,9 +67,10 @@ gates = [
     # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
     "check-red-team-gate",
     # Story 10.3 AC-1/2/3/4/5 — v1.0 compliance ship-gates.
+    # RETIRED 2026-09-07 by Story 15-3 per ADR-065: "check-cna-registration".
+    # Its two live SECURITY.md controls are re-homed into check-security-md.
     "check-export-control",
     "check-fuzz-targets",
-    "check-cna-registration",
     "check-ko-coverage",
     # Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
@@ -159,6 +160,17 @@ gates = [
     # manifest reissue, proven-red by unwiring the set-once install. The
     # method-aware AST probe is the fast second opinion, never the proof.
     "check-cert-rotation-trigger",
+    # Story 15-3 AC5 — confidence rule 1 made mechanical: every non-`done`
+    # epic's hermetic exit block is tokenised as shell and every
+    # `maos`/`maosctl`/`xtask` verb must exist at HEAD or be owed by a named,
+    # open story that actually claims it. Before this gate nothing read the
+    # exit blocks at all.
+    "check-exit-commands",
+    # Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Before
+    # this, no CI job ran `cargo test --workspace` unscoped: every invocation
+    # was `-p`/`--test`-scoped, so the exit line's final clause was performed
+    # by hand on a developer's box and nowhere else (a gap, not a demotion).
+    "workspace-test-suite",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -212,9 +224,10 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 name = "check-fuzz-targets"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 
-[[ship_gate]]
-name = "check-cna-registration"
-disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking" }
+# RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
+# stanza stood here. Its `blocking-when-present` disposition was never the arm
+# taken — the gate ran its content-validating path, and those two `SECURITY.md`
+# controls now live in `check-security-md` with their own proven-red tests.
 
 [[ship_gate]]
 name = "check-ko-coverage"
@@ -290,6 +303,30 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "check-cert-rotation-trigger"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 15-3 AC5 — the exit-command check. `v1_5 = "blocking"` is the key that
+# binds at today's `CURRENT_PHASE`, following the 14-2a precedent above rather
+# than architecture `15-full-spectrum-v2-2.md:130`'s "all new gates" clause:
+# that clause governs gates whose SUBJECT is a v2.2 capability (its own tail,
+# "absent-result → BLOCK at the v2.2 ship gate", only parses for
+# evidence-bearing v2.2 gates). A rule-1 gate that cannot red until v2.2 is
+# the thing this story exists to remove. Both readings are recorded (F12).
+[[ship_gate]]
+name = "check-exit-commands"
+disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 15-1 AC7 / D-3 — the full workspace test suite as a Blocking control.
+# At HEAD before this story NO CI job ran `cargo test --workspace` unscoped
+# (every `cargo test` in discipline.yml was `-p`/`--test`-scoped; both
+# `cargo nextest run` legs in journey-nightly.yml were `-p maos-journey-test`),
+# so the hermetic exit line's final clause was machine-checked by nobody.
+# Cost ruling R-13: one full workspace test run per CI cycle (measured
+# locally: 497 binaries, 4174 tests, ~3 min wall-clock on 32 cores; CI
+# timeout set to 45). Enrolled Blocking-at-every-phase like the other
+# foundation gates — there is no phase at which a red suite should pass.
+[[ship_gate]]
+name = "workspace-test-suite"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
 # scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1

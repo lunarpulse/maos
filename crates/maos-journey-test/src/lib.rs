@@ -41,6 +41,9 @@ use std::sync::{
 };
 use std::time::Duration;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 /// The world a journey test drives: a pinned clock, mock MCP endpoints, a replay
 /// LLM provider, and a temp audit DB. Construct via [`JourneyWorld::builder`].
 pub struct JourneyWorld {
@@ -73,6 +76,12 @@ pub struct JourneyWorldBuilder {
     mcp: BTreeMap<String, MockMcp>,
     llm: Option<ReplayProvider>,
     audit: Option<AuditDb>,
+    /// Story 16-2 / D-16-2-K — generic env additions. `Pty::spawn` splits
+    /// its command on whitespace and execs it, so env can never ride the
+    /// command string; J0 sets `MAOS_INFERENCE_MODE=replay` here (which also
+    /// overrides a job-wide record mode — J0's seed cassette is not a
+    /// re-record target).
+    extra_env: BTreeMap<String, String>,
 }
 
 impl JourneyWorldBuilder {
@@ -96,6 +105,13 @@ impl JourneyWorldBuilder {
         self
     }
 
+    /// Story 16-2 / D-16-2-K — set one environment variable on every child
+    /// the world spawns (generic: no per-journey endpoint on the builder).
+    pub fn env(mut self, key: &str, value: &str) -> Self {
+        self.extra_env.insert(key.to_string(), value.to_string());
+        self
+    }
+
     pub fn cassette(mut self, path: &str) -> Self {
         self.llm = Some(ReplayProvider::cassette(path));
         self
@@ -115,11 +131,22 @@ impl JourneyWorldBuilder {
             "XDG_DATA_HOME".into(),
             audit.path().join("xdg").to_string_lossy().into_owned(),
         );
+        // Story 16-1 / D-16-1-Q: every Pty child gets an empty scratch "HOME" —
+        // no control.json, so journey roots cannot collide on one endpoint.
+        env.insert(
+            "HOME".into(),
+            doorless_home::doorless_home()
+                .to_string_lossy()
+                .into_owned(),
+        );
         if let Some(cassette_path) = llm.cassette_path() {
             env.insert(
                 "MAOS_REPLAY_CASSETTE".into(),
                 cassette_path.to_string_lossy().into_owned(),
             );
+        }
+        for (key, value) in &self.extra_env {
+            env.insert(key.clone(), value.clone());
         }
         for (server_name, mock) in &mcp {
             let env_key = match server_name.as_str() {
@@ -327,16 +354,16 @@ impl Drop for MockMcp {
     }
 }
 
-/// A replay LLM provider keyed by a cassette file.
+/// A replay/record LLM provider keyed by a cassette file.
 pub struct ReplayProvider {
-    _cassette: String,
+    cassette_source: Option<PathBuf>,
     cassette_file: Option<PathBuf>,
 }
 
 impl Default for ReplayProvider {
     fn default() -> Self {
         Self {
-            _cassette: String::new(),
+            cassette_source: None,
             cassette_file: None,
         }
     }
@@ -356,7 +383,7 @@ impl ReplayProvider {
                 .unwrap_or_else(|e| panic!("ReplayProvider: failed to copy cassette {path}: {e}"));
         }
         Self {
-            _cassette: path.to_string(),
+            cassette_source: Some(src.to_path_buf()),
             cassette_file: Some(dest),
         }
     }
@@ -369,7 +396,11 @@ impl ReplayProvider {
     pub fn queue_scalar(&self, _tag: &str, _value: f64) {}
 
     pub fn cassette_path(&self) -> Option<&Path> {
-        self.cassette_file.as_deref()
+        if std::env::var("MAOS_INFERENCE_MODE").as_deref() == Ok("record") {
+            self.cassette_source.as_deref()
+        } else {
+            self.cassette_file.as_deref()
+        }
     }
 }
 
@@ -421,6 +452,10 @@ pub struct Pty {
     reader_handle: Mutex<Option<std::thread::JoinHandle<()>>>,
     screen_buf: Arc<Mutex<Vec<u8>>>,
     master: Mutex<Option<Box<dyn portable_pty::MasterPty + Send>>>,
+    /// Story 16-2 / D-16-2-K — the master's writer, taken ONCE at spawn
+    /// (`take_writer` yields the only handle). `send_line` and `send_eof`
+    /// write through it; before 16-2 the harness could only READ a PTY.
+    writer: parking_lot::Mutex<Option<Box<dyn std::io::Write + Send>>>,
 }
 
 impl Pty {
@@ -454,6 +489,19 @@ impl Pty {
             cmd.env(k, v);
         }
 
+        // 15-6 §A6 review P1: a cassette-free world must not inherit an
+        // outer MAOS_INFERENCE_MODE — the nightly rerecord leg exports
+        // `record` job-wide, and the selector would refuse a cassette-free
+        // child before the journey runs. Cassette-bearing worlds keep it:
+        // they are that leg's re-record targets.
+        if !world.env().contains_key("MAOS_REPLAY_CASSETTE") {
+            cmd.env_remove("MAOS_INFERENCE_MODE");
+        }
+        let pty_writer = pair
+            .master
+            .take_writer()
+            .expect("Pty::spawn: failed to take master writer");
+
         let child = pair
             .slave
             .spawn_command(cmd)
@@ -485,7 +533,35 @@ impl Pty {
             reader_handle: Mutex::new(Some(reader_handle)),
             screen_buf,
             master: Mutex::new(Some(pair.master)),
+            writer: parking_lot::Mutex::new(Some(pty_writer)),
         }
+    }
+
+    /// Story 16-2 / D-16-2-K — type a line into the child's stdin:
+    /// CR-terminated (a PTY line ends at CR; LF alone does not submit in
+    /// canonical mode).
+    pub fn send_line(&self, line: &str) {
+        let mut writer = self.writer.lock();
+        let writer = writer
+            .as_mut()
+            .expect("Pty::send_line: writer taken (Pty dropped?)");
+        writer
+            .write_all(format!("{line}\r").as_bytes())
+            .expect("Pty::send_line: write failed");
+        writer.flush().expect("Pty::send_line: flush failed");
+    }
+
+    /// Story 16-2 / D-16-2-K — end the REPL: `0x04` (Ctrl-D) in canonical
+    /// mode delivers EOF. `send_line` cannot end the session.
+    pub fn send_eof(&self) {
+        let mut writer = self.writer.lock();
+        let writer = writer
+            .as_mut()
+            .expect("Pty::send_eof: writer taken (Pty dropped?)");
+        writer
+            .write_all(&[0x04])
+            .expect("Pty::send_eof: write failed");
+        writer.flush().expect("Pty::send_eof: flush failed");
     }
 
     /// The current rendered screen via `vt100::Parser`.
@@ -625,5 +701,123 @@ pub mod guards {
                 }
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 16-2 / D-16-2-K — bounded subprocess helpers (the no-wallclock
+// guard's rule: bounded waits live HERE, never in a test body)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One bounded child run with the WORLD's env only — never the runner's
+/// `HOME` (16-1's decoy door holds the runner's real `control.json`
+/// endpoint inside the workspace suite, so any inherited home collides).
+#[derive(Debug, Clone)]
+pub struct BoundedRun {
+    pub code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Per-stream diagnostic capture ceiling. Readers continue draining after the
+/// ceiling so a noisy child cannot block on a full pipe or grow the harness
+/// without bound.
+const CAPTURE_LIMIT_BYTES: usize = 8 * 1024 * 1024;
+
+fn drain_bounded(mut pipe: impl std::io::Read) -> Vec<u8> {
+    let mut captured = Vec::with_capacity(CAPTURE_LIMIT_BYTES);
+    let mut chunk = [0u8; 16 * 1024];
+    loop {
+        let Ok(read) = pipe.read(&mut chunk) else {
+            break;
+        };
+        if read == 0 {
+            break;
+        }
+        let remaining = CAPTURE_LIMIT_BYTES.saturating_sub(captured.len());
+        captured.extend_from_slice(&chunk[..read.min(remaining)]);
+    }
+    captured
+}
+
+/// Run `program args` against the world's env, bounded by `timeout_secs`.
+/// `extra_env` rides ALONGSIDE the world env (e.g. a cassette copy).
+/// The pipes drain on two threads WHILE the bounded loop runs (D-16-3-O), so
+/// a child that fills either pipe buffer still exits inside the bound.
+pub fn run_bounded(
+    world: &JourneyWorld,
+    program: &str,
+    args: &[&str],
+    extra_env: &[(&str, &str)],
+    timeout_secs: u64,
+    label: &str,
+) -> BoundedRun {
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args)
+        .env_clear()
+        .env("PATH", std::env::var("PATH").unwrap_or_default());
+    for (k, v) in world.env() {
+        cmd.env(k, v);
+    }
+    for (k, v) in extra_env {
+        cmd.env(k, v);
+    }
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("{label}: spawn failed: {e}"));
+    // D-16-3-O — drain BOTH pipes WHILE the bounded loop runs, not after it:
+    // a child writing past the OS pipe buffer (~64 KiB) blocks on write
+    // forever when nobody reads, so the old drain-after-exit shape
+    // (`wait_with_output` only once `try_wait` yielded `Some`) never reached
+    // its drain, the deadline fired, and a full-pipe hang was misreported as
+    // a timeout (`deferred-work.md:938`, closed by Story 16-3).
+    let stdout_pipe = child.stdout.take().expect("stdout was piped");
+    let stderr_pipe = child.stderr.take().expect("stderr was piped");
+    let stdout_drain = std::thread::spawn(move || drain_bounded(stdout_pipe));
+    let stderr_drain = std::thread::spawn(move || drain_bounded(stderr_pipe));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // The child is reaped, so both write ends are closed and the
+                // drainers see EOF; the joins carry the whole capture.
+                let out = stdout_drain.join().expect("stdout drain thread panicked");
+                let err = stderr_drain.join().expect("stderr drain thread panicked");
+                return BoundedRun {
+                    code: status.code(),
+                    stdout: String::from_utf8_lossy(&out).into_owned(),
+                    stderr: String::from_utf8_lossy(&err).into_owned(),
+                };
+            }
+            Ok(None) if std::time::Instant::now() >= deadline => {
+                // The drainers are deliberately NOT joined on this path: the
+                // kill closes the child's write ends so they reach EOF on
+                // their own, and a descendant still holding a pipe is 17-1
+                // AC4's tree teardown, not this helper's bound.
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("{label}: did not exit within {timeout_secs}s");
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            Err(e) => panic!("{label}: wait failed: {e}"),
+        }
+    }
+}
+
+/// Poll a condition at 50 ms until it holds or `timeout_secs` elapses.
+/// Returns `true` when it held; `false` on timeout (the caller asserts).
+pub fn wait_until(timeout_secs: u64, label: &str, mut cond: impl FnMut() -> bool) -> bool {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    loop {
+        if cond() {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            eprintln!("{label}: condition not met within {timeout_secs}s");
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 }

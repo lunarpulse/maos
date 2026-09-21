@@ -28,6 +28,11 @@ pub mod lifecycle; // NEW — Story 5.1 lifecycle types + LifecycleResolver trai
 pub mod log_recall; // NEW — Story 4.4 log-recall domain types
 pub mod memory; // NEW — Story 4.3 memory tier types
 pub mod notification;
+/// Story 16-1 — the ONE MAOS home rule and the operator door's `control.json`
+/// discovery record. Here because `maos init` (`maos-shell`), every daemon root
+/// (`maos-bin`) and `maosctl` (`maos-cli`) must agree on one path, one schema
+/// and one custody rule, and this is the only crate all three depend on.
+pub mod operator_door;
 pub mod orchestrator;
 pub mod ports;
 pub mod provenance; // NEW — Story 9.4b AC-6 model-provenance admission error taxonomy (D5/D6)

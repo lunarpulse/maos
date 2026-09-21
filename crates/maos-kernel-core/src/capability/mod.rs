@@ -231,16 +231,12 @@ impl CapabilityRegistryAdapter {
     }
 
     pub(crate) fn record_verification(&self, token: &CapabilityToken, outcome: VerifyOutcome) {
-        if self
-            .audit
-            .try_send(cap_audit::CapAuditEvent::Verify {
-                token_id: token.token_id,
-                spirit_pid: token.spirit_pid,
-                outcome,
-            })
-            .is_err()
-        {
-            cap_audit::record_drop();
+        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Verify {
+            token_id: token.token_id,
+            spirit_pid: token.spirit_pid,
+            outcome,
+        }) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Verification, &error);
         }
     }
 
@@ -335,18 +331,15 @@ impl CapabilityRegistryPort for CapabilityRegistryAdapter {
         intent: String,
         payload: &[u8],
     ) -> Result<(), CapError> {
-        if self
-            .audit
-            .try_send(cap_audit::CapAuditEvent::Invocation {
-                token_id: token.token_id,
-                spirit_pid: token.spirit_pid,
-                capability_token_bytes: token.token_id.0.to_vec(),
-                intent,
-                payload: payload.to_vec(),
-            })
-            .is_err()
-        {
-            cap_audit::record_drop();
+        if let Err(error) = self.audit.try_send(cap_audit::CapAuditEvent::Invocation {
+            token_id: token.token_id,
+            spirit_pid: token.spirit_pid,
+            capability_token_bytes: token.token_id.0.to_vec(),
+            intent,
+            payload: payload.to_vec(),
+        }) {
+            cap_audit::record_send_error(cap_audit::AuditDropSite::Invocation, &error);
+            return Err(CapError::AuditSinkUnavailable);
         }
         Ok(())
     }
@@ -355,8 +348,8 @@ impl CapabilityRegistryPort for CapabilityRegistryAdapter {
 impl CapabilityRegistryAdapter {
     /// Story 5.1 — revoke all capability tokens for a given spirit_pid.
     /// Called by `SpiritSchedulerAdapter::unload` during graceful teardown.
-    pub fn revoke_all_for_pid(&self, spirit_pid: u32) -> Result<usize, CapError> {
-        Ok(self.tokens.revoke_all(spirit_pid))
+    pub fn revoke_all_for_pid(&self, spirit_pid: u32) -> usize {
+        self.tokens.revoke_all(spirit_pid)
     }
 
     /// Story 8.12 AC2 / FR52 — revoke the `Scope::CliSubprocessSpawn` cap-token
@@ -417,7 +410,8 @@ mod tests {
             );
             policy.update(inner);
         }
-        let (audit_tx, _audit_rx) = cap_audit::channel();
+        let (audit_tx, mut audit_rx) = cap_audit::channel();
+        std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
         let quota = CapQuotaTracker::new();
         let working_memory = Arc::new(WorkingMemoryStore::new());
         let telemetry = Arc::new(TelemetryStreamAdapter::default());

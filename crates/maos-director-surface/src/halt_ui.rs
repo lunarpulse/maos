@@ -71,6 +71,15 @@ impl<R: HaltResolver> HaltFlow<R> {
     /// fail-closed guarantee means every caller gets correct sequencing
     /// automatically, including callers wired to a resolver that does
     /// not validate (e.g. `MockHaltResolver`).
+    ///
+    /// AC5(b) / review 2026-09-17: the resolve→journal order keeps a journal
+    /// failure from producing an unsanctioned row, but it leaves the registry
+    /// terminal if the journal write then fails. A caller that owns the
+    /// registry MUST compensate that window — journal failure ⇒ roll the
+    /// resolution back and surface the failure (the operator door's
+    /// `rollback_resolution` wiring is the reference implementation).
+    /// The `MockHaltResolver` keeps this contract testable without a
+    /// registry.
     pub fn submit_resolution(
         &self,
         halt_id: HaltId,

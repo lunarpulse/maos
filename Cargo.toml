@@ -61,7 +61,7 @@ default-members = []
 exclude = ["templates", "templates/spirit-ts"]
 
 [workspace.package]
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/lunarpulse/maos"

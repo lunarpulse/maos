@@ -684,8 +684,11 @@ impl TcpA2ATransport {
             Ok(Ok(())) => {}
         }
 
-        match tokio::time::timeout(self.timeouts.idle, framed.next()).await {
-            Err(_) => Err(TcpTransportError::Timeout("awaiting response".into())),
+        match tokio::time::timeout(partition, framed.next()).await {
+            Err(_) => Err(TcpTransportError::PartitionTimeout {
+                phase: "awaiting response".into(),
+                secs: partition.as_secs(),
+            }),
             Ok(None) => Err(TcpTransportError::Io(
                 "connection closed before response".into(),
             )),

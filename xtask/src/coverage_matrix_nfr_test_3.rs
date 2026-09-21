@@ -100,8 +100,6 @@ fn extract_exercised_caps(
         r"(LocalRunnerFixture|SpiritTest|SpiritTestFixture|expectFrame|expect_frame!|assert_no_capability_invocation)"
     ).unwrap();
 
-    let cap_ref_patterns = regex::Regex::new(r#"(?m)(?:"([^"]+)"|'([^']+)')"#).unwrap();
-
     let mut has_fixture = false;
     for entry in walkdir::WalkDir::new(tests_dir)
         .into_iter()

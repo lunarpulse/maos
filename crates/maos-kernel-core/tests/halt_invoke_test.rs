@@ -315,17 +315,16 @@ fn kernel_resolver_accepted_halt_emits_task_orphaned_and_marks_terminated() {
     let frames = tl.query_frames(filter).unwrap();
     let orphan_frames: Vec<_> = frames
         .iter()
-        .filter(|f| {
-            f.kind == maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete
-                && std::str::from_utf8(&f.payload_redacted)
-                    .map(|s| s.contains("orphaned: accepted_halt"))
-                    .unwrap_or(false)
+        .filter(|frame| {
+            frame.kind == maos_kernel_core::iac::transparency_log::FrameKind::TaskComplete
+                && frame.intent == "task.orphaned"
         })
         .collect();
-    assert!(
-        !orphan_frames.is_empty(),
-        "TL should have task.orphaned TaskComplete row"
-    );
+    assert_eq!(orphan_frames.len(), 1);
+    let orphan: serde_json::Value =
+        serde_json::from_slice(&orphan_frames[0].payload_redacted).unwrap();
+    assert_eq!(orphan["halt_id"], "halt-ah");
+    assert_eq!(orphan["disposition"], "accepted_halt");
 }
 
 #[test]

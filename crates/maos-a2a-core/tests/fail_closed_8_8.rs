@@ -299,51 +299,292 @@ async fn nack_round_trips_to_consent_unclassified_at_peer() {
     }
 }
 
-// ── (h) map_a2a_error_to_iac_bus: ConsentUnclassified / ConsentUnclassifiedAtPeer
-// both map to CrossHostRouteFailure ─────────────────────────────────────────────
+// ── (h) map_a2a_error_to_iac_bus preserves local/peer reason types ───────────
 
 #[test]
 fn map_a2a_error_to_iac_bus_consent_unclassified() {
-    // Send-side unclassified → CrossHostRouteFailure.
-    let err = A2AError::ConsentUnclassified {
-        direction: IntentDirection::Send,
-        reason: UnclassifiedReason::Absent,
-    };
-    let bus = map_a2a_error_to_iac_bus(err, "peer-a");
-    match bus {
-        IacBusError::CrossHostRouteFailure(msg) => {
-            assert!(
-                msg.contains("absent"),
-                "message must carry the reason: {msg}"
-            );
-            assert!(
-                msg.contains("Send"),
-                "message must carry the direction: {msg}"
-            );
-            assert!(msg.contains("peer-a"), "message must carry the peer: {msg}");
-        }
-        other => panic!("expected CrossHostRouteFailure, got {other:?}"),
-    }
+    let local = map_a2a_error_to_iac_bus(
+        A2AError::ConsentUnclassified {
+            direction: IntentDirection::Send,
+            reason: UnclassifiedReason::Absent,
+        },
+        "peer-a",
+    );
+    assert!(matches!(
+        local,
+        IacBusError::CrossHostConsentUnclassified {
+            peer,
+            reason: maos_domain::iac_bus_types::CrossHostUnclassifiedReason::Absent,
+        } if peer == "peer-a"
+    ));
 
-    // Receiver-side mirror: ConsentUnclassifiedAtPeer.
-    let err = A2AError::ConsentUnclassifiedAtPeer {
-        peer: "test".to_string(),
-        reason: UnclassifiedReason::NonCanonical,
-    };
-    let bus = map_a2a_error_to_iac_bus(err, "caller");
-    match bus {
-        IacBusError::CrossHostRouteFailure(msg) => {
-            assert!(
-                msg.contains("non_canonical"),
-                "message must carry the reason: {msg}"
-            );
-            assert!(
-                msg.contains("test"),
-                "message must carry the denied peer: {msg}"
-            );
-        }
-        other => panic!("expected CrossHostRouteFailure, got {other:?}"),
+    let remote = map_a2a_error_to_iac_bus(
+        A2AError::ConsentUnclassifiedAtPeer {
+            peer: "test".to_string(),
+            reason: UnclassifiedReason::NonCanonical,
+        },
+        "caller",
+    );
+    assert!(matches!(
+        remote,
+        IacBusError::CrossHostConsentUnclassifiedAtPeer {
+            peer,
+            reason: maos_domain::iac_bus_types::CrossHostUnclassifiedReason::NonCanonical,
+        } if peer == "test"
+    ));
+}
+
+// ── (h2) every remaining typed deny arm maps to its OWN typed mirror ────────
+// Review 2026-09-17 / AC8: the deprecated collapse variant
+// `IacBusError::CrossHostRouteFailure(_)` must never be produced. Each typed
+// `A2AError` deny keeps a distinct `IacBusError` sub-variant so a caller can
+// tell a pin mismatch from a partition timeout without string matching.
+#[test]
+fn every_typed_deny_arm_maps_without_collapse() {
+    use maos_a2a_core::consent::AllowlistDirection;
+    use maos_a2a_core::{EIntentDenied, EPinMismatch};
+
+    // (label, denied error, the typed mirror the mapping MUST yield)
+    let cases: Vec<(&'static str, A2AError, Box<dyn Fn(IacBusError) -> bool>)> = vec![
+        (
+            "IntentDenied → CrossHostIntentDenied",
+            A2AError::IntentDenied {
+                direction: IntentDirection::Send,
+                inner: EIntentDenied {
+                    peer: "host-b".into(),
+                    intent: FINE.into(),
+                    direction: AllowlistDirection::Send,
+                },
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostIntentDenied {
+                        peer,
+                        intent,
+                        direction: maos_domain::iac_bus_types::CrossHostIntentDirection::Send,
+                    } if peer == "peer-a" && intent == FINE
+                )
+            }),
+        ),
+        (
+            "IntentDeniedAtPeer → CrossHostIntentDeniedAtPeer",
+            A2AError::IntentDeniedAtPeer {
+                peer: "test".into(),
+                message: "not allowlisted".into(),
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostIntentDeniedAtPeer { peer, message }
+                        if peer == "test" && message == "not allowlisted"
+                )
+            }),
+        ),
+        (
+            "PinMismatch → CrossHostPinMismatch",
+            A2AError::PinMismatch(EPinMismatch::Mismatch {
+                peer: "host-b".into(),
+                pinned: "aa".into(),
+                observed: "bb".into(),
+            }),
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostPinMismatch { peer, detail }
+                        if peer == "peer-a" && detail.contains("observed bb")
+                )
+            }),
+        ),
+        (
+            "PinInvalidated → CrossHostPinMismatch (typed re-pin detail)",
+            A2AError::PinInvalidated {
+                peer: "host-c".into(),
+                awaiting_repin: true,
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostPinMismatch { peer, detail }
+                        if peer == "host-c" && detail.contains("re-pin")
+                )
+            }),
+        ),
+        (
+            "ConsentExpired → CrossHostConsentExpired",
+            A2AError::ConsentExpired {
+                expired_at_ns: 100,
+                now_ns: 200,
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostConsentExpired {
+                        peer,
+                        expired_at_ns,
+                        now_ns,
+                    } if peer == "peer-a" && expired_at_ns == 100 && now_ns == 200
+                )
+            }),
+        ),
+        (
+            "PartitionTimeout → CrossHostPartitionTimeout",
+            A2AError::PartitionTimeout {
+                peer: "host-d".into(),
+                frame_id: [7; 16],
+                timeout_secs: 30,
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostPartitionTimeout {
+                        peer,
+                        frame_id,
+                        timeout_secs,
+                    } if peer == "host-d" && frame_id == [7; 16] && timeout_secs == 30
+                )
+            }),
+        ),
+        (
+            "PeerInternalFailure → CrossHostPeerInternalFailure",
+            A2AError::PeerInternalFailure {
+                peer: "host-e".into(),
+                message: "disk on fire".into(),
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostPeerInternalFailure { peer, message }
+                        if peer == "host-e" && message == "disk on fire"
+                )
+            }),
+        ),
+        (
+            "PeerIntakeTimeout → CrossHostPeerIntakeTimeout",
+            A2AError::PeerIntakeTimeout {
+                peer: "host-f".into(),
+                message: "slow intake".into(),
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostPeerIntakeTimeout { peer, message }
+                        if peer == "host-f" && message == "slow intake"
+                )
+            }),
+        ),
+        (
+            "TransportFailed → CrossHostTransportFailure",
+            A2AError::TransportFailed("socket closed".into()),
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostTransportFailure { peer, detail }
+                        if peer == "peer-a" && detail == "socket closed"
+                )
+            }),
+        ),
+        (
+            "ConfigInvalid → CrossHostConfigInvalid",
+            A2AError::ConfigInvalid("timeout out of range".into()),
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostConfigInvalid { detail }
+                        if detail == "timeout out of range"
+                )
+            }),
+        ),
+        (
+            "SpiritRestartDetected → CrossHostSpiritRestartDetected",
+            A2AError::SpiritRestartDetected {
+                peer: "host-g".into(),
+                prior_boot_nonce: 11,
+                observed_boot_nonce: 12,
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostSpiritRestartDetected {
+                        peer,
+                        prior_boot_nonce: 11,
+                        observed_boot_nonce: 12,
+                    } if peer == "host-g"
+                )
+            }),
+        ),
+        (
+            "PeerIdentityMismatch → CrossHostPeerIdentityMismatch",
+            A2AError::PeerIdentityMismatch {
+                expected: "tls-peer".into(),
+                asserted: "frame-from".into(),
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostPeerIdentityMismatch { expected, asserted }
+                        if expected == "tls-peer" && asserted == "frame-from"
+                )
+            }),
+        ),
+        (
+            "ConsentGranterMismatch → CrossHostConsentGranterMismatch",
+            A2AError::ConsentGranterMismatch {
+                granter: "host-x".into(),
+                frame_from: "host-y".into(),
+            },
+            Box::new(|e: IacBusError| {
+                matches!(
+                    e,
+                    IacBusError::CrossHostConsentGranterMismatch { granter, frame_from }
+                        if granter == "host-x" && frame_from == "host-y"
+                )
+            }),
+        ),
+    ];
+    for (label, err, is_typed_mirror) in cases {
+        let mapped = map_a2a_error_to_iac_bus(err, "peer-a");
+        assert!(
+            !matches!(mapped, IacBusError::CrossHostRouteFailure(_)),
+            "{label} collapsed into the deprecated CrossHostRouteFailure carrier"
+        );
+        assert!(
+            is_typed_mirror(mapped),
+            "{label} did not map to its typed IacBusError sub-variant"
+        );
     }
+}
+
+// ── (h3) the dead Accept arm is PINNED, not retired ─────────────────────────
+// Review 2026-09-17: production never constructs `IntentDenied` with
+// `direction: Accept` (the receiver answers with a typed NACK and the sender
+// re-materializes `…AtPeer` errors), but the mirror enum keeps `Accept` for
+// wire symmetry. `cross_host_direction` is private, so the pin goes through
+// the public `map_a2a_error_to_iac_bus`.
+#[test]
+fn accept_direction_maps_and_is_send_only_in_production() {
+    use maos_a2a_core::consent::AllowlistDirection;
+    use maos_a2a_core::EIntentDenied;
+
+    let mapped = map_a2a_error_to_iac_bus(
+        A2AError::IntentDenied {
+            direction: IntentDirection::Accept,
+            inner: EIntentDenied {
+                peer: "host-b".into(),
+                intent: FINE.into(),
+                direction: AllowlistDirection::Accept,
+            },
+        },
+        "peer-a",
+    );
+    assert!(matches!(
+        mapped,
+        IacBusError::CrossHostIntentDenied {
+            peer,
+            intent,
+            direction: maos_domain::iac_bus_types::CrossHostIntentDirection::Accept,
+        } if peer == "peer-a" && intent == FINE
+    ));
 }
 
 // ── (i) interpret_response malformed NACK falls back to Absent ────────────────

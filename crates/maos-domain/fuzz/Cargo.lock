@@ -239,7 +239,7 @@ dependencies = [
 
 [[package]]
 name = "maos-domain"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "async-trait",
  "ed25519-dalek",
@@ -248,6 +248,7 @@ dependencies = [
  "maos-spirit-abi",
  "serde",
  "serde_json",
+ "sha2",
  "smallvec",
  "thiserror",
 ]
@@ -264,7 +265,7 @@ dependencies = [
 
 [[package]]
 name = "maos-spirit-abi"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 dependencies = [
  "serde",
 ]

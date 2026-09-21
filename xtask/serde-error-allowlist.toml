@@ -694,7 +694,7 @@ location = "crates/maos-kernel-core/src/revocation/parser.rs:138"
 location = "crates/maos-kernel-core/src/revocation/parser.rs:146"
 
 [[allow]]
-location = "crates/maos-kernel-core/src/supervision/crash_detector.rs:168"
+location = "crates/maos-kernel-core/src/supervision/crash_detector.rs:167"  # E16-A1 sibling, 2026-09-20: pin re-derived, Epic 16 shifted this frozen site by one line; the code is unchanged
 
 [[allow]]
 location = "crates/maos-kernel-core/src/supervision/progress_watchdog.rs:128"

@@ -1,5 +1,16 @@
 #![forbid(unsafe_code)]
 
+/// Story 16-6 — the ONE `load → admit → start` admission path, shared by
+/// `maos run`'s standalone and topology arms and by the operator door's
+/// `load` verb. In the library, not `main.rs`, because the door's port lives
+/// here and because `crates/maos-bin/tests/` must drive the real gates rather
+/// than a re-implementation of them.
+#[cfg(feature = "network")]
+pub mod admission;
+/// Story 15-6 — provider-level cassette replay/record adapters shared by every
+/// inference consumer.
+#[cfg(feature = "network")]
+pub mod cassette_replay;
 /// Story 14-2a — the production peer-certificate rotation trigger's wiring: the
 /// real `T_grace` deadline and the operator read seam. In the library, not
 /// `main.rs`, so the runtime gate leg can drive the production types.
@@ -25,6 +36,31 @@ pub mod enterprise_identity;
 /// reads it by `include_str!`.
 #[cfg(feature = "network")]
 pub mod enterprise_pdp_runtime;
+/// Story 15-6 — the one authoritative live/record/replay selector. Public so
+/// integration tests execute the production lattice; an in-`src` test module
+/// would be budget-charged and CI-invisible.
+pub mod inference_mode;
+/// Story 16-1 (D-16-1-N) — the operator door's port implementation over the
+/// daemon's real kernel objects, plus the store lock set (D-16-1-D). In the
+/// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL
+/// port — a binary-crate `mod` would force its proofs inline, which kloc
+/// charges and CI cannot run.
+pub mod operator_door;
+/// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
+pub mod purge;
+pub mod shell_host;
+/// Story 16-3 — Worker supervision (the Worker's SCB, its exit observer, its
+/// progress stamp and its task record) and root shutdown (`unload_all_loaded`,
+/// the one unload function every `maos run` root leaves through).
+///
+/// UNGATED, like `shell_host`, because the root-shutdown half must reach every
+/// root including the no-default-features build; the Worker half inside is
+/// `#[cfg(feature = "network")]` exactly like `worker_spawn`. In the library,
+/// not `main.rs`, for the same reason as every module above: the corpora and
+/// `tests/worker_supervision_16_3.rs` must NAME `WorkerSupervisor`,
+/// `BindingPhase` and the port, and drive the real supervisor rather than a
+/// re-implementation of it.
+pub mod supervision;
 #[cfg(feature = "network")]
 pub mod tenant_map;
 /// The Worker-CLI **adapter** seam (J1 Tier-2 bridge). In the library, not

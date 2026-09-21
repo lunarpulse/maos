@@ -42,12 +42,14 @@ fn fixture() -> Fixture {
     let tmp = tempfile::TempDir::new().expect("revocation tempdir");
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xAC71));
     let telemetry = Arc::new(IacRtMetrics::new());
+    let (audit_tx, mut audit_rx) = cap_audit::channel();
+    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(RingCryptoProvider),
         Ed25519SigningKey::new([0u8; 32]),
         0xAC71,
         Arc::new(PolicyTable::new()),
-        cap_audit::channel().0,
+        audit_tx,
         CapQuotaTracker::new(),
         Arc::new(WorkingMemoryStore::new()),
         Arc::new(TelemetryStreamAdapter::default()),
@@ -225,7 +227,15 @@ async fn applier_executes_terminate_drain_and_quarantine_actions() {
     // the paused clock.
     tokio::task::yield_now().await;
     tokio::time::advance(Duration::from_millis(10_001)).await;
-    for _ in 0..4 {
+    for _ in 0..100 {
+        let both_unloaded = {
+            let scbs = fixture.scheduler.scbs();
+            let map = scbs.read().expect("spirits lock poisoned");
+            !map.contains_key(&pids[1]) && !map.contains_key(&pids[2])
+        };
+        if both_unloaded {
+            break;
+        }
         tokio::task::yield_now().await;
     }
     {

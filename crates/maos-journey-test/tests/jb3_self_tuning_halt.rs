@@ -8,6 +8,9 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
 }
@@ -47,6 +50,13 @@ fn maos_cmd() -> Command {
             c
         }
     };
+    let mut cmd = cmd;
+    // 15-6 §A6 review P1: cassette-free child; never inherit a job-level
+    // MAOS_INFERENCE_MODE (nightly rerecord leg).
+    cmd.env_remove("MAOS_INFERENCE_MODE");
+    // Story 16-1 / D-16-1-Q: empty scratch "HOME" — no $HOME/.maos/control.json
+    // for this root to inherit and collide on.
+    cmd.env("HOME", doorless_home::doorless_home());
     cmd
 }
 

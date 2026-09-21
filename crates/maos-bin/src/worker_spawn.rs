@@ -53,10 +53,6 @@ pub fn parse_run_args<I: IntoIterator<Item = String>>(args: I) -> Result<Option<
         match a.as_str() {
             "--live" => live = true,
             "--once" => once = true,
-            // `--replay-llm` is the explicit hermetic flag JB-3's PTY command
-            // uses; it is the DEFAULT (no `--live`) and accepted as a no-op so
-            // the documented command string stays stable.
-            "--replay-llm" => live = false,
             other if !other.starts_with("--") && manifest_path.is_none() => {
                 manifest_path = Some(other.to_string());
             }
@@ -379,6 +375,25 @@ pub fn issue_enterprise_governed_capability(
 ///
 /// Returns the adapter-parsed completion label so the caller can journal it as a
 /// real `FrameKind::TaskComplete` frame (AC3.10).
+///
+/// # Story 16-3 — the Worker is SUPERVISED (D-16-3-C, D-16-3-D)
+///
+/// `supervision` is the port ([`crate::supervision::WorkerSupervision`]); `task`
+/// says WHERE this run came from so `bind` can derive the in-flight task
+/// record without inventing a task id. Between them the Worker gets a real SCB
+/// at a real pid: every row this function writes moves off pid 0, a SIGKILL
+/// reaches `handle_crash` through the exit observer instead of waiting for the
+/// last pipe holder, and a stopped or crashed Worker's task is dispositioned.
+///
+/// This function STAYS SYNC (19-3 AC3 relies on it): the port does the
+/// `block_on`ing, which is why paths (a)/(b) call it inside
+/// `tokio::task::block_in_place` and path (c) already runs inside
+/// `spawn_blocking`.
+///
+/// **Every return between `bind` and `finish` is covered by the guard's
+/// `Drop`** — it signals the child, dispositions the record and unloads the
+/// SCB. That is structural, not a convention: a `?` added here later cannot
+/// leak a bound Worker.
 #[cfg(feature = "network")]
 #[allow(clippy::too_many_arguments)]
 pub fn run_cli_wrapper_manifest(
@@ -391,6 +406,8 @@ pub fn run_cli_wrapper_manifest(
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
     delegated_task: Option<&str>,
     remote_requested: bool,
+    supervision: &dyn crate::supervision::WorkerSupervision,
+    task: crate::supervision::WorkerTask,
 ) -> Result<worker_cli::WorkerCompletion, Box<dyn std::error::Error>> {
     use maos_domain::host_grant::HostGrantAllowlist;
     use maos_domain::invariants::i9::SandboxTier;
@@ -409,6 +426,39 @@ pub fn run_cli_wrapper_manifest(
     .map_err(|e| format!("maos run: serialize [cli_wrapper]: {e}"))?;
     let mut config = CliWrapperConfig::from_toml_str(&cw_toml)
         .map_err(|e| format!("maos run: [cli_wrapper] parse: {e}"))?;
+
+    // 1b. Story 16-3 (D-16-3-D) — `[on_crash]` (FR50) and `[supervision]`
+    //     (the ProgressWatchdog's threshold) are parsed HERE, at pid 0, with
+    //     every other admission gate and BEFORE any load: a malformed or
+    //     out-of-bounds section REFUSES the run rather than being clamped to a
+    //     default. The kernel's own loader (`lifecycle/upgrade.rs`) is
+    //     `pub(crate)`, so this repeats its extract-then-parse shape rather
+    //     than calling it.
+    //
+    //     Absent sections are not an error: `None` means the kernel's
+    //     documented defaults (`Nack`, 30 000 ms — the NFR's ">30s").
+    let on_crash_section = match manifest_root.get("on_crash") {
+        Some(value) => {
+            let text = toml::to_string(value)
+                .map_err(|e| format!("maos run: serialize [on_crash]: {e}"))?;
+            Some(
+                maos_kernel_core::security::manifest::OnCrashSection::from_toml_str(&text)
+                    .map_err(|e| format!("maos run: [on_crash] parse: {e}"))?,
+            )
+        }
+        None => None,
+    };
+    let supervision_section = match manifest_root.get("supervision") {
+        Some(value) => {
+            let text = toml::to_string(value)
+                .map_err(|e| format!("maos run: serialize [supervision]: {e}"))?;
+            Some(
+                maos_kernel_core::security::manifest::SupervisionSection::from_toml_str(&text)
+                    .map_err(|e| format!("maos run: [supervision] parse: {e}"))?,
+            )
+        }
+        None => None,
+    };
 
     // 2. Requested sandbox tier (defaults to the T3 CliWrapper floor).
     let requested_tier = match manifest_root
@@ -634,11 +684,28 @@ pub fn run_cli_wrapper_manifest(
     worker_cli::refuse_unsafe_argv(worker_cli.as_ref(), &config.argv_prefix)
         .map_err(|e| format!("maos run: {e}"))?;
     let aph = argv_prefix_hash(&config.argv_prefix);
+
+    // 7a. Story 16-3 (D-16-3-D) — BIND. Every gate above ran at pid 0 and is
+    //     unchanged: a refused manifest must never leave `lifecycle.load` rows
+    //     behind. From here on the Worker HAS an SCB, and the guard's `Drop`
+    //     owns every exit path.
+    let bundle = maos_kernel_core::scheduler::control_block::SpiritManifestBundle {
+        on_crash: on_crash_section,
+        supervision: supervision_section,
+        ..Default::default()
+    };
+    let binding = supervision.bind(&task, bundle).map_err(|e| e.to_string())?;
+    let spirit_pid = binding.spirit_pid();
+    let worker_spirit_id = binding.spirit_id().to_string();
+
+    // 7b. The mint moves to the REAL pid. Its revoke row, its
+    //     `identity.asserted` row under an enterprise posture, and the token
+    //     the in-flight record carries all belong to the Worker, not to pid 0.
     let token_id = match issue_enterprise_governed_capability(
         capability.as_ref(),
         enterprise_runtime.as_deref(),
         enterprise_pdp_runtime,
-        0,
+        spirit_pid,
         Scope::CliSubprocessSpawn {
             cli_binary_path: resolved.clone(),
             argv_prefix_hash: aph,
@@ -664,6 +731,10 @@ pub fn run_cli_wrapper_manifest(
             // BOTH paths: the AC5 host grant is the ratified stronger authority
             // there (Epic 9 surface), and hermetic deployments legitimately run
             // without a policy table.
+            //
+            // Story 16-3: this refusal is now AFTER `bind`, so it leaves
+            // through the guard — `lifecycle.unload`, a PlannedUnload receipt
+            // and the stop disposition, never a bound Worker with no process.
             if remote_requested {
                 match &e {
                     GovernedMintError::SsoAssertionMissing(_) | GovernedMintError::PdpDenied(_) => {
@@ -685,6 +756,28 @@ pub fn run_cli_wrapper_manifest(
             None
         }
     };
+    // The record was pushed at bind with a zero token and no deadline; patch it
+    // now that the real one exists. A refused mediation leaves `TokenId([0;16])`
+    // — stated as "no kernel token", never an invented one.
+    if let Some(tid) = token_id {
+        let ttl_deadline_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
+            .saturating_add(300u64.saturating_mul(1_000_000_000));
+        supervision.bind_token(binding.core(), tid, ttl_deadline_ns);
+    }
+
+    // 7c. A stop that landed DURING the mint must not spawn a child. The phase
+    //     and the supervisor-wide latch are read here (lock → decide → release,
+    //     inside the port), and a refusal leaves through the guard.
+    supervision.after_mint();
+    if supervision.is_stopping()
+        || binding.core().phase() != crate::supervision::BindingPhase::Running
+    {
+        return Err(
+            crate::supervision::WorkerSupervisionError::StoppedBeforeSpawn
+                .to_string()
+                .into(),
+        );
+    }
 
     // 8. Spawn the REAL bridge. The typed task is routed as the trailing argv
     //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
@@ -707,33 +800,62 @@ pub fn run_cli_wrapper_manifest(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let mut bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
-    let child_pid = bridge.child_pid();
+    let bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
+    // Story 16-3 (D-16-3-Q (6)) — guard FIRST. `SpawnedBridge::drop` kills and
+    // reaps the child, and struct fields drop in declaration order, so two
+    // separate locals would let the bridge kill the child before the guard
+    // acted: the guard's signal would prove nothing, and the bridge's SIGKILL
+    // landing in `Running` could race the observer into a spurious crash path.
+    let mut live = crate::supervision::LiveWorker { binding, bridge };
+    let child_pid = live.bridge.child_pid();
     println!(
         "{}",
         serde_json::json!({
             "event": "cli_wrapper_loaded",
-            "spirit_id": "worker",
+            "spirit_id": worker_spirit_id,
+            "spirit_pid": spirit_pid,
             "granted_tier": format!("{granted_tier:?}"),
             "child_pid": child_pid,
             "live": run.live,
         })
     );
 
-    let pump = bridge.pump_to_journal(
+    // 8b. The exit observer — on THIS thread, BEFORE the pump. After the pump
+    //     starts, the only signal available is EOF on both streams, which the
+    //     last pipe holder controls, not the death.
+    supervision.watch(live.binding.core(), child_pid);
+    // AC3's injected-`?` point, pinned HERE: after the child handle is stored
+    // and the observer is running, before the pump. A `?` at this position is
+    // the honest test of the RAII guard — the guard must signal the live child,
+    // disposition the record and unload the SCB with no explicit `abandon` call
+    // anywhere on this path.
+    supervision.error_after_watch()?;
+
+    let pump = live.bridge.pump_to_journal(
         &transparency_log,
-        0,
+        spirit_pid,
         "kernel",
         &config.command,
         &["cli-wrapper-run".to_string()],
     );
 
     let cap_for_revoke = Arc::clone(&capability);
-    let exit = bridge.wait_and_finalize(&transparency_log, 0, move |exit_code| {
-        if let Some(tid) = token_id {
-            let _ = cap_for_revoke.revoke_cli_subprocess_exit(tid, 0, exit_code);
-        }
-    });
+    // D-16-1-V — the revoke closure stays UNCONDITIONAL, at the Worker's real
+    // pid: its `CliSubprocessExit` row is kept even when an unload already
+    // revoked. The closure is `FnOnce` and is called exactly once.
+    let exit = live
+        .bridge
+        .wait_and_finalize(&transparency_log, spirit_pid, move |exit_code| {
+            if let Some(tid) = token_id {
+                let _ = cap_for_revoke.revoke_cli_subprocess_exit(tid, spirit_pid, exit_code);
+            }
+        });
+
+    // 8c. FINISH — the guard's terminal act, immediately after the exit cause
+    //     is known. On Linux the observer usually got there first and this
+    //     joins its handler; when it lost the reap race (`ECHILD`, measured
+    //     106/200 on fast exits) this IS the crash path.
+    live.binding.finish(&exit.cause);
 
     println!(
         "{}",
@@ -776,16 +898,18 @@ pub fn run_cli_wrapper_manifest(
     // delete the evidence pointer at exactly the moment someone asks what the
     // worker actually printed.
     let mut last_stdout_tl_ref: Option<[u8; 16]> = None;
+    // Story 16-3 — the read-back filters on the Worker's OWN pid. Every Worker
+    // of a root shares `from_spirit_id == "worker"` (the bridge's sender
+    // identity), so with two concurrent Workers the old sender filter mixed
+    // their output and each verdict was computed partly from the other's rows.
     match transparency_log.query_frames(FrameFilter {
         kind: Some(FrameKind::CliSubprocessOutput),
+        spirit_pid: Some(spirit_pid),
         since_ns: Some(worker_run_since_ns),
         ..Default::default()
     }) {
         Ok(rows) => {
             for row in &rows {
-                if row.from_spirit_id != "worker" {
-                    continue;
-                }
                 let Ok(v) = serde_json::from_slice::<serde_json::Value>(&row.payload_redacted)
                 else {
                     continue;
@@ -851,9 +975,13 @@ pub fn run_cli_wrapper_manifest(
     //     one and keeps its halt-on-duplicate semantics.
     //   * UNCONDITIONAL, exactly like `last_stdout_tl_ref`: the run you most need
     //     the verdict for is the one that FAILED.
+    //   * Story 16-3: at the Worker's REAL pid, so `maos audit query --spirit
+    //     worker` resolves it and the verdict sits in the same pid's row set as
+    //     the output it judges.
     let verdict_payload = serde_json::json!({
         "event": "worker_completion_verdict",
         "worker_cli": worker_cli.name(),
+        "spirit_id": worker_spirit_id,
         "verdict": completion.label(),
         "completed": completion.is_completed(),
         "last_stdout_tl_ref_is_not_a_completion_witness": true,
@@ -862,7 +990,7 @@ pub fn run_cli_wrapper_manifest(
     });
     let _logged = transparency_log.insert_frame_event(
         FrameKind::TelemetryEvent,
-        0,
+        spirit_pid,
         None,
         "worker.completion-verdict",
         verdict_payload.to_string().as_bytes(),

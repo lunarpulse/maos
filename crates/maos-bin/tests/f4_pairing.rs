@@ -38,6 +38,9 @@ use ed25519_dalek::SigningKey;
 use maos_a2a_core::PeerCertFingerprint;
 use maos_bin::delegation;
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 const LISTEN_TIMEOUT: Duration = Duration::from_secs(90);
 const LISTENING_MARKER: &str = "cohort-a2a-daemon listening on ";
 const NONCE_A: u64 = 0x2B_A;
@@ -316,6 +319,13 @@ fn host_b_config(fixture: &Fixture, pinned_nonce_for_a: u64, listen_addr: &str) 
 fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
+        // Story 16-1 / D-16-1-Q — an EMPTY scratch HOME, so this root finds no
+        // `<home>/control.json`, configures no operator door, and cannot
+        // collide with the second root below (or with the developer's own) on
+        // one endpoint. `HOME` and NOT `MAOS_HOME`: `MAOS_HOME` would redirect
+        // host A's whole Transparency Log away from `MAOS_AUDIT_DB`, which is
+        // the sink every assertion in this file reads.
+        .env("HOME", doorless_home::doorless_home())
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
         .env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
         .env("MAOS_COHORT_DAEMON_CONFIG", config)
@@ -441,6 +451,7 @@ fn run_host_a_once(
 ) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
+        .env("HOME", doorless_home::doorless_home())
         .args([
             "run",
             "spirits/topologies/j1-founder-loop-crosshost.toml",
@@ -478,6 +489,7 @@ fn spawn_host_a_streaming(
 ) -> (RunningChild, CapturedPipes) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
+        .env("HOME", doorless_home::doorless_home())
         .args([
             "run",
             "spirits/topologies/j1-founder-loop-crosshost.toml",

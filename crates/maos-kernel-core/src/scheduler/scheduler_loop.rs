@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
-use maos_domain::lifecycle::{LifecycleError, SpiritLifecycleState};
+use maos_domain::lifecycle::LifecycleError;
 use maos_domain::ports::scheduler::SpiritSchedulerPort;
 
 use crate::halt::terminate_spirit;
@@ -88,6 +88,9 @@ pub struct SpiritSchedulerAdapter {
     security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
     orchestrator_registry: Option<Arc<crate::orchestrator::OrchestratorBufferRegistry>>,
     crash_detector: Option<Arc<crate::supervision::CrashDetector>>,
+    /// Resolver used to route FR50 disposition after an unload-hook failure;
+    /// late-bound at the composition root with CrashDetector.
+    replica: Option<Arc<dyn maos_domain::supervision::ReplicaResolver>>,
     /// Shared validated CRL rules. When configured by the revocation
     /// composition root, admission and CRL application serialize on its gate.
     revocation_rules: Arc<RwLock<Option<Arc<crate::revocation::rules::ValidatedRevocationRules>>>>,
@@ -141,6 +144,7 @@ impl SpiritSchedulerAdapter {
             security_manager,
             orchestrator_registry,
             crash_detector,
+            replica: None,
             revocation_rules: Arc::new(RwLock::new(None)),
         }
     }
@@ -156,6 +160,15 @@ impl SpiritSchedulerAdapter {
     /// Story 5.3 — late-bind the CrashDetector after composition-root construction.
     pub fn set_crash_detector(&mut self, cd: Arc<crate::supervision::CrashDetector>) {
         self.crash_detector = Some(cd);
+    }
+
+    /// Story 16-6 — late-bind the resolver used by unload-hook disposition.
+    /// Keeps constructor call sites stable alongside `set_crash_detector`.
+    pub fn set_replica_resolver(
+        &mut self,
+        replica: Option<Arc<dyn maos_domain::supervision::ReplicaResolver>>,
+    ) {
+        self.replica = replica;
     }
 
     /// Shared dispatcher for the IdleWatchdog.
@@ -240,11 +253,35 @@ impl SpiritSchedulerAdapter {
     }
 
     /// Load a Spirit: create SCB, insert into map, fire on_load.
+    ///
+    /// Monomorphising wrapper over [`Self::load_obj`]. Behaviour is
+    /// unchanged for every existing caller.
     pub async fn load<T: Spirit + Send + Sync + 'static>(
         &self,
         spirit_id: &str,
         manifest: SpiritManifestBundle,
         spirit: T,
+        boot_nonce: u64,
+    ) -> Result<u32, LifecycleError> {
+        self.load_obj(spirit_id, manifest, make_spirit_obj(spirit), boot_nonce)
+            .await
+    }
+
+    /// Story 16-6 — the type-erased load primitive.
+    ///
+    /// `load` is generic over a compile-time `T: Spirit`, so a caller that
+    /// has already performed class dispatch (and therefore holds an
+    /// `Arc<dyn AnySpiritObj>`, the shape `SuccessorSpiritFactory` and the
+    /// hot-swap coordinator already speak) could not reach it without a
+    /// second, per-class copy of the whole admission triple. This entry point
+    /// is what lets `maos-bin` hold ONE extracted `load → admit → start`
+    /// function shared by `maos run`'s two file-manifest arms and the
+    /// operator door.
+    pub async fn load_obj(
+        &self,
+        spirit_id: &str,
+        manifest: SpiritManifestBundle,
+        spirit_obj: Arc<dyn crate::scheduler::control_block::AnySpiritObj>,
         boot_nonce: u64,
     ) -> Result<u32, LifecycleError> {
         let revocation_rules = self
@@ -274,7 +311,7 @@ impl SpiritSchedulerAdapter {
         let pid = allocate_pid();
 
         // Story 1b.3 — admit the Spirit through the security manager.
-        if let Some(ref security) = self.security_manager {
+        if let Some(security) = &self.security_manager {
             use crate::security::{
                 CapabilitiesRequired, McpCapabilities, Posture, PostureSection,
                 ProviderCapabilities, ResourceCaps, SandboxConfig,
@@ -334,7 +371,6 @@ impl SpiritSchedulerAdapter {
                 FrameOrigin::SpiritAuto,
             );
         }
-        let spirit_obj = make_spirit_obj(spirit);
         let scb = Arc::new(SpiritControlBlock::new(
             pid,
             spirit_id.into(),
@@ -469,6 +505,23 @@ impl SpiritSchedulerAdapter {
     }
 
     /// AC1 verb: unload a Spirit (idempotent).
+    ///
+    /// Story 16-6 (AC2(g), mechanism (x)) — the receipt, the token
+    /// revocation, the halt drain and the map removal run **before** the
+    /// fallible `on_unload` dispatch, not after it.
+    ///
+    /// Why: the state already flipped to `Unloaded` above, so a hook failure
+    /// used to abort all five cleanup steps while leaving the SCB in the map
+    /// with no `term-…` receipt and its capability tokens live — and the
+    /// operator's retry then hit the idempotent early return and answered
+    /// `Ok(())`, writing no receipt either. A Spirit the kernel has already
+    /// released is released whatever its hook does.
+    ///
+    /// The `PlannedUnload` receipt attests the kernel's release (§18a, ruled
+    /// (A)), not the death of an OS child. In-process classes have no child;
+    /// the subprocess Worker's child is signalled by its post-release
+    /// `on_unload` hook. A failing Worker hook leaves that child to
+    /// supervision as the documented residual.
     pub async fn unload(&self, spirit_pid: u32) -> Result<(), LifecycleError> {
         let scb = match self.get_scb_optional(spirit_pid) {
             Some(scb) => scb,
@@ -498,9 +551,7 @@ impl SpiritSchedulerAdapter {
             FrameOrigin::SpiritAuto,
         );
 
-        let outcome = self.dispatcher.fire_on_unload(&scb).await;
-        self.check_hook_outcome("on_unload", spirit_pid, outcome)?;
-
+        // Story 16-6 — UNCONDITIONAL cleanup, ahead of the hook.
         // Story 5.3 — produce halt-receipts for planned unload (NFR-Rel-11)
         let _receipts = terminate_spirit(
             &self.tl,
@@ -510,14 +561,24 @@ impl SpiritSchedulerAdapter {
             TerminationKind::PlannedUnload,
             scb.boot_nonce,
         );
-
-        let _ = self.capability.revoke_all_for_pid(spirit_pid);
+        self.capability.revoke_all_for_pid(spirit_pid);
         // Story 5.3 — per-PID drain (closes Story 4.1 deferred §1)
         let _ = self._halt_registry.drain_for_spirit(spirit_pid);
-
         {
             let mut spirits = self.spirits.write().unwrap();
             spirits.remove(&spirit_pid);
+        }
+
+        let outcome = self.dispatcher.fire_on_unload(&scb).await;
+        if let Err(error) = self.check_hook_outcome("on_unload", spirit_pid, outcome) {
+            // Story 16-6 (AC2(g)(ii)) — FR50's disposition and orphan frames
+            // inline. `check_hook_outcome` no longer spawns `handle_crash`
+            // for `on_unload` (it would double-teardown the same pid), and
+            // with the SCB already removed that spawn would in any case have
+            // returned `NotLoaded` into a `let _ =`, silently losing frames
+            // that fire today.
+            self.orphan_in_flight_tasks(&scb, &error);
+            return Err(error);
         }
 
         Ok(())
@@ -573,30 +634,98 @@ impl SpiritSchedulerAdapter {
             HookOutcome::Panicked {
                 panic_payload_preview,
             } => {
-                // Story 5.3 — fire-and-forget crash handler BEFORE propagating error
-                if let Some(ref cd) = self.crash_detector {
-                    let cd_clone = Arc::clone(cd);
-                    let hook_name_clone = hook_name.to_string();
-                    let payload_clone = panic_payload_preview.clone();
-                    let _ = tokio::spawn(async move {
-                        let _ = cd_clone
-                            .handle_crash(
-                                spirit_pid,
-                                maos_domain::supervision::CrashCause::Fault(
-                                    maos_domain::supervision::FaultCause::Panic {
-                                        hook_name: hook_name_clone,
-                                        payload_preview: payload_clone,
-                                    },
-                                ),
-                            )
-                            .await;
-                    });
+                // Story 5.3 — fire-and-forget crash handler BEFORE propagating error.
+                //
+                // Story 16-6 (AC2(g)(i)) — NEVER for `on_unload`. `unload`
+                // now owns the whole teardown (receipt + revoke + drain +
+                // map removal) and `handle_crash` performs the SAME teardown
+                // in parallel. `terminate_spirit` is not idempotent — its
+                // `HaltId` is `term-{spirit_id}-{pid}-{SystemTime::now()}`
+                // with no `boot_nonce` — so two calls mint two ids and four
+                // `EpistemicHalt` frames with mismatched `kind_str`. The
+                // weaker guard "spawn only if the pid is still in the map"
+                // does NOT work: `handle_crash` is also how a cancelled hook
+                // arrives here (`Ok(Err(join_err))` maps cancellation to
+                // `Panicked` too), so this is a hook-identity guard, not a
+                // panic-only one.
+                if hook_name != "on_unload" {
+                    if let Some(cd) = &self.crash_detector {
+                        let cd_clone = Arc::clone(cd);
+                        let hook_name_clone = hook_name.to_string();
+                        let payload_clone = panic_payload_preview.clone();
+                        let _ = tokio::spawn(async move {
+                            let _ = cd_clone
+                                .handle_crash(
+                                    spirit_pid,
+                                    maos_domain::supervision::CrashCause::Fault(
+                                        maos_domain::supervision::FaultCause::Panic {
+                                            hook_name: hook_name_clone,
+                                            payload_preview: payload_clone,
+                                        },
+                                    ),
+                                )
+                                .await;
+                        });
+                    }
                 }
-                Err(LifecycleError::Internal(format!(
-                    "hook {hook_name} panicked: {panic_payload_preview}"
-                )))
+                Err(LifecycleError::HookPanicked {
+                    hook_name: hook_name.to_string(),
+                    preview: panic_payload_preview,
+                })
             }
         }
+    }
+
+    /// Story 16-6 (AC2(g)(ii)) — FR50 disposition and `task.orphaned` frames
+    /// for an `on_unload` that failed after the Spirit was already released.
+    ///
+    /// This is the work `CrashDetector::handle_crash` steps 5 and 6 do. It is
+    /// performed inline because the crash handler is deliberately NOT spawned
+    /// for `on_unload` (see `check_hook_outcome`) and, with the SCB already
+    /// out of the map, would return `NotLoaded` from its Step-1 lookup into a
+    /// discarded `Result` — silently dropping frames that fire today.
+    fn orphan_in_flight_tasks(&self, scb: &Arc<SpiritControlBlock>, error: &LifecycleError) {
+        let drained: Vec<_> = {
+            let mut tasks = scb
+                .task_assignments_in_flight
+                .lock()
+                .expect("task ledger lock poisoned");
+            std::mem::take(&mut *tasks)
+        };
+        if drained.is_empty() {
+            return;
+        }
+        let runtime = scb.runtime_snapshot();
+        for task in &drained {
+            let payload = serde_json::json!({
+                "task_id": task.task_id,
+                "originator_spirit_id": task.originator_spirit_id,
+                "exit_signal": serde_json::Value::Null,
+                "exit_code": serde_json::Value::Null,
+                "stderr_tail": error.to_string(),
+                "cause": "on_unload_hook_failure",
+                "in_flight_tokens": task
+                    .capability_token
+                    .as_ref()
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                "disposition": runtime.on_crash_action.to_string(),
+            });
+            self.tl.insert_frame_event(
+                crate::iac::transparency_log::FrameKind::TaskComplete,
+                scb.pid,
+                None,
+                "task.orphaned",
+                &serde_json::to_vec(&payload).unwrap_or_default(), // xtask-serde-allow: journal payload mirrors crash_detector.rs:167, a frozen site; see 20-3c member (12)
+                FrameOrigin::Kernel,
+            );
+        }
+        let _ = crate::supervision::disposition::enforce_disposition(
+            runtime.on_crash_action.clone(),
+            &drained,
+            &self._iac,
+            self.replica.as_deref(),
+        );
     }
 }
 

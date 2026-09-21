@@ -36,6 +36,8 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
 
 use ed25519_dalek::SigningKey;
 use maos_a2a_core::PeerCertFingerprint;
@@ -256,8 +258,15 @@ fn fixture(tag: &str) -> Fixture {
 
 fn maos_command(fixture: &Fixture) -> Command {
     let workspace_root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    // Story 16-1 (D-16-1-Q) — the daemon is a door ROOT: isolate it from the
+    // developer's home so a real `<home>/control.json` cannot make a second
+    // root here bind (and collide with a live daemon, `EndpointInUse`). HOME,
+    // never MAOS_HOME — the Transparency Log under assertion is routed by
+    // MAOS_AUDIT_DB below and must not move.
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_maos"));
     cmd.current_dir(workspace_root)
+        .env("HOME", doorless_home::doorless_home())
+        .env("XDG_DATA_HOME", doorless_home::doorless_xdg_data_home())
         .env("MAOS_AUDIT_DB", &fixture.audit_db)
         // The daemon runs the full primary root (D24); skip the live LLM probe
         // exactly as `smoke_mira_nash_tcp_8_13.rs` does.
@@ -797,19 +806,36 @@ fn tenant_mode_boots_on_live_substrate() {
 
 #[test]
 fn production_collective_calls_share_one_atomic_pid_binding() {
+    // ⚠ Story 16-6 — the whole test read `../src/main.rs` and had been a
+    // NULL CONTROL since the three `collective_*` methods were relocated to
+    // `cross_team_crossing.rs`: `find("fn collective_write(")` was `None`,
+    // so it panicked on its first iteration and asserted NOTHING about the
+    // shared binding it exists to protect. Measured at HEAD:
+    // `fn collective_write(` occurs 0 times in main.rs and 3 times
+    // (write/read/scan) in cross_team_crossing.rs, and
+    // `CapabilityRegistryPort::record_invocation` is 0 / 3 the same way.
+    //
+    // The invariant genuinely spans TWO files, so each half now reads the
+    // file that owns it: the cap-gated collective calls and their
+    // correlation audits live in `cross_team_crossing.rs`, while the tenant
+    // registration that must reuse the same reloaded pid is in `main.rs`'s
+    // composition root.
+    const COLLECTIVE: &str = include_str!("../src/cross_team_crossing.rs");
     const MAIN: &str = include_str!("../src/main.rs");
     for method in ["write", "read", "scan"] {
         let signature = format!("fn collective_{method}(");
-        let start = MAIN
+        let start = COLLECTIVE
             .find(&signature)
             .unwrap_or_else(|| panic!("missing production {signature}"));
-        let tail = &MAIN[start..];
+        let tail = &COLLECTIVE[start..];
         let end = tail
             .find("\n    }\n")
             .unwrap_or_else(|| panic!("unterminated production {signature}"));
         let body = &tail[..end];
         assert_eq!(
-            MAIN.matches(&format!(".collective_{method}(")).count(),
+            COLLECTIVE
+                .matches(&format!(".collective_{method}("))
+                .count(),
             1,
             "collective_{method} must have exactly one production kernel call site"
         );
@@ -851,7 +877,8 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
         "registration must use the pid reloaded from the shared AtomicU32"
     );
     assert_eq!(
-        MAIN.matches("CapabilityRegistryPort::record_invocation")
+        COLLECTIVE
+            .matches("CapabilityRegistryPort::record_invocation")
             .count(),
         3,
         "production collective write, read, and scan must each persist one correlation audit"
@@ -860,8 +887,24 @@ fn production_collective_calls_share_one_atomic_pid_binding() {
 
 #[test]
 fn composition_root_does_not_seed_manifest_scopes() {
-    const SCANNED_SOURCE_FILES: [(&str, &str); 17] = [
+    // Story 15-3 (F13) — the verb table lands in its own `src/verbs.rs`, so
+    // the roster grows 17 → 18 DELIBERATELY: this assertion is a doorbell,
+    // not a wall, and the sanctioned move is to ring it. The negative below
+    // (no `manifest_scopes`) applies to `verbs.rs` like every other file: it
+    // is a pure argv table and must never seed the manifest-derived policy
+    // table.
+    // Story 16-2 (D-16-2-B) — 20 → 21: `shell_host.rs` joins the roster (the
+    // production ShellHost). Story 16-3 — 21 → 22: `supervision.rs` joins it.
+    // Story 16-4 — 22 → 23: `purge.rs` joins it.
+    // Story 16-6 — 23 → 24: `admission.rs` joins it.
+    // Ring the doorbell, do not widen the wall.
+    const SCANNED_SOURCE_FILES: [(&str, &str); 24] = [
         ("main.rs", include_str!("../src/main.rs")),
+        // Story 16-6 — the extracted `load → admit → start` path. Enrolled
+        // deliberately and NOT whitelisted below: the door's load must never
+        // seed or consume `manifest_scopes` — that table is `admit_spirit`'s
+        // to write — and this negative is what says so.
+        ("admission.rs", include_str!("../src/admission.rs")),
         ("tenant_map.rs", include_str!("../src/tenant_map.rs")),
         (
             "cross_team_consent.rs",
@@ -922,6 +965,31 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // trust planes from the running transport and must never seed the
         // manifest-derived policy table.
         ("cert_rotation.rs", include_str!("../src/cert_rotation.rs")),
+        // Story 15-3 (F13) — the single verb table (`VERBS`,
+        // `MAOS_ONE_SHOT_MODES`, `verbs::dispatch`). Listed so the 13.5d
+        // negative covers it: the table resolves argv tokens only and must
+        // never seed the manifest-derived policy table.
+        ("verbs.rs", include_str!("../src/verbs.rs")),
+        // Story 15-6 — authoritative inference-mode resolution. Listed so its
+        // composition-root inputs cannot become a manifest-scope back-channel.
+        (
+            "inference_mode.rs",
+            include_str!("../src/inference_mode.rs"),
+        ),
+        // Story 16-1 (D-16-1-N) — the operator door's port implementation and
+        // the store lock set. Listed so the 13.5d negative covers it: the
+        // door reaches the daemon's kernel objects through typed commands and
+        // must never seed the manifest-derived policy table.
+        ("operator_door.rs", include_str!("../src/operator_door.rs")),
+        ("shell_host.rs", include_str!("../src/shell_host.rs")),
+        // Story 16-3 (D-16-3-C/M) — Worker supervision and root shutdown.
+        // Listed so the 13.5d negative covers it: the supervisor receives
+        // already-constructed kernel handles and a host-granted tier, and must
+        // never seed the manifest-derived policy table.
+        ("supervision.rs", include_str!("../src/supervision.rs")),
+        // Story 16-4 — authoritative typed MAOS-footprint enumeration and
+        // offline purge. It must not seed manifest-derived policy scopes.
+        ("purge.rs", include_str!("../src/purge.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

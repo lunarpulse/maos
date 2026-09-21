@@ -7,10 +7,11 @@
 
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::panic::AssertUnwindSafe;
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use maos_domain::sandbox::SandboxInspectReport;
 use ring::constant_time;
@@ -182,11 +183,379 @@ impl OperatorHttpConfig {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 16-1 — the MUTATING half of the operator surface.
+//
+// Until this story the door was GET-only, served by ONE thread that read to
+// `\r\n\r\n` in a 16 KiB buffer, scanned every line of the request for the
+// bearer (so a BODY line `Authorization: Bearer …` counted as the header),
+// answered 404 for every unknown request line, and broke its accept loop on
+// the first non-`WouldBlock` error — leaving the process alive with no
+// listener. None of that carries a POST body safely.
+//
+// What follows is the bounded form ADR-062 (amended, Story 16-1) requires:
+// auth before route and method, a header scan that stops at the blank line, a
+// request-read deadline that covers headers AND body, `Content-Length`
+// required for POST, 64 KiB refused WITHOUT reading, a bounded worker pool, a
+// panic-isolating handler, and an accept loop that continues.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The whole-request read deadline: headers plus body.
+///
+/// Replaces a 2 s timeout on each individual `read()`, which a client dripping
+/// one byte every 1.9 s could hold open forever — BEFORE authenticating.
+const REQUEST_READ_DEADLINE: Duration = Duration::from_secs(5);
+
+/// Cap on the header section. A request whose headers do not end inside this
+/// is refused rather than buffered.
+const MAX_HEADER_BYTES: usize = 16 * 1024;
+
+/// Cap on a POST body (ADR-062: "bounded body parsing"). Refused from
+/// `Content-Length` alone, so an oversized body is never read.
+pub const MAX_BODY_BYTES: usize = 64 * 1024;
+
+/// Concurrent connections served at once. One slow POST used to stall every
+/// other verb: `fire_on_pause` runs Spirit hook code, an upgrade runs a
+/// hot swap, a CRL import runs an admission guard.
+const MAX_WORKERS: usize = 16;
+
+/// How long a route waits for its kernel transition before answering 503.
+const DEFAULT_ROUTE_BUDGET: Duration = Duration::from_secs(10);
+
+/// The budget for the four routes measured to run long: upgrade, uninstall,
+/// CRL import and hot-swap precheck.
+const LONG_ROUTE_BUDGET: Duration = Duration::from_secs(30);
+
+/// A submitted command that has not been picked up yet.
+pub const COMMAND_QUEUED: u8 = 0;
+/// A command the port has committed to running. From here it runs to
+/// completion and writes its rows, whatever the server answers.
+pub const COMMAND_STARTED: u8 = 1;
+/// A command the SERVER withdrew because its route budget expired before the
+/// port started it. It must never run.
+pub const COMMAND_WITHDRAWN: u8 = 2;
+
+/// Fixed body of every 405. Byte-equal across routes on purpose: a read route
+/// must not leak which verbs exist by varying its refusal.
+pub const METHOD_NOT_ALLOWED_BODY: &[u8] = br#"{"error":"method_not_allowed"}"#;
+/// Fixed body of a pool-exhaustion 503. Nothing was submitted.
+pub const BUSY_BODY: &[u8] = br#"{"error":"busy"}"#;
+/// Fixed body of a per-Spirit serialization 503. The command was WITHDRAWN
+/// before it started, so there is no `operation_id` to look up: retry the
+/// command itself.
+pub const SPIRIT_BUSY_BODY: &[u8] = br#"{"error":"spirit_busy"}"#;
+/// Fixed body of a captured handler panic. The pool worker survives it.
+pub const INTERNAL_BODY: &[u8] = br#"{"error":"internal"}"#;
+const NOT_FOUND_BODY: &[u8] = br#"{"error":"not_found"}"#;
+const UNAUTHORIZED_BODY: &[u8] = br#"{"error":"unauthorized"}"#;
+
+/// Which upgrade policy the operator asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradePolicyRequest {
+    /// The default, and the only one the door performs.
+    HotSwap,
+    /// Refused typed (D-16-1-W): the kernel's cold-swap arm starts the
+    /// successor under a NEW pid without `admit_spirit`, so it would leave an
+    /// unadmitted Spirit running. Fixing that is a kernel change.
+    ColdSwap,
+}
+
+/// Every state-changing operation the door carries.
+///
+/// One enum rather than one trait method per verb: the port implementation in
+/// `maos-bin` serializes these per Spirit id (D-16-1-R), and a shape it can
+/// match on is what makes "which Spirit does this command touch" a total
+/// function instead of eighteen ad-hoc answers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OperatorCommand {
+    Start {
+        spirit_id: String,
+    },
+    Pause {
+        spirit_id: String,
+    },
+    Resume {
+        spirit_id: String,
+    },
+    Unload {
+        spirit_id: String,
+    },
+    Posture {
+        spirit_id: String,
+        posture: String,
+    },
+    Upgrade {
+        spirit_id: String,
+        target_manifest: String,
+        policy: UpgradePolicyRequest,
+        attestation: Option<String>,
+        vetter_keyring: Option<String>,
+        /// The predecessor version a persisted multi-hop plan starts from.
+        /// Only meaningful with `create_plan`.
+        from_version: Option<String>,
+        /// Candidate successor manifests the resolver validates into a chain.
+        candidates: Vec<String>,
+        /// Resolve, validate, hash and persist a multi-hop migration plan
+        /// without starting an upgrade.
+        create_plan: bool,
+    },
+    HotSwapPrecheck {
+        spirit_id: String,
+        target_manifest: Option<String>,
+    },
+    Uninstall {
+        spirit_id: String,
+    },
+    ResolveHalt {
+        spirit_id: String,
+        halt_id: String,
+        resolution: String,
+        rationale: Option<String>,
+    },
+    OrchestratorEnqueue {
+        spirit_id: String,
+        text: String,
+    },
+    RevokeToken {
+        token_id: String,
+    },
+    /// The CRL's own bytes, never a path: a path would resolve in the daemon's
+    /// working directory, which is not the operator's (D-16-1-X).
+    ImportRevocations {
+        crl: Vec<u8>,
+    },
+    ForgetMemory {
+        principal: String,
+        reason: Option<String>,
+    },
+    ReleaseLegalHold {
+        principal: String,
+    },
+    AdmitGovernanceSchema {
+        schema: serde_json::Value,
+    },
+    /// Story 16-6 — admit a Spirit into the running daemon from a manifest.
+    ///
+    /// The manifest travels as a CANONICAL ABSOLUTE PATH, canonicalised by
+    /// the client. D-16-1-X's reason for `ImportRevocations` carrying bytes
+    /// is that a relative path resolves in the DAEMON's working directory,
+    /// not the operator's; canonicalising client-side answers the same
+    /// objection while keeping the daemon the only reader of the file, which
+    /// is what lets the same gates `maos run` applies apply here.
+    ///
+    /// It carries no `spirit_id`: the id IS the manifest's `[class].name` and
+    /// is not known until the daemon has parsed it. See `spirit_key`.
+    Load {
+        manifest: String,
+    },
+}
+
+impl OperatorCommand {
+    /// The Spirit id this command mutates, when it names one.
+    ///
+    /// The serialization key of D-16-1-R. `None` for the commands whose effect
+    /// is host-wide (a CRL import, a memory erase, a legal-hold release, a
+    /// schema admission) — those are not serialized against a Spirit.
+    pub fn spirit_key(&self) -> Option<&str> {
+        match self {
+            Self::Start { spirit_id }
+            | Self::Pause { spirit_id }
+            | Self::Resume { spirit_id }
+            | Self::Unload { spirit_id }
+            | Self::Posture { spirit_id, .. }
+            | Self::Upgrade { spirit_id, .. }
+            | Self::HotSwapPrecheck { spirit_id, .. }
+            | Self::Uninstall { spirit_id }
+            | Self::ResolveHalt { spirit_id, .. }
+            | Self::OrchestratorEnqueue { spirit_id, .. } => Some(spirit_id),
+            // `Load` is `None` BY CONSTRUCTION, not by omission: the id it
+            // will create lives inside a file the daemon has not opened yet,
+            // so no port-level key exists at enqueue time. The handler takes
+            // the per-Spirit lock ITSELF once the parse yields the id
+            // (D-16-6-D) — without it, two concurrent loads of the same id
+            // both pass the kernel's `resolve_pid` check and both insert,
+            // because that check and the insert are separate lock
+            // acquisitions with the whole of `admit_spirit` between them.
+            Self::RevokeToken { .. }
+            | Self::ImportRevocations { .. }
+            | Self::ForgetMemory { .. }
+            | Self::ReleaseLegalHold { .. }
+            | Self::AdmitGovernanceSchema { .. }
+            | Self::Load { .. } => None,
+        }
+    }
+
+    /// How long the route waits before withdrawing or reporting
+    /// `handler_still_running`.
+    ///
+    /// ⚠ This match ends in `_`, so a missing arm COMPILES and silently
+    /// inherits `DEFAULT_ROUTE_BUDGET`. It is the one `OperatorCommand`
+    /// match the compiler does not police; the control is obligation (l).
+    pub fn route_budget(&self) -> Duration {
+        match self {
+            Self::Upgrade { .. }
+            | Self::Uninstall { .. }
+            | Self::ImportRevocations { .. }
+            | Self::HotSwapPrecheck { .. }
+            // Story 16-6 — `Load` runs the whole load → admit → start triple,
+            // which dispatches the Spirit's `on_load` and `on_start` hooks;
+            // each carries its own manifest `[budget]` cap, and two of them
+            // do not fit inside a 10 s route.
+            | Self::Load { .. } => LONG_ROUTE_BUDGET,
+            _ => DEFAULT_ROUTE_BUDGET,
+        }
+    }
+}
+
+/// What a command did, as the door reports it.
+///
+/// Every variant names the KERNEL outcome, not an HTTP status, because the
+/// handler's job is the transition and the server's job is the mapping. The
+/// `code` is the machine-readable name `maosctl` prints and maps to an exit
+/// code (D-16-1-P).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OperatorOutcome {
+    /// The transition happened. The value is the route's JSON body.
+    Completed(serde_json::Value),
+    /// 404 — no such Spirit, halt, token or principal.
+    NotFound { code: String, detail: String },
+    /// 409 — the transition is not legal from the current state, or the request
+    /// asks for something the door refuses on principle (cold swap, a
+    /// non-increasing version).
+    Conflict { code: String, detail: String },
+    /// 400 — the request itself is malformed in a way only the handler can see
+    /// (an unreadable manifest, an unparseable CRL).
+    Invalid { code: String, detail: String },
+    /// 500 — the handler ran and failed.
+    Failed { code: String, detail: String },
+}
+
+/// The handle a [`OperatorCommandPort::submit`] hands back.
+pub struct OperatorSubmission {
+    /// The id the PORT minted. The server never mints one: an id in a 503 must
+    /// be findable in the Transparency Log, and only the side that writes the
+    /// row can promise that.
+    pub operation_id: String,
+    /// The shared `Queued`/`Started`/`Withdrawn` word. The port CASes
+    /// `Queued → Started` when it commits to running; the server CASes
+    /// `Queued → Withdrawn` when its budget expires first. Exactly one wins,
+    /// which is why "the budget expired" and "the command started" are never
+    /// both reported (V-25: a starved runtime made a timer-based answer lie).
+    pub state: Arc<AtomicU8>,
+    /// Delivered exactly once, by the task that ran the command.
+    pub completion: mpsc::Receiver<OperatorOutcome>,
+}
+
+/// One Spirit's live control block, as an operator reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpiritStatusRow {
+    pub spirit_id: String,
+    pub pid: u32,
+    pub boot_nonce: String,
+    /// Read from `SpiritControlBlock::current_state`, never from a journal row:
+    /// a journal-only handler must not be able to make this say `Paused`.
+    pub lifecycle_state: String,
+    /// Read from the same `PolicyTable` snapshot `evaluate_with_posture` reads.
+    pub posture: String,
+    /// Story 16-6 (R23(i)) — the posture ceiling actually in force.
+    ///
+    /// `posture` above is only `state.current`. Without this key, an operator
+    /// who configures `operator_posture_ceiling` has no surface anywhere that
+    /// shows the clamp took effect: `admit_spirit` writes a `LifecycleEntry`
+    /// with no posture field, so a clamped admission is indistinguishable
+    /// from an unclamped one. §16a requires BOTH the requested and the
+    /// effective ceiling to be readable, and a requirement with no surface is
+    /// a claim standing in for a control.
+    pub posture_ceiling: String,
+}
+
+/// The daemon itself, for "is this the root that holds my home's stores".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DaemonStatusRow {
+    pub pid: u32,
+    pub boot_nonce: String,
+    pub version: String,
+    pub spirit_ids: Vec<String>,
+    pub audit_degraded: bool,
+    pub audit_drop_count: u64,
+    /// Story 16-6 (R2) — each id's lifecycle state, positionally aligned with
+    /// `spirit_ids`.
+    ///
+    /// A NEW SIBLING KEY, never a reshape of `spirit_ids` into objects:
+    /// `post_surface_16_1.rs` asserts `daemon["spirit_ids"][0] == "butler"`.
+    ///
+    /// Why it exists: `maosctl load` creates a Spirit that nothing supervises
+    /// — the DRR picker selects only `Running` — so a loaded-and-forgotten
+    /// Spirit was indistinguishable from a working one on the only surface
+    /// that enumerates the daemon. Observability is the contract; it is the
+    /// operator's cue to `start` it or `unload` it.
+    pub lifecycle_states: Vec<String>,
+}
+
+/// One Spirit's Orchestrator buffer occupancy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrchestratorStatusRow {
+    pub spirit_id: String,
+    pub pending: usize,
+    pub capacity: usize,
+}
+
+/// One applied CRL, as `maosctl revocations list` renders it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevocationRow {
+    /// Hex, never the 32-integer array `serde` produces for a `CrlId`.
+    pub crl_id: String,
+    pub matched_count: usize,
+    pub revoked_count: usize,
+}
+
+/// Story 16-1 / D-16-1-F — the SYNC seam between this crate's blocking server
+/// and the daemon's async kernel.
+///
+/// Sync on purpose. The alternative considered and rejected was handing
+/// `bind` a `tokio::runtime::Handle` and calling `block_on` inside each
+/// handler: that puts runtime lifetime into the server's signature, blocks a
+/// runtime worker from a non-runtime thread, and gives this crate an opinion
+/// about the daemon's executor. Instead `maos-bin` implements this trait over
+/// a `Handle` it captured in its own `async main`, spawns each kernel future
+/// there, and delivers the outcome down `completion`.
+///
+/// The read methods follow the `SandboxReportSource`/`RotationWindowSource`
+/// shape: `None` means "no such object", never an empty value that could be
+/// mistaken for one.
+pub trait OperatorCommandPort: Send + Sync + 'static {
+    /// Hand a command to the daemon. Returns as soon as the command is
+    /// QUEUED — never blocks for the transition.
+    ///
+    /// `deadline` is the route budget, passed so the port can answer
+    /// `spirit_busy` itself just before the server gives up rather than
+    /// leaving the server to guess.
+    fn submit(&self, command: OperatorCommand, deadline: Duration) -> OperatorSubmission;
+
+    fn spirit_status(&self, spirit_id: &str) -> Option<SpiritStatusRow>;
+
+    fn daemon_status(&self) -> DaemonStatusRow;
+
+    fn orchestrator_status(&self, spirit_id: &str) -> Option<OrchestratorStatusRow>;
+
+    fn applied_revocations(&self) -> Vec<RevocationRow>;
+}
+
 /// A running server with explicit shutdown for daemon teardown and tests.
 pub struct OperatorHttpServer {
     local_addr: SocketAddr,
     stop: Arc<AtomicBool>,
-    worker: Option<JoinHandle<()>>,
+    acceptor: Option<JoinHandle<()>>,
+    workers: Arc<Mutex<Vec<JoinHandle<()>>>>,
+}
+
+/// Everything a route may read, borrowed for the life of one request.
+struct Routes<'a, S: SandboxReportSource> {
+    source: &'a S,
+    rotation: Option<&'a dyn RotationWindowSource>,
+    convergence: Option<&'a dyn CohortConvergenceSource>,
+    self_identity: Option<&'a dyn CohortSelfIdentitySource>,
+    commands: Option<&'a dyn OperatorCommandPort>,
 }
 
 impl OperatorHttpServer {
@@ -197,12 +566,28 @@ impl OperatorHttpServer {
     /// `convergence` is `None` on the same condition and for the same reason
     /// (Story 14-2b / AC3): an absent cohort state must not render as a cohort
     /// in which no peer has diverged.
+    ///
+    /// No command port: every mutating route answers 404 on the same
+    /// "the control is not installed here" convention. Story 16-1's door roots
+    /// call [`Self::bind_with_commands`].
     pub fn bind<S: SandboxReportSource>(
         config: OperatorHttpConfig,
         source: Arc<S>,
         rotation: Option<Arc<dyn RotationWindowSource>>,
         convergence: Option<Arc<dyn CohortConvergenceSource>>,
         self_identity: Option<Arc<dyn CohortSelfIdentitySource>>,
+    ) -> Result<Self, std::io::Error> {
+        Self::bind_with_commands(config, source, rotation, convergence, self_identity, None)
+    }
+
+    /// Story 16-1 — the full door, with the mutating surface installed.
+    pub fn bind_with_commands<S: SandboxReportSource>(
+        config: OperatorHttpConfig,
+        source: Arc<S>,
+        rotation: Option<Arc<dyn RotationWindowSource>>,
+        convergence: Option<Arc<dyn CohortConvergenceSource>>,
+        self_identity: Option<Arc<dyn CohortSelfIdentitySource>>,
+        commands: Option<Arc<dyn OperatorCommandPort>>,
     ) -> Result<Self, std::io::Error> {
         if config.bearer_token.is_empty() {
             return Err(std::io::Error::new(
@@ -220,198 +605,1112 @@ impl OperatorHttpServer {
         listener.set_nonblocking(true)?;
         let local_addr = listener.local_addr()?;
         let stop = Arc::new(AtomicBool::new(false));
-        let worker_stop = Arc::clone(&stop);
-        let worker = thread::spawn(move || {
-            while !worker_stop.load(Ordering::Acquire) {
-                match listener.accept() {
-                    Ok((stream, _)) => {
-                        let _ = handle_connection(
-                            stream,
-                            source.as_ref(),
-                            rotation.as_deref(),
-                            convergence.as_deref(),
-                            self_identity.as_deref(),
-                            config.bearer_token.as_bytes(),
-                        );
+        let workers: Arc<Mutex<Vec<JoinHandle<()>>>> = Arc::new(Mutex::new(Vec::new()));
+        let acceptor = {
+            let stop = Arc::clone(&stop);
+            let workers = Arc::clone(&workers);
+            let in_flight = Arc::new(AtomicUsize::new(0));
+            let token = Arc::new(config.bearer_token.clone());
+            thread::spawn(move || {
+                while !stop.load(Ordering::Acquire) {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            // Keep at most MAX_WORKERS spawned connections.
+                            // Overload is handled synchronously by the acceptor:
+                            // this bounds threads while still authenticating
+                            // before returning a typed 503.
+                            let previous = in_flight.fetch_add(1, Ordering::AcqRel);
+                            if previous >= MAX_WORKERS {
+                                in_flight.fetch_sub(1, Ordering::AcqRel);
+                                let routes = Routes {
+                                    source: source.as_ref(),
+                                    rotation: rotation.as_deref(),
+                                    convergence: convergence.as_deref(),
+                                    self_identity: self_identity.as_deref(),
+                                    commands: commands.as_deref(),
+                                };
+                                let _ = serve_connection(stream, &routes, token.as_bytes(), true);
+                                continue;
+                            }
+                            let source = Arc::clone(&source);
+                            let rotation = rotation.clone();
+                            let convergence = convergence.clone();
+                            let self_identity = self_identity.clone();
+                            let commands = commands.clone();
+                            let token = Arc::clone(&token);
+                            let in_flight_worker = Arc::clone(&in_flight);
+                            let worker = thread::spawn(move || {
+                                let routes = Routes {
+                                    source: source.as_ref(),
+                                    rotation: rotation.as_deref(),
+                                    convergence: convergence.as_deref(),
+                                    self_identity: self_identity.as_deref(),
+                                    commands: commands.as_deref(),
+                                };
+                                let _ = serve_connection(stream, &routes, token.as_bytes(), false);
+                                in_flight_worker.fetch_sub(1, Ordering::AcqRel);
+                            });
+                            if let Ok(mut workers) = workers.lock() {
+                                workers.retain(|handle| !handle.is_finished());
+                                workers.push(worker);
+                            }
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(10));
+                        }
+                        // ⚠ CONTINUE, never break. Breaking here left the
+                        // process alive with no listener and no diagnostic —
+                        // every subsequent operator verb reported "daemon not
+                        // running" against a daemon that was running.
+                        Err(error) => {
+                            eprintln!("maos: operator HTTP accept error (continuing): {error}");
+                            thread::sleep(Duration::from_millis(10));
+                        }
                     }
-                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(10));
-                    }
-                    Err(_) => break,
                 }
-            }
-        });
+            })
+        };
         Ok(Self {
             local_addr,
             stop,
-            worker: Some(worker),
+            acceptor: Some(acceptor),
+            workers,
         })
     }
 
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
     }
+
+    /// Stop accepting and join the accept thread and every pool worker.
+    ///
+    /// Called by [`Drop`], and directly by the daemon's SIGTERM path, which
+    /// must release the listener BEFORE it drains the audit channel: every
+    /// worker holds a port clone, the port holds the scheduler, the scheduler
+    /// holds the capability adapter, and that holds an `audit_tx` clone — so a
+    /// live server makes the drain time out at 10 s (Trap 16).
+    pub fn shutdown(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        if let Some(acceptor) = self.acceptor.take() {
+            let _ = acceptor.join();
+        }
+        let handles = match self.workers.lock() {
+            Ok(mut workers) => std::mem::take(&mut *workers),
+            Err(poisoned) => std::mem::take(&mut *poisoned.into_inner()),
+        };
+        for handle in handles {
+            let _ = handle.join();
+        }
+    }
 }
 
 impl Drop for OperatorHttpServer {
     fn drop(&mut self) {
-        self.stop.store(true, Ordering::Release);
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
+        self.shutdown();
+    }
+}
+
+/// One HTTP status and body.
+struct Response {
+    status: u16,
+    body: Vec<u8>,
+}
+
+impl Response {
+    fn new(status: u16, body: impl Into<Vec<u8>>) -> Self {
+        Self {
+            status,
+            body: body.into(),
+        }
+    }
+
+    fn value(status: u16, body: serde_json::Value) -> Self {
+        match serde_json::to_vec(&body) {
+            Ok(body) => Self::new(status, body),
+            Err(_) => Self::new(500, INTERNAL_BODY),
+        }
+    }
+
+    fn error(status: u16, code: &str, detail: &str) -> Self {
+        Self::value(
+            status,
+            serde_json::json!({ "error": code, "detail": detail }),
+        )
+    }
+}
+
+impl OperatorOutcome {
+    fn into_response(self) -> Response {
+        match self {
+            Self::Completed(value) => Response::value(200, value),
+            Self::NotFound { code, detail } => Response::error(404, &code, &detail),
+            Self::Conflict { code, detail } => Response::error(409, &code, &detail),
+            Self::Invalid { code, detail } => Response::error(400, &code, &detail),
+            Self::Failed { code, detail } => Response::error(500, &code, &detail),
         }
     }
 }
 
-fn handle_connection<S: SandboxReportSource>(
-    mut stream: TcpStream,
-    source: &S,
-    rotation: Option<&dyn RotationWindowSource>,
-    convergence: Option<&dyn CohortConvergenceSource>,
-    self_identity: Option<&dyn CohortSelfIdentitySource>,
-    expected_token: &[u8],
-) -> Result<(), std::io::Error> {
-    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    let mut request = [0_u8; 16 * 1024];
-    let mut read = 0;
-    while read < request.len() && !request[..read].windows(4).any(|bytes| bytes == b"\r\n\r\n") {
-        let received = stream.read(&mut request[read..])?;
-        if received == 0 {
-            break;
-        }
-        read += received;
+/// One authenticated request, with its body still on the wire.
+///
+/// The body is read **lazily**, by [`Self::body`], and that ordering is
+/// load-bearing: `POST /v1/cohort/self-identity` must answer 405 because the
+/// route is read-only, NOT 411 because a refusal-by-method was overtaken by a
+/// `Content-Length` requirement the route never had.
+struct Incoming<'a> {
+    method: String,
+    path: String,
+    headers: Vec<(String, String)>,
+    stream: &'a mut TcpStream,
+    deadline: Instant,
+    /// Bytes already read past the header terminator.
+    buffered: Vec<u8>,
+    body: Option<Vec<u8>>,
+}
+
+impl Incoming<'_> {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
     }
-    let request = std::str::from_utf8(&request[..read]).unwrap_or("");
-    let mut lines = request.split("\r\n");
+
+    /// The request body, read on first call and cached.
+    ///
+    /// `Content-Length` is REQUIRED here (411) and the 64 KiB bound is
+    /// enforced from that header alone (413) — reading 4 GiB to discover it is
+    /// too large is the denial of service the bound exists to prevent.
+    fn body(&mut self) -> Result<&[u8], Response> {
+        if self.body.is_none() {
+            if self
+                .headers
+                .iter()
+                .any(|(name, _)| name.eq_ignore_ascii_case("transfer-encoding"))
+            {
+                return Err(Response::error(
+                    400,
+                    "bad_request",
+                    "Transfer-Encoding is unsupported",
+                ));
+            }
+            let mut lengths = self
+                .headers
+                .iter()
+                .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                .map(|(_, value)| value.as_str());
+            let Some(declared) = lengths.next() else {
+                return Err(Response::error(
+                    411,
+                    "length_required",
+                    "a body-bearing method requires Content-Length",
+                ));
+            };
+            if lengths.next().is_some() {
+                return Err(Response::error(
+                    400,
+                    "bad_request",
+                    "duplicate Content-Length",
+                ));
+            }
+            let length: usize = declared.parse().map_err(|_| {
+                Response::error(400, "bad_request", "Content-Length is not a number")
+            })?;
+            if length > MAX_BODY_BYTES {
+                return Err(Response::error(
+                    413,
+                    "payload_too_large",
+                    "request body exceeds 64 KiB",
+                ));
+            }
+            if self.buffered.len() > length {
+                return Err(Response::error(
+                    400,
+                    "bad_request",
+                    "request body longer than Content-Length",
+                ));
+            }
+            let mut body = std::mem::take(&mut self.buffered);
+            while body.len() < length {
+                let mut chunk = vec![0_u8; (length - body.len()).min(8192)];
+                let read = read_within(self.stream, self.deadline, &mut chunk)?;
+                if read == 0 {
+                    return Err(Response::error(
+                        400,
+                        "bad_request",
+                        "request body shorter than Content-Length",
+                    ));
+                }
+                body.extend_from_slice(&chunk[..read]);
+            }
+            self.body = Some(body);
+        }
+        Ok(self.body.as_deref().unwrap_or_default())
+    }
+}
+
+fn serve_connection<S: SandboxReportSource>(
+    mut stream: TcpStream,
+    routes: &Routes<'_, S>,
+    expected_token: &[u8],
+    overloaded: bool,
+) -> Result<(), std::io::Error> {
+    let deadline = Instant::now() + REQUEST_READ_DEADLINE;
+    let response = match read_head(&mut stream, deadline, expected_token) {
+        Ok((method, path, headers, buffered)) if overloaded => {
+            let _ = (method, path, headers, buffered);
+            Response::new(503, BUSY_BODY)
+        }
+        Ok((method, path, headers, buffered)) => {
+            let mut request = Incoming {
+                method,
+                path,
+                headers,
+                stream: &mut stream,
+                deadline,
+                buffered,
+                body: None,
+            };
+            // A handler panic must cost one request, not the pool worker and
+            // not the daemon.
+            std::panic::catch_unwind(AssertUnwindSafe(|| route(routes, &mut request)))
+                .unwrap_or_else(|_| Response::new(500, INTERNAL_BODY))
+        }
+        Err(response) => response,
+    };
+    respond_and_close(&mut stream, response.status, &response.body)
+}
+
+/// Read the header section and authenticate.
+///
+/// Authentication happens here, BEFORE the method or the path is looked at and
+/// before any body byte is read, so an anonymous request learns nothing about
+/// which routes exist.
+#[allow(clippy::type_complexity)]
+fn read_head(
+    stream: &mut TcpStream,
+    deadline: Instant,
+    expected_token: &[u8],
+) -> Result<(String, String, Vec<(String, String)>, Vec<u8>), Response> {
+    let mut buffer = Vec::with_capacity(2048);
+    let head_end = loop {
+        if buffer.len() > MAX_HEADER_BYTES {
+            return Err(Response::error(
+                413,
+                "header_too_large",
+                "request header section exceeds 16 KiB",
+            ));
+        }
+        let mut chunk = [0_u8; 2048];
+        let read = read_within(stream, deadline, &mut chunk)?;
+        if read == 0 {
+            break None;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if let Some(end) = find_head_end(&buffer) {
+            if end > MAX_HEADER_BYTES {
+                return Err(Response::error(
+                    413,
+                    "header_too_large",
+                    "request header section exceeds 16 KiB",
+                ));
+            }
+            break Some(end);
+        }
+    };
+    let Some(head_end) = head_end else {
+        return Err(Response::error(
+            400,
+            "bad_request",
+            "request header section did not terminate",
+        ));
+    };
+    let head = std::str::from_utf8(&buffer[..head_end])
+        .map_err(|_| Response::error(400, "bad_request", "request header is not UTF-8"))?
+        .to_owned();
+    let mut lines = head.split("\r\n");
     let request_line = lines.next().unwrap_or("");
-    let authorized = lines
-        .filter_map(|line| line.strip_prefix("Authorization: Bearer "))
+    let mut parts = request_line.split_ascii_whitespace();
+    let method = parts.next().unwrap_or("").to_owned();
+    let path = parts.next().unwrap_or("").to_owned();
+    let version = parts.next().unwrap_or("");
+    let request_line_valid = !method.is_empty()
+        && !path.is_empty()
+        && matches!(version, "HTTP/1.0" | "HTTP/1.1")
+        && parts.next().is_none();
+
+    let mut malformed_header = false;
+    let headers: Vec<(String, String)> = lines
+        .filter_map(|line| match line.split_once(':') {
+            Some((key, value)) if !key.trim().is_empty() => {
+                Some((key.trim().to_owned(), value.trim().to_owned()))
+            }
+            _ => {
+                malformed_header = true;
+                None
+            }
+        })
+        .collect();
+
+    let authorized = headers
+        .iter()
+        .filter(|(key, _)| key.eq_ignore_ascii_case("authorization"))
+        .filter_map(|(_, value)| value.strip_prefix("Bearer "))
         .any(|presented| {
             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
         });
     if !authorized {
-        return respond(
-            &mut stream,
-            401,
-            "application/json",
-            br#"{"error":"unauthorized"}"#,
-        );
+        return Err(Response::new(401, UNAUTHORIZED_BODY));
     }
-    if request_line == "GET /v1/a2a/rotation-windows HTTP/1.1"
-        || request_line == "GET /v1/a2a/rotation-windows HTTP/1.0"
+    if !request_line_valid || malformed_header {
+        return Err(Response::error(
+            400,
+            "bad_request",
+            "malformed request head",
+        ));
+    }
+    Ok((method, path, headers, buffer[head_end + 4..].to_vec()))
+}
+
+fn find_head_end(buffer: &[u8]) -> Option<usize> {
+    buffer.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+/// One `read` bounded by the WHOLE-request deadline, so a client that keeps
+/// each individual read inside the timeout still cannot hold the connection.
+fn read_within(
+    stream: &mut TcpStream,
+    deadline: Instant,
+    into: &mut [u8],
+) -> Result<usize, Response> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return Err(Response::error(
+            408,
+            "request_timeout",
+            "request not received within the read deadline",
+        ));
+    }
+    stream
+        .set_read_timeout(Some(remaining))
+        .map_err(|error| Response::error(500, "internal", &error.to_string()))?;
+    stream.read(into).map_err(|error| match error.kind() {
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut => Response::error(
+            408,
+            "request_timeout",
+            "request not received within the read deadline",
+        ),
+        _ => Response::error(400, "bad_request", &error.to_string()),
+    })
+}
+
+/// The route table.
+///
+/// ⚠ Anti-rot anchors for ADR-062's gate
+/// (`xtask/tests/decision_adrs_and_provisioning.rs`, the `"062"` arm): the four
+/// read routes it pins are `GET /v1/a2a/rotation-windows`,
+/// `GET /v1/cohort/peer-versions`, `GET /v1/cohort/self-identity` and
+/// `GET /v1/spirits/` — matched below by path segments rather than by whole
+/// request-line literals, which is why they are named here. A dev who renames
+/// a path re-points the ADR in the SAME commit.
+///
+/// Segment matching, not request-line string comparison: `/v1/spirits/x/sandbox`
+/// and `/v1/spirits/x` used to be told apart by a suffix strip, so any new
+/// `/v1/spirits/{id}` route would have swallowed the sandbox one depending on
+/// declaration order.
+fn route<S: SandboxReportSource>(routes: &Routes<'_, S>, request: &mut Incoming<'_>) -> Response {
+    // Owned copies so the segment borrows do not conflict with the lazy,
+    // `&mut self` body read the POST arms perform.
+    let method = request.method.clone();
+    let method = method.as_str();
+    let path = request.path.clone();
+    let segments: Vec<&str> = path
+        .split('?')
+        .next()
+        .unwrap_or("")
+        .trim_start_matches('/')
+        .split('/')
+        .collect();
+    match segments.as_slice() {
+        ["v1", "daemon"] => get_only(method, || match routes.commands {
+            Some(port) => {
+                let daemon = port.daemon_status();
+                Response::value(
+                    200,
+                    serde_json::json!({
+                        "pid": daemon.pid,
+                        "boot_nonce": daemon.boot_nonce,
+                        "version": daemon.version,
+                        "spirit_ids": daemon.spirit_ids,
+                        "lifecycle_states": daemon.lifecycle_states,
+                        "audit_degraded": daemon.audit_degraded,
+                        "audit_drop_count": daemon.audit_drop_count,
+                    }),
+                )
+            }
+            None => Response::new(404, NOT_FOUND_BODY),
+        }),
+        ["v1", "a2a", "rotation-windows"] => get_only(method, || rotation_windows(routes)),
+        ["v1", "cohort", "peer-versions"] => get_only(method, || peer_versions(routes)),
+        ["v1", "cohort", "self-identity"] => get_only(method, || self_identity(routes)),
+        // Story 16-6 (D-16-6-E) — the COLLECTION route. `["v1","spirits"]`
+        // fell to the `_ => 404` below until now, so a new arm here has no
+        // ordering conflict with the delicate `{id}` / `{id}/sandbox`
+        // disambiguation above.
+        //
+        // A load cannot travel on `POST /v1/spirits/{id}/{verb}`: `validate_id`
+        // permits `[A-Za-z0-9._-]{1,128}`, so a filesystem path can never be a
+        // path segment; the id does not exist until the manifest is parsed;
+        // and `lifecycle_command` answers `spirit_not_loaded` from
+        // `resolve_pid` BEFORE doing anything, which is the exact inverse of
+        // what a load needs.
+        ["v1", "spirits"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            match required_str(&body, "manifest") {
+                Ok(manifest) => submit(routes, OperatorCommand::Load { manifest }),
+                Err(response) => response,
+            }
+        }
+        ["v1", "spirits", id, "sandbox"] => {
+            let id = match validate_id(id) {
+                Ok(id) => id,
+                Err(response) => return response,
+            };
+            get_only(method, || match routes.source.sandbox_report(id) {
+                Some(report) => match serde_json::to_vec(&report) {
+                    Ok(body) => Response::new(200, body),
+                    Err(_) => Response::new(500, INTERNAL_BODY),
+                },
+                None => Response::new(404, NOT_FOUND_BODY),
+            })
+        }
+        ["v1", "spirits", id] => {
+            let id = match validate_id(id) {
+                Ok(id) => id,
+                Err(response) => return response,
+            };
+            get_only(method, || match routes.commands {
+                Some(port) => match port.spirit_status(id) {
+                    Some(row) => Response::value(
+                        200,
+                        serde_json::json!({
+                            "spirit_id": row.spirit_id,
+                            "pid": row.pid,
+                            "boot_nonce": row.boot_nonce,
+                            "lifecycle_state": row.lifecycle_state,
+                            "posture": row.posture,
+                            "posture_ceiling": row.posture_ceiling,
+                        }),
+                    ),
+                    None => Response::new(404, NOT_FOUND_BODY),
+                },
+                None => Response::new(404, NOT_FOUND_BODY),
+            })
+        }
+        ["v1", "spirits", id, verb] => {
+            let id = match validate_id(id) {
+                Ok(id) => id,
+                Err(response) => return response,
+            };
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            spirit_command(routes, id, verb, request)
+        }
+        ["v1", "halts", halt_id, "resolve"] => {
+            let halt_id = match validate_id(halt_id) {
+                Ok(halt_id) => halt_id,
+                Err(response) => return response,
+            };
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let spirit_id = match required_str(&body, "spirit_id") {
+                Ok(value) => match validate_id(&value) {
+                    Ok(_) => value,
+                    Err(response) => return response,
+                },
+                Err(response) => return response,
+            };
+            let resolution = match required_str(&body, "resolution") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let rationale = match optional_str(&body, "rationale") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            submit(
+                routes,
+                OperatorCommand::ResolveHalt {
+                    spirit_id,
+                    halt_id: halt_id.to_owned(),
+                    resolution,
+                    rationale,
+                },
+            )
+        }
+        ["v1", "orchestrator", id] => {
+            let id = match validate_id(id) {
+                Ok(id) => id,
+                Err(response) => return response,
+            };
+            match method {
+                "GET" => match routes
+                    .commands
+                    .and_then(|port| port.orchestrator_status(id))
+                {
+                    Some(row) => Response::value(
+                        200,
+                        serde_json::json!({
+                            "spirit_id": row.spirit_id,
+                            "pending": row.pending,
+                            "capacity": row.capacity,
+                        }),
+                    ),
+                    None => Response::new(404, NOT_FOUND_BODY),
+                },
+                "POST" => {
+                    let body = match body_json(request) {
+                        Ok(body) => body,
+                        Err(response) => return response,
+                    };
+                    match required_str(&body, "text") {
+                        Ok(text) => submit(
+                            routes,
+                            OperatorCommand::OrchestratorEnqueue {
+                                spirit_id: id.to_owned(),
+                                text,
+                            },
+                        ),
+                        Err(response) => response,
+                    }
+                }
+                _ => method_not_allowed(),
+            }
+        }
+        ["v1", "tokens", token_id, "revoke"] => {
+            let token_id = match validate_id(token_id) {
+                Ok(token_id) => token_id.to_owned(),
+                Err(response) => return response,
+            };
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            submit(routes, OperatorCommand::RevokeToken { token_id })
+        }
+        ["v1", "revocations"] => match method {
+            "GET" => match routes.commands {
+                Some(port) => {
+                    let rows: Vec<serde_json::Value> = port
+                        .applied_revocations()
+                        .into_iter()
+                        .map(|row| {
+                            serde_json::json!({
+                                "crl_id": row.crl_id,
+                                "matched_count": row.matched_count,
+                                "revoked_count": row.revoked_count,
+                            })
+                        })
+                        .collect();
+                    Response::value(200, serde_json::json!({ "applied": rows }))
+                }
+                None => Response::new(404, NOT_FOUND_BODY),
+            },
+            // The CRL's own bytes, opaque here: only the daemon holds the trust
+            // anchor that can verify them.
+            "POST" => match request.body() {
+                Ok(crl) => submit(
+                    routes,
+                    OperatorCommand::ImportRevocations { crl: crl.to_vec() },
+                ),
+                Err(response) => response,
+            },
+            _ => method_not_allowed(),
+        },
+        ["v1", "memory", "forget"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            match required_str(&body, "principal") {
+                Ok(principal) => {
+                    let reason = match optional_str(&body, "reason") {
+                        Ok(value) => value,
+                        Err(response) => return response,
+                    };
+                    submit(routes, OperatorCommand::ForgetMemory { principal, reason })
+                }
+                Err(response) => response,
+            }
+        }
+        // ⚠ The principal travels in the BODY, not as a path segment, and the
+        // route is symmetric with `/v1/memory/forget` for that reason.
+        // Measured: every legal-hold principal in the tree is EMAIL-shaped
+        // (`held-uninstall@example.org`, `held@example.org`), and `@` is
+        // outside the `[A-Za-z0-9._-]` class every path segment is validated
+        // against. Keeping `{principal}` in the path would have meant either
+        // widening that class for one route or percent-decoding in the door —
+        // and a door that decodes its own paths is a door with a second,
+        // weaker parser. Both principal-scoped verbs now look the same.
+        ["v1", "legal-holds", "release"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            match required_str(&body, "principal") {
+                Ok(principal) => submit(routes, OperatorCommand::ReleaseLegalHold { principal }),
+                Err(response) => response,
+            }
+        }
+        ["v1", "governance", "schemas"] => {
+            if let Err(response) = post_guard(method, request) {
+                return response;
+            }
+            match body_json(request) {
+                Ok(schema) => submit(routes, OperatorCommand::AdmitGovernanceSchema { schema }),
+                Err(response) => response,
+            }
+        }
+        _ => Response::new(404, NOT_FOUND_BODY),
+    }
+}
+
+fn spirit_command<S: SandboxReportSource>(
+    routes: &Routes<'_, S>,
+    spirit_id: &str,
+    verb: &str,
+    request: &mut Incoming<'_>,
+) -> Response {
+    let spirit_id = spirit_id.to_owned();
+    let command = match verb {
+        "start" => OperatorCommand::Start { spirit_id },
+        "pause" => OperatorCommand::Pause { spirit_id },
+        "resume" => OperatorCommand::Resume { spirit_id },
+        "unload" => OperatorCommand::Unload { spirit_id },
+        "uninstall" => OperatorCommand::Uninstall { spirit_id },
+        "posture" => {
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            match required_str(&body, "posture") {
+                Ok(posture) => OperatorCommand::Posture { spirit_id, posture },
+                Err(response) => return response,
+            }
+        }
+        "upgrade" => {
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let target_manifest = match required_str(&body, "target_manifest") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let policy_value = match optional_str(&body, "policy") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let policy = match policy_value.as_deref() {
+                None | Some("hot-swap") => UpgradePolicyRequest::HotSwap,
+                Some("cold-swap") => UpgradePolicyRequest::ColdSwap,
+                Some(other) => {
+                    return Response::error(
+                        400,
+                        "bad_request",
+                        &format!("unknown upgrade policy {other:?}"),
+                    )
+                }
+            };
+            let attestation = match optional_str(&body, "attestation") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let vetter_keyring = match optional_str(&body, "vetter_keyring") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let from_version = match optional_str(&body, "from_version") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let candidates = match optional_string_array(&body, "candidates") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            let create_plan = match optional_bool(&body, "create_plan") {
+                Ok(value) => value.unwrap_or(false),
+                Err(response) => return response,
+            };
+            OperatorCommand::Upgrade {
+                spirit_id,
+                target_manifest,
+                policy,
+                attestation,
+                vetter_keyring,
+                from_version,
+                candidates,
+                create_plan,
+            }
+        }
+        "hot-swap-precheck" => {
+            let body = match body_json(request) {
+                Ok(body) => body,
+                Err(response) => return response,
+            };
+            let target_manifest = match optional_str(&body, "target_manifest") {
+                Ok(value) => value,
+                Err(response) => return response,
+            };
+            OperatorCommand::HotSwapPrecheck {
+                spirit_id,
+                target_manifest,
+            }
+        }
+        _ => return Response::new(404, NOT_FOUND_BODY),
+    };
+    submit(routes, command)
+}
+
+/// Submit a command and wait for it inside the route budget.
+fn submit<S: SandboxReportSource>(routes: &Routes<'_, S>, command: OperatorCommand) -> Response {
+    let Some(port) = routes.commands else {
+        return Response::new(404, NOT_FOUND_BODY);
+    };
+    match submit_and_wait(port, command) {
+        SubmitOutcome::Completed(outcome) => outcome.into_response(),
+        SubmitOutcome::Internal => Response::new(500, INTERNAL_BODY),
+        SubmitOutcome::SpiritBusy => Response::new(503, SPIRIT_BUSY_BODY),
+        SubmitOutcome::HandlerStillRunning { operation_id } => Response::value(
+            503,
+            serde_json::json!({
+                "error": "handler_still_running",
+                "operation_id": operation_id,
+            }),
+        ),
+    }
+}
+
+/// Story 16-2 / §15 R4 — what ONE submit-and-withdraw did, as a typed value.
+///
+/// The HTTP server maps this to its existing responses (byte-for-byte), and
+/// the shell's [`ShellHost`](maos_bin::shell_host::ShellHost) maps it to REPL
+/// lines. Neither re-implements the withdraw CAS — this function is the one
+/// copy.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SubmitOutcome {
+    /// The handler ran and delivered an outcome.
+    Completed(OperatorOutcome),
+    /// The completion channel closed without delivering — the handler died.
+    Internal,
+    /// The budget expired and the withdraw CAS WON: the command never ran.
+    SpiritBusy,
+    /// The budget expired and the withdraw CAS LOST: the port had already
+    /// committed to running, so the task finishes and writes its row — the
+    /// id is findable.
+    HandlerStillRunning { operation_id: String },
+}
+
+/// Story 16-2 / §15 R4 — THE one submit-and-withdraw implementation.
+///
+/// `port.submit`, wait on the completion channel for the command's route
+/// budget, and on timeout perform the `Queued → Withdrawn` CAS that decides
+/// `SpiritBusy` vs `HandlerStillRunning`. The server's route handler and the
+/// shell's in-process resolution both call THIS; before this extraction each
+/// would have had to copy the CAS, and a copied CAS is how "withdrew" and
+/// "still running" start meaning different things on different surfaces.
+pub fn submit_and_wait(port: &dyn OperatorCommandPort, command: OperatorCommand) -> SubmitOutcome {
+    let budget = command.route_budget();
+    submit_and_wait_with_deadline(port, command, budget)
+}
+
+/// The same protocol with a caller-chosen deadline — the seam the
+/// `crates/maos-control/tests/` vectors use to drive the timeout arms in
+/// milliseconds instead of the 10 s route budget.
+pub fn submit_and_wait_with_deadline(
+    port: &dyn OperatorCommandPort,
+    command: OperatorCommand,
+    budget: Duration,
+) -> SubmitOutcome {
+    let submission = port.submit(command, budget);
+    match submission.completion.recv_timeout(budget) {
+        Ok(outcome) => SubmitOutcome::Completed(outcome),
+        Err(mpsc::RecvTimeoutError::Disconnected) => SubmitOutcome::Internal,
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            // ⚠ The shared word decides, never the clock. If this CAS wins the
+            // command was still QUEUED and is now WITHDRAWN: it never ran, so
+            // there is nothing to look up and no id is handed out. If it loses,
+            // the port already CASed to STARTED and the task runs to
+            // completion and writes its row — so the id IS findable.
+            if submission
+                .state
+                .compare_exchange(
+                    COMMAND_QUEUED,
+                    COMMAND_WITHDRAWN,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
+                .is_ok()
+            {
+                SubmitOutcome::SpiritBusy
+            } else {
+                SubmitOutcome::HandlerStillRunning {
+                    operation_id: submission.operation_id,
+                }
+            }
+        }
+    }
+}
+
+/// Story 16-1 / D-16-1-G — a read route answers 405 to every other method,
+/// with a byte-equal fixed body, AFTER authentication.
+///
+/// The three HEAD `POST → 404` assertions (rotation windows, peer versions,
+/// self-identity) become guards here rather than being narrowed: ADR-062 `:63`
+/// preserves self-identity as a read, and "this host's signed and serving
+/// certificate identity" is exactly the second trust path a mutating verb
+/// would invent.
+fn get_only(method: &str, handler: impl FnOnce() -> Response) -> Response {
+    if method == "GET" {
+        handler()
+    } else {
+        method_not_allowed()
+    }
+}
+
+/// A POST-only route: refuse the wrong method FIRST (405), then enforce the
+/// body bound (411 without `Content-Length`, 413 over 64 KiB) for EVERY POST.
+///
+/// The bound applies even to verbs that take no parameters — `pause` reads
+/// nothing from its body, but a POST with no declared length is still an
+/// unbounded stream into this process, and ADR-062 `:57-58` bounds the body,
+/// not the parse.
+///
+/// The order matters the other way too: a 411 must never overtake a 405, or
+/// `POST /v1/cohort/self-identity` would answer "declare a length" about a
+/// route that accepts no writes at all.
+fn post_guard(method: &str, request: &mut Incoming<'_>) -> Result<(), Response> {
+    if method != "POST" {
+        return Err(method_not_allowed());
+    }
+    request.body().map(|_| ())
+}
+
+fn method_not_allowed() -> Response {
+    Response::new(405, METHOD_NOT_ALLOWED_BODY)
+}
+
+/// Server-side id validation. The client validated too, but a door that trusts
+/// its client for path segments is a door with no validation: `maosctl` is not
+/// the only thing that can reach a loopback port with a bearer token.
+fn validate_id<'a>(id: &'a str) -> Result<&'a str, Response> {
+    if id.is_empty() || id.len() > 128 {
+        return Err(Response::error(
+            400,
+            "bad_request",
+            "identifier must be 1..=128 characters",
+        ));
+    }
+    if !id
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
     {
-        let Some(rotation) = rotation else {
-            return respond(
-                &mut stream,
-                404,
-                "application/json",
-                br#"{"error":"not_found"}"#,
-            );
-        };
-        let Some(status) = rotation.open_rotation_windows() else {
-            return respond(
-                &mut stream,
-                404,
-                "application/json",
-                br#"{"error":"not_found"}"#,
-            );
-        };
-        let windows = match status {
-            RotationWindowStatus::Healthy(windows) => windows,
-            RotationWindowStatus::Unhealthy { detail } => {
-                let body = serde_json::to_vec(&serde_json::json!({
+        return Err(Response::error(
+            400,
+            "bad_request",
+            "identifier must match [A-Za-z0-9._-]",
+        ));
+    }
+    Ok(id)
+}
+
+/// An empty body is `{}` — `POST /v1/spirits/x/pause` takes no parameters, and
+/// requiring `{}` on the wire would be ceremony.
+fn body_json(request: &mut Incoming<'_>) -> Result<serde_json::Value, Response> {
+    let body = request.body()?;
+    if body.is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    serde_json::from_slice(body)
+        .map_err(|error| Response::error(400, "bad_request", &error.to_string()))
+}
+
+fn required_str(body: &serde_json::Value, key: &str) -> Result<String, Response> {
+    match body.get(key).and_then(serde_json::Value::as_str) {
+        Some(value) if !value.trim().is_empty() => Ok(value.to_owned()),
+        _ => Err(Response::error(
+            400,
+            "bad_request",
+            &format!("field `{key}` must be a non-empty string"),
+        )),
+    }
+}
+
+fn optional_str(body: &serde_json::Value, key: &str) -> Result<Option<String>, Response> {
+    match body.get(key) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::String(value)) if !value.trim().is_empty() => {
+            Ok(Some(value.to_owned()))
+        }
+        _ => Err(Response::error(
+            400,
+            "bad_request",
+            &format!("field `{key}` must be a non-empty string or null"),
+        )),
+    }
+}
+
+fn optional_bool(body: &serde_json::Value, key: &str) -> Result<Option<bool>, Response> {
+    match body.get(key) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Bool(value)) => Ok(Some(*value)),
+        _ => Err(Response::error(
+            400,
+            "bad_request",
+            &format!("field `{key}` must be a boolean or null"),
+        )),
+    }
+}
+
+fn optional_string_array(body: &serde_json::Value, key: &str) -> Result<Vec<String>, Response> {
+    match body.get(key) {
+        None | Some(serde_json::Value::Null) => Ok(Vec::new()),
+        Some(serde_json::Value::Array(values)) => values
+            .iter()
+            .map(|value| {
+                value.as_str().map(str::to_owned).ok_or_else(|| {
+                    Response::error(
+                        400,
+                        "bad_request",
+                        &format!("field `{key}` must contain only strings"),
+                    )
+                })
+            })
+            .collect(),
+        _ => Err(Response::error(
+            400,
+            "bad_request",
+            &format!("field `{key}` must be an array or null"),
+        )),
+    }
+}
+
+fn rotation_windows<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
+    let Some(status) = routes
+        .rotation
+        .and_then(|source| source.open_rotation_windows())
+    else {
+        return Response::new(404, NOT_FOUND_BODY);
+    };
+    let windows = match status {
+        RotationWindowStatus::Healthy(windows) => windows,
+        RotationWindowStatus::Unhealthy { detail } => {
+            return Response::value(
+                503,
+                serde_json::json!({
                     "error": "rotation_status_unhealthy",
                     "detail": detail,
-                }))
-                .map_err(std::io::Error::other)?;
-                return respond(&mut stream, 503, "application/json", &body);
-            }
-        };
-        let rows: Vec<serde_json::Value> = windows
-            .into_iter()
-            .map(|row| {
-                serde_json::json!({
-                    "peer": row.peer,
-                    "retiring": row.retiring,
-                    "next": row.next,
-                    "declared": row.declared,
-                    "state": row.state,
-                    "manifest_version": row.manifest_version,
-                    "opened_at_secs": row.opened_at_secs,
-                })
-            })
-            .collect();
-        let body = serde_json::to_vec(&serde_json::json!({ "open_windows": rows }))
-            .map_err(std::io::Error::other)?;
-        return respond(&mut stream, 200, "application/json", &body);
-    }
-    if request_line == "GET /v1/cohort/peer-versions HTTP/1.1"
-        || request_line == "GET /v1/cohort/peer-versions HTTP/1.0"
-    {
-        // Story 14-2b / AC3 — the SAME auth gate above, deliberately: a second
-        // authentication path for the same operator surface is a second thing
-        // to get wrong.
-        let Some(status) = convergence.and_then(|source| source.peer_manifest_versions()) else {
-            return respond(
-                &mut stream,
-                404,
-                "application/json",
-                br#"{"error":"not_found"}"#,
+                }),
             );
-        };
-        let observations = match status {
-            PeerVersionStatus::Healthy(rows) => rows,
-            PeerVersionStatus::Unhealthy { detail } => {
-                let body = serde_json::to_vec(&serde_json::json!({
+        }
+    };
+    let rows: Vec<serde_json::Value> = windows
+        .into_iter()
+        .map(|row| {
+            serde_json::json!({
+                "peer": row.peer,
+                "retiring": row.retiring,
+                "next": row.next,
+                "declared": row.declared,
+                "state": row.state,
+                "manifest_version": row.manifest_version,
+                "opened_at_secs": row.opened_at_secs,
+            })
+        })
+        .collect();
+    Response::value(200, serde_json::json!({ "open_windows": rows }))
+}
+
+fn peer_versions<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
+    // Story 14-2b / AC3 — the SAME auth gate every other route uses,
+    // deliberately: a second authentication path for the same operator surface
+    // is a second thing to get wrong.
+    let Some(status) = routes
+        .convergence
+        .and_then(|source| source.peer_manifest_versions())
+    else {
+        return Response::new(404, NOT_FOUND_BODY);
+    };
+    let observations = match status {
+        PeerVersionStatus::Healthy(rows) => rows,
+        PeerVersionStatus::Unhealthy { detail } => {
+            return Response::value(
+                503,
+                serde_json::json!({
                     "error": "peer_versions_unhealthy",
                     "detail": detail,
-                }))
-                .map_err(std::io::Error::other)?;
-                return respond(&mut stream, 503, "application/json", &body);
-            }
-        };
-        let rows: Vec<serde_json::Value> = observations
-            .into_iter()
-            .map(|row| {
-                serde_json::json!({
-                    "peer": row.peer,
-                    "declared_version": row.declared_version,
-                    "declared_hash": row.declared_hash,
-                    "observed_at_secs": row.observed_at_secs,
-                    "valid": row.valid,
-                    "state": row.state,
-                })
-            })
-            .collect();
-        // ⚠ The key is `peer_versions`, NOT `converged`: an empty array means
-        // NO peer has declared a version to this host, and naming the array
-        // after agreement would make that read as agreement.
-        let body = serde_json::to_vec(&serde_json::json!({ "peer_versions": rows }))
-            .map_err(std::io::Error::other)?;
-        return respond(&mut stream, 200, "application/json", &body);
-    }
-    if request_line == "GET /v1/cohort/self-identity HTTP/1.1"
-        || request_line == "GET /v1/cohort/self-identity HTTP/1.0"
-    {
-        let Some(status) = self_identity.and_then(|source| source.self_identity()) else {
-            return respond(
-                &mut stream,
-                404,
-                "application/json",
-                br#"{"error":"not_found"}"#,
+                }),
             );
-        };
-        let identity = match status {
-            SelfIdentityStatus::Healthy(identity) => identity,
-            SelfIdentityStatus::Unhealthy { detail } => {
-                let body = serde_json::to_vec(&serde_json::json!({
+        }
+    };
+    let rows: Vec<serde_json::Value> = observations
+        .into_iter()
+        .map(|row| {
+            serde_json::json!({
+                "peer": row.peer,
+                "declared_version": row.declared_version,
+                "declared_hash": row.declared_hash,
+                "observed_at_secs": row.observed_at_secs,
+                "valid": row.valid,
+                "state": row.state,
+            })
+        })
+        .collect();
+    // ⚠ The key is `peer_versions`, NOT `converged`: an empty array means NO
+    // peer has declared a version to this host, and naming the array after
+    // agreement would make that read as agreement.
+    Response::value(200, serde_json::json!({ "peer_versions": rows }))
+}
+
+fn self_identity<S: SandboxReportSource>(routes: &Routes<'_, S>) -> Response {
+    let Some(status) = routes
+        .self_identity
+        .and_then(|source| source.self_identity())
+    else {
+        return Response::new(404, NOT_FOUND_BODY);
+    };
+    let identity = match status {
+        SelfIdentityStatus::Healthy(identity) => identity,
+        SelfIdentityStatus::Unhealthy { detail } => {
+            return Response::value(
+                503,
+                serde_json::json!({
                     "error": "self_identity_unhealthy",
                     "detail": detail,
-                }))
-                .map_err(std::io::Error::other)?;
-                return respond(&mut stream, 503, "application/json", &body);
-            }
-        };
-        let body = serde_json::to_vec(&serde_json::json!({
+                }),
+            );
+        }
+    };
+    Response::value(
+        200,
+        serde_json::json!({
             "self_identity": {
                 "declared": identity.declared,
                 "serving": identity.serving,
@@ -420,34 +1719,8 @@ fn handle_connection<S: SandboxReportSource>(
                 "peers_total": identity.peers_total,
                 "last_pull_errors": identity.last_pull_errors,
             }
-        }))
-        .map_err(std::io::Error::other)?;
-        return respond(&mut stream, 200, "application/json", &body);
-    }
-    let Some(spirit_id) = request_line
-        .strip_prefix("GET /v1/spirits/")
-        .and_then(|path| {
-            path.strip_suffix("/sandbox HTTP/1.1")
-                .or_else(|| path.strip_suffix("/sandbox HTTP/1.0"))
-        })
-    else {
-        return respond(
-            &mut stream,
-            404,
-            "application/json",
-            br#"{"error":"not_found"}"#,
-        );
-    };
-    let Some(report) = source.sandbox_report(spirit_id) else {
-        return respond(
-            &mut stream,
-            404,
-            "application/json",
-            br#"{"error":"not_found"}"#,
-        );
-    };
-    let body = serde_json::to_vec(&report).map_err(std::io::Error::other)?;
-    respond(&mut stream, 200, "application/json", &body)
+        }),
+    )
 }
 
 fn respond(
@@ -456,10 +1729,20 @@ fn respond(
     content_type: &str,
     body: &[u8],
 ) -> Result<(), std::io::Error> {
+    // ⚠ Every status this server can emit has its phrase here. Before Story
+    // 16-1 the table held 200/401/404/503 and everything else rendered as
+    // "Internal Server Error", so a 405 would have been indistinguishable from
+    // a crash on the wire.
     let phrase = match status {
         200 => "OK",
+        400 => "Bad Request",
         401 => "Unauthorized",
         404 => "Not Found",
+        405 => "Method Not Allowed",
+        408 => "Request Timeout",
+        409 => "Conflict",
+        411 => "Length Required",
+        413 => "Payload Too Large",
         503 => "Service Unavailable",
         _ => "Internal Server Error",
     };
@@ -471,516 +1754,35 @@ fn respond(
     stream.write_all(body)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct Source;
-
-    impl SandboxReportSource for Source {
-        fn sandbox_report(&self, spirit_id: &str) -> Option<SandboxInspectReport> {
-            (spirit_id == "live").then(|| SandboxInspectReport {
-                spirit_id: "live".into(),
-                pid: 42,
-                runtime: "podman".into(),
-                image_sha: "a".repeat(64),
-                applied_t2_protections: maos_domain::sandbox::T2ProtectionSummary {
-                    landlock_rules: 1,
-                    seccomp_allow_count: 2,
-                    seccomp_kill_count: 3,
-                },
-                strictest_of_reasoning: maos_domain::sandbox::StrictestOfReasoning {
-                    manifest_tier: "T3".into(),
-                    trust_tier_floor: "T3".into(),
-                    operator_policy_floor: "T0".into(),
-                    effective_tier: "T3".into(),
-                    dominant_axis: "manifest".into(),
-                },
-            })
+/// Write the response, then drain whatever the client still had in flight and
+/// close both directions.
+///
+/// Not politeness — correctness. Closing a socket that still holds unread
+/// bytes in its receive queue makes the kernel send RST instead of FIN, and an
+/// RST lets the peer's stack discard data it had not yet handed to the
+/// application. Every refusal this server makes WITHOUT reading the body
+/// (401, 405, 411, 413, and the pool-exhaustion 503) is therefore exactly the
+/// answer most at risk of being lost — the operator would see a closed
+/// connection instead of the reason. Measured: the 17th concurrent request
+/// intermittently read zero bytes before this drain existed.
+fn respond_and_close(
+    stream: &mut TcpStream,
+    status: u16,
+    body: &[u8],
+) -> Result<(), std::io::Error> {
+    let written = respond(stream, status, "application/json", body);
+    let _ = stream.flush();
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(50)));
+    let mut sink = [0_u8; 4096];
+    // Bounded: a client that keeps writing after a refusal does not get to
+    // hold this thread. Eight chunks is enough to clear a refused body's
+    // already-in-flight segments.
+    for _ in 0..8 {
+        match stream.read(&mut sink) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => continue,
         }
     }
-
-    fn request(server: &OperatorHttpServer, token: &str, spirit: &str) -> String {
-        let mut stream = TcpStream::connect(server.local_addr()).unwrap();
-        write!(
-            stream,
-            "GET /v1/spirits/{spirit}/sandbox HTTP/1.1\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
-        )
-        .unwrap();
-        let mut response = String::new();
-        stream.read_to_string(&mut response).unwrap();
-        response
-    }
-
-    #[test]
-    fn loopback_server_requires_bearer_and_returns_exact_live_report() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-        assert!(request(&server, "wrong-token", "live").starts_with("HTTP/1.1 401"));
-        assert!(request(&server, "correct-token", "missing").starts_with("HTTP/1.1 404"));
-        let response = request(&server, "correct-token", "live");
-        assert!(response.contains(r#""spirit_id":"live","pid":42,"runtime":"podman""#));
-    }
-
-    struct Windows;
-
-    impl RotationWindowSource for Windows {
-        fn open_rotation_windows(&self) -> Option<RotationWindowStatus> {
-            Some(RotationWindowStatus::Healthy(vec![RotationWindowRow {
-                peer: "host_b".into(),
-                retiring: format!("sha256:{}", "11".repeat(32)),
-                next: format!("sha256:{}", "22".repeat(32)),
-                declared: format!("sha256:{}", "22".repeat(32)),
-                state: "open".into(),
-                manifest_version: 7,
-                opened_at_secs: 12,
-            }]))
-        }
-    }
-
-    /// A control that IS installed with nothing in flight — the fact a 404 must
-    /// never be confused with.
-    struct NoWindows;
-
-    impl RotationWindowSource for NoWindows {
-        fn open_rotation_windows(&self) -> Option<RotationWindowStatus> {
-            Some(RotationWindowStatus::Healthy(Vec::new()))
-        }
-    }
-
-    struct UnhealthyWindows;
-
-    impl RotationWindowSource for UnhealthyWindows {
-        fn open_rotation_windows(&self) -> Option<RotationWindowStatus> {
-            Some(RotationWindowStatus::Unhealthy {
-                detail: "cohort manifest state lock poisoned".into(),
-            })
-        }
-    }
-
-    fn get(server: &OperatorHttpServer, token: &str, path: &str) -> String {
-        let mut stream = TcpStream::connect(server.local_addr()).unwrap();
-        write!(
-            stream,
-            "{path} HTTP/1.1\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
-        )
-        .unwrap();
-        let mut response = String::new();
-        stream.read_to_string(&mut response).unwrap();
-        response
-    }
-
-    /// Story 14-2a / AC1.5 — the open-window set is readable by an authenticated
-    /// operator, and by nobody else.
-    #[test]
-    fn rotation_windows_route_is_authenticated_read_only_and_reports_the_live_set() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            Some(Arc::new(Windows)),
-            None,
-            None,
-        )
-        .unwrap();
-
-        assert!(
-            get(&server, "wrong-token", "GET /v1/a2a/rotation-windows").starts_with("HTTP/1.1 401"),
-            "the rotation surface is behind the same operator bearer as every other route"
-        );
-        let response = get(&server, "correct-token", "GET /v1/a2a/rotation-windows");
-        assert!(response.starts_with("HTTP/1.1 200"));
-        assert!(
-            response.contains(r#""peer":"host_b""#)
-                && response.contains(r#""manifest_version":7"#)
-                && response.contains(r#""opened_at_secs":12"#)
-                && response.contains(r#""state":"open""#),
-            "which peer, which incoming fingerprint, when the window opened, and what the \
-             live router actually declares: {response}"
-        );
-        assert!(
-            get(&server, "correct-token", "POST /v1/a2a/rotation-windows")
-                .starts_with("HTTP/1.1 404"),
-            "READ-ONLY: a mutating verb on this surface is the rejected second trust path"
-        );
-    }
-
-    /// A process with NO rotation control must answer 404; a process that HAS one
-    /// with nothing in flight must answer 200 with an empty set. "No rotation
-    /// control here" and "no windows open" are different facts and an operator
-    /// acts differently on each: reading an empty list at a process that never
-    /// rotates would say a signed reissue completed cleanly.
-    #[test]
-    fn rotation_windows_route_distinguishes_absent_control_from_empty_window_set() {
-        let absent = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-        assert!(
-            get(&absent, "correct-token", "GET /v1/a2a/rotation-windows")
-                .starts_with("HTTP/1.1 404")
-        );
-
-        let installed = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            Some(Arc::new(NoWindows)),
-            None,
-            None,
-        )
-        .unwrap();
-        let response = get(&installed, "correct-token", "GET /v1/a2a/rotation-windows");
-        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
-        assert!(
-            response.contains(r#"{"open_windows":[]}"#),
-            "an installed control with nothing in flight reports an EMPTY SET: {response}"
-        );
-    }
-
-    #[test]
-    fn rotation_windows_route_reports_an_unhealthy_control_as_503() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            Some(Arc::new(UnhealthyWindows)),
-            None,
-            None,
-        )
-        .unwrap();
-        let response = get(&server, "correct-token", "GET /v1/a2a/rotation-windows");
-        assert!(response.starts_with("HTTP/1.1 503 Service Unavailable"));
-        assert!(
-            response.contains(r#""error":"rotation_status_unhealthy""#)
-                && response.contains("cohort manifest state lock poisoned"),
-            "{response}"
-        );
-    }
-
-    /// The error bodies must be parseable JSON on an `application/json` route: a
-    /// RAW byte string keeps its backslashes and no parser accepts it. The 404
-    /// here is a semantically meaningful answer, so an operator tool is expected
-    /// to read exactly this body.
-    #[test]
-    fn error_bodies_are_valid_json() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-        for (token, expected) in [
-            ("wrong-token", "unauthorized"),
-            ("correct-token", "not_found"),
-        ] {
-            let response = get(&server, token, "GET /v1/a2a/rotation-windows");
-            let body = response
-                .split("\r\n\r\n")
-                .nth(1)
-                .expect("a body follows the headers");
-            let parsed: serde_json::Value = serde_json::from_str(body)
-                .unwrap_or_else(|error| panic!("body is not JSON ({error}): {body:?}"));
-            assert_eq!(parsed["error"], expected);
-        }
-    }
-
-    struct Declarations;
-
-    impl CohortConvergenceSource for Declarations {
-        fn peer_manifest_versions(&self) -> Option<PeerVersionStatus> {
-            Some(PeerVersionStatus::Healthy(vec![
-                PeerVersionRow {
-                    peer: "host_b".into(),
-                    declared_version: 1,
-                    declared_hash: "11".repeat(32),
-                    observed_at_secs: 4,
-                    valid: true,
-                    state: "observed".into(),
-                },
-                PeerVersionRow {
-                    peer: "host_c".into(),
-                    declared_version: 2,
-                    declared_hash: "22".repeat(32),
-                    observed_at_secs: 5,
-                    valid: false,
-                    state: "restarted".into(),
-                },
-            ]))
-        }
-    }
-
-    /// A cohort state that IS present and to which NO peer has ever declared a
-    /// version — the fact a 404 must never be confused with.
-    struct NoDeclarations;
-
-    impl CohortConvergenceSource for NoDeclarations {
-        fn peer_manifest_versions(&self) -> Option<PeerVersionStatus> {
-            Some(PeerVersionStatus::Healthy(Vec::new()))
-        }
-    }
-
-    struct UnhealthyDeclarations;
-
-    impl CohortConvergenceSource for UnhealthyDeclarations {
-        fn peer_manifest_versions(&self) -> Option<PeerVersionStatus> {
-            Some(PeerVersionStatus::Unhealthy {
-                detail: "cohort manifest state lock poisoned".into(),
-            })
-        }
-    }
-
-    /// Story 14-2b / AC3 — the retained declarations are readable by an
-    /// authenticated operator, by nobody else, and the surface TELLS TWO PEERS
-    /// AT DIFFERENT VERSIONS APART rather than merely proving a row exists.
-    #[test]
-    fn peer_versions_route_is_authenticated_and_distinguishes_peers_by_version() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            Some(Arc::new(Declarations)),
-            None,
-        )
-        .unwrap();
-
-        assert!(
-            get(&server, "wrong-token", "GET /v1/cohort/peer-versions").starts_with("HTTP/1.1 401"),
-            "the convergence surface is behind the SAME operator bearer, never a second auth path"
-        );
-        let response = get(&server, "correct-token", "GET /v1/cohort/peer-versions");
-        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
-        let body = response
-            .split("\r\n\r\n")
-            .nth(1)
-            .expect("a body follows the headers");
-        let parsed: serde_json::Value = serde_json::from_str(body).expect("body is JSON");
-        let rows = parsed["peer_versions"]
-            .as_array()
-            .expect("peer_versions is an array");
-        assert_eq!(rows.len(), 2, "{body}");
-        assert_eq!(rows[0]["peer"], "host_b");
-        assert_eq!(rows[0]["declared_version"], 1);
-        assert_eq!(rows[0]["declared_hash"], "11".repeat(32));
-        assert_eq!(rows[0]["observed_at_secs"], 4);
-        assert_eq!(rows[0]["valid"], true);
-        assert_eq!(rows[0]["state"], "observed");
-        assert_eq!(rows[1]["peer"], "host_c");
-        assert_eq!(rows[1]["declared_version"], 2);
-        assert_eq!(rows[1]["valid"], false);
-        assert_eq!(rows[1]["state"], "restarted");
-        assert_ne!(
-            rows[0]["declared_version"], rows[1]["declared_version"],
-            "two peers at different versions must be TOLD APART, not merely counted: {body}"
-        );
-        assert!(
-            get(&server, "correct-token", "POST /v1/cohort/peer-versions")
-                .starts_with("HTTP/1.1 404"),
-            "READ-ONLY: the write path for cohort manifest state is the signed reissue and nothing \
-             else"
-        );
-    }
-
-    /// An ABSENT cohort state answers 404; a PRESENT one to which nothing has
-    /// been declared answers 200 with an empty array. Collapsing the two would
-    /// tell an operator that every peer agrees on a host that has never received
-    /// a single declaration — the `Some(Healthy(vec![]))` distinction the
-    /// rotation route already draws.
-    #[test]
-    fn peer_versions_route_distinguishes_absent_state_from_no_declarations() {
-        let absent = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-        let response = get(&absent, "correct-token", "GET /v1/cohort/peer-versions");
-        assert!(response.starts_with("HTTP/1.1 404"), "{response}");
-        assert!(
-            !response.contains("peer_versions"),
-            "a 404 must not carry an empty observation set that could be parsed as agreement: \
-             {response}"
-        );
-
-        let present = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            Some(Arc::new(NoDeclarations)),
-            None,
-        )
-        .unwrap();
-        let response = get(&present, "correct-token", "GET /v1/cohort/peer-versions");
-        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
-        assert!(
-            response.contains(r#"{"peer_versions":[]}"#),
-            "a present cohort state with nothing declared reports an EMPTY SET: {response}"
-        );
-    }
-
-    #[test]
-    fn peer_versions_route_reports_an_unhealthy_source_as_503() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            Some(Arc::new(UnhealthyDeclarations)),
-            None,
-        )
-        .unwrap();
-        let response = get(&server, "correct-token", "GET /v1/cohort/peer-versions");
-        assert!(
-            response.starts_with("HTTP/1.1 503 Service Unavailable"),
-            "{response}"
-        );
-        assert!(
-            response.contains(r#""error":"peer_versions_unhealthy""#)
-                && response.contains("cohort manifest state lock poisoned"),
-            "an unreadable state must never launder into an empty set: {response}"
-        );
-    }
-    struct SelfIdentity;
-
-    impl CohortSelfIdentitySource for SelfIdentity {
-        fn self_identity(&self) -> Option<SelfIdentityStatus> {
-            Some(SelfIdentityStatus::Healthy(SelfIdentityRow {
-                declared: Some("a1a1a1a1".into()),
-                serving: Some("a2a2a2a2".into()),
-                verdict: "diverged".into(),
-                peers_observed: 0,
-                peers_total: 2,
-                last_pull_errors: std::collections::BTreeMap::from([(
-                    "host_b".into(),
-                    "PIN_MISMATCH".into(),
-                )]),
-            }))
-        }
-    }
-
-    struct UnconfirmableSelfIdentity;
-
-    impl CohortSelfIdentitySource for UnconfirmableSelfIdentity {
-        fn self_identity(&self) -> Option<SelfIdentityStatus> {
-            Some(SelfIdentityStatus::Healthy(SelfIdentityRow {
-                declared: Some("a1a1a1a1".into()),
-                serving: None,
-                verdict: "unconfirmable".into(),
-                peers_observed: 0,
-                peers_total: 2,
-                last_pull_errors: std::collections::BTreeMap::new(),
-            }))
-        }
-    }
-
-    struct UnhealthySelfIdentity;
-
-    impl CohortSelfIdentitySource for UnhealthySelfIdentity {
-        fn self_identity(&self) -> Option<SelfIdentityStatus> {
-            Some(SelfIdentityStatus::Unhealthy {
-                detail: "cohort manifest state lock poisoned".into(),
-            })
-        }
-    }
-
-    #[test]
-    fn self_identity_route_is_authenticated_read_only_and_reports_divergence() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            Some(Arc::new(SelfIdentity)),
-        )
-        .unwrap();
-
-        assert!(
-            get(&server, "wrong-token", "GET /v1/cohort/self-identity").starts_with("HTTP/1.1 401")
-        );
-        let response = get(&server, "correct-token", "GET /v1/cohort/self-identity");
-        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
-        let body: serde_json::Value = serde_json::from_str(
-            response
-                .split("\r\n\r\n")
-                .nth(1)
-                .expect("a body follows the headers"),
-        )
-        .expect("body is JSON");
-        let identity = &body["self_identity"];
-        assert_eq!(identity["declared"], "a1a1a1a1");
-        assert_eq!(identity["serving"], "a2a2a2a2");
-        assert_eq!(identity["verdict"], "diverged");
-        assert_eq!(identity["peers_observed"], 0);
-        assert_eq!(identity["peers_total"], 2);
-        assert_eq!(identity["last_pull_errors"]["host_b"], "PIN_MISMATCH");
-        assert!(
-            get(&server, "correct-token", "POST /v1/cohort/self-identity")
-                .starts_with("HTTP/1.1 404"),
-            "the surface is read-only"
-        );
-    }
-
-    #[test]
-    fn self_identity_route_distinguishes_absent_state_from_unconfirmable() {
-        let absent = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-        assert!(
-            get(&absent, "correct-token", "GET /v1/cohort/self-identity")
-                .starts_with("HTTP/1.1 404")
-        );
-
-        let present = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            Some(Arc::new(UnconfirmableSelfIdentity)),
-        )
-        .unwrap();
-        let response = get(&present, "correct-token", "GET /v1/cohort/self-identity");
-        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
-        assert!(
-            response.contains(r#""verdict":"unconfirmable""#),
-            "{response}"
-        );
-        assert!(response.contains(r#""serving":null"#), "{response}");
-    }
-
-    #[test]
-    fn self_identity_route_reports_an_unhealthy_source_as_503() {
-        let server = OperatorHttpServer::bind(
-            OperatorHttpConfig::loopback("correct-token".into()),
-            Arc::new(Source),
-            None,
-            None,
-            Some(Arc::new(UnhealthySelfIdentity)),
-        )
-        .unwrap();
-        let response = get(&server, "correct-token", "GET /v1/cohort/self-identity");
-        assert!(
-            response.starts_with("HTTP/1.1 503 Service Unavailable"),
-            "{response}"
-        );
-        assert!(
-            response.contains(r#""error":"self_identity_unhealthy""#)
-                && response.contains("cohort manifest state lock poisoned"),
-            "{response}"
-        );
-    }
+    let _ = stream.shutdown(std::net::Shutdown::Both);
+    written
 }

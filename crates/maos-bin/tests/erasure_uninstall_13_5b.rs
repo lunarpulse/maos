@@ -112,6 +112,19 @@ impl Fixture {
                 MemoryValue::Text("principal payload".into()),
             )
             .expect("seed principal row");
+
+        // Story 16-2 / D-16-2-F(4) — with the pid-0 wildcard retired the
+        // cascade resolves "hello-spirit" through the identity rows, so the
+        // fixture seeds the kind-19 row the one-shot evaluator run writes in
+        // production (`source: "one-shot"`).
+        let _ = transparency_log.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::SpiritAdmitted,
+            0,
+            None,
+            "hello-spirit",
+            br#"{"spirit_id":"hello-spirit","source":"one-shot"}"#,
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
         if held {
             let outcome = memory
                 .forget_with_reason(principal, Some("legal-hold:case-13-5b"))
@@ -158,6 +171,19 @@ impl Fixture {
                 MemoryValue::Markdown("# dossier\n\nprincipal payload\n".into()),
             )
             .expect("seed markdown record");
+
+        // Story 16-2 / D-16-2-F(4) — with the pid-0 wildcard retired the
+        // cascade resolves "hello-spirit" through the identity rows, so the
+        // fixture seeds the kind-19 row the one-shot evaluator run writes in
+        // production (`source: "one-shot"`).
+        let _ = transparency_log.insert_frame_event(
+            maos_kernel_core::iac::transparency_log::FrameKind::SpiritAdmitted,
+            0,
+            None,
+            "hello-spirit",
+            br#"{"spirit_id":"hello-spirit","source":"one-shot"}"#,
+            maos_domain::invariants::i3::FrameOrigin::Kernel,
+        );
     }
 
     fn seed_markdown_principal(&self) {
@@ -607,6 +633,109 @@ fn not_found_uninstall_has_distinct_terminal_code() {
     assert_eq!(regular_files(&fixture.proof_dir()), 0);
 }
 
+/// Story 16-2 / D-16-2-F — branch 1 of the erasure `not_found` terminal: a
+/// Transparency Log that EXISTS but holds no frames and no shared principal
+/// residue is `not_found` (exit 4, no proof) — provably nothing to erase —
+/// even though the queried name would fail `resolve_spirit_name`.
+///
+/// The name is deliberately one no identity row mentions: the empty-Log
+/// disjunct must fire BEFORE name resolution, so rerouting this shape through
+/// resolution (and answering `failed` for the unknown name, as branch 3 does
+/// on a populated Log) flips the exit code to 5 and reds this test.
+#[test]
+fn empty_transparency_log_is_not_found_even_for_unknown_spirit() {
+    let fixture = Fixture::new();
+    // Exists-but-empty Log: open the stores over the audit home without
+    // writing a single frame or Shared row. No existing seeder writes
+    // "nothing", so mirror `plant_pre_partition_shared_row`'s bare open.
+    std::fs::create_dir_all(fixture.audit_db().parent().expect("audit parent"))
+        .expect("create audit parent");
+    drop(SharedMemoryStore::open(&fixture.audit_db()).expect("open shared store"));
+
+    let mut command = fixture.command();
+    command.env("MAOS_SPIRIT_ID", "ghost-spirit");
+    let output = command.output().expect("run one-shot uninstall");
+
+    assert_eq!(output.status.code(), Some(4));
+    let result = terminal(&output);
+    assert_eq!(
+        result["outcome"], "not_found",
+        "an empty Log is provably nothing to erase: {result}"
+    );
+    assert_eq!(result["spirit_id"], "ghost-spirit");
+    assert_eq!(regular_files(&fixture.proof_dir()), 0);
+}
+
+/// Story 16-2 / D-16-2-F — branch 2: an unknown Spirit name on a POPULATED
+/// Transparency Log that also holds pre-partition Shared residue must reach
+/// the FAILED PARTIAL PROOF, never `not_found`.
+///
+/// This is the 13.5b false-success shape the rewrite exists to prevent:
+/// `not_found` here would sign "nothing to erase" over a Log that provably
+/// holds frames (identity rows for a DIFFERENT spirit) and legacy Shared rows.
+/// The resolution failure collapses to an empty incarnation set, the residue
+/// still drives the signed shared-`CoverageGap`, and the terminal is
+/// `failed`/exit 5 WITH the proof on disk — the proof's presence is what
+/// distinguishes this branch from the residue-free unknown-name failure
+/// (branch 3), and exit 5 from branch 1's `not_found`.
+#[test]
+fn unknown_spirit_on_populated_log_with_shared_residue_writes_partial_proof() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    fixture.plant_pre_partition_shared_row(PRINCIPAL);
+
+    let mut command = fixture.command();
+    command.env("MAOS_SPIRIT_ID", "ghost-spirit");
+    let output = command.output().expect("run one-shot uninstall");
+
+    assert_eq!(output.status.code(), Some(5));
+    let result = terminal(&output);
+    assert_eq!(
+        result["outcome"], "failed",
+        "unidentified rows exist, so `not_found` would be a signed lie: {result}"
+    );
+    assert_eq!(result["spirit_id"], "ghost-spirit");
+    assert_eq!(
+        regular_files(&fixture.proof_dir()),
+        1,
+        "the failed terminal must retain the signed partial proof"
+    );
+}
+
+/// Story 16-2 / D-16-2-F — branch 3: an unknown Spirit name on a populated
+/// Transparency Log with NO shared residue keeps the failed outcome the
+/// cascade has always given an unknown name — `failed`/exit 5, NO proof —
+/// and must never become a new `not_found`.
+///
+/// The proof's ABSENCE distinguishes this from branch 2 (same unknown name,
+/// residue present ⇒ failed partial proof), and exit 5 distinguishes it from
+/// branch 1. Silently mapping the unknown name to `not_found` would sign
+/// "nothing to erase" over a populated Log and red this test via the exit
+/// code; dropping the early `Err` in favour of the branch-2 arm is caught by
+/// the zero-proof count.
+#[test]
+fn unknown_spirit_on_populated_log_without_residue_fails_without_proof() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+
+    let mut command = fixture.command();
+    command.env("MAOS_SPIRIT_ID", "ghost-spirit");
+    let output = command.output().expect("run one-shot uninstall");
+
+    assert_eq!(output.status.code(), Some(5));
+    let result = terminal(&output);
+    assert_eq!(
+        result["outcome"], "failed",
+        "an unknown name keeps the cascade's failed outcome: {result}"
+    );
+    assert_eq!(result["spirit_id"], "ghost-spirit");
+    assert_eq!(
+        regular_files(&fixture.proof_dir()),
+        0,
+        "the resolution failure precedes proof building: no artifact may exist"
+    );
+}
+
 #[test]
 fn erased_uninstall_is_success_with_machine_receipt() {
     let fixture = Fixture::new();
@@ -762,21 +891,18 @@ fn legal_hold_list_and_release_are_operable_without_auto_erasure() {
     let fixture = Fixture::new();
     fixture.seed_held_principal();
 
-    let list = fixture
-        .command()
-        .env("MAOS_ONE_SHOT", "legal-hold-list")
-        .output()
-        .expect("list legal holds");
-    assert!(
-        list.status.success(),
-        "list failed: {}",
-        String::from_utf8_lossy(&list.stderr)
-    );
-    let holds: serde_json::Value =
-        serde_json::from_slice(&list.stdout).expect("decode legal hold list");
-    assert_eq!(holds.as_array().map(Vec::len), Some(1));
-    assert_eq!(holds[0]["principal_id"], PRINCIPAL);
-
+    // ⚠ Story 16-1 / AC7 — the list half no longer spawns a one-shot.
+    // `MAOS_ONE_SHOT=legal-hold-list` is one of the two durable READER modes
+    // the story deleted (D-16-1-A): booting a whole composition root to run
+    // one `SELECT` bought nothing, and the write-capable open it performed
+    // could hold the sqlite lock past a live daemon's `busy_timeout` and trip
+    // the Transparency Log's panic-on-write-error (Trap 9). This calls the
+    // SAME read-only reader `maosctl legal-hold list` now uses, so the
+    // assertions below still read the tree through production code.
+    let holds = maos_audit::list_legal_holds_readonly(&fixture.audit_db())
+        .expect("list legal holds read-only");
+    assert_eq!(holds.len(), 1, "the seeded hold must be visible: {holds:?}");
+    assert_eq!(holds[0].principal_id, PRINCIPAL);
     let release = fixture
         .command()
         .env("MAOS_ONE_SHOT", "legal-hold-release")
@@ -882,4 +1008,30 @@ fn private_tier_markdown_is_erased_by_the_forget_cascade() {
         &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
     )
     .expect("the signed bundle must verify now that it claims a real removal");
+}
+
+/// AC2(g) / D-16-5-I review vector (proven-red shape): private-tier residue
+/// must keep the cascade away from the `not-found` terminal. Before the
+/// repair the gates proved emptiness from the shared tier alone and signed
+/// "provably nothing to erase" over existing private data.
+#[test]
+fn private_tier_residue_prevents_not_found() {
+    const NAMESPACE_HEX: &str = "7b225072696e636970616c223a7b227072696e636970616c5f6964223a22616c696365222c22736368656d61223a2270726f66696c65227d7d";
+
+    let fixture = Fixture::new();
+    // Seed ONLY the private tier: one Principal namespace with one value.
+    // The shared tier and the audit TL stay empty — at the pre-repair tree
+    // this is exactly the false `not-found` shape.
+    let principal_dir = fixture.memory_root.join("42").join(NAMESPACE_HEX);
+    std::fs::create_dir_all(&principal_dir).expect("principal namespace");
+    std::fs::write(principal_dir.join("note.txt"), b"private data").expect("private value");
+
+    let output = fixture.run_uninstall(Some("eu-west"));
+    let terminal = terminal(&output);
+    assert_ne!(
+        terminal["outcome"],
+        "not-found",
+        "private-tier residue must prevent the NotFound terminal (AC2(g)); stdout={}",
+        String::from_utf8_lossy(&output.stdout)
+    );
 }

@@ -1246,8 +1246,8 @@ impl A2ARouterCore {
                 // restart detection IS pin invalidation, re-pin IS the designed
                 // recovery, and the variant already maps typed to
                 // `IacBusError::CrossHostPinMismatch`. Lands in `maos-a2a-core` at
-                // ZERO headroom as a correctness repair on a security path, which
-                // **`xtask/kloc.toml:87`** says a ceiling must never block.
+                // ZERO headroom as a correctness repair on a security path: the
+                // CEILING RULE says a ceiling "must never block a correctness or compliance repair."
                 //
                 // SCOPE WALL: this repairs ONLY the code this story makes reachable.
                 //
@@ -1268,8 +1268,8 @@ impl A2ARouterCore {
                 // `j1-crosshost-2c` AC3.2 — SHIP-BLOCKER for AC3's fault windows.
                 // Both of these used to land in the catch-all below, which made a
                 // dropped-receiver internal NACK and a genuine wire partition the
-                // SAME observable at the sender. Same `kloc.toml:87`
-                // correctness-repair grant, same binding scope wall as H13.
+                // SAME observable at the sender. Same CEILING RULE correctness-repair
+                // grant, same binding scope wall as H13.
                 CODE_INTERNAL => Err(A2AError::PeerInternalFailure {
                     peer: peer.as_str().to_string(),
                     message: n.error.message,
@@ -1930,135 +1930,202 @@ impl A2ARouterCore {
 /// `pub` so every `A2ATransport` impl (loopback in `maos-a2a`, TCP in
 /// `maos-a2a-tcp`) maps its `A2AError` to the kernel's `IacBusError` port type
 /// identically (Story 8.6 extraction — was a private fn in `maos-a2a::adapter`).
+///
+/// Review 2026-09-17: the `IntentDirection::Accept` arm is currently dead in
+/// production (the sole production `IntentDenied` constructor is send-side;
+/// the receiver answers with a typed NACK instead), but it is PINNED — not
+/// retired — by `accept_direction_maps_and_is_send_only_in_production`
+/// (`crates/maos-a2a-core/tests/fail_closed_8_8.rs`): the mirror enum keeps
+/// `Accept` for wire symmetry.
+fn cross_host_direction(
+    direction: IntentDirection,
+) -> maos_domain::iac_bus_types::CrossHostIntentDirection {
+    match direction {
+        IntentDirection::Send => maos_domain::iac_bus_types::CrossHostIntentDirection::Send,
+        IntentDirection::Accept => maos_domain::iac_bus_types::CrossHostIntentDirection::Accept,
+    }
+}
+
+fn cross_host_unclassified_reason(
+    reason: crate::error::UnclassifiedReason,
+) -> maos_domain::iac_bus_types::CrossHostUnclassifiedReason {
+    match reason {
+        crate::error::UnclassifiedReason::Absent => {
+            maos_domain::iac_bus_types::CrossHostUnclassifiedReason::Absent
+        }
+        crate::error::UnclassifiedReason::NonCanonical => {
+            maos_domain::iac_bus_types::CrossHostUnclassifiedReason::NonCanonical
+        }
+        crate::error::UnclassifiedReason::Oversized => {
+            maos_domain::iac_bus_types::CrossHostUnclassifiedReason::Oversized
+        }
+    }
+}
+
+fn cross_host_cohort_denial(
+    reason: crate::cohort::CohortConsentDenial,
+) -> maos_domain::iac_bus_types::CrossHostCohortConsentDenial {
+    use maos_domain::iac_bus_types::CrossHostCohortConsentDenial as PortReason;
+    match reason {
+        crate::cohort::CohortConsentDenial::ActingRoleAbsent => PortReason::ActingRoleAbsent,
+        crate::cohort::CohortConsentDenial::ManifestVersionAbsent => {
+            PortReason::ManifestVersionAbsent
+        }
+        crate::cohort::CohortConsentDenial::RoleNotEntitled => PortReason::RoleNotEntitled,
+        crate::cohort::CohortConsentDenial::NoGrant => PortReason::NoGrant,
+        crate::cohort::CohortConsentDenial::ManifestSkew {
+            sender_version,
+            receiver_version,
+            delta,
+        } => PortReason::ManifestSkew {
+            sender_version,
+            receiver_version,
+            delta,
+        },
+        crate::cohort::CohortConsentDenial::StateUnavailable => PortReason::StateUnavailable,
+        crate::cohort::CohortConsentDenial::CrossingDeferRefused => {
+            PortReason::CrossingDeferRefused
+        }
+    }
+}
+
 pub fn map_a2a_error_to_iac_bus(err: A2AError, peer: &str) -> IacBusError {
     match err {
-        A2AError::IntentDenied { direction, inner } => {
-            let dir = match direction {
-                IntentDirection::Send => maos_domain::iac_bus_types::CrossHostIntentDirection::Send,
-                IntentDirection::Accept => maos_domain::iac_bus_types::CrossHostIntentDirection::Accept,
-            };
-            IacBusError::CrossHostIntentDenied {
-                peer: peer.to_string(),
-                intent: inner.intent,
-                direction: dir,
-            }
-        }
-        A2AError::IntentDeniedAtPeer { peer: denied_peer, message } => {
-            IacBusError::CrossHostIntentDenied {
-                peer: denied_peer,
-                intent: message,
-                direction: maos_domain::iac_bus_types::CrossHostIntentDirection::Accept,
-            }
-        }
-        A2AError::PinMismatch(e) => {
-            IacBusError::CrossHostPinMismatch {
-                peer: peer.to_string(),
-                detail: e.to_string(),
-            }
-        }
-        A2AError::PinInvalidated { peer: inv_peer, .. } => {
-            IacBusError::CrossHostPinMismatch {
-                peer: inv_peer,
-                detail: format!("pin invalidated — re-pin consent required"),
-            }
-        }
-        A2AError::ConsentExpired { expired_at_ns, now_ns } => {
-            IacBusError::CrossHostConsentExpired {
-                peer: peer.to_string(),
-                expired_at_ns,
-                now_ns,
-            }
-        }
-        A2AError::PartitionTimeout { peer: p_peer, frame_id, timeout_secs } => {
-            IacBusError::CrossHostPartitionTimeout {
-                peer: p_peer,
-                frame_id,
-                timeout_secs,
-            }
-        }
-        // `j1-crosshost-2c` AC3.2 — both receiver-side faults route to the generic
-        // route-failure port type, following the Story 8.9 precedent directly
-        // below: NO new `IacBusError` variant, so `maos-domain` takes a ZERO delta
-        // (it is already at a pre-existing D14 ceiling breach that is not ours).
-        // The distinction survives anyway, because it is carried in the rendered
-        // text and because neither can be confused with the typed
-        // `CrossHostPartitionTimeout` above — which is the whole point.
-        A2AError::PeerInternalFailure { peer: p_peer, message } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "peer {p_peer} reported an internal failure — frame NOT delivered: {message}"
-            ))
-        }
-        A2AError::PeerIntakeTimeout { peer: p_peer, message } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "peer {p_peer} reported an intake timeout: {message}"
-            ))
-        }
+        A2AError::IntentDenied { direction, inner } => IacBusError::CrossHostIntentDenied {
+            peer: peer.to_string(),
+            intent: inner.intent,
+            direction: cross_host_direction(direction),
+        },
+        A2AError::IntentDeniedAtPeer {
+            peer: denied_peer,
+            message,
+        } => IacBusError::CrossHostIntentDeniedAtPeer {
+            peer: denied_peer,
+            message,
+        },
+        A2AError::PinMismatch(e) => IacBusError::CrossHostPinMismatch {
+            peer: peer.to_string(),
+            detail: e.to_string(),
+        },
+        A2AError::PinInvalidated { peer: inv_peer, .. } => IacBusError::CrossHostPinMismatch {
+            peer: inv_peer,
+            detail: format!("pin invalidated — re-pin consent required"),
+        },
+        A2AError::ConsentExpired {
+            expired_at_ns,
+            now_ns,
+        } => IacBusError::CrossHostConsentExpired {
+            peer: peer.to_string(),
+            expired_at_ns,
+            now_ns,
+        },
+        A2AError::PartitionTimeout {
+            peer: p_peer,
+            frame_id,
+            timeout_secs,
+        } => IacBusError::CrossHostPartitionTimeout {
+            peer: p_peer,
+            frame_id,
+            timeout_secs,
+        },
+        A2AError::PeerInternalFailure {
+            peer: p_peer,
+            message,
+        } => IacBusError::CrossHostPeerInternalFailure {
+            peer: p_peer,
+            message,
+        },
+        A2AError::PeerIntakeTimeout {
+            peer: p_peer,
+            message,
+        } => IacBusError::CrossHostPeerIntakeTimeout {
+            peer: p_peer,
+            message,
+        },
         A2AError::TransportFailed(detail)
         | A2AError::DeserializationFailed(detail)
         | A2AError::Io(detail)
-        | A2AError::HandshakeFailed { message: detail, .. } => {
-            IacBusError::CrossHostTransportFailure {
+        | A2AError::HandshakeFailed {
+            message: detail, ..
+        } => IacBusError::CrossHostTransportFailure {
+            peer: peer.to_string(),
+            detail,
+        },
+        A2AError::ConfigInvalid(detail) => IacBusError::CrossHostConfigInvalid { detail },
+        A2AError::SpiritRestartDetected {
+            peer,
+            prior_boot_nonce,
+            observed_boot_nonce,
+        } => IacBusError::CrossHostSpiritRestartDetected {
+            peer,
+            prior_boot_nonce,
+            observed_boot_nonce,
+        },
+        A2AError::PeerIdentityMismatch { expected, asserted } => {
+            IacBusError::CrossHostPeerIdentityMismatch { expected, asserted }
+        }
+        A2AError::ConsentGranterMismatch {
+            granter,
+            frame_from,
+        } => IacBusError::CrossHostConsentGranterMismatch {
+            granter,
+            frame_from,
+        },
+        A2AError::CohortConsentDenied { direction, reason } => {
+            IacBusError::CrossHostCohortConsentDenied {
                 peer: peer.to_string(),
-                detail,
+                direction: cross_host_direction(direction),
+                reason: cross_host_cohort_denial(reason),
             }
         }
-        A2AError::ConfigInvalid(msg) => {
-            IacBusError::CrossHostRouteFailure(msg)
-        }
-        A2AError::SpiritRestartDetected { peer, prior_boot_nonce, observed_boot_nonce } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "spirit restart detected on peer {peer}: prior={prior_boot_nonce} observed={observed_boot_nonce}"
-            ))
-        }
-        // Story 8.9 — trust-binding rejections map to the generic route-failure
-        // port type (no new kernel variant; `maos-kernel-core` stays
-        // byte-identical). Both carry the security-relevant addresses in the msg.
-        A2AError::PeerIdentityMismatch { expected, asserted } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "peer identity mismatch: TLS-verified peer {expected}, frame asserted {asserted}"
-            ))
-        }
-        A2AError::ConsentGranterMismatch { granter, frame_from } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "consent granter mismatch: envelope granter {granter}, frame from {frame_from}"
-            ))
-        }
-        A2AError::CohortConsentDenied { direction, reason } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "cohort consent denied ({direction:?}) for peer {peer}: {reason}"
-            ))
-        }
-        // Story 13.6a — the team-identity refusal rides the SAME generic
-        // route-failure port type (no new kernel variant; the 8.9/8.8 pattern).
-        // Its `Display` already names the claimed and manifest-declared teams.
-        error @ A2AError::CohortTeamIdentityRefused { .. } => {
-            IacBusError::CrossHostRouteFailure(format!("{error} (peer {peer})"))
-        }
-        // Story 13.6b — both crossing refusals ride the SAME generic
-        // route-failure port type. No new `IacBusError` variant, so
-        // `maos-kernel-core` stays byte-identical (Trap 10's sibling on the
-        // A2A axis) and the ZERO-Δ pin holds. Their `Display` impls already
-        // name the envelope/payload pair and the ordered pair + intent, so the
-        // three-way distinction survives into the message even though the port
-        // type is shared.
-        error @ (A2AError::CrossingSourceTeamUnbound { .. }
-        | A2AError::CrossTeamCrossingRefused { .. }) => {
-            IacBusError::CrossHostRouteFailure(format!("{error} (peer {peer})"))
-        }
-        // Story 8.8 — fail-closed unclassified-consent denials map to the generic
-        // route-failure port type (no new kernel variant; `maos-kernel-core` stays
-        // byte-identical — the 8.9 pattern). The reason + direction/peer are
-        // preserved in the message for the audit trail.
-        A2AError::ConsentUnclassified { direction, reason } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "cross-Host consent unclassified ({reason}) on {direction:?} — fail-closed deny for peer {peer}"
-            ))
-        }
-        A2AError::ConsentUnclassifiedAtPeer { peer: denied_peer, reason } => {
-            IacBusError::CrossHostRouteFailure(format!(
-                "cross-Host consent unclassified ({reason}) at peer {denied_peer} — fail-closed deny"
-            ))
-        }
+        A2AError::CohortTeamIdentityRefused {
+            direction,
+            host,
+            claimed_team,
+            declared,
+        } => IacBusError::CrossHostCohortTeamIdentityRefused {
+            peer: peer.to_string(),
+            direction: cross_host_direction(direction),
+            host,
+            claimed_team,
+            declared,
+        },
+        A2AError::CrossingSourceTeamUnbound {
+            envelope_team,
+            payload_team,
+        } => IacBusError::CrossHostCrossingSourceTeamUnbound {
+            peer: peer.to_string(),
+            envelope_team,
+            payload_team,
+        },
+        A2AError::CrossTeamCrossingRefused {
+            reason,
+            detail,
+            from_team,
+            to_team,
+            intent,
+        } => IacBusError::CrossHostCrossTeamCrossingRefused {
+            peer: peer.to_string(),
+            reason,
+            detail,
+            from_team,
+            to_team,
+            intent,
+        },
+        A2AError::ConsentUnclassified {
+            direction: _,
+            reason,
+        } => IacBusError::CrossHostConsentUnclassified {
+            peer: peer.to_string(),
+            reason: cross_host_unclassified_reason(reason),
+        },
+        A2AError::ConsentUnclassifiedAtPeer {
+            peer: denied_peer,
+            reason,
+        } => IacBusError::CrossHostConsentUnclassifiedAtPeer {
+            peer: denied_peer,
+            reason: cross_host_unclassified_reason(reason),
+        },
     }
 }
 

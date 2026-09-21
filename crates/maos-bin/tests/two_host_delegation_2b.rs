@@ -22,6 +22,9 @@ use maos_kernel_core::iac::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_spirit_abi::identity::SpiritRole;
 use orchestrator::{Orchestrator, DELEGATION_CONSENT_INTENT};
 
+#[path = "../../../tests/harness/doorless_home.rs"]
+mod doorless_home;
+
 const LISTEN_TIMEOUT: Duration = Duration::from_secs(90);
 const LISTENING_MARKER: &str = "cohort-a2a-daemon listening on ";
 const NONCE_A: u64 = 0x2B_A;
@@ -296,6 +299,9 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
+        // Story 16-1 / D-16-1-Q: both roots share one log (MAOS_AUDIT_DB) by design,
+        // so only "HOME" moves — no developer control.json endpoint for either.
+        .env("HOME", doorless_home::doorless_home())
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -465,6 +471,7 @@ fn run_host_a(config: &Path, audit_db: &Path) -> std::process::Output {
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
+        .env("HOME", doorless_home::doorless_home())
         // §A6 review D1 — MAOS_DELEGATED_GOAL is required on every cross-host
         // arm. This fixture asserts the delegation MECHANISM (the same frame_id
         // bytes in both logs), never the goal's content, so a dummy goal is
@@ -632,12 +639,93 @@ fn install_prior_distillate(db: &Path, frame_id: [u8; 16]) {
         .expect("install prior distillate");
 }
 
+/// Story 16-3 (D-16-3-I) — host B's Workers are supervised, so this harness
+/// builds a REAL `WorkerSupervisor` over a real in-process kernel world (the
+/// same shape `crash_detector_in_process_panic.rs` uses) rather than a stub.
+/// Without it the context would not compile, and with a stub the AC3(c)
+/// assertions would be about the stub.
 fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> HostBWorkerContext {
     let manifest_root = toml::from_str(
         &std::fs::read_to_string(&fixture.worker_manifest).expect("read worker manifest"),
     )
     .expect("parse worker manifest");
     let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let capability = Arc::new(
+        maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+            Arc::new(maos_kernel_core::api::RingCryptoProvider),
+            maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x2B; 32]),
+            NONCE_B,
+            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            audit_tx,
+            maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+            Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+            Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
+        ),
+    );
+    let metrics = Arc::new(IacRtMetrics::new());
+    let memory_db = fixture.dir.join("host-b-memory.sqlite");
+    let memory = Arc::new(maos_kernel_core::memory::MemoryManagerAdapter::new(
+        Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
+            fixture.dir.join("host-b-private"),
+            4,
+        )),
+        Arc::new(
+            maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db)
+                .expect("open host B shared memory"),
+        ),
+        Arc::new(
+            maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db)
+                .expect("open host B principal index"),
+        ),
+        Arc::clone(&log),
+    ));
+    let iac = Arc::new(IacBusAdapter::new(
+        Arc::new(Mailbox::new(Arc::clone(&metrics))),
+        Arc::clone(&log),
+    ));
+    let halt_registry = Arc::new(maos_kernel_core::halt::HaltRegistry::new());
+    let mut scheduler = Arc::new(maos_kernel_core::scheduler::SpiritSchedulerAdapter::new(
+        Arc::clone(&log),
+        Arc::clone(&capability),
+        memory,
+        Arc::clone(&iac),
+        Arc::clone(&halt_registry),
+        Arc::clone(&metrics),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ));
+    let journal = Arc::new(
+        maos_kernel_core::journal::JournalAdapter::open(&fixture.dir.join("host-b.journal.ndjson"))
+            .expect("open host B lifecycle journal"),
+    );
+    let crash_detector = Arc::new(maos_kernel_core::supervision::CrashDetector::new(
+        scheduler.scbs(),
+        Arc::clone(&log),
+        Arc::clone(&halt_registry),
+        Arc::clone(&capability),
+        Arc::clone(&iac),
+        Arc::clone(&metrics),
+        journal,
+    ));
+    // Before any clone: `set_crash_detector` needs strong count 1.
+    Arc::get_mut(&mut scheduler)
+        .expect("scheduler Arc strong_count == 1")
+        .set_crash_detector(Arc::clone(&crash_detector));
+    let supervision = Arc::new(maos_bin::supervision::WorkerSupervisor::new(
+        Arc::clone(&scheduler),
+        crash_detector,
+        Arc::clone(&log),
+        Arc::clone(&halt_registry),
+        Arc::clone(&iac),
+        tokio::runtime::Handle::current(),
+        NONCE_B,
+        tokio_util::sync::CancellationToken::new(),
+    ));
     HostBWorkerContext {
         manifest_root,
         remote_requested: true,
@@ -647,21 +735,11 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
             once: true,
         },
         transparency_log: log,
-        capability: Arc::new(
-            maos_kernel_core::capability::CapabilityRegistryAdapter::new(
-                Arc::new(maos_kernel_core::api::RingCryptoProvider),
-                maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x2B; 32]),
-                NONCE_B,
-                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
-                audit_tx,
-                maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
-                Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
-                Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(10)),
-            ),
-        ),
+        capability,
         spirit_host: None,
         enterprise_runtime: None,
         enterprise_pdp_runtime: None,
+        supervision,
     }
 }
 
@@ -700,6 +778,26 @@ async fn replayed_inbound_frame_returns_duplicate_without_halting_host_b() {
         .await
         .expect("first inbound frame runs host B worker");
     assert!(matches!(first, HostBOutcome::Ran { frame_id: actual, .. } if actual == frame_id));
+    let bindings = context.supervision.bindings();
+    assert_eq!(
+        bindings.len(),
+        1,
+        "host B must route the inbound delegation through one Worker binding"
+    );
+    let binding = &bindings[0];
+    assert_ne!(
+        binding.spirit_pid, 0,
+        "host B's Worker must receive a real SCB pid"
+    );
+    assert!(
+        binding.child_pid.is_some(),
+        "host B's supervised path must record the real child pid"
+    );
+    assert_eq!(
+        binding.phase,
+        maos_bin::supervision::BindingPhase::ExitedClean,
+        "the completed host-B Worker must reach the clean terminal phase"
+    );
     let second = delegation::handle_one_inbound(&mut leg, &iac, &context, frame)
         .await
         .expect("duplicate must return instead of halting host B");

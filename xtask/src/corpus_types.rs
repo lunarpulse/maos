@@ -31,7 +31,7 @@ pub struct CorpusEntry {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CoverageMatrixFile {
     pub schema_version: u32,
-    pub current_phase: String,
+    pub delivered_phase: String,
     pub mode: String,
     pub phase_order: Vec<String>,
     pub coverage: BTreeMap<String, CoverageRow>,
@@ -49,7 +49,7 @@ pub struct CoverageRow {
 /// Phase configuration TOML shape.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct PhaseConfig {
-    pub current_phase: String,
+    pub delivered_phase: String,
     pub phase_order: Vec<String>,
 }
 

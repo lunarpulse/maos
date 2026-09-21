@@ -12,7 +12,7 @@ use maos_kernel_core::security::manifest::ResourceCaps;
 
 #[test]
 #[cfg(target_os = "linux")]
-#[ignore]
+#[ignore = "self-skips unless MAOS_CGROUP_TEST is set (real-cgroup smoke; manual on a cgroup-capable host — Story 15-1 R-4)"]
 fn cgroup_ceiling_writes_cpu_and_memory_files() {
     if std::env::var_os("MAOS_CGROUP_TEST").is_none() {
         eprintln!("skipping: set MAOS_CGROUP_TEST=1 to run");

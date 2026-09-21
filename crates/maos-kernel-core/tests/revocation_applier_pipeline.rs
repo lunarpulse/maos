@@ -69,12 +69,14 @@ fn fixture() -> Fixture {
     let tmp = tempfile::TempDir::new().unwrap();
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0xC0DE));
     let policy = Arc::new(PolicyTable::new());
+    let (audit_tx, mut audit_rx) = cap_audit::channel();
+    std::thread::spawn(move || while audit_rx.blocking_recv().is_some() {});
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(RingCryptoProvider),
         Ed25519SigningKey::new([0u8; 32]),
         0xC0DE,
         Arc::clone(&policy),
-        cap_audit::channel().0,
+        audit_tx,
         CapQuotaTracker::new(),
         Arc::new(WorkingMemoryStore::new()),
         Arc::new(TelemetryStreamAdapter::default()),

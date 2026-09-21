@@ -54,9 +54,9 @@ pub struct ClassResult {
     pub scenarios_total: i64,
     pub detected_blocked: i64,
     pub unmitigated: i64,
-    // #16: schema documents notes as optional; gate must tolerate its absence.
-    #[serde(default)]
-    pub notes: String,
+    // Optional in the external schema, but typed when present.
+    #[serde(default, rename = "notes")]
+    pub _notes: String,
 }
 
 #[derive(Debug, Deserialize)]

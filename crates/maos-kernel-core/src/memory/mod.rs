@@ -74,7 +74,7 @@ use maos_domain::invariants::i5::{MemoryScope, NamespaceKey};
 /// Production Memory Manager adapter — implements `MemoryManagerPort`
 /// with three-tier memory, Principal Namespace index, and I5 enforcement.
 #[maos_attrs::i9_exempt(
-    reason = "memory manager three-tier substrate — bounded by principal forget-cascade + per-Spirit memory budget; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; parallel to the capability registry's per-Spirit token state, not pattern-learning"
+    reason = "memory manager three-tier substrate — bounded by principal forget-cascade + per-Spirit memory budget; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; the forget serializer is bounded synchronization state that makes legal-hold check-and-act atomic, not pattern-learning"
 )]
 pub struct MemoryManagerAdapter {
     private: Arc<PrivateMemoryStore>,
@@ -82,6 +82,12 @@ pub struct MemoryManagerAdapter {
     principal_index: Arc<PrincipalNamespaceIndex>,
     transparency_log: Arc<TransparencyLogAdapter>,
     next_frame_counter: AtomicU64,
+    /// Serializes each legal-hold check with its complete per-principal
+    /// forget action. The scope is one principal operation, not a whole
+    /// multi-principal uninstall cascade.
+    forget_serialization: std::sync::Mutex<()>,
+    #[cfg(test)]
+    forget_after_hold_check_hook: Option<Arc<dyn Fn() + Send + Sync>>,
     /// Story 9.4b AC-5 — configured home jurisdiction; `None` disables region
     /// pinning (legacy / default-region semantics).  Every store write routes
     /// through `write_entry_point::enforce_region` against this value.
@@ -123,6 +129,9 @@ impl MemoryManagerAdapter {
             capabilities: None,
             transparency_log,
             next_frame_counter: AtomicU64::new(0),
+            forget_serialization: std::sync::Mutex::new(()),
+            #[cfg(test)]
+            forget_after_hold_check_hook: None,
             home_region: None,
             principal_write_enforcement: None,
             #[cfg(feature = "spirit_test")]
@@ -413,6 +422,12 @@ impl MemoryManagerAdapter {
         self.isolation_hook = Some(hook);
         self
     }
+    #[cfg(test)]
+    fn with_forget_after_hold_check_hook(mut self, hook: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.forget_after_hold_check_hook = Some(hook);
+        self
+    }
+
     /// Story 9.2 — GDPR Art.17 forget cascade with optional legal-hold.
     ///
     /// * `reason` starting with `legal-hold` (case-insensitive) places a
@@ -426,6 +441,10 @@ impl MemoryManagerAdapter {
         principal_id: &str,
         reason: Option<&str>,
     ) -> Result<ForgetOutcome, MemoryError> {
+        let _forget_guard = self
+            .forget_serialization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // P2: case-insensitive legal-hold detection.  Both the bare form and
         // the `legal-hold:<ref>` form must match regardless of capitalization.
         let is_legal_hold = reason
@@ -436,6 +455,12 @@ impl MemoryManagerAdapter {
             .unwrap_or(false);
 
         if is_legal_hold {
+            // Review 2026-09-17: a hold requested over a principal a
+            // concurrent forget already erased must never claim the data is
+            // preserved. The durable hold is still recorded (P29 consults
+            // every later forget/uninstall); the returned record says what
+            // is actually true about the data.
+            let principal_present = !self.principal_index.lookup(principal_id)?.is_empty();
             // P29: place a DURABLE hold consulted by every later forget/uninstall.
             let requested_at_ns = Self::now_ns();
             let reason_str = reason.unwrap_or("legal-hold").to_string();
@@ -461,6 +486,8 @@ impl MemoryManagerAdapter {
             // P7: journal + capture frame_id atomically.
             self.transparency_log.insert_kernel_event_returning_id(
                 0,
+                maos_iac::adapter::transparency_log::FrameKind::Decision,
+                None,
                 "principal.forget.held",
                 payload.to_string().as_bytes(),
             );
@@ -470,7 +497,11 @@ impl MemoryManagerAdapter {
                 reason: reason_str,
                 case_ref,
                 requested_at_ns,
-                status: "NOT ERASED — SUSPENDED UNDER LEGAL HOLD".to_string(),
+                status: if principal_present {
+                    "NOT ERASED — SUSPENDED UNDER LEGAL HOLD".to_string()
+                } else {
+                    "PRINCIPAL NOT PRESENT — NOTHING TO ERASE; HOLD RECORDED".to_string()
+                },
             };
             return Ok(ForgetOutcome::Suspended { hold });
         }
@@ -491,6 +522,8 @@ impl MemoryManagerAdapter {
             });
             self.transparency_log.insert_kernel_event_returning_id(
                 0,
+                maos_iac::adapter::transparency_log::FrameKind::Decision,
+                None,
                 "principal.forget.held",
                 payload.to_string().as_bytes(),
             );
@@ -503,6 +536,10 @@ impl MemoryManagerAdapter {
                 status: "NOT ERASED — SUSPENDED UNDER PRIOR LEGAL HOLD".to_string(),
             };
             return Ok(ForgetOutcome::Suspended { hold });
+        }
+        #[cfg(test)]
+        if let Some(hook) = &self.forget_after_hold_check_hook {
+            hook();
         }
 
         // 1. Snapshot index rows (needed to identify affected Spirits/distillates).
@@ -592,6 +629,8 @@ impl MemoryManagerAdapter {
         });
         let frame_id = self.transparency_log.insert_kernel_event_returning_id(
             0,
+            maos_iac::adapter::transparency_log::FrameKind::Decision,
+            None,
             "principal.forget",
             payload.to_string().as_bytes(),
         );
@@ -624,7 +663,17 @@ impl MemoryManagerAdapter {
 
     /// Story 9.2 (P29) — release a durable legal hold so the principal may be
     /// erased again.  Returns whether a hold was actually removed.
+    ///
+    /// Review 2026-09-17: release takes the same per-principal serializer as
+    /// [`Self::forget_with_reason`], so a release can never interleave with a
+    /// hold being placed — a stale release that lands after a fresh
+    /// `place_legal_hold` commits would delete the new hold and expose the
+    /// principal to the next erase while litigation believed it held.
     pub fn release_legal_hold(&self, principal_id: &str) -> Result<bool, MemoryError> {
+        let _forget_guard = self
+            .forget_serialization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         self.transparency_log
             .release_legal_hold(principal_id)
             .map_err(|e| MemoryError::Storage(e.to_string()))
@@ -960,7 +1009,9 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
+    fn make_adapter_with_hook(
+        hook: Option<Arc<dyn Fn() + Send + Sync>>,
+    ) -> (Arc<MemoryManagerAdapter>, TempDir) {
         let tmp = TempDir::new().unwrap();
         let memory_root = tmp.path().join("memory");
         let db_path = tmp.path().join("audit.db");
@@ -968,17 +1019,18 @@ mod tests {
         let private = Arc::new(PrivateMemoryStore::new(memory_root, 4 * 1024));
         let shared = Arc::new(SharedMemoryStore::open(&db_path).unwrap());
         let principal_index = Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap());
-        // Unique boot-nonce per test fixture to avoid in-memory SQLite collision.
         static TEST_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let boot_nonce = TEST_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(boot_nonce));
-        let adapter = Arc::new(MemoryManagerAdapter::new(
-            private,
-            shared,
-            principal_index,
-            tl,
-        ));
-        (adapter, tmp)
+        let mut adapter = MemoryManagerAdapter::new(private, shared, principal_index, tl);
+        if let Some(hook) = hook {
+            adapter = adapter.with_forget_after_hold_check_hook(hook);
+        }
+        (Arc::new(adapter), tmp)
+    }
+
+    fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
+        make_adapter_with_hook(None)
     }
 
     #[test]
@@ -1086,6 +1138,60 @@ mod tests {
             .read(MemoryTier::Private, &MemoryNamespace::Default, "k")
             .unwrap();
         assert_eq!(got, Some(val));
+    }
+    #[test]
+    fn legal_hold_cannot_commit_inside_an_in_progress_forget() {
+        use std::sync::{mpsc, Barrier};
+        use std::time::Duration;
+
+        let entered = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let hook = {
+            let entered = Arc::clone(&entered);
+            let release = Arc::clone(&release);
+            Arc::new(move || {
+                entered.wait();
+                release.wait();
+            }) as Arc<dyn Fn() + Send + Sync>
+        };
+        let (adapter, _tmp) = make_adapter_with_hook(Some(hook));
+        let namespace =
+            MemoryNamespace::principal("alice".to_string(), "profile".to_string()).unwrap();
+        adapter
+            .write(
+                7,
+                MemoryTier::Private,
+                &namespace,
+                "record",
+                MemoryValue::Text("private".into()),
+            )
+            .unwrap();
+
+        let erase_adapter = Arc::clone(&adapter);
+        let erase = std::thread::spawn(move || erase_adapter.forget_with_reason("alice", None));
+        entered.wait();
+
+        let (done_tx, done_rx) = mpsc::channel();
+        let hold_adapter = Arc::clone(&adapter);
+        let hold = std::thread::spawn(move || {
+            let outcome = hold_adapter.forget_with_reason("alice", Some("legal-hold:case-16-5"));
+            done_tx.send(()).unwrap();
+            outcome
+        });
+        assert!(
+            done_rx.recv_timeout(Duration::from_millis(50)).is_err(),
+            "the hold must wait for the in-progress principal forget"
+        );
+
+        release.wait();
+        assert!(matches!(
+            erase.join().unwrap().unwrap(),
+            ForgetOutcome::Erased { .. }
+        ));
+        assert!(matches!(
+            hold.join().unwrap().unwrap(),
+            ForgetOutcome::Suspended { .. }
+        ));
     }
 
     #[test]

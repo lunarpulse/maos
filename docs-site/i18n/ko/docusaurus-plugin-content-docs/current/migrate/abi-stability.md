@@ -19,9 +19,9 @@ MAOS는 kernel과 Spirit 사이에 기계적으로 검증되는 호환성 계약
 
 | 항목 | 현재 값 | 추적 대상 |
 |---|---|---|
-| `kernel_version` | `0.1.0-alpha` | kernel 바이너리의 의미 버전(`Cargo.toml` 기준) |
+| `kernel_version` | `0.1.0-alpha.1` | kernel 바이너리의 의미 버전(`Cargo.toml` 기준) |
 | `abi_version` | `1` | Spirit ABI의 와이어 포맷 버전(`ComplianceClaim` 봉투, vtable 레이아웃) |
-| `manifest_schema_version` | `3` | Spirit manifest TOML 포맷의 스키마 버전 |
+| `manifest_schema_version` | `4` | Spirit manifest TOML 포맷의 스키마 버전 |
 
 이 상수들은 `maos-spirit-abi/src/lib.rs`에 있으며 어드미션 검사와 CI 게이트가 소비하는 단일 진실 원천입니다.
 

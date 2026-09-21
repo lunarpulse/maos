@@ -4,14 +4,14 @@
 //! REST wire format (`POST /v1/chat/completions`). The OpenAI JSON shapes
 //! never escape this module.
 //!
-//! Environment-gated: `MAOS_OPENAI_API_KEY` must be set; otherwise
-//! construction returns `ProviderError::Unconfigured`.
+//! Secret-store-gated: the injected store must carry an OpenAI credential;
+//! otherwise construction returns `ProviderError::Unconfigured`.
 
 use maos_domain::ports::inference::{
     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
     TokenUsage,
 };
-use maos_domain::ports::IoSubsystemPort;
+use maos_domain::ports::{IoSubsystemPort, SecretKey, SecretStore};
 
 use crate::provider::{Provider, ProviderError};
 
@@ -24,25 +24,31 @@ pub struct OpenAiProvider {
 }
 
 impl OpenAiProvider {
-    /// Create a new OpenAI provider.
-    ///
-    /// Reads the API key from `MAOS_OPENAI_API_KEY` env var.
+    /// Create an OpenAI provider from an injected secret store.
     pub fn new(
         transport: std::sync::Arc<dyn IoSubsystemPort>,
         endpoint_url: String,
         model_id: String,
+        secret_store: Option<std::sync::Arc<dyn SecretStore>>,
     ) -> Result<Self, ProviderError> {
-        let api_key =
-            std::env::var("MAOS_OPENAI_API_KEY").map_err(|_| ProviderError::Unconfigured)?;
-        if api_key.is_empty() {
+        let Some(secret_store) = secret_store else {
             return Err(ProviderError::Unconfigured);
-        }
-        Ok(Self {
-            api_key,
+        };
+        let api_key = secret_store
+            .get(SecretKey::OpenAiApiKey)
+            // Story 16-4 review — a credential-store `get` failure is NOT a
+            // transport failure: the fallback store has already journaled the
+            // store-level telemetry, and the composition root degrades to a
+            // provider-less boot instead of exiting 78.
+            .map_err(|_| ProviderError::Unconfigured)?
+            .filter(|key| !key.trim().is_empty())
+            .ok_or(ProviderError::Unconfigured)?;
+        Ok(Self::with_api_key(
+            transport,
             endpoint_url,
             model_id,
-            transport,
-        })
+            api_key,
+        ))
     }
 
     /// Create from an explicit API key (for tests).
@@ -179,6 +185,80 @@ mod tests {
         }
     }
 
+    struct StaticSecretStore(String);
+
+    impl SecretStore for StaticSecretStore {
+        fn get(
+            &self,
+            _key: SecretKey,
+        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
+            Ok(Some(self.0.clone()))
+        }
+        fn put(
+            &self,
+            _key: SecretKey,
+            _value: &str,
+        ) -> Result<(), maos_domain::ports::SecretStoreError> {
+            Ok(())
+        }
+
+        fn delete(
+            &self,
+            _key: SecretKey,
+        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
+        {
+            Ok(maos_domain::ports::SecretDeleteStatus::Absent)
+        }
+
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+
+    struct ErrorSecretStore;
+
+    impl SecretStore for ErrorSecretStore {
+        fn get(
+            &self,
+            _key: SecretKey,
+        ) -> Result<Option<String>, maos_domain::ports::SecretStoreError> {
+            Err(maos_domain::ports::SecretStoreError::Access(
+                "credential ciphertext is corrupt".to_string(),
+            ))
+        }
+
+        fn put(
+            &self,
+            _key: SecretKey,
+            _value: &str,
+        ) -> Result<(), maos_domain::ports::SecretStoreError> {
+            Ok(())
+        }
+
+        fn delete(
+            &self,
+            _key: SecretKey,
+        ) -> Result<maos_domain::ports::SecretDeleteStatus, maos_domain::ports::SecretStoreError>
+        {
+            Ok(maos_domain::ports::SecretDeleteStatus::Absent)
+        }
+
+        fn is_healthy(&self) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn credential_store_failures_degrade_to_unconfigured() {
+        let result = OpenAiProvider::new(
+            std::sync::Arc::new(MockTransport(Vec::new())),
+            "https://example.test".to_string(),
+            "test-model".to_string(),
+            Some(std::sync::Arc::new(ErrorSecretStore)),
+        );
+        assert!(matches!(result, Err(ProviderError::Unconfigured)));
+    }
+
     fn sample_request() -> InferenceRequest {
         InferenceRequest::new(
             42,
@@ -279,18 +359,14 @@ mod tests {
 
     #[test]
     fn provider_missing_api_key_is_unconfigured() {
-        let saved = std::env::var("MAOS_OPENAI_API_KEY").ok();
-        std::env::remove_var("MAOS_OPENAI_API_KEY");
         let transport = std::sync::Arc::new(MockTransport(vec![]));
         let result = OpenAiProvider::new(
             transport,
             "https://api.openai.com".into(),
             "gpt-4o-mini".into(),
+            None,
         );
         assert!(matches!(result, Err(ProviderError::Unconfigured)));
-        if let Some(key) = saved {
-            std::env::set_var("MAOS_OPENAI_API_KEY", key);
-        }
     }
 
     #[test]
@@ -302,10 +378,12 @@ mod tests {
         });
         let transport =
             std::sync::Arc::new(MockTransport(serde_json::to_vec(&response_json).unwrap()));
+        let key = std::env::var("MAOS_OPENAI_API_KEY").expect("MAOS_OPENAI_API_KEY must be set");
         let provider = OpenAiProvider::new(
             transport,
             "https://api.openai.com".into(),
             "gpt-4o-mini".into(),
+            Some(std::sync::Arc::new(StaticSecretStore(key))),
         )
         .expect("MAOS_OPENAI_API_KEY must be set");
         let req = sample_request();

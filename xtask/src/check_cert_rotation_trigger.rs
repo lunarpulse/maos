@@ -87,9 +87,10 @@ const COMPOSITION_ROOT: &str = "crates/maos-bin/src/main.rs";
 const INSTALL_METHOD: &str = "install_cert_rotation";
 /// The two live-mesh handles the install MUST pass, or it installs a copy.
 const PLANE_METHODS: [&str; 2] = ["pins", "core"];
-/// Derived-enrollment scope: the story's rotation test files (five at HEAD)
-/// and their packages.
-const TEST_FILES: [(&str, &str, &str); 5] = [
+/// Derived-enrollment scope: the story's rotation test files (six at HEAD —
+/// 15-1 AC6(a)/D-7 moved the promoted-generation leg into its own binary,
+/// `t_14_2a_post_grace_token`, for process isolation) and their packages.
+const TEST_FILES: [(&str, &str, &str); 6] = [
     (
         "maos-bin",
         "cert_rotation_trigger_14_2a",
@@ -108,6 +109,11 @@ const TEST_FILES: [(&str, &str, &str); 5] = [
     (
         "maos-a2a-tcp",
         "t_14_2a_post_grace_journal",
+        "crates/maos-a2a-tcp/tests",
+    ),
+    (
+        "maos-a2a-tcp",
+        "t_14_2a_post_grace_token",
         "crates/maos-a2a-tcp/tests",
     ),
     (
@@ -569,7 +575,12 @@ fn leg_invocations() -> Vec<(&'static str, Vec<Invocation>)> {
                 },
                 Invocation {
                     package: "maos-a2a-tcp",
-                    test_file: "t_14_2a_post_grace_journal",
+                    // Story 15-1 AC6(a) / D-7: the promoted-generation leg
+                    // moved to its OWN binary (process isolation) because
+                    // tracing_core's callsite-interest cache is process-global
+                    // and a subscriber-less co-resident test starved its
+                    // capture. Same test, same filter, new binary.
+                    test_file: "t_14_2a_post_grace_token",
                     filter: "t_14_2a_a_promoted_generation_makes_the_retired_leaf_a_queryable_refusal",
                     features: None,
                     expected_tests: 1,
@@ -605,13 +616,7 @@ fn invoke_cargo_test(invocation: &Invocation) -> Result<(u32, u32, bool, bool), 
     if let Some(features) = invocation.features {
         cmd.args(["--features", features]);
     }
-    cmd.args([
-        "--",
-        invocation.filter,
-        "--exact",
-        "--nocapture",
-        "--test-threads=1",
-    ]);
+    cmd.args(["--", invocation.filter, "--exact", "--nocapture"]);
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let output = cmd.output().map_err(|error| {
         format!(
@@ -886,7 +891,7 @@ pub fn run(json: bool) -> Result<(), String> {
                     "oracle_green": true,
                     "blocking_now": blocking_now,
                     "dev_blocks": dev_blocks,
-                    "current_phase": CURRENT_PHASE,
+                    "ship_phase": CURRENT_PHASE,
                     "disposition": disposition,
                     "enrolled_rotation_tests": derived.len(),
                     "legs": legs_json(&legs),
@@ -924,7 +929,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "oracle_green": false,
                 "blocking_now": blocking_now,
                 "dev_blocks": dev_blocks,
-                "current_phase": CURRENT_PHASE,
+                "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
                 "enrolled_rotation_tests": derived.len(),
                 "legs": legs_json(&legs),

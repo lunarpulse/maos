@@ -134,6 +134,8 @@ pub enum ResearcherCollectiveError {
     Unavailable,
     #[error("collective operation denied or unavailable: {0}")]
     Denied(String),
+    #[error("collective operation refused because the audit sink is unavailable")]
+    AuditUnavailable,
 }
 
 pub trait ResearcherCollectivePort: Send + Sync {

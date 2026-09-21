@@ -90,6 +90,8 @@ async fn hot_path_never_blocks_under_audit_saturation() {
 
     let start = Instant::now();
     for i in 0..100_000 {
+        // D-16-5-B: the hot path SURVIVES audit saturation — issue/revoke
+        // never fail for audit reasons; drops are observed, not propagated.
         let token = adapter
             .issue(
                 7,
@@ -115,9 +117,8 @@ async fn hot_path_never_blocks_under_audit_saturation() {
         elapsed
     );
 
-    // Audit drop counter must be > 0 — the bounded channel (8192 depth)
-    // cannot absorb 200K+ events without drops under this load.
-    let drops = cap_audit::audit_drop_count();
+    // The class-wide instrument must report bounded-channel pressure.
+    let drops = cap_audit::audit_health_snapshot().total_drops;
     assert!(
         drops > 0,
         "expected audit drops under 100K load (channel depth = 8192), got 0 drops — hot path may be blocking"

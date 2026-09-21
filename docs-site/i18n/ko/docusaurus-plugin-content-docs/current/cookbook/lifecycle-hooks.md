@@ -64,12 +64,17 @@ impl Spirit for AnalyticsSpirit {
         // Re-acquire resources, restart background loops.
     }
 
-    /// Called when the Spirit receives an Unload verb — clean up.
-    fn on_unload(&self, ctx: &mut Ctx) {
+    /// Called after the kernel has released this Spirit. State is already
+    /// flipped, the receipt written, capabilities revoked, and the SCB removed.
+    /// KernelCtx capability and heartbeat calls fail (ScbNotFound or denied);
+    /// clean up only resources that do not require live tokens.
+    fn on_unload(&self, _ctx: &mut Ctx) {
         // Flush pending writes, close connections, release resources.
     }
 }
 ```
+
+해제는 kernel이 소유합니다: `on_unload`는 해제 이후에 실행되는 정리 훅이며, teardown 트랜잭션이 아닙니다. 이 훅이 실행되는 동안 살아 있는 SCB, capability 토큰, heartbeat에 의존해서는 안 됩니다. Story 16-6 리뷰 2026-09-20.
 
 kernel이 나머지를 건너뛰도록 manifest에 사용하는 훅을 선언합니다:
 

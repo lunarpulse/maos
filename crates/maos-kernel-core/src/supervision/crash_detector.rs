@@ -124,8 +124,7 @@ impl CrashDetector {
         );
 
         // Step 3: Revoke all capability tokens for the PID
-        let actual_tokens_revoked =
-            self.capability.revoke_all_for_pid(spirit_pid).unwrap_or(0) as usize;
+        let actual_tokens_revoked = self.capability.revoke_all_for_pid(spirit_pid);
 
         // Step 4: Produce halt-receipts via terminate_spirit
         let receipts = terminate_spirit(
@@ -147,6 +146,7 @@ impl CrashDetector {
             std::mem::take(&mut *tasks)
         };
         let tokens_revoked = actual_tokens_revoked;
+        let runtime = scb.runtime_snapshot();
         let task_orphaned_emitted_at_ns = crate::capability::cap_tokens::monotonic_now_ns();
         for task in &drained_tasks {
             let payload = serde_json::json!({
@@ -156,14 +156,13 @@ impl CrashDetector {
                 "exit_code": cause.exit_code(),
                 "stderr_tail": cause.stderr_tail(),
                 "cause": cause.as_str(),
-                "in_flight_tokens": [task.capability_token],
+                "in_flight_tokens": task.capability_token.as_ref().into_iter().collect::<Vec<_>>(),
+                "disposition": runtime.on_crash_action.to_string(),
             });
-            let mut padded_token = [0u8; 32];
-            padded_token[..16].copy_from_slice(&task.capability_token.0);
             self.tl.insert_frame_event(
                 FrameKind::TaskComplete,
                 spirit_pid,
-                Some(&padded_token),
+                None,
                 "task.orphaned",
                 &serde_json::to_vec(&payload).unwrap_or_default(),
                 FrameOrigin::Kernel,
@@ -171,7 +170,6 @@ impl CrashDetector {
         }
 
         // Step 6: Apply FR50 disposition
-        let runtime = scb.runtime_snapshot();
         let disposition_outcome = crate::supervision::disposition::enforce_disposition(
             runtime.on_crash_action.clone(),
             &drained_tasks,

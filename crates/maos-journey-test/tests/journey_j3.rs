@@ -33,6 +33,8 @@ fn j3_day_30_digest_renders_and_persists_via_real_daemon() {
         .build();
 
     let manifest = workspace_root().join("spirits/digest/manifest.toml");
+    // Story 16-1 / D-16-1-Q: Pty children get their "HOME" from the JourneyWorld
+    // builder env (harness doorless_home) — no developer control.json endpoint.
     let cmd = format!("{} run {} --once", maos_bin(), manifest.display());
     let pty = Pty::spawn(&cmd, &world);
     let status = pty.wait();

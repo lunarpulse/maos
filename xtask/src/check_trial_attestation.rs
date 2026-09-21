@@ -6,7 +6,8 @@
 //! consumer (`check-third-party-trial`) validates cohort results and refuses
 //! unprovenanced v2.0 records.
 
-use crate::check_fkcs::{is_blocking_at, parse_inline_disposition};
+use crate::check_fkcs::parse_inline_disposition;
+use crate::gate_common::{is_blocking_at, phase_disposition, CURRENT_PHASE};
 use maos_audit::release_verify::{generate_sha256sums, sign_sha256sums};
 use maos_eval::trial_attestation::{
     derive_halt_recall, derive_participant_attestation, derive_reload_facts,
@@ -20,8 +21,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const GATE_NAME: &str = "check-trial-attestation";
-const CURRENT_PHASE: &str = "v1_5";
-const PHASE_ORDER: &[&str] = &["v1_0", "v1_5", "v2_0"];
 
 #[derive(Debug, Clone, Serialize)]
 struct LegResult {
@@ -103,7 +102,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "oracle_green": oracle_green,
                 "advisory": !oracle_green && !blocking_now,
                 "blocking_now": blocking_now,
-                "current_phase": CURRENT_PHASE,
+                "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
                 "provenance_stamp": PROVENANCE_STAMP,
                 "legs": legs,
@@ -430,7 +429,7 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
         }
         if in_target_stanza && trimmed.starts_with("disposition =") {
             let parsed = parse_inline_disposition(trimmed)?;
-            if phase_disposition_with_order(&parsed, CURRENT_PHASE).is_none() {
+            if phase_disposition(&parsed, CURRENT_PHASE).is_none() {
                 return Err(format!("{GATE_NAME}: no disposition for {CURRENT_PHASE}"));
             }
             return Ok(parsed);
@@ -439,19 +438,6 @@ fn read_disposition() -> Result<HashMap<String, String>, String> {
     Err(format!(
         "{GATE_NAME} [[ship_gate]] disposition row not found"
     ))
-}
-
-fn phase_disposition_with_order<'a>(
-    disposition: &'a HashMap<String, String>,
-    phase: &str,
-) -> Option<&'a str> {
-    let idx = PHASE_ORDER.iter().position(|p| *p == phase)?;
-    for i in (0..=idx).rev() {
-        if let Some(d) = disposition.get(PHASE_ORDER[i]) {
-            return Some(d.as_str());
-        }
-    }
-    None
 }
 
 fn resolve_workspace_path(path: &Path) -> Result<PathBuf, String> {

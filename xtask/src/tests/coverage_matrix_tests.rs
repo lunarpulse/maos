@@ -33,7 +33,7 @@ fn make_yaml(dir: &Path, mode: &str, coverage: &str) -> PathBuf {
         &path,
         format!(
             r#"schema_version: 1
-current_phase: "v0.1-alpha"
+delivered_phase: "v0.1-alpha"
 mode: "{}"
 phase_order:
   - "v0.1-alpha"
@@ -52,7 +52,7 @@ fn make_phase_config(dir: &Path) -> PathBuf {
     let path = dir.join("phase-config.toml");
     std::fs::write(
         &path,
-        r#"current_phase = "v0.1-alpha"
+        r#"delivered_phase = "v0.1-alpha"
 phase_order = ["v0.1-alpha", "v0.1", "v0.3"]
 "#,
     )
@@ -207,7 +207,7 @@ fn phase_config_mismatch_fails() {
     let dir = tmp_dir("mismatch");
     let yaml = make_yaml(&dir, "warning", "");
     let phase = dir.join("phase-config.toml");
-    std::fs::write(&phase, r#"current_phase = "v0.3"
+    std::fs::write(&phase, r#"delivered_phase = "v0.3"
 phase_order = ["v0.1-alpha", "v0.1", "v0.3"]
 "#).unwrap();
     let manifest = make_manifest(&dir);

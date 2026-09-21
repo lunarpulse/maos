@@ -303,6 +303,30 @@ pub enum CrossWallRecallRefusal {
     ReadPortUnavailable,
 }
 
+impl CrossWallRecallRefusal {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NoConsentProvider => "no_consent_provider",
+            Self::NoGrant => "no_grant",
+            Self::WrongDirection => "wrong_direction",
+            Self::ConsentStateStale(_) => "consent_state_stale",
+            Self::ConsentStateUnavailable(_) => "consent_state_unavailable",
+            Self::ReadPortUnavailable => "read_port_unavailable",
+        }
+    }
+
+    pub fn outcome(&self) -> &'static str {
+        match self {
+            Self::NoConsentProvider => "refused_no_consent_provider",
+            Self::NoGrant => "refused_no_grant",
+            Self::WrongDirection => "refused_wrong_direction",
+            Self::ConsentStateStale(_) => "refused_consent_state_stale",
+            Self::ConsentStateUnavailable(_) => "refused_consent_state_unavailable",
+            Self::ReadPortUnavailable => "refused_read_port_unavailable",
+        }
+    }
+}
+
 /// Typed error for log-recall operations.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum LogRecallError {
@@ -443,5 +467,24 @@ mod tests {
     #[test]
     fn cross_wall_request_rejects_noncanonical_team() {
         assert!(CrossWallRecallRequest::new(42, "TEAM-B", LogRecallFilter::default()).is_err());
+    }
+
+    #[test]
+    fn cross_wall_refusal_outcomes_are_machine_distinct() {
+        let refusals = [
+            CrossWallRecallRefusal::NoConsentProvider,
+            CrossWallRecallRefusal::NoGrant,
+            CrossWallRecallRefusal::WrongDirection,
+            CrossWallRecallRefusal::ConsentStateStale("stale".into()),
+            CrossWallRecallRefusal::ConsentStateUnavailable("offline".into()),
+            CrossWallRecallRefusal::ReadPortUnavailable,
+        ];
+        let mut outcomes = refusals
+            .iter()
+            .map(CrossWallRecallRefusal::outcome)
+            .collect::<Vec<_>>();
+        outcomes.sort_unstable();
+        outcomes.dedup();
+        assert_eq!(outcomes.len(), refusals.len());
     }
 }

@@ -18,9 +18,9 @@ Every MAOS kernel publishes three version numbers that together form the **ABI S
 
 | Leg | Current Value | What It Tracks |
 |---|---|---|
-| `kernel_version` | `0.1.0-alpha` | Semantic version of the kernel binary (from `Cargo.toml`) |
+| `kernel_version` | `0.1.0-alpha.1` | Semantic version of the kernel binary (from `Cargo.toml`) |
 | `abi_version` | `1` | Wire-format version of the Spirit ABI (`ComplianceClaim` envelope, vtable layout) |
-| `manifest_schema_version` | `3` | Schema version of the Spirit manifest TOML format |
+| `manifest_schema_version` | `4` | Schema version of the Spirit manifest TOML format |
 
 These constants live in `maos-spirit-abi/src/lib.rs` and are the single source of truth consumed by admission checks and CI gates.
 
