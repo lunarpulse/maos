@@ -3620,7 +3620,20 @@ jobs:
   # package (the j1-crosshost-2a P1 shape; the systemic fix is 20-3's).
   workspace-test-suite:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # ⚠ 45 -> 90 (Epic-16 retrospective, 2026-09-21). MEASURED, not guessed: on
+    # PR #7 at `ddb7441b` this job ran 10:09:20 -> 10:54:35 = exactly 45m15s and
+    # was KILLED by the old ceiling, reported as `cancelled` — a timeout wearing
+    # a cancellation's clothes, and `cancelled` is precisely the state E16-A2
+    # says must never be mistaken for anything else. It does a lot before it
+    # tests anything: installs a nightly toolchain, compiles `cargo-public-api`
+    # AND `tokei` from source, builds four fixture binaries, then builds and
+    # runs the ENTIRE workspace with `--no-fail-fast` (which by design does not
+    # stop early). The four prerequisite builds added below make it longer
+    # still. 90 is deliberately generous rather than tight: the useful signal
+    # from this job is "the suite ran to completion and here is what failed",
+    # and a suite killed mid-run yields no signal at all. Re-measure from the
+    # first run that completes and tighten with a number.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
         with:
@@ -3642,8 +3655,32 @@ jobs:
         run: rustup toolchain install nightly --profile minimal
       - name: Install cargo-public-api for workspace integration tests
         run: cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
-      - name: Build worker-cli-fixture (maos-bin tests spawn it)
-        run: cargo build --locked -p worker --bin worker-cli-fixture
+      # ⚠ The suite claims to run EVERYTHING, so it must install everything the
+      # everything needs. Added 2026-09-21 (Epic-16 retrospective): measured at
+      # HEAD, five suites failed here for want of a prerequisite this job never
+      # built, while their own dedicated jobs build them. An unmet prerequisite
+      # rendered as a test failure is the exact conflation E16-A2 names — and
+      # the retrospective itself read this job's five reds as "four environment
+      # gaps plus one defect" without noticing the gaps were the job's own doing.
+      #
+      #   maosctl                    -> one_daemon_one_door_16_1 (resolves it
+      #                                 beside CARGO_BIN_EXE_maos and asserts
+      #                                 is_file()), maosctl_load_16_6
+      #   equiv-native-twin          -> maos-wasm-host equiv_harness
+      #   forbidden-syscall-probe    -> t2_sandbox_kill (real seccomp SIGSYS)
+      #   python `cryptography`      -> two_host_reconcile_2c (Ed25519)
+      #
+      # Each mirrors the build its dedicated job already performs; none is new
+      # machinery. `cargo-public-api` and `tokei` are installed above for the
+      # same reason.
+      - name: Build the fixture binaries every workspace suite resolves by path
+        run: |
+          cargo build --locked -p worker --bin worker-cli-fixture
+          cargo build --locked -p maos-cli --bin maosctl
+          cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+          cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Install python Ed25519 for the two-host reconcile suite
+        run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
       - name: Install tokei
         run: |
           # kloc_check unit tests measure the real workspace through tokei
@@ -3711,8 +3748,20 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build worker-cli-fixture (maos-bin tests spawn it)
-        run: cargo build --locked -p worker --bin worker-cli-fixture
+      # ⚠ `maosctl` MUST be built here (Epic-16 retrospective, 2026-09-21).
+      # `one_daemon_one_door_16_1.rs:54-68` resolves `maosctl` beside
+      # `CARGO_BIN_EXE_maos` and hard-asserts `path.is_file()`. `maos-cli` is a
+      # plain `[dependencies]` entry of maos-bin (`crates/maos-bin/Cargo.toml:44`),
+      # so cargo builds its LIB and never its `[[bin]] maosctl`
+      # (`crates/maos-cli/Cargo.toml:10-12`). Story 16-1's own record flagged
+      # this: the job was green only because `Swatinem/rust-cache@v2` restored a
+      # `target/` that still held a `maosctl` from an earlier job. On a cold
+      # cache it reds — which is exactly what it did on PR #7. A test that
+      # passes because of cache state is not passing.
+      - name: Build worker-cli-fixture and maosctl (maos-bin tests spawn both)
+        run: |
+          cargo build --locked -p worker --bin worker-cli-fixture
+          cargo build --locked -p maos-cli --bin maosctl
       - name: maosctl reaches the live daemon, and the pause is real
         run: cargo test --locked -p maos-bin --test one_daemon_one_door_16_1 -- --test-threads=1
 

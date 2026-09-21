@@ -118,6 +118,17 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// scheduler with `security_manager: None`, so the kernel's own internal
     /// `admit_spirit` never runs here — calling it directly would admit the
     /// Spirit not at a lower sandbox tier but with no admission at all.
+    ///
+    /// ⚠ `#[cfg(feature = "network")]`: `crate::admission` is network-gated
+    /// because Gate 8 (model provenance) calls
+    /// `maos_registry::admission::validate_model_provenance`
+    /// (`admission.rs:608`). That coupling is CORRECT — dropping the gate in an
+    /// air-gap build would silently remove an admission check — so the door's
+    /// load path is gated instead. Story 16-6 gated the module and not its
+    /// consumers, which broke `cargo build -p maos-bin --no-default-features`
+    /// and reddened the `check-exit-commands` JOB while its GATE stayed green
+    /// (Epic-16 retrospective, 2026-09-21).
+    #[cfg(feature = "network")]
     async fn load_spirit(
         &self,
         manifest: &Path,
@@ -441,7 +452,19 @@ impl DoorInner {
             OperatorCommand::AdmitGovernanceSchema { schema } => {
                 self.admit_governance_schema_command(schema).await
             }
+            #[cfg(feature = "network")]
             OperatorCommand::Load { manifest } => self.load_command(&manifest, pread).await,
+            // Air-gap build: the load verb needs the provenance gate, and the
+            // gate needs maos-registry. Refuse LOUDLY rather than admit a
+            // Spirit with one fewer check than the operator was promised.
+            #[cfg(not(feature = "network"))]
+            OperatorCommand::Load { .. } => OperatorOutcome::Conflict {
+                code: "load_unavailable".into(),
+                detail: "this binary was built without the `network` feature, so the model-\
+                         provenance admission gate (maos-registry) is absent; loading a Spirit \
+                         here would skip a check the operator was promised"
+                    .into(),
+            },
         }
     }
 
@@ -572,6 +595,7 @@ impl DoorInner {
     /// (a `resolve_pid` read and an `insert` in separate acquisitions, with
     /// the whole of `admit_spirit` between them) cannot be raced through this
     /// door.
+    #[cfg(feature = "network")]
     async fn load_command(&self, manifest: &str, pread: Option<Arc<String>>) -> OperatorOutcome {
         use crate::admission::AdmissionRefusal;
 
@@ -1449,6 +1473,7 @@ impl DoorInner {
         // Read its bounded regular manifest on a blocking worker, then use
         // that same text both for the serialization key and admission.
         let pread = match &command {
+            #[cfg(feature = "network")]
             OperatorCommand::Load { manifest } => {
                 let path = PathBuf::from(manifest);
                 tokio::task::spawn_blocking(move || crate::admission::read_manifest(&path))
@@ -1460,6 +1485,7 @@ impl DoorInner {
             _ => None,
         };
         let lock_key = match (&command, &pread) {
+            #[cfg(feature = "network")]
             (OperatorCommand::Load { .. }, Some(text)) => {
                 crate::admission::peek_spirit_id_from_str(text)
             }
