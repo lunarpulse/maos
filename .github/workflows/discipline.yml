@@ -6,6 +6,24 @@ on:
   pull_request:
     branches: [main]
 
+# Added 2026-09-21 (Epic-16 retrospective). Five consecutive pushes to `main`
+# left FIVE full 162-job runs queued simultaneously — 810 jobs contending for
+# the same runners, so no run could finish and every verdict was hours away.
+# I had to cancel four by hand.
+#
+# ⚠ `cancel-in-progress` is deliberately TRUE ONLY FOR PULL REQUESTS. A
+# superseded PR run is worthless, but a superseded `main` run is NOT: the
+# release precondition looks for an `aggregate` check-run with
+# `completed/success` ON THE TAGGED SHA (`check_release_precondition.rs:53`,
+# `const CHECK_NAME: &str = "aggregate"` at :7). Cancelling main runs would
+# silently leave tag-able commits with no aggregate verdict at all — turning a
+# queue optimisation into a release-blocking hole. Main runs therefore always
+# run to completion, and the group key falls back to the SHA so they never
+# cancel one another.
+concurrency:
+  group: discipline-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
   TOKEI_VERSION: "14.0.0"
