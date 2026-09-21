@@ -776,9 +776,30 @@ fn tenant_mode_boots_on_live_substrate() {
         "Researcher on_idle never served team A; stderr:\n{route_stderr}"
     );
     assert_eq!(team_b_count, 0, "team A readiness row leaked into team B");
-    assert_eq!(
+    // ⚠ THIS ASSERTION PINNED A DEFECT. It demanded `audit_pid == 0` while its
+    // own message demanded "the loaded Researcher pid" — and those are opposites.
+    // `NEXT_SPIRIT_PID` is `AtomicU32::new(1)` (scheduler_loop.rs:29), so a
+    // loaded Spirit can NEVER hold pid 0; pid 0 is the placeholder that
+    // `spirit_pid: 0` defaults use, and admission.rs:24-27 states the rule
+    // outright: "the pid does not exist until `allocate_pid()` inside `load`.
+    // Admitting a placeholder pid would make every live port fail closed."
+    // So the green state this test used to require was an audit row recording
+    // an UNASSIGNED requester — a transparency-log entry that named nobody.
+    // Story 16-6's `provenance -> load -> admit -> start` re-ordering made the
+    // row carry the real pid, and this test went red for doing the right thing.
+    //
+    // Corrected to the contract rather than re-pinned to the new literal: `1`
+    // is merely today's allocation order and would break the moment anything
+    // loads a Spirit before the Researcher. What must hold is that the audit
+    // requester is a REAL allocated pid, never the placeholder.
+    // Measured RED before this change on two independent substrates (CI job
+    // 106339757344 and a local postgresql-17 + pgvector provisioning), both
+    // `left: 1, right: 0`.
+    assert_ne!(
         audit_pid, 0,
-        "audit requester must be the loaded Researcher pid"
+        "audit requester must be the REAL pid allocated to the loaded \
+         Researcher, never the 0 placeholder; a collective.write row naming pid \
+         0 is an audit row that names nobody. stderr:\n{route_stderr}"
     );
 
     // The same signed manifest declares team-a -> maos_team_a. Pointing the
