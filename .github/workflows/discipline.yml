@@ -2980,8 +2980,28 @@ jobs:
         run: cargo test -p maos-acp --test jetbrains_bridge_test
       - name: Run JetBrains ACP server e2e
         run: cargo test -p maos-bin --test jetbrains_acp_server
+      # ⚠ This step tested NOTHING until 2026-09-21 (Epic-16 retrospective).
+      # `-- --exact` makes libtest match the FULL test path, and the test lives
+      # at `subcommands::tests::install_verify_local_release_artifact`
+      # (maos-cli/src/subcommands.rs:5830 — a lib unit test, not an integration
+      # target). The bare name therefore matched zero tests, and libtest exits 0
+      # on zero matches, so the step went green on every platform while
+      # verifying no signature path at all. Measured on Linux: bare name +
+      # `--exact` => "0 passed; 50 filtered out"; full path + `--exact` =>
+      # "1 passed". This is E16-A2's thesis inside E16-A2's own CI file: a step
+      # that could not run was indistinguishable from one that ran and passed.
+      # The `--list` guard below makes a future rename LOUD instead of vacuous.
       - name: Verify Windows local release signature path
-        run: cargo test -p maos-cli install_verify_local_release_artifact -- --exact
+        # `shell: bash` is REQUIRED: windows-latest defaults to pwsh, where
+        # `tee`/`grep`/`|| { …; }` are not what this script means. Git Bash ships
+        # on the runner image. The list file is workspace-relative so it needs no
+        # /tmp mapping.
+        shell: bash
+        run: |
+          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact --list | tee win-release-test-list.txt
+          grep -q 'subcommands::tests::install_verify_local_release_artifact: test' win-release-test-list.txt || { echo "the Windows release-signature test did not resolve — it was renamed or moved, and this step must be repointed, not left to pass on an empty filter" >&2; exit 1; }
+          rm -f win-release-test-list.txt
+          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact
 
   # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
   check-skill-conformance:
