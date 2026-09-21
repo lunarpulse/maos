@@ -178,10 +178,28 @@ fn windows_memory_cap_allows_underbudget_child() {
 fn windows_child_runs_at_low_integrity() {
     let s = spec(SandboxTier::T2, no_caps(), "win-low-integrity");
     let mut cmd = Command::new("cmd");
+    // ⚠ ABSOLUTE PATHS ARE LOAD-BEARING, NOT STYLE. `cmd /C` resolves bare
+    // `whoami` through the INHERITED PATH, so this security assertion's verdict
+    // depended on which shell launched cargo. Measured 2026-09-21: after the
+    // job step was given `shell: bash` (to capture failure tails into a
+    // check-run annotation), Git Bash's `C:\Program Files\Git\usr\bin` preceded
+    // System32 and the child ran the MSYS `whoami.exe`, which cannot start at
+    // Low integrity at all — it died with
+    //   `fatal error - NtCreateDirectoryObject(\BaseNamedObjects\msys-2.0S5-...): 0xC0000022`
+    // creating its MSYS named objects. The child exited non-zero, `findstr`
+    // never ran, and this test reported "the low-integrity label did not apply"
+    // when the label had applied PERFECTLY — so perfectly that an MSYS binary
+    // could not tolerate it. A test that reads a WORKING sandbox as a broken
+    // one is worse than no test. Both ends of the pipe are now named
+    // absolutely, so the probe measures the sandbox instead of the PATH.
+    //
     // No inner quotes / metachars beyond the pipe — the whole pipeline is one
     // `/C` argument (quoted by the sandbox's CRT-style arg quoting). `findstr`
     // matching a SID literal needs no quoting.
-    cmd.args(["/C", "whoami /groups | findstr S-1-16-4096"]);
+    cmd.args([
+        "/C",
+        r"%SystemRoot%\System32\whoami.exe /groups | %SystemRoot%\System32\findstr.exe S-1-16-4096",
+    ]);
     let mut child = spawn_sandboxed(&s, &mut cmd).expect("spawn low-integrity probe");
     let status = child.wait().expect("wait");
     assert!(

@@ -2985,6 +2985,17 @@ jobs:
       # step is windows-check #8 (`jetbrains_acp_server`); the next run will say
       # WHY instead of merely that. `%25`-then-`%0A` escaping order matters, and
       # `shell: bash` is required because windows-latest defaults to pwsh.
+      #
+      # ⚠ AND `shell: bash` HAS A PRICE, paid once already: Git Bash puts
+      # `C:\Program Files\Git\usr\bin` AHEAD of System32, so any child that
+      # resolves a tool by bare name gets the MSYS build. That silently broke
+      # `windows_child_runs_at_low_integrity`, whose probe ran `whoami /groups`
+      # — MSYS `whoami.exe` cannot start at Low integrity at all
+      # (`NtCreateDirectoryObject(\BaseNamedObjects\msys-...): 0xC0000022`), so a
+      # PERFECTLY working sandbox was reported as a broken label. Fixed in the
+      # test by naming both ends of the pipe absolutely under `%SystemRoot%`.
+      # ANY new Windows probe added below MUST resolve its tools absolutely, or
+      # it will measure this runner's PATH instead of the product.
       - name: Run Windows sandbox enforcement tests
         shell: bash
         run: |
