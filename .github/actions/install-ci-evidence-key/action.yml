@@ -1,0 +1,50 @@
+name: Install the CI-only evidence audit key
+description: |
+  Operator ruling 2026-09-24: a DEDICATED CI-only evidence audit key (never the
+  operator's key — R-RG1's operator-pinned key stays off CI). Signatures made
+  with it prove "ran in this CI run", not "ran by the operator".
+
+  Single-sourced because the SIGNER and the VERIFIER of a ledger must hold the
+  same key, and they are different jobs:
+  - `check-multi-tenant-loom` signs its live legs (the harness signer,
+    tests/harness/evidence_record.rs:82-83) and verifies them in-gate;
+  - `check-ship-gate-completeness` downloads the published ledgers and
+    RE-VERIFIES every signed leg (xtask/src/evidence_ledger.rs:1390-1412).
+  Measured on run 36058940696: with the key in the first job only, the second
+  rejected the whole ledger set ("serialized PROVEN_LIVE_SIGNED but reprojects
+  to INDETERMINATE").
+
+  Both read `MAOS_AUDIT_KEY` (a PATH), which this action exports. An empty
+  input (secret not provisioned, or a fork) writes nothing and warns: live legs
+  then stay unsigned, which reprojects consistently.
+
+inputs:
+  key:
+    description: The CI_EVIDENCE_AUDIT_KEY secret (64 hex chars, nothing else).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install key and export MAOS_AUDIT_KEY
+      shell: bash
+      env:
+        CI_EVIDENCE_AUDIT_KEY: ${{ inputs.key }}
+      run: |
+        if [ -z "$CI_EVIDENCE_AUDIT_KEY" ]; then
+          echo "::warning::CI_EVIDENCE_AUDIT_KEY is not provisioned — live evidence legs stay unsigned (INDETERMINATE); check-multi-tenant-loom's required reza journey leg will be ABSENT (docs/runbooks/provisioning-checklist.md)"
+          exit 0
+        fi
+        # Report the SHAPE of a malformed value — counts only, never characters.
+        # The first delivered value was 65 bytes and died later with an opaque
+        # "audit key is not 64-char hex".
+        key_len=${#CI_EVIDENCE_AUDIT_KEY}
+        non_hex=$(printf '%s' "$CI_EVIDENCE_AUDIT_KEY" | tr -d '0-9a-fA-F' | wc -c)
+        if [ "$key_len" -ne 64 ] || [ "$non_hex" -ne 0 ]; then
+          echo "::error::CI_EVIDENCE_AUDIT_KEY is malformed: ${key_len} chars, ${non_hex} of them not hex (expected exactly 64 hex, nothing else). Re-set it with the key file's exact bytes — a trailing '%' shown by zsh after 'cat' is the shell's end-of-line marker, not part of the key."
+          exit 1
+        fi
+        key_dir="$RUNNER_TEMP/maos-ci-evidence"
+        install -d -m 700 "$key_dir"
+        ( umask 077 && printf '%s' "$CI_EVIDENCE_AUDIT_KEY" > "$key_dir/audit-signing.key" )
+        echo "MAOS_AUDIT_KEY=$key_dir/audit-signing.key" >> "$GITHUB_ENV"
