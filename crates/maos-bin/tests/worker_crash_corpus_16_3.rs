@@ -31,6 +31,16 @@
 //!   kill + 5 s, after both floor windows, so every blocked pump ends and
 //!   the next batch can start (killing them all "at the end" deadlocks the
 //!   first batch that has one).
+//! * *Grandchildren nobody can name* — a `hang-with-grandchild` Worker is
+//!   killed only once its grandchild pid has been JOURNALED. The fixture
+//!   spawns the grandchild and only then prints its pid, so a kill landing in
+//!   between leaves a grandchild no one knows to kill: its pump blocks
+//!   forever, and the runtime's drop waits on it forever. Measured
+//!   2026-09-21 under `taskset -c 0,1` (the 2-core runner): 37/50 announced,
+//!   6 pumps blocked, the test wedged after a passing summary; a lossless
+//!   insertion-order rescan found the same 37 (the cursor lost nothing). The
+//!   gate makes "half hold a grandchild" TRUE, and it is asserted, not
+//!   printed.
 //! * *Counts, not wall-clock* — the floors are latencies against a stamped
 //!   kill instant, not row counts.
 //! * *Per-waiter polling* — the Transparency Log has ONE mutex shared with
@@ -86,6 +96,9 @@ const POLLER_TICK: Duration = Duration::from_millis(10);
 /// The grandchild pid line is the `hang-with-grandchild` fixture's FIRST
 /// stdout line; the pump journals it as a kind-21 row at the Worker's pid.
 const GRANDCHILD_PREFIX: &str = "worker-fixture: grandchild pid ";
+/// The direct child's argv marker for the grandchild-holding mode (the
+/// grandchild re-spawns itself without it, so it never matches).
+const GRANDCHILD_MODE_ARG: &[u8] = b"--maos-fixture-mode=hang-with-grandchild";
 
 static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
     // The test binary's own profile decides where `resolve_cli_binary` looks
@@ -307,6 +320,30 @@ impl Ledger {
             },
         );
         true
+    }
+
+    /// A not-yet-killed `hang-with-grandchild` Worker whose grandchild pid has
+    /// not been journaled yet — killing it now could leave an unnamed
+    /// grandchild holding the pump's pipe forever. The killer skips it until
+    /// the pid lands.
+    fn awaiting_grandchild_pid(&self, view_pid: u32, child_pid: u32) -> bool {
+        if self
+            .workers
+            .lock()
+            .expect("worker ledger")
+            .contains_key(&view_pid)
+            || self
+                .grandchildren
+                .lock()
+                .expect("grandchild ledger")
+                .contains_key(&view_pid)
+        {
+            return false;
+        }
+        std::fs::read(format!("/proc/{child_pid}/cmdline")).is_ok_and(|argv| {
+            argv.split(|b| *b == 0)
+                .any(|arg| arg == GRANDCHILD_MODE_ARG)
+        })
     }
 
     fn observe(&self, row: &TransparencyLogEntry) {
@@ -566,6 +603,9 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                     let (Some(child_pid), Some(child)) = (view.child_pid, view.child) else {
                         continue;
                     };
+                    if ledger.awaiting_grandchild_pid(view.spirit_pid, child_pid) {
+                        continue;
+                    }
                     if !ledger.kill(
                         view.spirit_pid,
                         WorkerTask::Standalone.record_ids(&view.spirit_id).0,
@@ -726,9 +766,16 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
     let orphan_ok = ledger.meet(ORPHAN_FLOOR, Which::OrphanAndDisposition);
     let counters = supervisor.counters();
 
+    let announced = ledger
+        .grandchildren
+        .lock()
+        .expect("grandchild ledger")
+        .len();
     println!(
-        "corpus: {kills_sent}/{WORKERS} kills sent, {bound} bindings, 50 hang + \
-         50 hang-with-grandchild, batches of {BATCH}, settled={settled}"
+        "corpus: {kills_sent}/{WORKERS} kills sent, {bound} bindings, \
+         {announced}/{} grandchildren announced before the kill, batches of {BATCH}, \
+         settled={settled}",
+        WORKERS / 2,
     );
     println!(
         "completions: {completions:?}; run errors: {}",
@@ -769,6 +816,25 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
     assert_eq!(
         bound, WORKERS,
         "every Worker must have bound exactly once; got {bound} bindings"
+    );
+    // 1b. The grandchild half, MEASURED. It used to be the manifest split
+    //     printed as a label ("50 hang-with-grandchild"); on a 2-core runner
+    //     only 37/50 actually held an announced grandchild and the corpus
+    //     silently measured fewer of the hard case.
+    assert_eq!(
+        announced,
+        WORKERS / 2,
+        "exactly {} Workers must hold an announced grandchild at their kill; \
+         got {announced} — the kill gate is not holding",
+        WORKERS / 2,
+    );
+    // 1c. Every run ENDED. A run error here is a pump that never returned —
+    //     a grandchild nobody killed — and the runtime's drop will wait on
+    //     it; the job ceiling is the backstop for that wedge.
+    assert!(
+        run_errors.is_empty(),
+        "{} run(s) never ended: {run_errors:?}",
+        run_errors.len()
     );
 
     // 2. NFR-Rel-1: `lifecycle.crash` ≤ 2 s after the kill for ≥ 99/100.

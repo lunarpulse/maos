@@ -1289,14 +1289,14 @@ jobs:
     # right up to the kill. Six hours of runner time per push also starved the
     # queue for every other job in the run.
     #
-    # 20 is 10x the 2m01s healthy time. This does NOT fix the hang — the cause
-    # is a real kernel defect (SpawnedBridge::drop joins the stdout/stderr
-    # bridge readers unboundedly, and a SIGKILLed worker's surviving GRANDCHILD
-    # still holds the pipe write end, so `read()` never EOFs; measured with 10
-    # `cli-bridge-stdout`/`cli-bridge-stderr` threads parked in `anon_pipe_read`
-    # and 10 live fixtures). It makes the hang a FAST RED instead of a silent
-    # six-hour burn, which is the only half of this that does not require a
-    # kernel grant.
+    # 20 is 10x the 2m01s healthy time — the BACKSTOP, not the fix. The cause
+    # was a harness race, fixed in worker_crash_corpus_16_3.rs: the corpus
+    # SIGKILLed `hang-with-grandchild` Workers before their grandchild pid was
+    # journaled (37/50 announced on 2 starved cores), so 6 grandchildren nobody
+    # could name held 6 pumps' pipes forever and the runtime's drop waited on
+    # them. The kill is now gated on the announcement; the starved repro passes
+    # in 25.79s. (An earlier comment here blamed SpawnedBridge::drop — wrong;
+    # withdrawn in deferred-work.md.)
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
