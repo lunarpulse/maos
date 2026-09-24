@@ -3493,6 +3493,20 @@ jobs:
           extra-databases: |-
             maos_team_b
             maos_team_c
+      # The `maos-bin-whole-package-parallel-isolation` leg runs a debug
+      # `cargo test -p maos-bin`, whose tests resolve `worker-cli-fixture` and
+      # `maosctl` as siblings of the running debug `maos` — and `cargo test -p
+      # maos-bin` builds neither (other packages). Without this step the leg
+      # stops at its FIRST failing binary, `drain_once_audit_writer`, with
+      # "cli_wrapper command 'worker-cli-fixture' not found (checked
+      # daemon-sibling, deps/ parent, and $PATH)" — reproduced locally
+      # 2026-09-21 by moving exactly these two debug binaries aside. The gate
+      # reported it as `[INDETERMINATE]: ` with an EMPTY reason, so the cause
+      # was invisible from the check-run annotation.
+      - name: Build debug siblings for the maos-bin whole-package leg
+        run: |
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
       - name: Run check-multi-tenant-loom gate
         env:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
