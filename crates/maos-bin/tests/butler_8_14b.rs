@@ -144,10 +144,13 @@ fn shell_butler_pick_renders_option_messages() {
     );
 }
 
+use parking_lot::Mutex;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
+use std::time::{Duration, Instant};
 
 struct RequestCapture {
     method: String,
@@ -239,6 +242,84 @@ fn spawn_mock_mcp_server(responses: Vec<&'static str>) -> (String, mpsc::Receive
     (format!("http://{}", addr), rx)
 }
 
+/// Healthy: the whole `--live --once` run exits in ~5.2 s — 5 s of which is
+/// `audit writer drain timed out after 5s`, itself a filed defect. ~11x.
+const CHILD_BUDGET: Duration = Duration::from_secs(60);
+/// After `maos` exits, a reader still short of EOF means a DESCENDANT
+/// inherited the pipe (the Story 16-3 grandchild class). Waiting on it is a
+/// hang, so it is bounded and named instead.
+const PIPE_SETTLE: Duration = Duration::from_secs(10);
+/// Once `maos` has exited, a call it never made will never arrive.
+const MOCK_CALL_BUDGET: Duration = Duration::from_secs(10);
+
+/// Wait for a piped `maos` child with every wait BOUNDED.
+///
+/// 2026-09-21: `butler_8_14b_mcp_drivers` stalled workspace-test-suite for
+/// ~74 minutes on 79fc910e (the job died at its ceiling) while passing locally
+/// in 5.2 s — including on 2 pinned cores, with the job's
+/// MAOS_SECRETS_BACKEND=env, and with an initialised home. Every wait here was
+/// unbounded, and libtest prints a test's captured output only when it
+/// FINISHES, so the hang left no trace. A stall now FAILS with whatever `maos`
+/// had written, which is the diagnosis that run could not give.
+fn wait_bounded(
+    mut child: std::process::Child,
+    budget: Duration,
+) -> (std::process::ExitStatus, String, String) {
+    type Sink = Arc<Mutex<Vec<u8>>>;
+    fn drain(mut pipe: impl Read + Send + 'static) -> (Sink, mpsc::Receiver<()>) {
+        let sink: Sink = Arc::default();
+        let (done_tx, done_rx) = mpsc::channel();
+        let writer = Arc::clone(&sink);
+        thread::spawn(move || {
+            let mut chunk = [0u8; 4096];
+            while let Ok(n) = pipe.read(&mut chunk) {
+                if n == 0 {
+                    break;
+                }
+                writer.lock().extend_from_slice(&chunk[..n]);
+            }
+            let _ = done_tx.send(());
+        });
+        (sink, done_rx)
+    }
+    let text = |sink: &Sink| String::from_utf8_lossy(&sink.lock()).into_owned();
+
+    let (out, out_done) = drain(child.stdout.take().expect("piped stdout"));
+    let (err, err_done) = drain(child.stderr.take().expect("piped stderr"));
+    let deadline = Instant::now() + budget;
+    let status = loop {
+        if let Some(status) = child.try_wait().expect("try_wait maos") {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!(
+                "maos did not exit within {budget:?} — a HANG, not a slow run (healthy ~5.2 s).\n\
+                 stderr so far:\n{}\nstdout so far:\n{}",
+                text(&err),
+                text(&out)
+            );
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+    let settle = Instant::now() + PIPE_SETTLE;
+    for (name, done) in [("stdout", &out_done), ("stderr", &err_done)] {
+        if done
+            .recv_timeout(settle.saturating_duration_since(Instant::now()))
+            .is_err()
+        {
+            panic!(
+                "maos exited ({status:?}) but its {name} pipe was still open {PIPE_SETTLE:?} \
+                 later — a descendant inherited it.\nstderr:\n{}\nstdout:\n{}",
+                text(&err),
+                text(&out)
+            );
+        }
+    }
+    (status, text(&out), text(&err))
+}
+
 #[test]
 fn butler_8_14b_mcp_drivers() {
     // AC3 test 4: maos run butler --once with isolated MAOS_HOME + a mock MCP server URL
@@ -250,7 +331,7 @@ fn butler_8_14b_mcp_drivers() {
     ]);
 
     let home = isolated_data_home("mcp_drivers");
-    let mut child = Command::new(env!("CARGO_BIN_EXE_maos"))
+    let child = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/butler/manifest.toml", "--live", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", url.clone())
@@ -263,23 +344,7 @@ fn butler_8_14b_mcp_drivers() {
         .spawn()
         .expect("failed to execute maos run butler --live --once");
 
-    let mut stdout = child.stdout.take().unwrap();
-    let mut stderr = child.stderr.take().unwrap();
-
-    let t1 = thread::spawn(move || {
-        let mut s = String::new();
-        let _ = stdout.read_to_string(&mut s);
-        s
-    });
-    let t2 = thread::spawn(move || {
-        let mut s = String::new();
-        let _ = stderr.read_to_string(&mut s);
-        s
-    });
-
-    let status = child.wait().unwrap();
-    let stdout_str = t1.join().unwrap();
-    let stderr_str = t2.join().unwrap();
+    let (status, stdout_str, stderr_str) = wait_bounded(child, CHILD_BUDGET);
     eprintln!("Child exited with status: {:?}", status);
     eprintln!("Child stdout: {}", stdout_str);
     eprintln!("Child stderr: {}", stderr_str);
@@ -287,11 +352,15 @@ fn butler_8_14b_mcp_drivers() {
     let stdout = stdout_str;
 
     // Assert calendar list_events was called
-    let req1 = rx.recv().expect("expected calendar_events call");
+    let req1 = rx
+        .recv_timeout(MOCK_CALL_BUDGET)
+        .unwrap_or_else(|e| panic!("expected calendar_events call ({e}); stderr:\n{stderr_str}"));
     assert!(req1.path.contains("tools/call") || req1.path.contains("/"));
 
     // Assert comms list_messages was called
-    let req2 = rx.recv().expect("expected comms_messages call");
+    let req2 = rx
+        .recv_timeout(MOCK_CALL_BUDGET)
+        .unwrap_or_else(|e| panic!("expected comms_messages call ({e}); stderr:\n{stderr_str}"));
     assert!(req2.path.contains("tools/call") || req2.path.contains("/"));
 
     // Assert halt event is in stdout
