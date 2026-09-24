@@ -2,7 +2,10 @@
 
 //! Story 6.1 — DRR scheduler integration tests.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Poll;
 
 use maos_domain::frame::{
     FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
@@ -85,7 +88,10 @@ async fn drr_basic_two_spirits_fair() {
     assert!(bw_rx.try_recv().is_err(), "no backpressure expected");
 }
 
-#[tokio::test(flavor = "multi_thread")]
+// ONE worker thread: the DRR processor (spawned by `DrrScheduler::new`) and
+// the submitter task below share it, so neither runs while the other is being
+// polled. `block_in_place` in `flush_batch` rules out `current_thread`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0));
@@ -100,33 +106,54 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
     let _h1 = adapter.register_spirit_typed(&SpiritId::from("a")).unwrap();
     let _h2 = adapter.register_spirit_typed(&SpiritId::from("b")).unwrap();
 
-    // Spirit "a" floods with 10 × 1 KiB frames = 10 KiB backlog
+    // Spirit "a" floods with 10 × 1 KiB frames = 10 KiB backlog.
     // Threshold is 2 × 4 KiB = 8 KiB.
-    // Submit all frames concurrently (do not await) so they queue up
-    // before the DRR processor drains them.
-    let mut handles = Vec::new();
-    for _ in 0..10 {
-        let f = make_frame("a", "b", 1 * 1024);
-        let payload = serde_json::to_vec(&f.payload).unwrap();
-        let drr = adapter.drr_scheduler().unwrap().clone();
-        handles.push(tokio::spawn(async move {
-            drr.submit(
-                f,
-                payload,
-                maos_kernel_core::iac::FrameKind::TaskAssign,
-                0,
-                "standard".into(),
-                FrameOrigin::HumanAuthored,
-                vec![],
-            )
-            .await
-        }));
-    }
-    // Wait for all submit tasks to finish sending so every frame is in the
-    // (unbounded) channel before we inspect budget warnings.
-    for h in &mut handles {
-        let _ = h.await;
-    }
+    //
+    // DETERMINISTIC by construction (2026-09-24). The warning is emitted only
+    // at ENQUEUE, when a's queue exceeds 8 KiB — and the processor drains
+    // queues on a 100 ms ticker. The old test spawned ten submit tasks and
+    // hoped they all landed before a tick: on a loaded runner a tick fell
+    // mid-arrival, drained ~4 KiB, the backlog never crossed 8 KiB, and the
+    // warning was (correctly) never emitted — CI 79610248 waited the full
+    // 10 s bound and failed. No wait can fix that; ordering can.
+    //
+    // `submit` SENDS synchronously, then awaits the persist ack. Polling all
+    // ten submit futures inside ONE task poll puts all ten in the channel
+    // before the processor — on the same single worker — can run; its
+    // `biased` select then enqueues all ten before it ever considers the tick.
+    let drr = adapter.drr_scheduler().unwrap().clone();
+    let submitter = tokio::spawn(async move {
+        let mut pending: Vec<Pin<Box<dyn Future<Output = ()> + Send>>> = (0..10)
+            .map(|_| {
+                let f = make_frame("a", "b", 1 * 1024);
+                let payload = serde_json::to_vec(&f.payload).unwrap();
+                let drr = drr.clone();
+                Box::pin(async move {
+                    let _ = drr
+                        .submit(
+                            f,
+                            payload,
+                            maos_kernel_core::iac::FrameKind::TaskAssign,
+                            0,
+                            "standard".into(),
+                            FrameOrigin::HumanAuthored,
+                            vec![],
+                        )
+                        .await;
+                }) as Pin<Box<dyn Future<Output = ()> + Send>>
+            })
+            .collect();
+        std::future::poll_fn(|cx| {
+            pending.retain_mut(|submit| submit.as_mut().poll(cx).is_pending());
+            if pending.is_empty() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
+    });
+    submitter.await.expect("submitter task");
 
     // Bounded wait on the condition (Story 15-1 AC6(b)): the original fixed
     // `sleep(50ms)` was a synchronisation primitive — under load the DRR

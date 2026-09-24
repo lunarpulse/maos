@@ -41,6 +41,9 @@
 //!   insertion-order rescan found the same 37 (the cursor lost nothing). The
 //!   gate makes "half hold a grandchild" TRUE, and it is asserted, not
 //!   printed.
+//!   A child whose argv names no fixture mode yet (not exec'd — cmdline is
+//!   still this test binary's, or empty mid-exec) is UNDECIDED, not "plain
+//!   hang": reading it as hang let 1-4 of 50 through (CI 49/50 twice).
 //! * *Counts, not wall-clock* — the floors are latencies against a stamped
 //!   kill instant, not row counts.
 //! * *Per-waiter polling* — the Transparency Log has ONE mutex shared with
@@ -99,6 +102,9 @@ const GRANDCHILD_PREFIX: &str = "worker-fixture: grandchild pid ";
 /// The direct child's argv marker for the grandchild-holding mode (the
 /// grandchild re-spawns itself without it, so it never matches).
 const GRANDCHILD_MODE_ARG: &[u8] = b"--maos-fixture-mode=hang-with-grandchild";
+/// Any fixture-mode argv element — its presence proves the child has exec'd
+/// into `worker-cli-fixture` (before exec, cmdline is this test binary's).
+const FIXTURE_MODE_PREFIX: &[u8] = b"--maos-fixture-mode=";
 
 static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
     // The test binary's own profile decides where `resolve_cli_binary` looks
@@ -322,11 +328,18 @@ impl Ledger {
         true
     }
 
-    /// A not-yet-killed `hang-with-grandchild` Worker whose grandchild pid has
-    /// not been journaled yet — killing it now could leave an unnamed
-    /// grandchild holding the pump's pipe forever. The killer skips it until
-    /// the pid lands.
-    fn awaiting_grandchild_pid(&self, view_pid: u32, child_pid: u32) -> bool {
+    /// Not yet safe to kill: a `hang-with-grandchild` Worker whose grandchild
+    /// pid has not been journaled — killing it now could leave an unnamed
+    /// grandchild holding the pump's pipe forever — OR a child whose argv
+    /// names no fixture mode YET. The killer skips it and re-checks next tick.
+    ///
+    /// The second arm is load-bearing (measured 2026-09-24): a binding's
+    /// `child_pid` can be visible before the child has exec'd, so
+    /// `/proc/<pid>/cmdline` still shows THIS test binary's argv (8 reads in 6
+    /// starved runs) or is empty mid-exec (6 reads). Reading that as "not
+    /// grandchild mode" killed grandchild Workers before they announced —
+    /// 46-49/50 announced, on CI (49, twice) and locally (3 of 6 starved runs).
+    fn not_yet_killable(&self, view_pid: u32, child_pid: u32) -> bool {
         if self
             .workers
             .lock()
@@ -340,10 +353,17 @@ impl Ledger {
         {
             return false;
         }
-        std::fs::read(format!("/proc/{child_pid}/cmdline")).is_ok_and(|argv| {
-            argv.split(|b| *b == 0)
-                .any(|arg| arg == GRANDCHILD_MODE_ARG)
-        })
+        let Ok(argv) = std::fs::read(format!("/proc/{child_pid}/cmdline")) else {
+            // Unreadable: undecided, never "plain hang".
+            return true;
+        };
+        let mut mode_args = argv
+            .split(|b| *b == 0)
+            .filter(|arg| arg.starts_with(FIXTURE_MODE_PREFIX));
+        match mode_args.next() {
+            None => true, // not exec'd into the fixture yet
+            Some(arg) => arg == GRANDCHILD_MODE_ARG,
+        }
     }
 
     fn observe(&self, row: &TransparencyLogEntry) {
@@ -603,7 +623,7 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                     let (Some(child_pid), Some(child)) = (view.child_pid, view.child) else {
                         continue;
                     };
-                    if ledger.awaiting_grandchild_pid(view.spirit_pid, child_pid) {
+                    if ledger.not_yet_killable(view.spirit_pid, child_pid) {
                         continue;
                     }
                     if !ledger.kill(
