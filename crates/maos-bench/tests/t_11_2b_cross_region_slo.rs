@@ -265,7 +265,7 @@ async fn cross_region_roundtrip_live() {
     // nothing else — the shape of the failure was unmeasurable by construction.
     // A floor breach is a FINDING, and a finding you cannot characterise is a
     // guess. `--nocapture` (which both gate legs already pass) surfaces this.
-    eprintln!(
+    let live_line = format!(
         "cross-region round-trip LIVE: p50={}µs p95={}µs p99={}µs max={}µs \
          mean={}µs std_dev={}µs (budget={}µs, met={}, n={})",
         result.p50_us,
@@ -278,19 +278,76 @@ async fn cross_region_roundtrip_live() {
         result.budget_met,
         N
     );
-    let stage_p50: Vec<String> = STAGES
-        .iter()
-        .enumerate()
-        .map(|(i, name)| {
-            let mut stage: Vec<u64> = trips.iter().map(|trip| trip.stages_us[i]).collect();
-            stage.sort_unstable();
-            format!("{name}={}", stage[stage.len() / 2])
-        })
-        .collect();
-    eprintln!(
-        "cross-region round-trip STAGES p50 (µs): {}",
-        stage_p50.join(" ")
+    // Per-stage p50 / p95 / max (2026-09-24). p50 alone attributed a FLAT
+    // breach (the 2026-09-21 fsync cost) but not a TAIL one: CI 67bf70fa had
+    // p50 6120µs and p95 41300µs, max 341211µs, and a p50-only stage line
+    // could not say where those samples went.
+    let stage_line = format!(
+        "cross-region round-trip STAGES p50/p95/max (µs): {}",
+        STAGES
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let mut stage: Vec<u64> = trips.iter().map(|trip| trip.stages_us[i]).collect();
+                stage.sort_unstable();
+                format!(
+                    "{name}={}/{}/{}",
+                    stage[stage.len() / 2],
+                    stage[stage.len() * 95 / 100],
+                    stage[stage.len() - 1]
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     );
+    // For every sample over the floor: where did most of its time go? `other`
+    // is the span NOT covered by the five stage stamps (total − their sum) —
+    // the fault-inject delay, or a stall between stages — so a stall there is
+    // never blamed on the largest measured stage.
+    let mut dominant = [0usize; STAGES.len() + 1];
+    let over_floor = trips
+        .iter()
+        .filter(|trip| trip.total_us > MULTI_REGION_SLO_P95_US)
+        .inspect(|trip| {
+            let other = trip
+                .total_us
+                .saturating_sub(trip.stages_us.iter().sum::<u64>());
+            let (worst, _) = trip
+                .stages_us
+                .iter()
+                .copied()
+                .chain([other])
+                .enumerate()
+                .max_by_key(|(_, us)| *us)
+                .expect("six buckets");
+            dominant[worst] += 1;
+        })
+        .count();
+    let tail_line = format!(
+        "cross-region round-trip TAIL: {over_floor}/{N} samples over {}µs; dominant stage: {}",
+        MULTI_REGION_SLO_P95_US,
+        STAGES
+            .iter()
+            .copied()
+            .chain(["other"])
+            .zip(dominant)
+            .filter(|(_, count)| *count > 0)
+            .map(|(name, count)| format!("{name}×{count}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    );
+    for line in [&live_line, &stage_line, &tail_line] {
+        eprintln!("{line}");
+    }
+    // Also publish to the CI step summary, so a GREEN run leaves its
+    // distribution too: the gate prints a leg's transcript only when the leg
+    // fails, so six consecutive greens left no numbers to measure variance by.
+    if let Some(summary) = std::env::var_os("GITHUB_STEP_SUMMARY") {
+        use std::io::Write as _;
+        if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(summary) {
+            let _ = writeln!(file, "```\n{live_line}\n{stage_line}\n{tail_line}\n```");
+        }
+    }
 
     // Anti-hardcoded-count tooth: samples.len() == count == N.
     assert_eq!(
