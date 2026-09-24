@@ -40,9 +40,26 @@ env:
   # the failed jobs.
   CARGO_NET_RETRY: "10"
 
+# ── Job ceilings (2026-09-21, Epic-16 retrospective) ─────────────────────────
+# EVERY job carries `timeout-minutes`. GitHub Actions has no workflow-level
+# default, so a job without one inherits SIX HOURS — and
+# nfr-rel-1-crash-detection-2s spent all six on every push from ddb7441b to
+# 79fc910e while starving the queue for its siblings. A hang must read as a
+# fast red, distinguishable from a run (E16-A2).
+#
+# RULE for the 104 ceilings added in that pass: max(30, 3x the job's MEASURED
+# duration on 79fc910e, rounded up to 5). All 104 had a completed run to measure
+# (fetched across every page of the jobs API). The 30-minute floor exists
+# because those were warm-rust-cache runs; a cold rebuild is invisible in them.
+# Ceilings that pre-date this pass keep their own recorded rationale.
+# ⚠ A job that hits its ceiling is a HANG TO DIAGNOSE, not a ceiling to raise —
+# workspace-test-suite's 45 -> 90 raise was exactly that mistake
+# (butler_8_14b_mcp_drivers hangs; the suite is not slow).
+
 jobs:
   reproducible-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     # ADVISORY gate (2026-06-12). Cargo/rustc does not guarantee byte-identical
     # debug artifacts across consecutive builds because incremental metadata,
     # crate hashes and path-prefix data can vary depending on cargo/rustc
@@ -141,6 +158,7 @@ jobs:
 
   check-unsafe:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -158,6 +176,7 @@ jobs:
   # un-caught into 12.3 precisely because there was no fmt gate. Blocking.
   check-fmt:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -172,6 +191,7 @@ jobs:
 
   kloc-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # BLOCKING since 2026-07-25 (founder-ratified ceiling-policy replacement).
     # Was ADVISORY from 2026-06-11 under the "tight measured residual" rule, whose
     # own revert condition read: "revert to blocking once the kernel-core
@@ -209,6 +229,7 @@ jobs:
 
   abi-diff:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -230,6 +251,7 @@ jobs:
 
   gen-abi-docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -245,6 +267,7 @@ jobs:
 
   check-empty-kernel:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -258,6 +281,7 @@ jobs:
 
   check-loom:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -271,6 +295,7 @@ jobs:
 
   check-fr47:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -284,6 +309,7 @@ jobs:
 
   check-workspace-count:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -299,6 +325,7 @@ jobs:
   # for the fail-closed flip; never flipped-while-red).
   check-a2a-sender-completeness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -329,6 +356,7 @@ jobs:
 
   check-pub-field-constructors:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -342,6 +370,7 @@ jobs:
 
   check-composition-root-completeness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -355,6 +384,7 @@ jobs:
 
   check-service-boundary:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -369,6 +399,7 @@ jobs:
   # Story 12.6 — blocking registry coverage for maos-bin/src only; Story 12.7 widens this workspace-wide.
   check-env-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -396,6 +427,7 @@ jobs:
   # story exists to close.
   check-decision-register:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -475,6 +507,7 @@ jobs:
   # and "persist" introduced when DF16 was resolved.
   invariant-lock:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       pull-requests: read
     steps:
@@ -514,6 +547,7 @@ jobs:
 
   check-corpus:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -527,6 +561,7 @@ jobs:
 
   maos-audit-read-only:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Grep for write-open patterns in maos-audit
@@ -544,6 +579,7 @@ jobs:
 
   check-judge-config:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -557,6 +593,7 @@ jobs:
 
   check-security-md:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -593,6 +630,7 @@ jobs:
 
   audit-spine-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -606,6 +644,7 @@ jobs:
 
   cap-token-verify-bench:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -619,6 +658,7 @@ jobs:
 
   cap-registry-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -632,6 +672,7 @@ jobs:
 
   fr4-1000-call-fixture:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -650,6 +691,7 @@ jobs:
     # via jq. Complementary to `fr4-1000-call-fixture` (kernel-side
     # mediation) — this gate exercises the read-side surface.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -670,6 +712,7 @@ jobs:
     # (FR58 JSON on run; one Lifecycle Journal NDJSON line per lifecycle
     # verb; exit 2 + zero journal mutation on unknown-spirit).
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -689,6 +732,7 @@ jobs:
     # and asserts ≥3 cases per (section, field) tuple in the live
     # MANIFEST_FIELDS allowlist; orphan fixtures fail the build.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -705,6 +749,7 @@ jobs:
     # 1b.5a + 1b.5b + 1b.5c evaluator path in one sequential bash
     # script. Blocks the v0.1 release tag per the AC text.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -720,6 +765,7 @@ jobs:
 
   hello-spirit-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -733,6 +779,7 @@ jobs:
 
   hello-spirit-bench:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -746,6 +793,7 @@ jobs:
 
   example-spirit-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -766,6 +814,7 @@ jobs:
 
   butler-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1002,6 +1051,7 @@ jobs:
   # aggregate job to wire into.
   safety-critical-corpus-8-5:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1015,6 +1065,7 @@ jobs:
 
   example-spirit-drift:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1028,6 +1079,7 @@ jobs:
 
   example-spirit-ts-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [reproducible-build, check-workspace-count]
     steps:
       - uses: actions/checkout@v5
@@ -1047,6 +1099,7 @@ jobs:
 
   coverage-matrix-nfr-test-3:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [check-corpus]
     steps:
       - uses: actions/checkout@v5
@@ -1072,6 +1125,7 @@ jobs:
 
   spirit-test-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1085,6 +1139,7 @@ jobs:
 
   lcas-corpus-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1098,6 +1153,7 @@ jobs:
 
   isolation-framework-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1111,6 +1167,7 @@ jobs:
 
   onb-nfr2-timing:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1124,6 +1181,7 @@ jobs:
 
   coverage-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1137,6 +1195,7 @@ jobs:
 
   corpus-staleness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1150,6 +1209,7 @@ jobs:
 
   calibrate-per-commit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1173,6 +1233,7 @@ jobs:
   # Story 4.4 — NFR-Aud-7 five-metric distillation gate
   nfr-aud-7-distillate-five-metrics-floor:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1187,6 +1248,7 @@ jobs:
   # Story 4.5 — NFR-Sec-14 cross-Spirit isolation 200-corpus gate
   nfr-sec-14-cross-spirit-isolation-200:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1200,6 +1262,7 @@ jobs:
 
   nfr-rel-3-hsis-95pct:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1271,6 +1334,7 @@ jobs:
   # Story 5.3 — NFR-Rel-2 hung-Spirit detection ≤60s
   nfr-rel-2-hang-detection-60s:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1307,6 +1371,7 @@ jobs:
   # Story 5.3 — NFR-Rel-4 silent-failure detection
   nfr-rel-4-silent-failure-detection:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1321,6 +1386,7 @@ jobs:
   # Story 5.3 — NFR-Rel-10 cold-restart recovery
   nfr-rel-10-cold-restart:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1335,6 +1401,7 @@ jobs:
   # Story 5.3 — NFR-Rel-11 halt-receipt production rate ≥99.9%
   nfr-rel-11-halt-receipt-999pct:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1428,6 +1495,7 @@ jobs:
   # Story 5.4 — NFR-Rel-9 revocation propagation ≤5s p99
   nfr-rel-9-revocation-5s-p99:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1444,6 +1512,7 @@ jobs:
   # Story 5.4 — upgrade policy corpus (AC1 + AC2 + AC3 + AC4)
   upgrade-policy-corpus:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1458,6 +1527,7 @@ jobs:
   # Story 5.4 — revocation corpus (AC5)
   revocation-corpus:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1476,6 +1546,7 @@ jobs:
   # show "advisory ⚠️" without flipping the overall workflow status to failure.
   determinism-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       test_result: ${{ steps.surface.outputs.result }}
     steps:
@@ -1504,6 +1575,7 @@ jobs:
   # Story 5.5a — T3 escape corpus (Linux + Podman required)
   t3-escape-corpus:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Install Podman
@@ -1521,6 +1593,7 @@ jobs:
   # Story 5.5a — T3 image signature verification corpus
   nfr-sec-1-t3-image-signature:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1535,6 +1608,7 @@ jobs:
   # Story 5.5a — T3 busybox smoke test (Linux + Podman required)
   t3-smoke-busybox:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Install Podman and busybox
@@ -1554,6 +1628,7 @@ jobs:
   # Story 5.5b — multi-provider drift-check tool tests
   multi-provider-drift-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -1969,6 +2044,7 @@ jobs:
   # Stability Triple consumes these constants directly.
   check-manifest-schema-version:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2002,6 +2078,7 @@ jobs:
   # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
   check-review-findings-resolved:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2016,6 +2093,7 @@ jobs:
   # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
   check-dev-record-completeness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2045,6 +2123,7 @@ jobs:
   # Story 7.1.5 — assert ZERO bare `_No review findings._` placeholders remain
   check-bare-review-findings:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2059,6 +2138,7 @@ jobs:
   # Story 7.1.5 — assert every story file has a populated `dev_model_used:` frontmatter field
   check-dev-model-used-populated:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2075,6 +2155,7 @@ jobs:
   # artifact. Makes the frontier-allowlist policy mechanical, not just cultural.
   check-dev-model-tier:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2101,6 +2182,7 @@ jobs:
   #     get invoked.
   check-j1-loopback-delegation:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2195,6 +2277,7 @@ jobs:
   # and this story adds no `maos-bin` test target.
   check-j1-two-host-signed-run:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2250,6 +2333,7 @@ jobs:
   # edit that does not move the line count can no longer pass (drift D2).
   check-kernel-baseline:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -2282,6 +2366,7 @@ jobs:
   # workflow job (the meta-fix for the four-epic green-at-HEAD decay pattern).
   check-epic-close-green:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2297,6 +2382,7 @@ jobs:
   # proves the close-out sources AGREE. Different failure, same close-out family.
   check-epic-close-coherence:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2346,6 +2432,7 @@ jobs:
 
   smoke-discipline-7-1-5:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [check-review-findings-resolved, check-dev-record-completeness, check-bare-review-findings, check-dev-model-used-populated]
     steps:
       - uses: actions/checkout@v5
@@ -2361,6 +2448,7 @@ jobs:
   # install → yank → audit → import).
   smoke-registry-7-2:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2378,6 +2466,7 @@ jobs:
   # Story 7.2 AC4 — FR59 ≤5min yank-propagation latency gate.
   fr59-yank-propagation-5min:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2391,6 +2480,7 @@ jobs:
   # Story 7.2 AC3 — FR60 air-gap import bundle corpus.
   air-gap-import-corpus:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2409,6 +2499,7 @@ jobs:
   # across 3 reference contexts. NON-continue-on-error: a regression hard-fails CI.
   ccac-n600-ship-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2422,6 +2513,7 @@ jobs:
   # Story 7.3 AC6 — Layer-1.5 observability: v1.0 admission-verification demo.
   smoke-compliance-7-3:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2436,6 +2528,7 @@ jobs:
   # Story 7.4 AC6 — skill ecosystem observability smoke (6 deterministic JSON lines)
   smoke-skill-7-4:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2456,6 +2549,7 @@ jobs:
   # Story 7.4 AC6 — maos.skill.v1 schema posture gate
   check-skill-schema:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2470,6 +2564,7 @@ jobs:
   # Story 7.5a AC6 — ABI Stability Triple observability smoke (5 deterministic JSON lines)
   smoke-abi-7-5a:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2492,6 +2587,7 @@ jobs:
   # Story 7.5a AC3 — STABILITY.md generated-from-workspace; --check fails on drift (NFR-Maint-4)
   check-stability-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2506,6 +2602,7 @@ jobs:
   # Story 7.5a AC3 — BREAKING.md dated-entry + Migration taxonomy CI-grep-enforced (NFR-Maint-7)
   check-breaking-md:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2528,6 +2625,7 @@ jobs:
   # the one worth reading.
   check-ship-gate-completeness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - check-cross-region-consensus
       - check-multi-region-slo
@@ -2562,6 +2660,7 @@ jobs:
   # canonical Butler corpus lands (the resolver auto-prefers it).
   nfr-onb-1-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2579,6 +2678,7 @@ jobs:
   # explicitly NOT the N=12 gate (the test asserts N=1 ∧ provisional).
   smoke-onb-1-7-5b:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2596,6 +2696,7 @@ jobs:
   # When absent, pass with advisory annotation (pen-test engagement pending).
   check-pentest-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2610,6 +2711,7 @@ jobs:
   # Story 10.1b AC3 — Coverage matrix completeness: no v1.0 NFR has empty gates.
   check-coverage-matrix-completeness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2626,6 +2728,7 @@ jobs:
   # a registry update, which is auditable and protected by review.
   check-owasp-freeze-hash:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - name: Verify OWASP freeze immutability
@@ -2642,6 +2745,7 @@ jobs:
   # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
   check-third-party-trial:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Story 15-3 AC2(b): the ship-phase env block that stood here is retired.
     # A GitHub *repository variable* could move this one gate's ship phase with
     # no code change, and `check-env-contract` can never see it (it scans only
@@ -2671,6 +2775,7 @@ jobs:
   # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (ADVISORY per ADR-040).
   check-cross-form-equiv:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2692,6 +2797,7 @@ jobs:
   # Story 10.2 AC3 — adversarial red-team 80-scenario gate (v1.5 phase, advisory-until-engagement).
   check-red-team-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2714,6 +2820,7 @@ jobs:
   # (v1.5 phase, advisory-until-engagement).
   check-migration-merkle:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2734,6 +2841,7 @@ jobs:
   # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
   check-export-control:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2752,6 +2860,7 @@ jobs:
   # crate abi-diff never touches).
   check-host-surface:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2773,6 +2882,7 @@ jobs:
   # (wasmtime/wasmtime-wasi/wit-bindgen, ADR-031/ADR-041 isolation).
   check-dependency-closure:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2796,6 +2906,7 @@ jobs:
   # mirroring the kernel's own sandbox_enforcement_linux.rs pattern.
   wasm-host-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2819,6 +2930,7 @@ jobs:
   # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — fuzz-target existence gate (mechanics).
   check-fuzz-targets:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2835,6 +2947,7 @@ jobs:
   # gate only asserts the harnesses compile against libfuzzer-sys + nightly.
   fuzz-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2854,6 +2967,7 @@ jobs:
   # glossary-lock enforces locked-term preservation across all ko files.
   check-ko-coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -2962,6 +3076,7 @@ jobs:
   # still CUT (not_measured). Blocking — a J6 latency claim requires the harness.
   check-ff-j6:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -3083,6 +3198,7 @@ jobs:
   # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
   check-skill-conformance:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -3111,6 +3227,7 @@ jobs:
   # with a ≥1-test guard; the fault-inject feature is excluded from release.
   check-wasm-form-equiv:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -3913,6 +4030,7 @@ jobs:
   # explicit result checks to prevent skip-propagation false positives.
   v1-0-ship-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - ccac-n600-ship-gate
       - nfr-rel-3-hsis-95pct
@@ -4050,6 +4168,7 @@ jobs:
 
   aggregate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - reproducible-build
       - check-unsafe
@@ -4400,6 +4519,7 @@ jobs:
   # fire-drill. Promoted to the top-level aggregate needs once phase == v1.5.
   v1-5-ship-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - v1-0-ship-gate
       - check-red-team-gate
