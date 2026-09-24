@@ -11,7 +11,8 @@ the sprint-row comment is only its pointer.
 
 **Inventory source:** the secret denominator is every distinct
 `secrets.<NAME>` reference in `.github/workflows/*.yml` or `*.yaml`, excluding GitHub's
-auto-provided `GITHUB_TOKEN`. The inventory currently contains seven names.
+auto-provided `GITHUB_TOKEN`. The inventory currently contains eight names
+(seven until 2026-09-24, when the operator ruled `CI_EVIDENCE_AUDIT_KEY` in).
 Non-secret external dependencies are listed from their real tree anchors rather
 than inherited from planning prose.
 
@@ -19,6 +20,7 @@ than inherited from planning prose.
 
 | Item | Consumer or tree anchor | Behavior when unavailable | Owning sprint row | State |
 |---|---|---|---|---|
+| `CI_EVIDENCE_AUDIT_KEY` | `.github/workflows/discipline.yml` `check-multi-tenant-loom` step "Install the CI-only evidence audit key" | hard fail for the gate: without it the required `reza-three-team-three-region-journey` leg is `ABSENT`, `check-multi-tenant-loom` is red, and through `v1-0-ship-gate` so is `aggregate` (the tag precondition). The step warns and writes nothing | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `DOCKERHUB_TOKEN` | `.github/workflows/container.yml:44` | hard fail: Docker Hub login cannot authenticate | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `DOCKERHUB_USERNAME` | `.github/workflows/container.yml:43,52,80` | hard fail: Docker Hub login/image name cannot resolve | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `FUZZ_LEDGER_WRITE_TOKEN` | `.github/workflows/fuzz-cadence.yml:124` | skip-by-design: expression falls back to auto-provided `GITHUB_TOKEN` | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN fallback is sufficient; fuzz branch is blocked by a code bug)` |
@@ -65,6 +67,76 @@ than inherited from planning prose.
   `release-verify --sign` and hard-fails when this key is unavailable.
 - The penetration-test schedule, owner, findings threshold, and GA effect are
   not duplicated here. `RELEASE-HOLDS.md` Hold 1 is authoritative.
+- **Re-measured 2026-09-24 (work started):** the inventory rule still yields
+  exactly seven names (`DOCKERHUB_TOKEN`, `DOCKERHUB_USERNAME`,
+  `FUZZ_LEDGER_WRITE_TOKEN`, `MAOS_ANTHROPIC_API_KEY`, `MAOS_RELEASE_PUBKEY`,
+  `RELEASE_SIGNING_KEY`, `RTO_LEDGER_WRITE_TOKEN`), and the repository's
+  Actions secrets and variables APIs both return `total_count: 0` — every
+  `absent` row above is still absent. Key tooling in the tree:
+  `maosctl audit keygen --output <path>` writes a 64-hex Ed25519 seed at 0600
+  and prints only a truncated public-key fingerprint; `release-verify --sign`
+  parses `RELEASE_SIGNING_KEY` with the same seed parser; `MAOS_AUDIT_KEY` is a
+  PATH to a key file, not a key.
+- **Blocker surfaced 2026-09-24 — RULED the same day (now the `CI_EVIDENCE_AUDIT_KEY` row):** `check-multi-tenant-loom`
+  cannot pass in CI without an operator audit verification key. Its required
+  `reza-three-team-three-region-journey` leg is `ABSENT` whenever
+  `EvidenceVerifier::key_available()` is false
+  (`xtask/src/check_multi_tenant_loom.rs:192`), while `EvidenceVerifier::load`
+  documents that "CI may omit the key" (`xtask/src/evidence_ledger.rs:541-545`).
+  The gate reaches `aggregate` through `v1-0-ship-gate`, so `aggregate` — and
+  `check_release_precondition` for the tag — stays red until this is ruled.
+  Measured on run 36002875453 (`cd4422ef`): every other leg green; this leg was
+  already `ABSENT` on 6af9423a, masked because the gate names only its first
+  red. **Operator ruling:** a DEDICATED CI-only audit key, never the
+  operator's (R-RG1's operator-pinned key stays off CI); signatures in that job
+  prove "ran in this CI job". The harness signer
+  (`tests/harness/evidence_record.rs:82-83`) and the verifier read the same
+  `MAOS_AUDIT_KEY` path, so one export makes the job sign and verify.
+
+## Operator procedures (the two KEY procedures were tested end to end with THROWAWAY keys, 2026-09-24; Docker Hub is account setup and untested here)
+
+### `RELEASE_SIGNING_KEY` + `MAOS_RELEASE_PUBKEY` — generate OFFLINE (operator ruling)
+
+The public half is compiled into every shipped `maosctl`; losing the seed
+means no existing `maosctl` can ever verify a later release. Generate on a
+trusted machine, keep an offline backup, never paste the seed into chat.
+
+```sh
+umask 077 && mkdir -p ~/maos-release-key && cd ~/maos-release-key
+maosctl audit keygen --output ./release-signing.key   # 64-hex seed, 0600; prints a fingerprint aaaaaaaa..bbbbbbbb
+# Full 64-hex public key (PKCS#8 Ed25519 prefix + seed -> DER pubkey -> last 32 bytes):
+printf '302e020100300506032b657004220420%s' "$(cat ./release-signing.key)" \
+  | xxd -r -p | openssl pkey -inform DER -pubout -outform DER | tail -c 32 | xxd -p -c 64
+```
+
+Check: the printed public key's first and last 8 hex digits must equal the
+fingerprint `keygen` printed. Then set two repository Actions secrets:
+`RELEASE_SIGNING_KEY` = the file's contents (64 lowercase hex), and
+`MAOS_RELEASE_PUBKEY` = the derived public key (64 lowercase hex). Tested with a
+throwaway key: fingerprint matched; a `SHA256SUMS` signed with it verified
+under `maosctl install --from-local ./dist --verify-only --release-pubkey
+<derived>` (rc 0) and was refused under a wrong public key (rc 1).
+
+### `CI_EVIDENCE_AUDIT_KEY` — CI-only; any machine
+
+```sh
+maosctl audit keygen --output ./ci-evidence-audit.key   # never your ~/.config/maos/audit-signing.key
+```
+
+Set the repository Actions secret `CI_EVIDENCE_AUDIT_KEY` to the file's
+contents, then delete the local copy — CI is its only holder. Tested with a
+throwaway key under CI's own binding (`GITHUB_ACTIONS=true`, `GITHUB_SHA`,
+`GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`) and the three-team substrate.
+
+### `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
+
+Requires a Docker Hub account (the lead-time item). Create an access token with
+push scope for the `maos` repository and set both secrets; consumers are
+`.github/workflows/container.yml:43-52,80`.
+
+After setting any secret, report it here by flipping its row to `present`; the
+agent can confirm names (never values) via
+`GET /repos/lunarpulse/maos/actions/secrets`.
 
 ## Related operator rows
 

@@ -3507,6 +3507,30 @@ jobs:
         run: |
           cargo build -p maos-cli --bin maosctl
           cargo build -p worker --bin worker-cli-fixture
+      # Operator ruling 2026-09-24: a DEDICATED CI-only evidence audit key (NOT
+      # the operator's key). The required `reza-three-team-three-region-journey`
+      # leg is ABSENT whenever no audit key is loadable
+      # (xtask/src/check_multi_tenant_loom.rs:192), so without it this gate —
+      # and through v1-0-ship-gate, `aggregate` — can never pass in CI. The
+      # harness signer (tests/harness/evidence_record.rs:82-83) and the gate's
+      # verifier both read the SAME `MAOS_AUDIT_KEY` path, so one export makes
+      # the job sign and verify its own records. Signatures here therefore
+      # prove "ran in this CI job", not "ran by the operator" — R-RG1's
+      # operator-pinned key stays off CI. Absent secret (forks, or before it is
+      # provisioned): nothing is written, the leg stays ABSENT, the gate stays
+      # red — unchanged behaviour, stated loudly.
+      - name: Install the CI-only evidence audit key
+        env:
+          CI_EVIDENCE_AUDIT_KEY: ${{ secrets.CI_EVIDENCE_AUDIT_KEY }}
+        run: |
+          if [ -z "$CI_EVIDENCE_AUDIT_KEY" ]; then
+            echo "::warning::CI_EVIDENCE_AUDIT_KEY is not provisioned — reza-three-team-three-region-journey will be ABSENT and this gate red (docs/runbooks/provisioning-checklist.md)"
+            exit 0
+          fi
+          key_dir="$RUNNER_TEMP/maos-ci-evidence"
+          install -d -m 700 "$key_dir"
+          ( umask 077 && printf '%s' "$CI_EVIDENCE_AUDIT_KEY" > "$key_dir/audit-signing.key" )
+          echo "MAOS_AUDIT_KEY=$key_dir/audit-signing.key" >> "$GITHUB_ENV"
       - name: Run check-multi-tenant-loom gate
         env:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
