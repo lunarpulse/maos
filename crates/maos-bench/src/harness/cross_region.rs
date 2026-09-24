@@ -54,14 +54,25 @@ use std::time::Duration;
 /// geo-RTT is physically unobservable; pinning a geo number as a pass condition
 /// is the 10.2 trap (loopback passes trivially). This floor binds **machinery +
 /// convergence + regression** — the round-trip did not regress — and its teeth
-/// come from the `slo-fault-inject` falsifier (which moves p95 through the
-/// gate's own comparator), not from a geo-latency claim. The absolute geo-SLO
+/// come from the `slo-fault-inject` falsifier (a paired clean/injected delta
+/// that must carry ≥14 ms of the 15 ms injection), not from a geo-latency
+/// claim. The absolute geo-SLO
 /// is a separately-tracked release-gate pilot artifact, NOT this constant.
 ///
 /// Do NOT bump silently: record the measured p95 + rig + build mode in any
 /// change (the `J4_P95_BUDGET_US` idiom). This is distinct from
 /// `J4_P95_BUDGET_US` (10_000µs, kernel cross-task delivery) — same order of
 /// magnitude, different measurement source + semantics.
+///
+/// WHAT THE SPAN CONTAINS (21-2 ruling, 2026-09-24 — floor UNCHANGED): ~3 ms
+/// machinery + Postgres commit DURABILITY (~15 ms of fsync on the 2026-09 rig,
+/// kept inside the span on purpose — it is a real product cost) + Ed25519.
+/// The crypto crates build at opt-level 3 in dev/test (workspace `Cargo.toml`
+/// `[profile.dev.package.*]`), because in unoptimised debug codegen two
+/// verifies cost ~14 ms and the floor measured the build, not the product.
+/// Measured on the same substrate, durability ON: debug p95 34,379 µs (RED)
+/// → 17,656 µs ruled profile; `--release` 16,861 µs. The live test prints the
+/// per-stage p50 so any future breach attributes itself.
 pub const MULTI_REGION_SLO_P95_US: u64 = 30_000;
 /// The fixed delay injected INSIDE the measured A→B→A span when the
 /// `slo-fault-inject` feature is active (F7, Arm-1/latency only). 15ms — large

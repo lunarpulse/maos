@@ -109,6 +109,25 @@ async fn read_all_leaves(client: &tokio_postgres::Client) -> Vec<CollectiveKvLea
     rows.iter().map(CollectiveKvLeaf::from_row).collect()
 }
 
+/// The measured span's stages, in order. Printed as per-stage p50 by the live
+/// test (21-2 ruling, 2026-09-24): the 2026-09-21 floor breach needed a
+/// throwaway timer to attribute; a breach must now attribute itself.
+const STAGES: [&str; 5] = [
+    "write_a",
+    "read_build_a",
+    "apply_ab",
+    "read_build_b",
+    "apply_ba",
+];
+
+/// One round-trip: the single-clock total plus its per-stage split. The stage
+/// stamps are `Instant::now()` reads between stages — the total is still
+/// `t0 → end` on the one region-A clock, unchanged by them.
+struct RoundTrip {
+    total_us: u64,
+    stages_us: [u64; STAGES.len()],
+}
+
 /// Run one single-clock A→B→A round-trip. The region identities are prepared
 /// outside the measured span so the sample covers only the production path.
 async fn roundtrip_sample(
@@ -120,7 +139,7 @@ async fn roundtrip_sample(
     region_b: &Region,
     sequence: usize,
     inject: bool,
-) -> u64 {
+) -> RoundTrip {
     let ts = 1_700_000_000_000_000_000i64 + sequence as i64;
     // t0 on region A's monotonic clock — the SOLE clock for this round-trip.
     let t0 = Instant::now();
@@ -142,6 +161,7 @@ async fn roundtrip_sample(
         )
         .await
         .expect("write probe to A");
+    let written = Instant::now();
     // build@A → apply(dest=B)
     //
     // FIDELITY (2026-08-04): do not re-add an explicit
@@ -150,22 +170,37 @@ async fn roundtrip_sample(
     // verification failure makes the `.expect` below panic.
     let leaves_a = read_all_leaves(client_a).await;
     let bundle_ab = build_replication_bundle(leaves_a, region_a, &BASE_SEED);
+    let built_a = Instant::now();
     apply_replication_bundle(&bundle_ab, store_b, "region-b", None, &BASE_SEED)
         .await
         .expect("apply A->B (verifies internally)");
+    let applied_ab = Instant::now();
     // build@B → apply(dest=A) — the return leg.
     let leaves_b = read_all_leaves(client_b).await;
     let bundle_ba = build_replication_bundle(leaves_b, region_b, &BASE_SEED);
+    let built_b = Instant::now();
     apply_replication_bundle(&bundle_ba, store_a, "region-a", None, &BASE_SEED)
         .await
         .expect("apply B->A (verifies internally)");
+    let applied_ba = Instant::now();
     // F7 fault-inject: inject INSIDE the measured span (no-op without the
     // slo-fault-inject feature).
     if inject {
         slo_inject_delay();
     }
-    // t1 on the SAME region-A clock. rtt_us = t1 − t0 (single-clock — valid).
-    Instant::now().duration_since(t0).as_micros() as u64
+    // End on the SAME region-A clock. rtt_us = end − t0 (single-clock — valid).
+    let end = Instant::now();
+    let us = |from: Instant, to: Instant| to.duration_since(from).as_micros() as u64;
+    RoundTrip {
+        total_us: us(t0, end),
+        stages_us: [
+            us(t0, written),
+            us(written, built_a),
+            us(built_a, applied_ab),
+            us(applied_ab, built_b),
+            us(built_b, applied_ba),
+        ],
+    }
 }
 
 /// Run `n` round-trips. `inject: false` supplies a same-build clean arm for the
@@ -177,7 +212,7 @@ async fn roundtrip_samples(
     store_b: &LoomLiteStore,
     n: usize,
     inject: bool,
-) -> Vec<u64> {
+) -> Vec<RoundTrip> {
     let region_a = Region::canonicalize("region-a").unwrap();
     let region_b = Region::canonicalize("region-b").unwrap();
     let mut samples = Vec::with_capacity(n);
@@ -215,7 +250,8 @@ async fn cross_region_roundtrip_live() {
 
     // N≥200 post-warmup sample floor (mirror j4.rs:238-245).
     const N: usize = 200;
-    let samples = roundtrip_samples(&client_a, &client_b, &store_a, &store_b, N, true).await;
+    let trips = roundtrip_samples(&client_a, &client_b, &store_a, &store_b, N, true).await;
+    let samples: Vec<u64> = trips.iter().map(|trip| trip.total_us).collect();
 
     let result = build_journey_result(
         "J-crossregion-rt",
@@ -241,6 +277,19 @@ async fn cross_region_roundtrip_live() {
         MULTI_REGION_SLO_P95_US,
         result.budget_met,
         N
+    );
+    let stage_p50: Vec<String> = STAGES
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            let mut stage: Vec<u64> = trips.iter().map(|trip| trip.stages_us[i]).collect();
+            stage.sort_unstable();
+            format!("{name}={}", stage[stage.len() / 2])
+        })
+        .collect();
+    eprintln!(
+        "cross-region round-trip STAGES p50 (µs): {}",
+        stage_p50.join(" ")
     );
 
     // Anti-hardcoded-count tooth: samples.len() == count == N.
@@ -276,16 +325,23 @@ async fn cross_region_roundtrip_live() {
 }
 
 /// AC2 / F7 (Arm-1, latency): The `slo-fault-inject` mutation. With the feature
-/// active, a fixed 15ms is injected INSIDE the measured A→B→A span, so the p95
-/// MUST cross the loopback floor. This is the "stranger's falsifier" (D4): if
-/// anyone re-stubs the probe to constants, the injection cannot move the number
-/// → this test goes green-when-it-must-be-red.
+/// active, a fixed 15ms is injected INSIDE the measured A→B→A span, so the
+/// number MUST move. This is the "stranger's falsifier" (D4): if anyone
+/// re-stubs the probe to constants, the injection cannot move the number
+/// → the paired delta collapses to ~0 and this test goes red.
 ///
 /// Story 13.6e (T5) repaired the old absolute assertion with paired samples.
 /// Clean and injected measurements alternate order within each pair, then the
 /// median per-pair delta must carry at least 14ms of the fixed 15ms injection.
 /// This measures the injected contribution directly instead of subtracting two
 /// sequential batch percentiles that can drift independently.
+///
+/// 21-2 ruling (2026-09-24): the paired delta is the ONLY verdict. The former
+/// `!budget_met` assert ("injected p95 must cross the floor") held only while
+/// the CLEAN round-trip exceeded 30 − 15 = 15 ms, i.e. it depended on the
+/// runner's disk and build, not on the probe: at the ruled profile clean p95 is
+/// ~17.7 ms and injected ~33.6 ms — a 3.6 ms margin a faster disk erases,
+/// turning a working falsifier red. The injected p95 is still printed.
 #[cfg(feature = "slo-fault-inject")]
 #[tokio::test]
 #[ignore = "requires two live Postgres + --features slo-fault-inject"]
@@ -316,7 +372,8 @@ async fn cross_region_roundtrip_mutation() {
             let clean = roundtrip_sample(
                 &client_a, &client_b, &store_a, &store_b, &region_a, &region_b, sequence, false,
             )
-            .await;
+            .await
+            .total_us;
             let injected = roundtrip_sample(
                 &client_a,
                 &client_b,
@@ -327,13 +384,15 @@ async fn cross_region_roundtrip_mutation() {
                 sequence + 1,
                 true,
             )
-            .await;
+            .await
+            .total_us;
             (clean, injected)
         } else {
             let injected = roundtrip_sample(
                 &client_a, &client_b, &store_a, &store_b, &region_a, &region_b, sequence, true,
             )
-            .await;
+            .await
+            .total_us;
             let clean = roundtrip_sample(
                 &client_a,
                 &client_b,
@@ -344,7 +403,8 @@ async fn cross_region_roundtrip_mutation() {
                 sequence + 1,
                 false,
             )
-            .await;
+            .await
+            .total_us;
             (clean, injected)
         };
         clean_samples.push(clean_us);
@@ -383,13 +443,6 @@ async fn cross_region_roundtrip_mutation() {
         N
     );
 
-    assert!(
-        !result.budget_met,
-        "mutation: budget_met must be FALSE with slo-fault-inject — p95={}µs \
-         did not cross the {}µs floor. If the injection cannot move the number, \
-         the probe has been re-stubbed to constants (F7 ship-blocker).",
-        result.p95_us, MULTI_REGION_SLO_P95_US
-    );
     assert!(
         delta.p50_us >= 14_000,
         "mutation: paired injection delta p50={}µs is below 14 000µs \

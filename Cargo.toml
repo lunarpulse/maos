@@ -69,3 +69,24 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 async-trait = "0.1"
+
+# ── Dev/test profile: the three crypto crates compiled optimised ─────────────
+# Operator ruling 2026-09-24 (21-2, option D). In an unoptimised debug build
+# ONE Ed25519 verify costs ~7.1 ms (measured 7,137 µs, deferred-work.md
+# 2026-08-04), so every signature-heavy test measured the debug codegen of
+# these crates rather than the product. check-multi-region-slo's round-trip
+# verifies twice and was spending ~14 of its ~32 ms there. Measured on the same
+# substrate, durability ON: debug p95 34,379 µs (RED vs the 30,000 floor) ->
+# 17,656 µs with this override; the fault-inject mutation still discriminates
+# (paired delta p50 14,978 µs). Scope is exactly these three crates, dev/test
+# only (`test` inherits `dev`); the release profile is untouched. This removes
+# a BUILD ARTIFACT from what is measured — it does not relax any floor, and
+# Postgres commit durability stays inside the measured span.
+[profile.dev.package.curve25519-dalek]
+opt-level = 3
+
+[profile.dev.package.ed25519-dalek]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
