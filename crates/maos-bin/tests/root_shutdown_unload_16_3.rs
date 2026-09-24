@@ -1816,9 +1816,18 @@ mod cohort {
                 .lock()
                 .expect("stderr capture lock poisoned")
                 .clone();
+            // Parse the LISTENING LINE only. `seen` is the whole accumulated
+            // stderr, so without `.lines().next()` the port is read after the
+            // LAST `:` of everything that followed — e.g. the next line's
+            // "connect 127.0.0.1:1: Connection refused (os error 111)" — and
+            // the parse fails for good once that line lands before this 100 ms
+            // poll. Measured on CI 6af9423a: the daemon had printed
+            // "listening on 127.0.0.1:37595" and the test still timed out at
+            // 90 s. The sibling harnesses parse per line and never had this.
             if let Some(port) = seen
                 .split_once(LISTENING_MARKER)
-                .and_then(|(_, address)| address.trim().rsplit(':').next())
+                .and_then(|(_, rest)| rest.lines().next())
+                .and_then(|address| address.trim().rsplit(':').next())
                 .and_then(|port| port.parse::<u16>().ok())
             {
                 break (RunningDaemon(child), port, stdout_text, stderr_text);

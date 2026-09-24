@@ -41,6 +41,11 @@ fn maos_run_butler_once_preserved_existing_halt_behavior() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/butler/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        // MAOS_HOME isolated like `shell_butler_pick_renders_option_messages`
+        // (the one test that stayed green): without it `maos run` reads the
+        // machine's real `~/.maos/control.json`, and the CI decoy (D-16-1-Q)
+        // correctly reds it with EndpointInUse — measured on 6af9423a.
+        .env("MAOS_HOME", home.path.clone())
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos run butler --once");
@@ -82,6 +87,7 @@ fn maos_run_butler_live_once_wires_mcp_port() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/butler/manifest.toml", "--live", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", "http://localhost:9999")
         .current_dir(workspace_root())
         .output()
@@ -334,6 +340,7 @@ fn butler_8_14b_mcp_drivers() {
     let child = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/butler/manifest.toml", "--live", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", url.clone())
         .env("MAOS_MCP_SLACK_URI", url.clone())
         .env("MAOS_MCP_LINEAR_URI", url.clone())
@@ -422,6 +429,7 @@ fn butler_undeclared_tool_returns_capability_denied() {
             "--once",
         ])
         .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
         .env("MAOS_MCP_CALENDAR_URI", url)
         .current_dir(workspace_root())
         .output()

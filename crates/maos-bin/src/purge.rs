@@ -1780,6 +1780,9 @@ fn print_report_only_residue() {
         printed_heading = true;
     }
     for runtime in ["podman", "docker"] {
+        if runtime == "podman" && !podman_storage_exists() {
+            continue;
+        }
         let Some(names) = probe_container_names(runtime) else {
             continue;
         };
@@ -1791,6 +1794,28 @@ fn print_report_only_residue() {
             println!("  leaked container {name}: run `{runtime} rm -f {name}`");
         }
     }
+}
+
+/// `podman ps` INITIALISES rootless storage on first use, so probing a host
+/// where podman is installed but never ran for this user would create
+/// `$XDG_DATA_HOME/containers/storage` — and a `--dry-run` would stop being
+/// inert (measured on the CI runner 2026-09-24; `maos_uninstall_16_4` caught
+/// it). No storage means podman never ran as this user, so no `maos-`
+/// container can exist and there is nothing to report.
+fn podman_storage_exists() -> bool {
+    #[cfg(unix)]
+    if rustix::process::geteuid().is_root() {
+        return Path::new("/var/lib/containers/storage").exists();
+    }
+    std::env::var_os("XDG_DATA_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .filter(|value| !value.is_empty())
+                .map(|home| PathBuf::from(home).join(".local/share"))
+        })
+        .is_some_and(|data_home| data_home.join("containers/storage").exists())
 }
 
 /// `runtime ps` with a hard deadline: a wedged container daemon must not
