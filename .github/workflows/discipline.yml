@@ -3818,7 +3818,13 @@ jobs:
       - name: Reject signature from different seed
         if: matrix.target != 'aarch64-unknown-linux-gnu'
         env:
-          RELEASE_SIGNING_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+          # QUOTED ON PURPOSE. Unquoted, 64 zeros is a YAML plain scalar that
+          # resolves to the INTEGER 0, so the runner exported "0" (1 byte) and
+          # `release-verify --sign` died "not 64-char hex … (got 1 bytes)" before
+          # this control could test anything — red on every run since 843d5365
+          # (Story 15-4), measured 2026-09-24 (run 35974095675). The dev seed
+          # above survives unquoted only because it happens to contain letters.
+          RELEASE_SIGNING_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
         run: |
           cp dist/SHA256SUMS.sig /tmp/maos-release-correct.sig
           cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
