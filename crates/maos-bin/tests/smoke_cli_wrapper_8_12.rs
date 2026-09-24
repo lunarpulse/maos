@@ -56,6 +56,11 @@ fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/worker/manifest.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        // MAOS_HOME isolated like `ci_local_split_refuses_a_granted_real_agent_without_the_live_flag`
+        // (the one test here that stayed green): without it `maos run` reads the
+        // runner's real `~/.maos/control.json` and the CI decoy (D-16-1-Q)
+        // correctly reds it with EndpointInUse — measured on cd4422ef.
+        .env("MAOS_HOME", home.path.clone())
         .env("PATH", path_with_target_debug())
         .current_dir(workspace_root())
         .output()
@@ -115,6 +120,7 @@ fn founder_loop_journey_runs_with_real_worker_subprocess() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");
@@ -219,6 +225,7 @@ fn delegated_goal_reaches_the_frame_verbatim_with_non_ascii() {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
         .env("XDG_DATA_HOME", home.path.clone())
+        .env("MAOS_HOME", home.path.clone())
         .env("MAOS_DELEGATED_GOAL", sentinel)
         .current_dir(workspace_root())
         .output()
