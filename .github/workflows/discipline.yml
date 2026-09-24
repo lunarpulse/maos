@@ -3527,6 +3527,16 @@ jobs:
             echo "::warning::CI_EVIDENCE_AUDIT_KEY is not provisioned — reza-three-team-three-region-journey will be ABSENT and this gate red (docs/runbooks/provisioning-checklist.md)"
             exit 0
           fi
+          # Shape check BEFORE install (2026-09-24): the first delivered value
+          # was 65 bytes and the gate died with an opaque "audit key is not
+          # 64-char hex". Report the SHAPE of a malformed value — counts only,
+          # never characters — so the fix is obvious from this step.
+          key_len=${#CI_EVIDENCE_AUDIT_KEY}
+          non_hex=$(printf '%s' "$CI_EVIDENCE_AUDIT_KEY" | tr -d '0-9a-fA-F' | wc -c)
+          if [ "$key_len" -ne 64 ] || [ "$non_hex" -ne 0 ]; then
+            echo "::error::CI_EVIDENCE_AUDIT_KEY is malformed: ${key_len} chars, ${non_hex} of them not hex (expected exactly 64 hex, nothing else). Re-set it with the key file's exact bytes — a trailing '%' shown by zsh after 'cat' is the shell's end-of-line marker, not part of the key."
+            exit 1
+          fi
           key_dir="$RUNNER_TEMP/maos-ci-evidence"
           install -d -m 700 "$key_dir"
           ( umask 077 && printf '%s' "$CI_EVIDENCE_AUDIT_KEY" > "$key_dir/audit-signing.key" )
