@@ -1975,8 +1975,10 @@ pub fn acquire_store_lock_set(
             //    `(st_dev, st_ino)` of the OPEN HANDLE — canonical paths miss
             //    bind-mount aliases, and flocking the same inode twice from
             //    one process fails against itself.
-            let mut opened: Vec<(PathBuf, std::fs::File, u64, u64)> = Vec::new();
-            let mut identity: std::collections::BTreeSet<(u64, u64)> =
+            // `st_dev` is `dev_t` — u64 on Linux, i32 on macOS — so the key
+            // uses the platform type, never a hard-coded u64.
+            let mut opened: Vec<(PathBuf, std::fs::File, rustix::fs::Dev, u64)> = Vec::new();
+            let mut identity: std::collections::BTreeSet<(rustix::fs::Dev, u64)> =
                 std::collections::BTreeSet::new();
             for path in &resolved {
                 let file =

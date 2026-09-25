@@ -38,8 +38,6 @@ pub fn spawn_sandboxed(
         }
     }
 
-    let _use_cgroup = cgroup_path.is_some();
-
     // Pre-compute rlimit values.
     let rlimit_mem = mem_limit.map(|mb| mb as u64 * 1024 * 1024);
     let rlimit_cpu = cpu_limit.map(|pct| pct as u64);

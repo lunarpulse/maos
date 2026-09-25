@@ -1396,7 +1396,8 @@ fn open_parent(path: &Path) -> Result<(std::fs::File, std::ffi::OsString), Purge
 fn remove_directory_contents(
     directory: &impl std::os::fd::AsFd,
     logical_path: &Path,
-    root_device: u64,
+    // `dev_t`: u64 on Linux, i32 on macOS — never hard-code the width.
+    root_device: rustix::fs::Dev,
     protected: &[PathBuf],
     left_files: &mut Vec<PathBuf>,
 ) -> Result<(), PurgeError> {

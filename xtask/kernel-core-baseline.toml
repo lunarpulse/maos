@@ -502,7 +502,7 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 24922
+src_lines = 24920
 # HISTORY: Epic-16 retrospective, E16-A1 follow-through (2026-09-20): 24923 ->
 #          24922 physical lines (-1). OPERATOR-RATIFIED FLAG-Winston, and the
 #          FIRST re-pin taken under the BOTH-KERNEL-PINS obligation recorded at
@@ -532,6 +532,23 @@ src_lines = 24922
 #   `kernel_pin_content_hash_16_0.rs` pins `src_lines` to line 505 because
 #   `kernel-core-baseline.toml:505` is cited across the tree, so NOTHING may
 #   be inserted above it. The next re-pin has the same constraint.
+#
+# HISTORY: Release rehearsal for v0.1.0-alpha.1 (2026-09-25): 24922 -> 24920
+#          physical lines (-2). OPERATOR-RATIFIED FLAG-Winston 2026-09-25.
+#          DRIVER: the FIRST macOS build in project history (release.yml
+#          rehearsal, run 36084557101 on 01655f2a) failed E0425 at
+#          security/sandbox/macos.rs:41 -- `let _use_cgroup =
+#          cgroup_path.is_some();`, a Linux leftover from Story 1b-3
+#          (2026-05-14) naming a variable that exists only in linux.rs:60. The
+#          binding was unused and macOS has no cgroups; the line and its blank
+#          are deleted. `#[cfg(target_os = "macos")]` only: zero effect on any
+#          Linux build. Proven necessary AND sufficient on a real macOS runner:
+#          with it and the two non-kernel dev_t fixes the release build is
+#          green (run 36085769919). ONE per-file digest moves (macos.rs); 98
+#          files, set hash re-minted via --emit-pin.
+#          SURFACE PIN: re-derived and UNCHANGED -- a local binding is not a
+#          public symbol; `check-service-boundary` green with zero baseline
+#          edits. Both pins verified at the commit that lands this.
 
 
 # HISTORY: Story 16-6 (2026-09-19): 24628 -> 24796 physical lines (+168).
@@ -606,7 +623,7 @@ src_lines = 24922
 #          clamp helper extraction. No kernel file was added or removed.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "ba4d06f550a78cefa39a68e2a324f9aa1abd1b412a6a14b3911c2c2fbb05612d"
+set_hash = "957b0de26080edbfc90549ee99e0d1115b0b32fd959f96347dfcbd944e8035ee"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -684,7 +701,7 @@ set_hash = "ba4d06f550a78cefa39a68e2a324f9aa1abd1b412a6a14b3911c2c2fbb05612d"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
 "security/sandbox/linux.rs" = "8964be98eb51c34dd4a7ae75d2d60ab90d8e8d6897205f8787f0ae0563ff29f2"
-"security/sandbox/macos.rs" = "e2bcfda0b12bd4d738e0d8f1c4795c26a95cb828cd8a73eec02edc5e9014c2af"
+"security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
 "security/sandbox/mod.rs" = "1732708673ce3294434b5db9919683008a42e24cada8e8af3795032792b711a1"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
 "security/sandbox/t3/argv.rs" = "18badaa3d8141e86fb87b852577d1720319a16b765e2dbdc177facad913c5ae0"
