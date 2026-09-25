@@ -29,7 +29,7 @@ than inherited from planning prose.
 | `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:93,95` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml:113` | skip-by-design: expression falls back to auto-provided `GITHUB_TOKEN` | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
 | `GitHub OIDC for cosign` | `.github/workflows/container.yml:23-26,74-80` | invalid-ref only if workflow `id-token: write` is removed; no operator secret is required | `ops-provisioning-secrets-and-accounts` | `present` |
-| `macOS/aarch64 release build` | `.github/workflows/release.yml:10-60`; `.github/workflows/discipline.yml` `release-dry-run` | partial: Linux aarch64 is blocking per commit; macOS arm64 remains a required manual pre-tag dispatch and tagged-release leg | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `macOS/aarch64 release build` | `.github/workflows/release.yml:10-60`; `.github/workflows/discipline.yml` `release-dry-run` | partial: Linux aarch64 is blocking per commit; macOS arm64 remains a required manual pre-tag dispatch and tagged-release leg | `ops-provisioning-secrets-and-accounts` | `present` |
 | `lunarpulse/homebrew-maos` | `packaging/homebrew/maos.rb` | hard fail for publication: repository does not exist and formula hashes remain placeholders | `ops-brew-tap-and-aur-publication` | `absent` |
 | `AUR account and package publication` | `packaging/aur/PKGBUILD` | hard fail for publication: package was not submitted and hashes/version remain scaffold values | `ops-brew-tap-and-aur-publication` | `absent` |
 | `rto-ledger branch permission` | `.github/workflows/rpo-rto-cadence.yml:111-135` | hard fail only if the existing `GITHUB_TOKEN` branch permission is removed | `ops-provisioning-secrets-and-accounts` | `present` |
@@ -93,6 +93,7 @@ than inherited from planning prose.
   (`tests/harness/evidence_record.rs:82-83`) and the verifier read the same
   `MAOS_AUDIT_KEY` path, so one export makes the job sign and verify.
 
+- **`macOS/aarch64 release build` present 2026-09-25:** first macOS build in project history, pre-tag rehearsal run 36089542264 on `0c661995` green, and the tagged release (run 36094027381) published `maos-darwin-arm64` + `maosctl-darwin-arm64`, both covered by the verified `SHA256SUMS.sig`.
 - **Provisioned 2026-09-24 (state column holds only the legal vocabulary; the evidence lives here):**
   - `CI_EVIDENCE_AUDIT_KEY`: repository secret created 2026-09-24T13:53:06Z. Run 36007877995 on `3c1bc822` received it EMPTY — the run was created at 13:45:33, before the secret existed; its log shows `CI_EVIDENCE_AUDIT_KEY: ` rather than `***`. First delivery is expected on the next run created after 13:53:06.
   - `MAOS_RELEASE_PUBKEY`: repository secret created 2026-09-24T14:05:44Z; derived offline from the same seed as `RELEASE_SIGNING_KEY` with the procedure below; operator verified the derived key's first/last 8 hex equal `maosctl audit keygen`'s fingerprint. First CI use: `release.yml` `Verify artifacts (self-test)` at the tag push, which refuses to publish on a mismatched pair.
