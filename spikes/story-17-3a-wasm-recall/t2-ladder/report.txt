@@ -1,19 +1,19 @@
 Story 17-3a Q4b — T2 repair ladder report
 
-verdict: GO-WITH-CONDITIONS for the inherited-descriptor recall configuration; direct socket-path recall is NO-GO. Conditions: 17-6 must install KillProcess before the allow-list, grant the measured dynamic-loader Execute right, use the inherited descriptor, and retain the seven measured syscall entries. This is a spike result, not production approval.
+verdict: GO-WITH-CONDITIONS for the inherited-descriptor recall configuration; direct socket-path recall is NO-GO. Conditions: 17-6 must install KillProcess before the allow-list, grant the measured dynamic-loader Execute right, use the inherited descriptor, and retain the six measured syscall entries. This is a spike result, not production approval.
 
 measured:
 - Landlock Rights works only with program Execute|ReadFile, loader Execute|ReadFile, and remaining libraries ReadFile; as-is is EACCES. `q4b-landlock-execute-loader.log`.
 - Production's returned `[bpf, kill_bpf]` order causes second-filter installation EPERM; kill-first installs. The as-is kill-first filter then SIGSEGVs until the candidate is used. `a6-reexec-orchestrator.log`, `q4b-seccomp-minimal-local.log`.
-- Generic runner candidate is `rust-start` (poll, ppoll, rt_sigaction), clone3, memfd_create. Leave-one-out rejects each. `q4b-seccomp-minimality-local.log`.
+- Generic runner candidate is `rust-start` (poll, rt_sigaction), clone3, memfd_create; strace also shows the runner attempts `ppoll`, but it is NOT needed: CI run #10 leave-one-out kept the runner rc 0 without `ppoll` on both images (`t6-ci-run10-t2-annotations.log`, the `runner-drop-ppoll leave-one-out-still-succeeded` failing annotation), and the local LOO relay also completes without it (`q4b-loo-spike-runner-inherited-fd-local.log`). Dropping any of the six fails: `poll`/`rt_sigaction` → SIGSEGV 11, `clone3` → rc 101, `memfd_create` → rc 3 (run #10); `sendto`/`recvfrom` → recall denied. `q4b-seccomp-minimality-local.log`, `q4b-seccomp-leave-one-out-local.log`.
 - The real inherited socketpair relay additionally requires sendto and recvfrom; each removal yields classified recall error. Default, three mitigation flags, and precompiled component yield recall=ok/fetch=ok with two service audits. `q4b-relay-ci-ladder-local.log`.
 - Socket-path recall needs socket and connect, but then reaches a probe-created unrelated AF_UNIX listener and loopback TCP listener outside Landlock grants. `/run/dbus/system_bus_socket` was absent (ENOENT). `q4b-socket-escape-surfaces-local.log`.
 - Rust source count remains 144. `q4b-tokei-rust-source-names.log`.
 
-price: spike ladder has 620 Rust-source lines, 11 support-script/Python files (1,279 counted lines total), and no dependencies. maos-kernel-core committed delta is 0. The measured 17-6 candidate is one return-order change plus seven allow-list entries (poll, ppoll, rt_sigaction, clone3, memfd_create, sendto, recvfrom); the required Scope/FD lifecycle design is not sized by this spike. CI is two Ubuntu T2 matrix jobs and their ladder/relay steps.
+price: spike ladder has 620 Rust-source lines, 11 support-script/Python files (1,279 counted lines total), and no dependencies. maos-kernel-core committed delta is 0. The measured 17-6 candidate is one return-order change plus six allow-list entries (poll, rt_sigaction, clone3, memfd_create, sendto, recvfrom); the required Scope/FD lifecycle design is not sized by this spike. CI is two Ubuntu T2 matrix jobs and their ladder/relay steps.
 
 consequence:
-- 17-6 OLD: return `[bpf, kill_bpf]` and offer only FsRead scopes. NEW: install kill first, preserve hostile KillProcess precedence, add only the seven measured syscalls for inherited recall, and model executable/loader rights explicitly.
+- 17-6 OLD: return `[bpf, kill_bpf]` and offer only FsRead scopes. NEW: install kill first, preserve hostile KillProcess precedence, add only the six measured syscalls for inherited recall (`ppoll` proven unnecessary — CI run #10 on both images, and the local LOO relay), and model executable/loader rights explicitly.
 - 17-3b OLD: use `--recall-socket` in T2. NEW: parent creates and binds a socketpair endpoint, passes it as an inherited descriptor, and never grants socket/connect to the T2 runner.
 - 17-1 OLD: a direct path socket is an acceptable parent capability. NEW: use parent-owned inherited endpoints; the path route admits unrelated AF_UNIX and AF_INET connections.
 

@@ -17,9 +17,9 @@ force on 17-1, 17-3b and 17-6 are in `_bmad-output/planning-artifacts/epics/epic
 
 | Q | Verdict | In one line |
 |---|---|---|
-| 1 componentize-js | GO-WITH-CONDITIONS | A TS Spirit becomes a `maos:spirit@1.0.0` component that the **unmodified release** HEAD runner runs. It needs Node ≥ 22.20 and a release-built runner (debug compile 10.5 s > the 10 s watchdog), and the component is 12.26 MB (StarlingMonkey embedded). |
+| 1 componentize-js | GO-WITH-CONDITIONS | A TS Spirit becomes a `maos:spirit@1.0.0` component that the **unmodified release** HEAD runner runs. It needs Node 22.20–22.x or ≥ 24.12 (locked `@napi-rs/lzma` engines — 23.x and 24.0–24.11 are unsupported) and a release-built runner (debug compile 10.5 s > the 10 s watchdog), and the component is 12.26 MB (StarlingMonkey embedded). |
 | 2 additive WIT | GO-WITH-CONDITIONS | A recall-only `@1.1.0` costs 5 `wit_corpus` records and 4 provenance re-pins. The 4 pinned components do not rebuild to their pinned hashes at HEAD. |
-| 3 frame_bridge | NO-GO as an additive `@1.1.0` | A lossless bridge works (byte-identical CBOR), but growing `iac-frame` breaks every `@1.0` component (`expected record of 11 fields, found 8`). |
+| 3 frame_bridge | NO-GO as an additive `@1.1.0` | A lossless bridge works for the four frame fields (byte-identical CBOR; nested `prior-distillate-ref.intent_lineage` / `working-memory-digest-refs` still default — review), but growing `iac-frame` breaks every `@1.0` component (`expected record of 11 fields, found 8`). |
 | 4 recall relay | GO-WITH-CONDITIONS | 4a/4c/4d: the relay reaches the real `LogRecallAdapter` with kernel-Δ 0; `SO_PEERCRED` + one-shot accept are mandatory (off → a same-uid attacker reads A's frames); latency p50 0.71–0.75 ms, per-call cost climbing to ~1.2 ms (cause NOT-MEASURED). 4b (CI run #9, both images): kill-first order + 6 syscall additions + Landlock program/loader/libs runs the runner rc 0; a forbidden syscall dies SIGSYS 31; the socket-path transport is NO-GO (escape surface) — the inherited fd completes. T2 repair price +25/−1 across 5 files. |
 | 5 version skew | GO-WITH-CONDITIONS | Old guests run on new hosts, and a package-only bump links both ways. **One** added `frame-kind-label` case breaks both ways. |
 | 6 egress proxy | GO-WITH-CONDITIONS: M3 | Measured in CI on ubuntu-24.04 (podman 4.9.3) and ubuntu-26.04 (podman 5.7.0), with identical results. M3 (`--network=none` + a mounted Unix socket + an in-container forwarder) reaches the proxy and not the internet; the socket needs 0666 under the rootless userns remap. M1 and M2 both reach the internet. |
@@ -31,8 +31,8 @@ authoring host `target` is a symlink to `/mnt/build/cargo`, which is also `CARGO
 crates and scratch worktrees too) shares one target dir. A scratch-tree build can therefore overwrite the plain
 `target/{debug,release}/maos-wasm-runner`. A probe that needs **HEAD's** runner builds it from the main tree with
 `--locked`, copies it to a private path, and logs its sha256 (`cf3a4e04…` debug, `a596e1b1…` release at `92911f59`).
-Toolchain: `rustup target add wasm32-wasip2`; `cargo install --locked wasm-tools` (1.259.0 measured); Node **22.20+** for
-`ts-guest/`.
+Toolchain: `rustup target add wasm32-wasip2`; `cargo install --locked wasm-tools` (1.259.0 measured); Node 22.20–22.x
+or ≥ 24.12 for `ts-guest/` (locked `@napi-rs/lzma@1.5.1` engines `^22.20 || ^24.12 || >=25` — NOT 23.x, NOT 24.0–24.11).
 
 ## Files
 
@@ -57,15 +57,15 @@ Toolchain: `rustup target add wasm32-wasip2`; `cargo install --locked wasm-tools
   probe and the HEAD runner; every control runs its own target).
 - **Q1:** see `q1-driver/q1-componentize-js-report.md` §Reproduce. In short: Node 22, `npm ci && npm run build` in
   `ts-guest/`, the direct `npx componentize-js … --disable http fetch-event`, then
-  `target/release/q1-driver encode | target/release/maos-wasm-runner --component <ts-spirit.wasm> | target/release/q1-driver decode`.
+`target/release/q1-driver encode | target/release/maos-wasm-runner --component <ts-spirit.wasm> | target/release/q1-driver decode` — building HEAD's runner from the main tree `--locked` into a **private** copy per §Build environment (never a shared target dir).
 - **Q2:** see `wit-1.1-frame/q2-additive-wit-report.md` §Reproduce. It runs in a scratch worktree with a private
   `CARGO_TARGET_DIR`, and never edits `wit/spirit.wit` in the main tree.
 - **Q3:** `cargo run --locked --offline --release --manifest-path spikes/story-17-3a-wasm-recall/bridge/Cargo.toml --bin frame-bridge-probe`.
 - **Q4 (4a/4c/4d):** `cargo build --release --manifest-path spikes/story-17-3a-wasm-recall/host/Cargo.toml`;
   `cargo build --locked --release --target wasm32-wasip2 --manifest-path spikes/story-17-3a-wasm-recall/rust-guest/Cargo.toml`;
   `Q4_COUNT=1000 Q4_FETCH_OWNER=A spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh`;
-  `Q4_FETCH_OWNER=B spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh`; then `host/run_hostile_probe.py`,
-  `host/run_fd_vector_probe.py`, `host/run_one_shot_idle_probe.py`, `host/run_auto_socket_probe.py`.
+  `Q4_FETCH_OWNER=B spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh`; then `spikes/story-17-3a-wasm-recall/host/run_hostile_probe.py`,
+  `…/host/run_fd_vector_probe.py`, `…/host/run_one_shot_idle_probe.py`, `…/host/run_auto_socket_probe.py`.
 - **Q5:** `wasm-tools component wit tests/fixtures/wasm/echo_spirit_component.wasm`; the `@1.1` host on the `@1.0`
   fixture via `frame-driver … | spike-runner --component tests/fixtures/wasm/echo_spirit_component.wasm | frame-driver decode`;
   HEAD's runner on the `@1.1` guest; `spike-linker-1-2{,-same}` × `story_17_3a_{recall,enum,version_only}_guest.wasm`

@@ -3,12 +3,12 @@ Story 17-3a Q6 — egress compatibility report
 verdict: GO-WITH-CONDITIONS for M3 only; M1 and M2 are NO-GO. This is a measured transport result, not approval to change T3.
 
 measured:
-- Hosted matrix run #9, https://github.com/lunarpulse/maos/actions/runs/36210072648, tested ubuntu-24.04 and ubuntu-26.04 (Podman/netavark: 4.9.3 and 5.7.0 respectively).
+- Hosted matrix run #4, https://github.com/lunarpulse/maos/actions/runs/36207588609 (egress jobs 108307271210 ubuntu-24.04 and 108307271391 ubuntu-26.04; Podman/netavark: 4.9.3 and 5.7.0 respectively); run #1 `36206431636` agrees and run #9's public page corroborates.
 - M1 `slirp4netns:allow_host_loopback=true`: host=yes and internet=yes on both images. NO-GO.
 - M2 `pasta:--map-gw`: host=no and internet=yes on both images. NO-GO.
 - M3 preserves literal `--network=none`, mounts a host-owned Unix socket, and uses in-container socat: host=yes, internet=no, loopback up, socket-0600=no, socket-0666=yes, rc=0 on both images. GO-WITH-CONDITIONS.
 - Local Podman remains NOT-MEASURED: rootless runtime failed `cannot clone: Operation not permitted`. `q6-local-podman.log`.
-- Public run-page evidence is `q6-actions-run9-public-html.log`; prior full annotation evidence is `q6-actions-annotations-run1.json.log`.
+- Annotation evidence is `q6-actions-annotations-run4.json.log` (run #4, both egress jobs — captured during the 2026-09-26 review; the dev pass had left this run uncaptured) and `q6-actions-annotations-run1.json.log` (prior); public run-page evidence is `q6-actions-run9-public-html.log`.
 
 price: maos-kernel-core committed delta is 0; M3 proposes one T3 argv volume addition while retaining `--network=none` at `crates/maos-kernel-core/src/security/sandbox/t3/argv.rs:66-88`. It needs a socat-bearing attested image, parent-owned socket lifecycle, and two hosted CI jobs (observed egress job durations: 42s/33s in run #1). No Rust dependency.
 

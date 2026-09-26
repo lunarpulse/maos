@@ -1,16 +1,13 @@
-// `maos:spirit@1.1.0` — Story 17-3a spike COPY (recall-only variant).
+// `maos:spirit@1.2.0` — Story 17-3a spike COPY (the Q5 package-only control).
 //
-// NOT the pinned WIT. The pinned `@1.0.0` lives at `wit/spirit.wit` and is
-// never edited by the spike (its sha feeds four provenance `source_sha256`
-// rows — 17-3a P1/P3). This copy differs from `wit/spirit.wit` in exactly
-// three places, so a skew probe measures only the additive surface:
-//   1. `package maos:spirit@1.1.0;`
-//   2. `interface recall` (new) — mirrors `crates/maos-domain/src/log_recall.rs`
-//   3. `import recall;` in world `spirit`
-// `interface frames` is byte-for-byte the @1.0.0 text. The frame-field growth
-// Q3 measures (intent, consent-envelope, intent-lineage, lossless scope) lives
-// in `../wit-1.1-frame/`, because adding record fields changes a type and would
-// make the Q5 skew probe fail for Q3's reason instead of Q2's.
+// NOT the pinned WIT and NOT `../wit-1.1/`: this copy is `../wit-1.1/spirit.wit`
+// with exactly ONE change, so the Q5 skew probe measures only the package
+// version, with the additive `recall` surface held constant:
+//   1. `package maos:spirit@1.2.0;` (wit-1.1 declares `@1.1.0`)
+// Everything else — `interface frames`, `interface recall`, `import recall;` —
+// is byte-for-byte the `../wit-1.1/` text. The frame-field growth Q3 measures
+// (intent, consent-envelope, intent-lineage, lossless scope) lives in
+// `../wit-1.1-frame/`, and the one-added-enum-case control in `../wit-1.2-enum/`.
 
 package maos:spirit@1.2.0;
 
