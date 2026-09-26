@@ -41,6 +41,8 @@ than inherited from planning prose.
 | `Google Calendar OAuth` | `ops-google-calendar-oauth-mcp` | skip-by-design: CI uses the conformant fixture; no credential name exists in the tree | `ops-google-calendar-oauth-mcp` | `absent` |
 | `Gemini live credential` | `ops-live-gemini-leg` | skip-by-design: paid recording is operator-only and no credential name exists in the tree | `ops-live-gemini-leg` | `absent` |
 | `Bedrock and Vertex credentials` | `later-bedrock-vertex-and-kms-backends` | skip-by-design: post-v1.0 drivers do not exist and no credential names exist in the tree | `later-bedrock-vertex-and-kms-backends` | `absent` |
+| `stable performance runner` | `docs/adr/ADR-068-stable-performance-runner.md` §2–§4 | skip-by-design until it exists: the wall-clock performance verdicts read `ABSENT`, never `PASS` | `ops-stable-perf-runner` | `absent` |
+| `agent CI-log read token` | `_bmad-output/implementation-artifacts/17-3a-wasm-recall-and-componentize-spike.md` T6 | degraded: agents read only public workflow annotations and step conclusions; raw job logs need an operator download (unauthenticated log requests return 403) | `ops-provisioning-secrets-and-accounts` | `absent` |
 
 ## Evidence and blockers
 
