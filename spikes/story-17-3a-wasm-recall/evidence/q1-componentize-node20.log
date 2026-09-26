@@ -1,0 +1,63 @@
+UTC: 2026-09-26T00:22:20.921Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe executes the pinned componentize-js CLI against compiled guest ESM and the repository's pinned @1.0.0 WIT; it does not only inspect files it set itself.
+$ npx componentize-js dist/spirit.js --wit ../../../wit --world-name spirit --disable http fetch-event -o out/ts-spirit-node20.wasm
+/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js:573
+    const error = new Error(
+                  ^
+
+Error: Cannot find native binding. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+    at Object.<anonymous> (/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js:573:19)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    ... 2 lines matching cause stack trace ...
+    at Module._load (node:internal/modules/cjs/loader:1096:12)
+    at Module.require (node:internal/modules/cjs/loader:1298:19)
+    at require (node:internal/modules/helpers:182:18)
+    at Object.<anonymous> (/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/xz.js:1:46)
+    at Module._compile (node:internal/modules/cjs/loader:1529:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1613:10) {
+  cause: Error: Cannot find module '@napi-rs/lzma-linux-x64-gnu'
+  Require stack:
+  - /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js
+  - /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/xz.js
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+      ... 2 lines matching cause stack trace ...
+      at require (node:internal/modules/helpers:182:18)
+      at requireNative (/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js:288:27)
+      at Object.<anonymous> (/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js:526:17)
+      at Module._compile (node:internal/modules/cjs/loader:1529:14)
+      at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+      at Module.load (node:internal/modules/cjs/loader:1275:32)
+      at Module._load (node:internal/modules/cjs/loader:1096:12) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      '/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js',
+      '/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/xz.js'
+    ],
+    cause: Error: Cannot find module './lzma.linux-x64-gnu.node'
+    Require stack:
+    - /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js
+    - /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/xz.js
+        at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+        at Module._load (node:internal/modules/cjs/loader:1043:27)
+        at Module.require (node:internal/modules/cjs/loader:1298:19)
+        at require (node:internal/modules/helpers:182:18)
+        at requireNative (/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js:283:18)
+        at Object.<anonymous> (/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js:526:17)
+        at Module._compile (node:internal/modules/cjs/loader:1529:14)
+        at Module._extensions..js (node:internal/modules/cjs/loader:1613:10)
+        at Module.load (node:internal/modules/cjs/loader:1275:32)
+        at Module._load (node:internal/modules/cjs/loader:1096:12) {
+      code: 'MODULE_NOT_FOUND',
+      requireStack: [
+        '/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/index.js',
+        '/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma/xz.js'
+      ]
+    }
+  }
+}
+
+Node.js v20.19.2
+
+[exit 1]

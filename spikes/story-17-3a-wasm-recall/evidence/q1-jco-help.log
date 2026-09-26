@@ -1,0 +1,38 @@
+UTC: 2026-09-26T00:20:49.076Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe executes the installed jco CLI against its live help metadata; it does not only inspect files it set itself.
+$ npx jco guest-types --help
+Usage: jco guest-types <wit-path> -o <out-dir>
+
+(experimental) Generate guest types for the given WIT
+
+Arguments:
+  <wit-path>                          path to a WIT file or directory
+
+Options:
+  --name <name>                       custom output name
+  -n, --world-name <world>            WIT world to generate types for
+  -o, --out-dir <out-dir>             output directory
+  -q, --quiet                         disable output summary
+  --feature <feature>                 enable one specific WIT feature
+                                      (repeatable) (default: [])
+  --all-features                      enable all features
+  --async-exports <exports...>        EXPERIMENTAL: generate async exports
+                                      (examples: "ns:pkg/iface#func",
+                                      "wasi:cli/run@0.2.3#run", "handle")
+  --async-mode [mode]                 EXPERIMENTAL: use async imports and
+                                      exports (choices: "sync", "jspi", preset:
+                                      "sync")
+  --strict                            generate bindings with strict type
+                                      checking
+  --flags-as-bigint                   represent WIT flags as bigint values
+  --variants-inline-cases             inline WIT variant cases in discriminated
+                                      unions
+  --use-namespace-objects             generate namespace objects for WIT flags,
+                                      enums, and variants
+  --enum-values-screaming-snake-case  represent WIT enum values as
+                                      SCREAMING_SNAKE_CASE strings
+  -h, --help                          display help for command
+
+[exit 0]

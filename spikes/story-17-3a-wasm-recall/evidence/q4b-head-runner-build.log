@@ -1,0 +1,9 @@
+UTC 2026-09-26T00:44:22Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: the main-tree HEAD maos-wasm-runner rebuilt with its locked dependency graph; not only probe-created state.
++ cargo build --locked -p maos-wasm-host --bin maos-wasm-runner
++ cp target/debug/maos-wasm-runner spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59
++ sha256sum spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59
+cf3a4e044936be23b06401e472c3a2908bceb6f4cebcc25fb052edbc97142057  /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59
+PRIVATE_HEAD_RUNNER=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59

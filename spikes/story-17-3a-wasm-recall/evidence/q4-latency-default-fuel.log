@@ -1,0 +1,10 @@
+UTC 2026-09-26T00:36:24.747532+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ Q4_COUNT=1000 Q4_FETCH_OWNER=A spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh
+READY socket=/tmp/tmp.8kSPJY9Oi0/recall.sock caller-pid=3253248 peer-pid-check=true one-shot=true
+frame-driver: write ADR-032: Broken pipe (os error 32)
+
+[exit=1]
+
+E15-A6: this probe reads the built runner, guest, and live recall service under default fuel; it does not set the broken-pipe result.

@@ -1,0 +1,18 @@
+[workspace]
+
+[package]
+name = "story-17-3a-frame-bridge-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+maos-domain = { path = "../../../crates/maos-domain" }
+maos-spirit-abi = { path = "../../../crates/maos-spirit-abi" }
+maos-wasm-host = { path = "../../../crates/maos-wasm-host" }
+wasmtime = "=46.0.3"
+wasmtime-wasi = "=46.0.3"
+
+[[bin]]
+name = "frame-bridge-probe"
+path = "src/main.rs.txt"

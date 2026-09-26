@@ -1,0 +1,49 @@
+// Story 17-3a Q5 enum-growth probe. This is the @1.1 WIT surface with one
+// additive recall.frame-kind-label case; all frames definitions are unchanged.
+package maos:spirit@1.2.0;
+
+interface frames {
+  enum frame-kind { task-assign, task-complete, decision-dispatch, epistemic-halt, telemetry-event, consent-request, retract, capability-invocation, sandbox-block, inference-call, budget-warning, budget-exceeded, cli-subprocess-output, consent-rupture, rate-limited, gateway-inbound, gateway-outbound }
+  enum frame-origin { human-authored, spirit-auto, spirit-drafted-human-approved, kernel }
+  record frame-address { spirit-id: string, host-id: option<string>, role: option<string> }
+  enum posture-hint { autonomous-with-halt, assistive, cautious }
+  record halt-policy-override { tag: string, recall-vs-precision: f32 }
+  record posture-preferences { preferred-posture: option<posture-hint>, halt-policy-overrides: list<halt-policy-override> }
+  record prior-distillate-ref { digest-frame-id: list<u8>, distillation-depth: u32 }
+  record task-assign-body { goal: string, scope: list<string>, success-criteria: string, posture-preferences: posture-preferences, prior-distillate-ref: option<prior-distillate-ref> }
+  record task-complete-body { result-text: string }
+  record decision-dispatch-body { decision-id: u64, approved: bool }
+  record epistemic-halt-body { halt-id: string, tag: string, value: f32, threshold: option<f32>, policy-id: string, derived-from: string }
+  record telemetry-event-body { event-type: string, data: string }
+  record consent-request-body { capability: string }
+  record retract-body { original-frame-id: list<u8>, reason: string, original-kind: option<frame-kind> }
+  enum rupture-reason { intent-allowlist-mismatch, posture-shifted-during-transmission, token-revoked, principal-revoked, recipient-unloaded }
+  record rupture-rejection { address: frame-address, reason: rupture-reason }
+  record consent-rupture-body { rupture-id: list<u8>, original-frame-id: list<u8>, original-kind: frame-kind, accepted: list<frame-address>, rejected: list<rupture-rejection>, ruptured-at-ns: u64 }
+  record rate-limited-body { provider-id: string, credential-fingerprint-prefix-hex: string, retry-after-ms: u64, bucket-remaining: u32, bucket-capacity: u32, refill-per-sec: u32, schedule-id: option<string> }
+  record budget-envelope { spirit-pid: u32, hook-name: string, wall-ns: u64, cap-seconds: u64 }
+  variant frame-payload { task-assign(task-assign-body), task-complete(task-complete-body), decision-dispatch(decision-dispatch-body), epistemic-halt(epistemic-halt-body), telemetry-event(telemetry-event-body), consent-request(consent-request-body), retract(retract-body), budget-warning(budget-envelope), budget-exceeded(budget-envelope), consent-rupture(consent-rupture-body), rate-limited(rate-limited-body) }
+  record iac-frame { frame-id: list<u8>, timestamp-ns: u64, logical-clock: u64, frame-from: frame-address, to: list<frame-address>, kind: frame-kind, payload: frame-payload, auto-marker: frame-origin }
+  variant halt { voluntary, fault(string) }
+}
+
+interface recall {
+  use frames.{frame-origin};
+  enum frame-kind-label { task-assign, task-complete, decision-dispatch, epistemic-halt, telemetry-event, consent-request, retract, capability-invocation, sandbox-block, inference-call, decision, distillate, budget-warning, budget-exceeded, hot-swap-aborted, task-stalled, silent-failure-suspect, spirit-revoked, mcp-invocation, spirit-admitted, registry-yank, cli-subprocess-output, consent-rupture, rate-limited, gateway-inbound, gateway-outbound, spirit-imported, cli-wrapper-shape-mismatch, governance-event, cost-attribution, enum-growth-probe }
+  record recall-cursor { last-timestamp-ns: u64, last-frame-id: list<u8> }
+  record recall-filter { kind: option<frame-kind-label>, since-ns: option<u64>, until-ns: option<u64>, limit: u32, cursor: option<recall-cursor>, intent-filter: option<string> }
+  record recall-entry { frame-id: list<u8>, timestamp-ns: u64, kind: frame-kind-label, intent: string, peer-spirit-pid: u32, payload-available: bool }
+  record recall-page { entries: list<recall-entry>, next-cursor: option<recall-cursor> }
+  record fetch-response { frame-id: list<u8>, timestamp-ns: u64, kind: frame-kind-label, intent: string, payload-redacted: list<u8>, capability-token: option<list<u8>>, origin: frame-origin }
+  variant recall-error { scope-violation(list<u8>), frame-not-found(list<u8>), storage(string), invalid-cursor(string), limit-exceeded(u32), cross-wall-denied(string) }
+  recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
+  fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
+}
+
+world spirit {
+  import recall;
+  use frames.{iac-frame, halt};
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}

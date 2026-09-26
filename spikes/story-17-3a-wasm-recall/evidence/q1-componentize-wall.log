@@ -1,0 +1,8 @@
+UTC: 2026-09-26T00:34:14.287Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe executes the pinned componentize-js CLI with live Node 22 against final ESM/WIT to time the actual CI build step; it does not only inspect files it set itself.
+$ npx -y -p node@22 node node_modules/@bytecodealliance/componentize-js/src/cli.js dist/spirit.js --wit ../../../wit --world-name spirit --disable http fetch-event -o out/ts-spirit-measured.wasm
+
+wall-clock-ms=2253.828
+[exit 0]

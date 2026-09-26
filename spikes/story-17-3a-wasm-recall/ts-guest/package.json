@@ -1,0 +1,14 @@
+{
+  "name": "story-17-3a-ts-guest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "guest-types": "jco guest-types ../../../wit --world-name spirit --out-dir src/bindings --strict",
+    "build": "npm run guest-types && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bytecodealliance/componentize-js": "0.23.0",
+    "@bytecodealliance/jco": "1.35.0",
+    "typescript": "5.9.3"
+  }
+}

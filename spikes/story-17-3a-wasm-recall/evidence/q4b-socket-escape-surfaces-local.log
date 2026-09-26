@@ -1,0 +1,35 @@
+UTC 2026-09-26T01:48:47Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS runtime: static native connector run under candidate sandbox; unrelated AF_UNIX and loopback listeners are probe-created controls, system D-Bus path is host runtime; this probe does not read the repository tree beyond the t2 ladder and static connector.
++ gcc -static -O2 -o /tmp/q4b-escape-connect /tmp/q4b-escape-connect.c
++ python3 /tmp/q4b-escape-probes.py
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,sendto,recvfrom,socket,connect --read /tmp/q4b-escape-connect --static-target -- /tmp/q4b-escape-connect unix /tmp/q4b-unrelated-escape.sock
+ESCAPE_RESULT label=unrelated-unix rc=0
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/tmp/q4b-escape-connect args=["unix", "/tmp/q4b-unrelated-escape.sock"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "sendto", "recvfrom", "socket", "connect"] static_target=true execute_reads=false execute_loader=false inherit_fd=None
+ESCAPE_CONNECT=ok
+
+RESULT rc=0 sig=none errno=none
+SECCOMP_INSTALL=ok
+ESCAPE_LISTENER label=unrelated-unix accepted=true error=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,sendto,recvfrom,socket,connect --read /tmp/q4b-escape-connect --static-target -- /tmp/q4b-escape-connect unix /run/dbus/system_bus_socket
+ESCAPE_RESULT label=system-dbus rc=0
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/tmp/q4b-escape-connect args=["unix", "/run/dbus/system_bus_socket"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "sendto", "recvfrom", "socket", "connect"] static_target=true execute_reads=false execute_loader=false inherit_fd=None
+
+RESULT rc=67 sig=none errno=none
+SECCOMP_INSTALL=ok
+connect: No such file or directory
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,sendto,recvfrom,socket,connect --read /tmp/q4b-escape-connect --static-target -- /tmp/q4b-escape-connect inet 58527
+ESCAPE_RESULT label=loopback-inet rc=0
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/tmp/q4b-escape-connect args=["inet", "58527"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "sendto", "recvfrom", "socket", "connect"] static_target=true execute_reads=false execute_loader=false inherit_fd=None
+ESCAPE_CONNECT=ok
+
+RESULT rc=0 sig=none errno=none
+SECCOMP_INSTALL=ok
+ESCAPE_LISTENER label=loopback-inet accepted=true error=none

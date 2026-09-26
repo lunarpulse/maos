@@ -1,0 +1,76 @@
+UTC 2026-09-26T02:01:54Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: dynamic Rust hello under candidate seccomp, its ELF loader/libraries, and every leave-one-out syscall control; not only probe-created state.
++ python3 /tmp/q4b-loo-matrix.py hello-dynamic
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+LOO target=hello-dynamic drop=none harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["ppoll", "rt_sigaction", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+RESULT rc=none sig=11 errno=none
+LOO target=hello-dynamic drop=poll harness_rc=0 RESULT rc=none sig=11 errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,rt_sigaction,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "rt_sigaction", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+LOO target=hello-dynamic drop=ppoll harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,ppoll,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+fatal runtime error: assertion failed: signal(libc::SIGPIPE, handler) != libc::SIG_ERR, aborting
+
+RESULT rc=none sig=11 errno=none
+LOO target=hello-dynamic drop=rt_sigaction harness_rc=0 RESULT rc=none sig=11 errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,ppoll,rt_sigaction,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+LOO target=hello-dynamic drop=clone3 harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,ppoll,rt_sigaction,clone3,sendto,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+LOO target=hello-dynamic drop=memfd_create harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,ppoll,rt_sigaction,clone3,memfd_create,recvfrom -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "memfd_create", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+LOO target=hello-dynamic drop=sendto harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --extra poll,ppoll,rt_sigaction,clone3,memfd_create,sendto -- /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "memfd_create", "sendto"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+LOO target=hello-dynamic drop=recvfrom harness_rc=0 RESULT rc=0 sig=none errno=none

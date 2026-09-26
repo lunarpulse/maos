@@ -1,0 +1,9 @@
+UTC: 2026-09-26T00:44:54.858809+00:00
+Probe data source: parses the committed recall-only WIT file; not only data it set itself.
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+
+[exit=0]
+$ python3 -c "parse recall WIT record declarations and field cardinalities"
+{"recall_rows": {"fetch-response": 7, "recall-cursor": 2, "recall-entry": 6, "recall-filter": 6, "recall-page": 2}, "record_count": 21}
+[exit=0]

@@ -1,0 +1,15 @@
+UTC 2026-09-26T00:52:31.943502+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ target/release/spike-linker-1-2 --component target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm < /dev/null
+spike-linker-1-2: InvalidComponent: instantiate: component imports instance `maos:spirit/recall@1.1.0`, but a matching implementation was not found in the linker
+
+[host-1.2-enum-linker_vs_guest-1.1 exit=3]
+$ target/release/spike-runner --component target/wasm32-wasip2/release/story_17_3a_enum_guest.wasm < /dev/null
+spike-runner: InvalidComponent: component does not conform to maos:spirit@1.1 (instantiate failed): component imports instance `maos:spirit/recall@1.2.0`, but a matching implementation was not found in the linker
+
+[host-1.1_vs_guest-1.2-enum exit=3]
+$ target/release/spike-linker-1-2 --component target/wasm32-wasip2/release/story_17_3a_enum_guest.wasm < /dev/null
+
+[host-1.2-enum-linker_vs_guest-1.2-enum exit=0]
+E15-A6: these probes read the separately built @1.1 and @1.2 enum components and actual linkers; they do not create the version identities.

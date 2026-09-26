@@ -1,0 +1,620 @@
+//! Candidate T2 repair ladder for Story 17-3a Q4b.
+//!
+//! `prepare_landlock` is a verbatim copy of
+//! `crates/maos-kernel-core/src/security/sandbox/linux.rs:163-202` and
+//! `build_seccomp_filters` is a verbatim copy of `:208-347`; candidate
+//! additions live in the adjacent data-selected functions, never in kernel code.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::env;
+use std::fs::File;
+use std::io;
+use std::os::fd::RawFd;
+use std::os::unix::process::{CommandExt, ExitStatusExt};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use maos_domain::invariants::i1::Scope;
+use maos_domain::invariants::i9::SandboxTier;
+
+#[derive(Debug)]
+enum SpawnError {
+    SandboxSetup(String),
+}
+
+#[cfg(target_arch = "x86_64")]
+#[rustfmt::skip]
+const LEGACY_X86_SYSCALLS: &[i64] = &[
+    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access
+];
+#[cfg(not(target_arch = "x86_64"))]
+const LEGACY_X86_SYSCALLS: &[i64] = &[];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LandlockMode {
+    Off,
+    AsIs,
+    Rights,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SeccompMode {
+    Off,
+    AsIs,
+    Candidate,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SeccompOrder {
+    Verbatim,
+    KillFirst,
+}
+
+struct Args {
+    landlock: LandlockMode,
+    seccomp: SeccompMode,
+    seccomp_order: SeccompOrder,
+    extra_names: Vec<String>,
+    read_paths: Vec<PathBuf>,
+    static_target: bool,
+    execute_reads: bool,
+    execute_loader: bool,
+    stdin: Option<PathBuf>,
+    inherit_fd: Option<RawFd>,
+    pid_out: Option<PathBuf>,
+    program: PathBuf,
+    program_args: Vec<String>,
+}
+
+fn usage() -> ! {
+    eprintln!(
+        "usage: t2-ladder [--landlock off|as-is|rights] [--seccomp off|as-is|candidate] \
+         [--seccomp-order verbatim|kill-first] [--extra name[,name...]] [--read path] [--static-target] [--execute-reads] [--execute-loader] [--stdin frame] [--inherit-fd n] [--pid-out path] -- program [args...]"
+    );
+    std::process::exit(64);
+}
+
+fn main() {
+    let args = parse_args().unwrap_or_else(|error| {
+        eprintln!("argument error: {error}");
+        usage();
+    });
+    println!("PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.");
+    println!("TARGET program={} args={:?}", args.program.display(), args.program_args);
+    println!("RUNG landlock={:?} seccomp={:?} seccomp_order={:?} extra={:?} static_target={} execute_reads={} execute_loader={} inherit_fd={:?}", args.landlock, args.seccomp, args.seccomp_order, args.extra_names, args.static_target, args.execute_reads, args.execute_loader, args.inherit_fd);
+    match run(args) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("HARNESS_ERROR {error}");
+            std::process::exit(70);
+        }
+    }
+}
+
+fn parse_args() -> Result<Args, String> {
+    let mut landlock = LandlockMode::Off;
+    let mut seccomp = SeccompMode::Off;
+    let mut seccomp_order = SeccompOrder::Verbatim;
+    let mut extra_names = Vec::new();
+    let mut read_paths = Vec::new();
+    let mut static_target = false;
+    let mut execute_reads = false;
+    let mut execute_loader = false;
+    let mut stdin = None;
+    let mut inherit_fd = None;
+    let mut pid_out = None;
+    let mut values = env::args().skip(1);
+    loop {
+        let Some(arg) = values.next() else {
+            return Err("missing `-- program`".into());
+        };
+        if arg == "--" {
+            break;
+        }
+        match arg.as_str() {
+            "--landlock" => {
+                landlock = match values.next().as_deref() {
+                    Some("off") => LandlockMode::Off,
+                    Some("as-is") => LandlockMode::AsIs,
+                    Some("rights") => LandlockMode::Rights,
+                    _ => return Err("--landlock requires off, as-is, or rights".into()),
+                };
+            }
+            "--seccomp" => {
+                seccomp = match values.next().as_deref() {
+                    Some("off") => SeccompMode::Off,
+                    Some("as-is") => SeccompMode::AsIs,
+                    Some("candidate") => SeccompMode::Candidate,
+                    _ => return Err("--seccomp requires off, as-is, or candidate".into()),
+                };
+            }
+            "--seccomp-order" => {
+                seccomp_order = match values.next().as_deref() {
+                    Some("verbatim") => SeccompOrder::Verbatim,
+                    Some("kill-first") => SeccompOrder::KillFirst,
+                    _ => return Err("--seccomp-order requires verbatim or kill-first".into()),
+                };
+            }
+            "--extra" => {
+                let names = values.next().ok_or("--extra requires a list")?;
+                extra_names.extend(names.split(',').filter(|name| !name.is_empty()).map(str::to_owned));
+            }
+            "--read" => read_paths.push(PathBuf::from(values.next().ok_or("--read requires a path")?)),
+            "--static-target" => static_target = true,
+            "--execute-reads" => execute_reads = true,
+            "--execute-loader" => execute_loader = true,
+            "--stdin" => stdin = Some(PathBuf::from(values.next().ok_or("--stdin requires a path")?)),
+            "--inherit-fd" => {
+                inherit_fd = Some(values.next().ok_or("--inherit-fd requires a number")?.parse::<RawFd>().map_err(|e| format!("invalid fd: {e}"))?);
+            }
+            "--pid-out" => pid_out = Some(PathBuf::from(values.next().ok_or("--pid-out requires a path")?)),
+            other => return Err(format!("unknown argument `{other}`")),
+        }
+    }
+    let program = PathBuf::from(values.next().ok_or("missing program")?);
+    Ok(Args {
+        landlock,
+        seccomp,
+        seccomp_order,
+        extra_names,
+        read_paths,
+        static_target,
+        execute_reads,
+        execute_loader,
+        stdin,
+        inherit_fd,
+        pid_out,
+        program,
+        program_args: values.collect(),
+    })
+}
+
+
+fn run(args: Args) -> Result<(), String> {
+    let program = std::fs::canonicalize(&args.program)
+        .map_err(|e| format!("resolve program {}: {e}", args.program.display()))?;
+    let mut command = Command::new(&program);
+    command.args(&args.program_args);
+    if let Some(path) = &args.stdin {
+        command.stdin(Stdio::from(File::open(path).map_err(|e| format!("open stdin {}: {e}", path.display()))?));
+    }
+
+    let mut landlock_ruleset = match args.landlock {
+        LandlockMode::Off => None,
+        LandlockMode::AsIs => Some(prepare_landlock(&[]).map_err(show_spawn_error)?),
+        LandlockMode::Rights => Some(
+            prepare_candidate_landlock(&[], &program, &args.read_paths, args.static_target, args.execute_reads, args.execute_loader)
+                .map_err(show_spawn_error)?,
+        ),
+    };
+    let seccomp_progs = match args.seccomp {
+        SeccompMode::Off => None,
+        SeccompMode::AsIs => Some(build_seccomp_filters(SandboxTier::T2).map_err(show_spawn_error)?),
+        SeccompMode::Candidate => Some(
+            build_candidate_seccomp_filters(SandboxTier::T2, &syscalls_for(&args.extra_names)?)
+                .map_err(show_spawn_error)?,
+        ),
+    };
+    let seccomp_order = args.seccomp_order;
+    let inherit_fd = args.inherit_fd;
+    let pid_out = args.pid_out;
+
+    // This is the same Landlock → seccomp pre_exec order as spawn_sandboxed
+    // in linux.rs:67-103. Construction above is parent-side only.
+    unsafe {
+        command.pre_exec(move || {
+            if let Some(ruleset) = landlock_ruleset.take() {
+                // SAFETY: restrict_self issues a single landlock_restrict_self
+                // syscall on the pre-created ruleset fd. The ruleset was fully
+                // constructed in the parent — no allocation in the child.
+                match ruleset.restrict_self() {
+                    Ok(status) => {
+                        if status.ruleset == landlock::RulesetStatus::NotEnforced {
+                            let msg = b"maos: landlock not enforced\n";
+                            libc::write(2, msg.as_ptr() as *const _, msg.len());
+                            return Err(io::Error::from_raw_os_error(libc::ENOSYS));
+                        }
+                    }
+                    Err(_) => {
+                        let msg = b"maos: landlock restrict_self failed\n";
+                        libc::write(2, msg.as_ptr() as *const _, msg.len());
+                        return Err(io::Error::last_os_error());
+                    }
+                }
+            }
+            if let Some(ref progs) = seccomp_progs {
+                let failed = if seccomp_order == SeccompOrder::KillFirst && progs.len() == 2 {
+                    apply_seccomp(&progs[1]).is_err() || apply_seccomp(&progs[0]).is_err()
+                } else {
+                    progs.iter().any(|prog| apply_seccomp(prog).is_err())
+                };
+                if failed {
+                    let msg = b"SECCOMP_INSTALL=errno=1\nmaos: seccomp apply failed\n";
+                    libc::write(2, msg.as_ptr() as *const _, msg.len());
+                    return Err(io::Error::last_os_error());
+                }
+                let msg = b"SECCOMP_INSTALL=ok\n";
+                libc::write(2, msg.as_ptr() as *const _, msg.len());
+            }
+            if let Some(fd) = inherit_fd {
+                let flags = libc::fcntl(fd, libc::F_GETFD);
+                if flags == -1 || libc::fcntl(fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+            Ok(())
+        });
+    }
+
+    match command.spawn() {
+        Ok(mut child) => {
+            if let Some(path) = pid_out {
+                std::fs::write(&path, child.id().to_string())
+                    .map_err(|e| format!("write pid output {}: {e}", path.display()))?;
+            }
+            let status = child.wait().map_err(|e| format!("wait: {e}"))?;
+            println!(
+                "\nRESULT rc={} sig={} errno=none",
+                status.code().map_or_else(|| "none".to_string(), |rc| rc.to_string()),
+                status.signal().map_or_else(|| "none".to_string(), |signal| signal.to_string())
+            );
+        }
+        Err(error) => {
+            println!(
+                "\nRESULT rc=none sig=none errno={}",
+                error.raw_os_error().map_or_else(|| "none".to_string(), |errno| errno.to_string())
+            );
+        }
+    }
+    Ok(())
+}
+
+fn show_spawn_error(error: SpawnError) -> String {
+    match error {
+        SpawnError::SandboxSetup(message) => message,
+    }
+}
+
+fn candidate_paths(program: &Path, explicit_reads: &[PathBuf], static_target: bool) -> Result<(PathBuf, Vec<PathBuf>, BTreeSet<PathBuf>), SpawnError> {
+    let program = std::fs::canonicalize(program)
+        .map_err(|e| SpawnError::SandboxSetup(format!("resolve program {}: {e}", program.display())))?;
+    let mut reads = BTreeSet::new();
+    let mut loaders = BTreeSet::new();
+    for path in explicit_reads {
+        reads.insert(std::fs::canonicalize(path).map_err(|e| SpawnError::SandboxSetup(format!("resolve read path {}: {e}", path.display())))?);
+    }
+    if !static_target {
+        let output = Command::new("ldd")
+            .arg(&program)
+            .output()
+            .map_err(|e| SpawnError::SandboxSetup(format!("ldd {}: {e}", program.display())))?;
+        if !output.status.success() {
+            return Err(SpawnError::SandboxSetup(format!("ldd {} exited {:?}", program.display(), output.status)));
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        for token in text.split_whitespace() {
+            let path = token.trim_matches(|ch: char| ch == '(' || ch == ')');
+            if path.starts_with('/') {
+                if let Ok(resolved) = std::fs::canonicalize(path) {
+                    if resolved.file_name().is_some_and(|name| name.to_string_lossy().starts_with("ld-")) {
+                        loaders.insert(resolved.clone());
+                    }
+                    reads.insert(resolved);
+                }
+            }
+        }
+    }
+    reads.remove(&program);
+    Ok((program, reads.into_iter().collect(), loaders))
+}
+
+fn prepare_candidate_landlock(
+    scopes: &[Scope],
+    program: &Path,
+    explicit_reads: &[PathBuf],
+    static_target: bool,
+    execute_reads: bool,
+    execute_loader: bool,
+) -> Result<landlock::RulesetCreated, SpawnError> {
+    use landlock::{AccessFs, PathBeneath, PathFd, RulesetCreatedAttr};
+
+    let (program, reads, loaders) = candidate_paths(program, explicit_reads, static_target)?;
+    let mut created = prepare_landlock(scopes)?;
+    let program_fd = PathFd::new(&program)
+        .map_err(|e| SpawnError::SandboxSetup(format!("landlock program fd: {e}")))?;
+    created = created
+        .add_rule(PathBeneath::new(program_fd, AccessFs::Execute | AccessFs::ReadFile))
+        .map_err(|e| SpawnError::SandboxSetup(format!("landlock program rule: {e}")))?;
+    for path in reads {
+        let path_fd = PathFd::new(&path)
+            .map_err(|e| SpawnError::SandboxSetup(format!("landlock read fd {}: {e}", path.display())))?;
+        created = created
+            .add_rule(PathBeneath::new(path_fd, if execute_reads || (execute_loader && loaders.contains(&path)) { AccessFs::Execute | AccessFs::ReadFile } else { AccessFs::ReadFile.into() }))
+            .map_err(|e| SpawnError::SandboxSetup(format!("landlock read rule {}: {e}", path.display())))?;
+    }
+    Ok(created)
+}
+
+// VERBATIM copy: crates/maos-kernel-core/src/security/sandbox/linux.rs:163-202.
+fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnError> {
+    use landlock::{
+        Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, Ruleset, RulesetAttr,
+        RulesetCreatedAttr, ABI,
+    };
+
+    let abi = ABI::V1;
+    let ruleset = Ruleset::default()
+        .set_compatibility(CompatLevel::BestEffort)
+        .handle_access(AccessFs::from_all(abi))
+        .map_err(|e| SpawnError::SandboxSetup(format!("landlock handle_access: {e}")))?;
+
+    let mut created = ruleset
+        .create()
+        .map_err(|e| SpawnError::SandboxSetup(format!("landlock create: {e}")))?;
+
+    for scope in scopes {
+        match scope {
+            Scope::FsRead { subtree } => {
+                let path_fd = PathFd::new(subtree)
+                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock path fd: {e}")))?;
+                let access = AccessFs::ReadFile | AccessFs::ReadDir;
+                created = created
+                    .add_rule(PathBeneath::new(path_fd, access))
+                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock add_rule: {e}")))?;
+            }
+            Scope::FsWrite { subtree } => {
+                let path_fd = PathFd::new(subtree)
+                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock path fd: {e}")))?;
+                let access = AccessFs::ReadFile | AccessFs::ReadDir | AccessFs::WriteFile;
+                created = created
+                    .add_rule(PathBeneath::new(path_fd, access))
+                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock add_rule: {e}")))?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(created)
+}
+
+fn base_syscalls() -> Vec<i64> {
+    vec![
+        libc::SYS_read, libc::SYS_write, libc::SYS_openat, libc::SYS_close, libc::SYS_mmap,
+        libc::SYS_munmap, libc::SYS_exit, libc::SYS_exit_group, libc::SYS_brk,
+        libc::SYS_rt_sigreturn, libc::SYS_getpid, libc::SYS_getppid, libc::SYS_fstat,
+        libc::SYS_newfstatat, libc::SYS_lseek, libc::SYS_mprotect, libc::SYS_futex,
+        libc::SYS_execve, libc::SYS_clone, libc::SYS_wait4, libc::SYS_pipe2, libc::SYS_dup,
+        libc::SYS_dup3, libc::SYS_fcntl, libc::SYS_ioctl, libc::SYS_rt_sigprocmask,
+        libc::SYS_getrandom, libc::SYS_set_tid_address, libc::SYS_writev, libc::SYS_pread64,
+        libc::SYS_madvise, libc::SYS_sigaltstack, libc::SYS_getdents64, libc::SYS_faccessat,
+        libc::SYS_faccessat2, libc::SYS_readlinkat, libc::SYS_clock_gettime,
+        libc::SYS_clock_getres, libc::SYS_nanosleep, libc::SYS_sysinfo, libc::SYS_getuid,
+        libc::SYS_getgid, libc::SYS_geteuid, libc::SYS_getegid, libc::SYS_getgroups,
+        libc::SYS_getresuid, libc::SYS_getresgid, libc::SYS_prlimit64, libc::SYS_setrlimit,
+        libc::SYS_getrlimit, libc::SYS_rseq, libc::SYS_statx,
+    ]
+}
+
+fn syscalls_for(names: &[String]) -> Result<Vec<i64>, String> {
+    let map: BTreeMap<&str, i64> = [
+        ("poll", libc::SYS_poll), ("ppoll", libc::SYS_ppoll),
+        ("rt_sigaction", libc::SYS_rt_sigaction), ("clone3", libc::SYS_clone3),
+        ("set_robust_list", libc::SYS_set_robust_list), ("gettid", libc::SYS_gettid),
+        ("tgkill", libc::SYS_tgkill), ("sched_getaffinity", libc::SYS_sched_getaffinity),
+        ("epoll_create1", libc::SYS_epoll_create1), ("epoll_ctl", libc::SYS_epoll_ctl),
+        ("epoll_wait", libc::SYS_epoll_wait), ("eventfd2", libc::SYS_eventfd2),
+        ("readv", libc::SYS_readv), ("prctl", libc::SYS_prctl), ("getcwd", libc::SYS_getcwd),
+        ("ftruncate", libc::SYS_ftruncate), ("membarrier", libc::SYS_membarrier),
+        ("memfd_create", libc::SYS_memfd_create), ("sendto", libc::SYS_sendto),
+        ("recvfrom", libc::SYS_recvfrom), ("socket", libc::SYS_socket),
+        ("connect", libc::SYS_connect),
+    ].into_iter().collect();
+    let mut result = BTreeSet::new();
+    for name in names {
+        if name == "rust-start" {
+            for name in ["poll", "ppoll", "rt_sigaction"] {
+                result.insert(map[name]);
+            }
+        } else if name == "runner-all" {
+            for name in map.keys() {
+                result.insert(map[name]);
+            }
+        } else {
+            result.insert(*map.get(name.as_str()).ok_or_else(|| format!("unknown syscall flag `{name}`"))?);
+        }
+    }
+    Ok(result.into_iter().collect())
+}
+
+fn build_candidate_seccomp_filters(
+    tier: SandboxTier,
+    additions: &[i64],
+) -> Result<Vec<seccompiler::BpfProgram>, SpawnError> {
+    use seccompiler::{SeccompAction, SeccompFilter, SeccompRule};
+
+    let mut rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
+    for syscall in base_syscalls().into_iter().chain(LEGACY_X86_SYSCALLS.iter().copied()).chain(additions.iter().copied()) {
+        rules.insert(syscall, vec![]);
+    }
+    let hostile_syscalls = [
+        libc::SYS_ptrace, libc::SYS_process_vm_readv, libc::SYS_process_vm_writev,
+        libc::SYS_kexec_load, libc::SYS_unshare, libc::SYS_mount, libc::SYS_umount2,
+        libc::SYS_pivot_root, libc::SYS_chroot, libc::SYS_acct, libc::SYS_reboot,
+        libc::SYS_bpf, libc::SYS_perf_event_open, libc::SYS_kcmp, libc::SYS_userfaultfd,
+    ];
+    let target_arch = match std::env::consts::ARCH {
+        "x86_64" => seccompiler::TargetArch::x86_64,
+        "aarch64" => seccompiler::TargetArch::aarch64,
+        other => {
+            if tier.0 >= SandboxTier::T2.0 {
+                return Err(SpawnError::SandboxSetup(format!("unsupported arch for seccomp: {other}")));
+            }
+            return Ok(vec![vec![]]);
+        }
+    };
+    let filter = SeccompFilter::new(
+        rules,
+        SeccompAction::Errno(libc::EPERM as u32),
+        SeccompAction::Allow,
+        target_arch,
+    ).map_err(|e| SpawnError::SandboxSetup(format!("seccomp filter build: {e}")))?;
+    let bpf = filter.try_into().map_err(|e| SpawnError::SandboxSetup(format!("seccomp bpf compile: {e}")))?;
+    let mut kill_rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
+    for &syscall in &hostile_syscalls {
+        kill_rules.insert(syscall as i64, vec![]);
+    }
+    let kill_filter = SeccompFilter::new(
+        kill_rules,
+        SeccompAction::Allow,
+        SeccompAction::KillProcess,
+        target_arch,
+    ).map_err(|e| SpawnError::SandboxSetup(format!("seccomp kill filter build: {e}")))?;
+    let kill_bpf = kill_filter.try_into().map_err(|e| SpawnError::SandboxSetup(format!("seccomp bpf compile: {e}")))?;
+    Ok(vec![bpf, kill_bpf])
+}
+
+// VERBATIM copy: crates/maos-kernel-core/src/security/sandbox/linux.rs:208-347.
+fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgram>, SpawnError> {
+    use seccompiler::{SeccompAction, SeccompFilter, SeccompRule};
+    use std::collections::BTreeMap;
+
+    let mut rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
+
+    let basic_syscalls = [
+        libc::SYS_read,
+        libc::SYS_write,
+        libc::SYS_openat,
+        libc::SYS_close,
+        libc::SYS_mmap,
+        libc::SYS_munmap,
+        libc::SYS_exit,
+        libc::SYS_exit_group,
+        libc::SYS_brk,
+        libc::SYS_rt_sigreturn,
+        libc::SYS_getpid,
+        libc::SYS_getppid,
+        libc::SYS_fstat,
+        libc::SYS_newfstatat,
+        libc::SYS_lseek,
+        libc::SYS_mprotect,
+        libc::SYS_futex,
+        libc::SYS_execve,
+        libc::SYS_clone,
+        libc::SYS_wait4,
+        libc::SYS_pipe2,
+        libc::SYS_dup,
+        libc::SYS_dup3,
+        libc::SYS_fcntl,
+        libc::SYS_ioctl,
+        libc::SYS_rt_sigprocmask,
+        libc::SYS_getrandom,
+        libc::SYS_set_tid_address,
+        libc::SYS_writev,
+        libc::SYS_pread64,
+        libc::SYS_madvise,
+        libc::SYS_sigaltstack,
+        libc::SYS_getdents64,
+        libc::SYS_faccessat,
+        libc::SYS_faccessat2,
+        libc::SYS_readlinkat,
+        libc::SYS_clock_gettime,
+        libc::SYS_clock_getres,
+        libc::SYS_nanosleep,
+        libc::SYS_sysinfo,
+        libc::SYS_getuid,
+        libc::SYS_getgid,
+        libc::SYS_geteuid,
+        libc::SYS_getegid,
+        libc::SYS_getgroups,
+        libc::SYS_getresuid,
+        libc::SYS_getresgid,
+        libc::SYS_prlimit64,
+        libc::SYS_setrlimit,
+        libc::SYS_getrlimit,
+        libc::SYS_rseq,
+        libc::SYS_statx,
+    ];
+
+    for &syscall in basic_syscalls.iter().chain(LEGACY_X86_SYSCALLS) {
+        rules.insert(syscall as i64, vec![]);
+    }
+
+    // Hostile syscalls get KillProcess via explicit SeccompAction.
+    // We install a second filter with KillProcess as match_action.
+    let hostile_syscalls = [
+        libc::SYS_ptrace,
+        libc::SYS_process_vm_readv,
+        libc::SYS_process_vm_writev,
+        libc::SYS_kexec_load,
+        libc::SYS_unshare,
+        libc::SYS_mount,
+        libc::SYS_umount2,
+        libc::SYS_pivot_root,
+        libc::SYS_chroot,
+        libc::SYS_acct,
+        libc::SYS_reboot,
+        libc::SYS_bpf,
+        libc::SYS_perf_event_open,
+        libc::SYS_kcmp,
+        libc::SYS_userfaultfd,
+    ];
+
+    let target_arch = match std::env::consts::ARCH {
+        "x86_64" => seccompiler::TargetArch::x86_64,
+        "aarch64" => seccompiler::TargetArch::aarch64,
+        other => {
+            if tier.0 >= SandboxTier::T2.0 {
+                return Err(SpawnError::SandboxSetup(format!(
+                    "unsupported arch for seccomp: {other}"
+                )));
+            }
+            return Ok(vec![vec![]]);
+        }
+    };
+
+    // Build the allow-list filter: matched syscalls → Allow, unmatched → Errno(EPERM).
+    let filter = SeccompFilter::new(
+        rules,
+        SeccompAction::Errno(libc::EPERM as u32),
+        SeccompAction::Allow,
+        target_arch,
+    )
+    .map_err(|e| SpawnError::SandboxSetup(format!("seccomp filter build: {e}")))?;
+
+    let bpf: seccompiler::BpfProgram = filter
+        .try_into()
+        .map_err(|e| SpawnError::SandboxSetup(format!("seccomp bpf compile: {e}")))?;
+
+    // Build hostile-syscall KillProcess filter: matched → KillProcess, unmatched → Allow.
+    // Kernel evaluates filters in reverse installation order (last installed first).
+    // Installing KillProcess filter second means hostile syscalls get KillProcess
+    // before the allow-list filter is evaluated.
+    let mut kill_rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
+    for &syscall in &hostile_syscalls {
+        kill_rules.insert(syscall as i64, vec![]);
+    }
+    let kill_filter = SeccompFilter::new(
+        kill_rules,
+        SeccompAction::Allow,
+        SeccompAction::KillProcess,
+        target_arch,
+    )
+    .map_err(|e| SpawnError::SandboxSetup(format!("seccomp kill filter build: {e}")))?;
+
+    let kill_bpf: seccompiler::BpfProgram = kill_filter
+        .try_into()
+        .map_err(|e| SpawnError::SandboxSetup(format!("seccomp bpf compile: {e}")))?;
+
+    // Install kill filter first, then allow-list filter.
+    // The kernel evaluates the most recently installed filter first.
+    // So: allow-list filter is evaluated first → if matched, Allow.
+    // If not matched → Errno(EPERM). Kill filter is evaluated second:
+    // if matched → KillProcess. If not matched → Allow (no-op).
+    // Net effect: allowed syscalls pass, hostile get KillProcess,
+    // unknown get Errno(EPERM).
+    Ok(vec![bpf, kill_bpf])
+}
+
+fn apply_seccomp(bpf: &[seccompiler::sock_filter]) -> Result<(), String> {
+    seccompiler::apply_filter(bpf).map_err(|e| format!("seccomp apply_filter failed: {e}"))
+}

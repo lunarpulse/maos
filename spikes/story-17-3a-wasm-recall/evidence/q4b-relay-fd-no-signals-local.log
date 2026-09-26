@@ -1,0 +1,26 @@
+UTC 2026-09-26T01:49:35Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner and Rust recall guest with inherited AF_UNIX descriptor, recall-service, candidate seccomp, and seeded log frames; not only probe-created state.
++ env T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=rust-start,clone3,memfd_create,sendto,recvfrom SPIKE_RUNNER_FLAGS=--no-signals-based-traps python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T01:49:35Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 6 --pid-out /tmp/maos-q4b-fd-olqileb4/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 6 --no-signals-based-traps
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 7 --caller-pid 3399663 --seed-pids 3399663,424242 --ids-out /tmp/maos-q4b-fd-olqileb4/ids.json
+SEED_FRAME_ID=01a0db674c7228734f18f2b8962f2f02
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db674c7228734f18f2b8962f2f02 > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":255868,\"fetch_ns\":80280}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=7 caller-pid=3399663 binding=inherited-descriptor
+recall-service: caller-pid=3399663 capability-invocation-audit-count=1
+recall-service: caller-pid=3399663 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+SECCOMP_INSTALL=ok
+recall-import-boundary-ns=230441
+fetch-import-boundary-ns=70983
+RESULT rc=0 sig=none errno=none

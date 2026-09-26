@@ -1,0 +1,102 @@
+UTC 2026-09-26T02:02:15Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: copied HEAD maos-wasm-runner, pinned component, ADR-032 input, and every leave-one-out syscall control; not only probe-created state.
++ python3 /tmp/q4b-loo-matrix.py head-runner
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+�hframe_id�ltimestamp_ns[�mlogical_clockdfrom�ispirit_idit2-ladderghost_id�drole�bto��ispirit_idnt2-ladder-peerghost_id�drole�dkindjTaskAssignfintenthReadonlygpayload�jTaskAssign�dgoalx.exercise the real runner through the T2 ladderescope�psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences�qpreferred_posture�uhalt_policy_overrides�tprior_distillate_ref�kauto_markerfKernelpconsent_envelope�nintent_lineage�
+RESULT rc=0 sig=none errno=none
+LOO target=head-runner drop=none harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["ppoll", "rt_sigaction", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+RESULT rc=none sig=11 errno=none
+LOO target=head-runner drop=poll harness_rc=0 RESULT rc=none sig=11 errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,rt_sigaction,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "rt_sigaction", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+�hframe_id�ltimestamp_ns[�mlogical_clockdfrom�ispirit_idit2-ladderghost_id�drole�bto��ispirit_idnt2-ladder-peerghost_id�drole�dkindjTaskAssignfintenthReadonlygpayload�jTaskAssign�dgoalx.exercise the real runner through the T2 ladderescope�psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences�qpreferred_posture�uhalt_policy_overrides�tprior_distillate_ref�kauto_markerfKernelpconsent_envelope�nintent_lineage�
+RESULT rc=0 sig=none errno=none
+LOO target=head-runner drop=ppoll harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,ppoll,clone3,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+fatal runtime error: assertion failed: signal(libc::SIGPIPE, handler) != libc::SIG_ERR, aborting
+
+RESULT rc=none sig=11 errno=none
+LOO target=head-runner drop=rt_sigaction harness_rc=0 RESULT rc=none sig=11 errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,ppoll,rt_sigaction,memfd_create,sendto,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+thread 'main' (18446744073709551615) panicked at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/functions.rs:131:29:
+failed to spawn thread: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1870:5
+   3: <core::result::Result<std::thread::join_handle::JoinHandle<()>, core::io::error::Error>>::expect
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1183:23
+   4: std::thread::functions::spawn::<maos_wasm_runner::compile_with_timeout::{closure#0}, ()>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/functions.rs:131:29
+   5: maos_wasm_runner::compile_with_timeout
+             at /home/lunarpulse/dev_ws/crates/maos-wasm-host/src/runner.rs:207:5
+   6: maos_wasm_runner::run
+             at /home/lunarpulse/dev_ws/crates/maos-wasm-host/src/runner.rs:160:21
+   7: maos_wasm_runner::main
+             at /home/lunarpulse/dev_ws/crates/maos-wasm-host/src/runner.rs:73:11
+   8: <fn() -> std::process::ExitCode as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+RESULT rc=101 sig=none errno=none
+LOO target=head-runner drop=clone3 harness_rc=0 RESULT rc=101 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,ppoll,rt_sigaction,clone3,sendto,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+maos-wasm-runner: InvalidComponent: component does not conform to maos:spirit@1.0 (instantiate failed): cannot create a memfd
+
+RESULT rc=3 sig=none errno=none
+LOO target=head-runner drop=memfd_create harness_rc=0 RESULT rc=3 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,ppoll,rt_sigaction,clone3,memfd_create,recvfrom -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "memfd_create", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+�hframe_id�ltimestamp_ns[�mlogical_clockdfrom�ispirit_idit2-ladderghost_id�drole�bto��ispirit_idnt2-ladder-peerghost_id�drole�dkindjTaskAssignfintenthReadonlygpayload�jTaskAssign�dgoalx.exercise the real runner through the T2 ladderescope�psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences�qpreferred_posture�uhalt_policy_overrides�tprior_distillate_ref�kauto_markerfKernelpconsent_envelope�nintent_lineage�
+RESULT rc=0 sig=none errno=none
+LOO target=head-runner drop=sendto harness_rc=0 RESULT rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --seccomp candidate --seccomp-order kill-first --execute-loader --read /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm --stdin /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame --extra poll,ppoll,rt_sigaction,clone3,memfd_create,sendto -- /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["poll", "ppoll", "rt_sigaction", "clone3", "memfd_create", "sendto"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+�hframe_id�ltimestamp_ns[�mlogical_clockdfrom�ispirit_idit2-ladderghost_id�drole�bto��ispirit_idnt2-ladder-peerghost_id�drole�dkindjTaskAssignfintenthReadonlygpayload�jTaskAssign�dgoalx.exercise the real runner through the T2 ladderescope�psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences�qpreferred_posture�uhalt_policy_overrides�tprior_distillate_ref�kauto_markerfKernelpconsent_envelope�nintent_lineage�
+RESULT rc=0 sig=none errno=none
+LOO target=head-runner drop=recvfrom harness_rc=0 RESULT rc=0 sig=none errno=none

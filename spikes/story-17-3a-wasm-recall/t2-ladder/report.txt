@@ -1,0 +1,44 @@
+Story 17-3a Q4b — T2 repair ladder report
+
+verdict: GO-WITH-CONDITIONS for the inherited-descriptor recall configuration; direct socket-path recall is NO-GO. Conditions: 17-6 must install KillProcess before the allow-list, grant the measured dynamic-loader Execute right, use the inherited descriptor, and retain the seven measured syscall entries. This is a spike result, not production approval.
+
+measured:
+- Landlock Rights works only with program Execute|ReadFile, loader Execute|ReadFile, and remaining libraries ReadFile; as-is is EACCES. `q4b-landlock-execute-loader.log`.
+- Production's returned `[bpf, kill_bpf]` order causes second-filter installation EPERM; kill-first installs. The as-is kill-first filter then SIGSEGVs until the candidate is used. `a6-reexec-orchestrator.log`, `q4b-seccomp-minimal-local.log`.
+- Generic runner candidate is `rust-start` (poll, ppoll, rt_sigaction), clone3, memfd_create. Leave-one-out rejects each. `q4b-seccomp-minimality-local.log`.
+- The real inherited socketpair relay additionally requires sendto and recvfrom; each removal yields classified recall error. Default, three mitigation flags, and precompiled component yield recall=ok/fetch=ok with two service audits. `q4b-relay-ci-ladder-local.log`.
+- Socket-path recall needs socket and connect, but then reaches a probe-created unrelated AF_UNIX listener and loopback TCP listener outside Landlock grants. `/run/dbus/system_bus_socket` was absent (ENOENT). `q4b-socket-escape-surfaces-local.log`.
+- Rust source count remains 144. `q4b-tokei-rust-source-names.log`.
+
+price: spike ladder has 620 Rust-source lines, 11 support-script/Python files (1,279 counted lines total), and no dependencies. maos-kernel-core committed delta is 0. The measured 17-6 candidate is one return-order change plus seven allow-list entries (poll, ppoll, rt_sigaction, clone3, memfd_create, sendto, recvfrom); the required Scope/FD lifecycle design is not sized by this spike. CI is two Ubuntu T2 matrix jobs and their ladder/relay steps.
+
+consequence:
+- 17-6 OLD: return `[bpf, kill_bpf]` and offer only FsRead scopes. NEW: install kill first, preserve hostile KillProcess precedence, add only the seven measured syscalls for inherited recall, and model executable/loader rights explicitly.
+- 17-3b OLD: use `--recall-socket` in T2. NEW: parent creates and binds a socketpair endpoint, passes it as an inherited descriptor, and never grants socket/connect to the T2 runner.
+- 17-1 OLD: a direct path socket is an acceptable parent capability. NEW: use parent-owned inherited endpoints; the path route admits unrelated AF_UNIX and AF_INET connections.
+
+findings:
+- 17-6: production filter vector contradicts its own comments; the observed second filter cannot install under the allow-list.
+- 17-6: dynamic ELF loading requires loader Execute, while non-loader shared objects required only ReadFile.
+- 17-3b: socket/connect are disallowed because actual escape listeners accepted both AF_UNIX and loopback connections.
+
+reproduce:
+1. `cargo build --locked --offline --manifest-path spikes/story-17-3a-wasm-recall/t2-ladder/Cargo.toml`
+2. `RUNNER_IMAGE=local T2_RUNNER_EXTRAS=rust-start,clone3,memfd_create spikes/story-17-3a-wasm-recall/t2-ladder/ci-relay-ladder.sh`
+3. `env T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=rust-start,clone3,memfd_create,sendto,recvfrom spikes/story-17-3a-wasm-recall/t2-ladder/run-relay-path.sh`
+4. Inspect the cited evidence logs for the exact commands and output.
+
+excerpt (15 lines):
+SECCOMP_INSTALL=ok
+relay-fd-default: recall=ok, fetch=ok, audit-count=2
+relay-fd-no-parallel-compilation: recall=ok, fetch=ok, audit-count=2
+relay-fd-no-signals-based-traps: recall=ok, fetch=ok, audit-count=2
+relay-fd-no-compile-watchdog: recall=ok, fetch=ok, audit-count=2
+relay-fd-precompiled: recall=ok, fetch=ok, audit-count=2
+relay-drop-sendto: recall=error
+relay-drop-recvfrom: recall=error
+path without socket/connect: recall=error
+path with socket/connect: recall=ok, fetch=ok, audit-count=2
+unrelated AF_UNIX listener: accepted=true
+loopback AF_INET listener: accepted=true
+system D-Bus socket: ENOENT

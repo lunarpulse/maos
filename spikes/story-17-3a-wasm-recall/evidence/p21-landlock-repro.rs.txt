@@ -1,0 +1,79 @@
+// P21 (17-3a, creation-time experiment, re-run in T0).
+//
+// Reproduces crates/maos-kernel-core/src/security/sandbox/linux.rs::prepare_landlock
+// VERBATIM for an empty scope list (t2_sandbox_kill's t2_spec), then execs a
+// program from pre_exec exactly as spawn_sandboxed does (restrict_self in the
+// child, linux.rs:72-84; a NotEnforced status maps to ENOSYS as linux.rs:80-83).
+//
+// T0 change from the creation-time draft: the control case now runs the SAME
+// target as the three Landlock cases (the draft always ran /bin/true), so the
+// control answers E15-A6's null-control question for every target.
+use landlock::{
+    Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, Ruleset, RulesetAttr,
+    RulesetCreatedAttr, RulesetStatus, ABI,
+};
+use std::os::unix::process::CommandExt;
+use std::process::Command;
+
+fn ruleset(extra: Option<(&str, landlock::BitFlags<AccessFs>)>) -> landlock::RulesetCreated {
+    let abi = ABI::V1;
+    let mut created = Ruleset::default()
+        .set_compatibility(CompatLevel::BestEffort)
+        .handle_access(AccessFs::from_all(abi))
+        .unwrap()
+        .create()
+        .unwrap();
+    if let Some((p, a)) = extra {
+        created = created
+            .add_rule(PathBeneath::new(PathFd::new(p).unwrap(), a))
+            .unwrap();
+    }
+    created
+}
+
+fn report(label: &str, result: std::io::Result<std::process::ExitStatus>) {
+    match result {
+        Ok(s) => println!("[{label}] spawned; status={s}"),
+        Err(e) => println!(
+            "[{label}] spawn Err: kind={:?} raw_os_error={:?} ({e})",
+            e.kind(),
+            e.raw_os_error()
+        ),
+    }
+}
+
+fn run(label: &str, extra: Option<(&str, landlock::BitFlags<AccessFs>)>, prog: &str) {
+    let mut rs = Some(ruleset(extra));
+    let mut cmd = Command::new(prog);
+    unsafe {
+        cmd.pre_exec(move || {
+            let st = rs
+                .take()
+                .unwrap()
+                .restrict_self()
+                .map_err(|_| std::io::Error::from_raw_os_error(1))?; // EPERM
+            if st.ruleset == RulesetStatus::NotEnforced {
+                return Err(std::io::Error::from_raw_os_error(38)); // ENOSYS, as linux.rs:83
+            }
+            Ok(())
+        });
+    }
+    report(label, cmd.status());
+}
+
+fn main() {
+    let prog = std::env::args().nth(1).unwrap_or("/bin/true".into());
+    println!("target: {prog}");
+    report("control: no landlock", Command::new(&prog).status());
+    run("exact kernel T2 ruleset, empty scopes (t2_spec)", None, &prog);
+    run(
+        "kernel ruleset + FsRead scope on /usr (what an FsRead grant adds)",
+        Some(("/usr", AccessFs::ReadFile | AccessFs::ReadDir)),
+        &prog,
+    );
+    run(
+        "same + Execute|ReadFile|ReadDir on / (positive control)",
+        Some(("/", AccessFs::Execute | AccessFs::ReadFile | AccessFs::ReadDir)),
+        &prog,
+    );
+}

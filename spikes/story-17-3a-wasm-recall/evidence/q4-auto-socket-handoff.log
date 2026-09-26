@@ -1,0 +1,20 @@
+UTC 2026-09-26T00:53:39.051973+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ spikes/story-17-3a-wasm-recall/host/run_auto_socket_probe.py
+E15-A6: this probe reads a runtime-selected service socket path and a runner that receives it; it does not set the selected path.
+service_ready=READY socket=/tmp/maos-recall-spike-3309610-1790384019026067016/recall.sock caller-pid=0 peer-pid-check=false one-shot=true
+launcher_passed_socket=/tmp/maos-recall-spike-3309610-1790384019026067016/recall.sock
+runner_rc=0 service_rc=0
+-- decoded relay --
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":246641,\"fetch_ns\":71413}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=236332
+fetch-import-boundary-ns=66875
+-- service stderr --
+recall-service: one-shot-unlinked=/tmp/maos-recall-spike-3309610-1790384019026067016/recall.sock
+recall-service: caller-pid=0 capability-invocation-audit-count=1
+recall-service: caller-pid=0 capability-invocation-audit-count=2
+
+[exit=0]

@@ -1,0 +1,88 @@
+UTC 2026-09-26T00:51:10Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ SPIKE_RUNNER_FLAGS= python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T00:51:10Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp off --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-jxslu0ic/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3295227 --seed-pids 3295227,424242 --ids-out /tmp/maos-q4b-fd-jxslu0ic/ids.json
+SEED_FRAME_ID=01a0db31d11f197c447dc4998053c384
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db31d11f197c447dc4998053c384 > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":191588,\"fetch_ns\":72034}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3295227 binding=inherited-descriptor
+recall-service: caller-pid=3295227 capability-invocation-audit-count=1
+recall-service: caller-pid=3295227 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+recall-import-boundary-ns=163896
+fetch-import-boundary-ns=61725
+RESULT rc=0 sig=none errno=none
++ SPIKE_RUNNER_FLAGS=--no-parallel-compilation python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T00:51:10Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp off --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-glc7fgsl/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5 --no-parallel-compilation
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3295286 --seed-pids 3295286,424242 --ids-out /tmp/maos-q4b-fd-glc7fgsl/ids.json
+SEED_FRAME_ID=01a0db31d1a2bbe64fc06d1972bbc296
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db31d1a2bbe64fc06d1972bbc296 > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":208279,\"fetch_ns\":68037}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3295286 binding=inherited-descriptor
+recall-service: caller-pid=3295286 capability-invocation-audit-count=1
+recall-service: caller-pid=3295286 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+recall-import-boundary-ns=185467
+fetch-import-boundary-ns=59351
+RESULT rc=0 sig=none errno=none
++ SPIKE_RUNNER_FLAGS=--no-signals-based-traps python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T00:51:10Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp off --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-4p6gip5j/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5 --no-signals-based-traps
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3295301 --seed-pids 3295301,424242 --ids-out /tmp/maos-q4b-fd-4p6gip5j/ids.json
+SEED_FRAME_ID=01a0db31d221c4876b584c255b02f825
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db31d221c4876b584c255b02f825 > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":167673,\"fetch_ns\":79008}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3295301 binding=inherited-descriptor
+recall-service: caller-pid=3295301 capability-invocation-audit-count=1
+recall-service: caller-pid=3295301 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+recall-import-boundary-ns=143929
+fetch-import-boundary-ns=65602
+RESULT rc=0 sig=none errno=none
++ SPIKE_RUNNER_FLAGS=--no-compile-watchdog python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T00:51:10Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp off --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-t_giuj2p/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5 --no-compile-watchdog
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3295349 --seed-pids 3295349,424242 --ids-out /tmp/maos-q4b-fd-t_giuj2p/ids.json
+SEED_FRAME_ID=01a0db31d2a36bd482a8f289f5def23c
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db31d2a36bd482a8f289f5def23c > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":220803,\"fetch_ns\":81953}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3295349 binding=inherited-descriptor
+recall-service: caller-pid=3295349 capability-invocation-audit-count=1
+recall-service: caller-pid=3295349 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+recall-import-boundary-ns=193371
+fetch-import-boundary-ns=71213
+RESULT rc=0 sig=none errno=none

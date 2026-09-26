@@ -1,0 +1,95 @@
+// 17-3a §A6 non-author check: does T2's seccomp INSTALL fail because of filter ORDER?
+//
+// crates/maos-kernel-core/src/security/sandbox/linux.rs:339-346 documents "Install kill filter
+// first, then allow-list filter" but returns `vec![bpf, kill_bpf]`: allow-list FIRST. pre_exec
+// applies them in vector order (:95-102). seccompiler 0.4.0's apply_filter issues
+// prctl(PR_SET_NO_NEW_PRIVS) then seccomp(SECCOMP_SET_MODE_FILTER) (seccompiler src/lib.rs:347,
+// :363-364), and neither is on T2's allow-list (no SYS_prctl / SYS_seccomp in linux.rs). So the
+// second install should hit the allow-list's mismatch action Errno(EPERM).
+//
+// Probe: install filters inside Command::pre_exec, exactly as spawn_sandboxed does, then exec
+// /bin/true. A spawn Err means the INSTALL failed. `spawned` means every install succeeded; what
+// the target then does under the filter is irrelevant here. The allow-list below is a stand-in
+// with the one property that matters (no prctl, no seccomp); the kill filter mirrors linux.rs:
+// ptrace -> KillProcess, everything else Allow.
+use seccompiler::{apply_filter, BpfProgram, SeccompAction, SeccompFilter, SeccompRule, TargetArch};
+use std::collections::BTreeMap;
+use std::os::unix::process::CommandExt;
+use std::process::Command;
+
+fn arch() -> TargetArch {
+    match std::env::consts::ARCH {
+        "aarch64" => TargetArch::aarch64,
+        _ => TargetArch::x86_64,
+    }
+}
+
+fn filter(syscalls: &[i64], mismatch: SeccompAction, matched: SeccompAction) -> BpfProgram {
+    let mut rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
+    for &s in syscalls {
+        rules.insert(s, vec![]);
+    }
+    SeccompFilter::new(rules, mismatch, matched, arch())
+        .unwrap()
+        .try_into()
+        .unwrap()
+}
+
+fn allow_list_without_prctl_or_seccomp() -> BpfProgram {
+    filter(
+        &[
+            libc::SYS_read,
+            libc::SYS_write,
+            libc::SYS_openat,
+            libc::SYS_close,
+            libc::SYS_mmap,
+            libc::SYS_munmap,
+            libc::SYS_exit,
+            libc::SYS_exit_group,
+            libc::SYS_brk,
+            libc::SYS_execve,
+            libc::SYS_futex,
+        ],
+        SeccompAction::Errno(libc::EPERM as u32),
+        SeccompAction::Allow,
+    )
+}
+
+fn kill_filter() -> BpfProgram {
+    filter(&[libc::SYS_ptrace], SeccompAction::Allow, SeccompAction::KillProcess)
+}
+
+fn allow_all() -> BpfProgram {
+    // Allow everything except ptrace (EPERM). seccompiler rejects identical match and
+    // mismatch actions, so a literal allow-all filter cannot be expressed.
+    filter(&[libc::SYS_ptrace], SeccompAction::Allow, SeccompAction::Errno(libc::EPERM as u32))
+}
+
+fn run(label: &str, progs: Vec<BpfProgram>) {
+    let mut progs = Some(progs);
+    let mut cmd = Command::new("/bin/true");
+    unsafe {
+        cmd.pre_exec(move || {
+            for p in progs.take().unwrap().iter() {
+                if apply_filter(p).is_err() {
+                    return Err(std::io::Error::last_os_error());
+                }
+            }
+            Ok(())
+        });
+    }
+    match cmd.status() {
+        Ok(s) => println!("[{label}] INSTALL ok (spawned); target status={s}"),
+        Err(e) => println!(
+            "[{label}] INSTALL FAILED: spawn Err kind={:?} raw_os_error={:?}",
+            e.kind(),
+            e.raw_os_error()
+        ),
+    }
+}
+
+fn main() {
+    run("control: one allow-all filter", vec![allow_all()]);
+    run("allow-list then kill (the order linux.rs:346 returns)", vec![allow_list_without_prctl_or_seccomp(), kill_filter()]);
+    run("kill then allow-list (the order linux.rs:339 documents)", vec![kill_filter(), allow_list_without_prctl_or_seccomp()]);
+}

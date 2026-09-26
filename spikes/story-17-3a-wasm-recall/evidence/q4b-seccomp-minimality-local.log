@@ -1,0 +1,55 @@
+UTC 2026-09-26T01:43:40Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real Rust targets, the HEAD runner, pinned component, Landlock, seccomp, and strace; not only probe-created state.
++ rustc --crate-name ladder_hello t2-ladder/hello.rs.txt -o target/t2-ladder/hello-dynamic
++ rustc --crate-name ladder_hello -C target-feature=+crt-static t2-ladder/hello.rs.txt -o target/t2-ladder/hello-static
++ cargo run --locked --offline --manifest-path t2-ladder/Cargo.toml --bin framegen > target/t2-ladder/runner.frame
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + candidate + --seccomp-order + kill-first + --extra + clone3\,memfd_create + --read + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm + --stdin + /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame + -- + /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 + --component + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["clone3", "memfd_create"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+RESULT rc=none sig=11 errno=none
+::notice title=t2-probe/local/runner-drop-rust-start::target=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 install=ok rc=none sig=11 errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + candidate + --seccomp-order + kill-first + --extra + rust-start\,memfd_create + --read + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm + --stdin + /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame + -- + /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 + --component + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "memfd_create"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+thread 'main' (18446744073709551615) panicked at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/functions.rs:131:29:
+failed to spawn thread: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1870:5
+   3: <core::result::Result<std::thread::join_handle::JoinHandle<()>, core::io::error::Error>>::expect
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1183:23
+   4: std::thread::functions::spawn::<maos_wasm_runner::compile_with_timeout::{closure#0}, ()>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/functions.rs:131:29
+   5: maos_wasm_runner::compile_with_timeout
+             at /home/lunarpulse/dev_ws/crates/maos-wasm-host/src/runner.rs:207:5
+   6: maos_wasm_runner::run
+             at /home/lunarpulse/dev_ws/crates/maos-wasm-host/src/runner.rs:160:21
+   7: maos_wasm_runner::main
+             at /home/lunarpulse/dev_ws/crates/maos-wasm-host/src/runner.rs:73:11
+   8: <fn() -> std::process::ExitCode as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+RESULT rc=101 sig=none errno=none
+::notice title=t2-probe/local/runner-drop-clone3::target=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 install=ok rc=101 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + candidate + --seccomp-order + kill-first + --extra + rust-start\,clone3 + --read + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm + --stdin + /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame + -- + /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 + --component + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+maos-wasm-runner: InvalidComponent: component does not conform to maos:spirit@1.0 (instantiate failed): cannot create a memfd
+
+RESULT rc=3 sig=none errno=none
+::notice title=t2-probe/local/runner-drop-memfd_create::target=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 install=ok rc=3 sig=none errno=none

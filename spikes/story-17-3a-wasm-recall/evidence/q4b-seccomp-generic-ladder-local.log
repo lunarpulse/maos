@@ -1,0 +1,87 @@
+UTC 2026-09-26T01:59:29Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: dynamic and static Rust controls plus copied HEAD maos-wasm-runner and pinned component under verbatim and kill-first seccomp filters; not only probe-created state.
++ env RUNNER_IMAGE=local T2_RUNNER_EXTRAS=rust-start,clone3,memfd_create ci-ladder.sh seccomp
+UTC 2026-09-26T01:59:29Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real Rust targets, the HEAD runner, pinned component, Landlock, seccomp, and strace; not only probe-created state.
++ rustc --crate-name ladder_hello t2-ladder/hello.rs.txt -o target/t2-ladder/hello-dynamic
++ rustc --crate-name ladder_hello -C target-feature=+crt-static t2-ladder/hello.rs.txt -o target/t2-ladder/hello-static
++ cargo run --locked --offline --manifest-path t2-ladder/Cargo.toml --bin framegen > target/t2-ladder/runner.frame
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /home/lunarpulse/dev_ws/crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + as-is + --seccomp-order + verbatim + --read + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm + --stdin + /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame + -- + /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 + --component + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=AsIs seccomp_order=Verbatim extra=[] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=errno=1
+maos: seccomp apply failed
+
+RESULT rc=none sig=none errno=1
+::notice title=t2-probe/local/runner-as-is-verbatim::target=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 install=errno=1 rc=none sig=none errno=1
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + as-is + --seccomp-order + kill-first + --read + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm + --stdin + /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame + -- + /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 + --component + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=AsIs seccomp_order=KillFirst extra=[] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+RESULT rc=none sig=11 errno=none
+::notice title=t2-probe/local/runner-as-is-kill-first::target=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 install=ok rc=none sig=11 errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + candidate + --seccomp-order + kill-first + --extra + rust-start\,clone3\,memfd_create + -- + /home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+::notice title=t2-probe/local/hello-dynamic-candidate::target=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic install=ok rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --static-target + --seccomp + candidate + --seccomp-order + kill-first + --extra + rust-start\,clone3\,memfd_create + -- + /home/lunarpulse/dev_ws/target/t2-ladder/hello-static 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-static args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create"] static_target=true execute_reads=false execute_loader=false inherit_fd=None
+SECCOMP_INSTALL=ok
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
+::notice title=t2-probe/local/hello-static-candidate::target=/home/lunarpulse/dev_ws/target/t2-ladder/hello-static install=ok rc=0 sig=none errno=none
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder + --landlock + rights + --execute-loader + --seccomp + candidate + --seccomp-order + kill-first + --extra + rust-start\,clone3\,memfd_create + --read + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm + --stdin + /home/lunarpulse/dev_ws/target/t2-ladder/runner.frame + -- + /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 + --component + /home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm 
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+´hframe_idêltimestamp_ns[Õmlogical_clockdfrom£ispirit_idit2-ladderghost_idˆdroleˆbtoÅ£ispirit_idnt2-ladder-peerghost_idˆdroleˆdkindjTaskAssignfintenthReadonlygpayload°jTaskAssign•dgoalx.exercise the real runner through the T2 ladderescopeÄpsuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureˆuhalt_policy_overridesÄtprior_distillate_refˆkauto_markerfKernelpconsent_envelopeˆnintent_lineageÄ
+RESULT rc=0 sig=none errno=none
+::notice title=t2-probe/local/runner-candidate-kill-first::target=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 install=ok rc=0 sig=none errno=none

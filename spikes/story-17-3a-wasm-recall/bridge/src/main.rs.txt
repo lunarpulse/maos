@@ -1,0 +1,150 @@
+#![forbid(unsafe_code)]
+
+#[path = "bridge.rs.txt"]
+mod bridge;
+
+mod bindings {
+    wasmtime::component::bindgen!({
+        path: "../wit-1.1-frame/spirit.wit",
+        world: "spirit",
+    });
+}
+
+use maos_domain::frame::{
+    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, PosturePreferences, TaskAssignPayload,
+};
+use maos_domain::invariants::i1::{IntentClass, Scope};
+use maos_domain::invariants::i13::IntentLineage;
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::invariants::i8::A2AIntent;
+use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
+use wasmtime::component::{Component, Linker};
+use wasmtime::{Config, Engine, Store};
+
+fn address(id: &str, role: Option<SpiritRole>) -> FrameAddress {
+    FrameAddress {
+        spirit_id: SpiritId(id.into()),
+        host_id: Some(HostId("host-17-3a".into())),
+        role,
+    }
+}
+
+fn populated_frame() -> IacFrame {
+    let from = address("director-17-3a", Some(SpiritRole::Director));
+    let granter = address("granter-17-3a", Some(SpiritRole::Worker));
+    IacFrame {
+        frame_id: [0x17; 16],
+        timestamp_ns: 1_700_000_017_003,
+        logical_clock: 1703,
+        from: from.clone(),
+        to: vec![address("worker-17-3a", Some(SpiritRole::Worker))]
+            .into_iter()
+            .collect(),
+        kind: FrameKind::TaskAssign,
+        intent: IntentClass::HighPrivilege,
+        payload: FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "prove typed frame transport".into(),
+            scope: vec![
+                Scope::FsRead {
+                    subtree: "/evidence".into(),
+                },
+                Scope::McpCall {
+                    server: "audit".into(),
+                    tool: "query".into(),
+                },
+                Scope::CliSubprocessSpawn {
+                    cli_binary_path: "/usr/bin/probe".into(),
+                    argv_prefix_hash: [0xA3; 32],
+                    output_shape_version: "v1".into(),
+                },
+                Scope::GatewaySend {
+                    gateway_id: "relay-17-3a".into(),
+                    recipient: "operator@example.invalid".into(),
+                },
+                Scope::LoomScan,
+            ],
+            success_criteria: "byte-identical canonical CBOR".into(),
+            posture_preferences: PosturePreferences::default(),
+            prior_distillate_ref: None,
+        }),
+        auto_marker: FrameOrigin::HumanAuthored,
+        consent_envelope: Some(ConsentEnvelope {
+            consent_id: [0xC0; 16],
+            granter,
+            timestamp_ns: 1_700_000_017_000,
+            intent_class: Some(A2AIntent::new("diagnosis-handoff:read-only-evidence")),
+            valid_until_ns: Some(1_700_000_077_000),
+        }),
+        intent_lineage: IntentLineage::new(vec![
+            A2AIntent::new("diagnosis-handoff"),
+            A2AIntent::new("read-only-evidence"),
+        ]),
+    }
+}
+
+fn probe_frame_round_trip(frame: &IacFrame) -> Result<(), String> {
+    let original = maos_wasm_host::codec::encode_cbor(frame).map_err(|e| e.to_string())?;
+    let extended = bridge::lift(bridge::lower(frame).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    let extended_bytes = maos_wasm_host::codec::encode_cbor(&extended).map_err(|e| e.to_string())?;
+    if original != extended_bytes {
+        return Err("extended bridge changed canonical CBOR".into());
+    }
+
+    let head = maos_wasm_host::frame_bridge::lift(maos_wasm_host::frame_bridge::lower(frame))
+        .map_err(|e| e.to_string())?;
+    let head_bytes = maos_wasm_host::codec::encode_cbor(&head).map_err(|e| e.to_string())?;
+    if original == head_bytes {
+        return Err("HEAD control unexpectedly preserved canonical CBOR".into());
+    }
+    let FramePayload::TaskAssign(head_task) = &head.payload else {
+        return Err("HEAD control changed the task-assignment payload variant".into());
+    };
+    if head.intent != IntentClass::Readonly
+        || head.consent_envelope.is_some()
+        || !head.intent_lineage.is_empty()
+        || !head_task.scope.is_empty()
+    {
+        return Err("HEAD control did not exhibit its documented field loss".into());
+    }
+
+    println!("extended_cbor_equal=true bytes={}", original.len());
+    println!("head_control_cbor_equal=false head_bytes={}", head_bytes.len());
+    println!("head_control_defaults=readonly/none/empty-lineage/empty-scope");
+    Ok(())
+}
+
+fn probe_frame_growth_skew() -> Result<(), String> {
+    let mut config = Config::new();
+    config.wasm_component_model(true);
+    let engine = Engine::new(&config).map_err(|e| e.to_string())?;
+    let component = Component::from_file(
+        &engine,
+        "tests/fixtures/wasm/echo_spirit_component.wasm",
+    )
+    .map_err(|e| e.to_string())?;
+    let mut store = Store::new(&engine, maos_wasm_host::host_state::HostState::new());
+    let mut linker = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|e| e.to_string())?;
+    match bindings::Spirit::instantiate(&mut store, &component, &linker) {
+        Ok(_) => Err("old @1.0.0 fixture instantiated against frame-grown @1.1.0 WIT".into()),
+        Err(error) => {
+            let message = format!("{error:?}");
+            if !message.contains("expected record of 11 fields, found 8 fields") {
+                return Err(format!(
+                    "expected frame-record type mismatch after satisfying WASI imports; got: {message}"
+                ));
+            }
+            println!("frame_growth_skew=type-mismatch");
+            println!("frame_growth_error={message}");
+            Ok(())
+        }
+    }
+}
+
+fn main() -> Result<(), String> {
+    let frame = populated_frame();
+    probe_frame_round_trip(&frame)?;
+    probe_frame_growth_skew()?;
+    Ok(())
+}

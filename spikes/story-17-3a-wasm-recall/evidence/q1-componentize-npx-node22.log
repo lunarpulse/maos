@@ -1,0 +1,7 @@
+UTC: 2026-09-26T00:34:48.769Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe runs npm's npx CLI under the actual Node 22 runtime and invokes the locally pinned componentize-js binary against final ESM/WIT; it does not only inspect files it set itself.
+$ npx -y -p node@22 node /usr/share/nodejs/npm/bin/npx-cli.js componentize-js dist/spirit.js --wit ../../../wit --world-name spirit --disable http fetch-event -o out/ts-spirit-npx-node22.wasm
+
+[exit 0]

@@ -1,0 +1,54 @@
+use std::process::ExitCode;
+
+use wasmtime::component::{Component, Linker};
+use wasmtime::{Config, Engine, Store};
+
+#[path = "protocol.rs.txt"]
+mod protocol;
+#[path = "host_state.rs.txt"]
+mod host_state;
+#[path = "wit_guest_1_2_same.rs.txt"]
+mod wit_guest;
+
+use host_state::HostState;
+use wit_guest::maos::spirit::recall as recall;
+use wit_guest::Spirit;
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => { eprintln!("spike-linker-1-2-same: InvalidComponent: {error}"); ExitCode::from(3) }
+    }
+}
+
+fn run() -> Result<(), String> {
+    let mut args = std::env::args().skip(1);
+    if args.next().as_deref() != Some("--component") { return Err("usage: spike-linker-1-2-same --component <path>".to_string()); }
+    let component = args.next().ok_or_else(|| "--component requires a value".to_string())?;
+    if args.next().is_some() { return Err("unexpected argument".to_string()); }
+    let mut config = Config::new();
+    config.wasm_component_model(true);
+    let engine = Engine::new(&config).map_err(|error| format!("engine: {error}"))?;
+    let component = Component::from_file(&engine, component).map_err(|error| format!("component: {error}"))?;
+    let mut store = Store::new(&engine, HostState::new(None, None)?);
+    let mut linker = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|error| format!("wasi linker: {error}"))?;
+    Spirit::add_to_linker::<HostState, wasmtime::component::HasSelf<HostState>>(&mut linker, |state| state).map_err(|error| format!("recall linker: {error}"))?;
+    let spirit = Spirit::instantiate(&mut store, &component, &linker).map_err(|error| format!("instantiate: {error}"))?;
+    match spirit.call_on_start(&mut store).map_err(|error| format!("on-start trap: {error}"))? {
+        Ok(()) => Ok(()),
+        Err(halt) => Err(format!("on-start halt: {halt:?}")),
+    }
+}
+
+impl recall::Host for HostState {
+    fn recall(&mut self, _: recall::RecallFilter) -> Result<recall::RecallPage, recall::RecallError> {
+        Err(recall::RecallError::Storage("version-only link probe".to_string()))
+    }
+
+    fn fetch(&mut self, _: Vec<u8>) -> Result<recall::FetchResponse, recall::RecallError> {
+        Err(recall::RecallError::Storage("version-only link probe".to_string()))
+    }
+}
+
+impl wit_guest::maos::spirit::frames::Host for HostState {}

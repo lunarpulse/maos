@@ -1,0 +1,13 @@
+UTC: 2026-09-26T00:21:03.017Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe reads the pinned repository WIT (../../../wit) and executes the installed jco generator; it does not only inspect files it set itself.
+$ npx jco guest-types ../../../wit --world-name spirit --out-dir src/bindings --strict
+
+  Generated Guest Typescript Definition Files (.d.ts):
+
+ - src/bindings/interfaces/maos-spirit-frames.d.ts  [30m[3m9.34 KiB[23m[39m
+ - src/bindings/spirit.d.ts                         [30m[3m 0.8 KiB[23m[39m
+
+
+[exit 0]

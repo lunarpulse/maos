@@ -1,0 +1,274 @@
+UTC 2026-09-26T00:32:40.697294+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ wasm-tools component wit tests/fixtures/wasm/echo_spirit_component.wasm
+package root:component;
+
+world root {
+  import maos:spirit/frames@1.0.0;
+  import wasi:io/poll@0.2.6;
+  import wasi:io/error@0.2.6;
+  import wasi:io/streams@0.2.6;
+  import wasi:cli/environment@0.2.6;
+  import wasi:cli/exit@0.2.6;
+  import wasi:cli/stdin@0.2.6;
+  import wasi:cli/stdout@0.2.6;
+  import wasi:cli/stderr@0.2.6;
+  import wasi:cli/terminal-input@0.2.6;
+  import wasi:cli/terminal-output@0.2.6;
+  import wasi:cli/terminal-stdin@0.2.6;
+  import wasi:cli/terminal-stdout@0.2.6;
+  import wasi:cli/terminal-stderr@0.2.6;
+  use maos:spirit/frames@1.0.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@1.0.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<string>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.6 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream;
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:cli@0.2.6 {
+  interface environment {
+    get-environment: func() -> list<tuple<string, string>>;
+  }
+  interface exit {
+    exit: func(status: result);
+  }
+  interface stdin {
+    use wasi:io/streams@0.2.6.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface stdout {
+    use wasi:io/streams@0.2.6.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.6.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+[exit=0]
+
+E15-A6: this probe reads the untouched fixture component's embedded WIT; it does not set its interface declaration.

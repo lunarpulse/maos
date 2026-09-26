@@ -1,0 +1,26 @@
+UTC 2026-09-26T01:47:06Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, path-bound recall-service, candidate seccomp without socket creation or connection, and seeded log frames; not only probe-created state.
++ env T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=rust-start,clone3,memfd_create,sendto,recvfrom spikes/story-17-3a-wasm-recall/t2-ladder/run-relay-path.sh
+UTC 2026-09-26T01:47:06Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, recall-service, socket path, and seeded log frames; not only probe-created state.
++ mkfifo /tmp/tmp.t4gR4aH42j/runner.stdin
++ t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --read guest --stdin fifo --pid-out pid -- spike-runner --component guest --recall-socket socket
+RUNNER_PID=3397164
++ timeout 15s recall-service --socket /tmp/tmp.t4gR4aH42j/recall.sock --caller-pid 3397164 --seed-pids 3397164,424242 --ids-out /tmp/tmp.t4gR4aH42j/ids.json --one-shot
+SEED_FRAME_ID=01a0db650653fe2701902f78ee083e71
++ frame-driver encode --data 01a0db650653fe2701902f78ee083e71 >&3
+LADDER_RC=0 SERVICE_RC=124
++ frame-driver decode < extracted ladder output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"error\",\"recall_entries\":0,\"fetch\":\"error\",\"recall_ns\":33142,\"fetch_ns\":8836}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY socket=/tmp/tmp.t4gR4aH42j/recall.sock caller-pid=3397164 peer-pid-check=true one-shot=true
++ cat ladder stderr and RESULT
+SECCOMP_INSTALL=ok
+recall-import-boundary-ns=12643
+fetch-import-boundary-ns=911
+RESULT rc=0 sig=none errno=none

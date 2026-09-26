@@ -1,0 +1,24 @@
+UTC: 2026-09-26T00:20:38.983Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe reads npm's installed dependency tree and registry state; it does not only inspect files it set itself.
+$ npm i -E @bytecodealliance/componentize-js@0.23.0 @bytecodealliance/jco@1.35.0 typescript@5
+
+up to date, audited 165 packages in 524ms
+
+26 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (3 moderate, 1 critical)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: '@napi-rs/lzma@1.5.1',
+npm WARN EBADENGINE   required: { node: '^22.20 || ^24.12 || >=25' },
+npm WARN EBADENGINE   current: { node: 'v20.19.2', npm: '9.2.0' }
+npm WARN EBADENGINE }
+
+[exit 0]

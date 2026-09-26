@@ -1,0 +1,29 @@
+UTC 2026-09-26T00:46:14Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real dynamic hello and the HEAD runner plus their ldd paths and component; not only probe-created state.
++ ldd target/t2-ladder/hello-dynamic; ldd spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59
+	linux-vdso.so.1 (0x00007f838c85e000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f838c7ca000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f838c5d6000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f838c860000)
+	linux-vdso.so.1 (0x00007fd2f6e15000)
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fd2f6dd9000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fd2f3110000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fd2f2f1c000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fd2f6e17000)
++ t2-ladder --landlock rights --execute-loader --seccomp off -- target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Off extra=[] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+t2-ladder hello reached main
+
+RESULT rc=0 sig=none errno=none
++ t2-ladder --landlock rights --execute-loader --seccomp off --read tests/fixtures/wasm/echo_spirit_component.wasm --stdin target/t2-ladder/runner.frame -- spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Off extra=[] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+Content-Length: 452
+
+«hframe_idltimestamp_ns[Ímlogical_clockdfrom£ispirit_idit2-ladderghost_idödroleöbto£ispirit_idnt2-ladder-peerghost_idödroleödkindjTaskAssignfintenthReadonlygpayload¡jTaskAssign¥dgoalx.exercise the real runner through the T2 ladderescope€psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureöuhalt_policy_overrides€tprior_distillate_refökauto_markerfKernelpconsent_envelopeönintent_lineage€
+RESULT rc=0 sig=none errno=none

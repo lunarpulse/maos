@@ -1,0 +1,17 @@
+[package]
+name = "p21-landlock-repro"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Not a workspace member: the spike is out-of-workspace (17-3a AC2).
+[workspace]
+
+# Rust sources under spikes/ are `.rs.txt` so `kloc-check` (tokei --types Rust)
+# does not count them (17-3a P16); rustc compiles any path Cargo hands it.
+[[bin]]
+name = "p21-landlock-repro"
+path = "../p21-landlock-repro.rs.txt"
+
+[dependencies]
+landlock = "=0.4.4"

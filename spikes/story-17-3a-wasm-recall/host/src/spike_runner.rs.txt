@@ -1,0 +1,321 @@
+use std::io::{self, BufReader, BufWriter};
+use std::process::ExitCode;
+use std::time::{Duration, Instant};
+
+use maos_domain::log_recall::{
+    FrameKindLabel, LogFetchResponse, LogRecallCursor, LogRecallEntry, LogRecallFilter, LogRecallPage,
+};
+use wasmtime::component::{Component, Linker};
+use wasmtime::{Config, Engine, Store};
+
+#[path = "protocol.rs.txt"]
+mod protocol;
+#[path = "host_state.rs.txt"]
+mod host_state;
+#[path = "frame_bridge.rs.txt"]
+mod frame_bridge;
+#[path = "wit_guest.rs.txt"]
+mod wit_guest;
+
+use host_state::HostState;
+use protocol::{WireError, WireReply, WireRequest};
+use wit_guest::maos::spirit::recall as wit_recall;
+use wit_guest::Spirit;
+
+#[repr(u8)]
+enum RunnerExit { Ok = 0, GenericError = 1, InvalidComponent = 3, OutOfFuel = 4 }
+
+enum RunError { InvalidComponent(String), OutOfFuel, Other(String) }
+
+struct RunnerArgs {
+    component: String,
+    fuel: u64,
+    socket: Option<String>,
+    fd: Option<i32>,
+    no_parallel_compilation: bool,
+    no_signals_based_traps: bool,
+    no_compile_watchdog: bool,
+    precompiled: Option<String>,
+}
+
+fn main() -> ExitCode {
+    let result = match std::env::args().nth(1).as_deref() {
+        Some("precompile") => precompile(),
+        _ => parse_args().and_then(run),
+    };
+    match result {
+        Ok(()) => ExitCode::from(RunnerExit::Ok as u8),
+        Err(RunError::InvalidComponent(reason)) => {
+            eprintln!("spike-runner: InvalidComponent: {reason}");
+            ExitCode::from(RunnerExit::InvalidComponent as u8)
+        }
+        Err(RunError::OutOfFuel) => {
+            eprintln!("spike-runner: OutOfFuel");
+            ExitCode::from(RunnerExit::OutOfFuel as u8)
+        }
+        Err(RunError::Other(reason)) => {
+            eprintln!("spike-runner: {reason}");
+            ExitCode::from(RunnerExit::GenericError as u8)
+        }
+    }
+}
+
+fn parse_args() -> Result<RunnerArgs, RunError> {
+    let mut component = None;
+    let mut fuel = 10_000_000;
+    let mut socket = None;
+    let mut fd = None;
+    let mut no_parallel_compilation = false;
+    let mut no_signals_based_traps = false;
+    let mut no_compile_watchdog = false;
+    let mut precompiled = None;
+    fn value(args: &mut impl Iterator<Item = String>, name: &str) -> Result<String, RunError> {
+        args.next().ok_or_else(|| RunError::Other(format!("{name} requires a value")))
+    }
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--component" => component = Some(value(&mut args, "--component")?),
+            "--fuel" => fuel = value(&mut args, "--fuel")?.parse().map_err(|error| RunError::Other(format!("invalid --fuel: {error}")))?,
+            "--recall-socket" => socket = Some(value(&mut args, "--recall-socket")?),
+            "--recall-fd" => fd = Some(value(&mut args, "--recall-fd")?.parse().map_err(|error| RunError::Other(format!("invalid --recall-fd: {error}")))?),
+            "--precompiled" => precompiled = Some(value(&mut args, "--precompiled")?),
+            "--no-parallel-compilation" => no_parallel_compilation = true,
+            "--no-signals-based-traps" => no_signals_based_traps = true,
+            "--no-compile-watchdog" => no_compile_watchdog = true,
+            other => return Err(RunError::Other(format!("unknown argument: {other}"))),
+        }
+    }
+    Ok(RunnerArgs {
+        component: component.ok_or_else(|| RunError::Other("--component is required".to_string()))?,
+        fuel, socket, fd, no_parallel_compilation, no_signals_based_traps, no_compile_watchdog, precompiled,
+    })
+}
+
+fn engine(args: &RunnerArgs) -> Result<Engine, RunError> {
+    let mut config = Config::new();
+    config.consume_fuel(true);
+    config.wasm_component_model(true);
+    if args.no_parallel_compilation { config.parallel_compilation(false); }
+    if args.no_signals_based_traps { config.signals_based_traps(false); }
+    Engine::new(&config).map_err(|error| RunError::Other(format!("wasmtime engine init: {error}")))
+}
+
+fn load_component(engine: &Engine, args: &RunnerArgs) -> Result<Component, RunError> {
+    if let Some(path) = &args.precompiled {
+        // `precompile` is the only producer documented by this spike; never deserialize an untrusted cache.
+        return unsafe { Component::deserialize_file(engine, path) }
+            .map_err(|error| RunError::InvalidComponent(format!("precompiled component: {error}")));
+    }
+    let bytes = std::fs::read(&args.component)
+        .map_err(|error| RunError::InvalidComponent(format!("cannot read component '{}': {error}", args.component)))?;
+    if args.no_compile_watchdog {
+        return Component::new(engine, bytes)
+            .map_err(|error| RunError::InvalidComponent(format!("component compile failed: {error}")));
+    }
+    let cloned = engine.clone();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || { let _ = sender.send(Component::new(&cloned, bytes)); });
+    match receiver.recv_timeout(Duration::from_secs(10)) {
+        Ok(Ok(component)) => Ok(component),
+        Ok(Err(error)) => Err(RunError::InvalidComponent(format!("component compile failed: {error}"))),
+        Err(_) => Err(RunError::InvalidComponent("component compile exceeded 10s".to_string())),
+    }
+}
+
+fn run(args: RunnerArgs) -> Result<(), RunError> {
+    let engine = engine(&args)?;
+    let component = load_component(&engine, &args)?;
+    let state = HostState::new(args.socket.clone(), args.fd).map_err(RunError::Other)?;
+    let mut store = Store::new(&engine, state);
+    store.set_fuel(args.fuel).map_err(|error| RunError::Other(format!("set fuel: {error}")))?;
+    let mut linker = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|error| RunError::Other(format!("wasi linker: {error}")))?;
+    Spirit::add_to_linker::<HostState, wasmtime::component::HasSelf<HostState>>(&mut linker, |state| state).map_err(|error| RunError::Other(format!("recall linker: {error}")))?;
+    let spirit = Spirit::instantiate(&mut store, &component, &linker).map_err(|error| {
+        RunError::InvalidComponent(format!("component does not conform to maos:spirit@1.1 (instantiate failed): {error}"))
+    })?;
+    match spirit.call_on_start(&mut store) {
+        Ok(Ok(())) => {}
+        Ok(Err(halt)) => return Err(RunError::Other(format!("guest on-start halted: {halt:?}"))),
+        Err(error) => return Err(classify_trap(error)),
+    }
+    let stdin = io::stdin();
+    let stdout = io::stdout();
+    let mut reader = BufReader::new(stdin.lock());
+    let mut writer = BufWriter::new(stdout.lock());
+    let result = pump_frames(&mut store, &spirit, &mut reader, &mut writer);
+    let _ = spirit.call_on_shutdown(&mut store);
+    result
+}
+
+fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, reader: &mut impl io::BufRead, writer: &mut impl io::Write) -> Result<(), RunError> {
+    loop {
+        let bytes = match maos_wasm_host::codec::read_frame(reader) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => return Ok(()),
+            Err(error) => return Err(RunError::Other(format!("stdin read error: {error}"))),
+        };
+        let frame = maos_wasm_host::codec::decode_cbor(&bytes).map_err(|error| RunError::Other(format!("inbound frame decode: {error}")))?;
+        let frame = frame_bridge::lower(&frame).map_err(|error| RunError::Other(format!("lower frame: {error}")))?;
+        let emitted = match spirit.call_handle_frame(&mut *store, &frame) {
+            Ok(Ok(frames)) => frames,
+            Ok(Err(halt)) => return Err(RunError::Other(format!("guest handle-frame halted: {halt:?}"))),
+            Err(error) => return Err(classify_trap(error)),
+        };
+        for frame in emitted {
+            let frame = frame_bridge::lift(frame).map_err(|error| RunError::Other(format!("lift frame: {error}")))?;
+            let bytes = maos_wasm_host::codec::encode_cbor(&frame).map_err(|error| RunError::Other(format!("outbound frame encode: {error}")))?;
+            maos_wasm_host::codec::write_frame(writer, &bytes).map_err(|error| RunError::Other(format!("stdout write: {error}")))?;
+        }
+    }
+}
+
+fn classify_trap(error: wasmtime::Error) -> RunError {
+    if error.downcast_ref::<wasmtime::Trap>().is_some_and(|trap| *trap == wasmtime::Trap::OutOfFuel) { RunError::OutOfFuel }
+    else { RunError::Other(format!("guest trapped: {error}")) }
+}
+
+fn precompile() -> Result<(), RunError> {
+    let mut component = None;
+    let mut out = None;
+    let mut no_parallel_compilation = false;
+    let mut no_signals_based_traps = false;
+    let mut no_compile_watchdog = false;
+    let mut args = std::env::args().skip(2);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--component" => component = args.next(),
+            "--out" => out = args.next(),
+            "--no-parallel-compilation" => no_parallel_compilation = true,
+            "--no-signals-based-traps" => no_signals_based_traps = true,
+            "--no-compile-watchdog" => no_compile_watchdog = true,
+            other => return Err(RunError::Other(format!("unknown precompile argument: {other}"))),
+        }
+    }
+    let component = component.ok_or_else(|| RunError::Other("precompile --component is required".to_string()))?;
+    let out = out.ok_or_else(|| RunError::Other("precompile --out is required".to_string()))?;
+    let args = RunnerArgs {
+        component,
+        fuel: 0,
+        socket: None,
+        fd: None,
+        no_parallel_compilation,
+        no_signals_based_traps,
+        no_compile_watchdog,
+        precompiled: None,
+    };
+    let engine = engine(&args)?;
+    let bytes = std::fs::read(&args.component).map_err(|error| RunError::Other(format!("read component: {error}")))?;
+    let serialized = engine.precompile_component(&bytes).map_err(|error| RunError::InvalidComponent(format!("precompile component: {error}")))?;
+    std::fs::write(out, serialized).map_err(|error| RunError::Other(format!("write cwasm: {error}")))
+}
+
+fn domain_kind(kind: wit_recall::FrameKindLabel) -> FrameKindLabel {
+    use wit_recall::FrameKindLabel::*;
+    match kind {
+        TaskAssign => FrameKindLabel::TaskAssign, TaskComplete => FrameKindLabel::TaskComplete, DecisionDispatch => FrameKindLabel::DecisionDispatch,
+        EpistemicHalt => FrameKindLabel::EpistemicHalt, TelemetryEvent => FrameKindLabel::TelemetryEvent, ConsentRequest => FrameKindLabel::ConsentRequest,
+        Retract => FrameKindLabel::Retract, CapabilityInvocation => FrameKindLabel::CapabilityInvocation, SandboxBlock => FrameKindLabel::SandboxBlock,
+        InferenceCall => FrameKindLabel::InferenceCall, Decision => FrameKindLabel::Decision, Distillate => FrameKindLabel::Distillate,
+        BudgetWarning => FrameKindLabel::BudgetWarning, BudgetExceeded => FrameKindLabel::BudgetExceeded, HotSwapAborted => FrameKindLabel::HotSwapAborted,
+        TaskStalled => FrameKindLabel::TaskStalled, SilentFailureSuspect => FrameKindLabel::SilentFailureSuspect, SpiritRevoked => FrameKindLabel::SpiritRevoked,
+        McpInvocation => FrameKindLabel::McpInvocation, SpiritAdmitted => FrameKindLabel::SpiritAdmitted, RegistryYank => FrameKindLabel::RegistryYank,
+        CliSubprocessOutput => FrameKindLabel::CliSubprocessOutput, ConsentRupture => FrameKindLabel::ConsentRupture, RateLimited => FrameKindLabel::RateLimited,
+        GatewayInbound => FrameKindLabel::GatewayInbound, GatewayOutbound => FrameKindLabel::GatewayOutbound, SpiritImported => FrameKindLabel::SpiritImported,
+        CliWrapperShapeMismatch => FrameKindLabel::CliWrapperShapeMismatch, GovernanceEvent => FrameKindLabel::GovernanceEvent, CostAttribution => FrameKindLabel::CostAttribution,
+    }
+}
+
+fn wit_kind(kind: FrameKindLabel) -> wit_recall::FrameKindLabel {
+    use FrameKindLabel::*;
+    match kind {
+        TaskAssign => wit_recall::FrameKindLabel::TaskAssign, TaskComplete => wit_recall::FrameKindLabel::TaskComplete, DecisionDispatch => wit_recall::FrameKindLabel::DecisionDispatch,
+        EpistemicHalt => wit_recall::FrameKindLabel::EpistemicHalt, TelemetryEvent => wit_recall::FrameKindLabel::TelemetryEvent, ConsentRequest => wit_recall::FrameKindLabel::ConsentRequest,
+        Retract => wit_recall::FrameKindLabel::Retract, CapabilityInvocation => wit_recall::FrameKindLabel::CapabilityInvocation, SandboxBlock => wit_recall::FrameKindLabel::SandboxBlock,
+        InferenceCall => wit_recall::FrameKindLabel::InferenceCall, Decision => wit_recall::FrameKindLabel::Decision, Distillate => wit_recall::FrameKindLabel::Distillate,
+        BudgetWarning => wit_recall::FrameKindLabel::BudgetWarning, BudgetExceeded => wit_recall::FrameKindLabel::BudgetExceeded, HotSwapAborted => wit_recall::FrameKindLabel::HotSwapAborted,
+        TaskStalled => wit_recall::FrameKindLabel::TaskStalled, SilentFailureSuspect => wit_recall::FrameKindLabel::SilentFailureSuspect, SpiritRevoked => wit_recall::FrameKindLabel::SpiritRevoked,
+        McpInvocation => wit_recall::FrameKindLabel::McpInvocation, SpiritAdmitted => wit_recall::FrameKindLabel::SpiritAdmitted, RegistryYank => wit_recall::FrameKindLabel::RegistryYank,
+        CliSubprocessOutput => wit_recall::FrameKindLabel::CliSubprocessOutput, ConsentRupture => wit_recall::FrameKindLabel::ConsentRupture, RateLimited => wit_recall::FrameKindLabel::RateLimited,
+        GatewayInbound => wit_recall::FrameKindLabel::GatewayInbound, GatewayOutbound => wit_recall::FrameKindLabel::GatewayOutbound, SpiritImported => wit_recall::FrameKindLabel::SpiritImported,
+        CliWrapperShapeMismatch => wit_recall::FrameKindLabel::CliWrapperShapeMismatch, GovernanceEvent => wit_recall::FrameKindLabel::GovernanceEvent, CostAttribution => wit_recall::FrameKindLabel::CostAttribution,
+        _ => wit_recall::FrameKindLabel::TelemetryEvent,
+    }
+}
+
+fn bad_id(bytes: &[u8]) -> wit_recall::RecallError { wit_recall::RecallError::InvalidCursor(format!("frame id must be 16 bytes, got {}", bytes.len())) }
+
+fn to_domain_filter(filter: wit_recall::RecallFilter) -> Result<LogRecallFilter, wit_recall::RecallError> {
+    let cursor = filter.cursor.map(|cursor| {
+        let len = cursor.last_frame_id.len();
+        let frame_id = cursor.last_frame_id.try_into().map_err(|_| wit_recall::RecallError::InvalidCursor(format!("frame id must be 16 bytes, got {len}")))?;
+        Ok(LogRecallCursor::new(cursor.last_timestamp_ns, frame_id))
+    }).transpose()?;
+    Ok(LogRecallFilter::new(filter.kind.map(domain_kind), filter.since_ns, filter.until_ns, filter.limit as usize, cursor, filter.intent_filter))
+}
+
+fn to_wit_error(error: WireError) -> wit_recall::RecallError {
+    match error {
+        WireError::ScopeViolation { frame_id } => wit_recall::RecallError::ScopeViolation(frame_id.to_vec()),
+        WireError::FrameNotFound { frame_id } => wit_recall::RecallError::FrameNotFound(frame_id.to_vec()),
+        WireError::Storage(detail) | WireError::Protocol(detail) => wit_recall::RecallError::Storage(detail),
+        WireError::PeerIdentity => wit_recall::RecallError::Storage("peer identity refused".to_string()),
+        WireError::InvalidCursor(detail) => wit_recall::RecallError::InvalidCursor(detail),
+        WireError::LimitExceeded { requested, .. } => wit_recall::RecallError::LimitExceeded(requested as u32),
+        WireError::CrossWallDenied(detail) => wit_recall::RecallError::CrossWallDenied(detail),
+    }
+}
+
+fn to_wit_page(page: LogRecallPage) -> wit_recall::RecallPage {
+    wit_recall::RecallPage {
+        entries: page.entries.into_iter().map(|entry: LogRecallEntry| wit_recall::RecallEntry {
+            frame_id: entry.frame_id.to_vec(), timestamp_ns: entry.timestamp_ns, kind: wit_kind(entry.kind), intent: entry.intent,
+            peer_spirit_pid: entry.peer_spirit_pid, payload_available: entry.payload_available,
+        }).collect(),
+        next_cursor: page.next_cursor.map(|cursor| wit_recall::RecallCursor { last_timestamp_ns: cursor.last_timestamp_ns, last_frame_id: cursor.last_frame_id.to_vec() }),
+    }
+}
+
+fn to_wit_fetch(response: LogFetchResponse) -> wit_recall::FetchResponse {
+    wit_recall::FetchResponse {
+        frame_id: response.frame_id.to_vec(), timestamp_ns: response.timestamp_ns, kind: wit_kind(response.kind), intent: response.intent,
+        payload_redacted: response.payload_redacted, capability_token: response.capability_token.map(|token| token.to_vec()),
+        origin: match response.origin {
+            maos_domain::invariants::i3::FrameOrigin::HumanAuthored => wit_guest::maos::spirit::frames::FrameOrigin::HumanAuthored,
+            maos_domain::invariants::i3::FrameOrigin::SpiritAuto => wit_guest::maos::spirit::frames::FrameOrigin::SpiritAuto,
+            maos_domain::invariants::i3::FrameOrigin::SpiritDraftedHumanApproved => wit_guest::maos::spirit::frames::FrameOrigin::SpiritDraftedHumanApproved,
+            maos_domain::invariants::i3::FrameOrigin::Kernel => wit_guest::maos::spirit::frames::FrameOrigin::Kernel,
+        },
+    }
+}
+
+impl wit_recall::Host for HostState {
+    fn recall(&mut self, filter: wit_recall::RecallFilter) -> Result<wit_recall::RecallPage, wit_recall::RecallError> {
+        let filter = to_domain_filter(filter)?;
+        let started = Instant::now();
+        let reply = self.recall.exchange(&WireRequest::Recall { filter });
+        eprintln!("recall-import-boundary-ns={}", started.elapsed().as_nanos());
+        match reply {
+            Ok(WireReply::Recall(Ok(page))) => Ok(to_wit_page(page)),
+            Ok(WireReply::Recall(Err(error))) => Err(to_wit_error(error)),
+            Ok(_) => Err(wit_recall::RecallError::Storage("recall reply kind mismatch".to_string())),
+            Err(error) => Err(wit_recall::RecallError::Storage(error)),
+        }
+    }
+
+    fn fetch(&mut self, frame_id: Vec<u8>) -> Result<wit_recall::FetchResponse, wit_recall::RecallError> {
+        let frame_id: [u8; 16] = frame_id.try_into().map_err(|value: Vec<u8>| bad_id(&value))?;
+        let started = Instant::now();
+        let reply = self.recall.exchange(&WireRequest::Fetch { frame_id });
+        eprintln!("fetch-import-boundary-ns={}", started.elapsed().as_nanos());
+        match reply {
+            Ok(WireReply::Fetch(Ok(response))) => Ok(to_wit_fetch(response)),
+            Ok(WireReply::Fetch(Err(error))) => Err(to_wit_error(error)),
+            Ok(_) => Err(wit_recall::RecallError::Storage("fetch reply kind mismatch".to_string())),
+            Err(error) => Err(wit_recall::RecallError::Storage(error)),
+        }
+    }
+}
+
+impl wit_guest::maos::spirit::frames::Host for HostState {}

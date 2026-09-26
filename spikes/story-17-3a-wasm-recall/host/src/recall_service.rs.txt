@@ -1,0 +1,209 @@
+use std::collections::BTreeMap;
+use std::io::{self, Write};
+use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::unix::fs::PermissionsExt;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::log_recall::LogRecallError;
+use maos_domain::ports::LogRecallPort;
+use maos_iac::adapter::log_recall::LogRecallAdapter;
+use maos_iac::{FrameFilter, FrameKind, TransparencyLogAdapter};
+
+#[path = "protocol.rs.txt"]
+mod protocol;
+use protocol::{read_message, write_message, WireError, WireReply, WireRequest};
+
+struct Args {
+    socket: Option<String>,
+    fd: Option<i32>,
+    caller_pid: u32,
+    seed_pids: Vec<u32>,
+    ids_out: Option<String>,
+    one_shot: bool,
+    peer_pid_check: bool,
+    max_accepts: Option<usize>,
+}
+
+fn main() {
+    if let Err(error) = run(parse_args()) {
+        eprintln!("recall-service: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn parse_args() -> Result<Args, String> {
+    let mut socket = None;
+    let mut fd = None;
+    let mut caller_pid = None;
+    let mut seed_pids = None;
+    let mut ids_out = None;
+    let mut one_shot = false;
+    let mut peer_pid_check = true;
+    let mut max_accepts = None;
+    fn next(args: &mut impl Iterator<Item = String>, name: &str) -> Result<String, String> {
+        args.next().ok_or_else(|| format!("{name} requires a value"))
+    }
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--socket" => socket = Some(next(&mut args, "--socket")?),
+            "--fd" => fd = Some(next(&mut args, "--fd")?.parse().map_err(|error| format!("invalid --fd: {error}"))?),
+            "--caller-pid" => caller_pid = Some(next(&mut args, "--caller-pid")?.parse().map_err(|error| format!("invalid --caller-pid: {error}"))?),
+            "--seed-pids" => seed_pids = Some(next(&mut args, "--seed-pids")?.split(',').map(|value| value.parse().map_err(|error| format!("invalid seed pid {value}: {error}"))).collect::<Result<Vec<_>, _>>()?),
+            "--ids-out" => ids_out = Some(next(&mut args, "--ids-out")?),
+            "--one-shot" => one_shot = true,
+            "--no-peer-pid-check" => peer_pid_check = false,
+            "--max-accepts" => max_accepts = Some(next(&mut args, "--max-accepts")?.parse().map_err(|error| format!("invalid --max-accepts: {error}"))?),
+            other => return Err(format!("unknown argument: {other}")),
+        }
+    }
+    if socket.is_some() == fd.is_some() { return Err("use exactly one of --socket or --fd".to_string()); }
+    let seed_pids = seed_pids.ok_or_else(|| "--seed-pids is required".to_string())?;
+    if seed_pids.len() != 2 || seed_pids[0] == seed_pids[1] { return Err("--seed-pids must be two distinct pids A,B".to_string()); }
+    Ok(Args { socket, fd, caller_pid: caller_pid.ok_or_else(|| "--caller-pid is required".to_string())?, seed_pids, ids_out, one_shot, peer_pid_check, max_accepts })
+}
+
+fn run(args: Result<Args, String>) -> Result<(), String> {
+    let args = args?;
+    let log = Arc::new(TransparencyLogAdapter::open_in_memory(17_003));
+    let ids = seed(&log, &args.seed_pids)?;
+    if let Some(path) = &args.ids_out {
+        std::fs::write(path, serde_json::to_vec_pretty(&ids).map_err(|error| error.to_string())?)
+            .map_err(|error| format!("write --ids-out: {error}"))?;
+    }
+    let adapter = LogRecallAdapter::new(Arc::clone(&log));
+    if let Some(fd) = args.fd {
+        if fd < 0 { return Err("--fd must be non-negative".to_string()); }
+        // Descriptor possession is the per-spawn binding. SO_PEERCRED here
+        // identifies the socketpair creator, not the inherited runner endpoint.
+        let stream = unsafe { UnixStream::from_raw_fd(fd) };
+        println!("READY fd={fd} caller-pid={} binding=inherited-descriptor", args.caller_pid);
+        io::stdout().flush().map_err(|error| format!("flush ready: {error}"))?;
+        return serve(stream, &adapter, &log, args.caller_pid, None);
+    }
+    let (listener, socket_path, remove_dir) = listener(&args)?;
+    println!("READY socket={} caller-pid={} peer-pid-check={} one-shot={}", socket_path.display(), args.caller_pid, args.peer_pid_check, args.one_shot);
+    io::stdout().flush().map_err(|error| format!("flush ready: {error}"))?;
+    let mut accepts = 0usize;
+    loop {
+        let (stream, _) = listener.accept().map_err(|error| format!("accept: {error}"))?;
+        accepts += 1;
+        if args.one_shot {
+            std::fs::remove_file(&socket_path).map_err(|error| format!("one-shot unlink: {error}"))?;
+            eprintln!("recall-service: one-shot-unlinked={}", socket_path.display());
+        }
+        if args.peer_pid_check {
+            let actual = peer_pid(&stream)?;
+            if actual != args.caller_pid {
+                eprintln!("recall-service: peer-pid-refused expected={} actual={actual:?}", args.caller_pid);
+                if args.max_accepts.is_some_and(|max| accepts >= max) { break; }
+                continue;
+            }
+        }
+        serve(stream, &adapter, &log, args.caller_pid, args.one_shot.then_some(Duration::from_secs(1)))?;
+        if args.one_shot || args.max_accepts.is_some_and(|max| accepts >= max) { break; }
+    }
+    if socket_path.exists() { let _ = std::fs::remove_file(&socket_path); }
+    if let Some(dir) = remove_dir { let _ = std::fs::remove_dir(dir); }
+    Ok(())
+}
+
+fn listener(args: &Args) -> Result<(UnixListener, PathBuf, Option<PathBuf>), String> {
+    let requested = args.socket.as_deref().expect("validated");
+    let (path, created_dir) = if requested == "auto" {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|error| error.to_string())?.as_nanos();
+        let dir = std::env::temp_dir().join(format!("maos-recall-spike-{}-{nonce}", std::process::id()));
+        std::fs::create_dir(&dir).map_err(|error| format!("create socket dir: {error}"))?;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).map_err(|error| format!("chmod socket dir: {error}"))?;
+        (dir.join("recall.sock"), Some(dir))
+    } else {
+        let path = PathBuf::from(requested);
+        let dir = path.parent().ok_or_else(|| "socket must have a parent directory".to_string())?;
+        if !dir.exists() {
+            std::fs::create_dir_all(dir).map_err(|error| format!("create socket dir: {error}"))?;
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).map_err(|error| format!("chmod socket dir: {error}"))?;
+        }
+        let mode = std::fs::metadata(dir).map_err(|error| format!("socket dir metadata: {error}"))?.permissions().mode() & 0o777;
+        if mode != 0o700 { return Err(format!("socket directory must be mode 0700, found {mode:03o}")); }
+        (path, None)
+    };
+    if path.exists() { return Err(format!("refusing to replace existing socket {}", path.display())); }
+    let listener = UnixListener::bind(&path).map_err(|error| format!("bind {}: {error}", path.display()))?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).map_err(|error| format!("chmod socket: {error}"))?;
+    Ok((listener, path, created_dir))
+}
+
+fn seed(log: &TransparencyLogAdapter, pids: &[u32]) -> Result<BTreeMap<String, String>, String> {
+    let mut ids = BTreeMap::new();
+    for pid in pids {
+        let _ = log.insert_frame_event(FrameKind::TelemetryEvent, *pid, None, &format!("seed-{pid}"), format!("seed-for-{pid}").as_bytes(), FrameOrigin::SpiritAuto);
+        let rows = log.query_frames(FrameFilter { spirit_pid: Some(*pid), ..Default::default() }).map_err(|error| format!("query seeded pid: {error}"))?;
+        let id = rows.last().ok_or_else(|| "seed row missing".to_string())?.frame_id;
+        ids.insert(pid.to_string(), hex(&id));
+    }
+    Ok(ids)
+}
+
+fn serve(mut stream: UnixStream, adapter: &LogRecallAdapter, log: &TransparencyLogAdapter, caller_pid: u32, idle_timeout: Option<Duration>) -> Result<(), String> {
+    if let Some(timeout) = idle_timeout {
+        stream.set_read_timeout(Some(timeout)).map_err(|error| format!("set one-shot read timeout: {error}"))?;
+    }
+    loop {
+        let request = match read_message(&mut stream) {
+            Ok(Some(request)) => request,
+            Ok(None) => return Ok(()),
+            Err(error) if idle_timeout.is_some_and(|_| matches!(error.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock)) => {
+                eprintln!("recall-service: one-shot-idle-timeout");
+                return Ok(());
+            }
+            Err(error) => return Err(format!("read wire request: {error}")),
+        };
+        let reply = match request {
+            WireRequest::Recall { filter } => WireReply::Recall(adapter.recall(caller_pid, filter).map_err(map_error)),
+            WireRequest::Fetch { frame_id } => WireReply::Fetch(adapter.fetch(caller_pid, frame_id).map_err(map_error)),
+        };
+        let audit_count = log.query_frames(FrameFilter { spirit_pid: Some(caller_pid), kind: Some(FrameKind::CapabilityInvocation), ..Default::default() })
+            .map_err(|error| format!("query audit rows: {error}"))?.len();
+        eprintln!("recall-service: caller-pid={caller_pid} capability-invocation-audit-count={audit_count}");
+        write_message(&mut stream, &reply).map_err(|error| format!("write wire reply: {error}"))?;
+    }
+}
+
+fn map_error(error: LogRecallError) -> WireError {
+    match error {
+        LogRecallError::ScopeViolation { frame_id, .. } => WireError::ScopeViolation { frame_id },
+        LogRecallError::FrameNotFound { frame_id } => WireError::FrameNotFound { frame_id },
+        LogRecallError::Storage(detail) => WireError::Storage(detail),
+        LogRecallError::InvalidCursor(detail) => WireError::InvalidCursor(detail),
+        LogRecallError::LimitExceeded { requested, max } => WireError::LimitExceeded { requested, max },
+        LogRecallError::ECrossWallRecallDenied { reason, .. } => WireError::CrossWallDenied(reason.to_string()),
+    }
+}
+
+fn hex(bytes: &[u8]) -> String { bytes.iter().map(|byte| format!("{byte:02x}")).collect() }
+
+fn peer_pid(stream: &UnixStream) -> Result<u32, String> {
+    let mut credentials = std::mem::MaybeUninit::<libc::ucred>::zeroed();
+    let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    let rc = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            credentials.as_mut_ptr().cast(),
+            &mut len,
+        )
+    };
+    if rc != 0 {
+        return Err(format!("SO_PEERCED: {}", io::Error::last_os_error()));
+    }
+    if len != std::mem::size_of::<libc::ucred>() as libc::socklen_t {
+        return Err(format!("SO_PEERCRED returned unexpected length {len}"));
+    }
+    let credentials = unsafe { credentials.assume_init() };
+    u32::try_from(credentials.pid).map_err(|_| "SO_PEERCRED returned negative pid".to_string())
+}

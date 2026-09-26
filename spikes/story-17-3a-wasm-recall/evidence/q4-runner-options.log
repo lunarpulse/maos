@@ -1,0 +1,30 @@
+UTC 2026-09-26T00:46:52.679121+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ mkdir -p /tmp/17-3a-q4 && target/release/spike-runner precompile --component tests/fixtures/wasm/echo_spirit_component.wasm --out /tmp/17-3a-q4/echo-default.cwasm
+
+[precompile-default exit=0]
+$ set -o pipefail; target/release/frame-driver encode --data 00000000000000000000000000000000 | target/release/spike-runner --component tests/fixtures/wasm/echo_spirit_component.wasm --precompiled /tmp/17-3a-q4/echo-default.cwasm | target/release/frame-driver decode
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-probe","data":"00000000000000000000000000000000"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+
+[default-precompiled exit=0]
+$ set -o pipefail; target/release/frame-driver encode --data 00000000000000000000000000000000 | target/release/spike-runner --component tests/fixtures/wasm/echo_spirit_component.wasm --no-parallel-compilation --no-signals-based-traps --no-compile-watchdog | target/release/frame-driver decode
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-probe","data":"00000000000000000000000000000000"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+
+[options-nonprecompiled exit=0]
+$ set -o pipefail; target/release/frame-driver encode --data 00000000000000000000000000000000 | target/release/spike-runner --component tests/fixtures/wasm/echo_spirit_component.wasm --precompiled /tmp/17-3a-q4/echo-default.cwasm --no-parallel-compilation --no-signals-based-traps --no-compile-watchdog | target/release/frame-driver decode
+spike-runner: InvalidComponent: precompiled component: failed to load code for: /tmp/17-3a-q4/echo-default.cwasm
+frame-driver: decoded-frames=0
+
+[options-default-cache-control exit=3]
+$ target/release/spike-runner precompile --component tests/fixtures/wasm/echo_spirit_component.wasm --out /tmp/17-3a-q4/echo-options.cwasm --no-parallel-compilation --no-signals-based-traps --no-compile-watchdog
+
+[precompile-options exit=0]
+$ set -o pipefail; target/release/frame-driver encode --data 00000000000000000000000000000000 | target/release/spike-runner --component tests/fixtures/wasm/echo_spirit_component.wasm --precompiled /tmp/17-3a-q4/echo-options.cwasm --no-parallel-compilation --no-signals-based-traps --no-compile-watchdog | target/release/frame-driver decode
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-probe","data":"00000000000000000000000000000000"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+
+[options-matching-precompiled exit=0]
+E15-A6: this probe reads the built runner, HEAD fixture, and Wasmtime-produced external precompiled artifacts; it does not set option or compatibility behavior.

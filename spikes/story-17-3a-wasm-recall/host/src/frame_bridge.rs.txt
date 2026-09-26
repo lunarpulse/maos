@@ -1,0 +1,148 @@
+use maos_domain::frame as domain;
+use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_spirit_abi::identity::{FrameKind as DomainFrameKind, HostId, SpiritId, SpiritRole};
+
+use crate::wit_guest::maos::spirit::frames as wit;
+
+#[derive(Debug, thiserror::Error)]
+pub enum BridgeError {
+    #[error("frame_id is not 16 bytes (was {0})")]
+    BadFrameIdLen(usize),
+    #[error("the relay probe supports telemetry-event frames only")]
+    UnsupportedPayload,
+}
+
+fn frame_id(value: Vec<u8>) -> Result<[u8; 16], BridgeError> {
+    let len = value.len();
+    value.try_into().map_err(|_| BridgeError::BadFrameIdLen(len))
+}
+
+fn to_wit_kind(kind: DomainFrameKind) -> wit::FrameKind {
+    use DomainFrameKind::*;
+    match kind {
+        TaskAssign => wit::FrameKind::TaskAssign,
+        TaskComplete => wit::FrameKind::TaskComplete,
+        DecisionDispatch => wit::FrameKind::DecisionDispatch,
+        EpistemicHalt => wit::FrameKind::EpistemicHalt,
+        TelemetryEvent => wit::FrameKind::TelemetryEvent,
+        ConsentRequest => wit::FrameKind::ConsentRequest,
+        Retract => wit::FrameKind::Retract,
+        CapabilityInvocation => wit::FrameKind::CapabilityInvocation,
+        SandboxBlock => wit::FrameKind::SandboxBlock,
+        InferenceCall => wit::FrameKind::InferenceCall,
+        BudgetWarning => wit::FrameKind::BudgetWarning,
+        BudgetExceeded => wit::FrameKind::BudgetExceeded,
+        CliSubprocessOutput => wit::FrameKind::CliSubprocessOutput,
+        ConsentRupture => wit::FrameKind::ConsentRupture,
+        RateLimited => wit::FrameKind::RateLimited,
+        GatewayInbound => wit::FrameKind::GatewayInbound,
+        GatewayOutbound => wit::FrameKind::GatewayOutbound,
+    }
+}
+
+fn from_wit_kind(kind: wit::FrameKind) -> DomainFrameKind {
+    use wit::FrameKind::*;
+    match kind {
+        TaskAssign => DomainFrameKind::TaskAssign,
+        TaskComplete => DomainFrameKind::TaskComplete,
+        DecisionDispatch => DomainFrameKind::DecisionDispatch,
+        EpistemicHalt => DomainFrameKind::EpistemicHalt,
+        TelemetryEvent => DomainFrameKind::TelemetryEvent,
+        ConsentRequest => DomainFrameKind::ConsentRequest,
+        Retract => DomainFrameKind::Retract,
+        CapabilityInvocation => DomainFrameKind::CapabilityInvocation,
+        SandboxBlock => DomainFrameKind::SandboxBlock,
+        InferenceCall => DomainFrameKind::InferenceCall,
+        BudgetWarning => DomainFrameKind::BudgetWarning,
+        BudgetExceeded => DomainFrameKind::BudgetExceeded,
+        CliSubprocessOutput => DomainFrameKind::CliSubprocessOutput,
+        ConsentRupture => DomainFrameKind::ConsentRupture,
+        RateLimited => DomainFrameKind::RateLimited,
+        GatewayInbound => DomainFrameKind::GatewayInbound,
+        GatewayOutbound => DomainFrameKind::GatewayOutbound,
+    }
+}
+
+fn to_wit_origin(origin: FrameOrigin) -> wit::FrameOrigin {
+    match origin {
+        FrameOrigin::HumanAuthored => wit::FrameOrigin::HumanAuthored,
+        FrameOrigin::SpiritAuto => wit::FrameOrigin::SpiritAuto,
+        FrameOrigin::SpiritDraftedHumanApproved => wit::FrameOrigin::SpiritDraftedHumanApproved,
+        FrameOrigin::Kernel => wit::FrameOrigin::Kernel,
+    }
+}
+
+fn from_wit_origin(origin: wit::FrameOrigin) -> FrameOrigin {
+    match origin {
+        wit::FrameOrigin::HumanAuthored => FrameOrigin::HumanAuthored,
+        wit::FrameOrigin::SpiritAuto => FrameOrigin::SpiritAuto,
+        wit::FrameOrigin::SpiritDraftedHumanApproved => FrameOrigin::SpiritDraftedHumanApproved,
+        wit::FrameOrigin::Kernel => FrameOrigin::Kernel,
+    }
+}
+
+fn to_wit_address(address: &domain::FrameAddress) -> wit::FrameAddress {
+    wit::FrameAddress {
+        spirit_id: address.spirit_id.as_str().to_string(),
+        host_id: address.host_id.as_ref().map(|id| id.as_str().to_string()),
+        role: address.role.map(|role| match role {
+            SpiritRole::Director => "director",
+            SpiritRole::Observer => "observer",
+            SpiritRole::Worker => "worker",
+            SpiritRole::Orchestrator => "orchestrator",
+        }.to_string()),
+    }
+}
+
+fn from_wit_address(address: wit::FrameAddress) -> domain::FrameAddress {
+    let role = match address.role.as_deref() {
+        Some("director") => Some(SpiritRole::Director),
+        Some("observer") => Some(SpiritRole::Observer),
+        Some("worker") => Some(SpiritRole::Worker),
+        Some("orchestrator") => Some(SpiritRole::Orchestrator),
+        _ => None,
+    };
+    domain::FrameAddress { spirit_id: SpiritId(address.spirit_id), host_id: address.host_id.map(HostId), role }
+}
+
+pub fn lower(frame: &domain::IacFrame) -> Result<wit::IacFrame, BridgeError> {
+    let domain::FramePayload::TelemetryEvent(payload) = &frame.payload else {
+        return Err(BridgeError::UnsupportedPayload);
+    };
+    Ok(wit::IacFrame {
+        frame_id: frame.frame_id.to_vec(),
+        timestamp_ns: frame.timestamp_ns,
+        logical_clock: frame.logical_clock,
+        frame_from: to_wit_address(&frame.from),
+        to: frame.to.iter().map(to_wit_address).collect(),
+        kind: to_wit_kind(frame.kind),
+        payload: wit::FramePayload::TelemetryEvent(wit::TelemetryEventBody {
+            event_type: payload.event_type.clone(),
+            data: payload.data.clone(),
+        }),
+        auto_marker: to_wit_origin(frame.auto_marker),
+    })
+}
+
+pub fn lift(frame: wit::IacFrame) -> Result<domain::IacFrame, BridgeError> {
+    let wit::FramePayload::TelemetryEvent(payload) = frame.payload else {
+        return Err(BridgeError::UnsupportedPayload);
+    };
+    Ok(domain::IacFrame {
+        frame_id: frame_id(frame.frame_id)?,
+        timestamp_ns: frame.timestamp_ns,
+        logical_clock: frame.logical_clock,
+        from: from_wit_address(frame.frame_from),
+        to: frame.to.into_iter().map(from_wit_address).collect(),
+        kind: from_wit_kind(frame.kind),
+        intent: IntentClass::Readonly,
+        payload: domain::FramePayload::TelemetryEvent(domain::TelemetryEventPayload {
+            event_type: payload.event_type,
+            data: payload.data,
+        }),
+        auto_marker: from_wit_origin(frame.auto_marker),
+        consent_envelope: None,
+        intent_lineage: Default::default(),
+    })
+}

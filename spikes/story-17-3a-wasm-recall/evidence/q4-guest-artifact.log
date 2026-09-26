@@ -1,0 +1,396 @@
+UTC 2026-09-26T00:47:07.529786+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ sha256sum target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm
+3be976fc38b4feb4a4a93c57af47da653a0321982aa84d29c4b8d60bfe083fda  target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm
+
+[exit=0]
+$ wc -c target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm
+94655 target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm
+
+[exit=0]
+$ wasm-tools component wit target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm
+package root:component;
+
+world root {
+  import maos:spirit/frames@1.1.0;
+  import maos:spirit/recall@1.1.0;
+  import wasi:io/poll@0.2.9;
+  import wasi:clocks/monotonic-clock@0.2.9;
+  import wasi:clocks/wall-clock@0.2.9;
+  import wasi:io/error@0.2.9;
+  import wasi:io/streams@0.2.9;
+  import wasi:cli/stdout@0.2.9;
+  import wasi:cli/stderr@0.2.9;
+  import wasi:cli/stdin@0.2.9;
+  import wasi:cli/environment@0.2.9;
+  import wasi:cli/exit@0.2.9;
+  import wasi:cli/terminal-input@0.2.9;
+  import wasi:cli/terminal-output@0.2.9;
+  import wasi:cli/terminal-stdin@0.2.9;
+  import wasi:cli/terminal-stdout@0.2.9;
+  import wasi:cli/terminal-stderr@0.2.9;
+  use maos:spirit/frames@1.1.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@1.1.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<string>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+  interface recall {
+    use frames.{frame-origin};
+
+    enum frame-kind-label {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      decision,
+      distillate,
+      budget-warning,
+      budget-exceeded,
+      hot-swap-aborted,
+      task-stalled,
+      silent-failure-suspect,
+      spirit-revoked,
+      mcp-invocation,
+      spirit-admitted,
+      registry-yank,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+      spirit-imported,
+      cli-wrapper-shape-mismatch,
+      governance-event,
+      cost-attribution,
+    }
+
+    record recall-cursor {
+      last-timestamp-ns: u64,
+      last-frame-id: list<u8>,
+    }
+
+    record recall-filter {
+      kind: option<frame-kind-label>,
+      since-ns: option<u64>,
+      until-ns: option<u64>,
+      limit: u32,
+      cursor: option<recall-cursor>,
+      intent-filter: option<string>,
+    }
+
+    record recall-entry {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      kind: frame-kind-label,
+      intent: string,
+      peer-spirit-pid: u32,
+      payload-available: bool,
+    }
+
+    record recall-page {
+      entries: list<recall-entry>,
+      next-cursor: option<recall-cursor>,
+    }
+
+    variant recall-error {
+      scope-violation(list<u8>),
+      frame-not-found(list<u8>),
+      storage(string),
+      invalid-cursor(string),
+      limit-exceeded(u32),
+      cross-wall-denied(string),
+    }
+
+    record fetch-response {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      kind: frame-kind-label,
+      intent: string,
+      payload-redacted: list<u8>,
+      capability-token: option<list<u8>>,
+      origin: frame-origin,
+    }
+
+    recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
+
+    fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
+  }
+}
+
+
+package wasi:io@0.2.9 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream;
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.9 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.9.{pollable};
+
+    type instant = u64;
+
+    type duration = u64;
+
+    now: func() -> instant;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+  interface wall-clock {
+    record datetime {
+      seconds: u64,
+      nanoseconds: u32,
+    }
+
+    now: func() -> datetime;
+  }
+}
+
+
+package wasi:cli@0.2.9 {
+  interface stdout {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface stdin {
+    use wasi:io/streams@0.2.9.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface environment {
+    get-environment: func() -> list<tuple<string, string>>;
+  }
+  interface exit {
+    exit: func(status: result);
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+[exit=0]
+E15-A6: this probe reads the built guest artifact and its component metadata; it does not set its checksum, byte size, or imports.

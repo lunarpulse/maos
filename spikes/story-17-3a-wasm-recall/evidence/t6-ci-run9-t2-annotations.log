@@ -1,0 +1,63 @@
+UTC 2026-09-26T02:12:25Z
+saved-to-evidence 2026-09-26T09:15:36Z (fetch performed 02:12:25Z, identical digest)
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: GitHub Actions public-API check-run annotations for run #9 (36210072648, head 25981d48, completed success), t2-probe jobs on both images; not only probe-created state.
++ GET https://api.github.com/repos/lunarpulse/maos/check-runs/108314568486/annotations?per_page=100
++ GET https://api.github.com/repos/lunarpulse/maos/check-runs/108314568373/annotations?per_page=100
+HTTP 200 x2 (54 annotations total; 27 per job, identical sets)
+Jobs: 108314568486 t2-probe (ubuntu-24.04) SUCCESS, 108314568373 t2-probe (ubuntu-26.04) SUCCESS; all steps 7-17 success. This run is the authoritative CI t2-probe result.
+== job 108314568486
+   noti | t2-probe/ubuntu-24.04/relay-path | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none candidate filter denied socket-path recall while inherited descriptor remained the tested alternative
+   noti | t2-probe/ubuntu-24.04/relay-drop-recvfrom | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none harness=1 required inherited-socket operation was denied
+   noti | t2-probe/ubuntu-24.04/relay-drop-sendto | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none harness=0 required inherited-socket operation was denied
+   noti | t2-probe/ubuntu-24.04/relay-fd-precompiled | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-24.04/relay-fd-no-compile-watchd | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-24.04/relay-fd-no-signals-based- | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-24.04/relay-fd-no-parallel-compi | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-24.04/relay-fd-default | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-24.04/runner-drop-memfd_create | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=3 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/runner-drop-clone3 | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=101 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/runner-drop-rust-start | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=none sig=11 errno=none
+   noti | t2-probe/ubuntu-24.04/runner-candidate-kill-firs | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/hello-static-candidate | target=/home/runner/work/maos/maos/target/t2-ladder/hello-static install=ok rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/hello-dynamic-candidate | target=/home/runner/work/maos/maos/target/t2-ladder/hello-dynamic install=ok rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/runner-as-is-kill-first | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=none sig=11 errno=none
+   noti | t2-probe/ubuntu-24.04/runner-as-is-verbatim | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=errno=1 rc=none sig=none errno=1
+   noti | t2-probe/ubuntu-24.04/strace-additions | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=not-applicable rc=0 sig=none errno=rust-start,clone3,memfd_create
+   noti | t2-probe/ubuntu-24.04/runner-rights-loader | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=not-attempted rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/runner-as-is | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=not-attempted rc=none sig=none errno=13
+   noti | t2-probe/ubuntu-24.04/hello-static | target=/home/runner/work/maos/maos/target/t2-ladder/hello-static install=not-attempted rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/hello-rights-loader | target=/home/runner/work/maos/maos/target/t2-ladder/hello-dynamic install=not-attempted rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-24.04/hello-as-is | target=/home/runner/work/maos/maos/target/t2-ladder/hello-dynamic install=not-attempted rc=none sig=none errno=13
+   noti | build/guest/ubuntu-24.04 | rc=0
+   noti | build/host/ubuntu-24.04 | rc=0
+   noti | build/ladder/ubuntu-24.04 | rc=0
+   noti | t2-probe/ubuntu-24.04/p20 | rc=0 skip-count=3 first-skip=SKIP forbidden_syscall: sandbox setup requires CAP_SYS_ADMIN / no_new_privs raw-refusal-count=3 first-raw-refusal=maos: seccomp apply failed result=test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== job 108314568373
+   noti | t2-probe/ubuntu-26.04/relay-path | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none candidate filter denied socket-path recall while inherited descriptor remained the tested alternative
+   noti | t2-probe/ubuntu-26.04/relay-drop-recvfrom | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none harness=1 required inherited-socket operation was denied
+   noti | t2-probe/ubuntu-26.04/relay-drop-sendto | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none harness=0 required inherited-socket operation was denied
+   noti | t2-probe/ubuntu-26.04/relay-fd-precompiled | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-26.04/relay-fd-no-compile-watchd | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-26.04/relay-fd-no-signals-based- | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-26.04/relay-fd-no-parallel-compi | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-26.04/relay-fd-default | target=spike-runner rung=receiver install=ok rc=0 sig=none errno=none expected inherited-descriptor recall relay completed under candidate seccomp
+   noti | t2-probe/ubuntu-26.04/runner-drop-memfd_create | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=3 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/runner-drop-clone3 | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=101 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/runner-drop-rust-start | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=none sig=11 errno=none
+   noti | t2-probe/ubuntu-26.04/runner-candidate-kill-firs | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/hello-static-candidate | target=/home/runner/work/maos/maos/target/t2-ladder/hello-static install=ok rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/hello-dynamic-candidate | target=/home/runner/work/maos/maos/target/t2-ladder/hello-dynamic install=ok rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/runner-as-is-kill-first | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=ok rc=none sig=11 errno=none
+   noti | t2-probe/ubuntu-26.04/runner-as-is-verbatim | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=errno=1 rc=none sig=none errno=1
+   noti | t2-probe/ubuntu-26.04/strace-additions | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=not-applicable rc=0 sig=none errno=rust-start,clone3,memfd_create
+   noti | t2-probe/ubuntu-26.04/runner-rights-loader | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=not-attempted rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/runner-as-is | target=/home/runner/work/maos/maos/target/debug/maos-wasm-runner install=not-attempted rc=none sig=none errno=13
+   noti | t2-probe/ubuntu-26.04/hello-static | target=/home/runner/work/maos/maos/target/t2-ladder/hello-static install=not-attempted rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/hello-rights-loader | target=/home/runner/work/maos/maos/target/t2-ladder/hello-dynamic install=not-attempted rc=0 sig=none errno=none
+   noti | t2-probe/ubuntu-26.04/hello-as-is | target=/home/runner/work/maos/maos/target/t2-ladder/hello-dynamic install=not-attempted rc=none sig=none errno=13
+   noti | build/guest/ubuntu-26.04 | rc=0
+   noti | build/host/ubuntu-26.04 | rc=0
+   noti | build/ladder/ubuntu-26.04 | rc=0
+   noti | t2-probe/ubuntu-26.04/p20 | rc=0 skip-count=3 first-skip=SKIP t2_benign_control: sandbox setup requires CAP_SYS_ADMIN / no_new_privs raw-refusal-count=3 first-raw-refusal=maos: seccomp apply failed result=test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

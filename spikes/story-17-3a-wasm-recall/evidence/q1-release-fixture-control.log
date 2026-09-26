@@ -1,0 +1,68 @@
+UTC: 2026-09-26T00:37:22.158Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This same release-runner/release-driver control drives the committed fixture through the identical ADR-032 pipeline; it observes live driver and runner behavior, not only data it set itself.
+$ target/release/q1-driver encode | target/release/maos-wasm-runner --component tests/fixtures/wasm/echo_spirit_component.wasm | target/release/q1-driver decode
+[stdout]
+decoded[1]=IacFrame {
+    frame_id: [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+    ],
+    timestamp_ns: 123456789,
+    logical_clock: 1,
+    from: FrameAddress {
+        spirit_id: SpiritId(
+            "q1-driver",
+        ),
+        host_id: None,
+        role: None,
+    },
+    to: [
+        FrameAddress {
+            spirit_id: SpiritId(
+                "peer-spirit",
+            ),
+            host_id: None,
+            role: None,
+        },
+    ],
+    kind: TaskAssign,
+    intent: Readonly,
+    payload: TaskAssign(
+        TaskAssignPayload {
+            goal: "componentize-js runner probe",
+            scope: [],
+            success_criteria: "the guest echoes this real ADR-032 frame",
+            posture_preferences: PosturePreferences {
+                preferred_posture: None,
+                halt_policy_overrides: [],
+            },
+            prior_distillate_ref: None,
+        },
+    ),
+    auto_marker: Kernel,
+    consent_envelope: None,
+    intent_lineage: IntentLineage(
+        [],
+    ),
+}
+decoded-count=1
+
+[stderr]
+
+[exit 0]

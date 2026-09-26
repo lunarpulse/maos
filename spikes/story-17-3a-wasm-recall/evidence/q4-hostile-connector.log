@@ -1,0 +1,52 @@
+UTC 2026-09-26T00:50:30.956198+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ spikes/story-17-3a-wasm-recall/host/run_hostile_probe.py
+E15-A6: this probe reads the running runner, service, socket permissions, SO_PEERCRED, and same-uid attacker process; it does not set its own answer.
+CASE so-peercred-refusal same_uid=1000 runner_rc=0 service_rc=0 attacker_rc=1
+READY READY socket=/tmp/tmpq2ne7lu1/recall.sock caller-pid=3293859 peer-pid-check=true one-shot=false
+MODES directory=0700 socket=0600
+-- runner decoded --
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":207247,\"fetch_ns\":95418}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=195896
+fetch-import-boundary-ns=85459
+-- attacker output --
+frame-driver: write: Broken pipe (os error 32)
+-- service stderr --
+recall-service: caller-pid=3293859 capability-invocation-audit-count=1
+recall-service: caller-pid=3293859 capability-invocation-audit-count=2
+recall-service: peer-pid-refused expected=3293859 actual=3293895
+CASE no-peer-check-control same_uid=1000 runner_rc=0 service_rc=0 attacker_rc=0
+READY READY socket=/tmp/tmpvurf9b8e/recall.sock caller-pid=3293897 peer-pid-check=false one-shot=false
+MODES directory=0700 socket=0600
+-- runner decoded --
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":208860,\"fetch_ns\":57808}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=191929
+fetch-import-boundary-ns=52889
+-- attacker output --
+{"Recall":{"Ok":{"entries":[{"frame_id":[1,160,219,49,55,125,161,122,187,224,91,122,238,230,184,148],"timestamp_ns":1790383830909510058,"kind":"TelemetryEvent","intent":"seed-3293897","peer_spirit_pid":3293897,"payload_available":true}],"next_cursor":null}}}
+-- service stderr --
+recall-service: caller-pid=3293897 capability-invocation-audit-count=1
+recall-service: caller-pid=3293897 capability-invocation-audit-count=2
+recall-service: caller-pid=3293897 capability-invocation-audit-count=3
+CASE one-shot-unlink same_uid=1000 runner_rc=0 service_rc=0 attacker_rc=1
+READY READY socket=/tmp/tmplkbe3623/recall.sock caller-pid=3293935 peer-pid-check=true one-shot=true
+MODES directory=0700 socket=0600
+-- runner decoded --
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":233847,\"fetch_ns\":57567}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=221715
+fetch-import-boundary-ns=52709
+-- attacker output --
+frame-driver: connect: No such file or directory (os error 2)
+-- service stderr --
+recall-service: one-shot-unlinked=/tmp/tmplkbe3623/recall.sock
+recall-service: caller-pid=3293935 capability-invocation-audit-count=1
+recall-service: caller-pid=3293935 capability-invocation-audit-count=2
+
+[exit=0]

@@ -1,0 +1,104 @@
+use std::io::{self, BufReader, BufWriter, Write};
+use std::os::unix::net::UnixStream;
+
+use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TelemetryEventPayload};
+use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::log_recall::LogRecallFilter;
+use maos_spirit_abi::identity::{FrameKind, SpiritId};
+
+#[path = "protocol.rs.txt"]
+mod protocol;
+use protocol::{read_message, write_message, WireReply, WireRequest};
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("frame-driver: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), String> {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("encode") => encode(args.collect()),
+        Some("decode") => decode(),
+        Some("service-request") => service_request(args.collect()),
+        _ => Err("usage: frame-driver encode --data <hex-id> [--count N] | decode | service-request --socket <path> --op recall|fetch [--frame-id <hex>]".to_string()),
+    }
+}
+
+fn option(args: &[String], name: &str) -> Result<Option<String>, String> {
+    let Some(index) = args.iter().position(|arg| arg == name) else { return Ok(None) };
+    args.get(index + 1).cloned().ok_or_else(|| format!("{name} requires a value")).map(Some)
+}
+
+fn encode(args: Vec<String>) -> Result<(), String> {
+    let data = option(&args, "--data")?.ok_or_else(|| "encode --data is required".to_string())?;
+    let event_type = option(&args, "--event-type")?.unwrap_or_else(|| "recall-probe".to_string());
+    let count = option(&args, "--count")?.map(|value| value.parse().map_err(|error| format!("invalid --count: {error}"))).transpose()?.unwrap_or(1usize);
+    let mut output = BufWriter::new(io::stdout().lock());
+    for sequence in 0..count {
+        let frame = frame(sequence as u64, &event_type, &data);
+        let cbor = maos_wasm_host::codec::encode_cbor(&frame).map_err(|error| format!("encode CBOR: {error}"))?;
+        maos_wasm_host::codec::write_frame(&mut output, &cbor).map_err(|error| format!("write ADR-032: {error}"))?;
+    }
+    output.flush().map_err(|error| format!("flush ADR-032: {error}"))
+}
+
+fn frame(sequence: u64, event_type: &str, data: &str) -> IacFrame {
+    let mut frame_id = [0u8; 16];
+    frame_id[..8].copy_from_slice(&sequence.to_be_bytes());
+    IacFrame {
+        frame_id,
+        timestamp_ns: 1_700_300_000_000_000_000 + sequence,
+        logical_clock: sequence,
+        from: FrameAddress { spirit_id: SpiritId("spike-frame-driver".to_string()), host_id: None, role: None },
+        to: Default::default(),
+        kind: FrameKind::TelemetryEvent,
+        intent: IntentClass::Readonly,
+        payload: FramePayload::TelemetryEvent(TelemetryEventPayload { event_type: event_type.to_string(), data: data.to_string() }),
+        auto_marker: FrameOrigin::HumanAuthored,
+        consent_envelope: None,
+        intent_lineage: Default::default(),
+    }
+}
+
+fn decode() -> Result<(), String> {
+    let mut input = BufReader::new(io::stdin().lock());
+    let mut count = 0;
+    while let Some(cbor) = maos_wasm_host::codec::read_frame(&mut input).map_err(|error| format!("read ADR-032: {error}"))? {
+        let frame: IacFrame = maos_wasm_host::codec::decode_cbor(&cbor).map_err(|error| format!("decode CBOR: {error}"))?;
+        println!("{}", serde_json::to_string(&frame).map_err(|error| format!("render frame: {error}"))?);
+        count += 1;
+    }
+    eprintln!("frame-driver: decoded-frames={count}");
+    Ok(())
+}
+
+fn service_request(args: Vec<String>) -> Result<(), String> {
+    let socket = option(&args, "--socket")?.ok_or_else(|| "service-request --socket is required".to_string())?;
+    let op = option(&args, "--op")?.ok_or_else(|| "service-request --op is required".to_string())?;
+    let request = match op.as_str() {
+        "recall" => WireRequest::Recall { filter: LogRecallFilter::default() },
+        "fetch" => WireRequest::Fetch { frame_id: hex(&option(&args, "--frame-id")?.ok_or_else(|| "fetch needs --frame-id".to_string())?)? },
+        _ => return Err("--op must be recall or fetch".to_string()),
+    };
+    let mut stream = UnixStream::connect(socket).map_err(|error| format!("connect: {error}"))?;
+    write_message(&mut stream, &request).map_err(|error| format!("write: {error}"))?;
+    let reply: Option<WireReply> = read_message(&mut stream).map_err(|error| format!("read: {error}"))?;
+    match reply {
+        Some(reply) => println!("{}", serde_json::to_string(&reply).map_err(|error| format!("render: {error}"))?),
+        None => return Err("service closed channel without a reply".to_string()),
+    }
+    Ok(())
+}
+
+fn hex(value: &str) -> Result<[u8; 16], String> {
+    if value.len() != 32 { return Err(format!("frame id must be 32 hex chars, got {}", value.len())); }
+    let mut id = [0u8; 16];
+    for (index, byte) in id.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).map_err(|error| format!("invalid frame id: {error}"))?;
+    }
+    Ok(id)
+}

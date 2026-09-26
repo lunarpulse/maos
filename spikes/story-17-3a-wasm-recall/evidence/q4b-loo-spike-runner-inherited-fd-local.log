@@ -1,0 +1,172 @@
+UTC 2026-09-26T02:02:38Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: spike-runner with real Rust recall guest, inherited AF_UNIX endpoint, recall-service, and every leave-one-out syscall control; not only probe-created state.
++ python3 /tmp/q4b-loo-relay.py
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:38Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-1xtbmux6/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427012 --seed-pids 3427012,424242 --ids-out /tmp/maos-q4b-fd-1xtbmux6/ids.json
+SEED_FRAME_ID=01a0db73401c88f6f374e9ed625e98e8
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73401c88f6f374e9ed625e98e8 > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":162634,\"fetch_ns\":67516}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3427012 binding=inherited-descriptor
+recall-service: caller-pid=3427012 capability-invocation-audit-count=1
+recall-service: caller-pid=3427012 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+SECCOMP_INSTALL=ok
+recall-import-boundary-ns=139681
+fetch-import-boundary-ns=58910
+RESULT rc=0 sig=none errno=none
+LOO target=spike-runner-inherited-fd drop=none harness_rc=0 recall_ok=True service_clean=True
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:38Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra ppoll,rt_sigaction,clone3,memfd_create,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-10_kof46/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427074 --seed-pids 3427074,424242 --ids-out /tmp/maos-q4b-fd-10_kof46/ids.json
+SEED_FRAME_ID=01a0db73409b69428111b370828a491d
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73409b69428111b370828a491d > runner stdin
+LADDER_RC=0 SERVICE_RC=0
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py", line 84, in <module>
+    start = raw.index(b"Content-Length: ")
+ValueError: subsection not found
+LOO target=spike-runner-inherited-fd drop=poll harness_rc=1 recall_ok=False service_clean=True
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,rt_sigaction,clone3,memfd_create,sendto,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:38Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,rt_sigaction,clone3,memfd_create,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-plo02boa/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427119 --seed-pids 3427119,424242 --ids-out /tmp/maos-q4b-fd-plo02boa/ids.json
+SEED_FRAME_ID=01a0db7341216b62e52cc8d032fbeb16
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db7341216b62e52cc8d032fbeb16 > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":223798,\"fetch_ns\":70492}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3427119 binding=inherited-descriptor
+recall-service: caller-pid=3427119 capability-invocation-audit-count=1
+recall-service: caller-pid=3427119 capability-invocation-audit-count=2
++ cat ladder stderr and RESULT
+SECCOMP_INSTALL=ok
+recall-import-boundary-ns=202329
+fetch-import-boundary-ns=61756
+RESULT rc=0 sig=none errno=none
+LOO target=spike-runner-inherited-fd drop=ppoll harness_rc=0 recall_ok=True service_clean=True
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,ppoll,clone3,memfd_create,sendto,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:38Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,ppoll,clone3,memfd_create,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-edfrk_0l/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427167 --seed-pids 3427167,424242 --ids-out /tmp/maos-q4b-fd-edfrk_0l/ids.json
+SEED_FRAME_ID=01a0db73419f4e814bb660b0b91cd8d5
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73419f4e814bb660b0b91cd8d5 > runner stdin
+frame-driver: write ADR-032: Broken pipe (os error 32)
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py", line 79, in <module>
+    subprocess.run([str(frame_driver), "encode", "--data", frame_id], stdout=writer, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/home/lunarpulse/dev_ws/target/release/frame-driver', 'encode', '--data', '01a0db73419f4e814bb660b0b91cd8d5']' returned non-zero exit status 1.
+LOO target=spike-runner-inherited-fd drop=rt_sigaction harness_rc=1 recall_ok=False service_clean=False
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,ppoll,rt_sigaction,memfd_create,sendto,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:38Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,ppoll,rt_sigaction,memfd_create,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-koug25kn/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427211 --seed-pids 3427211,424242 --ids-out /tmp/maos-q4b-fd-koug25kn/ids.json
+SEED_FRAME_ID=01a0db73421e935b1bae583409aec9cf
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73421e935b1bae583409aec9cf > runner stdin
+frame-driver: write ADR-032: Broken pipe (os error 32)
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py", line 79, in <module>
+    subprocess.run([str(frame_driver), "encode", "--data", frame_id], stdout=writer, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/home/lunarpulse/dev_ws/target/release/frame-driver', 'encode', '--data', '01a0db73421e935b1bae583409aec9cf']' returned non-zero exit status 1.
+LOO target=spike-runner-inherited-fd drop=clone3 harness_rc=1 recall_ok=False service_clean=False
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,ppoll,rt_sigaction,clone3,sendto,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:39Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,ppoll,rt_sigaction,clone3,sendto,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-u89zelxt/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427255 --seed-pids 3427255,424242 --ids-out /tmp/maos-q4b-fd-u89zelxt/ids.json
+SEED_FRAME_ID=01a0db73429c0c0f364a61bc487ba4d2
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73429c0c0f364a61bc487ba4d2 > runner stdin
+frame-driver: write ADR-032: Broken pipe (os error 32)
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py", line 79, in <module>
+    subprocess.run([str(frame_driver), "encode", "--data", frame_id], stdout=writer, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/home/lunarpulse/dev_ws/target/release/frame-driver', 'encode', '--data', '01a0db73429c0c0f364a61bc487ba4d2']' returned non-zero exit status 1.
+LOO target=spike-runner-inherited-fd drop=memfd_create harness_rc=1 recall_ok=False service_clean=False
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,ppoll,rt_sigaction,clone3,memfd_create,recvfrom python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:39Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,ppoll,rt_sigaction,clone3,memfd_create,recvfrom --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-wt1jawt3/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427302 --seed-pids 3427302,424242 --ids-out /tmp/maos-q4b-fd-wt1jawt3/ids.json
+SEED_FRAME_ID=01a0db73431ba0bd95a241a277ad822a
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73431ba0bd95a241a277ad822a > runner stdin
+LADDER_RC=0 SERVICE_RC=0
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"error\",\"recall_entries\":0,\"fetch\":\"error\",\"recall_ns\":34134,\"fetch_ns\":8907}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3427302 binding=inherited-descriptor
++ cat ladder stderr and RESULT
+SECCOMP_INSTALL=ok
+recall-import-boundary-ns=12884
+fetch-import-boundary-ns=1282
+RESULT rc=0 sig=none errno=none
+LOO target=spike-runner-inherited-fd drop=sendto harness_rc=0 recall_ok=False service_clean=True
++ T2_SECCOMP=candidate T2_SECCOMP_ORDER=kill-first T2_RUNNER_EXTRAS=poll,ppoll,rt_sigaction,clone3,memfd_create,sendto python3 spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py
+UTC 2026-09-26T02:02:39Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: real spike-runner, Rust recall guest, connected AF_UNIX socketpair, recall-service, and seeded log frames; not only probe-created state.
++ /home/lunarpulse/dev_ws/target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra poll,ppoll,rt_sigaction,clone3,memfd_create,sendto --read /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --stdin /proc/self/fd/3 --inherit-fd 5 --pid-out /tmp/maos-q4b-fd-601ek4pd/runner.pid -- /home/lunarpulse/dev_ws/target/release/spike-runner --component /home/lunarpulse/dev_ws/target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm --recall-fd 5
++ /home/lunarpulse/dev_ws/target/release/recall-service --fd 6 --caller-pid 3427350 --seed-pids 3427350,424242 --ids-out /tmp/maos-q4b-fd-601ek4pd/ids.json
+SEED_FRAME_ID=01a0db73439a62847dad06e5dfb571a3
++ /home/lunarpulse/dev_ws/target/release/frame-driver encode --data 01a0db73439a62847dad06e5dfb571a3 > runner stdin
+LADDER_RC=0 SERVICE_RC=1
++ frame-driver decode < inherited-fd runner output
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"error\",\"recall_entries\":0,\"fetch\":\"error\",\"recall_ns\":41687,\"fetch_ns\":11691}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
++ cat service stdout and stderr
+READY fd=6 caller-pid=3427350 binding=inherited-descriptor
+recall-service: caller-pid=3427350 capability-invocation-audit-count=1
+recall-service: caller-pid=3427350 capability-invocation-audit-count=2
+recall-service: read wire request: Connection reset by peer (os error 104)
++ cat ladder stderr and RESULT
+SECCOMP_INSTALL=ok
+recall-import-boundary-ns=16300
+fetch-import-boundary-ns=3867
+RESULT rc=0 sig=none errno=none
+Traceback (most recent call last):
+  File "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/t2-ladder/relay_fd.py", line 101, in <module>
+    raise RuntimeError("inherited-fd relay did not complete cleanly")
+RuntimeError: inherited-fd relay did not complete cleanly
+LOO target=spike-runner-inherited-fd drop=recvfrom harness_rc=1 recall_ok=False service_clean=False

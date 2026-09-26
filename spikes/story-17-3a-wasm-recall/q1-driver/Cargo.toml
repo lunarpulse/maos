@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "story-17-3a-q1-driver"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+maos-wasm-host = { path = "../../../crates/maos-wasm-host" }
+maos-domain = { path = "../../../crates/maos-domain" }
+maos-spirit-abi = { path = "../../../crates/maos-spirit-abi" }
+wasmtime = { version = "=46.0.3", features = ["component-model"] }
+
+[[bin]]
+name = "q1-driver"
+path = "src/main.rs.txt"

@@ -1,0 +1,16 @@
+[package]
+name = "a6-seccomp-order"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Not a workspace member (17-3a AC2). The source is `.rs.txt` (P16).
+[workspace]
+
+[[bin]]
+name = "a6-seccomp-order"
+path = "../a6-seccomp-order.rs.txt"
+
+[dependencies]
+seccompiler = "=0.4.0"
+libc = "0.2"

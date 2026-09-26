@@ -1,0 +1,37 @@
+Story 17-3a Q6 — egress compatibility report
+
+verdict: GO-WITH-CONDITIONS for M3 only; M1 and M2 are NO-GO. This is a measured transport result, not approval to change T3.
+
+measured:
+- Hosted matrix run #9, https://github.com/lunarpulse/maos/actions/runs/36210072648, tested ubuntu-24.04 and ubuntu-26.04 (Podman/netavark: 4.9.3 and 5.7.0 respectively).
+- M1 `slirp4netns:allow_host_loopback=true`: host=yes and internet=yes on both images. NO-GO.
+- M2 `pasta:--map-gw`: host=no and internet=yes on both images. NO-GO.
+- M3 preserves literal `--network=none`, mounts a host-owned Unix socket, and uses in-container socat: host=yes, internet=no, loopback up, socket-0600=no, socket-0666=yes, rc=0 on both images. GO-WITH-CONDITIONS.
+- Local Podman remains NOT-MEASURED: rootless runtime failed `cannot clone: Operation not permitted`. `q6-local-podman.log`.
+- Public run-page evidence is `q6-actions-run9-public-html.log`; prior full annotation evidence is `q6-actions-annotations-run1.json.log`.
+
+price: maos-kernel-core committed delta is 0; M3 proposes one T3 argv volume addition while retaining `--network=none` at `crates/maos-kernel-core/src/security/sandbox/t3/argv.rs:66-88`. It needs a socat-bearing attested image, parent-owned socket lifecycle, and two hosted CI jobs (observed egress job durations: 42s/33s in run #1). No Rust dependency.
+
+consequence:
+- 17-1 OLD: select host-loopback networking by plausibility. NEW: only M3—parent-owned socket, exact `/proxy/egress.sock` mount, attested socat, explicit Unix mode/custody, and retained `--network=none`.
+- 17-3b OLD: permit runner host networking. NEW: consume the 17-1 M3 capability bridge; do not relax the network namespace.
+- 17-6 OLD: T2 repair may add networking syscalls. NEW: M3 is T3-only; no socket/network syscall is licensed for T2 from Q6.
+
+findings:
+- 17-1: socket mode is a capability boundary: 0600 blocks the remapped uid; 0666 permits the mounted proxy endpoint and broadens same-host exposure.
+- 17-1: M1 and M2 retain internet egress on both hosted Ubuntu images and cannot be selected.
+- 20-3a: after 17-1 implementation, add the M3 host/no-internet/loopback and 0600/0666 regression matrix.
+
+reproduce:
+1. Local blocker: `RUNNER_IMAGE=local spikes/story-17-3a-wasm-recall/egress/egress-probe.sh`.
+2. Hosted matrix: create a disposable branch, copy `spikes/story-17-3a-wasm-recall/egress/ci-probe.yml.txt` to `.github/workflows/spike-17-3a-ci-probe.yml`, commit, push, then inspect the emitted `egress-probe/<image>` annotations.
+
+excerpt (12 lines):
+ubuntu-24.04: podman 4.9.3, netavark, slirp4netns 1.2.1
+ubuntu-26.04: podman 5.7.0, netavark, slirp4netns 1.3.3
+M1 ubuntu-24.04: host=yes internet=yes
+M1 ubuntu-26.04: host=yes internet=yes
+M2 ubuntu-24.04: host=no internet=yes
+M2 ubuntu-26.04: host=no internet=yes
+M3 ubuntu-24.04: host=yes internet=no lo=yes socket-0600=no socket-0666=yes rc=0
+M3 ubuntu-26.04: host=yes internet=no lo=yes socket-0600=no socket-0666=yes rc=0

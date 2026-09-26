@@ -1,0 +1,43 @@
+use std::io::Write;
+
+use maos_domain::frame::{
+    FrameAddress, FramePayload, IacFrame, TaskAssignPayload,
+};
+use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_spirit_abi::identity::FrameKind;
+
+fn main() {
+    let frame = IacFrame {
+        frame_id: [7; 16],
+        timestamp_ns: 123_456_789,
+        logical_clock: 1,
+        from: FrameAddress {
+            spirit_id: "t2-ladder".into(),
+            host_id: None,
+            role: None,
+        },
+        to: smallvec::smallvec![FrameAddress {
+            spirit_id: "t2-ladder-peer".into(),
+            host_id: None,
+            role: None,
+        }],
+        kind: FrameKind::TaskAssign,
+        intent: IntentClass::Standard,
+        payload: FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "exercise the real runner through the T2 ladder".into(),
+            scope: vec![],
+            success_criteria: "guest handles one real ADR-032 frame".into(),
+            posture_preferences: Default::default(),
+            prior_distillate_ref: None,
+        }),
+        auto_marker: FrameOrigin::Kernel,
+        consent_envelope: None,
+        intent_lineage: Default::default(),
+    };
+    let mut cbor = Vec::new();
+    ciborium::into_writer(&frame, &mut cbor).expect("encode canonical frame");
+    let mut out = std::io::stdout().lock();
+    write!(out, "Content-Length: {}\r\n\r\n", cbor.len()).expect("write header");
+    out.write_all(&cbor).expect("write frame");
+}

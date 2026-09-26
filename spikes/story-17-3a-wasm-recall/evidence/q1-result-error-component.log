@@ -1,0 +1,10 @@
+UTC: 2026-09-26T00:33:22.449Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe compiles a temporary guest that throws the generated halt-shaped error and componentizes it with the pinned CLI; it reads the generated types and live componentizer, not only files it set itself.
+$ npx tsc -p tsconfig.json
+
+[exit 0]
+$ npx -y -p node@22 node node_modules/@bytecodealliance/componentize-js/src/cli.js dist/result-error.js --wit ../../../wit --world-name spirit --disable http fetch-event -o out/result-error.wasm
+
+[exit 0]

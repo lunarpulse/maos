@@ -1,0 +1,74 @@
+use std::io;
+use std::os::fd::FromRawFd;
+use std::os::unix::net::UnixStream;
+use std::path::Path;
+
+use wasmtime::component::ResourceTable;
+use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+
+use crate::protocol::{read_message, write_message, WireReply, WireRequest};
+
+pub struct HostState {
+    ctx: WasiCtx,
+    table: ResourceTable,
+    pub recall: RecallClient,
+}
+
+impl HostState {
+    pub fn new(socket: Option<String>, fd: Option<i32>) -> Result<Self, String> {
+        Ok(Self {
+            ctx: WasiCtxBuilder::new().build(),
+            table: ResourceTable::new(),
+            recall: RecallClient::new(socket, fd)?,
+        })
+    }
+}
+
+impl WasiView for HostState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.ctx,
+            table: &mut self.table,
+        }
+    }
+}
+
+pub struct RecallClient {
+    socket: Option<String>,
+    stream: Option<UnixStream>,
+}
+
+impl RecallClient {
+    fn new(socket: Option<String>, fd: Option<i32>) -> Result<Self, String> {
+        if socket.is_some() && fd.is_some() {
+            return Err("use exactly one of --recall-socket or --recall-fd".to_string());
+        }
+        let stream = match fd {
+            Some(fd) if fd >= 0 => {
+                // The caller transfers ownership of a pre-connected AF_UNIX fd.
+                Some(unsafe { UnixStream::from_raw_fd(fd) })
+            }
+            Some(_) => return Err("--recall-fd must be non-negative".to_string()),
+            None => None,
+        };
+        Ok(Self { socket, stream })
+    }
+
+    fn stream(&mut self) -> io::Result<&mut UnixStream> {
+        if self.stream.is_none() {
+            let path = self.socket.as_deref().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotConnected, "recall transport not configured")
+            })?;
+            self.stream = Some(UnixStream::connect(Path::new(path))?);
+        }
+        Ok(self.stream.as_mut().expect("stream inserted above"))
+    }
+
+    pub fn exchange(&mut self, request: &WireRequest) -> Result<WireReply, String> {
+        let stream = self.stream().map_err(|error| format!("recall connect: {error}"))?;
+        write_message(stream, request).map_err(|error| format!("recall write: {error}"))?;
+        read_message(stream)
+            .map_err(|error| format!("recall read: {error}"))?
+            .ok_or_else(|| "recall service closed the channel".to_string())
+    }
+}

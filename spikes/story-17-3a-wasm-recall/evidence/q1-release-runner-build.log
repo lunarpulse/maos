@@ -1,0 +1,48 @@
+UTC: 2026-09-26T00:28:08.567Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe builds the unmodified HEAD runner release binary from the root locked workspace; it reads the live source/dependency graph, not only files it set itself.
+$ cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+    Blocking waiting for file lock on build directory
+   Compiling tokio v1.52.3
+   Compiling maos-spirit-abi v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-spirit-abi)
+   Compiling curve25519-dalek v4.1.3
+   Compiling getrandom v0.3.4
+   Compiling ed25519-dalek v2.2.0
+   Compiling maos-domain v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-domain)
+   Compiling wasmtime-wasi v46.0.3
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-wasm-host v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-wasm-host)
+    Finished `release` profile [optimized] target(s) in 29.45s
+
+[exit 0]

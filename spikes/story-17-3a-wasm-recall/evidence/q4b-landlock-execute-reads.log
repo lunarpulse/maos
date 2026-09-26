@@ -1,0 +1,17 @@
+UTC 2026-09-26T00:27:02Z
++ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+PROBE_INPUTS tree/runtime: real dynamic hello and the HEAD runner plus their ldd paths and component; not only probe-created state.
++ t2-ladder --landlock rights --execute-reads --seccomp off -- target/t2-ladder/hello-dynamic
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/t2-ladder/hello-dynamic args=[]
+RUNG landlock=Rights seccomp=Off extra=[] static_target=false execute_reads=true inherit_fd=None
+t2-ladder hello reached main
+RESULT rc=0 sig=none errno=none
++ t2-ladder --landlock rights --execute-reads --seccomp off --read tests/fixtures/wasm/echo_spirit_component.wasm --stdin target/t2-ladder/runner.frame -- target/debug/maos-wasm-runner --component tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=/home/lunarpulse/dev_ws/target/debug/maos-wasm-runner args=["--component", "/home/lunarpulse/dev_ws/tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Off extra=[] static_target=false execute_reads=true inherit_fd=None
+Content-Length: 452
+
+«hframe_idltimestamp_ns[Ímlogical_clockdfrom£ispirit_idit2-ladderghost_idödroleöbto£ispirit_idnt2-ladder-peerghost_idödroleödkindjTaskAssignfintenthReadonlygpayload¡jTaskAssign¥dgoalx.exercise the real runner through the T2 ladderescope€psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureöuhalt_policy_overrides€tprior_distillate_refökauto_markerfKernelpconsent_envelopeönintent_lineage€RESULT rc=0 sig=none errno=none

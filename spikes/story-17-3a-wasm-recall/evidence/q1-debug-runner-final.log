@@ -1,0 +1,12 @@
+UTC: 2026-09-26T00:39:20.046Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe drives the final component and real ADR-032 frame through the unmodified debug HEAD runner, the exact control for the release-runner condition; it observes runtime behavior, not only files it set itself.
+$ target/release/q1-driver encode | target/debug/maos-wasm-runner --component spikes/story-17-3a-wasm-recall/ts-guest/out/ts-spirit-node22.wasm | target/release/q1-driver decode
+[stdout]
+decoded-count=0
+
+[stderr]
+maos-wasm-runner: InvalidComponent: component compile exceeded 10s — treating as a compile-bomb
+
+[exit 3]

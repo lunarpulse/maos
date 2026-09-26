@@ -1,0 +1,502 @@
+# §A6 evidence re-execution by the orchestrator (non-author of the slice code) — 2026-09-26T00:43:44Z — HEAD 92911f59da6a75a7745a23ec05036d18116f68af
+# CARGO_TARGET_DIR=/mnt/build/cargo (repo target -> /mnt/build/cargo)
+
+## Q1 — TS component through the UNMODIFIED HEAD runner
+$ sha256sum spikes/story-17-3a-wasm-recall/ts-guest/out/ts-spirit-node22.wasm; stat -c %s spikes/story-17-3a-wasm-recall/ts-guest/out/ts-spirit-node22.wasm
+72f6f9232be94bac3076a02610fa64de64ffdcacea890078e317043ebef374ff  spikes/story-17-3a-wasm-recall/ts-guest/out/ts-spirit-node22.wasm
+12259559
+$ target/release/q1-driver encode | target/release/maos-wasm-runner --component spikes/story-17-3a-wasm-recall/ts-guest/out/ts-spirit-node22.wasm | target/release/q1-driver decode
+    kind: TaskAssign,
+decoded-count=1
+pipe rc=0 0 0 0
+$ (same-target control) ... --component tests/fixtures/wasm/echo_spirit_component.wasm ...
+decoded-count=1
+pipe rc=0 0 0 0
+$ target/debug/maos-wasm-runner --component spikes/story-17-3a-wasm-recall/ts-guest/out/ts-spirit-node22.wasm </dev/null
+maos-wasm-runner: InvalidComponent: component compile exceeded 10s — treating as a compile-bomb
+rc=3
+
+## Shared-target provenance check (2026-09-26T00:45:17Z) — after Q2Q3WitTax reported scratch-worktree builds into the shared CARGO_TARGET_DIR
+debug  target/debug/maos-wasm-runner   sha256 cf3a4e044936be23b06401e472c3a2908bceb6f4cebcc25fb052edbc97142057  (rm + cargo build --locked from main tree re-linked the same unit deps/maos_wasm_runner-d61b78d4866164f1, mtime 00:11:51 = T0 build)
+release target/release/maos-wasm-runner sha256 a596e1b1af00f865030d68f85da3c1e3f138679da9652519ad1dbf25416626fa  (cargo build --locked --release from main tree: fresh, unchanged)
+
+## Q1 re-run with runner provenance pinned (2026-09-26T00:55:31Z) — the shared debug runner was briefly a scratch-tree build during Q2's run, so every Q1 runner check is repeated against verified main-tree hashes
+debug   runner sha256 cf3a4e044936be23b06401e472c3a2908bceb6f4cebcc25fb052edbc97142057 (expect cf3a4e04…)
+release runner sha256 a596e1b1af00f865030d68f85da3c1e3f138679da9652519ad1dbf25416626fa (expect a596e1b1…)
+$ q1-driver encode | release runner --component ts-spirit-node22.wasm | q1-driver decode
+decoded-count=1
+pipe rc=0 0 0 0
+$ fuel boundaries (release runner): --fuel 303157 / 303158 with no frame; 2617111 / 2617112 with one frame
+fuel=303157 no-frame rc=4
+fuel=303158 no-frame rc=0
+fuel=2617111 one-frame rc=4
+decoded-count=1
+fuel=2617112 one-frame rc=0
+$ debug runner watchdog
+maos-wasm-runner: InvalidComponent: component compile exceeded 10s — treating as a compile-bomb
+rc=3
+
+## Q3 — frame-bridge probe re-run (2026-09-26T00:55:46Z)
+$ cargo run --locked --offline --release --manifest-path spikes/story-17-3a-wasm-recall/bridge/Cargo.toml --bin frame-bridge-probe
+extended_cbor_equal=true bytes=1025
+head_control_cbor_equal=false head_bytes=476
+head_control_defaults=readonly/none/empty-lineage/empty-scope
+frame_growth_skew=type-mismatch
+    expected record of 11 fields, found 8 fields
+rc=0
+
+## Q4 — recall relay re-run (2026-09-26T00:57:28Z)
+binaries: spike-runner 9f24d5df3e5523db… recall-service 4871662c1ce06ad8… guest 3be976fc38b4feb4…
+$ Q4_COUNT=200 Q4_FETCH_OWNER=A spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":257912,\"fetch_ns\":68689}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000001,"logical_clock":1,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":65813,\"fetch_ns\":101359}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000002,"logical_clock":2,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":76072,\"fetch_ns\":62848}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000003,"logical_clock":3,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":60383,\"fetch_ns\":109094}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,4,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000004,"logical_clock":4,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":88405,\"fetch_ns\":61555}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000005,"logical_clock":5,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":66294,\"fetch_ns\":56185}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000006,"logical_clock":6,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":91682,\"fetch_ns\":55374}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000007,"logical_clock":7,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":69379,\"fetch_ns\":63950}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000008,"logical_clock":8,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":73587,\"fetch_ns\":64360}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000009,"logical_clock":9,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":82373,\"fetch_ns\":63318}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,10,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000010,"logical_clock":10,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":73678,\"fetch_ns\":64781}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+{"frame_id":[0,0,0,0,0,0,0,11,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000011,"logical_clock":11,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":74289,\"fetch_ns\":60914}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+rc=101
+$ Q4_FETCH_OWNER=B spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"scope-violation\",\"recall_ns\":269494,\"fetch_ns\":65232}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+rc=0
+$ spikes/story-17-3a-wasm-recall/host/run_hostile_probe.py
+E15-A6: this probe reads the running runner, service, socket permissions, SO_PEERCRED, and same-uid attacker process; it does not set its own answer.
+CASE so-peercred-refusal same_uid=1000 runner_rc=0 service_rc=0 attacker_rc=1
+READY READY socket=/tmp/tmp2rwfmm8u/recall.sock caller-pid=3314195 peer-pid-check=true one-shot=false
+-- attacker output --
+recall-service: peer-pid-refused expected=3314195 actual=3314231
+CASE no-peer-check-control same_uid=1000 runner_rc=0 service_rc=0 attacker_rc=0
+READY READY socket=/tmp/tmp3po5lkg2/recall.sock caller-pid=3314233 peer-pid-check=false one-shot=false
+-- attacker output --
+{"Recall":{"Ok":{"entries":[{"frame_id":[1,160,219,55,150,55,12,202,97,121,214,244,97,142,155,25],"timestamp_ns":1790384248375647212,"kind":"TelemetryEvent","intent":"seed-3314233","peer_spirit_pid":3314233,"payload_available":true}],"next_cursor":null}}}
+CASE one-shot-unlink same_uid=1000 runner_rc=0 service_rc=0 attacker_rc=1
+READY READY socket=/tmp/tmpshrcw_u7/recall.sock caller-pid=3314271 peer-pid-check=true one-shot=true
+-- attacker output --
+rc=0
+
+## Q5 — instantiate probes re-run (2026-09-26T00:57:28Z)
+$ frame-driver encode | spike-runner(@1.1 host) --component tests/fixtures/wasm/echo_spirit_component.wasm(@1.0) | frame-driver decode
+frame-driver: decoded-frames=1
+pipe rc=0 0 0 0 0
+HEAD runner copy sha256 cf3a4e044936be23b06401e472c3a2908bceb6f4cebcc25fb052edbc97142057
+$ HEAD runner(@1.0) --component story_17_3a_recall_guest.wasm(@1.1, imports recall)
+maos-wasm-runner: InvalidComponent: component does not conform to maos:spirit@1.0 (instantiate failed): component imports instance `maos:spirit/recall@1.1.0`, but a matching implementation was not found in the linker
+rc=3
+
+## Q4 A 1000-call re-run (orchestrator, full output captured) — script rc=0
+frames=1000 all_ok=1000
+guest_recall_ns: p50=745604 p99=1318574 min=66163 max=1759298 first10_mean=90772 last10_mean=1224471
+guest_fetch_ns: p50=730966 p99=1318574 min=55273 max=1920900 first10_mean=64145 last10_mean=1214140
+
+## Q5(c) enum growth vs version-only control — re-run (2026-09-26T01:01:53Z)
+$ diff wit-1.1/spirit.wit wit-1.2-same/spirit.wit
+15c15
+< package maos:spirit@1.1.0;
+---
+> package maos:spirit@1.2.0;
+$ diff wit-1.1/spirit.wit wit-1.2-enum/spirit.wit (lines changed)
+< // `maos:spirit@1.1.0` — Story 17-3a spike COPY (recall-only variant).
+< //
+< // NOT the pinned WIT. The pinned `@1.0.0` lives at `wit/spirit.wit` and is
+< // never edited by the spike (its sha feeds four provenance `source_sha256`
+< // rows — 17-3a P1/P3). This copy differs from `wit/spirit.wit` in exactly
+< // three places, so a skew probe measures only the additive surface:
+< //   1. `package maos:spirit@1.1.0;`
+< //   2. `interface recall` (new) — mirrors `crates/maos-domain/src/log_recall.rs`
+< //   3. `import recall;` in world `spirit`
+< // `interface frames` is byte-for-byte the @1.0.0 text. The frame-field growth
+< // Q3 measures (intent, consent-envelope, intent-lineage, lossless scope) lives
+< // in `../wit-1.1-frame/`, because adding record fields changes a type and would
+< // make the Q5 skew probe fail for Q3's reason instead of Q2's.
+< 
+< package maos:spirit@1.1.0;
+> // Story 17-3a Q5 enum-growth probe. This is the @1.1 WIT surface with one
+> // additive recall.frame-kind-label case; all frames definitions are unchanged.
+> package maos:spirit@1.2.0;
+<     // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
+<     // WIT enum order encodes the discriminant; the comment is the on-wire
+<     // CBOR discriminant value.
+<     enum frame-kind {
+<         task-assign,            // 0
+<         task-complete,          // 1
+<         decision-dispatch,      // 2
+<         epistemic-halt,         // 3
+<         telemetry-event,        // 4
+<         consent-request,        // 5
+<         retract,                // 6
+<         capability-invocation,  // 7
+<         sandbox-block,          // 8
+<         inference-call,         // 9
+<         budget-warning,         // 12
+<         budget-exceeded,        // 13
+<         cli-subprocess-output,  // 21
+<         consent-rupture,        // 22
+<         rate-limited,           // 23
+<         gateway-inbound,        // 24
+<         gateway-outbound,       // 25
+<     }
+< 
+<     // ── FrameOrigin (i3) ───────────────────────────────────────────────
+<     enum frame-origin {
+<         human-authored,
+<         spirit-auto,
+<         spirit-drafted-human-approved,
+<         kernel,
+<     }
+< 
+<     // ── FrameAddress (frame.rs:54-59) ──────────────────────────────────
+<     record frame-address {
+<         spirit-id: string,
+<         host-id: option<string>,
+<         role: option<string>,
+<     }
+< 
+<     // ── PostureHint (frame.rs:166-171) ─────────────────────────────────
+<     enum posture-hint {
+<         autonomous-with-halt,
+<         assistive,
+<         cautious,
+<     }
+< 
+<     // ── HaltPolicyOverride (frame.rs:142-147) ──────────────────────────
+<     record halt-policy-override {
+<         tag: string,
+<         recall-vs-precision: f32,
+<     }
+< 
+<     // ── PosturePreferences (frame.rs:118-130) ──────────────────────────
+<     record posture-preferences {
+<         preferred-posture: option<posture-hint>,
+<         halt-policy-overrides: list<halt-policy-override>,
+<     }
+< 
+<     // ── PriorDistillateRef (frame.rs:100-110) ──────────────────────────
+<     record prior-distillate-ref {
+<         digest-frame-id: list<u8>,      // [u8; 16]
+<         distillation-depth: u32,
+<     }
+< 
+<     // ── TaskAssignPayload (frame.rs:79-92) ─────────────────────────────
+<     record task-assign-body {
+<         goal: string,
+<         scope: list<string>,           // Vec<Scope> serialized as strings
+<         success-criteria: string,
+<         posture-preferences: posture-preferences,
+<         prior-distillate-ref: option<prior-distillate-ref>,
+<     }
+< 
+<     // ── TaskCompletePayload (frame.rs:175-177) ─────────────────────────
+<     record task-complete-body {
+<         result-text: string,
+<     }
+< 
+<     // ── DecisionDispatchPayload (frame.rs:181-190) ─────────────────────
+<     record decision-dispatch-body {
+<         decision-id: u64,
+<         approved: bool,
+<     }
+< 
+<     // ── EpistemicHaltPayload (frame.rs:198-230) ────────────────────────
+<     record epistemic-halt-body {
+<         halt-id: string,
+<         tag: string,
+<         value: f32,
+<         threshold: option<f32>,
+<         policy-id: string,
+<         derived-from: string,
+<     }
+< 
+<     // ── TelemetryEventPayload (frame.rs:278-281) ───────────────────────
+<     record telemetry-event-body {
+<         event-type: string,
+<         data: string,
+<     }
+< 
+<     // ── ConsentRequestPayload (frame.rs:285-287) ───────────────────────
+<     record consent-request-body {
+<         capability: string,
+<     }
+< 
+<     // ── RetractPayload (frame.rs:296-308) ──────────────────────────────
+<     record retract-body {
+<         original-frame-id: list<u8>,    // [u8; 16]
+<         reason: string,
+<         original-kind: option<frame-kind>,
+<     }
+< 
+<     // ── RuptureReason (frame.rs:370-382) ───────────────────────────────
+<     enum rupture-reason {
+<         intent-allowlist-mismatch,
+<         posture-shifted-during-transmission,
+<         token-revoked,
+<         principal-revoked,
+<         recipient-unloaded,
+<     }
+< 
+<     // ── RuptureRejection (frame.rs:360-363) ────────────────────────────
+<     record rupture-rejection {
+<         address: frame-address,
+<         reason: rupture-reason,
+<     }
+< 
+<     // ── ConsentRupturePayload (frame.rs:345-356) ───────────────────────
+<     record consent-rupture-body {
+<         rupture-id: list<u8>,           // [u8; 16]
+<         original-frame-id: list<u8>,    // [u8; 16]
+<         original-kind: frame-kind,
+<         accepted: list<frame-address>,
+<         rejected: list<rupture-rejection>,
+<         ruptured-at-ns: u64,
+<     }
+< 
+<     // ── RateLimitedPayload (frame.rs:386-400) ──────────────────────────
+<     record rate-limited-body {
+<         provider-id: string,
+<         credential-fingerprint-prefix-hex: string,
+<         retry-after-ms: u64,
+<         bucket-remaining: u32,
+<         bucket-capacity: u32,
+<         refill-per-sec: u32,
+<         schedule-id: option<string>,
+<     }
+< 
+<     // ── BudgetEnvelope (frame.rs) ─────────────────────────────────────
+<     record budget-envelope {
+<         spirit-pid: u32,
+<         hook-name: string,
+<         wall-ns: u64,
+<         cap-seconds: u64,
+<     }
+< 
+<     // ── FramePayload (frame.rs:63-75) ──────────────────────────────────
+<     // Discriminated union — one variant per routed FrameKind.
+<     variant frame-payload {
+<         task-assign(task-assign-body),
+<         task-complete(task-complete-body),
+<         decision-dispatch(decision-dispatch-body),
+<         epistemic-halt(epistemic-halt-body),
+<         telemetry-event(telemetry-event-body),
+<         consent-request(consent-request-body),
+<         retract(retract-body),
+<         budget-warning(budget-envelope),
+<         budget-exceeded(budget-envelope),
+<         consent-rupture(consent-rupture-body),
+<         rate-limited(rate-limited-body),
+<     }
+< 
+<     // ── IacFrame envelope (frame.rs:26-51) ─────────────────────────────
+<     record iac-frame {
+<         frame-id: list<u8>,             // [u8; 16]
+<         timestamp-ns: u64,
+<         logical-clock: u64,
+<         frame-from: frame-address,
+<         to: list<frame-address>,
+<         kind: frame-kind,
+<         payload: frame-payload,
+<         auto-marker: frame-origin,
+<     }
+< 
+<     // ── Halt signal ────────────────────────────────────────────────────
+<     // Returned by the guest (ADR-032: EOF after clean frame =
+<     // Halt::Voluntary; mid-frame EOF = Halt::Fault(Truncated)).
+<     variant halt {
+<         voluntary,
+<         fault(string),
+<     }
+>   enum frame-kind { task-assign, task-complete, decision-dispatch, epistemic-halt, telemetry-event, consent-request, retract, capability-invocation, sandbox-block, inference-call, budget-warning, budget-exceeded, cli-subprocess-output, consent-rupture, rate-limited, gateway-inbound, gateway-outbound }
+>   enum frame-origin { human-authored, spirit-auto, spirit-drafted-human-approved, kernel }
+>   record frame-address { spirit-id: string, host-id: option<string>, role: option<string> }
+>   enum posture-hint { autonomous-with-halt, assistive, cautious }
+>   record halt-policy-override { tag: string, recall-vs-precision: f32 }
+>   record posture-preferences { preferred-posture: option<posture-hint>, halt-policy-overrides: list<halt-policy-override> }
+>   record prior-distillate-ref { digest-frame-id: list<u8>, distillation-depth: u32 }
+>   record task-assign-body { goal: string, scope: list<string>, success-criteria: string, posture-preferences: posture-preferences, prior-distillate-ref: option<prior-distillate-ref> }
+>   record task-complete-body { result-text: string }
+>   record decision-dispatch-body { decision-id: u64, approved: bool }
+>   record epistemic-halt-body { halt-id: string, tag: string, value: f32, threshold: option<f32>, policy-id: string, derived-from: string }
+>   record telemetry-event-body { event-type: string, data: string }
+>   record consent-request-body { capability: string }
+>   record retract-body { original-frame-id: list<u8>, reason: string, original-kind: option<frame-kind> }
+>   enum rupture-reason { intent-allowlist-mismatch, posture-shifted-during-transmission, token-revoked, principal-revoked, recipient-unloaded }
+>   record rupture-rejection { address: frame-address, reason: rupture-reason }
+>   record consent-rupture-body { rupture-id: list<u8>, original-frame-id: list<u8>, original-kind: frame-kind, accepted: list<frame-address>, rejected: list<rupture-rejection>, ruptured-at-ns: u64 }
+>   record rate-limited-body { provider-id: string, credential-fingerprint-prefix-hex: string, retry-after-ms: u64, bucket-remaining: u32, bucket-capacity: u32, refill-per-sec: u32, schedule-id: option<string> }
+>   record budget-envelope { spirit-pid: u32, hook-name: string, wall-ns: u64, cap-seconds: u64 }
+>   variant frame-payload { task-assign(task-assign-body), task-complete(task-complete-body), decision-dispatch(decision-dispatch-body), epistemic-halt(epistemic-halt-body), telemetry-event(telemetry-event-body), consent-request(consent-request-body), retract(retract-body), budget-warning(budget-envelope), budget-exceeded(budget-envelope), consent-rupture(consent-rupture-body), rate-limited(rate-limited-body) }
+>   record iac-frame { frame-id: list<u8>, timestamp-ns: u64, logical-clock: u64, frame-from: frame-address, to: list<frame-address>, kind: frame-kind, payload: frame-payload, auto-marker: frame-origin }
+>   variant halt { voluntary, fault(string) }
+< // ── Recall (crates/maos-domain/src/log_recall.rs) ─────────────────────
+< // The caller's Spirit pid is NOT a parameter anywhere in this interface:
+< // `LogRecallFilter` has no pid field by design (log_recall.rs:13-38, pinned by
+< // crates/maos-bin/tests/cross_team_consent_13_3.rs:290-308). The host binds the
+< // caller's pid from the channel it spawned the runner with (17-3a P7, Q4c).
+<     use frames.{frame-origin};
+< 
+<     // FrameKindLabel (log_recall.rs:44-91): 30 variants, `#[non_exhaustive]`.
+<     // Deliberately NOT `frames.frame-kind` (17 routed kinds): recall reads the
+<     // audit log, whose label set is wider. A WIT enum is closed, so a new label
+<     // is a type change for every importer — Q5 measures what that costs.
+<     enum frame-kind-label {
+<         task-assign,
+<         task-complete,
+<         decision-dispatch,
+<         epistemic-halt,
+<         telemetry-event,
+<         consent-request,
+<         retract,
+<         capability-invocation,
+<         sandbox-block,
+<         inference-call,
+<         decision,
+<         distillate,
+<         budget-warning,
+<         budget-exceeded,
+<         hot-swap-aborted,
+<         task-stalled,
+<         silent-failure-suspect,
+<         spirit-revoked,
+<         mcp-invocation,
+<         spirit-admitted,
+<         registry-yank,
+<         cli-subprocess-output,
+<         consent-rupture,
+<         rate-limited,
+<         gateway-inbound,
+<         gateway-outbound,
+<         spirit-imported,
+<         cli-wrapper-shape-mismatch,
+<         governance-event,
+<         cost-attribution,
+<     }
+< 
+<     // LogRecallCursor (log_recall.rs:175-180).
+<     record recall-cursor {
+<         last-timestamp-ns: u64,
+<         last-frame-id: list<u8>,        // [u8; 16]
+<     }
+< 
+<     // LogRecallFilter (log_recall.rs:14-38); `limit` is clamped host-side to
+<     // LogRecallFilter::MAX_LIMIT = 1024 (:95, :98-115).
+<     record recall-filter {
+<         kind: option<frame-kind-label>,
+<         since-ns: option<u64>,
+<         until-ns: option<u64>,
+<         limit: u32,
+<         cursor: option<recall-cursor>,
+<         intent-filter: option<string>,
+<     }
+< 
+<     // LogRecallEntry (log_recall.rs:213-226) — no payload; `fetch` for that.
+<     record recall-entry {
+<         frame-id: list<u8>,             // [u8; 16]
+<         timestamp-ns: u64,
+<         kind: frame-kind-label,
+<         intent: string,
+<         peer-spirit-pid: u32,
+<         payload-available: bool,
+<     }
+< 
+<     // LogRecallPage (log_recall.rs:193-198).
+<     record recall-page {
+<         entries: list<recall-entry>,
+<         next-cursor: option<recall-cursor>,
+<     }
+< 
+<     // LogFetchResponse (log_recall.rs:250-265).
+<     record fetch-response {
+<         frame-id: list<u8>,             // [u8; 16]
+<         timestamp-ns: u64,
+<         kind: frame-kind-label,
+<         intent: string,
+<         payload-redacted: list<u8>,
+<         capability-token: option<list<u8>>,   // [u8; 32]
+<         origin: frame-origin,
+<     }
+< 
+<     // LogRecallError (log_recall.rs:332-358), hand-mapped host-side (the
+<     // domain error has no serde, :331). `scope-violation` carries the frame id
+<     // only — never the owner pid the domain error holds (:341-345).
+<     variant recall-error {
+<         scope-violation(list<u8>),
+<         frame-not-found(list<u8>),
+<         storage(string),
+<         invalid-cursor(string),
+<         limit-exceeded(u32),
+<         cross-wall-denied(string),
+<     }
+< 
+<     recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
+<     fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
+>   use frames.{frame-origin};
+>   enum frame-kind-label { task-assign, task-complete, decision-dispatch, epistemic-halt, telemetry-event, consent-request, retract, capability-invocation, sandbox-block, inference-call, decision, distillate, budget-warning, budget-exceeded, hot-swap-aborted, task-stalled, silent-failure-suspect, spirit-revoked, mcp-invocation, spirit-admitted, registry-yank, cli-subprocess-output, consent-rupture, rate-limited, gateway-inbound, gateway-outbound, spirit-imported, cli-wrapper-shape-mismatch, governance-event, cost-attribution, enum-growth-probe }
+>   record recall-cursor { last-timestamp-ns: u64, last-frame-id: list<u8> }
+>   record recall-filter { kind: option<frame-kind-label>, since-ns: option<u64>, until-ns: option<u64>, limit: u32, cursor: option<recall-cursor>, intent-filter: option<string> }
+>   record recall-entry { frame-id: list<u8>, timestamp-ns: u64, kind: frame-kind-label, intent: string, peer-spirit-pid: u32, payload-available: bool }
+>   record recall-page { entries: list<recall-entry>, next-cursor: option<recall-cursor> }
+>   record fetch-response { frame-id: list<u8>, timestamp-ns: u64, kind: frame-kind-label, intent: string, payload-redacted: list<u8>, capability-token: option<list<u8>>, origin: frame-origin }
+>   variant recall-error { scope-violation(list<u8>), frame-not-found(list<u8>), storage(string), invalid-cursor(string), limit-exceeded(u32), cross-wall-denied(string) }
+>   recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
+>   fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
+< // The Spirit world a WASM-component author implements. The host
+< // (maos-wasm-host) drives it: feeds inbound frames decoded from the
+< // ADR-032 stdio stream, and writes the guest's emitted frames back to
+< // the same stream.
+<     import recall;
+<     use frames.{iac-frame, halt};
+< 
+<     // host → guest: deliver one inbound frame, get zero-or-more emitted
+<     // frames. A returned `halt` ends the session (maps to the ADR-032
+<     // EOF semantics).
+<     export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+< 
+<     // host → guest: lifecycle hooks (mirror the native form's boot/shutdown).
+<     export on-start: func() -> result<_, halt>;
+<     export on-shutdown: func();
+>   import recall;
+>   use frames.{iac-frame, halt};
+>   export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+>   export on-start: func() -> result<_, halt>;
+>   export on-shutdown: func();
+$ target/release/spike-linker-1-2-same --component target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm </dev/null
+rc=0
+$ target/release/spike-runner --component target/wasm32-wasip2/release/story_17_3a_version_only_guest.wasm </dev/null
+recall-import-boundary-ns=1683
+rc=0
+$ target/release/spike-linker-1-2 --component target/wasm32-wasip2/release/story_17_3a_recall_guest.wasm </dev/null
+spike-linker-1-2: InvalidComponent: instantiate: component imports instance `maos:spirit/recall@1.1.0`, but a matching implementation was not found in the linker
+rc=3
+$ target/release/spike-runner --component target/wasm32-wasip2/release/story_17_3a_enum_guest.wasm </dev/null
+spike-runner: InvalidComponent: component does not conform to maos:spirit@1.1 (instantiate failed): component imports instance `maos:spirit/recall@1.2.0`, but a matching implementation was not found i
+rc=3
+$ target/release/spike-linker-1-2 --component target/wasm32-wasip2/release/story_17_3a_enum_guest.wasm </dev/null
+rc=0
+
+## T6 run #1/#2 exit 101 — root cause reproduced from the exact branch tree (2026-09-26T01:06:41Z)
+$ git archive 4e944b10 | tar -x -C $tmp; cd $tmp; CARGO_TARGET_DIR=<private> cargo build --locked --release --manifest-path spikes/story-17-3a-wasm-recall/host/Cargo.toml
+branch-tree host build rc=101
+error: failed to read path for WIT [/tmp/tmp.pGwdt0tujf/spikes/story-17-3a-wasm-recall/host/../wit-1.2-enum/spirit.wit]
+       
+       Caused by:
+           No such file or directory (os error 2)
+error[E0433]: cannot find `maos` in `wit_guest`
+  --> src/spike_linker_1_2.rs.txt:14:16
+   |
+14 | use wit_guest::maos::spirit::recall as recall;
+   |                ^^^^ could not find `maos` in `wit_guest`
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `story-17-3a-recall-host` (bin "spike-linker-1-2") due to 2 previous errors
+git ls-tree 4e944b10 -- spikes/story-17-3a-wasm-recall: 44 files; wit-1.2-enum/ absent (the working tree has it). The probe was broken, not the platform; T6 re-opened (RT-7 does not apply).
+
+## Seccomp install ORDER — independent local check (2026-09-26T01:38:11Z, host kernel 7.2.6-1-cachyos, Seccomp: 2)
+$ cargo build --offline --manifest-path spikes/story-17-3a-wasm-recall/evidence/a6-seccomp-order/Cargo.toml && a6-seccomp-order
+[control: one allow-all filter] INSTALL ok (spawned); target status=exit status: 0
+[allow-list then kill (the order linux.rs:346 returns)] INSTALL FAILED: spawn Err kind=PermissionDenied raw_os_error=Some(1)
+[kill then allow-list (the order linux.rs:339 documents)] INSTALL ok (spawned); target status=exit status: 127
+rc=0

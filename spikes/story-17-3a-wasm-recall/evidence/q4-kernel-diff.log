@@ -1,0 +1,6 @@
+UTC 2026-09-26T00:42:58.155297+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ git diff --stat 92911f59 -- crates/maos-kernel-core/src
+[exit=0]
+E15-A6: this probe reads the repository diff and kernel source tree; it does not set its own result.

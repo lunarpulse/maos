@@ -1,0 +1,11 @@
+UTC 2026-09-26T02:01:07Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: repository forbidden ptrace fixture under the selected inherited-relay candidate, compared with the runner-all control; not only probe-created state.
++ target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,sendto,recvfrom -- crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe args=[]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "sendto", "recvfrom"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+
+RESULT rc=none sig=31 errno=none

@@ -1,0 +1,1506 @@
+UTC: 2026-09-26T00:20:21.789Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe reads the installed dependency tree and npm metadata; it does not only inspect files it set itself.
+$ npm ls @bytecodealliance/componentize-js
+story-17-3a-ts-guest@ /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest
++-- @bytecodealliance/componentize-js@0.23.0
+`-- @bytecodealliance/jco@1.35.0
+  `-- @bytecodealliance/componentize-js@0.22.0
+
+
+[exit 0]
+$ npm query :attr(scripts, [postinstall])
+[]
+
+[exit 0]
+$ npm query :attr(scripts, [preinstall])
+[]
+
+[exit 0]
+$ npm query :attr(scripts, [install])
+[]
+
+[exit 0]
+$ npm query :attr(scripts, [prepare])
+[
+  {
+    "name": "@isaacs/fs-minipass",
+    "version": "4.0.1",
+    "main": "./dist/commonjs/index.js",
+    "scripts": {
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "test": "tap",
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "format": "prettier --write . --loglevel warn",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts"
+    },
+    "keywords": [],
+    "author": "Isaac Z. Schlueter",
+    "license": "ISC",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/npm/fs-minipass.git"
+    },
+    "description": "fs read and write streams based on minipass",
+    "dependencies": {
+      "minipass": "^7.0.4"
+    },
+    "devDependencies": {
+      "@types/node": "^20.11.30",
+      "mutate-fs": "^2.1.1",
+      "prettier": "^3.2.5",
+      "tap": "^18.7.1",
+      "tshy": "^1.12.0",
+      "typedoc": "^0.25.12"
+    },
+    "files": [
+      "dist"
+    ],
+    "engines": {
+      "node": ">=18.0.0"
+    },
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "types": "./dist/commonjs/index.d.ts",
+    "type": "module",
+    "prettier": {
+      "semi": false,
+      "printWidth": 75,
+      "tabWidth": 2,
+      "useTabs": false,
+      "singleQuote": true,
+      "jsxSingleQuote": false,
+      "bracketSameLine": true,
+      "arrowParens": "avoid",
+      "endOfLine": "lf"
+    },
+    "_id": "@isaacs/fs-minipass@4.0.1",
+    "pkgid": "@isaacs/fs-minipass@4.0.1",
+    "location": "node_modules/@isaacs/fs-minipass",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@isaacs/fs-minipass",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@isaacs/fs-minipass",
+    "resolved": "https://registry.npmjs.org/@isaacs/fs-minipass/-/fs-minipass-4.0.1.tgz",
+    "from": [
+      "node_modules/tar"
+    ],
+    "to": [
+      "node_modules/minipass"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "@tybys/wasm-util",
+    "version": "0.10.4",
+    "description": "WASI polyfill for browser and some wasm util",
+    "main": "./lib/cjs/index.js",
+    "module": "./dist/wasm-util.esm-bundler.js",
+    "types": "./dist/wasm-util.d.ts",
+    "exports": {
+      ".": {
+        "module": "./dist/wasm-util.esm-bundler.js",
+        "import": "./lib/mjs/index.mjs",
+        "require": "./lib/cjs/index.js",
+        "types": "./dist/wasm-util.d.ts"
+      }
+    },
+    "scripts": {
+      "build": "tsgo build",
+      "watch": "tsgo watch",
+      "test": "jest",
+      "lint": "eslint ./src/**/*.{ts,js} --fix",
+      "prepare": "npm run build"
+    },
+    "publishConfig": {
+      "access": "public"
+    },
+    "keywords": [
+      "wasm",
+      "webassembly",
+      "wasi",
+      "polyfill"
+    ],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/toyobayashi/wasm-util.git"
+    },
+    "author": "toyobayashi",
+    "license": "MIT",
+    "dependencies": {
+      "tslib": "^2.4.0"
+    },
+    "devDependencies": {
+      "@tybys/ts-transform-module-specifier": "^0.0.2",
+      "@tybys/ts-transform-pure-class": "^0.1.1",
+      "@tybys/tsgo": "^1.1.0",
+      "@types/node": "^14.14.31",
+      "@typescript-eslint/eslint-plugin": "^5.40.1",
+      "@typescript-eslint/parser": "^5.40.1",
+      "eslint": "^8.25.0",
+      "eslint-config-standard-with-typescript": "^23.0.0",
+      "eslint-plugin-import": "^2.26.0",
+      "eslint-plugin-n": "^15.3.0",
+      "eslint-plugin-promise": "^6.1.0",
+      "memfs-browser": "^3.4.13000",
+      "mocha": "^10.1.0",
+      "ts-node": "^10.9.1",
+      "typescript": "~4.8.3"
+    },
+    "_id": "@tybys/wasm-util@0.10.4",
+    "pkgid": "@tybys/wasm-util@0.10.4",
+    "location": "node_modules/@tybys/wasm-util",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@tybys/wasm-util",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@tybys/wasm-util",
+    "resolved": "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.4.tgz",
+    "from": [
+      "node_modules/@napi-rs/wasm-runtime"
+    ],
+    "to": [
+      "node_modules/tslib"
+    ],
+    "dev": true,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "acorn",
+    "description": "ECMAScript parser",
+    "homepage": "https://github.com/acornjs/acorn",
+    "main": "dist/acorn.js",
+    "types": "dist/acorn.d.ts",
+    "module": "dist/acorn.mjs",
+    "exports": {
+      ".": [
+        {
+          "import": "./dist/acorn.mjs",
+          "require": "./dist/acorn.js",
+          "default": "./dist/acorn.js"
+        },
+        "./dist/acorn.js"
+      ],
+      "./package.json": "./package.json"
+    },
+    "version": "8.17.0",
+    "engines": {
+      "node": ">=0.4.0"
+    },
+    "maintainers": [
+      {
+        "name": "Marijn Haverbeke",
+        "email": "marijn@haverbeke.berlin",
+        "web": "https://marijnhaverbeke.nl"
+      },
+      {
+        "name": "Ingvar Stepanyan",
+        "email": "me@rreverser.com",
+        "web": "https://rreverser.com/"
+      },
+      {
+        "name": "Adrian Heine",
+        "web": "http://adrianheine.de"
+      }
+    ],
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/acornjs/acorn.git"
+    },
+    "license": "MIT",
+    "scripts": {
+      "prepare": "cd ..; npm run build:main"
+    },
+    "bin": {
+      "acorn": "bin/acorn"
+    },
+    "_id": "acorn@8.17.0",
+    "pkgid": "acorn@8.17.0",
+    "location": "node_modules/acorn",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/acorn",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/acorn",
+    "resolved": "https://registry.npmjs.org/acorn/-/acorn-8.17.0.tgz",
+    "from": [
+      "node_modules/acorn-walk",
+      "node_modules/@bytecodealliance/jco-std"
+    ],
+    "to": [],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "acorn-walk",
+    "description": "ECMAScript (ESTree) AST walker",
+    "homepage": "https://github.com/acornjs/acorn",
+    "main": "dist/walk.js",
+    "types": "dist/walk.d.ts",
+    "module": "dist/walk.mjs",
+    "exports": {
+      ".": [
+        {
+          "import": "./dist/walk.mjs",
+          "require": "./dist/walk.js",
+          "default": "./dist/walk.js"
+        },
+        "./dist/walk.js"
+      ],
+      "./package.json": "./package.json"
+    },
+    "version": "8.3.5",
+    "engines": {
+      "node": ">=0.4.0"
+    },
+    "dependencies": {
+      "acorn": "^8.11.0"
+    },
+    "maintainers": [
+      {
+        "name": "Marijn Haverbeke",
+        "email": "marijnh@gmail.com",
+        "web": "https://marijnhaverbeke.nl"
+      },
+      {
+        "name": "Ingvar Stepanyan",
+        "email": "me@rreverser.com",
+        "web": "https://rreverser.com/"
+      },
+      {
+        "name": "Adrian Heine",
+        "web": "http://adrianheine.de"
+      }
+    ],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/acornjs/acorn.git"
+    },
+    "scripts": {
+      "prepare": "cd ..; npm run build:walk"
+    },
+    "license": "MIT",
+    "_id": "acorn-walk@8.3.5",
+    "pkgid": "acorn-walk@8.3.5",
+    "location": "node_modules/acorn-walk",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/acorn-walk",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/acorn-walk",
+    "resolved": "https://registry.npmjs.org/acorn-walk/-/acorn-walk-8.3.5.tgz",
+    "from": [
+      "node_modules/@bytecodealliance/jco-std"
+    ],
+    "to": [
+      "node_modules/acorn"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "balanced-match",
+    "description": "Match balanced character pairs, like \"{\" and \"}\"",
+    "version": "4.0.4",
+    "files": [
+      "dist"
+    ],
+    "repository": {
+      "type": "git",
+      "url": "git://github.com/juliangruber/balanced-match.git"
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "type": "module",
+    "scripts": {
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "test": "tap",
+      "snap": "tap",
+      "format": "prettier --write .",
+      "benchmark": "node benchmark/index.js",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts"
+    },
+    "devDependencies": {
+      "@types/brace-expansion": "^1.1.2",
+      "@types/node": "^25.2.1",
+      "mkdirp": "^3.0.1",
+      "prettier": "^3.3.2",
+      "tap": "^21.6.2",
+      "tshy": "^3.0.2",
+      "typedoc": "^0.28.5"
+    },
+    "keywords": [
+      "match",
+      "regexp",
+      "test",
+      "balanced",
+      "parse"
+    ],
+    "license": "MIT",
+    "engines": {
+      "node": "18 || 20 || >=22"
+    },
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "main": "./dist/commonjs/index.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "module": "./dist/esm/index.js",
+    "_id": "balanced-match@4.0.4",
+    "pkgid": "balanced-match@4.0.4",
+    "location": "node_modules/balanced-match",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/balanced-match",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/balanced-match",
+    "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-4.0.4.tgz",
+    "from": [
+      "node_modules/brace-expansion"
+    ],
+    "to": [],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "brace-expansion",
+    "description": "Brace expansion as known from sh/bash",
+    "version": "5.0.12",
+    "files": [
+      "dist"
+    ],
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "type": "module",
+    "scripts": {
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "test": "tap",
+      "snap": "tap",
+      "format": "prettier --write .",
+      "format:check": "prettier --check .",
+      "benchmark": "node benchmark/index.js",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts"
+    },
+    "devDependencies": {
+      "@types/brace-expansion": "^1.1.2",
+      "@types/node": "^25.2.1",
+      "mkdirp": "^3.0.1",
+      "prettier": "^3.3.2",
+      "tap": "^21.6.2",
+      "tshy": "^3.0.2",
+      "typedoc": "^0.28.5"
+    },
+    "dependencies": {
+      "balanced-match": "^4.0.2"
+    },
+    "license": "MIT",
+    "engines": {
+      "node": "20 || >=22"
+    },
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "main": "./dist/commonjs/index.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "module": "./dist/esm/index.js",
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/juliangruber/brace-expansion.git"
+    },
+    "_id": "brace-expansion@5.0.12",
+    "pkgid": "brace-expansion@5.0.12",
+    "location": "node_modules/brace-expansion",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/brace-expansion",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/brace-expansion",
+    "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
+    "from": [
+      "node_modules/minimatch"
+    ],
+    "to": [
+      "node_modules/balanced-match"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+    "name": "chownr",
+    "description": "like `chown -R`",
+    "version": "3.0.0",
+    "repository": {
+      "type": "git",
+      "url": "git://github.com/isaacs/chownr.git"
+    },
+    "files": [
+      "dist"
+    ],
+    "devDependencies": {
+      "@types/node": "^20.12.5",
+      "mkdirp": "^3.0.1",
+      "prettier": "^3.2.5",
+      "rimraf": "^5.0.5",
+      "tap": "^18.7.2",
+      "tshy": "^1.13.1",
+      "typedoc": "^0.25.12"
+    },
+    "scripts": {
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "test": "tap",
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "format": "prettier --write . --loglevel warn",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts"
+    },
+    "license": "BlueOak-1.0.0",
+    "engines": {
+      "node": ">=18"
+    },
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "main": "./dist/commonjs/index.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "type": "module",
+    "prettier": {
+      "semi": false,
+      "printWidth": 75,
+      "tabWidth": 2,
+      "useTabs": false,
+      "singleQuote": true,
+      "jsxSingleQuote": false,
+      "bracketSameLine": true,
+      "arrowParens": "avoid",
+      "endOfLine": "lf"
+    },
+    "_id": "chownr@3.0.0",
+    "pkgid": "chownr@3.0.0",
+    "location": "node_modules/chownr",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/chownr",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/chownr",
+    "resolved": "https://registry.npmjs.org/chownr/-/chownr-3.0.0.tgz",
+    "from": [
+      "node_modules/tar"
+    ],
+    "to": [],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)",
+    "name": "minimatch",
+    "description": "a glob matcher in javascript",
+    "version": "10.2.6",
+    "repository": {
+      "type": "git",
+      "url": "git@github.com:isaacs/minimatch"
+    },
+    "main": "./dist/commonjs/index.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "files": [
+      "dist"
+    ],
+    "scripts": {
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "test": "tap",
+      "snap": "tap",
+      "format": "prettier --write .",
+      "benchmark": "node benchmark/index.js",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts",
+      "lint": "oxlint --fix src test",
+      "postsnap": "npm run lint",
+      "postlint": "npm run format"
+    },
+    "engines": {
+      "node": "18 || 20 || >=22"
+    },
+    "devDependencies": {
+      "@types/node": "^26.1.2",
+      "mkdirp": "^3.0.1",
+      "oxlint": "^1.76.0",
+      "oxlint-tsgolint": "^7.0.2001",
+      "prettier": "^3.9.6",
+      "tap": "^21.7.5",
+      "tshy": "^4.1.3",
+      "typedoc": "^0.28.20"
+    },
+    "funding": {
+      "url": "https://github.com/sponsors/isaacs"
+    },
+    "license": "BlueOak-1.0.0",
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      },
+      "selfLink": false
+    },
+    "type": "module",
+    "module": "./dist/esm/index.js",
+    "dependencies": {
+      "brace-expansion": "^5.0.8"
+    },
+    "_id": "minimatch@10.2.6",
+    "pkgid": "minimatch@10.2.6",
+    "location": "node_modules/minimatch",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/minimatch",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/minimatch",
+    "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-10.2.6.tgz",
+    "from": [
+      "node_modules/@bytecodealliance/jco-std"
+    ],
+    "to": [
+      "node_modules/brace-expansion"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "minipass",
+    "version": "7.1.3",
+    "description": "minimal implementation of a PassThrough stream",
+    "main": "./dist/commonjs/index.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "module": "./dist/esm/index.js",
+    "type": "module",
+    "tshy": {
+      "selfLink": false,
+      "compiler": "tsgo",
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "files": [
+      "dist"
+    ],
+    "scripts": {
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "test": "tap",
+      "snap": "tap",
+      "format": "prettier --write . --loglevel warn",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts"
+    },
+    "prettier": {
+      "semi": false,
+      "printWidth": 75,
+      "tabWidth": 2,
+      "useTabs": false,
+      "singleQuote": true,
+      "jsxSingleQuote": false,
+      "bracketSameLine": true,
+      "arrowParens": "avoid",
+      "endOfLine": "lf"
+    },
+    "devDependencies": {
+      "@types/end-of-stream": "^1.4.2",
+      "@types/node": "^25.2.3",
+      "end-of-stream": "^1.4.0",
+      "node-abort-controller": "^3.1.1",
+      "prettier": "^3.8.1",
+      "tap": "^21.6.1",
+      "through2": "^2.0.3",
+      "tshy": "^3.3.2",
+      "typedoc": "^0.28.17"
+    },
+    "repository": "https://github.com/isaacs/minipass",
+    "keywords": [
+      "passthrough",
+      "stream"
+    ],
+    "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+    "license": "BlueOak-1.0.0",
+    "engines": {
+      "node": ">=16 || 14 >=14.17"
+    },
+    "_id": "minipass@7.1.3",
+    "pkgid": "minipass@7.1.3",
+    "location": "node_modules/minipass",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/minipass",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/minipass",
+    "resolved": "https://registry.npmjs.org/minipass/-/minipass-7.1.3.tgz",
+    "from": [
+      "node_modules/minizlib",
+      "node_modules/tar",
+      "node_modules/@isaacs/fs-minipass"
+    ],
+    "to": [],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "minizlib",
+    "version": "3.1.0",
+    "description": "A small fast zlib stream built on [minipass](http://npm.im/minipass) and Node.js's zlib binding.",
+    "main": "./dist/commonjs/index.js",
+    "dependencies": {
+      "minipass": "^7.1.2"
+    },
+    "scripts": {
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "test": "tap",
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "format": "prettier --write . --loglevel warn",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts"
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/isaacs/minizlib.git"
+    },
+    "keywords": [
+      "zlib",
+      "gzip",
+      "gunzip",
+      "deflate",
+      "inflate",
+      "compression",
+      "zip",
+      "unzip"
+    ],
+    "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+    "license": "MIT",
+    "devDependencies": {
+      "@types/node": "^24.5.2",
+      "tap": "^21.1.0",
+      "tshy": "^3.0.2",
+      "typedoc": "^0.28.1"
+    },
+    "files": [
+      "dist"
+    ],
+    "engines": {
+      "node": ">= 18"
+    },
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "types": "./dist/commonjs/index.d.ts",
+    "type": "module",
+    "prettier": {
+      "semi": false,
+      "printWidth": 75,
+      "tabWidth": 2,
+      "useTabs": false,
+      "singleQuote": true,
+      "jsxSingleQuote": false,
+      "bracketSameLine": true,
+      "arrowParens": "avoid",
+      "endOfLine": "lf"
+    },
+    "module": "./dist/esm/index.js",
+    "_id": "minizlib@3.1.0",
+    "pkgid": "minizlib@3.1.0",
+    "location": "node_modules/minizlib",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/minizlib",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/minizlib",
+    "resolved": "https://registry.npmjs.org/minizlib/-/minizlib-3.1.0.tgz",
+    "from": [
+      "node_modules/tar"
+    ],
+    "to": [
+      "node_modules/minipass"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "mkdirp",
+    "description": "Recursively mkdir, like `mkdir -p`",
+    "version": "3.0.1",
+    "keywords": [
+      "mkdir",
+      "directory",
+      "make dir",
+      "make",
+      "dir",
+      "recursive",
+      "native"
+    ],
+    "bin": {
+      "mkdirp": "dist/cjs/src/bin.js"
+    },
+    "main": "./dist/cjs/src/index.js",
+    "module": "./dist/mjs/index.js",
+    "types": "./dist/mjs/index.d.ts",
+    "exports": {
+      ".": {
+        "import": {
+          "types": "./dist/mjs/index.d.ts",
+          "default": "./dist/mjs/index.js"
+        },
+        "require": {
+          "types": "./dist/cjs/src/index.d.ts",
+          "default": "./dist/cjs/src/index.js"
+        }
+      }
+    },
+    "files": [
+      "dist"
+    ],
+    "scripts": {
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "preprepare": "rm -rf dist",
+      "prepare": "tsc -p tsconfig.json && tsc -p tsconfig-esm.json",
+      "postprepare": "bash fixup.sh",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "test": "c8 tap",
+      "snap": "c8 tap",
+      "format": "prettier --write . --loglevel warn",
+      "benchmark": "node benchmark/index.js",
+      "typedoc": "typedoc --tsconfig tsconfig-esm.json ./src/*.ts"
+    },
+    "prettier": {
+      "semi": false,
+      "printWidth": 80,
+      "tabWidth": 2,
+      "useTabs": false,
+      "singleQuote": true,
+      "jsxSingleQuote": false,
+      "bracketSameLine": true,
+      "arrowParens": "avoid",
+      "endOfLine": "lf"
+    },
+    "devDependencies": {
+      "@types/brace-expansion": "^1.1.0",
+      "@types/node": "^18.11.9",
+      "@types/tap": "^15.0.7",
+      "c8": "^7.12.0",
+      "eslint-config-prettier": "^8.6.0",
+      "prettier": "^2.8.2",
+      "tap": "^16.3.3",
+      "ts-node": "^10.9.1",
+      "typedoc": "^0.23.21",
+      "typescript": "^4.9.3"
+    },
+    "tap": {
+      "coverage": false,
+      "node-arg": [
+        "--no-warnings",
+        "--loader",
+        "ts-node/esm"
+      ],
+      "ts": false
+    },
+    "funding": {
+      "url": "https://github.com/sponsors/isaacs"
+    },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/isaacs/node-mkdirp.git"
+    },
+    "license": "MIT",
+    "engines": {
+      "node": ">=10"
+    },
+    "_id": "mkdirp@3.0.1",
+    "pkgid": "mkdirp@3.0.1",
+    "location": "node_modules/mkdirp",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/mkdirp",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/mkdirp",
+    "resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-3.0.1.tgz",
+    "from": [
+      "node_modules/@bytecodealliance/jco"
+    ],
+    "to": [],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "author": "Isaac Z. Schlueter",
+    "name": "tar",
+    "description": "tar for node",
+    "version": "7.5.22",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/isaacs/node-tar.git"
+    },
+    "scripts": {
+      "genparse": "node scripts/generate-parse-fixtures.js",
+      "snap": "tap",
+      "test": "tap",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "prepare": "tshy && bash scripts/build.sh",
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "format": "prettier --write . --log-level warn",
+      "typedoc": "typedoc --tsconfig .tshy/esm.json ./src/*.ts",
+      "lint": "oxlint --fix src test",
+      "postsnap": "npm run lint",
+      "postlint": "npm run format"
+    },
+    "dependencies": {
+      "@isaacs/fs-minipass": "^4.0.0",
+      "chownr": "^3.0.0",
+      "minipass": "^7.1.2",
+      "minizlib": "^3.1.0",
+      "yallist": "^5.0.0"
+    },
+    "devDependencies": {
+      "@types/node": "^25.9.1",
+      "chmodr": "^2.0.2",
+      "end-of-stream": "^1.4.3",
+      "esbuild": "^0.28.0",
+      "events-to-array": "^2.0.3",
+      "mutate-fs": "^2.1.1",
+      "nock": "^13.5.4",
+      "oxlint": "^1.67.0",
+      "oxlint-tsgolint": "^0.23.0",
+      "prettier": "^3.8.3",
+      "rimraf": "^6.1.2",
+      "tap": "^21.7.4",
+      "tshy": "^4.1.2",
+      "typedoc": "^0.28.19"
+    },
+    "license": "BlueOak-1.0.0",
+    "engines": {
+      "node": ">=18"
+    },
+    "files": [
+      "dist"
+    ],
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": {
+          "import": {
+            "types": "./dist/esm/index.d.ts",
+            "default": "./dist/esm/index.min.js"
+          },
+          "require": {
+            "types": "./dist/commonjs/index.d.ts",
+            "default": "./dist/commonjs/index.min.js"
+          }
+        },
+        "./raw": "./src/index.ts",
+        "./c": "./src/create.ts",
+        "./create": "./src/create.ts",
+        "./replace": "./src/create.ts",
+        "./r": "./src/create.ts",
+        "./list": "./src/list.ts",
+        "./t": "./src/list.ts",
+        "./update": "./src/update.ts",
+        "./u": "./src/update.ts",
+        "./extract": "./src/extract.ts",
+        "./x": "./src/extract.ts",
+        "./pack": "./src/pack.ts",
+        "./unpack": "./src/unpack.ts",
+        "./parse": "./src/parse.ts",
+        "./read-entry": "./src/read-entry.ts",
+        "./write-entry": "./src/write-entry.ts",
+        "./header": "./src/header.ts",
+        "./pax": "./src/pax.ts",
+        "./types": "./src/types.ts"
+      },
+      "selfLink": false
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.min.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.min.js"
+        }
+      },
+      "./raw": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      },
+      "./c": {
+        "import": {
+          "types": "./dist/esm/create.d.ts",
+          "default": "./dist/esm/create.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/create.d.ts",
+          "default": "./dist/commonjs/create.js"
+        }
+      },
+      "./create": {
+        "import": {
+          "types": "./dist/esm/create.d.ts",
+          "default": "./dist/esm/create.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/create.d.ts",
+          "default": "./dist/commonjs/create.js"
+        }
+      },
+      "./replace": {
+        "import": {
+          "types": "./dist/esm/create.d.ts",
+          "default": "./dist/esm/create.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/create.d.ts",
+          "default": "./dist/commonjs/create.js"
+        }
+      },
+      "./r": {
+        "import": {
+          "types": "./dist/esm/create.d.ts",
+          "default": "./dist/esm/create.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/create.d.ts",
+          "default": "./dist/commonjs/create.js"
+        }
+      },
+      "./list": {
+        "import": {
+          "types": "./dist/esm/list.d.ts",
+          "default": "./dist/esm/list.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/list.d.ts",
+          "default": "./dist/commonjs/list.js"
+        }
+      },
+      "./t": {
+        "import": {
+          "types": "./dist/esm/list.d.ts",
+          "default": "./dist/esm/list.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/list.d.ts",
+          "default": "./dist/commonjs/list.js"
+        }
+      },
+      "./update": {
+        "import": {
+          "types": "./dist/esm/update.d.ts",
+          "default": "./dist/esm/update.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/update.d.ts",
+          "default": "./dist/commonjs/update.js"
+        }
+      },
+      "./u": {
+        "import": {
+          "types": "./dist/esm/update.d.ts",
+          "default": "./dist/esm/update.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/update.d.ts",
+          "default": "./dist/commonjs/update.js"
+        }
+      },
+      "./extract": {
+        "import": {
+          "types": "./dist/esm/extract.d.ts",
+          "default": "./dist/esm/extract.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/extract.d.ts",
+          "default": "./dist/commonjs/extract.js"
+        }
+      },
+      "./x": {
+        "import": {
+          "types": "./dist/esm/extract.d.ts",
+          "default": "./dist/esm/extract.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/extract.d.ts",
+          "default": "./dist/commonjs/extract.js"
+        }
+      },
+      "./pack": {
+        "import": {
+          "types": "./dist/esm/pack.d.ts",
+          "default": "./dist/esm/pack.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/pack.d.ts",
+          "default": "./dist/commonjs/pack.js"
+        }
+      },
+      "./unpack": {
+        "import": {
+          "types": "./dist/esm/unpack.d.ts",
+          "default": "./dist/esm/unpack.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/unpack.d.ts",
+          "default": "./dist/commonjs/unpack.js"
+        }
+      },
+      "./parse": {
+        "import": {
+          "types": "./dist/esm/parse.d.ts",
+          "default": "./dist/esm/parse.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/parse.d.ts",
+          "default": "./dist/commonjs/parse.js"
+        }
+      },
+      "./read-entry": {
+        "import": {
+          "types": "./dist/esm/read-entry.d.ts",
+          "default": "./dist/esm/read-entry.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/read-entry.d.ts",
+          "default": "./dist/commonjs/read-entry.js"
+        }
+      },
+      "./write-entry": {
+        "import": {
+          "types": "./dist/esm/write-entry.d.ts",
+          "default": "./dist/esm/write-entry.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/write-entry.d.ts",
+          "default": "./dist/commonjs/write-entry.js"
+        }
+      },
+      "./header": {
+        "import": {
+          "types": "./dist/esm/header.d.ts",
+          "default": "./dist/esm/header.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/header.d.ts",
+          "default": "./dist/commonjs/header.js"
+        }
+      },
+      "./pax": {
+        "import": {
+          "types": "./dist/esm/pax.d.ts",
+          "default": "./dist/esm/pax.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/pax.d.ts",
+          "default": "./dist/commonjs/pax.js"
+        }
+      },
+      "./types": {
+        "import": {
+          "types": "./dist/esm/types.d.ts",
+          "default": "./dist/esm/types.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/types.d.ts",
+          "default": "./dist/commonjs/types.js"
+        }
+      }
+    },
+    "type": "module",
+    "main": "./dist/commonjs/index.min.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "module": "./dist/esm/index.min.js",
+    "_id": "tar@7.5.22",
+    "pkgid": "tar@7.5.22",
+    "location": "node_modules/tar",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/tar",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/tar",
+    "resolved": "https://registry.npmjs.org/tar/-/tar-7.5.22.tgz",
+    "from": [
+      "node_modules/@bytecodealliance/weval"
+    ],
+    "to": [
+      "node_modules/@isaacs/fs-minipass",
+      "node_modules/chownr",
+      "node_modules/minipass",
+      "node_modules/minizlib",
+      "node_modules/yallist"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "unbzip2-stream",
+    "version": "1.4.3",
+    "description": "streaming unbzip2 implementation in pure javascript for node and browsers",
+    "keywords": [
+      "bzip",
+      "bzip2",
+      "bz2",
+      "stream",
+      "streaming",
+      "decompress",
+      "through"
+    ],
+    "scripts": {
+      "prepare": "mkdir -p dist && browserify -s unbzip2Stream index.js | uglifyjs > dist/unbzip2-stream.min.js",
+      "browser-test": "browserify -t brfs test/simple.js | tape-run",
+      "prepare-long-test": "head -c 104857600 < /dev/urandom | tee test/fixtures/vmlinux.bin | bzip2 > test/fixtures/vmlinux.bin.bz2",
+      "long-test": "tape test/extra/long.js",
+      "download-test": "beefy test/browser/long.js --open -- -t brfs",
+      "test": "tape test/*.js"
+    },
+    "author": "Jan Bölsche <jan@lagomorph.de>",
+    "repository": {
+      "url": "https://github.com/regular/unbzip2-stream.git",
+      "type": "git"
+    },
+    "bugs": {
+      "url": "https://github.com/regular/unbzip2-stream/issues"
+    },
+    "files": [
+      "index.js",
+      "lib",
+      "dist/unbzip2-stream.min.js"
+    ],
+    "main": "index.js",
+    "devDependencies": {
+      "beefy": "^2.1.8",
+      "brfs": "^1.2.0",
+      "browserify": "^16.2.3",
+      "concat-stream": "^1.4.7",
+      "stream-equal": "^1.1.1",
+      "tape": "^4.9.2",
+      "tape-run": "^4.0.0",
+      "uglify-js": "^3.0.10"
+    },
+    "dependencies": {
+      "buffer": "^5.2.1",
+      "through": "^2.3.8"
+    },
+    "license": "MIT",
+    "_id": "unbzip2-stream@1.4.3",
+    "pkgid": "unbzip2-stream@1.4.3",
+    "location": "node_modules/unbzip2-stream",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/unbzip2-stream",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/unbzip2-stream",
+    "resolved": "https://registry.npmjs.org/unbzip2-stream/-/unbzip2-stream-1.4.3.tgz",
+    "from": [
+      "node_modules/decompress-tarbz2"
+    ],
+    "to": [
+      "node_modules/unbzip2-stream/node_modules/buffer",
+      "node_modules/through"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "whatwg-url",
+    "version": "14.2.0",
+    "description": "An implementation of the WHATWG URL Standard's URL API and parsing machinery",
+    "main": "index.js",
+    "files": [
+      "index.js",
+      "webidl2js-wrapper.js",
+      "lib/*.js"
+    ],
+    "author": "Sebastian Mayr <github@smayr.name>",
+    "license": "MIT",
+    "repository": "jsdom/whatwg-url",
+    "dependencies": {
+      "tr46": "^5.1.0",
+      "webidl-conversions": "^7.0.0"
+    },
+    "devDependencies": {
+      "@domenic/eslint-config": "^4.0.1",
+      "benchmark": "^2.1.4",
+      "c8": "^10.1.3",
+      "esbuild": "^0.25.1",
+      "eslint": "^9.22.0",
+      "globals": "^16.0.0",
+      "webidl2js": "^18.0.0"
+    },
+    "engines": {
+      "node": ">=18"
+    },
+    "scripts": {
+      "coverage": "c8 node --test --experimental-test-coverage test/*.js",
+      "lint": "eslint",
+      "prepare": "node scripts/transform.js",
+      "pretest": "node scripts/get-latest-platform-tests.js && node scripts/transform.js",
+      "build-live-viewer": "esbuild --bundle --format=esm --sourcemap --outfile=live-viewer/whatwg-url.mjs index.js",
+      "test": "node --test test/*.js",
+      "bench": "node scripts/benchmark.js"
+    },
+    "c8": {
+      "reporter": [
+        "text",
+        "html"
+      ],
+      "exclude": [
+        "lib/Function.js",
+        "lib/URL.js",
+        "lib/URLSearchParams.js",
+        "lib/utils.js",
+        "scripts/",
+        "test/"
+      ]
+    },
+    "_id": "whatwg-url@14.2.0",
+    "pkgid": "whatwg-url@14.2.0",
+    "location": "node_modules/whatwg-url",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/whatwg-url",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/whatwg-url",
+    "resolved": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-14.2.0.tgz",
+    "from": [
+      "node_modules/@bytecodealliance/jco-std"
+    ],
+    "to": [
+      "node_modules/tr46",
+      "node_modules/webidl-conversions"
+    ],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  },
+  {
+    "name": "yallist",
+    "version": "5.0.0",
+    "description": "Yet Another Linked List",
+    "files": [
+      "dist"
+    ],
+    "devDependencies": {
+      "prettier": "^3.2.5",
+      "tap": "^18.7.2",
+      "tshy": "^1.13.1",
+      "typedoc": "^0.25.13"
+    },
+    "scripts": {
+      "preversion": "npm test",
+      "postversion": "npm publish",
+      "prepublishOnly": "git push origin --follow-tags",
+      "prepare": "tshy",
+      "pretest": "npm run prepare",
+      "presnap": "npm run prepare",
+      "test": "tap",
+      "snap": "tap",
+      "format": "prettier --write . --loglevel warn --ignore-path ../../.prettierignore --cache",
+      "typedoc": "typedoc"
+    },
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/isaacs/yallist.git"
+    },
+    "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+    "license": "BlueOak-1.0.0",
+    "tshy": {
+      "exports": {
+        "./package.json": "./package.json",
+        ".": "./src/index.ts"
+      }
+    },
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "import": {
+          "types": "./dist/esm/index.d.ts",
+          "default": "./dist/esm/index.js"
+        },
+        "require": {
+          "types": "./dist/commonjs/index.d.ts",
+          "default": "./dist/commonjs/index.js"
+        }
+      }
+    },
+    "main": "./dist/commonjs/index.js",
+    "types": "./dist/commonjs/index.d.ts",
+    "type": "module",
+    "prettier": {
+      "semi": false,
+      "printWidth": 70,
+      "tabWidth": 2,
+      "useTabs": false,
+      "singleQuote": true,
+      "jsxSingleQuote": false,
+      "bracketSameLine": true,
+      "arrowParens": "avoid",
+      "endOfLine": "lf"
+    },
+    "engines": {
+      "node": ">=18"
+    },
+    "_id": "yallist@5.0.0",
+    "pkgid": "yallist@5.0.0",
+    "location": "node_modules/yallist",
+    "path": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/yallist",
+    "realpath": "/home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/yallist",
+    "resolved": "https://registry.npmjs.org/yallist/-/yallist-5.0.0.tgz",
+    "from": [
+      "node_modules/tar"
+    ],
+    "to": [],
+    "dev": false,
+    "inBundle": false,
+    "deduped": false,
+    "overridden": false,
+    "queryContext": {}
+  }
+]
+
+[exit 0]

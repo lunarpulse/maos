@@ -1,0 +1,18 @@
+UTC 2026-09-26T00:49:58.617152+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ Q4_FETCH_OWNER=B spikes/story-17-3a-wasm-recall/host/run_relay_probe.sh
+READY socket=/tmp/tmp.gH5ZVEz9JT/recall.sock caller-pid=3290057 peer-pid-check=true one-shot=true
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"scope-violation\",\"recall_ns\":265346,\"fetch_ns\":63899}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=242613
+fetch-import-boundary-ns=56085
+-- service stderr --
+recall-service: one-shot-unlinked=/tmp/tmp.gH5ZVEz9JT/recall.sock
+recall-service: caller-pid=3290057 capability-invocation-audit-count=1
+recall-service: caller-pid=3290057 capability-invocation-audit-count=2
+
+[exit=0]
+SUMMARY identity check=True guest={'recall': 'ok', 'recall_entries': 1, 'fetch': 'scope-violation', 'recall_ns': 265346, 'fetch_ns': 63899}
+E15-A6: this probe reads the final built runner, guest, and live recall service; it does not set the scope-violation result.

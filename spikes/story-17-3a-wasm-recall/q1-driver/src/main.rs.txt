@@ -1,0 +1,97 @@
+use std::error::Error;
+use std::io::{self, BufReader};
+use std::time::{Duration, Instant};
+
+use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskAssignPayload};
+use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i3::FrameOrigin;
+use maos_spirit_abi::identity::FrameKind;
+use wasmtime::component::Component;
+use wasmtime::{Config, Engine};
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("encode") if args.next().is_none() => encode(),
+        Some("decode") if args.next().is_none() => decode(),
+        Some("compile-time") => {
+            let component = args.next().ok_or("compile-time requires a component path")?;
+            if args.next().is_some() {
+                return Err("compile-time accepts exactly one component path".into());
+            }
+            compile_time(&component)
+        }
+        _ => Err("usage: q1-driver encode | decode | compile-time <component>".into()),
+    }
+}
+
+fn sample_frame() -> IacFrame {
+    let mut frame = IacFrame {
+        frame_id: [7u8; 16],
+        timestamp_ns: 123_456_789,
+        logical_clock: 1,
+        from: FrameAddress {
+            spirit_id: "q1-driver".into(),
+            host_id: None,
+            role: None,
+        },
+        to: Default::default(),
+        kind: FrameKind::TaskAssign,
+        intent: IntentClass::Standard,
+        payload: FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "componentize-js runner probe".into(),
+            scope: vec![],
+            success_criteria: "the guest echoes this real ADR-032 frame".into(),
+            posture_preferences: Default::default(),
+            prior_distillate_ref: None,
+        }),
+        auto_marker: FrameOrigin::Kernel,
+        consent_envelope: None,
+        intent_lineage: Default::default(),
+    };
+    frame.to.push(FrameAddress {
+        spirit_id: "peer-spirit".into(),
+        host_id: None,
+        role: None,
+    });
+    frame
+}
+
+fn encode() -> Result<(), Box<dyn Error>> {
+    let frame = sample_frame();
+    let cbor = maos_wasm_host::codec::encode_cbor(&frame).map_err(io::Error::other)?;
+    maos_wasm_host::codec::write_frame(&mut io::stdout().lock(), &cbor)?;
+    Ok(())
+}
+
+fn decode() -> Result<(), Box<dyn Error>> {
+    let stdin = io::stdin();
+    let mut input = BufReader::new(stdin.lock());
+    let mut count = 0;
+    while let Some(cbor) = maos_wasm_host::codec::read_frame(&mut input)? {
+        let frame: IacFrame = maos_wasm_host::codec::decode_cbor(&cbor).map_err(io::Error::other)?;
+        count += 1;
+        println!("decoded[{count}]={frame:#?}");
+    }
+    println!("decoded-count={count}");
+    Ok(())
+}
+
+fn compile_time(component_path: &str) -> Result<(), Box<dyn Error>> {
+    let wasm = std::fs::read(component_path)?;
+    // Exact Q1 runner configuration: runner.rs:150-154.
+    let mut config = Config::new();
+    config.consume_fuel(true);
+    config.wasm_component_model(true);
+    let engine = Engine::new(&config)?;
+    let started = Instant::now();
+    let _component = Component::new(&engine, wasm)?;
+    let elapsed = started.elapsed();
+    println!(
+        "component={component_path} bytes={} component-new-ms={:.3} under-compile-timeout={}",
+        std::fs::metadata(component_path)?.len(),
+        elapsed.as_secs_f64() * 1_000.0,
+        elapsed < Duration::from_secs(10),
+    );
+    Ok(())
+}

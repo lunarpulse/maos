@@ -1,0 +1,13 @@
+# T1 toolchain — 2026-09-26T00:10:22Z
+$ rustup target add wasm32-wasip2
+info: downloading component rust-std
+rc=0
+$ cargo install --locked wasm-tools
+   Compiling wit-dylib v0.259.0
+   Compiling wit-smith v0.259.0
+    Finished `release` profile [optimized] target(s) in 37.08s
+  Installing /home/lunarpulse/.cargo/bin/wasm-tools
+   Installed package `wasm-tools v1.259.0` (executable `wasm-tools`)
+rc=0
+$ wasm-tools --version
+wasm-tools 1.259.0

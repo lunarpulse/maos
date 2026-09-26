@@ -1,0 +1,24 @@
+[workspace]
+
+[package]
+name = "story-17-3a-t2-ladder"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+landlock = "=0.4.4"
+seccompiler = "=0.4.0"
+libc = "=0.2.186"
+ciborium = "=0.2.2"
+smallvec = "=1.15.1"
+maos-domain = { path = "../../../crates/maos-domain" }
+maos-spirit-abi = { path = "../../../crates/maos-spirit-abi" }
+
+[[bin]]
+name = "t2-ladder"
+path = "t2_ladder.rs.txt"
+
+[[bin]]
+name = "framegen"
+path = "framegen.rs.txt"

@@ -1,0 +1,19 @@
+[workspace]
+
+[package]
+name = "story-17-3a-version-only-guest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wit-bindgen = "=0.44.0"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs.txt"
+
+[profile.release]
+opt-level = "s"
+panic = "abort"
+strip = true

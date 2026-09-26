@@ -1,0 +1,383 @@
+// `maos:spirit@1.1.0` — Story 17-3a spike COPY (recall + frame variant).
+// NOT the pinned WIT. The pinned `@1.0.0` lives at `wit/spirit.wit` and is
+// never edited by the spike (its sha feeds four provenance `source_sha256`
+// rows — 17-3a P1/P3). This copy differs from the recall-only variant in its
+// `frames` projection: typed `intent`, `consent-envelope`, `intent-lineage`,
+// and lossless `scope` replace the lossy v1.0 bridge projections. It exists
+// separately so Q5 isolates world-import additivity from record-shape skew.
+
+package maos:spirit@1.1.0;
+
+interface frames {
+    // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
+    // WIT enum order encodes the discriminant; the comment is the on-wire
+    // CBOR discriminant value.
+    enum frame-kind {
+        task-assign,            // 0
+        task-complete,          // 1
+        decision-dispatch,      // 2
+        epistemic-halt,         // 3
+        telemetry-event,        // 4
+        consent-request,        // 5
+        retract,                // 6
+        capability-invocation,  // 7
+        sandbox-block,          // 8
+        inference-call,         // 9
+        budget-warning,         // 12
+        budget-exceeded,        // 13
+        cli-subprocess-output,  // 21
+        consent-rupture,        // 22
+        rate-limited,           // 23
+        gateway-inbound,        // 24
+        gateway-outbound,       // 25
+    }
+
+    // ── FrameOrigin (i3) ───────────────────────────────────────────────
+    enum frame-origin {
+        human-authored,
+        spirit-auto,
+        spirit-drafted-human-approved,
+        kernel,
+    }
+
+    // ── FrameAddress (frame.rs:54-59) ──────────────────────────────────
+    record frame-address {
+        spirit-id: string,
+        host-id: option<string>,
+        role: option<string>,
+    }
+
+    // ── PostureHint (frame.rs:166-171) ─────────────────────────────────
+    enum posture-hint {
+        autonomous-with-halt,
+        assistive,
+        cautious,
+    }
+
+    // ── HaltPolicyOverride (frame.rs:142-147) ──────────────────────────
+    record halt-policy-override {
+        tag: string,
+        recall-vs-precision: f32,
+    }
+
+    // ── PosturePreferences (frame.rs:118-130) ──────────────────────────
+    record posture-preferences {
+        preferred-posture: option<posture-hint>,
+        halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    // ── PriorDistillateRef (frame.rs:100-110) ──────────────────────────
+    record prior-distillate-ref {
+        digest-frame-id: list<u8>,      // [u8; 16]
+        distillation-depth: u32,
+    }
+
+    // ── Lossless Scope (invariants/i1.rs) ──────────────────────────────
+    record scope-mcp-call {
+        server: string,
+        tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+        cli-binary-path: string,
+        argv-prefix-hash: list<u8>, // [u8; 32]
+        output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+        gateway-id: string,
+        recipient: string,
+    }
+
+    variant scope {
+        fs-read(string),
+        fs-write(string),
+        net-https(string),
+        proc-exec(string),
+        sub-spirit-spawn(string),
+        provider-infer(string),
+        iac-send(string),
+        mem-read(string),
+        mem-write(string),
+        self-telemetry-read,
+        log-recall,
+        log-fetch,
+        distillate-write,
+        mcp-call(scope-mcp-call),
+        cli-subprocess-spawn(scope-cli-subprocess-spawn),
+        gateway-send(scope-gateway-send),
+        skill-author-self,
+        loom-read,
+        loom-write,
+        loom-scan,
+    }
+
+    // ── TaskAssignPayload (frame.rs:79-92) ─────────────────────────────
+    record task-assign-body {
+        goal: string,
+        scope: list<scope>,            // Vec<Scope>, lossless
+        success-criteria: string,
+        posture-preferences: posture-preferences,
+        prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    // ── TaskCompletePayload (frame.rs:175-177) ─────────────────────────
+    record task-complete-body {
+        result-text: string,
+    }
+
+    // ── DecisionDispatchPayload (frame.rs:181-190) ─────────────────────
+    record decision-dispatch-body {
+        decision-id: u64,
+        approved: bool,
+    }
+
+    // ── EpistemicHaltPayload (frame.rs:198-230) ────────────────────────
+    record epistemic-halt-body {
+        halt-id: string,
+        tag: string,
+        value: f32,
+        threshold: option<f32>,
+        policy-id: string,
+        derived-from: string,
+    }
+
+    // ── TelemetryEventPayload (frame.rs:278-281) ───────────────────────
+    record telemetry-event-body {
+        event-type: string,
+        data: string,
+    }
+
+    // ── ConsentRequestPayload (frame.rs:285-287) ───────────────────────
+    record consent-request-body {
+        capability: string,
+    }
+
+    // ── RetractPayload (frame.rs:296-308) ──────────────────────────────
+    record retract-body {
+        original-frame-id: list<u8>,    // [u8; 16]
+        reason: string,
+        original-kind: option<frame-kind>,
+    }
+
+    // ── RuptureReason (frame.rs:370-382) ───────────────────────────────
+    enum rupture-reason {
+        intent-allowlist-mismatch,
+        posture-shifted-during-transmission,
+        token-revoked,
+        principal-revoked,
+        recipient-unloaded,
+    }
+
+    // ── RuptureRejection (frame.rs:360-363) ────────────────────────────
+    record rupture-rejection {
+        address: frame-address,
+        reason: rupture-reason,
+    }
+
+    // ── ConsentRupturePayload (frame.rs:345-356) ───────────────────────
+    record consent-rupture-body {
+        rupture-id: list<u8>,           // [u8; 16]
+        original-frame-id: list<u8>,    // [u8; 16]
+        original-kind: frame-kind,
+        accepted: list<frame-address>,
+        rejected: list<rupture-rejection>,
+        ruptured-at-ns: u64,
+    }
+
+    // ── RateLimitedPayload (frame.rs:386-400) ──────────────────────────
+    record rate-limited-body {
+        provider-id: string,
+        credential-fingerprint-prefix-hex: string,
+        retry-after-ms: u64,
+        bucket-remaining: u32,
+        bucket-capacity: u32,
+        refill-per-sec: u32,
+        schedule-id: option<string>,
+    }
+
+    // ── BudgetEnvelope (frame.rs) ─────────────────────────────────────
+    record budget-envelope {
+        spirit-pid: u32,
+        hook-name: string,
+        wall-ns: u64,
+        cap-seconds: u64,
+    }
+
+    // ── FramePayload (frame.rs:63-75) ──────────────────────────────────
+    // Discriminated union — one variant per routed FrameKind.
+    variant frame-payload {
+        task-assign(task-assign-body),
+        task-complete(task-complete-body),
+        decision-dispatch(decision-dispatch-body),
+        epistemic-halt(epistemic-halt-body),
+        telemetry-event(telemetry-event-body),
+        consent-request(consent-request-body),
+        retract(retract-body),
+        budget-warning(budget-envelope),
+        budget-exceeded(budget-envelope),
+        consent-rupture(consent-rupture-body),
+        rate-limited(rate-limited-body),
+    }
+
+    // ── IntentClass / ConsentEnvelope / IntentLineage ─────────────────
+    enum intent-class {
+        high-privilege,
+        standard,
+        readonly,
+    }
+
+    record consent-envelope {
+        consent-id: list<u8>,          // [u8; 16]
+        granter: frame-address,
+        timestamp-ns: u64,
+        intent-class: option<string>,  // A2AIntent's lossless inner string
+        valid-until-ns: option<u64>,
+    }
+
+    // ── IacFrame envelope (frame.rs:26-51) ─────────────────────────────
+    record iac-frame {
+        frame-id: list<u8>,             // [u8; 16]
+        timestamp-ns: u64,
+        logical-clock: u64,
+        frame-from: frame-address,
+        to: list<frame-address>,
+        kind: frame-kind,
+        intent: intent-class,
+        payload: frame-payload,
+        auto-marker: frame-origin,
+        consent-envelope: option<consent-envelope>,
+        intent-lineage: list<string>,   // Vec<A2AIntent>'s lossless strings
+    }
+
+    // ── Halt signal ────────────────────────────────────────────────────
+    // Returned by the guest (ADR-032: EOF after clean frame =
+    // Halt::Voluntary; mid-frame EOF = Halt::Fault(Truncated)).
+    variant halt {
+        voluntary,
+        fault(string),
+    }
+}
+
+// ── Recall (crates/maos-domain/src/log_recall.rs) ─────────────────────
+// The caller's Spirit pid is NOT a parameter anywhere in this interface:
+// `LogRecallFilter` has no pid field by design (log_recall.rs:13-38, pinned by
+// crates/maos-bin/tests/cross_team_consent_13_3.rs:290-308). The host binds the
+// caller's pid from the channel it spawned the runner with (17-3a P7, Q4c).
+interface recall {
+    use frames.{frame-origin};
+
+    // FrameKindLabel (log_recall.rs:44-91): 30 variants, `#[non_exhaustive]`.
+    // Deliberately NOT `frames.frame-kind` (17 routed kinds): recall reads the
+    // audit log, whose label set is wider. A WIT enum is closed, so a new label
+    // is a type change for every importer — Q5 measures what that costs.
+    enum frame-kind-label {
+        task-assign,
+        task-complete,
+        decision-dispatch,
+        epistemic-halt,
+        telemetry-event,
+        consent-request,
+        retract,
+        capability-invocation,
+        sandbox-block,
+        inference-call,
+        decision,
+        distillate,
+        budget-warning,
+        budget-exceeded,
+        hot-swap-aborted,
+        task-stalled,
+        silent-failure-suspect,
+        spirit-revoked,
+        mcp-invocation,
+        spirit-admitted,
+        registry-yank,
+        cli-subprocess-output,
+        consent-rupture,
+        rate-limited,
+        gateway-inbound,
+        gateway-outbound,
+        spirit-imported,
+        cli-wrapper-shape-mismatch,
+        governance-event,
+        cost-attribution,
+    }
+
+    // LogRecallCursor (log_recall.rs:175-180).
+    record recall-cursor {
+        last-timestamp-ns: u64,
+        last-frame-id: list<u8>,        // [u8; 16]
+    }
+
+    // LogRecallFilter (log_recall.rs:14-38); `limit` is clamped host-side to
+    // LogRecallFilter::MAX_LIMIT = 1024 (:95, :98-115).
+    record recall-filter {
+        kind: option<frame-kind-label>,
+        since-ns: option<u64>,
+        until-ns: option<u64>,
+        limit: u32,
+        cursor: option<recall-cursor>,
+        intent-filter: option<string>,
+    }
+
+    // LogRecallEntry (log_recall.rs:213-226) — no payload; `fetch` for that.
+    record recall-entry {
+        frame-id: list<u8>,             // [u8; 16]
+        timestamp-ns: u64,
+        kind: frame-kind-label,
+        intent: string,
+        peer-spirit-pid: u32,
+        payload-available: bool,
+    }
+
+    // LogRecallPage (log_recall.rs:193-198).
+    record recall-page {
+        entries: list<recall-entry>,
+        next-cursor: option<recall-cursor>,
+    }
+
+    // LogFetchResponse (log_recall.rs:250-265).
+    record fetch-response {
+        frame-id: list<u8>,             // [u8; 16]
+        timestamp-ns: u64,
+        kind: frame-kind-label,
+        intent: string,
+        payload-redacted: list<u8>,
+        capability-token: option<list<u8>>,   // [u8; 32]
+        origin: frame-origin,
+    }
+
+    // LogRecallError (log_recall.rs:332-358), hand-mapped host-side (the
+    // domain error has no serde, :331). `scope-violation` carries the frame id
+    // only — never the owner pid the domain error holds (:341-345).
+    variant recall-error {
+        scope-violation(list<u8>),
+        frame-not-found(list<u8>),
+        storage(string),
+        invalid-cursor(string),
+        limit-exceeded(u32),
+        cross-wall-denied(string),
+    }
+
+    recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
+    fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
+}
+
+// The Spirit world a WASM-component author implements. The host
+// (maos-wasm-host) drives it: feeds inbound frames decoded from the
+// ADR-032 stdio stream, and writes the guest's emitted frames back to
+// the same stream.
+world spirit {
+    import recall;
+    use frames.{iac-frame, halt};
+
+    // host → guest: deliver one inbound frame, get zero-or-more emitted
+    // frames. A returned `halt` ends the session (maps to the ADR-032
+    // EOF semantics).
+    export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+
+    // host → guest: lifecycle hooks (mirror the native form's boot/shutdown).
+    export on-start: func() -> result<_, halt>;
+    export on-shutdown: func();
+}

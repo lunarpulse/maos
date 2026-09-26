@@ -1,0 +1,138 @@
+UTC: 2026-09-26T00:19:52.671Z
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+E15-A6: This probe observes npm's actual install network activity and installed dependency tree; it does not only inspect files it set itself.
+$ npm ci --verbose
+
+added 164 packages, and audited 165 packages in 2s
+
+26 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (3 moderate, 1 critical)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+npm verb cli /usr/bin/node /usr/bin/npm
+npm info using npm@9.2.0
+npm info using node@v20.19.2
+npm verb title npm ci
+npm verb argv "ci" "--loglevel" "verbose"
+npm verb logfile logs-max:10 dir:/home/lunarpulse/.npm/_logs/2026-09-26T00_19_50_412Z-
+npm verb logfile /home/lunarpulse/.npm/_logs/2026-09-26T00_19_50_412Z-debug-0.log
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: '@napi-rs/lzma@1.5.1',
+npm WARN EBADENGINE   required: { node: '^22.20 || ^24.12 || >=25' },
+npm WARN EBADENGINE   current: { node: 'v20.19.2', npm: '9.2.0' }
+npm WARN EBADENGINE }
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-win32-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-win32-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-sunos-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-openbsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-openbsd-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-netbsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-netbsd-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-s390x
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-riscv64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-ppc64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-mips64el
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-loong64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-linux-arm
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-freebsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-freebsd-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@typescript/typescript-aix-ppc64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-win32-x64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-win32-arm64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-openharmony-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-linux-s390x-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-linux-ppc64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-linux-arm64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-linux-arm64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-linux-arm-gnueabihf
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-freebsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-android-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@rolldown/binding-android-arm-eabi
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-win32-x64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-win32-arm64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-wasm32-wasi
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-wasm32-wasi/node_modules/@napi-rs/wasm-runtime
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-linux-s390x-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-linux-riscv64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-linux-arm64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-linux-arm64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-linux-arm-musleabihf
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-linux-arm-gnueabihf
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-freebsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-parser/binding-android-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-win32-x64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-win32-ia32-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-win32-arm64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-wasm32-wasi
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-wasm32-wasi/node_modules/@emnapi/core
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-wasm32-wasi/node_modules/@emnapi/runtime
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-openharmony-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-s390x-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-riscv64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-riscv64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-ppc64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-arm64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-arm64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-arm-musleabihf
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-linux-arm-gnueabihf
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-freebsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-android-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@oxc-minify/binding-android-arm-eabi
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-win32-x64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-win32-ia32-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-win32-arm64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-wasm32-wasi
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-x64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-x64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-s390x-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-riscv64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-ppc64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-arm64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-arm64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-linux-arm-gnueabihf
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-freebsd-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-android-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@napi-rs/lzma-android-arm-eabi
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/wizer-win32-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/wizer-linux-s390x
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/wizer-linux-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/wizer-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/wizer-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/jco-node-fs-win32-x64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/jco-node-fs-win32-arm64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/jco-node-fs-linux-arm64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/jco-node-fs-linux-arm64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/jco-node-fs-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@bytecodealliance/jco-node-fs-darwin-arm64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@andreiltd/componentize-qjs-binding-win32-x64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@andreiltd/componentize-qjs-binding-win32-arm64-msvc
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@andreiltd/componentize-qjs-binding-linux-arm64-musl
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@andreiltd/componentize-qjs-binding-linux-arm64-gnu
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@andreiltd/componentize-qjs-binding-darwin-x64
+npm verb reify failed optional dependency /home/lunarpulse/dev_ws/spikes/story-17-3a-wasm-recall/ts-guest/node_modules/@andreiltd/componentize-qjs-binding-darwin-arm64
+npm http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 1615ms
+npm http fetch GET 200 https://registry.npmjs.org/decompress 7ms (cache hit)
+npm http fetch GET 200 https://registry.npmjs.org/@bytecodealliance%2fweval 5ms (cache hit)
+npm http fetch GET 200 https://registry.npmjs.org/@bytecodealliance%2fcomponentize-js 4ms (cache hit)
+npm http fetch GET 200 https://registry.npmjs.org/@bytecodealliance%2fjco 4ms (cache hit)
+npm verb exit 0
+npm info ok 
+
+[exit 0]

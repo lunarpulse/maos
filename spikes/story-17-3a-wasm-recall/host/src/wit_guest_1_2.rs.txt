@@ -1,0 +1,4 @@
+wasmtime::component::bindgen!({
+    path: "../wit-1.2-enum/spirit.wit",
+    world: "spirit",
+});

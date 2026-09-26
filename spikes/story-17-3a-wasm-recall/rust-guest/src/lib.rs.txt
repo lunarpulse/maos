@@ -1,0 +1,75 @@
+wit_bindgen::generate!({
+    path: "../wit-1.1/spirit.wit",
+    world: "spirit",
+});
+
+use maos::spirit::recall;
+use maos::spirit::frames::{FramePayload, TelemetryEventBody};
+
+struct RecallGuest;
+
+impl Guest for RecallGuest {
+    fn handle_frame(mut frame: IacFrame) -> Result<Vec<IacFrame>, Halt> {
+        let FramePayload::TelemetryEvent(event) = &frame.payload else {
+            return Ok(vec![frame]);
+        };
+        if event.event_type != "recall-probe" {
+            return Ok(vec![frame]);
+        }
+        let frame_id = match decode_hex_id(&event.data) {
+            Ok(frame_id) => frame_id,
+            Err(error) => {
+                frame.payload = FramePayload::TelemetryEvent(TelemetryEventBody {
+                    event_type: "recall-result".to_string(),
+                    data: format!(r#"{{"error":"{error}"}}"#),
+                });
+                return Ok(vec![frame]);
+            }
+        };
+        let recall_started = std::time::Instant::now();
+        let recalled = recall::recall(&recall::RecallFilter {
+            kind: None,
+            since_ns: None,
+            until_ns: None,
+            limit: 16,
+            cursor: None,
+            intent_filter: None,
+        });
+        let recall_ns = recall_started.elapsed().as_nanos();
+        let fetched_started = std::time::Instant::now();
+        let fetched = recall::fetch(&frame_id);
+        let fetch_ns = fetched_started.elapsed().as_nanos();
+        let recall_entries = recalled.as_ref().map(|page| page.entries.len()).unwrap_or(0);
+        let fetch_status = match &fetched {
+            Ok(_) => "ok",
+            Err(recall::RecallError::ScopeViolation(_)) => "scope-violation",
+            Err(_) => "error",
+        };
+        frame.payload = FramePayload::TelemetryEvent(TelemetryEventBody {
+            event_type: "recall-result".to_string(),
+            data: format!(
+                r#"{{"recall":"{}","recall_entries":{},"fetch":"{}","recall_ns":{},"fetch_ns":{}}}"#,
+                if recalled.is_ok() { "ok" } else { "error" },
+                recall_entries,
+                fetch_status,
+                recall_ns,
+                fetch_ns,
+            ),
+        });
+        Ok(vec![frame])
+    }
+
+    fn on_start() -> Result<(), Halt> { Ok(()) }
+    fn on_shutdown() {}
+}
+
+fn decode_hex_id(input: &str) -> Result<Vec<u8>, String> {
+    if input.len() != 32 { return Err("frame id must be 32 lowercase hex characters".to_string()); }
+    let mut id = Vec::with_capacity(16);
+    for index in (0..input.len()).step_by(2) {
+        id.push(u8::from_str_radix(&input[index..index + 2], 16).map_err(|_| "frame id must be hex".to_string())?);
+    }
+    Ok(id)
+}
+
+export!(RecallGuest);

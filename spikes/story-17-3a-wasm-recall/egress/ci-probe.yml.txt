@@ -1,0 +1,171 @@
+name: Spike 17-3a CI probe
+
+on:
+  push:
+    branches: [spike/17-3a-ci-probe]
+
+permissions:
+  contents: read
+
+jobs:
+  t2-probe:
+    name: t2-probe (${{ matrix.image }})
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      SPIKE_CI_BRANCH_BUILD: true
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: spike-17-3a-t2-${{ matrix.image }}-${{ hashFiles('Cargo.lock', 'spikes/story-17-3a-wasm-recall/**/Cargo.lock') }}
+      - name: Install strace and WASI P2 target
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y strace
+          rustup target add wasm32-wasip2
+      - name: Build forbidden-syscall probe fixture
+        run: cargo build --locked --release --target-dir crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/target --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Record current T2 test-layer refusal
+        run: |
+          set +e
+          cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture > /tmp/t2-sandbox-kill.log 2>&1
+          test_rc=$?
+          set -e
+          cat /tmp/t2-sandbox-kill.log
+          p20=$(python3 - /tmp/t2-sandbox-kill.log <<'PY'
+          import pathlib
+          import sys
+          lines = pathlib.Path(sys.argv[1]).read_text(errors="replace").splitlines()
+          skips = [line for line in lines if line.startswith("SKIP ")]
+          raw = [line for line in lines if "maos: landlock not enforced" in line or "landlock restrict_self failed" in line or "maos: seccomp apply failed" in line]
+          result = next((line for line in reversed(lines) if line.startswith("test result:")), "none")
+          print(f"skip-count={len(skips)} first-skip={skips[0] if skips else 'none'} raw-refusal-count={len(raw)} first-raw-refusal={raw[0] if raw else 'none'} result={result}".replace("\n", "%0A"))
+          PY
+          )
+          printf '::notice title=t2-probe/${{ matrix.image }}/p20::rc=%s %s\n' "$test_rc" "$p20"
+          if [ "$test_rc" -ne 0 ]; then
+            printf '::error title=t2-probe/${{ matrix.image }}/p20::test completed rc=%s; recorded separately so the independent Landlock/seccomp ladder still executes\n' "$test_rc"
+          fi
+      - name: Build spike ladder
+        run: |
+          set +e
+          cargo build --locked --manifest-path spikes/story-17-3a-wasm-recall/t2-ladder/Cargo.toml > /tmp/build-ladder.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/build-ladder.log
+          if [ "$rc" -ne 0 ]; then
+            detail=$(python3 - /tmp/build-ladder.log <<'PY'
+          import pathlib, sys
+          lines = pathlib.Path(sys.argv[1]).read_text(errors="replace").splitlines()
+          start = next((i for i, line in enumerate(lines) if "error" in line.lower()), 0)
+          print("%0A".join(lines[start:start + 8]))
+          PY
+            )
+            printf '::error title=build/ladder/${{ matrix.image }}::rc=%s %s\n' "$rc" "$detail"
+            exit "$rc"
+          fi
+          printf '::notice title=build/ladder/${{ matrix.image }}::rc=0\n'
+      - name: Build recall relay host
+        run: |
+          set +e
+          cargo build --locked --release --manifest-path spikes/story-17-3a-wasm-recall/host/Cargo.toml > /tmp/build-host.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/build-host.log
+          if [ "$rc" -ne 0 ]; then
+            detail=$(python3 - /tmp/build-host.log <<'PY'
+          import pathlib, sys
+          lines = pathlib.Path(sys.argv[1]).read_text(errors="replace").splitlines()
+          start = next((i for i, line in enumerate(lines) if "error" in line.lower()), 0)
+          print("%0A".join(lines[start:start + 8]))
+          PY
+            )
+            printf '::error title=build/host/${{ matrix.image }}::rc=%s %s\n' "$rc" "$detail"
+            exit "$rc"
+          fi
+          printf '::notice title=build/host/${{ matrix.image }}::rc=0\n'
+      - name: Build recall guest
+        run: |
+          set +e
+          cargo build --locked --release --target wasm32-wasip2 --manifest-path spikes/story-17-3a-wasm-recall/rust-guest/Cargo.toml > /tmp/build-guest.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/build-guest.log
+          if [ "$rc" -ne 0 ]; then
+            detail=$(python3 - /tmp/build-guest.log <<'PY'
+          import pathlib, sys
+          lines = pathlib.Path(sys.argv[1]).read_text(errors="replace").splitlines()
+          start = next((i for i, line in enumerate(lines) if "error" in line.lower()), 0)
+          print("%0A".join(lines[start:start + 8]))
+          PY
+            )
+            printf '::error title=build/guest/${{ matrix.image }}::rc=%s %s\n' "$rc" "$detail"
+            exit "$rc"
+          fi
+          printf '::notice title=build/guest/${{ matrix.image }}::rc=0\n'
+      - name: Measure Landlock ladder
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-ladder.sh landlock
+      - name: Trace runner syscall ground truth
+        id: trace
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-ladder.sh prepare-seccomp
+      - name: Measure seccomp candidate
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+          T2_RUNNER_EXTRAS: ${{ steps.trace.outputs.runner_extras }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-ladder.sh seccomp
+      - name: Prove seccomp minimality 1
+        if: ${{ always() }}
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+          T2_RUNNER_EXTRAS: ${{ steps.trace.outputs.runner_extras }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-ladder.sh leave-one-out 0 8
+      - name: Prove seccomp minimality 2
+        if: ${{ always() }}
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+          T2_RUNNER_EXTRAS: ${{ steps.trace.outputs.runner_extras }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-ladder.sh leave-one-out 8 8
+      - name: Prove seccomp minimality 3
+        if: ${{ always() }}
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+          T2_RUNNER_EXTRAS: ${{ steps.trace.outputs.runner_extras }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-ladder.sh leave-one-out 16 8
+      - name: Measure recall path and inherited-fd transport
+        if: ${{ always() }}
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+          T2_RUNNER_EXTRAS: ${{ steps.trace.outputs.runner_extras }}
+        run: spikes/story-17-3a-wasm-recall/t2-ladder/ci-relay-ladder.sh
+
+  egress-probe:
+    name: egress-probe (${{ matrix.image }})
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Podman and busybox
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman busybox-static
+      - name: Measure M1 M2 and M3 egress mechanisms
+        env:
+          RUNNER_IMAGE: ${{ matrix.image }}
+        run: spikes/story-17-3a-wasm-recall/egress/egress-probe.sh

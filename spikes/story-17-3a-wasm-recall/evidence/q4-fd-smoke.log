@@ -1,0 +1,19 @@
+UTC 2026-09-26T00:38:39.884318+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ python3 connected-fd socketpair smoke (service --fd, runner --recall-fd)
+runner_pid=3256172
+service_ready=READY fd=9 caller-pid=3256172 binding=inherited-descriptor
+runner_rc=0 service_rc=0
+-- decoded --
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":188552,\"fetch_ns\":56546}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=179586
+fetch-import-boundary-ns=52408
+-- service stderr --
+recall-service: caller-pid=3256172 capability-invocation-audit-count=1
+recall-service: caller-pid=3256172 capability-invocation-audit-count=2
+
+
+E15-A6: this probe reads a live inherited-FD runner and recall service; it does not set the relay result.

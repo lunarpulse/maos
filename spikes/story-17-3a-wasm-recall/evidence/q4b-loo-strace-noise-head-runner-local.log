@@ -1,0 +1,44 @@
+UTC 2026-09-26T02:02:56Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS tree/runtime: copied HEAD runner, pinned component, ADR-032 input, and the three syscall names observed in CI strace but excluded from the minimal candidate; not only probe-created state.
++ target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,set_robust_list,gettid,sched_getaffinity --read tests/fixtures/wasm/echo_spirit_component.wasm --stdin target/t2-ladder/runner.frame -- spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "set_robust_list", "gettid", "sched_getaffinity"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+«hframe_idltimestamp_ns[Ímlogical_clockdfrom£ispirit_idit2-ladderghost_idödroleöbto£ispirit_idnt2-ladder-peerghost_idödroleödkindjTaskAssignfintenthReadonlygpayload¡jTaskAssign¥dgoalx.exercise the real runner through the T2 ladderescope€psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureöuhalt_policy_overrides€tprior_distillate_refökauto_markerfKernelpconsent_envelopeönintent_lineage€
+RESULT rc=0 sig=none errno=none
+NOISE_LOO target=head-runner drop=none expected=success
++ target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,gettid,sched_getaffinity --read tests/fixtures/wasm/echo_spirit_component.wasm --stdin target/t2-ladder/runner.frame -- spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "gettid", "sched_getaffinity"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+«hframe_idltimestamp_ns[Ímlogical_clockdfrom£ispirit_idit2-ladderghost_idödroleöbto£ispirit_idnt2-ladder-peerghost_idödroleödkindjTaskAssignfintenthReadonlygpayload¡jTaskAssign¥dgoalx.exercise the real runner through the T2 ladderescope€psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureöuhalt_policy_overrides€tprior_distillate_refökauto_markerfKernelpconsent_envelopeönintent_lineage€
+RESULT rc=0 sig=none errno=none
+NOISE_LOO target=head-runner drop=set_robust_list expected=success
++ target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,set_robust_list,sched_getaffinity --read tests/fixtures/wasm/echo_spirit_component.wasm --stdin target/t2-ladder/runner.frame -- spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "set_robust_list", "sched_getaffinity"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+«hframe_idltimestamp_ns[Ímlogical_clockdfrom£ispirit_idit2-ladderghost_idödroleöbto£ispirit_idnt2-ladder-peerghost_idödroleödkindjTaskAssignfintenthReadonlygpayload¡jTaskAssign¥dgoalx.exercise the real runner through the T2 ladderescope€psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureöuhalt_policy_overrides€tprior_distillate_refökauto_markerfKernelpconsent_envelopeönintent_lineage€
+RESULT rc=0 sig=none errno=none
+NOISE_LOO target=head-runner drop=gettid expected=success
++ target/debug/t2-ladder --landlock rights --execute-loader --seccomp candidate --seccomp-order kill-first --extra rust-start,clone3,memfd_create,set_robust_list,gettid --read tests/fixtures/wasm/echo_spirit_component.wasm --stdin target/t2-ladder/runner.frame -- spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 --component tests/fixtures/wasm/echo_spirit_component.wasm
+PROBE_INPUTS tree/runtime: target execution plus its resolved executable, loader, ldd libraries, and explicit data paths; not only probe-created state.
+TARGET program=spikes/story-17-3a-wasm-recall/t2-ladder/target/maos-wasm-runner-head-92911f59 args=["--component", "tests/fixtures/wasm/echo_spirit_component.wasm"]
+RUNG landlock=Rights seccomp=Candidate seccomp_order=KillFirst extra=["rust-start", "clone3", "memfd_create", "set_robust_list", "gettid"] static_target=false execute_reads=false execute_loader=true inherit_fd=None
+SECCOMP_INSTALL=ok
+Content-Length: 452
+
+«hframe_idltimestamp_ns[Ímlogical_clockdfrom£ispirit_idit2-ladderghost_idödroleöbto£ispirit_idnt2-ladder-peerghost_idödroleödkindjTaskAssignfintenthReadonlygpayload¡jTaskAssign¥dgoalx.exercise the real runner through the T2 ladderescope€psuccess_criteriax$guest handles one real ADR-032 framesposture_preferences¢qpreferred_postureöuhalt_policy_overrides€tprior_distillate_refökauto_markerfKernelpconsent_envelopeönintent_lineage€
+RESULT rc=0 sig=none errno=none
+NOISE_LOO target=head-runner drop=sched_getaffinity expected=success

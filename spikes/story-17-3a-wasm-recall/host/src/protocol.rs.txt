@@ -1,0 +1,58 @@
+use std::io::{self, Read, Write};
+
+use maos_domain::log_recall::{LogFetchResponse, LogRecallFilter, LogRecallPage};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum WireRequest {
+    Recall { filter: LogRecallFilter },
+    Fetch { frame_id: [u8; 16] },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum WireReply {
+    Recall(Result<LogRecallPage, WireError>),
+    Fetch(Result<LogFetchResponse, WireError>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "detail", rename_all = "kebab-case")]
+pub enum WireError {
+    ScopeViolation { frame_id: [u8; 16] },
+    FrameNotFound { frame_id: [u8; 16] },
+    Storage(String),
+    InvalidCursor(String),
+    LimitExceeded { requested: usize, max: usize },
+    CrossWallDenied(String),
+    PeerIdentity,
+    Protocol(String),
+}
+
+pub fn write_message<T: Serialize>(writer: &mut impl Write, value: &T) -> io::Result<()> {
+    let body = serde_json::to_vec(value)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    let len = u32::try_from(body.len())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "message exceeds u32"))?;
+    writer.write_all(&len.to_be_bytes())?;
+    writer.write_all(&body)?;
+    writer.flush()
+}
+
+pub fn read_message<T: for<'de> Deserialize<'de>>(reader: &mut impl Read) -> io::Result<Option<T>> {
+    let mut header = [0u8; 4];
+    match reader.read_exact(&mut header) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(error) => return Err(error),
+    }
+    let len = u32::from_be_bytes(header) as usize;
+    const MAX_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
+    if len > MAX_MESSAGE_BYTES {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "message exceeds cap"));
+    }
+    let mut body = vec![0u8; len];
+    reader.read_exact(&mut body)?;
+    serde_json::from_slice(&body)
+        .map(Some)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}

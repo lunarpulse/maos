@@ -1,0 +1,21 @@
+UTC 2026-09-26T02:07:27Z
++ git rev-parse HEAD
+a388fe625f81997a9617e2ce257b31274beaf202
+PROBE_INPUTS scratch-only proposed kernel diff for measured Q4b repair costs; not only probe-created state.
++ git diff --numstat
+1	0	crates/maos-bench/src/harness/j1.rs
+1	0	crates/maos-bin/src/worker_spawn.rs
+6	0	crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+16	1	crates/maos-kernel-core/src/security/sandbox/linux.rs
+1	0	crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
++ git diff --check
+UTC 2026-09-26T02:12:17Z (build completion; block appended to evidence 2026-09-26T09:15:36Z)
++ git rev-parse HEAD (workspace)
+a388fe625f81997a9617e2ce257b31274beaf202
+Re-executed by the orchestrator (slice driver terminated before build completion). Build of the prototype diff in the scratch worktree /tmp/17-3a-kernel-price (base a388fe62 + the numstat diff above):
++ cd /tmp/17-3a-kernel-price && CARGO_TARGET_DIR=/tmp/17-3a-orch/kprice-target cargo build --locked -p maos-kernel-core -p maos-bin -p maos-bench  (output captured whole to /tmp/17-3a-orch/kprice-build.txt; an earlier `| head` pipeline had faked rc=101 via EPIPE)
+rc=0
+warning: `maos-bin` (bin "maos") generated 4 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.18s
+No errors. The 4 warnings are pre-existing unused-variable/unused-import diagnostics in maos-bin, unrelated to the diff.
+[INFERENCE] Known prototype gaps, not measured: dynamic loader/lib resolution is delegated to the runner's own Landlock grants (program+loader+libs rights), and the inherited recall fd still carries FD_CLOEXEC from std socketpair - production wiring needs a pre_exec dup2-style clear (counted inside the runtime.rs +6, not separately proven to compile beyond the build above).

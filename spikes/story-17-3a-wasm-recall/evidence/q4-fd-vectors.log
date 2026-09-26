@@ -1,0 +1,20 @@
+UTC 2026-09-26T00:50:38.514278+00:00
+git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+$ spikes/story-17-3a-wasm-recall/host/run_fd_vector_probe.py
+E15-A6: this probe reads live inherited descriptors, /proc, pidfd_getfd, yama, and a running relay; it does not set the access result.
+runner_pid=3294188 runner_fd=3 target=socket:[1006340365] yama_ptrace_scope=1
+service_ready=READY fd=4 caller-pid=3294188 binding=inherited-descriptor
+attacker_rc=0 attacker={"path": "/proc/3294188/fd/3", "pidfd_getfd": {"errno": 1, "error": "Operation not permitted", "ok": false}, "proc_path-only": {"ok": true}, "proc_read-only": {"errno": 6, "error": "No such device or address", "ok": false}}
+runner_rc=0 service_rc=0
+-- decoded control relay --
+{"frame_id":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"timestamp_ns":1700300000000000000,"logical_clock":0,"from":{"spirit_id":"spike-frame-driver","host_id":null,"role":null},"to":[],"kind":"TelemetryEvent","intent":"Readonly","payload":{"TelemetryEvent":{"event_type":"recall-result","data":"{\"recall\":\"ok\",\"recall_entries\":1,\"fetch\":\"ok\",\"recall_ns\":188332,\"fetch_ns\":58950}"}},"auto_marker":"HumanAuthored","consent_envelope":null,"intent_lineage":[]}
+frame-driver: decoded-frames=1
+-- runner stderr --
+recall-import-boundary-ns=176891
+fetch-import-boundary-ns=54191
+-- service stderr --
+recall-service: caller-pid=3294188 capability-invocation-audit-count=1
+recall-service: caller-pid=3294188 capability-invocation-audit-count=2
+
+[exit=0]

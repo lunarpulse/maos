@@ -1,0 +1,24 @@
+// Retain the byte-identical recall interface at package @1.2 for the Q5(c)
+// version-only control; accepting the linker's probe error keeps on-start green.
+wit_bindgen::generate!({
+    path: "../../wit-1.2-same/spirit.wit",
+    world: "spirit",
+});
+
+use maos::spirit::recall;
+
+struct VersionOnlyGuest;
+
+impl Guest for VersionOnlyGuest {
+    fn handle_frame(frame: IacFrame) -> Result<Vec<IacFrame>, Halt> { Ok(vec![frame]) }
+    fn on_start() -> Result<(), Halt> {
+        let _ = recall::recall(&recall::RecallFilter {
+            kind: None,
+            since_ns: None, until_ns: None, limit: 1, cursor: None, intent_filter: None,
+        });
+        Ok(())
+    }
+    fn on_shutdown() {}
+}
+
+export!(VersionOnlyGuest);

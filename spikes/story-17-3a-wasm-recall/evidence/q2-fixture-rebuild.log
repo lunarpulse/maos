@@ -1,0 +1,1819 @@
+UTC: 2026-09-26T00:31:28.566952+00:00
+Probe data source: reads HEAD guest sources, guest locks, installed wasm target, and Rust build runtime; not only data it set itself.
+$ git rev-parse HEAD
+92911f59da6a75a7745a23ec05036d18116f68af
+
+[exit=0]
+$ rustc --version
+rustc 1.98.1 (48a229cea 2026-09-01)
+
+[exit=0]
+$ cargo --version
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+
+[exit=0]
+$ wasm-tools --version
+wasm-tools 1.259.0
+
+[exit=0]
+$ rustup target list --installed
+aarch64-apple-darwin
+wasm32-wasip2
+x86_64-unknown-linux-gnu
+
+[exit=0]
+$ CARGO_TARGET_DIR=/tmp/17-3a-q2-fixtures-target cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/echo-spirit/Cargo.toml
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.46
+   Compiling serde_core v1.0.228
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.1.5
+   Compiling wasmparser v0.236.1
+   Compiling hashbrown v0.17.1
+   Compiling bitflags v2.13.0
+   Compiling anyhow v1.0.103
+   Compiling semver v1.0.28
+   Compiling zmij v1.0.21
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling memchr v2.8.2
+   Compiling itoa v1.0.18
+   Compiling prettyplease v0.2.37
+   Compiling wasm-encoder v0.236.1
+   Compiling log v0.4.33
+   Compiling id-arena v2.3.0
+   Compiling futures-sink v0.3.32
+   Compiling leb128fmt v0.1.0
+   Compiling futures-core v0.3.32
+   Compiling unicode-xid v0.2.6
+   Compiling futures-task v0.3.32
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-io v0.3.32
+   Compiling slab v0.4.12
+   Compiling wit-bindgen-rust v0.44.0
+   Compiling heck v0.5.0
+   Compiling wit-bindgen-rt v0.44.0
+   Compiling wit-bindgen-rust-macro v0.44.0
+   Compiling once_cell v1.21.4
+   Compiling hashbrown v0.15.5
+   Compiling futures-channel v0.3.32
+   Compiling syn v2.0.118
+   Compiling indexmap v2.14.0
+   Compiling serde_derive v1.0.228
+   Compiling futures-macro v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling wit-parser v0.236.1
+   Compiling wasm-metadata v0.236.1
+   Compiling wit-bindgen-core v0.44.0
+   Compiling wit-component v0.236.1
+   Compiling wit-bindgen v0.44.0
+   Compiling echo-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/echo-spirit)
+    Finished `release` profile [optimized] target(s) in 6.40s
+
+[exit=0]
+$ CARGO_TARGET_DIR=/tmp/17-3a-q2-fixtures-target cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/Cargo.toml
+   Compiling equiv-fixture-logic v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/logic)
+   Compiling equiv-identity-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/wasm-guest)
+    Finished `release` profile [optimized] target(s) in 0.29s
+
+[exit=0]
+$ CARGO_TARGET_DIR=/tmp/17-3a-q2-fixtures-target cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml
+   Compiling equiv-divergent-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/divergent-guest)
+    Finished `release` profile [optimized] target(s) in 0.27s
+
+[exit=0]
+$ CARGO_TARGET_DIR=/tmp/17-3a-q2-fixtures-target cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml
+   Compiling equiv-cosmetic-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest)
+    Finished `release` profile [optimized] target(s) in 0.26s
+
+[exit=0]
+$ sha256sum /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/echo_spirit.wasm /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/equiv_identity_spirit.wasm /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/equiv_divergent_spirit.wasm /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/equiv_cosmetic_spirit.wasm
+a41ad244cdeae3f3abc8a183733888d0af6fe32e74d4083756acf87feaba2832  /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/echo_spirit.wasm
+c72ac4c6992842dc8c6aff51f0a123290b3d9b319a44bc91d391c6efc35ca9ef  /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/equiv_identity_spirit.wasm
+9a09597636a61709eeb1f6c2fb781625a0c438bf583b6b45d33f8962d3bcf120  /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/equiv_divergent_spirit.wasm
+15aebcf68815f1f47ed93025c23a2456e063f212cd0ae8605306ca07347f171b  /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/equiv_cosmetic_spirit.wasm
+
+[exit=0]
+$ python3 compare rebuilt SHA-256 and byte sizes to provenance wasm_sha256
+echo_spirit.wasm: sha256=a41ad244cdeae3f3abc8a183733888d0af6fe32e74d4083756acf87feaba2832 bytes=69735 pinned=1ab9c5b8e019ff64988152c3b7b9fddd2408d2e3c2300919931ad3a407f00c2f reproducible=False
+equiv_identity_spirit.wasm: sha256=c72ac4c6992842dc8c6aff51f0a123290b3d9b319a44bc91d391c6efc35ca9ef bytes=69794 pinned=7a5a46d895689e99094d1b59c16223ae4252cc4325472bf67b85b72af88fae5f reproducible=False
+equiv_divergent_spirit.wasm: sha256=9a09597636a61709eeb1f6c2fb781625a0c438bf583b6b45d33f8962d3bcf120 bytes=69794 pinned=eafcc329d8961f0a9627d9ecde4ba206f15984f7a356409974234ec8b1de5c11 reproducible=False
+equiv_cosmetic_spirit.wasm: sha256=15aebcf68815f1f47ed93025c23a2456e063f212cd0ae8605306ca07347f171b bytes=69833 pinned=6eba896d5a5df3824d64fcbd1658442b9aec639fb56d1606378858846e2a4ac7 reproducible=False
+$ wasm-tools dump tests/fixtures/wasm/echo_spirit_component.wasm
+[elided by the 17-3a orchestrator 2026-09-26: 28184 lines of `wasm-tools dump` hex listing, sha256 097a68286d9c9937c031d355604828d9f8e202116575a1096b146bb31972922d; they were read for producer markers (none found); re-run the command above to regenerate]
+$ wasm-tools dump /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/echo_spirit.wasm
+[elided by the 17-3a orchestrator 2026-09-26: 29480 lines of `wasm-tools dump` hex listing, sha256 f8707f24e637486ab4b17e6449dddef20a5b2b625d022d0ac27b468f41b8c504; they were read for producer markers (none found); re-run the command above to regenerate]
+$ wasm-tools validate tests/fixtures/wasm/echo_spirit_component.wasm
+
+[exit=0]
+$ wasm-tools validate /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/echo_spirit.wasm
+
+[exit=0]
+$ strings tests/fixtures/wasm/echo_spirit_component.wasm
+	spirit-ids
+host-id
+role
+frame-address
+task-assign
+task-complete
+decision-dispatch
+epistemic-halt
+telemetry-event
+consent-request
+retract
+capability-invocation
+sandbox-block
+inference-call
+budget-warning
+budget-exceeded
+cli-subprocess-output
+consent-rupture
+rate-limited
+gateway-inbound
+gateway-outbound
+frame-kind
+autonomous-with-halt	assistive
+cautious
+posture-hint
+tags
+recall-vs-precisionv
+halt-policy-override
+preferred-posture	
+halt-policy-overrides
+posture-preferences
+digest-frame-id
+distillation-depthy
+prior-distillate-ref
+goals
+scope
+success-criterias
+posture-preferences
+prior-distillate-ref
+task-assign-body
+result-texts
+task-complete-body
+decision-idw
+approved
+decision-dispatch-body
+halt-ids
+tags
+valuev	threshold
+	policy-ids
+derived-froms
+epistemic-halt-body
+event-types
+datas
+telemetry-event-body
+capabilitys
+consent-request-body
+original-frame-id
+reasons
+original-kind
+retract-body
+spirit-pidy	hook-names
+wall-nsw
+cap-secondsw
+budget-envelope
+intent-allowlist-mismatch#posture-shifted-during-transmission
+token-revoked
+principal-revoked
+recipient-unloaded
+rupture-reason
+address
+reason%
+rupture-rejection
+rupture-id
+original-frame-id
+original-kind
+accepted(
+rejected)
+ruptured-at-nsw
+consent-rupture-body
+provider-ids!credential-fingerprint-prefix-hexs
+retry-after-msw
+bucket-remainingy
+bucket-capacityy
+refill-per-secy
+schedule-id
+rate-limited-body
+task-assign
+task-complete
+decision-dispatch
+epistemic-halt
+telemetry-event
+consent-request
+retract
+budget-warning
+budget-exceeded
+consent-rupture
+rate-limited
+frame-payload
+human-authored
+spirit-auto
+spirit-drafted-human-approved
+kernel
+frame-origin
+frame-id
+timestamp-nsw
+logical-clockw
+frame-from
+kind
+payload/
+auto-marker1
+	iac-frame
+	voluntary
+fault
+halt
+maos:spirit/frames@1.0.0
+pollable
+self
+[method]pollable.block
+wasi:io/poll@0.2.6
+error
+wasi:io/error@0.2.6
+error
+pollable
+input-stream
+output-stream
+error
+last-operation-failed
+closed
+stream-error
+pollable
+self	
+![method]output-stream.check-write
+self	
+contents
+[method]output-stream.write
+self	
+$[method]output-stream.blocking-flush
+self	
+[method]output-stream.subscribe
+wasi:io/streams@0.2.6
+get-environment
+wasi:cli/environment@0.2.6
+status
+exit
+wasi:cli/exit@0.2.6
+input-stream
+input-stream
+	get-stdin
+wasi:cli/stdin@0.2.6
+output-stream
+output-stream
+get-stdout
+wasi:cli/stdout@0.2.6
+output-stream
+output-stream
+get-stderr
+wasi:cli/stderr@0.2.6
+terminal-input
+wasi:cli/terminal-input@0.2.6
+terminal-output
+wasi:cli/terminal-output@0.2.6
+terminal-input
+terminal-input
+get-terminal-stdin
+wasi:cli/terminal-stdin@0.2.6
+terminal-output
+terminal-output
+get-terminal-stdout
+wasi:cli/terminal-stdout@0.2.6
+terminal-output
+terminal-output
+get-terminal-stderr
+wasi:cli/terminal-stderr@0.2.6
+	iac-frame
+	iac-frame
+halt
+halt
+wasi:io/error@0.2.0
+[resource-drop]error
+wasi:io/poll@0.2.0
+[resource-drop]pollable
+wasi:io/streams@0.2.0
+[resource-drop]input-stream
+wasi:io/streams@0.2.0
+[resource-drop]output-stream
+wasi:cli/terminal-input@0.2.0
+[resource-drop]terminal-input
+wasi:cli/terminal-output@0.2.0
+[resource-drop]terminal-output
+wasi:cli/environment@0.2.0
+get-environment
+wasi:cli/exit@0.2.0
+exit
+wasi:io/poll@0.2.0
+[method]pollable.block
+wasi:io/streams@0.2.0![method]output-stream.check-write
+wasi:io/streams@0.2.0
+[method]output-stream.write
+wasi:io/streams@0.2.0$[method]output-stream.blocking-flush
+wasi:io/streams@0.2.0
+[method]output-stream.subscribe
+wasi:cli/stdin@0.2.0	get-stdin
+wasi:cli/stdout@0.2.0
+get-stdout
+wasi:cli/stderr@0.2.0
+get-stderr
+wasi:cli/terminal-stdin@0.2.0
+get-terminal-stdin
+wasi:cli/terminal-stdout@0.2.0
+get-terminal-stdout
+wasi:cli/terminal-stderr@0.2.0
+get-terminal-stderr
+memory
+cabi_post_handle-frame
+cabi_post_on-start
+handle-frame
+on-shutdown
+on-start
+cabi_realloc
+IFGb
+n:f~
+omkl<j}|
+spqr
+i9xtuwyvced
+A j!
+\"	!
+@ 	E
+p"	E
+A j!
+A$j!
+A$l"
+A j!
+A$j!
+A|j 
+Axj 
+A j!
+A$j!
+A j!
+A$j 
+A$j!
+A(j!
+A$l"
+x!  
+  B 
+A7j 
+8!	 
+@!" 
+D!# 
+t!  
+A$l"
+A$j!
+A\j!
+A j!
+A$j!
+A$j(
+jA$j!
+A0j 
+A(j 
+Atj!
+Axj)
+A j 
+Atj!
+Apj!
+@ 	A
+A8j 
+A$l"
+A$j!
+A\j!
+A j!
+A$j!
+A$j(
+jA$j!
+A(l"
+@ 	(
+ 	A(j!
+AXj!
+A$j-
+A j 
+A$j!
+A(j!
+A(j(
+jA(j!
+A$j!
+kA$n!
+A$j!
+kA(n!
+A(j!
+A(j!
+A8j"
+A$j"
+A0j"
+A(j!
+A4jA
+A8j 
+A8j 
+A0j 
+A0j 
+A8j 
+A$j(
+A k"
+A j$
+A k"
+A j$
+A k"
+Axj6
+A j$
+A0k"
+A/j#
+A$jA
+A0j$
+A k"
+AxjA
+Axj"
+tj!	
+AxjA
+Axj"
+tj"	(
+ 	 	(
+Axj(
+Apj(
+Ahj(
+jjjj!
+A j!
+Axj(
+Apj(
+Ahj(
+jjjj!
+A j!
+A?qA
+A?qA
+A?qA
+vApr:
+A k"
+A j$
+A0k"
+A$j#
+A0j$
+A?qA
+A?qA
+A?qA
+vApr:
+A?qA
+A?qA
+A?qA
+vApr:
+A?qA
+A?qA
+A?qA
+vApr:
+A0k"
+A,j 
+A$j 
+A0j$
+"	j"
+@ 	E
+ 	j"	A=:
+A k"
+A j$
+A|j!
+A{j!
+jApqA
+A<j 
+A0j"
+A(j"
+A4j 
+A8j"
+A j"
+ALjA86
+kAHj"
+A(j"
+krqh"
+A(j"
+AxqjA(j!
+vt"	q
+ 	r6
+Axq 
+Axq 
+@ 	!
+j!	 
+j!	 
+Apq!
+tkA>j!
+Axq 
+Axq 
+@ 	(
+@ 	(
+jApqA
+q"	 
+ 	j"
+kqj!
+A8jM
+"	jF
+A<j 
+A0j"
+A(j"	6
+A4j 	6
+A8j"	6
+A j"
+AHj"
+k"	A
+jA86
+jA86
+AHj"	 
+ 	jA86
+qjAAj"
+"	A#6
+ 	A$j!
+ 	 	(
+A~q6
+ 	 	 
+AxqjA(j!
+vt"	q
+ 	r6
+tkA>j!
+j"	 
+@ 	(
+j 	 
+@ 	"
+Axq 
+v!	 
+ 	j 
+@ 	#
+j 	(
+@ 	(
+AxqjA(j!
+tkA>j!
+Axq 
+A~ 	wq6
+AxqjA(j!
+vt"	 
+j 	 
+Axq!
+vwq6
+A~q6
+AxqjA(j!
+tkA>j!
+Axq 
+Axj"
+A|j(
+Axq"
+vwq6
+A~q6
+Axq 
+vwq6
+A~q6
+AxqjA(j!
+tkA>j!
+Axq 
+A|j-
+jApq 
+A|j"
+Axq!
+Axj"
+A~q6
+Axq 
+j"	 
+vwq6
+q 	rA
+ 	j"
+ 	j"
+@A|Ax 
+Axqj"
+vwq6
+A~q6
+Axq 
+vwq6
+A~q6
+AxqjA(j!
+tkA>j!
+Axq 
+jApq 
+Axj!
+A|j"
+Axq 
+kqAxj"
+Axq"
+jA# 
+A k"
+A j$
+A j 
+A j 
+A k"
+A k"
+A|j#
+n"	A
+A~j 
+A|j!
+A~j"
+A j$
+q"	A
+A qE
+A k"
+jA|q"
+Axj"
+Axj!
+~A+A
+ 	j!	
+@ 	 
+ 	k!
+q!	 
+ 	kA
+jA|q"
+k"	A|K
+@ 	!
+v 	A
+v 	A
+v 	A
+v 	A
+jjjj!
+j!	 
+v 	A
+A|q!
+ 	j"
+j"	G
+ 	j!
+k!	A
+A|j#
+n"	A
+A~j 
+A|j!
+A~j"
+jA|q"
+Axj!
+Axj"
+slice index starts at 
+ but ends at 
+range start index 
+" out of range for slice of length 
+range end index 
+" out of range for slice of length 
+assertion `left 
+ right` failed
+  left: 
+ right: 
+assertion `left 
+ right` failed: 
+  left: 
+ right: 
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/sys/sync/mutex/no_threads.rs
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/sys/sync/rwlock/no_threads.rs
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/io/mod.rs
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/alloc/src/raw_vec/mod.rs
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/thread/id.rs
+/rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/sys/io/io_slice/iovec.rs
+memory allocation of 
+G bytes failed
+skipping backtrace printing to avoid potential recursion
+5fatal runtime error: failed to initiate panic, error 
+, aborting
+memory allocation of 
+ bytes failed
+panicked at 
+thread panicked while processing panic. aborting.
+thread '
+) panicked at 
+aborting due to panic at 
+a formatting trait implementation returned an error when the underlying stream did notfile name contained an unexpected NUL bytemain<unnamed>note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+fatal runtime error: rwlock locked for writing, aborting
+rwlock overflowed read locksRUST_BACKTRACEcannot recursively acquire mutexadvancing io slices beyond their lengthadvancing IoSlice beyond its length
+Box<dyn Any>thread caused non-unwinding panic. aborting.
+failed to write whole bufferstack backtrace:
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+failed to generate unique thread ID: bitspace exhaustedrwlock has not been locked for readingcapacity overflow==!=matches00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899falsetrue
+\	producers
+processed-by
+wit-component
+0.244.0
+wit-bindgen-rust
+0.45.0
+wit-bindgen-c
+0.51.0
+$imports
+/	producers
+processed-by
+wit-component
+0.246.2
+$imports
+/	producers
+processed-by
+wit-component
+0.246.2
+error
+[resource-drop]error
+pollable
+[method]pollable.block
+[resource-drop]pollable
+[method]pollable.block
+input-stream
+output-stream
+[method]output-stream.subscribe
+[resource-drop]input-stream
+[resource-drop]output-stream
+![method]output-stream.check-write
+[method]output-stream.write
+$[method]output-stream.blocking-flush
+[method]output-stream.subscribe
+terminal-input
+[resource-drop]terminal-input
+terminal-output
+[resource-drop]terminal-output
+get-environment
+exit
+exit
+	get-stdin
+	get-stdin
+get-stdout
+get-stdout
+get-stderr
+get-stderr
+get-terminal-stdin
+get-terminal-stdout
+get-terminal-stderr
+wasi:io/error@0.2.0
+wasi:io/poll@0.2.0
+wasi:io/streams@0.2.0
+wasi:cli/terminal-input@0.2.0
+wasi:cli/terminal-output@0.2.0
+wasi:cli/environment@0.2.0
+wasi:cli/exit@0.2.0
+wasi:cli/stdin@0.2.0
+wasi:cli/stdout@0.2.0
+wasi:cli/stderr@0.2.0
+wasi:cli/terminal-stdin@0.2.0
+wasi:cli/terminal-stdout@0.2.0
+wasi:cli/terminal-stderr@0.2.0
+memory
+$imports
+![method]output-stream.check-write
+cabi_realloc
+[method]output-stream.write
+$[method]output-stream.blocking-flush
+get-environment
+get-terminal-stdin
+get-terminal-stdout
+get-terminal-stderr
+$imports
+frame
+handle-frame
+cabi_post_handle-frame
+handle-frame
+on-start
+cabi_post_on-start
+on-start
+on-shutdown
+on-shutdown
+component-name
+resource.drop
+resource.drop
+[method]pollable.block
+resource.drop
+resource.drop
+@indirect-wasi:io/streams@0.2.0-[method]output-stream.check-write
+:indirect-wasi:io/streams@0.2.0-[method]output-stream.write
+Cindirect-wasi:io/streams@0.2.0-[method]output-stream.blocking-flush
+[method]output-stream.subscribe	
+resource.drop
+resource.drop
+3indirect-wasi:cli/environment@0.2.0-get-environment
+exit
+	get-stdin
+get-stdout
+get-stderr
+9indirect-wasi:cli/terminal-stdin@0.2.0-get-terminal-stdin
+;indirect-wasi:cli/terminal-stdout@0.2.0-get-terminal-stdout
+;indirect-wasi:cli/terminal-stderr@0.2.0-get-terminal-stderr
+realloc
+@indirect-wasi:io/streams@0.2.0-[method]output-stream.check-write
+:indirect-wasi:io/streams@0.2.0-[method]output-stream.write
+Cindirect-wasi:io/streams@0.2.0-[method]output-stream.blocking-flush
+3indirect-wasi:cli/environment@0.2.0-get-environment
+9indirect-wasi:cli/terminal-stdin@0.2.0-get-terminal-stdin
+;indirect-wasi:cli/terminal-stdout@0.2.0-get-terminal-stdout
+;indirect-wasi:cli/terminal-stderr@0.2.0-get-terminal-stderr
+handle-frame
+cabi_post_handle-frame
+on-start
+cabi_post_on-start
+on-shutdown
+shim table
+memory
+main
+wit-component-shim-module
+wit-component-fixup
+wit-component-shim-instance
+wasi:io/error@0.2.0
+wasi:io/poll@0.2.0
+wasi:io/streams@0.2.0
+wasi:cli/terminal-input@0.2.0
+wasi:cli/terminal-output@0.2.0
+wasi:cli/environment@0.2.0
+wasi:cli/exit@0.2.0
+wasi:cli/stdin@0.2.0	
+wasi:cli/stdout@0.2.0
+wasi:cli/stderr@0.2.0
+wasi:cli/terminal-stdin@0.2.0
+wasi:cli/terminal-stdout@0.2.0
+wasi:cli/terminal-stderr@0.2.0
+main
+fixup-args
+fixup
+maos:spirit/frames@1.0.0
+wasi:io/poll@0.2.6
+wasi:io/error@0.2.6
+wasi:io/streams@0.2.6
+wasi:cli/environment@0.2.6
+wasi:cli/exit@0.2.6
+wasi:cli/stdin@0.2.6
+wasi:cli/stdout@0.2.6
+wasi:cli/stderr@0.2.6	
+wasi:cli/terminal-input@0.2.6
+wasi:cli/terminal-output@0.2.6
+wasi:cli/terminal-stdin@0.2.6
+wasi:cli/terminal-stdout@0.2.6
+wasi:cli/terminal-stderr@0.2.6
+[method]pollable.block
+[method]output-stream.subscribe
+exit
+	get-stdin
+get-stdout
+get-stderr
+![method]output-stream.check-write
+[method]output-stream.write
+$[method]output-stream.blocking-flush	
+get-environment
+get-terminal-stdin
+get-terminal-stdout
+get-terminal-stderr
+handle-frame
+handle-frame
+on-start
+on-start
+on-shutdown
+on-shutdown
+ty-maos:spirit/frames@1.0.0
+ty-wasi:io/poll@0.2.6
+ty-wasi:io/error@0.2.6
+error
+pollable
+ty-wasi:io/streams@0.2.6
+ty-wasi:cli/environment@0.2.6
+ty-wasi:cli/exit@0.2.6
+input-stream	
+ty-wasi:cli/stdin@0.2.6
+output-stream
+ty-wasi:cli/stdout@0.2.6
+output-stream
+ty-wasi:cli/stderr@0.2.6
+ ty-wasi:cli/terminal-input@0.2.6
+!ty-wasi:cli/terminal-output@0.2.6
+terminal-input
+ ty-wasi:cli/terminal-stdin@0.2.6
+terminal-output
+!ty-wasi:cli/terminal-stdout@0.2.6
+terminal-output
+!ty-wasi:cli/terminal-stderr@0.2.6
+	iac-frame
+	iac-frame
+halt
+halt
+error
+pollable
+input-stream
+output-stream
+terminal-input
+terminal-output
+maos:spirit/frames@1.0.0
+wasi:io/poll@0.2.6
+wasi:io/error@0.2.6
+wasi:io/streams@0.2.6
+wasi:cli/environment@0.2.6
+wasi:cli/exit@0.2.6
+wasi:cli/stdin@0.2.6
+wasi:cli/stdout@0.2.6
+wasi:cli/stderr@0.2.6	
+wasi:cli/terminal-input@0.2.6
+wasi:cli/terminal-output@0.2.6
+wasi:cli/terminal-stdin@0.2.6
+wasi:cli/terminal-stdout@0.2.6
+wasi:cli/terminal-stderr@0.2.6
+/	producers
+processed-by
+wit-component
+0.246.2
+
+[exit=0]
+$ strings /tmp/17-3a-q2-fixtures-target/wasm32-wasip2/release/echo_spirit.wasm
+	spirit-ids
+host-id
+role
+frame-address
+task-assign
+task-complete
+decision-dispatch
+epistemic-halt
+telemetry-event
+consent-request
+retract
+capability-invocation
+sandbox-block
+inference-call
+budget-warning
+budget-exceeded
+cli-subprocess-output
+consent-rupture
+rate-limited
+gateway-inbound
+gateway-outbound
+frame-kind
+autonomous-with-halt	assistive
+cautious
+posture-hint
+tags
+recall-vs-precisionv
+halt-policy-override
+preferred-posture	
+halt-policy-overrides
+posture-preferences
+digest-frame-id
+distillation-depthy
+prior-distillate-ref
+goals
+scope
+success-criterias
+posture-preferences
+prior-distillate-ref
+task-assign-body
+result-texts
+task-complete-body
+decision-idw
+approved
+decision-dispatch-body
+halt-ids
+tags
+valuev	threshold
+	policy-ids
+derived-froms
+epistemic-halt-body
+event-types
+datas
+telemetry-event-body
+capabilitys
+consent-request-body
+original-frame-id
+reasons
+original-kind
+retract-body
+spirit-pidy	hook-names
+wall-nsw
+cap-secondsw
+budget-envelope
+intent-allowlist-mismatch#posture-shifted-during-transmission
+token-revoked
+principal-revoked
+recipient-unloaded
+rupture-reason
+address
+reason%
+rupture-rejection
+rupture-id
+original-frame-id
+original-kind
+accepted(
+rejected)
+ruptured-at-nsw
+consent-rupture-body
+provider-ids!credential-fingerprint-prefix-hexs
+retry-after-msw
+bucket-remainingy
+bucket-capacityy
+refill-per-secy
+schedule-id
+rate-limited-body
+task-assign
+task-complete
+decision-dispatch
+epistemic-halt
+telemetry-event
+consent-request
+retract
+budget-warning
+budget-exceeded
+consent-rupture
+rate-limited
+frame-payload
+human-authored
+spirit-auto
+spirit-drafted-human-approved
+kernel
+frame-origin
+frame-id
+timestamp-nsw
+logical-clockw
+frame-from
+kind
+payload/
+auto-marker1
+	iac-frame
+	voluntary
+fault
+halt
+maos:spirit/frames@1.0.0
+pollable
+self
+[method]pollable.block
+poll
+wasi:io/poll@0.2.9
+pollable
+duration
+pollable
+when
+subscribe-duration
+!wasi:clocks/monotonic-clock@0.2.9
+error
+wasi:io/error@0.2.9
+error
+pollable
+input-stream
+output-stream
+error
+last-operation-failed
+closed
+stream-error
+pollable
+self	
+![method]output-stream.check-write
+self	
+contents
+[method]output-stream.write
+self	
+$[method]output-stream.blocking-flush
+self	
+[method]output-stream.subscribe
+wasi:io/streams@0.2.9
+output-stream
+output-stream
+get-stdout
+wasi:cli/stdout@0.2.9
+output-stream
+output-stream
+get-stderr
+wasi:cli/stderr@0.2.9
+input-stream
+input-stream
+	get-stdin
+wasi:cli/stdin@0.2.9
+get-environment
+wasi:cli/environment@0.2.9
+status
+exit
+wasi:cli/exit@0.2.9
+terminal-input
+wasi:cli/terminal-input@0.2.9
+terminal-output
+wasi:cli/terminal-output@0.2.9
+terminal-input
+terminal-input
+get-terminal-stdin
+wasi:cli/terminal-stdin@0.2.9
+terminal-output
+terminal-output
+get-terminal-stdout
+wasi:cli/terminal-stdout@0.2.9
+terminal-output
+terminal-output
+get-terminal-stderr
+wasi:cli/terminal-stderr@0.2.9
+	iac-frame
+	iac-frame
+halt
+halt
+wasi:io/error@0.2.0
+[resource-drop]error
+wasi:io/poll@0.2.0
+[resource-drop]pollable
+wasi:io/streams@0.2.0
+[resource-drop]input-stream
+wasi:io/streams@0.2.0
+[resource-drop]output-stream
+wasi:cli/terminal-input@0.2.0
+[resource-drop]terminal-input
+wasi:cli/terminal-output@0.2.0
+[resource-drop]terminal-output
+wasi:cli/environment@0.2.0
+get-environment
+wasi:cli/exit@0.2.0
+exit
+wasi:io/poll@0.2.0
+[method]pollable.block
+wasi:io/poll@0.2.0
+poll
+wasi:io/streams@0.2.0![method]output-stream.check-write
+wasi:io/streams@0.2.0
+[method]output-stream.write
+wasi:io/streams@0.2.0$[method]output-stream.blocking-flush
+wasi:io/streams@0.2.0
+[method]output-stream.subscribe
+wasi:cli/stdin@0.2.0	get-stdin
+wasi:cli/stdout@0.2.0
+get-stdout
+wasi:cli/stderr@0.2.0
+get-stderr
+wasi:cli/terminal-stdin@0.2.0
+get-terminal-stdin
+wasi:cli/terminal-stdout@0.2.0
+get-terminal-stdout
+wasi:cli/terminal-stderr@0.2.0
+get-terminal-stderr
+!wasi:clocks/monotonic-clock@0.2.0
+subscribe-duration
+memory
+cabi_post_handle-frame
+cabi_post_on-start
+handle-frame
+on-shutdown
+on-start
+cabi_realloc
+CAB\
+k8zy
+migh9f}|
+_^qnopZe6vrsuwt~xa{j`
+kA$n!
+A$j!
+A j!
+\"	!
+@ 	E
+p"	E
+A j!
+A$j!
+A$l"
+A$l!
+A j!
+A$j!
+A|j 
+Axj 
+`"!B 
+`"!B 
+A$l!
+X!  
+A j!
+A$j!
+A(l!
+j "8
+A j!
+A$j 
+A$j!
+A(j!
+A$lA
+x!! 
+ !B 
+A7j 
+,!! 
+ !B 
+A$lj"
+A$j!
+A j!
+A$j"
+ &B 
+A j 
+j "8
+@  A
+A8j 
+A0j 
+A$lj"
+A$j!
+A j!
+A$j"
+A(j 
+A(lj!
+A$j-
+A(j!
+A j 
+A$j!
+A(j"
+kA(n!
+A(j!
+A8j 
+A8j 
+A0j 
+A0j 
+A8j 
+A$j(
+A k"
+A j$
+A k"
+A j$
+A k"
+Axj6
+A j$
+A0k"
+A/j#
+A$jA
+A0j$
+A k"
+jA% 
+jA+ 
+AxjA
+Axj"
+tj!	 
+AxjA
+Axj"
+tj!	
+ 	 	(
+Axj(
+Apj(
+Ahj(
+jjjj!
+A j!
+Axj(
+Apj(
+Ahj(
+jjjj!
+A j!
+jA	 
+jA	 
+A?qA
+A?qA
+A?qA
+vApr:
+A k"
+A j$
+A k"
+A j$
+A?qA
+A?qA
+A?qA
+vApr:
+A?qA
+A?qA
+A?qA
+vApr:
+A?qA
+A?qA
+A?qA
+vApr:
+A k"
+A j$
+"	j"
+@ 	E
+ 	j"	A=:
+A0k"
+A j 
+A j 
+A0j$
+A k"
+A j$
+A|j!
+A{j!
+jApqA
+A j"
+ALjA86
+kAHj"
+A(j"
+krqh"	A
+A(j"
+A~ 	wq"
+AxqjA(j!
+vt"	q
+ 	r6
+Axq 
+Axq 
+@ 	!
+j!	 
+j!	 
+Apq!
+tkA>j!
+Axq 
+Axq 
+@ 	(
+@ 	(
+jApqA
+q"	 
+ 	j"
+kqj!
+A8jM
+"	jF
+j"	6
+j 	6
+j"	6
+A j"
+AHj"
+k"	A
+jA86
+jA86
+AHj"	 
+ 	jA86
+qjAAj"
+"	A#6
+ 	A$j!
+ 	 	(
+A~q6
+ 	 	 
+qjA(j!
+vt"	q
+ 	r6
+trA>s!
+j"	 
+@ 	(
+j 	 
+@ 	"
+Axq 
+v!	 
+ 	j 
+@ 	#
+j 	(
+@ 	(
+qjA(j!
+trA>s!
+Axq 
+A~ 	wq6
+AxqjA(j!
+vt"	 
+j 	 
+Axq!
+vwq6
+A~q6
+qjA(j!
+trA>s!
+Axq 
+Axj"
+A|j(
+Axq"
+vwq6
+A~q6
+Axq 
+vwq6
+A~q6
+qjA(j!
+trA>s!
+Axq 
+A|j-
+jApq 
+A|j"
+Axq!
+Axj"
+A~q6
+Axq 
+j"	 
+vwq6
+q 	rA
+ 	j"
+ 	j"
+@A|Ax 
+Axqj"
+vwq6
+A~q6
+Axq 
+vwq6
+A~q6
+qjA(j!
+trA>s!
+Axq 
+jApq 
+Axj!
+A|j"
+Axq 
+kqAxj"
+Axq"
+jA# 
+A k"
+A j$
+A j 
+A j 
+A k"
+A|j#
+n"	A
+A~j 
+A|j!
+A~j"
+A j$
+q"	A
+A qE
+A k"
+A k"
+Ayj"
+jA|q 
+j"	 
+j"	 
+ 	j,
+ 	A`qA
+A~qAnG
+ 	A@H
+ 	A@H
+ 	j,
+ 	A@H
+qA0I
+@ 	A
+jA|q"
+ 	k!
+@ 	 
+Axj"
+@ 	 
+Axj!
+@ 	 
+A k"
+j 	A
+A j$
+jA|q"
+Axj"
+Axj!
+~A+A
+ 	j!	
+@ 	 
+ 	k!
+q!	 
+ 	kA
+jA|q"
+k"	A|K
+@ 	!
+v 	A
+v 	A
+v 	A
+v 	A
+jjjj!
+j!	 
+v 	A
+A|q!
+ 	j"
+j"	G
+ 	j!
+A k"
+A j$
+k!	A
+A|j#
+n"	A
+A~j 
+A|j!
+A~j"
+A k"
+jA|q"
+Axj!
+Axj"
+slice index starts at 
+ but ends at 
+range start index 
+" out of range for slice of length 
+range end index 
+" out of range for slice of length 
+assertion `left 
+ right` failed
+  left: 
+ right: 
+assertion `left 
+ right` failed: 
+  left: 
+ right: 
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/sync/mutex/no_threads.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/sync/rwlock/no_threads.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/io/error/wasi.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/io/io_slice.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/mod.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/id.rs
+/rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/io/io_slice/repr_iovec.rs
+memory allocation of 
+G bytes failed
+skipping backtrace printing to avoid potential recursion
+5fatal runtime error: failed to initiate panic, error 
+, aborting
+memory allocation of 
+ bytes failed
+panicked at 
+thread panicked while processing panic. aborting.
+thread '
+) panicked at 
+aborting due to panic at 
+a formatting trait implementation returned an error when the underlying stream did notfile name contained an unexpected NUL bytemain<unnamed>note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+called `Result::unwrap()` on an `Err` value
+([mfatal runtime error: rwlock locked for writing, aborting
+rwlock overflowed read locksRUST_BACKTRACEcannot recursively acquire mutexadvancing io slices beyond their lengthadvancing IoSlice beyond its length
+Box<dyn Any>thread caused non-unwinding panic. aborting.
+failed to write whole bufferstack backtrace:
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+strerror_r failurefailed to generate unique thread ID: bitspace exhaustedUtf8Errorvalid_up_toerror_lenNoneSomerwlock has not been locked for reading"
+**'#
+( **!
+***&**
+***$****
+****
+Success
+Illegal byte sequence
+Domain error
+Result not representable
+Not a tty
+Permission denied
+Operation not permitted
+No such file or directory
+No such process
+File exists
+Value too large for data type
+No space left on device
+Out of memory
+Resource busy
+Interrupted system call
+Resource temporarily unavailable
+Invalid seek
+Cross-device link
+Read-only file system
+Directory not empty
+Connection reset by peer
+Operation timed out
+Connection refused
+Host is unreachable
+Address in use
+Broken pipe
+I/O error
+No such device or address
+No such device
+Not a directory
+Is a directory
+Text file busy
+Exec format error
+Invalid argument
+Argument list too long
+Symbolic link loop
+Filename too long
+Too many open files in system
+No file descriptors available
+Bad file descriptor
+No child process
+Bad address
+File too large
+Too many links
+No locks available
+Resource deadlock would occur
+State not recoverable
+Previous owner died
+Operation canceled
+Function not implemented
+No message of desired type
+Identifier removed
+Link has been severed
+Protocol error
+Bad message
+Not a socket
+Destination address required
+Message too large
+Protocol wrong type for socket
+Protocol not available
+Protocol not supported
+Not supported
+Address family not supported by protocol
+Address not available
+Network is down
+Network unreachable
+Connection reset by network
+Connection aborted
+No buffer space available
+Socket is connected
+Socket not connected
+Operation already in progress
+Operation in progress
+Stale file handle
+Quota exceeded
+Multihop attempted
+Capabilities insufficient
+capacity overflow0123456789abcdef { , :  {
+}), }==!=matches00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899
+    0x0123456789ABCDEFfalsetrue
+\	producers
+processed-by
+wit-component
+0.245.1
+wit-bindgen-rust
+0.57.1
+wit-bindgen-c
+0.53.1
+$imports
+/	producers
+processed-by
+wit-component
+0.252.0
+$imports
+/	producers
+processed-by
+wit-component
+0.252.0
+error
+[resource-drop]error
+pollable
+[method]pollable.block
+[resource-drop]pollable
+[method]pollable.block
+poll
+input-stream
+output-stream
+[method]output-stream.subscribe
+[resource-drop]input-stream
+[resource-drop]output-stream
+![method]output-stream.check-write
+[method]output-stream.write
+$[method]output-stream.blocking-flush
+[method]output-stream.subscribe
+terminal-input
+[resource-drop]terminal-input
+terminal-output
+[resource-drop]terminal-output
+get-environment
+exit
+exit
+	get-stdin
+	get-stdin
+get-stdout
+get-stdout
+get-stderr
+get-stderr
+get-terminal-stdin
+get-terminal-stdout
+get-terminal-stderr
+subscribe-duration
+subscribe-duration
+wasi:io/error@0.2.0
+wasi:io/poll@0.2.0
+wasi:io/streams@0.2.0
+wasi:cli/terminal-input@0.2.0
+wasi:cli/terminal-output@0.2.0
+wasi:cli/environment@0.2.0
+wasi:cli/exit@0.2.0
+wasi:cli/stdin@0.2.0
+wasi:cli/stdout@0.2.0
+wasi:cli/stderr@0.2.0
+wasi:cli/terminal-stdin@0.2.0
+wasi:cli/terminal-stdout@0.2.0
+wasi:cli/terminal-stderr@0.2.0
+!wasi:clocks/monotonic-clock@0.2.0
+memory
+$imports
+poll
+cabi_realloc
+![method]output-stream.check-write
+[method]output-stream.write
+$[method]output-stream.blocking-flush
+get-environment
+get-terminal-stdin
+get-terminal-stdout
+get-terminal-stderr
+$imports
+frame
+handle-frame
+cabi_post_handle-frame
+handle-frame
+on-start
+cabi_post_on-start
+on-start
+on-shutdown
+on-shutdown
+component-name
+resource.drop
+resource.drop
+[method]pollable.block
+ indirect-wasi:io/poll@0.2.0-poll
+resource.drop
+resource.drop
+@indirect-wasi:io/streams@0.2.0-[method]output-stream.check-write
+:indirect-wasi:io/streams@0.2.0-[method]output-stream.write
+Cindirect-wasi:io/streams@0.2.0-[method]output-stream.blocking-flush	
+[method]output-stream.subscribe
+resource.drop
+resource.drop
+3indirect-wasi:cli/environment@0.2.0-get-environment
+exit
+	get-stdin
+get-stdout
+get-stderr
+9indirect-wasi:cli/terminal-stdin@0.2.0-get-terminal-stdin
+;indirect-wasi:cli/terminal-stdout@0.2.0-get-terminal-stdout
+;indirect-wasi:cli/terminal-stderr@0.2.0-get-terminal-stderr
+subscribe-duration
+realloc
+ indirect-wasi:io/poll@0.2.0-poll
+@indirect-wasi:io/streams@0.2.0-[method]output-stream.check-write
+:indirect-wasi:io/streams@0.2.0-[method]output-stream.write
+Cindirect-wasi:io/streams@0.2.0-[method]output-stream.blocking-flush
+3indirect-wasi:cli/environment@0.2.0-get-environment
+9indirect-wasi:cli/terminal-stdin@0.2.0-get-terminal-stdin
+;indirect-wasi:cli/terminal-stdout@0.2.0-get-terminal-stdout
+;indirect-wasi:cli/terminal-stderr@0.2.0-get-terminal-stderr
+handle-frame
+cabi_post_handle-frame 
+on-start!
+cabi_post_on-start"
+on-shutdown
+shim table
+memory
+main
+wit-component-shim-module
+wit-component-fixup
+wit-component-shim-instance
+wasi:io/error@0.2.0
+wasi:io/poll@0.2.0
+wasi:io/streams@0.2.0
+wasi:cli/terminal-input@0.2.0
+wasi:cli/terminal-output@0.2.0
+wasi:cli/environment@0.2.0
+wasi:cli/exit@0.2.0
+wasi:cli/stdin@0.2.0	
+wasi:cli/stdout@0.2.0
+wasi:cli/stderr@0.2.0
+wasi:cli/terminal-stdin@0.2.0
+wasi:cli/terminal-stdout@0.2.0
+wasi:cli/terminal-stderr@0.2.0
+!wasi:clocks/monotonic-clock@0.2.0
+main
+fixup-args
+fixup
+maos:spirit/frames@1.0.0
+wasi:io/poll@0.2.9
+!wasi:clocks/monotonic-clock@0.2.9
+wasi:io/error@0.2.9
+wasi:io/streams@0.2.9
+wasi:cli/stdout@0.2.9
+wasi:cli/stderr@0.2.9
+wasi:cli/stdin@0.2.9
+wasi:cli/environment@0.2.9	
+wasi:cli/exit@0.2.9
+wasi:cli/terminal-input@0.2.9
+wasi:cli/terminal-output@0.2.9
+wasi:cli/terminal-stdin@0.2.9
+wasi:cli/terminal-stdout@0.2.9
+wasi:cli/terminal-stderr@0.2.9
+[method]pollable.block
+[method]output-stream.subscribe
+exit
+	get-stdin
+get-stdout
+get-stderr
+subscribe-duration
+poll
+![method]output-stream.check-write	
+[method]output-stream.write
+$[method]output-stream.blocking-flush
+get-environment
+get-terminal-stdin
+get-terminal-stdout
+get-terminal-stderr
+handle-frame
+handle-frame
+on-start
+on-start
+on-shutdown
+on-shutdown
+ty-maos:spirit/frames@1.0.0
+ty-wasi:io/poll@0.2.9
+pollable
+$ty-wasi:clocks/monotonic-clock@0.2.9
+ty-wasi:io/error@0.2.9
+error
+pollable
+ty-wasi:io/streams@0.2.9
+output-stream	
+ty-wasi:cli/stdout@0.2.9
+output-stream
+ty-wasi:cli/stderr@0.2.9
+input-stream
+ty-wasi:cli/stdin@0.2.9
+ty-wasi:cli/environment@0.2.9
+ty-wasi:cli/exit@0.2.9
+ ty-wasi:cli/terminal-input@0.2.9
+!ty-wasi:cli/terminal-output@0.2.9
+terminal-input
+ ty-wasi:cli/terminal-stdin@0.2.9
+terminal-output
+!ty-wasi:cli/terminal-stdout@0.2.9
+terminal-output
+!ty-wasi:cli/terminal-stderr@0.2.9
+	iac-frame
+	iac-frame
+halt
+halt
+error
+pollable
+input-stream
+output-stream 
+terminal-input!
+terminal-output
+maos:spirit/frames@1.0.0
+wasi:io/poll@0.2.9
+!wasi:clocks/monotonic-clock@0.2.9
+wasi:io/error@0.2.9
+wasi:io/streams@0.2.9
+wasi:cli/stdout@0.2.9
+wasi:cli/stderr@0.2.9
+wasi:cli/stdin@0.2.9
+wasi:cli/environment@0.2.9	
+wasi:cli/exit@0.2.9
+wasi:cli/terminal-input@0.2.9
+wasi:cli/terminal-output@0.2.9
+wasi:cli/terminal-stdin@0.2.9
+wasi:cli/terminal-stdout@0.2.9
+wasi:cli/terminal-stderr@0.2.9
+/	producers
+processed-by
+wit-component
+0.252.0
+
+[exit=0]
+$ python3 inspect component strings for producer provenance markers
+rustc: pinned=True rebuilt=True
+rust-version: pinned=False rebuilt=False
+wit-bindgen: pinned=True rebuilt=True
+producers: pinned=True rebuilt=True
+Cargo: pinned=False rebuilt=False
+conclusion: neither component exposes a toolchain producer marker in printable strings; the committed fixture provenance manifest records hashes and source inputs, not a Rust toolchain identity.

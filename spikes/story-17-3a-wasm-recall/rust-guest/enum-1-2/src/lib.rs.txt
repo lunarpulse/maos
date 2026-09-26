@@ -1,0 +1,24 @@
+// The on-start call retains the @1.2 recall import in the component, while
+// accepting the linker's deliberate probe error.
+wit_bindgen::generate!({
+    path: "../../wit-1.2-enum/spirit.wit",
+    world: "spirit",
+});
+
+use maos::spirit::recall;
+
+struct EnumGuest;
+
+impl Guest for EnumGuest {
+    fn handle_frame(frame: IacFrame) -> Result<Vec<IacFrame>, Halt> { Ok(vec![frame]) }
+    fn on_start() -> Result<(), Halt> {
+        let _ = recall::recall(&recall::RecallFilter {
+            kind: Some(recall::FrameKindLabel::EnumGrowthProbe),
+            since_ns: None, until_ns: None, limit: 1, cursor: None, intent_filter: None,
+        });
+        Ok(())
+    }
+    fn on_shutdown() {}
+}
+
+export!(EnumGuest);
