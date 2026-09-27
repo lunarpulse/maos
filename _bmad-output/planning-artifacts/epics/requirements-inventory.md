@@ -541,7 +541,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR2 clean kernel uninstall (PARTIAL) | 16-4 |
 | FR3 providers + endpoint lock (PARTIAL: 3 of 6) | 20-4 (Gemini + pin); `later-bedrock-vertex-and-kms-backends` |
 | FR4/FR47 mediation incl. Worker subprocess (PARTIAL) | 17-1 |
-| FR5 sandbox enforcement (PARTIAL: computed, never applied) | **by form (ADR-060):** Workers 17-1/17-2; third-party WASM 17-3b; first-party in-proc trusted |
+| FR5 sandbox enforcement (PARTIAL: computed, never applied) | **by form (ADR-060):** Workers 17-1/17-2; third-party WASM 17-3b (admission) + 17-3c (execution under T2); first-party in-proc trusted |
 | FR6 cgroups v2 caps (TEST-ONLY) | 17-2 |
 | FR7 telemetry opt-in (ABSENT: no emitter) | explicit non-goal until an emitter exists (recorded in 15-5) |
 | FR9/FR13/FR16/FR24/FR51 verbs reaching a running Spirit (CANNED/PARTIAL) | 16-1 — ⚠ **R10 (Story 16-6): except FR9's `load`, which is `16-6`.** 16-1 shipped four of FR9's five verbs; the fifth has no verb in the tree, and 16-1's own round-table (F-B) split it out |
@@ -554,8 +554,8 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR21/FR25/FR52 real Workers (PARTIAL) | 19-1, 19-3 |
 | FR23b clock skew, partition, revocation (PARTIAL) | 21-3 |
 | FR28 kernel quota enforcement (PARTIAL) | 21-4 |
-| FR29 `log.recall` for a non-Rust form (PARTIAL: in-proc only) | 17-3b (WASM wire) |
-| FR33 per-language templates (PARTIAL: Rust + TS harness) | 17-3b (TS via componentize-js); Python later via componentize-py |
+| FR29 `log.recall` for a non-Rust form (PARTIAL: in-proc only) | 17-3d (inherited-descriptor side channel, ADR-060 §Amendment) |
+| FR33 per-language templates (PARTIAL: Rust + TS harness) | 17-3b (`templates/spirit-ts` → `wasm-component` via componentize-js); Python later via componentize-py |
 | FR35/FR36 publish to a real registry, verified install (PARTIAL) | 20-1 |
 | FR37 vetter-side issuance (PARTIAL: zero callers) | 20-1 |
 | FR39/FR57 skill.author.self + revision proposals (CANNED) | follow-on at Epic 18 preflight |
@@ -565,7 +565,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR55 hook firers (PARTIAL) | 17-4 |
 | FR59 yank policy (PARTIAL) | 20-1 |
 | FR61 GPG key (documented deviation, ADR-047) | unchanged |
-| FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the WIT extension is the first emitted event) |
+| FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the `maos:spirit@2.0.0` break is the first emitted event — epic-17 R17-59) |
 | FR64 cost dimensions (PARTIAL) | later (post-v1.0) |
 | FR65 pending halts + lineage in erasure proof (PARTIAL) | 16-4 |
 | NFR-Test-4 per-class halt-recall (UNMEASURED) | 18-2, 21-1 |

@@ -1,0 +1,26 @@
+2026-09-26T21:06:37Z
++ throwaway spawn_and_bridge(forbidden-syscall-probe) at T0..T4 under the lean design
+ZZ SandboxTier(0) exit=Exited { code: 0 }
+ZZ SandboxTier(1) refused=SandboxRefused("/tmp/17-6-proto2/crates/maos-kernel-core/../maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe: no spawn path applies tier SandboxTier(1)")
+ZZ SandboxTier(2) exit=Signaled { signal: 31 }
+ZZ SandboxTier(3) exit=Exited { code: 0 }
+ZZ SandboxTier(4) refused=SandboxRefused("/tmp/17-6-proto2/crates/maos-kernel-core/../maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe: no spawn path applies tier SandboxTier(4)")
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
++ throwaway maos_exec_deps::resolve cases (incl. a FIFO, a script, a directory)
+### planted: T2 arm routed bare
+warning: unreachable pattern
+warning: unreachable pattern
+ZZ SandboxTier(2) exit=Signaled { signal: 31 }
+68	19	crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++ throwaway maos_exec_deps::resolve cases (a FIFO, a text file, a script, a directory)
+ZZ /bin/true (139.03µs) -> Ok(("/usr/bin/true", Some("/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"), ["/usr/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"]))
+ZZ /bin/sh (61.775µs) -> Ok(("/usr/bin/dash", Some("/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"), ["/usr/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"]))
+ZZ true (98.885µs) -> Ok(("/usr/bin/true", Some("/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"), ["/usr/lib/x86_64-linux-gnu/libc.so.6", "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"]))
+ZZ /tmp/zz-fifo (7.113µs) -> Err("/tmp/zz-fifo: not a regular file")
+ZZ /etc/hostname (14.818µs) -> Err("/etc/hostname: short ELF header")
+ZZ /usr/bin/ldd (4.317157ms) -> Err("/usr/bin/ldd: not an ELF64 little-endian executable")
+ZZ /tmp/17-6-proto2/crates/maos-exec-deps (12.163µs) -> Err("/tmp/17-6-proto2/crates/maos-exec-deps: not a regular file")
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+### planted: the T2 arm deleted (T2 falls to bare spawn)
+ZZ T2 exit=Exited { code: 0 }
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

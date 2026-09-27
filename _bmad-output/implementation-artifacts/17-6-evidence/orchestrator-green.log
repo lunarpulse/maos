@@ -1,0 +1,23 @@
+2026-09-26T19:06:59Z
+c0a397ea29661a171a3030ba4a48cb3a03962780
++ CARGO_TARGET_DIR=/tmp/17-6-proto-target cargo test -q --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture  (prototype, kill-first)
+running 3 tests
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+.capability-gated contentmaos-sandbox: no writable cgroup subtree; using setrlimit fallback
+cat: /tmp/.tmpM94edQ/secret.txt: Permission denied
+..
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
++ same, kernel suite
+running 4 tests
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+..maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+sh: 0: getcwd() failed: Operation not permitted
+ok
+sh: 0: getcwd() failed: Operation not permitted
+..
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

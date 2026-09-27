@@ -1,0 +1,13 @@
+8	0	Cargo.lock
+1	0	Cargo.toml
+3	0	crates/maos-bench/src/harness/j1.rs
+7	0	crates/maos-bin/src/worker_spawn.rs
+11	0	crates/maos-exec-deps/Cargo.toml
+278	0	crates/maos-exec-deps/src/lib.rs
+2	0	crates/maos-kernel-core/Cargo.toml
+4	4	crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+68	19	crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+41	14	crates/maos-kernel-core/src/security/sandbox/linux.rs
+7	0	crates/maos-kernel-core/src/security/sandbox/mod.rs
+3	0	crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
+3	0	xtask/src/check_skill_conformance.rs

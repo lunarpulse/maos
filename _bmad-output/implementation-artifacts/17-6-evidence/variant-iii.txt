@@ -1,0 +1,5 @@
+2026-09-26T19:00:29.070484+00:00
+c0a397ea29661a171a3030ba4a48cb3a03962780
+cargo check --locked -p maos-kernel-core after temporary object = "0.37.3"
+rc=101
+error: cannot update Cargo.lock because --locked was passed; although object 0.37.3 is present in Cargo.lock, it has no existing maos-kernel-core dependency edge. No semantic object variant built. Temporary Cargo.toml edit reverted; Cargo.lock unchanged.

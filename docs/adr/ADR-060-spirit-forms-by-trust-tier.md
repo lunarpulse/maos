@@ -1,5 +1,5 @@
 ---
-Status: ACCEPTED — ratified 2026-09-08 under Story 15-5, decisions F3–F5
+Status: ACCEPTED — ratified 2026-09-08 under Story 15-5, decisions F3–F5; §D-C transport AMENDED 2026-09-26 (operator-ratified — see Amendment)
 Gate: `cargo test -p xtask --test decision_adrs_and_provisioning`; implementation gates owned by Story 17-3b
 Decided: 2026-09-08
 Accepted-in-PR: pending — Story 15-5
@@ -82,7 +82,7 @@ continues to select native-subprocess versus WASM-component host adapters. The
 two representations may be mapped by the composition root, but they are not
 silently treated as the same schema.
 
-Story `17-3b-wasm-third-party-form-with-log-recall` owns the validator and
+Story `17-3b-wasm-form-admission-and-contract` owns the validator and
 registry changes. `RawClassSection` is `deny_unknown_fields`; adding the token
 has schema-version and field-coverage consequences that land with that story.
 
@@ -101,8 +101,8 @@ continues to be the ADR-032 kernel bridge and remains byte-identical. Recall
 does not transit a new kernel protocol, so kernel-core delta is zero.
 
 This is a to-build decision. Unix socket primitives and a WASM recall path are
-absent today. Story 17-3a prices and validates the design before Story 17-3b
-builds it. The WIT world gains only the versioned capability surface selected
+absent today. Story 17-3a prices and validates the design before Story 17-3d
+builds it (epic-17 R17-51 split the old 17-3b). The WIT world gains only the versioned capability surface selected
 by that spike; this ADR does not claim an existing import.
 
 ### D-E — digest rendering
@@ -120,9 +120,12 @@ component toolchain.
 
 ## Consumers
 
-- `17-3b-wasm-third-party-form-with-log-recall` implements `wasm-component`
+- `17-3b-wasm-form-admission-and-contract` implements `wasm-component`
   validation, registry admission by form/trust tier, and refusal of registry
   `rust-inproc` packages.
+- `17-3c-wasm-spirit-on-the-bus-under-t2` runs a `wasm-component` Spirit on the
+  IAC bus under ADR-031's T2 process boundary.
+- `17-3d-wasm-log-recall` builds the D-C recall side channel.
 - `17-3a-wasm-recall-and-componentize-spike` validates the D-C side channel.
 - `19-4-j1-beats-and-demo-replay` supplies the D-E production digest caller.
 - `20-1-registry-client-install-verb-vetter-and-yank` relies on the registry
@@ -151,3 +154,48 @@ from Story 17 work prevents this ADR from claiming controls that do not exist.
 - The phased roadmap and product-scoping text are reconciled with the explicit
   ADR-002/031/040 supersession chain.
 - Kernel-core source remains unchanged by this decision story.
+
+## Amendment — §D-C transport (ratified 2026-09-26)
+
+Ratified by the operator (Lunarpulse) on 2026-09-26, on Story 17-3a's measured
+proposal (Go/No-Go Q4 row and ratification checklist) as re-shaped by Story
+17-6's preflight round-table (epic-17 §R6, R17-46). Measurement disproved two
+statements in §D-C above; each point below supersedes the sentence it names.
+Everything else in §D-C stands: recall is a `maos-bin` side channel, the
+runner's stdio stays the byte-identical ADR-032 kernel bridge, and recall does
+not transit a new kernel protocol.
+
+- **The transport is an inherited descriptor, not a socket path.** SUPERSEDES
+  *"The daemon chooses and passes the socket path to the runner."* The daemon
+  creates a connected `socketpair`, keeps one end, and hands the other to the
+  runner at spawn as an inherited descriptor. Measured (17-3a Q4b, CI run
+  `36210072648`, both x64 images): under the T2 allow-list — which carries no
+  `socket` and no `connect`, and must not, because a sandbox with them reached
+  unrelated AF_UNIX and loopback TCP listeners — a path-based recall is denied
+  while five inherited-descriptor variants complete. The runner needs only
+  `sendto` and `recvfrom` on the descriptor it was given.
+- **Condition (i) — same-uid safety rests on host ptrace protection.** A process
+  at the operator's uid can take the inherited descriptor through
+  `pidfd_getfd` or `/proc/<pid>/fd` wherever Yama `ptrace_scope` is `0`; with
+  `ptrace_scope=1` both are refused (17-3a `q4-fd-vectors.log`). The recall
+  service binds the caller's pid per spawn (epic-17 R17-23) rather than treating
+  possession of the descriptor as identity, and the Yama dependency is a stated
+  deployment condition, not a guarantee this design provides.
+- **Condition (ii) — availability must not rest on a one-shot path accept.** A
+  path socket accepted once and unlinked is denial-of-service-able by the first
+  same-uid connector, because the unlink precedes the `SO_PEERCRED` check (17-3a
+  `recall_service.rs.txt:93-98`). Any path-socket fallback keeps `SO_PEERCRED`,
+  a 0600 socket in a daemon-owned 0700 directory, and a retry path; the
+  descriptor transport above is the design.
+- **Kernel-core is not unchanged.** SUPERSEDES *"so kernel-core delta is zero"*
+  and the Outcomes bullet *"Kernel-core source remains unchanged by this
+  decision story"* as it applies to building D-C. The inherited descriptor's
+  `FD_CLOEXEC` must be cleared inside the child before `execve`, which only a
+  `pre_exec` hook can do; that is `unsafe` and belongs to the sandbox zone
+  (`security/sandbox/`), and `lifecycle/cli_wrapper/runtime.rs` forbids
+  `unsafe`. The runner's own allow-list entries (`memfd_create`, `sendto`,
+  `recvfrom`) also land there. Stories `17-3c-wasm-spirit-on-the-bus-under-t2`
+  (`memfd_create`) and `17-3d-wasm-log-recall` (the descriptor hand-off,
+  `sendto`, `recvfrom`) are therefore ◆ FLAG-Winston for exactly those lines,
+  each with its kernel figure measured by a prototype at its creation (E16-A7;
+  epic-17 R17-46, routed by R17-51 when the old 17-3b was split).

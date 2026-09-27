@@ -39,7 +39,7 @@ These are different primitives, not different views of one log. v1.0 ships all f
 
 ## Technical Constraints
 
-**Sandbox tiers (security domain).** T0 (no sandbox; trusted only — local-tier Spirits) → T1 (process isolation; UID separation) → T2 (Landlock+seccomp on Linux, Seatbelt on macOS, WinRT job objects on Windows; the default for public-untrusted Spirits per ADR-009) → T3 (containerized — Docker/Podman) → T4 (WASM component model; v2.0). Strictest-of-(manifest, trust tier) floor enforced (ADR-009).
+**Sandbox tiers (security domain).** T0 (no sandbox; trusted only — local-tier Spirits) → T1 (process isolation; UID separation) → T2 (Landlock+seccomp on Linux, Seatbelt on macOS, WinRT job objects on Windows; the default for public-untrusted Spirits per ADR-009) → T3 (containerized — Docker/Podman) → T4 (WASM component model; v2.0). Strictest-of-(manifest, trust tier) floor enforced (ADR-009). **[DELTA-2026-09-27 per Lunarpulse (operator), epic-17 R17-57]** T4 is reserved for the WASM *tool* sandbox and refused at admission until built; **WASM-component Spirits run at T2** (the ADR-031 process boundary) with WIT capability gating on top (ADR-060, Epic 17).
 
 **Per-Spirit resource isolation (Winston's addition).** Each Spirit runs under a resource cgroup (Linux cgroups v2; equivalent constraint primitives on macOS/Windows) with kernel-enforced caps on CPU, memory, file descriptors, and process count. Sandbox tiers cover the *security* boundary; resource cgroups cover the *resource* boundary. A runaway Spirit gets throttled, not the host. Caps declared in manifest `[resources]` table; defaults per Spirit class.
 

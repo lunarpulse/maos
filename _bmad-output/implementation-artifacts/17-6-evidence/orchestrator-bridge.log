@@ -1,0 +1,8 @@
+2026-09-26T19:08:19Z
+c0a397ea29661a171a3030ba4a48cb3a03962780
++ throwaway crates/maos-kernel-core/tests/zz_throwaway_t2_bridge.rs (NOT committed): spawn_and_bridge(forbidden-syscall-probe) at T0/T2/T4, pump_to_journal, wait_and_finalize
+ZZ tier=SandboxTier(0) exit=Exited { code: 0 }
+ZZ tier=SandboxTier(2) exit=Signaled { signal: 31 }
+ZZ tier=SandboxTier(4) refused=SandboxRefused("bridge tier SandboxTier(4) is not supported by this spawn path")
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
++ throwaway spirits/worker/tests zz test: probe_and_verify_shape(worker-cli-fixture, T2|T3) -> ZZ T2 probe result: Ok(()) / ZZ T3 probe result: Ok(()) (run 19:08Z, reverted)

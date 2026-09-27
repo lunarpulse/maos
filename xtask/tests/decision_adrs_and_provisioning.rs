@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 const CHECKLIST: &str = "docs/runbooks/provisioning-checklist.md";
 const REQUIRED_ADRS: &[(&str, &str)] = &[
-    ("060", "17-3b-wasm-third-party-form-with-log-recall"),
+    ("060", "17-3b-wasm-form-admission-and-contract"),
     ("061", "17-1-worker-egress-allowlist-and-scoped-credential"),
     ("062", "16-1-daemon-post-surface-and-verb-retarget"),
     ("063", "21-3-durable-tofu-and-self-leaf-rotation"),

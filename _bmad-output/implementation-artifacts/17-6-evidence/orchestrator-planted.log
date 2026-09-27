@@ -1,0 +1,53 @@
+2026-09-26T19:07:11Z
+c0a397ea29661a171a3030ba4a48cb3a03962780
+### planted fault 1: Ok(vec![bpf, kill_bpf]) (verbatim HEAD order), helpers unmodified
+running 3 tests
+maos: seccomp apply failed
+maos: seccomp apply failed
+SKIP t2_benign_control: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+SKIP forbidden_syscall: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+..maos: seccomp apply failed
+SKIP fs_granted: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+.
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+### planted fault 2: libc::SYS_poll dropped from LEGACY_X86_SYSCALLS
+0
+running 3 tests
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+.maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+maos-sandbox: no writable cgroup subtree; using setrlimit fallback
+capability-gated contentmaos-sandbox: no writable cgroup subtree; using setrlimit fallback
+cat: /tmp/.tmptVgind/secret.txt: Permission denied
+.
+thread 'forbidden_syscall_killed_by_t2_with_sigsys' (3693901) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:94:10:
+T2 must classify this exit as a SandboxViolation, not an ordinary failure
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::panic_display::<&str>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:259:5
+   3: core::option::expect_failed
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:2260:5
+   4: <core::option::Option<maos_kernel_core::security::sandbox::SandboxViolation>>::expect
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:969:21
+   5: t2_sandbox_kill::forbidden_syscall_killed_by_t2_with_sigsys
+             at ./tests/t2_sandbox_kill.rs:94:10
+   6: t2_sandbox_kill::forbidden_syscall_killed_by_t2_with_sigsys::{closure#0}
+             at ./tests/t2_sandbox_kill.rs:75:48
+   7: <t2_sandbox_kill::forbidden_syscall_killed_by_t2_with_sigsys::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+   8: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+ 2/3
+forbidden_syscall_killed_by_t2_with_sigsys --- FAILED
+failures:
+failures:
+    forbidden_syscall_killed_by_t2_with_sigsys
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+error: test failed, to rerun pass `-p maos-wasm-host --test t2_sandbox_kill`
+1
+### restored
+335	31	crates/maos-kernel-core/src/security/sandbox/linux.rs

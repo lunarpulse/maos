@@ -1,0 +1,12 @@
+1	0	crates/maos-bench/src/harness/j1.rs
+13	9	crates/maos-bin/src/worker_spawn.rs
+4	5	crates/maos-domain/src/cli_wrapper.rs
+96	69	crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+93	28	crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+335	31	crates/maos-kernel-core/src/security/sandbox/linux.rs
+15	0	crates/maos-kernel-core/src/security/sandbox/mod.rs
+2	4	crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs
+14	4	crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
+2	2	crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs
+3	3	xtask/error-catalog.toml
+1	0	xtask/src/check_skill_conformance.rs

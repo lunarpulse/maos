@@ -326,7 +326,7 @@ Eight journeys collectively reveal the capability areas the kernel and reference
 | Cross-Host A2A peer mesh + ADR-012 typed-intent consent | J1 (loopback only at v0.8), J3, J4, Reza | v0.8 (loopback-only profile per Winston) → v1.0 (cross-host with mTLS+TOFU) |
 | Episodic memory persistence across sessions | J-Butler, J-Researcher (private tier), J1, J3, J4 | v0.3 (private tier) → v1.0 (shared tier) → v1.5 (collective tier via Loom) |
 | Transparency Log + Approval Decision Log + `log.recall` | All journeys | v0.1 (basic Transparency Log) → v0.3 (replay) → v0.5 (`log.recall` ABI per ADR-013) → v1.0 (queryable export + sealed export) |
-| Sandbox tiers (T0–T4) with capability scoping | All | v0.1 (T0/T1) → v0.3 (T2 narrow) → v0.5 (T2/T3) → v2.0 (T4 WASM) |
+| Sandbox tiers (T0–T4) with capability scoping | All | v0.1 (T0/T1) → v0.3 (T2 narrow) → v0.5 (T2/T3) → v2.0 (T4 WASM tool sandbox; WASM-component Spirits run at T2 + WIT from W2 — **[DELTA-2026-09-27 per Lunarpulse (operator), epic-17 R17-57]**) |
 | Pluggable provider drivers (Anthropic / OpenAI / local / Bedrock) | J-Researcher, J1, J4 | v0.1 (Anthropic single) → v0.5 (multi-provider via CLI-wrapped agents) → v1.5 (MAOS-mediated provider proxies) → v2.0 (full multi-provider) |
 | Mobile-friendly approval surface (phone push) | J1, J4 | v1.0 (HTTP push) → v2.0 (native push) |
 | Asymmetric capability postures (sre-diagnostician vs principal-architect vs platform-lead) | J4, Reza | v1.5 |

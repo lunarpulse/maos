@@ -1,0 +1,1110 @@
+diff --git a/crates/maos-bench/src/harness/j1.rs b/crates/maos-bench/src/harness/j1.rs
+index e92b313b..aa5a18db 100644
+--- a/crates/maos-bench/src/harness/j1.rs
++++ b/crates/maos-bench/src/harness/j1.rs
+@@ -218,6 +218,7 @@ pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResul
+     let argv_prefix = vec!["-c".to_string()];
+     let spec = BridgeSpawnSpec {
+         program: "sh".to_string(),
++        tier: maos_domain::invariants::i9::SandboxTier::T0,
+         argv_prefix: argv_prefix.clone(),
+         task_args: vec!["while IFS= read -r line; do printf '%s\\n' \"$line\"; done".to_string()],
+         expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index 366999a3..c01b4eb2 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -630,15 +630,18 @@ pub fn run_cli_wrapper_manifest(
+                 .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+         }
+         worker_cli::ProbeStrategy::Liveness { argv } => {
+-            // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
+-            // this; preserve it on the real-CLI path).
+-            if !matches!(granted_tier, maos_domain::invariants::i9::SandboxTier::T3) {
+-                return Err(format!(
+-                    "maos run: cli_wrapper admission failed: {} requires SandboxTier::T3, \
+-                     host-granted {granted_tier:?}",
+-                    worker_cli.name()
+-                )
+-                .into());
++            if !matches!(
++                granted_tier,
++                maos_domain::invariants::i9::SandboxTier::T2
++                    | maos_domain::invariants::i9::SandboxTier::T3
++            ) {
++                return Err(
++                    maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperTierUnenforced {
++                        observed_tier: format!("{granted_tier:?}"),
++                    }
++                    .to_string()
++                    .into(),
++                );
+             }
+             worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
+                 .map_err(|e| {
+@@ -783,6 +786,7 @@ pub fn run_cli_wrapper_manifest(
+     //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
+     let spec = BridgeSpawnSpec {
+         program: resolved,
++        tier: granted_tier,
+         argv_prefix: config.argv_prefix.clone(),
+         task_args,
+         expected_argv_prefix_hash: aph,
+diff --git a/crates/maos-domain/src/cli_wrapper.rs b/crates/maos-domain/src/cli_wrapper.rs
+index 1eb4778e..d53d8478 100644
+--- a/crates/maos-domain/src/cli_wrapper.rs
++++ b/crates/maos-domain/src/cli_wrapper.rs
+@@ -41,11 +41,10 @@ pub enum CliWrapperAdmissionError {
+     #[error("output shape adapter not registered: cli-wrapper-template:{cli}:{shape_version}")]
+     EOutputShapeAdapterNotRegistered { cli: String, shape_version: String },
+ 
+-    /// Story 6.2 AC6 — CliWrapperSpirit MUST declare `[sandbox] tier = "t3"`.
+-    /// Lower tiers cannot contain a subprocess CLI invocation; the FR52 surface
+-    /// requires the T3 sandbox.
+-    #[error("CliWrapperSpirit requires sandbox tier = t3 (got {observed_tier})")]
+-    ECliWrapperRequiresT3 { observed_tier: String },
++    /// CliWrapperSpirit requires an enforcement tier the bridge can run.
++    /// T2 is egress-free under its syscall allow-list; T3 remains admitted.
++    #[error("CliWrapperSpirit requires sandbox tier t2 or t3 (got {observed_tier})")]
++    ECliWrapperTierUnenforced { observed_tier: String },
+ 
+     /// CLI probe failed (subprocess exit non-zero, stdio I/O failure, or
+     /// adapter-declared probe protocol violated).
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+index f0f8a97e..2117ad51 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+@@ -23,6 +23,7 @@
+ //! At v0.5-α the probe runs with a 2s timeout; failure (timeout, non-zero exit,
+ //! parse failure) fires `CliWrapperAdmissionError::ECliProbeFailed`.
+ 
++use std::io::Read;
+ use std::path::Path;
+ use std::time::{Duration, Instant};
+ 
+@@ -33,6 +34,7 @@ use maos_domain::invariants::i9::SandboxTier;
+ 
+ use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+ use crate::security::manifest::{CliWrapperConfig, CliWrapperRecoveryPolicy};
++use crate::security::sandbox::{spawn_sandboxed, SandboxSpec};
+ 
+ /// Probe-result envelope returned by the CLI's `--maos-bridge-probe` handler.
+ #[derive(Debug, Clone, serde::Deserialize)]
+@@ -43,15 +45,14 @@ struct ProbeEnvelope {
+ /// Verify the CLI's observed output shape matches the manifest's declared
+ /// `output_shape_version`. On mismatch returns `EOutputShapeAdapterMismatch`.
+ ///
+-/// Story 6.2 AC6 — also asserts the manifest's `[sandbox] tier = "t3"`; lower
+-/// tiers cannot contain the FR52 subprocess invocation.
++/// Story 17.6: CliWrapperSpirit admits only the enforcement tiers T2 and T3.
+ pub fn probe_and_verify_shape(
+     config: &CliWrapperConfig,
+     sandbox_tier: SandboxTier,
+ ) -> Result<(), CliWrapperAdmissionError> {
+-    // 0. Story 6.2 AC6 §boundary — T3 required for CliWrapperSpirit.
+-    if !matches!(sandbox_tier, SandboxTier::T3) {
+-        return Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 {
++    // T2 has no socket/connect syscall allowance, so it enforces zero egress.
++    if !matches!(sandbox_tier, SandboxTier::T2 | SandboxTier::T3) {
++        return Err(CliWrapperAdmissionError::ECliWrapperTierUnenforced {
+             observed_tier: format!("{sandbox_tier:?}"),
+         });
+     }
+@@ -71,65 +72,109 @@ pub fn probe_and_verify_shape(
+     let mut argv: Vec<String> = config.argv_prefix.clone();
+     argv.push("--maos-bridge-probe".to_string());
+ 
+-    let mut child = std::process::Command::new(&resolved)
++    let mut command = std::process::Command::new(&resolved);
++    command
+         .args(&argv)
+         .stdin(std::process::Stdio::null())
+         .stdout(std::process::Stdio::piped())
+-        .stderr(std::process::Stdio::piped())
+-        .spawn()
+-        .map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
+-            cli: config.command.clone(),
+-            reason: format!("spawn failed: {e}"),
+-        })?;
++        .stderr(std::process::Stdio::piped());
++    let mut plain_child = None;
++    let mut sandboxed_child = None;
++    if sandbox_tier == SandboxTier::T2 {
++        let sandbox_spec = SandboxSpec {
++            tier: sandbox_tier,
++            resolved_caps: Default::default(),
++            declared_scopes: vec![],
++            spirit_id: config.command.clone(),
++            output_shape_predicate: None,
++        };
++        sandboxed_child = Some(spawn_sandboxed(&sandbox_spec, &mut command).map_err(|e| {
++            CliWrapperAdmissionError::ECliProbeFailed {
++                cli: config.command.clone(),
++                reason: format!("sandboxed probe spawn failed: {e}"),
++            }
++        })?);
++    } else {
++        plain_child =
++            Some(
++                command
++                    .spawn()
++                    .map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
++                        cli: config.command.clone(),
++                        reason: format!("spawn failed: {e}"),
++                    })?,
++            );
++    }
+ 
+     // 2s probe timeout per ADR-021 — a hanging CLI must not block admission.
+-    // Uses a try_wait polling loop since std::process::Child::wait_timeout
+-    // requires an extra crate; the 100ms poll interval adds at most 100ms of
+-    // latency to the timeout which is acceptable for one-shot admission.
+     const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+     const POLL_INTERVAL: Duration = Duration::from_millis(100);
+     let started = Instant::now();
+-    let exit_status = loop {
+-        match child
+-            .try_wait()
+-            .map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
+-                cli: config.command.clone(),
+-                reason: format!("try_wait failed: {e}"),
+-            })? {
+-            Some(status) => break Some(status),
+-            None => {
+-                if started.elapsed() >= PROBE_TIMEOUT {
++    let status = loop {
++        let result = if let Some(child) = plain_child.as_mut() {
++            child.try_wait()
++        } else {
++            sandboxed_child
++                .as_mut()
++                .expect("probe child exists")
++                .try_wait()
++        };
++        match result.map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
++            cli: config.command.clone(),
++            reason: format!("try_wait failed: {e}"),
++        })? {
++            Some(status) => break status,
++            None if started.elapsed() >= PROBE_TIMEOUT => {
++                if let Some(child) = plain_child.as_mut() {
+                     let _ = child.kill();
+                     let _ = child.wait();
+-                    return Err(CliWrapperAdmissionError::ECliProbeFailed {
+-                        cli: config.command.clone(),
+-                        reason: format!("probe timed out after {PROBE_TIMEOUT:?}"),
+-                    });
+                 }
+-                std::thread::sleep(POLL_INTERVAL);
+-            }
+-        }
+-    };
+-    let output = match exit_status {
+-        Some(status) => {
+-            if !status.success() {
+                 return Err(CliWrapperAdmissionError::ECliProbeFailed {
+                     cli: config.command.clone(),
+-                    reason: format!("non-zero exit ({status})"),
++                    reason: format!("probe timed out after {PROBE_TIMEOUT:?}"),
+                 });
+             }
+-            child
+-                .wait_with_output()
+-                .map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
+-                    cli: config.command.clone(),
+-                    reason: format!("wait_with_output after try_wait failed: {e}"),
+-                })?
++            None => std::thread::sleep(POLL_INTERVAL),
+         }
+-        None => unreachable!("try_wait loop ensures either Some(status) or timeout return"),
+     };
++    if !status.success() {
++        return Err(CliWrapperAdmissionError::ECliProbeFailed {
++            cli: config.command.clone(),
++            reason: format!("non-zero exit ({status})"),
++        });
++    }
++    let mut stdout = Vec::new();
++    if let Some(child) = plain_child.as_mut() {
++        child
++            .stdout
++            .as_mut()
++            .ok_or_else(|| CliWrapperAdmissionError::ECliProbeFailed {
++                cli: config.command.clone(),
++                reason: "stdout not captured".into(),
++            })?
++            .read_to_end(&mut stdout)
++            .map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
++                cli: config.command.clone(),
++                reason: format!("read stdout: {e}"),
++            })?;
++    } else {
++        sandboxed_child
++            .as_mut()
++            .expect("probe child exists")
++            .take_stdout()
++            .ok_or_else(|| CliWrapperAdmissionError::ECliProbeFailed {
++                cli: config.command.clone(),
++                reason: "stdout not captured".into(),
++            })?
++            .read_to_end(&mut stdout)
++            .map_err(|e| CliWrapperAdmissionError::ECliProbeFailed {
++                cli: config.command.clone(),
++                reason: format!("read stdout: {e}"),
++            })?;
++    }
+ 
+     // 3. Parse stdout — accept either JSON envelope or bare semver line.
+-    let first_line = std::str::from_utf8(&output.stdout)
++    let first_line = std::str::from_utf8(&stdout)
+         .unwrap_or("")
+         .lines()
+         .next()
+@@ -246,34 +291,16 @@ pub fn reject_respawn_with_context(
+     Ok(())
+ }
+ 
+-/// Story 8.12 AC5 (FORK A — Winston host-grant model) — resolve the manifest's
+-/// **requested** sandbox tier against the host-side grant allowlist.
+-///
+-/// Trust-direction gate: the manifest REQUESTS a tier; the host GRANTS it via an
+-/// operator-config allowlist keyed on attested-image + signing-key (NOT in the
+-/// artifact). Fail-closed at every branch:
+-///
+-/// - requested tier below the CliWrapper T3 floor → `ECliWrapperRequiresT3`
+-///   (default-deny semantics retained — a CLI subprocess cannot be contained
+-///   below T3);
+-/// - no matching host grant, or a request above the grant, or a platform that
+-///   cannot enforce the tier (non-Linux) → `ECliWrapperTierNotGranted`
+-///   (fail-closed, NO silent downgrade).
+-///
+-/// On success returns the granted tier (== requested). The deterministic
+-/// fixture-CLI admission path passes a T3 request against a T3 grant and is
+-/// unchanged in behavior.
++/// Story 17.6: resolve the requested enforcement tier against host grants.
+ pub fn resolve_cli_wrapper_tier(
+     requested: SandboxTier,
+     attested_image: &str,
+     signing_key_id: &str,
+     allowlist: &dyn HostGrantAllowlist,
+ ) -> Result<SandboxTier, CliWrapperAdmissionError> {
+-    // Default-deny floor: a CliWrapperSpirit cannot run below T3 (no T2
+-    // scoped-egress mechanism exists in the kernel — verified). This keeps the
+-    // existing `ECliWrapperRequiresT3` semantics.
+-    if requested < SandboxTier::T3 {
+-        return Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 {
++    // T2 is acceptable because its seccomp policy has no socket/connect syscalls.
++    if !matches!(requested, SandboxTier::T2 | SandboxTier::T3) {
++        return Err(CliWrapperAdmissionError::ECliWrapperTierUnenforced {
+             observed_tier: format!("{requested:?}"),
+         });
+     }
+@@ -338,12 +365,12 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn admission_rejects_non_t3_sandbox() {
++    fn admission_rejects_unenforced_sandbox() {
+         let c = cfg("echo", "1.0.0");
+         let err = probe_and_verify_shape(&c, SandboxTier::T1).unwrap_err();
+         assert!(matches!(
+             err,
+-            CliWrapperAdmissionError::ECliWrapperRequiresT3 { .. }
++            CliWrapperAdmissionError::ECliWrapperTierUnenforced { .. }
+         ));
+     }
+ 
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index cad2ab9a..1d2cf081 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -47,7 +47,7 @@
+ //! drop/shutdown order: on `Drop` it closes stdin, kills+reaps the child (no
+ //! `<defunct>` zombie), then joins the readers (no orphaned threads).
+ 
+-use std::io::{BufRead, BufReader, Read, Write};
++use std::io::{BufRead, BufReader, Write};
+ use std::process::{Child, ChildStdin, Command, Stdio};
+ use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
+ use std::thread::JoinHandle;
+@@ -55,9 +55,11 @@ use std::thread::JoinHandle;
+ use sha2::Digest;
+ 
+ use maos_domain::invariants::i3::FrameOrigin;
++use maos_domain::invariants::i9::SandboxTier;
+ 
+ use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+ use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
++use crate::security::sandbox::{spawn_sandboxed, SandboxSpec, SandboxedChild};
+ 
+ /// Story 6.2 AC6 — recompute the manifest's `argv_prefix_hash` for cap-token
+ /// binding verification. Re-derived at runtime; asserted equal to the
+@@ -195,6 +197,9 @@ pub enum BridgeError {
+     /// request was seen on the hermetic Tier-1 path (use `--live` for Tier-2).
+     #[error("ci_default hermetic guard tripped: {0}")]
+     CiGuardTripped(String),
++    /// The requested bridge tier cannot be enforced by this spawn path.
++    #[error("cli bridge sandbox refused: {0}")]
++    SandboxRefused(String),
+ }
+ 
+ /// Story 8.12 AC6 — the `ci_default` hermetic guard.
+@@ -240,6 +245,8 @@ pub fn ci_default_guard(program: &str, network_requested: bool) -> Result<(), Br
+ pub struct BridgeSpawnSpec {
+     /// Resolved absolute path or PATH-resolvable name of the CLI binary.
+     pub program: String,
++    /// Sandbox tier granted at admission for this bridge child.
++    pub tier: SandboxTier,
+     /// Manifest argv prefix (`["code"]` for `claude code`). Hashed for the
+     /// cap-token binding assertion.
+     pub argv_prefix: Vec<String>,
+@@ -296,6 +303,8 @@ enum ReaderMsg {
+ )]
+ pub struct SpawnedBridge {
+     child: Option<Child>,
++    /// T2 child guard retained so cgroup cleanup runs after bridge completion.
++    sandboxed_child: Option<SandboxedChild>,
+     stdin: Option<ChildStdin>,
+     readers: Vec<JoinHandle<()>>,
+     rx: Option<Receiver<ReaderMsg>>,
+@@ -472,33 +481,78 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+         cmd.env(k, v);
+     }
+ 
+-    let mut child = cmd
+-        .spawn()
+-        .map_err(|e| BridgeError::Spawn(format!("{}: {e}", spec.program)))?;
+-
+-    let child_pid = child.id();
++    let (mut child, mut sandboxed_child) = match spec.tier {
++        SandboxTier::T2 => {
++            let sandbox_spec = SandboxSpec {
++                tier: spec.tier,
++                resolved_caps: Default::default(),
++                declared_scopes: vec![],
++                spirit_id: spec.from_spirit_id.clone(),
++                output_shape_predicate: None,
++            };
++            let sandboxed = spawn_sandboxed(&sandbox_spec, &mut cmd)
++                .map_err(|e| BridgeError::SandboxRefused(e.to_string()))?;
++            (None, Some(sandboxed))
++        }
++        SandboxTier::T0 | SandboxTier::T3 => {
++            let child = cmd
++                .spawn()
++                .map_err(|e| BridgeError::Spawn(format!("{}: {e}", spec.program)))?;
++            (Some(child), None)
++        }
++        SandboxTier::T1 | SandboxTier::T4 => {
++            return Err(BridgeError::SandboxRefused(format!(
++                "bridge tier {:?} is not supported by this spawn path",
++                spec.tier
++            )));
++        }
++        _ => {
++            return Err(BridgeError::SandboxRefused(format!(
++                "unknown bridge tier {:?}",
++                spec.tier
++            )))
++        }
++    };
++    let child_pid = child
++        .as_ref()
++        .map(Child::id)
++        .or_else(|| sandboxed_child.as_ref().map(SandboxedChild::id))
++        .expect("bridge spawn produced a child");
+     // Close the child's stdin unless stdin IS the control channel. A worker
+     // driven by `Signals` (or the fixture) is not fed via stdin, and a real CLI
+     // that reads stdin-until-EOF (e.g. `codex exec`) would otherwise DEADLOCK on
+     // the bridge's held-open pipe: it blocks reading stdin while the bridge blocks
+-    // reading its output. Dropping the `ChildStdin` sends EOF so the child
+-    // proceeds on its argv prompt. `StdinCommands` (and the J1 bench's
+-    // `write_stdin_line`) keep stdin open — that path drives the worker through it.
+-    let stdin = match spec.control_channel {
+-        CliWrapperControlChannel::Signals => {
+-            let _ = child.stdin.take(); // drop the ChildStdin → EOF to the child
+-            None
++    // reading its output. Dropping the ChildStdin sends EOF so the child proceeds.
++    let stdin = if matches!(spec.control_channel, CliWrapperControlChannel::Signals) {
++        if let Some(child) = child.as_mut() {
++            let _ = child.stdin.take();
++        } else if let Some(child) = sandboxed_child.as_mut() {
++            let _ = child.take_stdin();
+         }
+-        _ => child.stdin.take(),
++        None
++    } else if let Some(child) = child.as_mut() {
++        child.stdin.take()
++    } else {
++        sandboxed_child
++            .as_mut()
++            .and_then(SandboxedChild::take_stdin)
+     };
+-    let stdout = child
+-        .stdout
+-        .take()
+-        .ok_or_else(|| BridgeError::Spawn("stdout not captured".into()))?;
+-    let stderr = child
+-        .stderr
+-        .take()
+-        .ok_or_else(|| BridgeError::Spawn("stderr not captured".into()))?;
++    let stdout = if let Some(child) = child.as_mut() {
++        child.stdout.take()
++    } else {
++        sandboxed_child
++            .as_mut()
++            .and_then(SandboxedChild::take_stdout)
++    }
++    .ok_or_else(|| BridgeError::Spawn("stdout not captured".into()))?;
++    let stderr = if let Some(child) = child.as_mut() {
++        child.stderr.take()
++    } else {
++        sandboxed_child
++            .as_mut()
++            .and_then(SandboxedChild::take_stderr)
++    }
++    .ok_or_else(|| BridgeError::Spawn("stderr not captured".into()))?;
+ 
+     let (tx, rx) = std::sync::mpsc::sync_channel::<ReaderMsg>(spec.channel_capacity.max(1));
+     let dropped = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+@@ -538,7 +592,8 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+         .map_err(|e| BridgeError::Io(format!("spawn stderr reader: {e}")))?;
+ 
+     Ok(SpawnedBridge {
+-        child: Some(child),
++        child,
++        sandboxed_child,
+         stdin,
+         readers: vec![out_handle, err_handle],
+         rx: Some(rx),
+@@ -653,11 +708,18 @@ impl SpawnedBridge {
+                 Ok(status) => ExitCause::classify(status),
+                 Err(_) => ExitCause::Unknown,
+             },
+-            None => ExitCause::Unknown,
++            None => match self.sandboxed_child.as_mut() {
++                Some(child) => match child.wait() {
++                    Ok(status) => ExitCause::classify(status),
++                    Err(_) => ExitCause::Unknown,
++                },
++                None => ExitCause::Unknown,
++            },
+         };
+-        // The child is now reaped (wait consumed it). Mark consumed so Drop does
+-        // not double-wait.
++        // The child is now reaped (wait consumed it). Mark both representations
++        // consumed so their RAII cleanup cannot double-own process lifetime.
+         self.child = None;
++        self.sandboxed_child = None;
+ 
+         let payload = serde_json::json!({
+             "event": "cli_subprocess_exit",
+@@ -789,6 +851,7 @@ impl SpawnedBridge {
+             let _ = child.wait();
+         }
+         self.child = None;
++        self.sandboxed_child = None;
+         Ok(())
+     }
+ }
+@@ -802,6 +865,7 @@ impl Drop for SpawnedBridge {
+             let _ = child.kill();
+             let _ = child.wait();
+         }
++        self.sandboxed_child = None;
+         // Drop the receiver first so any `Block`ed reader send returns Err and
+         // the thread exits, then join. This MUST happen before joining — without
+         // it, a reader blocked on tx.send() (channel full) deadlocks forever.
+@@ -1110,9 +1174,10 @@ mod tests {
+             }
+         });
+ 
+-        // Build a minimal SpawnedBridge without calling spawn_and_bridge
++        // Build a minimal SpawnedBridge without calling spawn_and_bridge.
+         let bridge = SpawnedBridge {
+             child: Some(child),
++            sandboxed_child: None,
+             stdin: None,
+             readers: vec![out_handle],
+             rx: Some(rx),
+@@ -1124,7 +1189,6 @@ mod tests {
+         };
+ 
+         // Drop without ever calling pump_to_journal. The channel may be full.
+-        // Before the fix, this would deadlock if the reader blocked on tx.send().
+         let start = std::time::Instant::now();
+         drop(bridge);
+         let _ = err_handle.join();
+@@ -1151,6 +1215,7 @@ mod tests {
+             expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
+             argv_prefix,
+             task_args: vec![],
++            tier: SandboxTier::T0,
+             from_spirit_id: "worker".to_string(),
+             stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+             control_channel: CliWrapperControlChannel::Signals,
+diff --git a/crates/maos-kernel-core/src/security/sandbox/linux.rs b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+index ffbe3b13..c587c3a7 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -12,9 +12,13 @@
+ //! `setrlimit`). No heap allocation, no locking, no formatting.
+ #![allow(unsafe_code)]
+ 
+-use std::io;
++use std::collections::{BTreeSet, VecDeque};
++use std::ffi::{OsStr, OsString};
++use std::fs::File;
++use std::io::{self, Read, Seek, SeekFrom};
++use std::os::unix::fs::PermissionsExt;
+ use std::os::unix::process::CommandExt;
+-use std::path::PathBuf;
++use std::path::{Path, PathBuf};
+ use std::process::Command;
+ 
+ use maos_domain::invariants::i1::Scope;
+@@ -24,7 +28,7 @@ use super::{Cleanup, SandboxSpec, SandboxedChild, SpawnError};
+ #[cfg(target_arch = "x86_64")]
+ #[rustfmt::skip]
+ const LEGACY_X86_SYSCALLS: &[i64] = &[
+-    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access
++    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access, libc::SYS_poll
+ ];
+ #[cfg(not(target_arch = "x86_64"))]
+ const LEGACY_X86_SYSCALLS: &[i64] = &[];
+@@ -42,7 +46,8 @@ pub fn spawn_sandboxed(
+     // --- Parent-side pre-computation (all allocation happens here) ---
+ 
+     let mut landlock_ruleset = if tier.0 >= SandboxTier::T2.0 {
+-        Some(prepare_landlock(&scopes)?)
++        let program = resolve_program(command)?;
++        Some(prepare_landlock(&scopes, &program)?)
+     } else {
+         None
+     };
+@@ -160,7 +165,14 @@ pub fn spawn_sandboxed(
+ /// All allocation (Vec, String, PathFd open) happens here.
+ /// The returned `RulesetCreated` is moved into the `pre_exec` closure
+ /// where only `restrict_self()` (a single syscall) is called.
+-fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnError> {
++/// Build the Landlock ruleset fully in the parent process.
++/// All allocation (Vec, String, PathFd open) happens here.
++/// The returned `RulesetCreated` is moved into the `pre_exec` closure
++/// where only `restrict_self()` (a single syscall) is called.
++fn prepare_landlock(
++    scopes: &[Scope],
++    program: &Path,
++) -> Result<landlock::RulesetCreated, SpawnError> {
+     use landlock::{
+         Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, Ruleset, RulesetAttr,
+         RulesetCreatedAttr, ABI,
+@@ -177,29 +189,317 @@ fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnE
+         .map_err(|e| SpawnError::SandboxSetup(format!("landlock create: {e}")))?;
+ 
+     for scope in scopes {
+-        match scope {
++        let (path, access) = match scope {
+             Scope::FsRead { subtree } => {
+-                let path_fd = PathFd::new(subtree)
+-                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock path fd: {e}")))?;
+-                let access = AccessFs::ReadFile | AccessFs::ReadDir;
+-                created = created
+-                    .add_rule(PathBeneath::new(path_fd, access))
+-                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock add_rule: {e}")))?;
++                (Path::new(subtree), AccessFs::ReadFile | AccessFs::ReadDir)
+             }
+-            Scope::FsWrite { subtree } => {
+-                let path_fd = PathFd::new(subtree)
+-                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock path fd: {e}")))?;
+-                let access = AccessFs::ReadFile | AccessFs::ReadDir | AccessFs::WriteFile;
+-                created = created
+-                    .add_rule(PathBeneath::new(path_fd, access))
+-                    .map_err(|e| SpawnError::SandboxSetup(format!("landlock add_rule: {e}")))?;
++            Scope::FsWrite { subtree } => (
++                Path::new(subtree),
++                AccessFs::ReadFile | AccessFs::ReadDir | AccessFs::WriteFile,
++            ),
++            Scope::ProcExec { binary } => {
++                (Path::new(binary), AccessFs::Execute | AccessFs::ReadFile)
+             }
+-            _ => {}
++            _ => continue,
++        };
++        let path_fd = PathFd::new(path)
++            .map_err(|e| SpawnError::SandboxSetup(format!("landlock path fd: {e}")))?;
++        created = created
++            .add_rule(PathBeneath::new(path_fd, access))
++            .map_err(|e| SpawnError::SandboxSetup(format!("landlock add_rule: {e}")))?;
++    }
++
++    let program_fd = PathFd::new(program)
++        .map_err(|e| SpawnError::SandboxSetup(format!("landlock program path fd: {e}")))?;
++    created = created
++        .add_rule(PathBeneath::new(
++            program_fd,
++            AccessFs::Execute | AccessFs::ReadFile,
++        ))
++        .map_err(|e| SpawnError::SandboxSetup(format!("landlock program rule: {e}")))?;
++
++    let elf = Elf64::read(program)?;
++    if let Some(loader) = &elf.interpreter {
++        let loader = PathBuf::from(loader).canonicalize().map_err(|e| {
++            SpawnError::SandboxSetup(format!(
++                "canonicalize ELF interpreter for {}: {e}",
++                program.display()
++            ))
++        })?;
++        let loader_fd = PathFd::new(&loader)
++            .map_err(|e| SpawnError::SandboxSetup(format!("landlock loader path fd: {e}")))?;
++        created = created
++            .add_rule(PathBeneath::new(
++                loader_fd,
++                AccessFs::Execute | AccessFs::ReadFile,
++            ))
++            .map_err(|e| SpawnError::SandboxSetup(format!("landlock loader rule: {e}")))?;
++
++        for library in resolve_elf_libraries(program, &elf, &loader)? {
++            let library_fd = PathFd::new(&library)
++                .map_err(|e| SpawnError::SandboxSetup(format!("landlock library path fd: {e}")))?;
++            created = created
++                .add_rule(PathBeneath::new(library_fd, AccessFs::ReadFile))
++                .map_err(|e| SpawnError::SandboxSetup(format!("landlock library rule: {e}")))?;
+         }
+     }
+ 
+     Ok(created)
+ }
++/// Resolve the executable exactly once in the parent before Landlock is enabled.
++fn resolve_program(command: &Command) -> Result<PathBuf, SpawnError> {
++    let program = Path::new(command.get_program());
++    let resolved = if program.is_absolute() || program.components().count() > 1 {
++        program.to_path_buf()
++    } else {
++        let path = command
++            .get_envs()
++            .find_map(|(key, value)| (key == OsStr::new("PATH")).then_some(value))
++            .flatten()
++            .map(OsString::from)
++            .or_else(|| std::env::var_os("PATH"))
++            .ok_or_else(|| {
++                SpawnError::SandboxSetup("PATH is unset while resolving program".into())
++            })?;
++        std::env::split_paths(&path)
++            .map(|dir| dir.join(program))
++            .find(|candidate| {
++                candidate.is_file()
++                    && candidate
++                        .metadata()
++                        .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
++                        .unwrap_or(false)
++            })
++            .ok_or_else(|| {
++                SpawnError::SandboxSetup(format!(
++                    "program {} was not executable on PATH",
++                    program.display()
++                ))
++            })?
++    };
++    resolved.canonicalize().map_err(|e| {
++        SpawnError::SandboxSetup(format!("canonicalize program {}: {e}", resolved.display()))
++    })
++}
++
++#[derive(Debug)]
++struct Elf64 {
++    interpreter: Option<String>,
++    needed: Vec<String>,
++    runpaths: Vec<String>,
++}
++
++#[derive(Debug)]
++struct ProgramHeader {
++    typ: u32,
++    offset: u64,
++    vaddr: u64,
++    filesz: u64,
++    memsz: u64,
++}
++
++impl Elf64 {
++    fn read(path: &Path) -> Result<Self, SpawnError> {
++        const ELF_HEADER_LEN: usize = 64;
++        const PROGRAM_HEADER_LEN: usize = 56;
++        const PT_LOAD: u32 = 1;
++        const PT_DYNAMIC: u32 = 2;
++        const PT_INTERP: u32 = 3;
++        const DT_NULL: i64 = 0;
++        const DT_NEEDED: i64 = 1;
++        const DT_STRTAB: i64 = 5;
++        const DT_STRSZ: i64 = 10;
++        const DT_RUNPATH: i64 = 29;
++
++        let mut file = File::open(path)
++            .map_err(|e| SpawnError::SandboxSetup(format!("open ELF {}: {e}", path.display())))?;
++        let mut header = [0_u8; ELF_HEADER_LEN];
++        file.read_exact(&mut header).map_err(|e| {
++            SpawnError::SandboxSetup(format!("read ELF header {}: {e}", path.display()))
++        })?;
++        if &header[..4] != b"\x7fELF" || header[4] != 2 || header[5] != 1 {
++            return Err(SpawnError::SandboxSetup(format!(
++                "program {} is not ELF64 little-endian",
++                path.display()
++            )));
++        }
++        let phoff = u64::from_le_bytes(header[32..40].try_into().unwrap());
++        let phentsize = u16::from_le_bytes(header[54..56].try_into().unwrap()) as usize;
++        let phnum = u16::from_le_bytes(header[56..58].try_into().unwrap()) as usize;
++        if phentsize != PROGRAM_HEADER_LEN {
++            return Err(SpawnError::SandboxSetup(format!(
++                "ELF program header size for {} is unsupported",
++                path.display()
++            )));
++        }
++
++        file.seek(SeekFrom::Start(phoff))
++            .map_err(|e| SpawnError::SandboxSetup(format!("seek ELF program headers: {e}")))?;
++        let mut headers = Vec::with_capacity(phnum);
++        for _ in 0..phnum {
++            let mut raw = [0_u8; PROGRAM_HEADER_LEN];
++            file.read_exact(&mut raw)
++                .map_err(|e| SpawnError::SandboxSetup(format!("read ELF program header: {e}")))?;
++            headers.push(ProgramHeader {
++                typ: u32::from_le_bytes(raw[0..4].try_into().unwrap()),
++                offset: u64::from_le_bytes(raw[8..16].try_into().unwrap()),
++                vaddr: u64::from_le_bytes(raw[16..24].try_into().unwrap()),
++                filesz: u64::from_le_bytes(raw[32..40].try_into().unwrap()),
++                memsz: u64::from_le_bytes(raw[40..48].try_into().unwrap()),
++            });
++        }
++
++        let interpreter = headers
++            .iter()
++            .find(|header| header.typ == PT_INTERP)
++            .map(|header| read_elf_string(&mut file, header.offset, header.filesz as usize))
++            .transpose()?;
++        let Some(dynamic) = headers.iter().find(|header| header.typ == PT_DYNAMIC) else {
++            return Ok(Self {
++                interpreter,
++                needed: vec![],
++                runpaths: vec![],
++            });
++        };
++
++        file.seek(SeekFrom::Start(dynamic.offset))
++            .map_err(|e| SpawnError::SandboxSetup(format!("seek ELF dynamic table: {e}")))?;
++        let entry_count = (dynamic.filesz / 16) as usize;
++        let mut needed_offsets = Vec::new();
++        let mut runpath_offsets = Vec::new();
++        let mut strtab_addr = None;
++        let mut strtab_size = None;
++        for _ in 0..entry_count {
++            let mut raw = [0_u8; 16];
++            file.read_exact(&mut raw)
++                .map_err(|e| SpawnError::SandboxSetup(format!("read ELF dynamic entry: {e}")))?;
++            let tag = i64::from_le_bytes(raw[0..8].try_into().unwrap());
++            let value = u64::from_le_bytes(raw[8..16].try_into().unwrap());
++            match tag {
++                DT_NULL => break,
++                DT_NEEDED => needed_offsets.push(value),
++                DT_STRTAB => strtab_addr = Some(value),
++                DT_STRSZ => strtab_size = Some(value),
++                DT_RUNPATH => runpath_offsets.push(value),
++                _ => {}
++            }
++        }
++        let Some(strtab_addr) = strtab_addr else {
++            return Ok(Self {
++                interpreter,
++                needed: vec![],
++                runpaths: vec![],
++            });
++        };
++        let strtab_size = strtab_size.unwrap_or(0);
++        let strtab_offset = headers
++            .iter()
++            .find(|header| {
++                header.typ == PT_LOAD
++                    && strtab_addr >= header.vaddr
++                    && strtab_addr < header.vaddr.saturating_add(header.memsz)
++            })
++            .map(|header| header.offset + (strtab_addr - header.vaddr))
++            .ok_or_else(|| SpawnError::SandboxSetup("ELF DT_STRTAB is outside PT_LOAD".into()))?;
++        let string_at = |offset: u64, file: &mut File| {
++            if offset >= strtab_size {
++                return Err(SpawnError::SandboxSetup(
++                    "ELF dynamic string offset is outside DT_STRSZ".into(),
++                ));
++            }
++            read_elf_string(
++                file,
++                strtab_offset + offset,
++                (strtab_size - offset) as usize,
++            )
++        };
++        let needed = needed_offsets
++            .into_iter()
++            .map(|offset| string_at(offset, &mut file))
++            .collect::<Result<Vec<_>, _>>()?;
++        let runpaths = runpath_offsets
++            .into_iter()
++            .map(|offset| string_at(offset, &mut file))
++            .collect::<Result<Vec<_>, _>>()?
++            .into_iter()
++            .flat_map(|paths| paths.split(':').map(str::to_owned).collect::<Vec<_>>())
++            .collect();
++        Ok(Self {
++            interpreter,
++            needed,
++            runpaths,
++        })
++    }
++}
++
++fn read_elf_string(file: &mut File, offset: u64, max_len: usize) -> Result<String, SpawnError> {
++    const MAX_ELF_STRING_LEN: usize = 4096;
++    file.seek(SeekFrom::Start(offset))
++        .map_err(|e| SpawnError::SandboxSetup(format!("seek ELF string: {e}")))?;
++    let mut bytes = Vec::new();
++    for _ in 0..max_len.min(MAX_ELF_STRING_LEN) {
++        let mut byte = [0_u8; 1];
++        file.read_exact(&mut byte)
++            .map_err(|e| SpawnError::SandboxSetup(format!("read ELF string: {e}")))?;
++        if byte[0] == 0 {
++            return String::from_utf8(bytes)
++                .map_err(|_| SpawnError::SandboxSetup("ELF dynamic string was not UTF-8".into()));
++        }
++        bytes.push(byte[0]);
++    }
++    Err(SpawnError::SandboxSetup(
++        "ELF dynamic string exceeded maximum length".into(),
++    ))
++}
++
++fn resolve_elf_libraries(
++    program: &Path,
++    program_elf: &Elf64,
++    loader: &Path,
++) -> Result<Vec<PathBuf>, SpawnError> {
++    let loader_dir = loader.parent().ok_or_else(|| {
++        SpawnError::SandboxSetup(format!(
++            "ELF interpreter {} has no parent directory",
++            loader.display()
++        ))
++    })?;
++    let mut libraries = Vec::new();
++    let mut resolved = BTreeSet::new();
++    let mut pending = VecDeque::from([(
++        program.to_path_buf(),
++        program_elf.needed.clone(),
++        program_elf.runpaths.clone(),
++    )]);
++    while let Some((owner, needed, runpaths)) = pending.pop_front() {
++        let search_dirs = std::iter::once(loader_dir.to_path_buf())
++            .chain(runpaths.into_iter().filter_map(|runpath| {
++                let path = PathBuf::from(runpath);
++                if path.is_absolute() {
++                    Some(path)
++                } else {
++                    owner.parent().map(|parent| parent.join(path))
++                }
++            }))
++            .collect::<Vec<_>>();
++        for soname in needed {
++            let library = search_dirs
++                .iter()
++                .map(|dir| dir.join(&soname))
++                .find_map(|candidate| candidate.canonicalize().ok())
++                .ok_or_else(|| {
++                    SpawnError::SandboxSetup(format!(
++                        "ELF dependency {soname} could not be resolved"
++                    ))
++                })?;
++            if resolved.insert(library.clone()) {
++                let elf = Elf64::read(&library)?;
++                pending.push_back((library.clone(), elf.needed, elf.runpaths));
++                libraries.push(library);
++            }
++        }
++    }
++    Ok(libraries)
++}
+ 
+ // ------------------------------------------------------------------
+ // seccomp-bpf (via seccompiler) — parent-side compilation
+@@ -261,6 +561,11 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
+         libc::SYS_getresgid,
+         libc::SYS_prlimit64,
+         libc::SYS_setrlimit,
++        libc::SYS_rt_sigaction,
++        libc::SYS_clone3,
++        libc::SYS_memfd_create,
++        libc::SYS_sendto,
++        libc::SYS_recvfrom,
+         libc::SYS_getrlimit,
+         libc::SYS_rseq,
+         libc::SYS_statx,
+@@ -336,14 +641,13 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
+         .try_into()
+         .map_err(|e| SpawnError::SandboxSetup(format!("seccomp kill bpf compile: {e}")))?;
+ 
+-    // Install kill filter first, then allow-list filter.
+-    // The kernel evaluates the most recently installed filter first.
+-    // So: allow-list filter is evaluated first → if matched, Allow.
+-    // If not matched → Errno(EPERM). Kill filter is evaluated second:
+-    // if matched → KillProcess. If not matched → Allow (no-op).
+-    // Net effect: allowed syscalls pass, hostile get KillProcess,
+-    // unknown get Errno(EPERM).
+-    Ok(vec![bpf, kill_bpf])
++    // Every installed seccomp filter runs for every syscall. The kernel selects
++    // the most restrictive result across them: KillProcess beats Errno, which
++    // beats Allow. Install KillProcess first because applying any later filter
++    // itself needs prctl/seccomp, which the allow-list intentionally omits.
++    // Therefore hostile syscalls always produce SIGSYS, while unknown syscalls
++    // receive EPERM from the allow-list.
++    Ok(vec![kill_bpf, bpf])
+ }
+ 
+ fn apply_seccomp(bpf: &[seccompiler::sock_filter]) -> Result<(), String> {
+@@ -359,9 +663,9 @@ fn find_writable_cgroup_root() -> Option<PathBuf> {
+         for line in own_cgroup.lines() {
+             let parts: Vec<&str> = line.split(':').collect();
+             if parts.len() >= 3 {
+-                let p = PathBuf::from("/sys/fs/cgroup").join(parts[2].trim_start_matches('/'));
+-                if p.join("cgroup.procs").exists() {
+-                    return Some(p);
++                let path = PathBuf::from("/sys/fs/cgroup").join(parts[2].trim_start_matches('/'));
++                if path.join("cgroup.procs").exists() {
++                    return Some(path);
+                 }
+             }
+         }
+diff --git a/crates/maos-kernel-core/src/security/sandbox/mod.rs b/crates/maos-kernel-core/src/security/sandbox/mod.rs
+index 8db4d7c4..38a5377d 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/mod.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/mod.rs
+@@ -103,6 +103,21 @@ enum Cleanup {
+ }
+ 
+ impl SandboxedChild {
++    #[cfg(not(target_os = "windows"))]
++    pub fn take_stdin(&mut self) -> Option<std::process::ChildStdin> {
++        self.child.stdin.take()
++    }
++
++    #[cfg(not(target_os = "windows"))]
++    pub fn take_stdout(&mut self) -> Option<std::process::ChildStdout> {
++        self.child.stdout.take()
++    }
++
++    #[cfg(not(target_os = "windows"))]
++    pub fn take_stderr(&mut self) -> Option<std::process::ChildStderr> {
++        self.child.stderr.take()
++    }
++
+     pub fn wait(&mut self) -> Result<ExitStatus, std::io::Error> {
+         self.child.wait()
+     }
+diff --git a/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs b/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs
+index 57e34024..d82d80dd 100644
+--- a/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs
++++ b/crates/maos-kernel-core/tests/cli_subprocess_invocation_fr52.rs
+@@ -112,12 +112,10 @@ fn ac6_scenario_6_4_t1_sandbox_refused_with_ecli_wrapper_requires_t3() {
+     let c = cfg("echo", "1.0.0");
+     let err = probe_and_verify_shape(&c, SandboxTier::T1).unwrap_err();
+     match err {
+-        CliWrapperAdmissionError::ECliWrapperRequiresT3 { observed_tier } => {
+-            // Format is "T1" per the Debug derivation; either substring or
+-            // exact match is acceptable per v0.5-α telemetry shape.
++        CliWrapperAdmissionError::ECliWrapperTierUnenforced { observed_tier } => {
+             assert!(observed_tier.contains("T1") || observed_tier.contains("1"));
+         }
+-        other => panic!("expected ECliWrapperRequiresT3, got {other:?}"),
++        other => panic!("expected ECliWrapperTierUnenforced, got {other:?}"),
+     }
+ }
+ 
+diff --git a/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs b/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
+index 93d31b3e..e388e737 100644
+--- a/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
++++ b/crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs
+@@ -31,6 +31,7 @@ fn sh_spec(script: &str) -> BridgeSpawnSpec {
+     let expected = argv_prefix_hash(&argv_prefix);
+     BridgeSpawnSpec {
+         program: "sh".to_string(),
++        tier: maos_domain::invariants::i9::SandboxTier::T0,
+         argv_prefix,
+         task_args: vec![script.to_string()],
+         expected_argv_prefix_hash: expected,
+@@ -276,10 +277,19 @@ fn admission_tier_grant_gate() {
+         other => panic!("expected ECliWrapperTierNotGranted, got {other:?}"),
+     }
+ 
+-    // Below the T3 floor → default-deny (ECliWrapperRequiresT3).
+-    match resolve_cli_wrapper_tier(SandboxTier::T2, "worker-image", "key-1", &allowlist) {
+-        Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 { .. }) => {}
+-        other => panic!("expected ECliWrapperRequiresT3, got {other:?}"),
++    let t2_allowlist = StaticHostGrantAllowlist::new(vec![HostGrant {
++        attested_image: "worker-image".into(),
++        signing_key_id: "key-1".into(),
++        permitted_tier: SandboxTier::T2,
++        permitted_egress_destinations: vec![],
++    }]);
++    assert_eq!(
++        resolve_cli_wrapper_tier(SandboxTier::T2, "worker-image", "key-1", &t2_allowlist),
++        Ok(SandboxTier::T2)
++    );
++    match resolve_cli_wrapper_tier(SandboxTier::T1, "worker-image", "key-1", &allowlist) {
++        Err(CliWrapperAdmissionError::ECliWrapperTierUnenforced { .. }) => {}
++        other => panic!("expected ECliWrapperTierUnenforced, got {other:?}"),
+     }
+ }
+ 
+diff --git a/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs b/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs
+index 41b762d5..5cc3be53 100644
+--- a/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs
++++ b/crates/maos-kernel-core/tests/cli_wrapper_shape_mismatch_journal_7_4.rs
+@@ -129,12 +129,12 @@ fn resumption_gate_no_silent_restart_then_corrected_config_admits() {
+ #[test]
+ fn non_shape_errors_are_not_journaled_as_shape_mismatch() {
+     let log = TransparencyLogAdapter::open_in_memory(0x7_4_0_7);
+-    // Wrong sandbox tier → ECliWrapperRequiresT3, NOT a shape mismatch.
++    // Wrong sandbox tier → ECliWrapperTierUnenforced, NOT a shape mismatch.
+     let c = sh_probe_cfg("1.0.0", "1.0.0");
+     let err = admit_cli_wrapper_journaled(&c, SandboxTier::T1, 77, &log).unwrap_err();
+     assert!(matches!(
+         err,
+-        CliWrapperAdmissionError::ECliWrapperRequiresT3 { .. }
++        CliWrapperAdmissionError::ECliWrapperTierUnenforced { .. }
+     ));
+     assert_eq!(
+         mismatch_frames(&log).len(),
+diff --git a/xtask/error-catalog.toml b/xtask/error-catalog.toml
+index a50b425d..8782a54c 100644
+--- a/xtask/error-catalog.toml
++++ b/xtask/error-catalog.toml
+@@ -165,10 +165,10 @@ kernel_or_spirit = "kernel"
+ since_version = "0.5.0"
+ 
+ [[error]]
+-code = "ECliWrapperRequiresT3"
+-rust_path = "CliWrapperAdmissionError::ECliWrapperRequiresT3"
++code = "ECliWrapperTierUnenforced"
++rust_path = "CliWrapperAdmissionError::ECliWrapperTierUnenforced"
+ source_file = "crates/maos-domain/src/cli_wrapper.rs"
+-description = "CliWrapperSpirit MUST declare sandbox tier = t3; lower tiers cannot contain subprocess CLI invocation"
++description = "CliWrapperSpirit requires sandbox tier T2 or T3; all other tiers are unenforced"
+ severity = "policy"
+ recovery_class = "reject"
+ owner = "maos-domain"
+diff --git a/xtask/src/check_skill_conformance.rs b/xtask/src/check_skill_conformance.rs
+index 23d20435..da224f05 100755
+--- a/xtask/src/check_skill_conformance.rs
++++ b/xtask/src/check_skill_conformance.rs
+@@ -68,6 +68,7 @@ fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
+     let expected_argv_prefix_hash = argv_prefix_hash(&argv_prefix);
+     let mut bridge = spawn_and_bridge(BridgeSpawnSpec {
+         program,
++        tier: maos_domain::invariants::i9::SandboxTier::T0,
+         argv_prefix,
+         task_args,
+         expected_argv_prefix_hash,
