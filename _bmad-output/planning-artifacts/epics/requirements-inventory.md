@@ -565,7 +565,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR55 hook firers (PARTIAL) | 17-4 |
 | FR59 yank policy (PARTIAL) | 20-1 |
 | FR61 GPG key (documented deviation, ADR-047) | unchanged |
-| FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the `maos:spirit@2.0.0` break is the first emitted event — epic-17 R17-59) |
+| FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the `maos:spirit@2.0.0` break is the first **recorded** WIT ABI-extension proposal — a ratified `xtask/abi-ratifications.toml` entry gated by `wit_corpus.rs`; no Transparency-Log emitter exists or is claimed — epic-17 R17-59, R17-67) |
 | FR64 cost dimensions (PARTIAL) | later (post-v1.0) |
 | FR65 pending halts + lineage in erasure proof (PARTIAL) | 16-4 |
 | NFR-Test-4 per-class halt-recall (UNMEASURED) | 18-2, 21-1 |
