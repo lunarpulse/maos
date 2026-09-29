@@ -227,8 +227,6 @@ struct LegResult {
     ran: bool,
     attempted: bool,
     green: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    held_advisory_reason: Option<&'static str>,
     /// WHY this leg is RED, in the gate's own JSON.
     ///
     /// Added 2026-08-08 after CI run 31193312117: three legs went red in CI and
@@ -251,38 +249,6 @@ impl LegResult {
         }
     }
 }
-/// The one admission-path mismatch currently held advisory.
-///
-/// The hold is fingerprint-bound: a malformed baseline, unreadable source,
-/// changed file set, or any later content drift must block rather than inherit
-/// Story 13.4's debt by sharing this leg's label.
-const HELD_ADVISORY_ADMISSION_BASELINE_SHA256: &str =
-    "dfbbf748707d8891edbbfcbdeacb5a55cf4ed83391cb614febe0f9012d2c6eb2";
-const HELD_ADVISORY_ADMISSION_WORKTREE_SHA256: &str =
-    "9ccc1399bb42568b89885df71dd574f6f2f2552eebcad8523f3ae1a14222bd51";
-const HELD_ADVISORY_ADMISSION_REASON: &str =
-    "RED since Story 13.4 (148a33ee) changed the admission path without \
-     re-pinning `admission_baseline.sha256` in xtask/fkcs-baseline.toml; hidden \
-     until Story 13.6e closed this gate's blocking_now/dev_blocks divergence. \
-     Re-pinning is a frozen-kernel-conformance judgement on 13.4's change, not \
-     a 13.6e drive-by. \
-     OWNER: 14-3-ecosystem-readiness-verification-v2-5-graduation-ledger \
-     (decision D8; deadline: before that story leaves `backlog`). \
-     RE-HOMED 2026-08-26 by Story 14-0 AC5.3 — this string printed \
-     `OWNER: Epic-13 retrospective` for months after the decision register had \
-     already moved D8 to 14-3, and nobody told the gate. \"Owned by a \
-     retrospective is not an owner\" is that register's own epigraph, and an \
-     epic-level roll-up has no story file, no ACs and nobody the tracker can \
-     page. \
-     TRACKING: deferred-work.md, Story 13.6e section; \
-     _bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md (D8).";
-
-fn known_admission_hold(expected: &str, computed: &str) -> Option<&'static str> {
-    (expected == HELD_ADVISORY_ADMISSION_BASELINE_SHA256
-        && computed == HELD_ADVISORY_ADMISSION_WORKTREE_SHA256)
-        .then_some(HELD_ADVISORY_ADMISSION_REASON)
-}
-
 pub fn run(json: bool) -> Result<(), String> {
     let disposition = read_disposition()?;
     if !matches!(
@@ -323,34 +289,11 @@ pub fn run(json: bool) -> Result<(), String> {
         .find(|leg| leg.attempted && (!leg.ran || (leg.passed == 0 && leg.failed == 0)));
 
     let oracle_green = legs.iter().all(|leg| leg.green);
-    let held: Vec<&LegResult> = legs
-        .iter()
-        .filter(|leg| !leg.green && leg.held_advisory_reason.is_some())
-        .collect();
-    let blocking_reds: Vec<&LegResult> = legs
-        .iter()
-        .filter(|leg| !leg.green && leg.held_advisory_reason.is_none())
-        .collect();
+    // Decision D8 (2026-09-29): the admission-path hold is gone — every RED
+    // leg blocks. A gate that can carry an exception becomes a gate every later
+    // story re-binds instead of fixing.
+    let blocking_reds: Vec<&LegResult> = legs.iter().filter(|leg| !leg.green).collect();
     let gate_passed = vacuous.is_none() && (blocking_reds.is_empty() || !dev_blocks);
-
-    // The hold is LOUD (governing rule, `13-6c…md:154`): banner, owner,
-    // tracking entry. Never a silent pass, never a re-canned fixture.
-    if !held.is_empty() {
-        let detail = held
-            .iter()
-            .filter_map(|leg| {
-                leg.held_advisory_reason
-                    .map(|why| format!("- {}: {why}\n", leg.label))
-            })
-            .collect::<String>();
-        let count = held.len();
-        let banner = format!(
-            "## ⚠️ FKCS Gate: WOULD HAVE BLOCKED — {count} leg(s) HELD ADVISORY\n\
-             {detail}- Held, not fixed and not re-pinned. Every other RED leg blocks.\n"
-        );
-        crate::gate_common::emit_command(json, "warning", &banner.replace('\n', " "));
-        eprintln!("{banner}");
-    }
 
     if json {
         println!(
@@ -365,7 +308,6 @@ pub fn run(json: bool) -> Result<(), String> {
                 "disposition": disposition,
                 "legs": legs,
                 "vacuous_leg": vacuous.map(|leg| leg.label),
-                "held_advisory_legs": held.iter().map(|leg| leg.label).collect::<Vec<_>>(),
                 "blocking_red_legs": blocking_reds.iter().map(|leg| leg.label).collect::<Vec<_>>(),
             })
         );
@@ -378,13 +320,7 @@ pub fn run(json: bool) -> Result<(), String> {
         eprintln!("{GATE_NAME}: PASSED — oracle green ({} legs)", legs.len());
     } else {
         eprintln!(
-            "{GATE_NAME}: {} ({} held advisory); {}",
-            if blocking_reds.is_empty() {
-                "PASS — every RED leg is a named, tracked hold"
-            } else {
-                "RED"
-            },
-            held.len(),
+            "{GATE_NAME}: RED; {}",
             legs.iter()
                 .map(|leg| format!("{}={}", leg.label, leg.status_word()))
                 .collect::<Vec<_>>()
@@ -437,7 +373,6 @@ fn run_frozen_tag_consistency_leg() -> LegResult {
         ran: true,
         attempted: true,
         green,
-        held_advisory_reason: None,
         detail: outcome.err(),
     }
 }
@@ -482,7 +417,6 @@ fn run_diff_oracle_derives_leg() -> LegResult {
         ran,
         attempted: true,
         green,
-        held_advisory_reason: None,
         detail,
     }
 }
@@ -546,16 +480,15 @@ fn run_fault_inject_falsifiers_leg() -> LegResult {
         ran,
         attempted: true,
         green,
-        held_advisory_reason: None,
         detail,
     }
 }
 
 fn run_admission_path_unmodified_leg() -> LegResult {
     // Content semantics (literal AC3): the admission path is pinned by SHA-256
-    // over the declared source files. Only the exact, recorded Story 13.4
-    // baseline/current mismatch is held; every other failure blocks.
-    let (green, held_advisory_reason, detail) = match FkcsBaseline::load_from_file(BASELINE_FILE) {
+    // over the declared source files. Every mismatch blocks — a deliberate
+    // admission change is reviewed and re-pinned in the same commit (D8).
+    let (green, detail) = match FkcsBaseline::load_from_file(BASELINE_FILE) {
         Ok(baseline) => match admission_path_observed_hash(&baseline) {
             Ok(computed) => {
                 let expected = baseline.admission_baseline.sha256.as_str();
@@ -563,23 +496,14 @@ fn run_admission_path_unmodified_leg() -> LegResult {
                 let detail = (!green).then(|| {
                     format!("admission-path SHA-256 mismatch: baseline pins {expected}, worktree computes {computed}")
                 });
-                (
-                    green,
-                    known_admission_hold(expected, computed.as_str()),
-                    detail,
-                )
+                (green, detail)
             }
             Err(error) => (
                 false,
-                None,
                 Some(format!("cannot hash the admission path: {error}")),
             ),
         },
-        Err(error) => (
-            false,
-            None,
-            Some(format!("cannot load {BASELINE_FILE}: {error}")),
-        ),
+        Err(error) => (false, Some(format!("cannot load {BASELINE_FILE}: {error}"))),
     };
     LegResult {
         label: "admission-path-unmodified",
@@ -588,7 +512,6 @@ fn run_admission_path_unmodified_leg() -> LegResult {
         ran: true,
         attempted: true,
         green,
-        held_advisory_reason,
         detail,
     }
 }
@@ -642,7 +565,6 @@ fn run_release_graph_absence_leg() -> LegResult {
         ran: true,
         attempted: true,
         green,
-        held_advisory_reason: None,
         detail,
     }
 }
@@ -668,7 +590,6 @@ fn run_kernel_abi_leg() -> LegResult {
         ran: true,
         attempted: true,
         green,
-        held_advisory_reason: None,
         detail,
     }
 }
@@ -729,7 +650,6 @@ fn cargo_test_leg(label: &'static str, pkg: &str, test_file: &str, filter: &str)
         ran,
         attempted: true,
         green,
-        held_advisory_reason: None,
         detail,
     }
 }
@@ -911,14 +831,17 @@ fn admission_path_observed_hash(baseline: &FkcsBaseline) -> Result<String, Strin
     if files.is_empty() {
         return Err("admission baseline declares no files".into());
     }
-    admission_content_hash(files)
+    admission_content_hash(&workspace_root()?, files)
 }
 
-/// SHA-256 over the path-stamped concatenation of the declared admission files.
-pub fn admission_content_hash(files: &[String]) -> Result<String, String> {
+/// SHA-256 over the path-stamped concatenation of the declared admission files,
+/// read beneath `root` (the workspace root in the gate; a scratch copy in the
+/// drift test). The stamp is the declared RELATIVE path, so the pin does not
+/// depend on where the tree lives.
+pub fn admission_content_hash(root: &Path, files: &[String]) -> Result<String, String> {
     let mut hasher = Sha256::new();
     for file in files {
-        let path = resolve_workspace_path(Path::new(file))?;
+        let path = root.join(file);
         let content =
             fs::read(&path).map_err(|e| format!("read admission file {}: {e}", path.display()))?;
         hasher.update(file.as_bytes());
@@ -959,34 +882,4 @@ fn parse_count(s: &str, key: &str) -> u32 {
         .last()
         .and_then(|n| n.parse().ok())
         .unwrap_or(0)
-}
-
-#[cfg(test)]
-mod review_tests {
-    use super::*;
-
-    #[test]
-    fn advisory_hold_matches_only_the_recorded_admission_fingerprint() {
-        assert_eq!(
-            known_admission_hold(
-                HELD_ADVISORY_ADMISSION_BASELINE_SHA256,
-                HELD_ADVISORY_ADMISSION_WORKTREE_SHA256,
-            ),
-            Some(HELD_ADVISORY_ADMISSION_REASON)
-        );
-        assert_eq!(
-            known_admission_hold(
-                HELD_ADVISORY_ADMISSION_BASELINE_SHA256,
-                "later-admission-drift",
-            ),
-            None
-        );
-        assert_eq!(
-            known_admission_hold(
-                "malformed-or-repinned-baseline",
-                HELD_ADVISORY_ADMISSION_WORKTREE_SHA256,
-            ),
-            None
-        );
-    }
 }

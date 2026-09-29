@@ -93,3 +93,28 @@ The in-house Chinese-wall proxy cohort computes per-Spirit FKCS scores and aggre
 ## Ratification
 
 Ratified by the Story 11.5 preflight (Winston · Murat · John · Amelia · Vex, 2026-07-07) and **amended the same day for literal AC3** (user overruled the preflight two-axis model): F1 whole-story opus-4-8 + full §A6; F2 annotated tag + TOML triple; **F3 (amended): literal at-admission negative-control rejection by `admit_spirit` (`OffFrozenSurface`), with L4 redefined and the frozen admission baseline redefined to include the new rejection surface**; F4 oracle in `xtask` (real capture for green, synthetic only for mutation), proxy fixtures in `maos-fkcs`; F5 proxy score advisory at v2.0 and genuine-external floor at v2.5.
+
+## Amendment — the admission baseline after decision D8 (2026-09-29)
+
+Recorded by the operator-directed discharge of decision D8
+(`_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md`, §D8 ruling). Each point corrects a
+statement above that the tree had stopped matching; the §3 decision itself stands.
+
+- **The hashed file set is the two admission files, and that is deliberate.** `xtask/fkcs-baseline.toml`
+  `[admission_baseline].files` lists `crates/maos-registry/src/admission.rs` and
+  `crates/maos-skill/src/admission.rs`. The `[fkcs]`-fixture emission in `crates/maos-fkcs/src/lib.rs`, which §3 and
+  Consequences name as part of the baseline, was never hashed: it is enforced by behaviour instead — the
+  `negative-control-rejects` leg reds if the emission is removed, and the blind twin must admit. Hashing the whole
+  harness file would red the leg on formatting-only edits (as `0c733d33` would have).
+- **The FKCS parse no longer "mirrors `extract_manifest_tier`".** Story 13.4 replaced that lenient tier parser with
+  the structural, fail-closed `maos_manifest::parse_manifest_trust_tier`. `extract_fkcs_internal_references` is still
+  line-based, so a multi-line `internal_references` array or a dotted `fkcs.internal_references` key is not seen — a
+  known weakness of the floor, owned by `17-3b-wasm-form-admission-and-contract` (it rewrites the same prelude with a
+  structural manifest reader and re-pins its own reviewed diff).
+- **One gate, called first by every entry point.** The refusal lives in one private function, `frozen_surface_gate`,
+  the first statement of both public entry points (`admit_spirit`, `admit_spirit_with_attestation`); the attested
+  path's vector is `crates/maos-registry/tests/vetting_attestation_gate.rs::fkcs_off_surface_refusal_precedes_a_valid_attestation`.
+- **No hold.** `admission-path-unmodified` blocks on every mismatch. A deliberate admission change is reviewed and
+  re-pinned in the same commit; the drift proof is
+  `xtask/tests/fkcs_oracle.rs::every_declared_admission_file_reds_a_one_byte_mutation`. Re-pinned
+  `dfbbf748…` → `650f13b9…` on 2026-09-29 after the conformance review of Story 13.4's `148a33ee`.

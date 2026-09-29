@@ -1,6 +1,6 @@
 use xtask::check_fkcs::{
-    parse_inline_disposition, read_disposition, read_nonempty_lines, FkcsBaseline, FkcsOracle,
-    FkcsSurfaceSnapshot, ForgedSelfReport,
+    admission_content_hash, parse_inline_disposition, read_disposition, read_nonempty_lines,
+    FkcsBaseline, FkcsOracle, FkcsSurfaceSnapshot, ForgedSelfReport,
 };
 // Story 15-3 AC2(c): `is_blocking_at` / `phase_disposition` were byte-identical
 // private copies in `check_fkcs`; they now resolve to the single shared source.
@@ -310,4 +310,60 @@ fn read_disposition_extracts_exactly_the_check_fkcs_stanza() {
         is_blocking_at(&map, "v2_0"),
         "check-fkcs graduates to blocking at v2_0"
     );
+}
+
+/// Decision D8 (2026-09-29) — `admission-path-unmodified` has no hold left, so
+/// this is its proven red: the pin matches the tree, and a one-byte change to
+/// EITHER declared admission file changes the hash the leg compares. Reads the
+/// real baseline and the real files; mutates only a scratch copy.
+#[test]
+fn every_declared_admission_file_reds_a_one_byte_mutation() {
+    let baseline =
+        FkcsBaseline::load_from_file("xtask/fkcs-baseline.toml").expect("baseline loads");
+    let files = &baseline.admission_baseline.files;
+    assert_eq!(
+        files.len(),
+        2,
+        "the declared admission file set changed: {files:?}"
+    );
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("xtask sits in the workspace root");
+    assert_eq!(
+        admission_content_hash(root, files).expect("hash the real tree"),
+        baseline.admission_baseline.sha256,
+        "the committed admission files must match the pin (re-pin only after review)"
+    );
+
+    let scratch = tempfile::tempdir().expect("scratch dir");
+    for file in files {
+        let dest = scratch.path().join(file);
+        std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+        std::fs::copy(root.join(file), &dest).unwrap();
+    }
+    let pristine = admission_content_hash(scratch.path(), files).unwrap();
+    assert_eq!(pristine, baseline.admission_baseline.sha256);
+
+    for file in files {
+        let path = scratch.path().join(file);
+        let original = std::fs::read(&path).unwrap();
+        let at = original
+            .iter()
+            .position(u8::is_ascii_alphanumeric)
+            .expect("an alphanumeric byte to flip");
+        let mut mutated = original.clone();
+        mutated[at] = if mutated[at] == b'a' { b'b' } else { b'a' };
+        std::fs::write(&path, &mutated).unwrap();
+        assert_ne!(
+            admission_content_hash(scratch.path(), files).unwrap(),
+            pristine,
+            "a one-byte change to {file} must change the admission hash"
+        );
+        std::fs::write(&path, &original).unwrap();
+        assert_eq!(
+            admission_content_hash(scratch.path(), files).unwrap(),
+            pristine
+        );
+    }
 }

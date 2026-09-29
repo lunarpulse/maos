@@ -651,7 +651,7 @@ pub fn run(json: bool) -> Result<(), String> {
 
     // Oracle RED — BindingClass::Blocking hard-fails at HEAD regardless of
     // CURRENT_PHASE. No whole-gate advisory tail exists (D20's shape is
-    // deleted; per-leg held_advisory_reason is the only lawful hold).
+    // deleted; the last per-leg hold, check-fkcs's, was retired by D8).
     let detail: String = legs
         .iter()
         .map(|l| {

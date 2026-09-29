@@ -590,8 +590,9 @@ pub fn run(json: bool) -> Result<(), String> {
     // below this point was therefore STRUCTURALLY UNREACHABLE dead code —
     // deleted, never revived (14-1 AC6.1): a whole-gate advisory flag with no
     // per-leg discrimination is D20's exact shape, and AC6.3 forbids
-    // re-arming it here (per-leg `held_advisory_reason` is the only lawful
-    // hold, and only on a measured contradiction).
+    // re-arming it here. (The one per-leg hold this codebase ever carried —
+    // `check-fkcs`'s admission-path hold — was retired by decision D8 on
+    // 2026-09-29: a RED leg is fixed or re-pinned, never held.)
     let detail: String = legs
         .iter()
         .map(|l| {

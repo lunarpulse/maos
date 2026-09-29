@@ -13,10 +13,25 @@ ratifier = "Lunarpulse"
 # the post-AC3 content over the declared admission source files. The
 # `admission-path-unmodified` leg compares the working-tree content hash to
 # this value (content semantics, not file existence). Re-pin after any
-# deliberate admission-path change.
+# deliberate admission-path change — in the SAME commit as the change, after its
+# review. There is no hold: every mismatch blocks.
+#
+# RE-PINNED 2026-09-29 (decision D8, operator-directed; ratifier Lunarpulse):
+# dfbbf748… (Story 11.5, 461eb213) -> 650f13b9…. Covers (1) Story 13.4's
+# 148a33ee (+416/-144 in the registry file, never re-pinned, held advisory
+# since 13.6e), reviewed CONFORMANT against ADR-052 §3: both public entry
+# points refuse `[fkcs].internal_references` first; the attested path cannot
+# admit anything `admit_spirit` would refuse except `PublicVettedDeferred`;
+# promotion sits above `strictest_of`; the negative control still rejects at
+# the real path — and (2) the review's pre-pin fixes: one shared
+# `frozen_surface_gate` called first by both entry points (replacing 13.4's
+# copied prelude) and three stale doc comments. `crates/maos-skill/src/
+# admission.rs` is byte-identical to 461eb213. Evidence:
+# epic-14-preflight-decisions.md §D8 ruling; the drift proof is
+# xtask/tests/fkcs_oracle.rs::every_declared_admission_file_reds_a_one_byte_mutation.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "dfbbf748707d8891edbbfcbdeacb5a55cf4ed83391cb614febe0f9012d2c6eb2"
+sha256 = "650f13b939f03618d43fe4b2214f5a2f46ee79d9574272126236a70c466c3c91"

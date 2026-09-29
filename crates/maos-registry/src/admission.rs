@@ -1,13 +1,16 @@
-//! Three-trust-tier strictest-of-floor admission per ADR-009.
+//! Strictest-of-floor admission per ADR-009, with attestation-conditional
+//! `public-vetted` promotion (Story 13.4, FR37 / ADR-056).
 //!
-//! The `admit_spirit` function implements the strictest-of-(manifest, registry,
-//! operator-policy) floor for the four trust tiers.  It performs:
+//! Both public entry points — [`admit_spirit`] and
+//! [`admit_spirit_with_attestation`] — call [`frozen_surface_gate`] first. They
+//! then:
 //!
-//! 1. Parse manifest to extract declared trust tier.
+//! 1. Parse the manifest's declared trust tier (structural TOML, fail-closed).
 //! 2. Compute `effective_tier = strictest_of(manifest_declared, registry_origin, op_cfg.tier_floor)`.
 //! 3. Branch on tier: `Local` (unsigned allowed per policy), `OrgInternal` (org key required),
 //!    `PublicUntrusted` (signature + ComplianceClaim envelope required),
-//!    `PublicVetted` (rejected per FR37).
+//!    `PublicVetted` (admitted only with a verified vetting attestation, above
+//!    `strictest_of`; otherwise `PublicVettedDeferred`).
 
 use maos_domain::ports::registry::{SignedPackage, TrustTier};
 use maos_spirit_abi::compliance::{CryptoProviderId, ProviderEndpointPin, SandboxTier};
@@ -175,17 +178,36 @@ fn verify_public_untrusted_baseline(
     })
 }
 
-/// Three-trust-tier strictest-of-floor admission per ADR-009.
+/// Story 11.5 AC3 (literal) — the FKCS off-frozen-surface gate, and the ONE
+/// place it lives.
+///
+/// A package whose manifest declares a non-empty `[fkcs].internal_references`
+/// array (off-surface / `pub(crate)`-style internals) is refused HERE, before
+/// tier, signature, ComplianceClaim or vetting-attestation resolution:
+/// off-surface conformance is orthogonal to the trust-tier axis. An absent or
+/// empty declaration admits — backward compatible with pre-11.5 manifests.
+///
+/// Invariant (ADR-052 §3, the L4 landmine): every public admission entry point
+/// calls this as its FIRST statement. A second copy that could drift from this
+/// one would fork the frozen admission floor.
+fn frozen_surface_gate(pkg: &SignedPackage) -> Result<(), AdmissionError> {
+    let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
+    if off_surface_refs.is_empty() {
+        Ok(())
+    } else {
+        Err(AdmissionError::OffFrozenSurface {
+            symbols: off_surface_refs,
+        })
+    }
+}
+
+/// Strictest-of-floor admission per ADR-009 (every tier except an attested
+/// `public-vetted`, which is [`admit_spirit_with_attestation`]'s).
 pub fn admit_spirit(
     pkg: &SignedPackage,
     op_cfg: &AdmissionConfig,
 ) -> Result<AdmissionDecision, AdmissionError> {
-    let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
-    if !off_surface_refs.is_empty() {
-        return Err(AdmissionError::OffFrozenSurface {
-            symbols: off_surface_refs,
-        });
-    }
+    frozen_surface_gate(pkg)?;
 
     let manifest_declared_tier = maos_manifest::parse_manifest_trust_tier(&pkg.manifest_toml)
         .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
@@ -283,12 +305,7 @@ pub fn admit_spirit_with_attestation(
     expected_operator_root: &[u8; 32],
     now_unix_ms: u64,
 ) -> Result<AdmissionDecision, AdmissionError> {
-    let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
-    if !off_surface_refs.is_empty() {
-        return Err(AdmissionError::OffFrozenSurface {
-            symbols: off_surface_refs,
-        });
-    }
+    frozen_surface_gate(pkg)?;
 
     let manifest_declared_tier = maos_manifest::parse_manifest_trust_tier(&pkg.manifest_toml)
         .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
@@ -432,7 +449,9 @@ pub fn validate_model_provenance(
 }
 
 /// Strictest-of ordering: PublicUntrusted > OrgInternal > Local.
-/// PublicVetted is the most-restricted and always rejected.
+/// PublicVetted ranks most restricted: [`admit_spirit`] defers it
+/// (`PublicVettedDeferred`); only [`admit_spirit_with_attestation`] admits it,
+/// with a verified vetting attestation.
 fn strictest_of(
     manifest_tier: TrustTier,
     registry_origin_tier: TrustTier,
@@ -502,8 +521,9 @@ fn extract_fkcs_internal_references(manifest_toml: &[u8]) -> Vec<String> {
 }
 
 /// Parse a single-line TOML inline string array (`["a", "b"]`) into owned
-/// strings, tolerating surrounding whitespace and quotes. Mirrors the lenient
-/// line-based parsing used by [`extract_manifest_tier`].
+/// strings, tolerating surrounding whitespace and quotes. Line-based: a
+/// multi-line array or a dotted `fkcs.internal_references` key is not seen
+/// (owned by Story 17-3b, which replaces this with a structural read).
 fn parse_manifest_string_array(s: &str) -> Vec<String> {
     let s = s.trim();
     let s = s.strip_prefix('[').unwrap_or(s);

@@ -80,3 +80,23 @@ Each negative control must red on its own defect; the gate cannot accept a share
 - **External accredited vetters now:** rejected; NFR-Comp-2 belongs to v2.5.
 
 ADV-056-1 governs exact-hash upgrade refusal, ADV-056-2 governs lapse/revocation disposition and four-cause audit visibility, and ADV-056-3 governs the signed operator-root vetter-key lifecycle.
+
+## Amendment — facts recorded by the D8 review (2026-09-29)
+
+The FKCS conformance review that discharged decision D8 (`epic-14-preflight-decisions.md`, §D8 ruling) read Story
+13.4's change to `crates/maos-registry/src/admission.rs` in full and records two facts this ADR states otherwise.
+
+- **`admit_spirit` was not byte-stable.** §2 says the attested entry point "wraps the byte-stable `admit_spirit`".
+  13.4's review remediation replaced its lenient line-based tier read with the structural, fail-closed
+  `maos_manifest::parse_manifest_trust_tier` (hyphenated tiers now parse; unknown, non-string and invalid TOML
+  refuse), extracted `verify_public_untrusted_baseline`, and inlined equivalent branches. None of it can escalate a
+  package — the manifest tier is author-controlled and origin/floor are unchanged — and every path still refuses
+  `[fkcs]` off-surface declarations first.
+- **The attestation binds the manifest, not the artifact.** `VettingClaim` binds `sha256(manifest_toml)`,
+  `spirit_id` and version (§1); neither `artifact_bytes` nor the publisher key is covered, and the publisher
+  signature and ComplianceClaim envelope are self-attested at the public-untrusted tier. A holder of a valid
+  attestation for manifest M can therefore pair M with different artifact bytes under a fresh publisher key and
+  reach `effective_tier: PublicVetted`. This is a vetting-design gap, not an FKCS violation. **Owner:
+  `20-1-registry-client-install-verb-vetter-and-yank`** (it ships `maos-spirit vet issue`, the first producer of
+  attestations): bind `artifact_sha256` (and the publisher key) into `VettingClaim` and `verify_attestation` —
+  a golden-byte-pin change and an amendment to §1 — before any attestation is issued outside tests.

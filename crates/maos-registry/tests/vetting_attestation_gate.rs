@@ -39,6 +39,14 @@ fn ed_pub(seed: &[u8; 32]) -> [u8; 32] {
 }
 
 fn signed_vetted_pkg(spirit_id: &str, version: &str) -> SignedPackage {
+    signed_vetted_pkg_with_extra_manifest(spirit_id, version, "")
+}
+
+fn signed_vetted_pkg_with_extra_manifest(
+    spirit_id: &str,
+    version: &str,
+    extra_manifest: &str,
+) -> SignedPackage {
     use ring::signature::Ed25519KeyPair;
     use sha2::Digest;
 
@@ -51,7 +59,7 @@ fn signed_vetted_pkg(spirit_id: &str, version: &str) -> SignedPackage {
     };
 
     let manifest = format!(
-        "[spirit]\nname = \"{spirit_id}\"\nversion = \"{version}\"\ntrust_tier = \"public-vetted\"\n"
+        "[spirit]\nname = \"{spirit_id}\"\nversion = \"{version}\"\ntrust_tier = \"public-vetted\"\n{extra_manifest}"
     );
     let artifact = b"vetted-binary".to_vec();
 
@@ -361,4 +369,36 @@ fn leg7_four_cause_distinguishability() {
         VettingTerminalCause::VettingRevocation
     );
     assert_ne!(observations[2].cause.audit_label(), "operator-local");
+}
+
+/// Decision D8 (2026-09-29) — the FKCS off-frozen-surface refusal runs FIRST on
+/// the attested entry point too: a package carrying a fully valid vetting
+/// attestation is still refused for declaring an off-surface internal. The
+/// promoted branch never delegates to `admit_spirit`, so this is the only
+/// vector that reds if `admit_spirit_with_attestation` stops calling the
+/// shared gate.
+#[test]
+fn fkcs_off_surface_refusal_precedes_a_valid_attestation() {
+    use maos_registry::admission::admit_spirit;
+
+    let pkg = signed_vetted_pkg_with_extra_manifest(
+        "vetted",
+        "0.1.0",
+        "\n[fkcs]\ninternal_references = [\"maos_kernel_core::scheduler::pick_next_spirit_from_slice\"]\n",
+    );
+    let att = attestation_for(&pkg, 500, 2_000);
+    let kr = enrolled_keyring(100);
+
+    let err =
+        admit_spirit_with_attestation(&pkg, &cfg(), Some(&att), &kr, &ed_pub(&OP_SEED), 1_000)
+            .unwrap_err();
+    assert!(
+        matches!(&err, AdmissionError::OffFrozenSurface { symbols } if symbols.len() == 1),
+        "the attested path must refuse an off-surface package before verifying its attestation, got {err:?}"
+    );
+    let err = admit_spirit(&pkg, &cfg()).unwrap_err();
+    assert!(
+        matches!(&err, AdmissionError::OffFrozenSurface { .. }),
+        "admit_spirit must refuse the same package the same way, got {err:?}"
+    );
 }

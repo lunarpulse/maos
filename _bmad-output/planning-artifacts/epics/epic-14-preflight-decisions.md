@@ -71,7 +71,7 @@ pass. A gate that governs nothing passes for the wrong reason, and
 | **D5** · OPEN | Legal-hold check-then-act race; revocation failure signed as zero; decommission receipt claims completion; mutation-to-audit crash gap. | Scope into **distinct controls**. These are four lifecycle/atomicity questions and must not be folded into the already-proven collective erase. | `20-3a-gate-honesty`, `16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary`, `v25-erasure-crash-reconciliation` | Before `v25-erasure-crash-reconciliation` leaves `backlog` (RE-ANCHORED TWICE: from 14-4 by 14-0 AC4.7, then off 14-1 onto this row's own last vehicle by the 14-1 preflight, 2026-08-27 — see the ruling below) | Winston + Murat |
 | **D6** · CLOSED | Private-tier residue, erase races, directory-iteration hazards. | Kernel filesystem/atomicity design, or retain the recorded security limits until separately scoped. | `v25-private-tier-erase-atomicity` — the three NAMED defects are closed on measurement; this is the general non-atomicity D6 never mentioned. | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` (RE-ANCHORED from 14-4 by AC4.7) | Winston |
 | **D7** · OPEN | `CrossWallRecallRefusal` collapses six variants into the token `refused`. | A shipped CLI operator surface preserving cause only in free text is insufficient for a machine-readable operator outcome. Decide the typed outcome shape. | `20-3c-audit-truth-and-halt-receipt-residuals` | Before `20-3c-audit-truth-and-halt-receipt-residuals` reaches `done` (RE-ANCHORED 2026-09-17 by Story 16-5's preflight, D-16-5-H — clause REPLACED, not supplemented. No ruling section for this row has ever existed, so 16-5's preflight is where the decision is made. Premise verified INTACT at `df45c609` — `crates/maos-domain/src/log_recall.rs:291-304` still carries all six variants, and the collapse to the token `refused` is at `crates/maos-bin/src/main.rs:2611-2646`, rendered at `:2633`, which also violates `docs/adr/ADR-058-cross-wall-provenance-and-consented-recall.md:52` verbatim)| John + Amelia |
-| **D8** · OPEN | `check-fkcs` `admission-path-unmodified` is RED, held advisory. | Frozen-kernel-conformant re-pin, or retain the exact bounded hold. Admission sources genuinely changed in 13.4; re-pinning without review would re-can an unreviewed floor. | `20-3a-gate-honesty` | Before `20-3a-gate-honesty` leaves `backlog` | Winston + Murat |
+| **D8** · CLOSED | `check-fkcs` `admission-path-unmodified` was RED, held advisory, from Story 13.4 until 2026-09-29. | Frozen-kernel-conformant re-pin, or retain the exact bounded hold. Admission sources genuinely changed in 13.4; re-pinning without review would re-can an unreviewed floor. **RULED 2026-09-29: conformant re-pin after review; the hold is deleted** — see the D8 ruling below. | `20-3a-gate-honesty` — discharged ahead of it by operator instruction; see the D8 ruling below. | Before `20-3a-gate-honesty` leaves `backlog` | Winston + Murat |
 | **D9** · OPEN | A vetting lapse cannot refuse a crossing. | The only demonstrable vetting boundary is upgrade/promotion, not crossing. Accept that boundary explicitly, or scope a crossing mechanism — **no invented mechanism**. | `20-3a-gate-honesty` | Before `20-3a-gate-honesty` leaves `backlog` | Murat |
 | **D10** · CLOSED | `maos-a2a-core` third consecutive KLOC grant / v2.5 team-crypto identity. | The v2.5 ecosystem graduation ledger is the explicit home for an external/team-identity boundary. **No retro may ratify a third unscoped grant by implication.** | `20-3a-gate-honesty` | Before `20-3a-gate-honesty` leaves `backlog` | Winston + Lunarpulse |
 | **D11** · OPEN | No gate reconciles kernel-pin HISTORY; **budget-charged code with no execution path** (widened 2026-08-14 — see D11-E1); `EXPECTED_GATES` is hand-maintained (**36 entries vs 67 `check_*.rs` at `af788c3e`; 37 / 68 once the J1 loopback gate lands** — corrected 2026-08-14). | Make pin history, execution coverage, and workflow-derived gate registration mechanically auditable. Carries **E11-A6** forward to mechanical close. | `21-4-one-instrument-and-env-registry` — retro action C5 is not a vehicle and is no longer named as one. | Before `21-4-one-instrument-and-env-registry` leaves `backlog` | Winston + Murat |
@@ -98,6 +98,59 @@ whose subject is edited by an earlier story cannot lawfully wait for a later one
 it pointed at 20-3 would have meant deleting the two gates' local phase constants in 15-3
 while leaving their binding classes unadopted, which is exactly the half-migration
 (`project_gate_binding_decay`) this row records.
+
+### D8 — CLOSED 2026-09-29: Story 13.4's admission change reviewed CONFORMANT; baseline re-pinned, hold deleted
+
+**Directive.** Operator (Lunarpulse), 2026-09-29, while creating `17-3b-wasm-form-admission-and-contract`: *repin it
+now after reviews … do it properly — no more handing the same problem to every later story.* The alternative on the
+table (re-binding the hold to 17-3b's new hash) was refused on exactly that ground: a gate that can carry an exception
+becomes a gate every admission story re-binds instead of fixing.
+
+**What was reviewed.** `git diff 461eb213 4f677bc1` over the two declared admission files. Only `148a33ee`
+(`13-4-fr37-vetting-machinery`) touched them: +416/−144 in `crates/maos-registry/src/admission.rs`;
+`crates/maos-skill/src/admission.rs` is byte-identical. Two independent non-author reviews (FKCS conformance; gate
+design) on 2026-09-29, against ADR-052 §3 (the L4 landmine) and Story 11.5 AC3.
+
+**Verdict: CONFORMANT-WITH-FIXES** — the fixes were applied before the pin.
+- (a) Both public entry points refuse `[fkcs].internal_references` / `OffFrozenSurface` **first**, before tier,
+  signature, ComplianceClaim or attestation work.
+- (b) The attested path cannot admit anything `admit_spirit` would refuse, except by lifting `PublicVettedDeferred`:
+  every non-vetted effective tier delegates to `admit_spirit` unchanged; the promoted branch runs the same
+  `verify_public_untrusted_baseline` (publisher signature, ComplianceClaim envelope, drift/malformed/expired) and
+  requires a verified attestation on top.
+- (c) Promotion sits above `strictest_of`, only from a declared public tier, only with an attestation verified for
+  signature, manifest exact-hash, tiers, validity window, operator-root-anchored key enrollment and the attestation CRL.
+- (d) The only production caller is `maosctl import` (`crates/maos-cli/src/subcommands.rs:1359`, `:1368`).
+- (e) The FKCS negative control still rejects at the real path (`cargo test -p maos-fkcs`: 8/8; `negative-control-rejects` green).
+- (f) `admit_spirit` was **not** byte-stable (structural fail-closed tier parse, an extracted baseline helper, equivalent
+  inlining) — none of it can escalate a package; recorded in ADR-056's 2026-09-29 amendment.
+
+**Pre-pin fixes (in the pinned bytes).** 13.4 had copied the FKCS prelude into the attested entry point and deleted
+11.5's invariant comment; a later edit to one copy could silently fork the floor (L4). Both entry points now call one
+private `frozen_surface_gate` as their first statement, with the invariant documented on it, and three stale doc
+comments were corrected. Proven: removing the call from `admit_spirit_with_attestation` reds
+`crates/maos-registry/tests/vetting_attestation_gate.rs::fkcs_off_surface_refusal_precedes_a_valid_attestation`
+(planted locally, restored).
+
+**The pin.** `xtask/fkcs-baseline.toml` `[admission_baseline].sha256` `dfbbf748…` → `650f13b9…` (reproduced by an
+independent re-implementation of the gate's framing; HEAD before the fixes hashes to `9ccc1399…`, the old hold's
+fingerprint). The hold — `HELD_ADVISORY_ADMISSION_*`, `known_admission_hold`, the per-leg `held_advisory_reason` field,
+the banner and the `held_advisory_legs` JSON key — is deleted from `xtask/src/check_fkcs.rs`; every RED leg now blocks.
+`check-fkcs --json` → `passed: true, oracle_green: true`, all eight legs green. Drift proof:
+`xtask/tests/fkcs_oracle.rs::every_declared_admission_file_reds_a_one_byte_mutation`; a planted one-byte change to the
+registry file made `check-fkcs` exit 1 naming `admission-path-unmodified` (restored).
+
+**Rule from here.** A deliberate admission change is reviewed and re-pinned in the **same commit** as the change —
+`17-3b-wasm-form-admission-and-contract` is the first to do so (its AC4). There is no hold to re-bind.
+
+**Found by the review, routed (rule 10), not part of D8's floor:**
+- The vetting attestation binds the manifest, not the artifact or publisher key (ADR-056 amendment) →
+  **`20-1-registry-client-install-verb-vetter-and-yank`**, before it ships `maos-spirit vet issue`.
+- `extract_fkcs_internal_references` is line-based: a multi-line array or a dotted `fkcs.internal_references` key is
+  not seen (pre-existing since 11.5; ADR-052 amendment) → **`17-3b-wasm-form-admission-and-contract`** AC4, which
+  replaces it with a structural read of the same manifest.
+- ADR-052's claim that `crates/maos-fkcs/src/lib.rs` is hashed was never true; amended to the behavioural guard that
+  actually covers it.
 
 ### D20 — RESOLVED 2026-09-07: both gates, implemented by `15-3-single-phase-source-and-exit-command-check`
 
