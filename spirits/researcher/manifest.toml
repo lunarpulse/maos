@@ -94,9 +94,8 @@ cpu_max_pct = 25
 memory_max_mb = 256
 
 [sandbox]
-# T2 for the rust-inproc reference/measurement form (testable). Production
-# survey-mode deploy targets T3 (containerized) per §13 — confirm with Winston.
-tier = "T2"
+# rust-inproc runs in the host process, so it declares the unsandboxed T0 tier.
+tier = "T0"
 
 [author]
 name = "MAOS Project"

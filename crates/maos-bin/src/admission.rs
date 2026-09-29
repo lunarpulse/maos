@@ -187,20 +187,16 @@ pub fn emit_model_provenance_event(
     Ok(())
 }
 
-/// Why a load was refused, as a typed outcome rather than a bare non-zero.
+/// Why a load was refused, as a typed outcome rather than a bare non-zero —
+/// one variant per gate `maos run` applies (§2b), so "one refusal vector per
+/// gate" is discharged by exhaustiveness.
 ///
-/// One variant per gate `maos run` applies (§2b), so AC1's "one refusal vector
-/// per gate, each a distinct typed outcome" is discharged by exhaustiveness
-/// rather than by a list someone maintains.
-///
-/// ⚠ There is deliberately NO `SandboxTierUnsupported` / `T3AdmissionFailed`
-/// variant. The manifest's `[sandbox] tier` is parsed and then DISCARDED on
-/// the admission path: `effective_sandbox_tier` seeds its manifest leg from
-/// the policy table's per-pid declared tier, which is absent on a first
-/// admission and therefore falls back to `SandboxTier::DEFAULT_FLOOR`, and
-/// `admit_spirit` reads its `&SandboxConfig` only for `image_pin`. A
-/// manifest cannot select its own tier, so it cannot be refused for one.
-/// Those refusals arrive (if ever) inside `Admission`, from the kernel.
+/// The manifest's `[sandbox] tier` never SELECTS the effective tier (admission
+/// admits at `SandboxTier::DEFAULT_FLOOR`), but it can be FALSE: a `rust-inproc`
+/// Spirit runs inside the daemon, so its only true tier is `T0` and gate 6
+/// refuses any other (Story 17-6 AC6). Spawned forms get their tier applied by
+/// the launch primitive — `spawn_and_bridge` routes T2 through `spawn_sandboxed`
+/// on Linux (AC5); the first production T2 child is 17-3c's.
 #[derive(Debug, Clone)]
 pub enum AdmissionRefusal {
     /// Gate 1 — the manifest file could not be read.
@@ -219,6 +215,10 @@ pub enum AdmissionRefusal {
     /// binary. `rust-inproc` means first-party compiled-in (ADR-060); the
     /// third-party form is Epic 17's `wasm-component`.
     UnknownClass { name: String },
+    /// Gate 6 — `rust-inproc` is compiled into this process and declares T0.
+    RustInprocRequiresT0 {
+        tier: maos_domain::invariants::i9::SandboxTier,
+    },
     /// Gates 6 and 7 — a declared section did not parse.
     SectionParse {
         section: &'static str,
@@ -253,6 +253,7 @@ impl AdmissionRefusal {
             Self::CliWrapperUnsupported => "cli_wrapper_unsupported",
             Self::ClassSection { .. } => "class_section_invalid",
             Self::UnknownClass { .. } => "unknown_spirit_class",
+            Self::RustInprocRequiresT0 { .. } => "rust_inproc_requires_t0",
             Self::SectionParse { .. } => "manifest_section_invalid",
             Self::ModelProvenance { .. } => "model_provenance_refused",
             Self::AlreadyLoaded { .. } => "already_loaded",
@@ -291,6 +292,9 @@ impl std::fmt::Display for AdmissionRefusal {
                  first-party classes compiled into this binary only (ADR-060)",
                 KNOWN_CLASS_NAMES.join(", ")
             ),
+            Self::RustInprocRequiresT0 { tier } => {
+                write!(f, "rust-inproc requires sandbox tier T0, got {tier}")
+            }
             Self::SectionParse { section, detail } => {
                 write!(f, "[{section}] section: {detail}")
             }
@@ -461,6 +465,13 @@ pub fn gate_manifest(
     // Gate 6 — the mediation sections.
     let sandbox_cfg = SandboxConfig::from_toml_str(&required("sandbox")?)
         .map_err(|e| parse_err("sandbox")(e.to_string()))?;
+    if class_section.forms.iter().any(|form| form == "rust-inproc")
+        && sandbox_cfg.tier != maos_domain::invariants::i9::SandboxTier::T0
+    {
+        return Err(AdmissionRefusal::RustInprocRequiresT0 {
+            tier: sandbox_cfg.tier,
+        });
+    }
     let resource_caps = ResourceCaps::from_toml_str(&required("resources")?)
         .map_err(|e| parse_err("resources")(e.to_string()))?;
     let caps_required = caps_required_or_empty(&root)?

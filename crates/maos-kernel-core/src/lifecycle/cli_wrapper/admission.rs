@@ -253,9 +253,9 @@ pub fn reject_respawn_with_context(
 /// operator-config allowlist keyed on attested-image + signing-key (NOT in the
 /// artifact). Fail-closed at every branch:
 ///
-/// - requested tier below the CliWrapper T3 floor → `ECliWrapperRequiresT3`
-///   (default-deny semantics retained — a CLI subprocess cannot be contained
-///   below T3);
+/// - any tier other than T3 (below: no containment; T4: no spawn path) →
+///   `ECliWrapperRequiresT3` (ADR-060 clause 4 — a CliWrapperSpirit is
+///   governed by T3 admission; Story 17-6 AC5);
 /// - no matching host grant, or a request above the grant, or a platform that
 ///   cannot enforce the tier (non-Linux) → `ECliWrapperTierNotGranted`
 ///   (fail-closed, NO silent downgrade).
@@ -269,10 +269,10 @@ pub fn resolve_cli_wrapper_tier(
     signing_key_id: &str,
     allowlist: &dyn HostGrantAllowlist,
 ) -> Result<SandboxTier, CliWrapperAdmissionError> {
-    // Default-deny floor: a CliWrapperSpirit cannot run below T3 (no T2
-    // scoped-egress mechanism exists in the kernel — verified). This keeps the
-    // existing `ECliWrapperRequiresT3` semantics.
-    if requested < SandboxTier::T3 {
+    // ADR-060 clause 4: a CliWrapperSpirit is governed by T3 admission — exactly
+    // T3. Below it no scoped egress exists; above it (T4) no spawn path applies
+    // (Story 17-6 AC5), so both are refused here, typed, before any probe.
+    if requested != SandboxTier::T3 {
         return Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 {
             observed_tier: format!("{requested:?}"),
         });

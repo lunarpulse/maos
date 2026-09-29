@@ -37,7 +37,7 @@ const PER_TARGET_FLOOR_S: i64 = 259_200;
 const AGGREGATE_FLOOR_S: i64 = 3_600_000;
 const WINDOW_DAYS: i64 = 90;
 /// Targets the floor applies to. A record for an unknown target is rejected.
-const REQUIRED_TARGETS: &[&str] = &["manifest_parser", "frame_deser"];
+const REQUIRED_TARGETS: &[&str] = &["manifest_parser", "frame_deser", "fuzz_exec_deps_parse_elf"];
 
 #[derive(Debug, Default)]
 pub struct Report {
@@ -329,9 +329,10 @@ mod tests {
         write_ledger(
             tmp.path(),
             &format!(
-                "[{},{}]",
+                "[{},{},{}]",
                 rec("manifest_parser", 1000, 100),
-                rec("frame_deser", 1000, 100)
+                rec("frame_deser", 1000, 100),
+                rec("fuzz_exec_deps_parse_elf", 1000, 100)
             ),
         );
         let r = check_fuzz_floor(tmp.path(), now());
@@ -343,6 +344,10 @@ mod tests {
         );
         assert!(r.failures.iter().any(|f| f.contains("manifest_parser")));
         assert!(r.failures.iter().any(|f| f.contains("frame_deser")));
+        assert!(r
+            .failures
+            .iter()
+            .any(|f| f.contains("fuzz_exec_deps_parse_elf")));
         assert!(r.failures.iter().any(|f| f.contains("aggregate")));
     }
 
@@ -352,15 +357,18 @@ mod tests {
         // Old record matures the ledger (100 d). Recent in-window records meet
         // both per-target and aggregate floors.
         let manifest_in_window = 2_000_000; // >= per-target (259 200) + contributes to aggregate
-        let frame_in_window = 2_000_000; // 2 targets × 2 000 000 = 4 000 000 >= 3 600 000 aggregate
+        let frame_in_window = 2_000_000; // >= per-target (259 200) + contributes to aggregate
+        let exec_deps_in_window = 2_000_000; // >= per-target (259 200) + contributes to aggregate
         write_ledger(
             tmp.path(),
             &format!(
-                "[{},{},{},{}]",
+                "[{},{},{},{},{},{}]",
                 rec("manifest_parser", 1, 100), // matures, out of window
                 rec("frame_deser", 1, 100),     // matures, out of window
+                rec("fuzz_exec_deps_parse_elf", 1, 100),
                 rec("manifest_parser", manifest_in_window, 5),
                 rec("frame_deser", frame_in_window, 5),
+                rec("fuzz_exec_deps_parse_elf", exec_deps_in_window, 5),
             ),
         );
         let r = check_fuzz_floor(tmp.path(), now());

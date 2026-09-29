@@ -1,13 +1,14 @@
 # Fuzz Cadence Runbook (NFR-Sec-5 / NFR-Sec-6)
 
-Operational runbook for the MAOS fuzz targets. Two targets, two crates:
+Operational runbook for the MAOS fuzz targets. Three targets, three crates:
 
 | Target `[[bin]]` | Crate | Path | Fuzz surface |
 |------------------|-------|------|--------------|
 | `manifest_parser` | `maos-manifest` | `crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs` | All 23 `*::from_toml_str` manifest section parsers |
 | `frame_deser` | `maos-domain` | `crates/maos-domain/fuzz/fuzz_targets/frame_deser.rs` | `IacFrame` wire deserialization (JSON + canonical-CBOR) |
+| `fuzz_exec_deps_parse_elf` | `maos-exec-deps` | `crates/maos-exec-deps/fuzz/fuzz_targets/fuzz_exec_deps_parse_elf.rs` | Hostile-input ELF64 dependency parsing before T2 Landlock grants |
 
-Both targets are standalone `cargo-fuzz` projects (`[package.metadata] cargo-fuzz = true`,
+All three targets are standalone `cargo-fuzz` projects (`[package.metadata] cargo-fuzz = true`,
 `libfuzzer-sys` harness via `fuzz_target!`). They build with the nightly toolchain.
 
 ## Tiered cadence
@@ -16,10 +17,10 @@ Both targets are standalone `cargo-fuzz` projects (`[package.metadata] cargo-fuz
 
 | Field | Value |
 |-------|-------|
-| Trigger | Nightly cron (03:00 UTC) via the `fuzz-cadence.yml` workflow (`.github/workflows/fuzz-cadence.yml`), plus a manual `workflow_dispatch` trigger for backfill / release close-out. It is a SEPARATE workflow from `discipline.yml` so the nightly timer does not re-run the entire v1.0 ship-gate suite. **Nightly is the floor-accrual driver**: one run ≈ 0.67 CPU-hr (600 s × 4 workers), so the ≥72 CPU-hr/target/90-day floor needs ~108 runs/target/quarter — only a nightly cadence reaches it. |
+| Trigger | Nightly cron (03:00 UTC) via the `fuzz-cadence.yml` workflow (`.github/workflows/fuzz-cadence.yml`), plus a manual `workflow_dispatch` trigger for backfill / release close-out. It is a SEPARATE workflow from `discipline.yml` so the nightly timer does not re-run the entire v1.0 ship-gate suite. **Nightly is the floor-accrual driver**: one run per target ≈ 0.67 CPU-hr (600 s × 4 workers), so the ≥72 CPU-hr/target/90-day floor needs ~108 runs/target/quarter — only a nightly cadence reaches it. |
 | Duration | 10 minutes per target |
 | Workers | 4 (`-workers=4`) |
-| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=600 -workers=4` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=600 -workers=4 -rss_limit_mb=0` |
+| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=600 -workers=4` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=600 -workers=4 -rss_limit_mb=0` <br> exec-deps: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf -- -max_total_time=600 -workers=4` |
 | Ledger-append | The job uploads a per-target record as a workflow artifact; the separate `fuzz-ledger-collect` job appends to `fuzz-ledger.json` on the dedicated `fuzz-ledger` branch (see [Ledger append](#ledger-append-format)). Decoupled from `main` to serialize appends and avoid protected-branch write races. |
 
 T1 is **non-blocking** — it never fails a merge. A crash in T1 files a bug
@@ -33,7 +34,7 @@ pre-merge compile gate.
 | Trigger | Scheduled cron, once per day |
 | Duration | 4 hours per target |
 | Workers | 8 (`-workers=8`) |
-| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=14400 -workers=8` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=14400 -workers=8 -rss_limit_mb=0` |
+| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=14400 -workers=8` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=14400 -workers=8 -rss_limit_mb=0` <br> exec-deps: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf -- -max_total_time=14400 -workers=8` |
 | Ledger-append | One record per target after the run |
 
 ### T3 — pre-release (manual)
@@ -43,7 +44,7 @@ pre-merge compile gate.
 | Trigger | Manual, before tagging a release |
 | Duration | 24 hours per target |
 | Workers | 8 (`-workers=8`) |
-| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=86400 -workers=8` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=86400 -workers=8 -rss_limit_mb=0` |
+| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=86400 -workers=8` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=86400 -workers=8 -rss_limit_mb=0` <br> exec-deps: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf -- -max_total_time=86400 -workers=8` |
 | Ledger-append | One record per target after the run; verify floors (see [Floor assertions](#floor-assertions)) before GA |
 
 ## Toolchain & invocation
@@ -97,7 +98,7 @@ Append contract — each record is:
 }
 ```
 
-- `target` — one of `manifest_parser`, `frame_deser`.
+- `target` — one of `manifest_parser`, `frame_deser`, or `fuzz_exec_deps_parse_elf`.
 - `commit` — the git SHA the fuzzed binary was built from.
 - `cpu_seconds` — `duration_seconds * workers` (wall time × worker count =
   CPU time). T1 10min×4 = 2400; T2 4h×8 = 115200; T3 24h×8 = 691200.
@@ -169,3 +170,5 @@ fail-open.
 - `crates/maos-domain/fuzz/corpus/frame_deser/` — valid `IacFrame` instances
   serialized to JSON (`.json`) and canonical CBOR (`.cbor`), built from the
   `frame.rs` test fixtures (5 frames × 2 formats = 10 seeds).
+- `crates/maos-exec-deps/fuzz/corpus/fuzz_exec_deps_parse_elf/` — crafted
+  truncated, static ELF64, and dynamic-ELF parser inputs (3 seeds).

@@ -2980,6 +2980,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-exec-deps"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "maos-fkcs"
 version = "0.1.0-alpha.1"
 dependencies = [
@@ -3061,6 +3068,7 @@ dependencies = [
  "maos-director-surface",
  "maos-domain",
  "maos-eval",
+ "maos-exec-deps",
  "maos-iac",
  "maos-manifest",
  "maos-mcp",

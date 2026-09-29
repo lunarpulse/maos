@@ -76,13 +76,13 @@ pub struct SandboxTier(pub u8);
 impl SandboxTier {
     /// T0 — trusted local; least restrictive.
     pub const T0: Self = SandboxTier(0);
-    /// T1 — process isolation + UID separation.
+    /// T1 — reserved: no UID-separation mechanism exists; an effective T1 is refused.
     pub const T1: Self = SandboxTier(1);
     /// T2 — Landlock+seccomp (Linux), Seatbelt (macOS), restricted-token (Windows).
     pub const T2: Self = SandboxTier(2);
     /// T3 — container isolation (v0.5); representable but rejected at v0.1-β enforcement.
     pub const T3: Self = SandboxTier(3);
-    /// T4 — WASM-component sandbox (v2.0); reserved.
+    /// T4 — the reserved WASM *tool* sandbox; WASM-component Spirits run at T2.
     pub const T4: Self = SandboxTier(4);
 
     /// The default floor for fail-closed fallbacks: T2 (most restrictive

@@ -16,9 +16,9 @@
 //! forbidden-syscall x T2 kill, the benign-under-T2 negative control, and
 //! the granted/ungranted filesystem-capability negative control — lives in
 //! `tests/t2_sandbox_kill.rs`, which drives the kernel's REAL
-//! `spawn_sandboxed`/`classify_exit` (requires CAP_SYS_ADMIN / no_new_privs;
-//! self-skips with a clear message otherwise, mirroring
-//! `maos-kernel-core/tests/sandbox_enforcement_linux.rs`).
+//! `spawn_sandboxed`/`classify_exit` (Landlock + seccomp via `no_new_privs`;
+//! a host that refuses the sandbox SKIPs with a named reason off CI and FAILS
+//! in CI — rule 11(b), Story 17-6 AC4, as in `sandbox_enforcement_linux.rs`).
 
 use wasmtime::{Config, Engine, Store};
 

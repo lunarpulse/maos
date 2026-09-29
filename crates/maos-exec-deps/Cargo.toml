@@ -1,0 +1,11 @@
+[package]
+name = "maos-exec-deps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Parent-side resolution of the files an exec opens (program, ELF loader, shared libraries) for the kernel's T2 Landlock grant (Story 17-6)"
+
+[dependencies]
+libc = "0.2"

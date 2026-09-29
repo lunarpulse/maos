@@ -41,9 +41,9 @@
 //!    measured LIVE over REAL seccomp children (no mock;
 //!    `detection_quality_meets_floor_and_ceiling_on_real_seccomp`), the
 //!    enforcement tripwire complementing the host-independent leg 3.
-//!    Legs 8/9 are advisory on hosts whose kernel blocks seccomp
-//!    (environment-unavailable, not a regression); a real per-commit tripwire
-//!    on seccomp-capable runners (CI ubuntu-latest).
+//!    Legs 8/9 skip off CI on a host that refuses the sandbox (advisory there);
+//!    in CI a refusal PANICS (rule 11(b), Story 17-6 AC4), so no `SKIP` line
+//!    reaches this gate and a refused spawn is a RED leg, never advisory.
 //!
 //! # Phase disposition
 //!
@@ -102,9 +102,9 @@ fn seccomp_kernel_filtering() -> bool {
 /// substrate verdict backed by a REAL spawn attempt against the real kernel —
 /// the most real probe available, and strictly stronger than a config read.
 ///
-/// Its own doc records why honouring it cannot mask a capable-host regression:
-/// a missing kill surfaces as no marker and a RED leg, never as a spawn
-/// refusal, so it never reaches that helper.
+/// Off CI only: in CI the helper PANICS on a refusal (rule 11(b), Story 17-6
+/// AC4) — a capable-host regression CAN reach it as a refusal (17-3a measured
+/// the seccomp install-order defect doing exactly that), so CI never skips.
 ///
 /// Separating this from `green` is the whole of F3. Before story 15-3
 /// [`invoke_cargo_test_marker`] collapsed "seccomp is unavailable here" and

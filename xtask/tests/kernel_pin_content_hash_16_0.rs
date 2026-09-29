@@ -181,38 +181,55 @@ fn falsifier_tag_is_annotated_and_peels_to_the_pinned_commit() {
 fn a_line_neutral_kernel_edit_reds_the_gate_and_names_the_file() {
     let temp = tempfile::tempdir().expect("tempdir");
 
-    // The pin AS TAKEN AT THE PARENT: copy the live tree, drop the parent's real
-    // blob in over the one file the falsifier touched, mint through the gate's
-    // own `pin_block`. No fixture — the bytes come from git.
+    // BOTH sides of the falsifier, rebuilt from git over copies of the live tree:
+    // the parent's blob (the pin as taken) and the falsifier's own blob (the edit
+    // the old instrument passed). Story 17-6 grew the live linux.rs past 15-4's
+    // 396 lines, so the LIVE blob can no longer stand in for the "after" side;
+    // the falsifier commit's blob is byte-for-byte that edit. No fixture.
     let parent_tree = temp.path().join("parent-src");
+    let falsifier_tree = temp.path().join("falsifier-src");
     copy_tree(&kernel_src(), &parent_tree);
-    let parent_blob = git_loud(&[
-        "show",
-        &format!("{FALSIFIER_TAG}^:crates/maos-kernel-core/src/{FALSIFIER_FILE}"),
-    ]);
-    let live_blob = std::fs::read(kernel_src().join(FALSIFIER_FILE)).expect("live blob reads");
+    copy_tree(&kernel_src(), &falsifier_tree);
+    let blob_at = |rev: &str| {
+        git_loud(&[
+            "show",
+            &format!("{rev}:crates/maos-kernel-core/src/{FALSIFIER_FILE}"),
+        ])
+    };
+    let parent_blob = blob_at(&format!("{FALSIFIER_TAG}^"));
+    let falsifier_blob = blob_at(FALSIFIER_TAG);
     assert_ne!(
-        parent_blob, live_blob,
-        "the falsifier's parent blob is byte-identical to the live one — the vector \
-         would prove nothing"
+        parent_blob, falsifier_blob,
+        "the falsifier's parent blob is byte-identical to its own — the vector would \
+         prove nothing"
     );
     assert_eq!(
         parent_blob.iter().filter(|b| **b == b'\n').count(),
-        live_blob.iter().filter(|b| **b == b'\n').count(),
+        falsifier_blob.iter().filter(|b| **b == b'\n').count(),
         "the falsifier must be LINE-NEUTRAL — that is the whole defect class"
     );
     std::fs::write(parent_tree.join(FALSIFIER_FILE), &parent_blob).expect("plant parent blob");
+    std::fs::write(falsifier_tree.join(FALSIFIER_FILE), &falsifier_blob)
+        .expect("plant falsifier blob");
 
+    // The parent's pin, minted by the gate's own `pin_block`, at the parent's own
+    // line count — so the count agrees on both sides and only the hash can red.
     let parent_pin = pin_block(&parent_tree).expect("mint the parent's pin");
-    let baseline = baseline_with(temp.path(), &parent_pin);
+    let parent_lines = checked(&parent_tree, &baseline_with(temp.path(), &parent_pin)).actual_lines;
+    let baseline = temp.path().join("kernel-core-baseline.toml");
+    std::fs::write(
+        &baseline,
+        format!("src_lines = {parent_lines}\n\n{parent_pin}"),
+    )
+    .expect("write the parent's baseline");
 
-    // The REAL gate, the parent's pin, the LIVE tree.
-    let report = checked(&kernel_src(), &baseline);
+    // The REAL gate, the parent's pin, the falsifier's tree.
+    let report = checked(&falsifier_tree, &baseline);
 
     assert!(
         !report.passed,
-        "the pin taken at {} passed against the live tree — the line count is 24474 on \
-         BOTH sides of the falsifier, so only the per-file hash can red this",
+        "the pin taken at {}^ passed against the falsifier's tree — the line count is \
+         equal on BOTH sides of the falsifier, so only the per-file hash can red this",
         &FALSIFIER_SHA[..8]
     );
     assert_eq!(
@@ -799,7 +816,7 @@ fn no_key_before_src_lines_begins_with_src_lines() {
 fn the_three_other_readers_still_resolve_the_pin() {
     assert_eq!(
         read_pinned(&baseline_toml()).expect("read_pinned"),
-        24920,
+        25032,
         "the xtask reader"
     );
 
@@ -817,7 +834,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .map(str::trim)
         .and_then(|v| v.parse().ok())
         .expect("the a2a-tcp guard's parse still resolves");
-    assert_eq!(a2a, 24920, "the a2a-tcp reader");
+    assert_eq!(a2a, 25032, "the a2a-tcp reader");
 
     // `fkcs_oracle.rs:170` — exact `strip_prefix("src_lines = ")`.
     let oracle: usize = text
@@ -826,7 +843,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .expect("the fkcs oracle's parse still resolves")
         .parse()
         .expect("parses");
-    assert_eq!(oracle, 24920, "the fkcs oracle reader");
+    assert_eq!(oracle, 25032, "the fkcs oracle reader");
 }
 
 #[test]
@@ -837,7 +854,7 @@ fn the_pin_is_readable_by_a_real_toml_parser() {
     // line-count-neutral; Story 16-5's ratification ledger now places it at line 496.
     let text = std::fs::read_to_string(baseline_toml()).expect("read baseline");
     let parsed: toml::Value = toml::from_str(&text).expect("the baseline file must be valid TOML");
-    assert_eq!(parsed["src_lines"].as_integer(), Some(24920));
+    assert_eq!(parsed["src_lines"].as_integer(), Some(25032));
 
     let numbered = text
         .lines()

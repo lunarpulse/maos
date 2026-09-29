@@ -149,3 +149,29 @@ fn manifest_self_check_rejects_invalid_sandbox_tier() {
         })
     ));
 }
+
+#[test]
+fn manifest_self_check_rejects_rust_inproc_above_t0() {
+    let manifest = br#"
+        [class]
+        name = "hello"
+        version = "0.1.0"
+        forms = ["rust-inproc"]
+        trust_tier = "local"
+
+        [posture]
+        default = "assistive"
+        allowed_max = "assistive"
+
+        [sandbox]
+        tier = "T2"
+    "#;
+    assert!(matches!(
+        manifest_self_check(manifest),
+        Err(ManifestSelfCheckViolation::InvalidValue {
+            field: "sandbox.tier",
+            value,
+            reason: "rust-inproc requires sandbox tier T0",
+        }) if value == "T2"
+    ));
+}

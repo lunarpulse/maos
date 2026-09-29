@@ -110,7 +110,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError",
-      "signature_hash": "13553a93a0055865d12acafab9b1d371391a15defdaa2d9bec5c88303eaadbfb"
+      "signature_hash": "a9317d2c92579f6ae66214aee934e4290d9ddd04172ca1558b04de5d3e47e611"
     },
     {
       "kind": "enum",
@@ -665,7 +665,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeSpawnSpec",
-      "signature_hash": "542acf62cf98dca29181d9cc80824472f913944c9cb14404a9f92e4ff2bbd651"
+      "signature_hash": "f7abd467f81fa56f2dfcbecaa17ecc2d15ca2d90cfe8c3b9445ace4acbf4e0df"
     },
     {
       "kind": "struct",
@@ -675,7 +675,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
-      "signature_hash": "7fdd42b571a66ba5fa4fc545b5ea8867408d1354c70fe60ec0cf861595ca0777"
+      "signature_hash": "57c22dc9243bfdff0b4e7ba184b94405e842ce96ce0a8264c27e02eebd56bbae"
     },
     {
       "kind": "struct",

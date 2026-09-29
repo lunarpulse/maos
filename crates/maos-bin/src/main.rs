@@ -6785,7 +6785,10 @@ description = "smoke test spirit successor"
                 .admit_spirit(
                     revoked_pid,
                     "smoke-spirit",
-                    &maos_kernel_core::security::manifest::SandboxConfig::default(),
+                    &maos_kernel_core::security::manifest::SandboxConfig {
+                        tier: maos_domain::invariants::i9::SandboxTier::T0,
+                        image_pin: None,
+                    },
                     &maos_kernel_core::security::manifest::ResourceCaps::default(),
                     &smoke_caps,
                     None,

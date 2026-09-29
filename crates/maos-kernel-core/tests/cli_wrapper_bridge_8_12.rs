@@ -31,6 +31,9 @@ fn sh_spec(script: &str) -> BridgeSpawnSpec {
     let expected = argv_prefix_hash(&argv_prefix);
     BridgeSpawnSpec {
         program: "sh".to_string(),
+        sandbox: maos_kernel_core::security::sandbox::SandboxSpec::new_for_test(
+            maos_domain::invariants::i9::SandboxTier::T0,
+        ),
         argv_prefix,
         task_args: vec![script.to_string()],
         expected_argv_prefix_hash: expected,
@@ -280,6 +283,22 @@ fn admission_tier_grant_gate() {
     match resolve_cli_wrapper_tier(SandboxTier::T2, "worker-image", "key-1", &allowlist) {
         Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 { .. }) => {}
         other => panic!("expected ECliWrapperRequiresT3, got {other:?}"),
+    }
+
+    // Above T3 → refused too, even under an operator T4 grant (Story 17-6 AC5,
+    // ADR-060 clause 4: a CliWrapperSpirit is exactly T3; T4 has no spawn path).
+    // Before 17-6 this request passed the `< T3` floor and was GRANTED T4.
+    let t4_allowlist = StaticHostGrantAllowlist::new(vec![HostGrant {
+        attested_image: "worker-image".into(),
+        signing_key_id: "key-1".into(),
+        permitted_tier: SandboxTier::T4,
+        permitted_egress_destinations: vec![],
+    }]);
+    match resolve_cli_wrapper_tier(SandboxTier::T4, "worker-image", "key-1", &t4_allowlist) {
+        Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 { observed_tier }) => {
+            assert_eq!(observed_tier, format!("{:?}", SandboxTier::T4));
+        }
+        other => panic!("expected ECliWrapperRequiresT3 for a T4 request, got {other:?}"),
     }
 }
 

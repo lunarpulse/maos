@@ -1,0 +1,104 @@
+# Story 17-6 T1.2 — AC4 local red: the three T2 helpers at HEAD's linux.rs (f86b5d4f, vec![bpf, kill_bpf] order)
+# Planted state: crates/maos-kernel-core/src/security/sandbox/linux.rs = `git show HEAD:<path>` (the 17-3a F1 order defect, unrepaired);
+# helpers = this story's AC4 rewrite. Off CI: byte-identical SKIP lines, rc 0. CI=true: named rule-11(b) panics, rc 101.
+# Host: Seccomp-capable Linux (CachyOS 7.2.6), probes built with `env -u CARGO_TARGET_DIR cargo build --release --locked --target-dir target`.
+
+$ env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+rc=0
+test benign_process_survives_t2_under_same_spec ... ok
+test forbidden_syscall_killed_by_t2_with_sigsys ... ok
+test granted_fs_capability_works_ungranted_is_refused ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t2_sandbox_kill.rs (target/debug/deps/t2_sandbox_kill-9a02dce5665b2a1c)
+maos: seccomp apply failed
+SKIP t2_benign_control: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+maos: seccomp apply failed
+SKIP forbidden_syscall: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+maos: seccomp apply failed
+SKIP fs_granted: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+
+$ env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux -- --nocapture --test-threads=1
+rc=0
+test classify_exit_normal_returns_none ... ok
+test t0_passthrough_exits_cleanly ... ok
+test t2_benign_process_not_killed_by_seccomp ... ok
+test t2_child_exit_code_preserved ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/sandbox_enforcement_linux.rs (target/debug/deps/sandbox_enforcement_linux-875b3931ff4deb30)
+maos: seccomp apply failed
+SKIP t2_benign: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+maos: seccomp apply failed
+SKIP t2_child_exit: sandbox setup requires CAP_SYS_ADMIN / no_new_privs
+
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+rc=101
+test benign_process_survives_t2_under_same_spec ... FAILED
+test forbidden_syscall_killed_by_t2_with_sigsys ... FAILED
+test granted_fs_capability_works_ungranted_is_refused ... FAILED
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t2_sandbox_kill.rs (target/debug/deps/t2_sandbox_kill-9a02dce5665b2a1c)
+maos: seccomp apply failed
+thread 'benign_process_survives_t2_under_same_spec' (3968000) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:40:17:
+t2_benign_control: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+maos: seccomp apply failed
+thread 'forbidden_syscall_killed_by_t2_with_sigsys' (3968002) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:40:17:
+forbidden_syscall: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+maos: seccomp apply failed
+thread 'granted_fs_capability_works_ungranted_is_refused' (3968004) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:40:17:
+fs_granted: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+error: test failed, to rerun pass `-p maos-wasm-host --test t2_sandbox_kill`
+
+$ CI=true cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux -- --nocapture --test-threads=1
+rc=101
+test classify_exit_normal_returns_none ... ok
+test t0_passthrough_exits_cleanly ... ok
+test t2_benign_process_not_killed_by_seccomp ... FAILED
+test t2_child_exit_code_preserved ... FAILED
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/sandbox_enforcement_linux.rs (target/debug/deps/sandbox_enforcement_linux-875b3931ff4deb30)
+maos: seccomp apply failed
+thread 't2_benign_process_not_killed_by_seccomp' (3968022) panicked at crates/maos-kernel-core/tests/sandbox_enforcement_linux.rs:24:17:
+t2_benign: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+maos: seccomp apply failed
+thread 't2_child_exit_code_preserved' (3968024) panicked at crates/maos-kernel-core/tests/sandbox_enforcement_linux.rs:24:17:
+t2_child_exit: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+error: test failed, to rerun pass `-p maos-kernel-core --test sandbox_enforcement_linux`
+
+$ env -u CI -u GITHUB_ACTIONS cargo test --locked -p maos-escape-detector -- --nocapture --test-threads=1
+rc=0
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/concurrent_read.rs (target/debug/deps/concurrent_read-9e263eb6e83ca664)
+     Running tests/detection_quality.rs (target/debug/deps/detection_quality-fedc14025529cf70)
+ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1
+maos: seccomp apply failed
+SKIP detection_quality_emit_real_kill: sandbox spawn refused by host (PermissionDenied)
+maos: seccomp apply failed
+SKIP detection_quality_emit_real_kill: sandbox spawn refused by host (PermissionDenied)
+maos: seccomp apply failed
+SKIP detection_quality_emit_real_kill: sandbox spawn refused by host (PermissionDenied)
+maos: seccomp apply failed
+SKIP detection_quality_benign: sandbox spawn refused by host (PermissionDenied)
+SKIP detection_quality: degenerate real-seccomp corpus (tp_kills=0, fp_cases=0) — N/A, not a vacuous pass
+     Running tests/no_verdict_invariant.rs (target/debug/deps/no_verdict_invariant-f316e148d104f5d9)
+     Running tests/producer_wired_e2e.rs (target/debug/deps/producer_wired_e2e-eec3acbadcd3ce75)
+maos: seccomp apply failed
+SKIP producer_wired_e2e: sandbox spawn refused by host (PermissionDenied)
+     Running tests/source_identity_blind.rs (target/debug/deps/source_identity_blind-a31ea1220f9253a2)
+
+$ CI=true cargo test --locked -p maos-escape-detector -- --nocapture --test-threads=1
+rc=101
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+     Running tests/concurrent_read.rs (target/debug/deps/concurrent_read-9e263eb6e83ca664)
+     Running tests/detection_quality.rs (target/debug/deps/detection_quality-fedc14025529cf70)
+ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1
+maos: seccomp apply failed
+thread 'detection_quality_meets_floor_and_ceiling_on_real_seccomp' (3969060) panicked at crates/maos-escape-detector/tests/common/mod.rs:158:13:
+detection_quality_emit_real_kill: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped

@@ -21,13 +21,16 @@ use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
 use super::{Cleanup, SandboxSpec, SandboxedChild, SpawnError};
+/// Per-arch allow-list row: x86_64 legacy calls + `poll`; aarch64 `ppoll` (Story 17-6).
 #[cfg(target_arch = "x86_64")]
 #[rustfmt::skip]
-const LEGACY_X86_SYSCALLS: &[i64] = &[
-    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access
+const ARCH_SYSCALLS: &[i64] = &[
+    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access, libc::SYS_poll
 ];
-#[cfg(not(target_arch = "x86_64"))]
-const LEGACY_X86_SYSCALLS: &[i64] = &[];
+#[cfg(target_arch = "aarch64")]
+const ARCH_SYSCALLS: &[i64] = &[libc::SYS_ppoll];
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+const ARCH_SYSCALLS: &[i64] = &[];
 
 /// Spawn a sandboxed child on Linux.
 pub fn spawn_sandboxed(
@@ -42,7 +45,13 @@ pub fn spawn_sandboxed(
     // --- Parent-side pre-computation (all allocation happens here) ---
 
     let mut landlock_ruleset = if tier.0 >= SandboxTier::T2.0 {
-        Some(prepare_landlock(&scopes)?)
+        let path_env = command
+            .get_envs()
+            .find_map(|(key, value)| (key == "PATH").then_some(value))
+            .flatten();
+        let deps = maos_exec_deps::resolve(command.get_program(), path_env)
+            .map_err(|e| SpawnError::SandboxSetup(format!("exec set: {e}")))?;
+        Some(prepare_landlock(&scopes, &deps)?)
     } else {
         None
     };
@@ -160,11 +169,15 @@ pub fn spawn_sandboxed(
 /// All allocation (Vec, String, PathFd open) happens here.
 /// The returned `RulesetCreated` is moved into the `pre_exec` closure
 /// where only `restrict_self()` (a single syscall) is called.
-fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnError> {
+fn prepare_landlock(
+    scopes: &[Scope],
+    deps: &maos_exec_deps::ExecDeps,
+) -> Result<landlock::RulesetCreated, SpawnError> {
     use landlock::{
         Access, AccessFs, CompatLevel, Compatible, PathBeneath, PathFd, Ruleset, RulesetAttr,
         RulesetCreatedAttr, ABI,
     };
+    use std::os::fd::AsFd;
 
     let abi = ABI::V1;
     let ruleset = Ruleset::default()
@@ -198,6 +211,41 @@ fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnE
         }
     }
 
+    // Story 17-6 AC2: the exec set. The program and its loader are executed
+    // (Execute|ReadFile); libraries are only mapped by the loader (ReadFile).
+    // Landlock V1 checks execve and open, not mmap(PROT_EXEC).
+    let exec = AccessFs::Execute | AccessFs::ReadFile;
+    let rules = std::iter::once((&deps.program, exec))
+        .chain(deps.loader.iter().map(|loader| (loader, exec)))
+        .chain(
+            deps.libraries
+                .iter()
+                .map(|lib| (lib, AccessFs::ReadFile.into())),
+        );
+    for ((path, access), expected) in rules.zip(deps.file_ids()) {
+        let path_fd = PathFd::new(path)
+            .map_err(|e| SpawnError::SandboxSetup(format!("landlock exec-set fd: {e}")))?;
+        let opened = std::fs::File::from(
+            path_fd
+                .as_fd()
+                .try_clone_to_owned()
+                .map_err(|e| SpawnError::SandboxSetup(format!("landlock exec-set dup: {e}")))?,
+        );
+        let metadata = opened
+            .metadata()
+            .map_err(|e| SpawnError::SandboxSetup(format!("landlock exec-set metadata: {e}")))?;
+        use std::os::unix::fs::MetadataExt;
+        if !metadata.is_file() || metadata.dev() != expected.dev || metadata.ino() != expected.ino {
+            return Err(SpawnError::SandboxSetup(format!(
+                "landlock exec-set path changed: {}",
+                path.display()
+            )));
+        }
+        created = created
+            .add_rule(PathBeneath::new(path_fd, access))
+            .map_err(|e| SpawnError::SandboxSetup(format!("landlock exec-set rule: {e}")))?;
+    }
+
     Ok(created)
 }
 
@@ -206,7 +254,9 @@ fn prepare_landlock(scopes: &[Scope]) -> Result<landlock::RulesetCreated, SpawnE
 // ------------------------------------------------------------------
 
 fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgram>, SpawnError> {
-    use seccompiler::{SeccompAction, SeccompFilter, SeccompRule};
+    use seccompiler::{
+        SeccompAction, SeccompCmpArgLen, SeccompCmpOp, SeccompCondition, SeccompFilter, SeccompRule,
+    };
     use std::collections::BTreeMap;
 
     let mut rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
@@ -264,11 +314,22 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
         libc::SYS_getrlimit,
         libc::SYS_rseq,
         libc::SYS_statx,
+        // Story 17-6 AC3 (17-3a Q4b, leave-one-out in CI): Rust std init
+        // (SIGPIPE handler) and std::thread (glibc >= 2.34 pthread_create).
+        libc::SYS_rt_sigaction,
+        libc::SYS_clone3,
     ];
 
-    for &syscall in basic_syscalls.iter().chain(LEGACY_X86_SYSCALLS) {
+    for &syscall in basic_syscalls.iter().chain(ARCH_SYSCALLS) {
         rules.insert(syscall as i64, vec![]);
     }
+    // prctl(PR_GET_AUXV) only: rustix-based programs (uutils coreutils, the
+    // ubuntu-26.04 `/bin/cat`) read their own auxv at start (17-6 T8 finding).
+    const PR_GET_AUXV: u64 = 0x4155_5856;
+    let get_auxv = SeccompCondition::new(0, SeccompCmpArgLen::Dword, SeccompCmpOp::Eq, PR_GET_AUXV)
+        .and_then(|c| SeccompRule::new(vec![c]))
+        .map_err(|e| SpawnError::SandboxSetup(format!("seccomp prctl rule: {e}")))?;
+    rules.insert(libc::SYS_prctl, vec![get_auxv]);
 
     // Hostile syscalls get KillProcess via explicit SeccompAction.
     // We install a second filter with KillProcess as match_action.
@@ -317,9 +378,6 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
         .map_err(|e| SpawnError::SandboxSetup(format!("seccomp bpf compile: {e}")))?;
 
     // Build hostile-syscall KillProcess filter: matched → KillProcess, unmatched → Allow.
-    // Kernel evaluates filters in reverse installation order (last installed first).
-    // Installing KillProcess filter second means hostile syscalls get KillProcess
-    // before the allow-list filter is evaluated.
     let mut kill_rules: BTreeMap<i64, Vec<SeccompRule>> = BTreeMap::new();
     for &syscall in &hostile_syscalls {
         kill_rules.insert(syscall as i64, vec![]);
@@ -336,14 +394,12 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
         .try_into()
         .map_err(|e| SpawnError::SandboxSetup(format!("seccomp kill bpf compile: {e}")))?;
 
-    // Install kill filter first, then allow-list filter.
-    // The kernel evaluates the most recently installed filter first.
-    // So: allow-list filter is evaluated first → if matched, Allow.
-    // If not matched → Errno(EPERM). Kill filter is evaluated second:
-    // if matched → KillProcess. If not matched → Allow (no-op).
-    // Net effect: allowed syscalls pass, hostile get KillProcess,
-    // unknown get Errno(EPERM).
-    Ok(vec![bpf, kill_bpf])
+    // Every installed filter runs on every syscall and the most restrictive
+    // result wins (KILL_PROCESS > ERRNO > ALLOW), so a hostile syscall is
+    // SIGSYS whatever the order. The ORDER matters only for installing:
+    // installing a filter needs prctl + seccomp, which the allow-list refuses,
+    // so the kill filter must go first (17-3a F1 — the reverse never installed).
+    Ok(vec![kill_bpf, bpf])
 }
 
 fn apply_seccomp(bpf: &[seccompiler::sock_filter]) -> Result<(), String> {

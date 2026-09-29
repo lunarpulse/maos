@@ -103,6 +103,13 @@ enum Cleanup {
 }
 
 impl SandboxedChild {
+    /// Story 17-6 AC5 — the confined child, for a caller that pipes its stdio.
+    /// The guard keeps owning it (and the cgroup dir) until drop.
+    #[cfg(target_os = "linux")]
+    pub fn child_mut(&mut self) -> &mut Child {
+        &mut self.child
+    }
+
     pub fn wait(&mut self) -> Result<ExitStatus, std::io::Error> {
         self.child.wait()
     }

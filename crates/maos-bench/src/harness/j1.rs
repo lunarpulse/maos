@@ -218,6 +218,9 @@ pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResul
     let argv_prefix = vec!["-c".to_string()];
     let spec = BridgeSpawnSpec {
         program: "sh".to_string(),
+        sandbox: maos_kernel_core::security::sandbox::SandboxSpec::new_for_test(
+            maos_domain::invariants::i9::SandboxTier::T0,
+        ),
         argv_prefix: argv_prefix.clone(),
         task_args: vec!["while IFS= read -r line; do printf '%s\\n' \"$line\"; done".to_string()],
         expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),

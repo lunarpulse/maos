@@ -1,0 +1,19 @@
+# Story 17-6 T12 — the three named-prerequisite suites, before/after (dev host CachyOS 7.2.6, global CARGO_TARGET_DIR=/mnt/build/cargo)
+
+## BEFORE (/tmp/ws-test.log, 2026-09-28): cargo test --workspace --locked --no-fail-fast -> 4508 passed / 10 failed / 121 ignored
+cargo-public-api failed for /home/lunarpulse/dev_ws/xtask/tests/fixtures/abi-diff/generic-bound-reorder/baseline/Cargo.toml: error: no such command: `public-api`
+cargo-public-api failed for /home/lunarpulse/dev_ws/xtask/tests/fixtures/abi-diff/inline-mod-items/baseline/Cargo.toml: error: no such command: `public-api`
+cargo-public-api failed for /home/lunarpulse/dev_ws/xtask/tests/fixtures/abi-diff/pub-use-reexport/baseline/Cargo.toml: error: no such command: `public-api`
+cargo-public-api failed for /home/lunarpulse/dev_ws/xtask/tests/fixtures/abi-diff/quote-whitespace/baseline/Cargo.toml: error: no such command: `public-api`
+on-demand build reported success but did not produce "/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/native-twin/target/release/equiv-native-twin"
+the stranger's path requires a Python Ed25519 backend — pip install cryptography (verify.py said: Error: no Ed25519 library found. Install one of:
+thread 'cosmetic_only_stays_green' (76118) panicked at crates/maos-wasm-host/tests/equiv_harness.rs:703:5:
+thread 'divergent_spirit_causes_invariant_red' (76120) panicked at crates/maos-wasm-host/tests/equiv_harness.rs:703:5:
+
+## Fixes
+- equiv_harness (3): CODE DEFECT. The on-demand native-twin build ignored CARGO_TARGET_DIR, so the binary landed in /mnt/build/cargo/release/, not native-twin/target/release/. Now passes --target-dir <twin_dir>/target.
+- abi_diff_integration (5): PROVISIONING. cargo install cargo-public-api --version 0.51.0 --locked (= discipline.yml CARGO_PUBLIC_API_VERSION).
+- two_host_reconcile_2c (2): PROVISIONING. The Python Ed25519 backend goes in a venv, because PEP 668 blocks 'pip install --user' on this host: python3 -m venv ~/.venvs/maos-test && ~/.venvs/maos-test/bin/pip install cryptography (50.0.1), run with that venv first on PATH. CI installs it with 'pip install --user cryptography' (discipline.yml:3989).
+
+## AFTER: PATH=$HOME/.venvs/maos-test/bin:$PATH cargo test --workspace --locked --no-fail-fast
+passed 4518 failed 0 ignored 121 binaries 553 (rc=0)

@@ -4,11 +4,11 @@
 //!
 //! # Architecture (Story 11.1a, ADR-031)
 //!
-//! The kernel is already form-agnostic: every launch primitive runs a bare
-//! executable path (`Command::new(&spec.program)`). `SandboxSpec` carries
-//! tier/caps but **no `program` field and no form discriminator**. The
-//! form-specific knowledge (where the WASM component runner lives, how to
-//! invoke it for a given `.wasm`, fuel/epoch config) belongs OUT of the kernel.
+//! The kernel is form-agnostic: every launch primitive runs an executable path
+//! (`Command::new(&spec.program)`), and `spawn_and_bridge` confines it under the
+//! admitted `BridgeSpawnSpec::sandbox` (T2 on Linux — Story 17-6 AC5). Neither
+//! spec has a form discriminator. The form-specific knowledge (where the WASM
+//! component runner lives, how to invoke it, fuel/epoch config) stays OUT of it.
 //!
 //! This crate defines the `SpiritHostPort` trait and its plan types. The
 //! trait resolves a `SpiritLaunchRequest` (the manifest's form + artifact)
@@ -40,10 +40,10 @@
 /// The Spirit authoring forms hosted at v2.0.
 ///
 /// Native subprocess is the v0.1 form (ADR-002); `WasmComponent` is the v2.0
-/// addition (ADR-031). Both are hosted as subprocesses sandboxed by the
-/// existing T2 path — the WASM component sandbox (WIT capability gating,
-/// fuel/epoch limits) composes ON TOP of the OS process boundary (defense
-/// in depth).
+/// addition (ADR-031), to run as a subprocess under T2 through `spawn_and_bridge`
+/// (the route exists since Story 17-6; its first production caller is 17-3c) —
+/// the WASM component sandbox (WIT capability gating, fuel/epoch limits) composes
+/// ON TOP of that OS process boundary (defense in depth).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpiritForm {
     /// ADR-002 native form: `program` is a resolved binary run directly.
@@ -83,8 +83,8 @@ pub struct SpiritLaunchRequest {
 
 /// The concrete launch plan the kernel's existing subprocess bridge consumes.
 ///
-/// `program` + `argv` + `env` are exactly the inputs `BridgeSpawnSpec` already
-/// takes (`runtime.rs:240`) — the kernel needs no new field and no form logic.
+/// `program` + `argv` + `env` are the inputs `BridgeSpawnSpec` takes; the tier
+/// travels in its `sandbox` field as admission's grant (Story 17-6), not here.
 #[derive(Debug, Clone)]
 pub struct SpiritLaunchPlan {
     /// The executable to run (binary for native, component-runner for WASM).

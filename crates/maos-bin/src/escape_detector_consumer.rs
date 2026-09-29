@@ -10,12 +10,12 @@
 //! constraint). It **decides nothing** about capability grants (it is not
 //! authorization — L10); it only reports structural anomalies.
 //!
-//! Production posture (the honesty clause): production Spirits today launch via
-//! the unsandboxed `spawn_and_bridge` path (CATCH-0 — wiring production
-//! sandboxing is a separate hardening story, out of scope). So in production
-//! today this consumer finds no `SandboxBlock` rows — it is wired and dormant,
-//! ready to surface anomalies the moment a real T2 sandbox kill flows through
-//! the edge-wired producer seam. It is exercised here against a synthetic TL.
+//! Production posture (the honesty clause): `spawn_and_bridge` routes a T2
+//! spec through `spawn_sandboxed` since Story 17-6 AC5, but no production
+//! Spirit launches at T2 until 17-3c's WASM runner (Workers stay T3, bare
+//! until 17-1). So in production today this consumer finds no `SandboxBlock`
+//! rows — wired and dormant, ready to surface anomalies the moment a real T2
+//! kill flows through the edge-wired producer seam (tested on a synthetic TL).
 
 use std::path::Path;
 

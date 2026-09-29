@@ -688,11 +688,15 @@ fn ensure_native_twin_binary() -> PathBuf {
     }
 
     // 3. Build on demand into the standalone workspace (release profile to
-    //    match the CI contract).
+    //    match the CI contract). `--target-dir` is explicit: a global
+    //    `CARGO_TARGET_DIR` (or `build.target-dir`) would otherwise emit the
+    //    binary outside `twin_dir/target` and step 1 would never find it.
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
     let manifest = format!("{twin_dir}/Cargo.toml");
+    let target_dir = format!("{twin_dir}/target");
     let status = Command::new(&cargo)
         .args(["build", "--release", "--manifest-path", &manifest])
+        .args(["--target-dir", &target_dir])
         .status()
         .unwrap_or_else(|e| panic!("failed to invoke {cargo} to build equiv-native-twin: {e}"));
     assert!(

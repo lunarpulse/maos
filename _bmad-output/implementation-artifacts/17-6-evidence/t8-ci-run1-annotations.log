@@ -1,0 +1,85 @@
+# Story 17-6 T8 run 1 — throwaway branch t8-17-6 @ d521c495 (the dev tree's kernel/test files + temporary workflow), four images; green steps + six planted faults per image (.github/t8/plants.py: each plant built, warnings diffed, suite run, file restored)
+# run 36319846823 — https://github.com/lunarpulse/maos/actions/runs/36319846823
+# fetched unauthenticated: GET /repos/lunarpulse/maos/actions/runs/<run>/jobs and /check-runs/<job>/annotations
+
+== job 108621450316 t2 (ubuntu-26.04) conclusion=failure head_sha=d521c495
+   step FAILED: Epic-17 exit line 3 — T2 kill proof (Story 17-6 AC1) (failure)
+  [warning] T2 diag (ubuntu-26.04) ::       1 <... set_robust_list resumed>)    = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04) ::       1 rt_sigaction(SIGSEGV, {sa_handler=0x5a2582fcf8a0, sa_mask=[], sa_flags=SA_RESTOR
+  [warning] T2 diag (ubuntu-26.04) ::       1 rt_sigaction(SIGSEGV, {sa_handler=0x62c36a9b4520, sa_mask=[], sa_flags=SA_RESTOR
+  [warning] T2 diag (ubuntu-26.04) ::       1 sched_getaffinity(9407, 32, 0x7cf0bc000b80) = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04) ::       1 set_robust_list(0x7cf0c24aeaa0, 24) = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04) ::       2 rt_sigaction(SIGSEGV, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+  [notice] T8 plant bridge-T2-routed-bare (ubuntu-26.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); T0: Exited { code: 0 } | T1: SandboxRefused(..) | T4: SandboxRefused(..) | T2: Exited { code: 0 } | T3: Exited { code: 0 }
+  [notice] T8 plant drop-clone3 (ubuntu-26.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: exit status: 101 | forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: signal: 11 (SIGSEGV) (core dumped)
+  [notice] T8 plant drop-rt_sigaction (ubuntu-26.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 11 (SIGSEGV) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 11 (SIGSEGV) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: signal: 11 (SIGSEGV) (core dumped)
+  [notice] T8 plant drop-poll (ubuntu-26.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 11 (SIGSEGV) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 11 (SIGSEGV) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: signal: 11 (SIGSEGV) (core dumped)
+  [notice] T8 plant no-exec-set-grant (ubuntu-26.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [notice] T8 plant verbatim-order (ubuntu-26.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [failure]  :: Process completed with exit code 101.
+  [notice] T2 exit line 3 (ubuntu-26.04) :: rc=101 test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+  [failure] T2 exit line 3 (ubuntu-26.04) :: a granted FsRead capability must allow reading the declared subtree (observed signal: 11 (SIGSEGV) (core dumped); stdout ""; stderr "\nthread 'main' (18446744073709551615) panicked at /build/rust-coreutils-GrFZ8c/rust-coreutils-0.8.0/rust-vendor/rustix/src/backend/linux_raw/param/auxv.rs:269:22:\ncalled `Result::unwrap()` on an `Err` value: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n")
+  [failure] T2 exit line 3 (ubuntu-26.04) :: thread 'granted_fs_capability_works_ungranted_is_refused' (7425) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:245:5:
+  [notice] T2 exit line 3 (ubuntu-26.04) :: granted_fs_capability_works_ungranted_is_refused/granted: signal: 11 (SIGSEGV) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04) :: forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04) :: benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-26.04) :: benign_process_survives_t2_under_same_spec: exit status: 0
+
+== job 108621450525 t2 (ubuntu-26.04-arm) conclusion=failure head_sha=d521c495
+   step FAILED: Epic-17 exit line 3 — T2 kill proof (Story 17-6 AC1) (failure)
+  [warning] T2 diag (ubuntu-26.04-arm) ::       1 <... set_robust_list resumed>)    = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04-arm) ::       1 <... uname resumed>0xffffe7e889e8) = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04-arm) ::       1 rt_sigaction(SIGSEGV, {sa_handler=0xaef9883b6dd4, sa_mask=[], sa_flags=SA_ONSTAC
+  [warning] T2 diag (ubuntu-26.04-arm) ::       1 rt_sigaction(SIGSEGV, {sa_handler=0xb7f0c191a184, sa_mask=[], sa_flags=SA_ONSTAC
+  [warning] T2 diag (ubuntu-26.04-arm) ::       1 sched_getaffinity(8774, 32, 0xed3e80000b80) = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04-arm) ::       1 set_robust_list(0xed3e8706b100, 24) = -1 EPERM (Operation not permitted)
+  [warning] T2 diag (ubuntu-26.04-arm) ::       2 rt_sigaction(SIGSEGV, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+  [notice] T8 plant bridge-T2-routed-bare (ubuntu-26.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); T0: Exited { code: 0 } | T1: SandboxRefused(..) | T4: SandboxRefused(..) | T2: Exited { code: 0 } | T3: Exited { code: 0 }
+  [notice] T8 plant drop-clone3 (ubuntu-26.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: exit status: 101 | forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: signal: 5 (SIGTRAP) (core dumped)
+  [notice] T8 plant drop-rt_sigaction (ubuntu-26.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 5 (SIGTRAP) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 5 (SIGTRAP) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: signal: 5 (SIGTRAP) (core dumped)
+  [notice] T8 plant drop-ppoll (ubuntu-26.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 5 (SIGTRAP) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 5 (SIGTRAP) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: signal: 5 (SIGTRAP) (core dumped)
+  [notice] T8 plant no-exec-set-grant (ubuntu-26.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [notice] T8 plant verbatim-order (ubuntu-26.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [failure]  :: Process completed with exit code 101.
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: rc=101 test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+  [failure] T2 exit line 3 (ubuntu-26.04-arm) :: a granted FsRead capability must allow reading the declared subtree (observed signal: 5 (SIGTRAP) (core dumped); stdout ""; stderr "\nthread 'main' (18446744073709551615) panicked at /build/rust-coreutils-5Hih9u/rust-coreutils-0.8.0/rust-vendor/rustix/src/backend/linux_raw/param/auxv.rs:269:22:\ncalled `Result::unwrap()` on an `Err` value: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n")
+  [failure] T2 exit line 3 (ubuntu-26.04-arm) :: thread 'granted_fs_capability_works_ungranted_is_refused' (6932) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:245:5:
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: granted_fs_capability_works_ungranted_is_refused/granted: signal: 5 (SIGTRAP) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: benign_process_survives_t2_under_same_spec: exit status: 0
+
+== job 108621450534 t2 (ubuntu-24.04) conclusion=success head_sha=d521c495
+  [notice] T8 plant bridge-T2-routed-bare (ubuntu-24.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); T0: Exited { code: 0 } | T1: SandboxRefused(..) | T4: SandboxRefused(..) | T2: Exited { code: 0 } | T3: Exited { code: 0 }
+  [notice] T8 plant drop-clone3 (ubuntu-24.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: exit status: 101 | forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0 | granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T8 plant drop-rt_sigaction (ubuntu-24.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 11 (SIGSEGV) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 11 (SIGSEGV) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0 | granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T8 plant drop-poll (ubuntu-24.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 11 (SIGSEGV) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 11 (SIGSEGV) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0 | granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T8 plant no-exec-set-grant (ubuntu-24.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [notice] T8 plant verbatim-order (ubuntu-24.04) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [notice] Escape detector (ubuntu-24.04) :: rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+  [notice] Kernel T2 suites (ubuntu-24.04) :: rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+  [notice] Bridge T2 route (ubuntu-24.04) :: T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T3: Exited { code: 0 };T4: SandboxRefused
+  [notice] T2 exit line 3 (ubuntu-24.04) :: rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+  [notice] T2 exit line 3 (ubuntu-24.04) :: forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-24.04) :: granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T2 exit line 3 (ubuntu-24.04) :: benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-24.04) :: granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-24.04) :: benign_process_survives_t2_under_same_spec: exit status: 0
+
+== job 108621450609 t2 (ubuntu-24.04-arm) conclusion=success head_sha=d521c495
+  [notice] T8 plant bridge-T2-routed-bare (ubuntu-24.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); T0: Exited { code: 0 } | T1: SandboxRefused(..) | T4: SandboxRefused(..) | T2: Exited { code: 0 } | T3: Exited { code: 0 }
+  [notice] T8 plant drop-clone3 (ubuntu-24.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: exit status: 101 | forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0 | granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T8 plant drop-rt_sigaction (ubuntu-24.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 5 (SIGTRAP) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 5 (SIGTRAP) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0 | granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T8 plant drop-ppoll (ubuntu-24.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); benign_process_survives_t2_under_same_spec: exit status: 0 | benign_rust_probe_survives_t2_under_same_spec: signal: 5 (SIGTRAP) (core dumped) | forbidden_syscall_killed_by_t2_with_sigsys: signal: 5 (SIGTRAP) (core dumped) | granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0 | granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T8 plant no-exec-set-grant (ubuntu-24.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [notice] T8 plant verbatim-order (ubuntu-24.04-arm) :: build rc=0 new-warnings=none; suite rc=101 (RED); 
+  [notice] Escape detector (ubuntu-24.04-arm) :: rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+  [notice] Kernel T2 suites (ubuntu-24.04-arm) :: rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  [notice] Bridge T2 route (ubuntu-24.04-arm) :: T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T3: Exited { code: 0 };T4: SandboxRefused
+  [notice] T2 exit line 3 (ubuntu-24.04-arm) :: rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+  [notice] T2 exit line 3 (ubuntu-24.04-arm) :: forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-24.04-arm) :: granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+  [notice] T2 exit line 3 (ubuntu-24.04-arm) :: granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-24.04-arm) :: benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-24.04-arm) :: benign_process_survives_t2_under_same_spec: exit status: 0
+

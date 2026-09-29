@@ -9,9 +9,9 @@
 //! `maos:spirit@1.0` WIT world and resolves launch requests into concrete
 //! subprocess launch plans pointing at the `maos-wasm-runner` binary.
 //!
-//! The `maos-wasm-runner` binary IS `BridgeSpawnSpec.program` — it is a real
-//! wasmtime component runner that speaks ADR-032 (Content-Length + CBOR) over
-//! stdio. The kernel's existing `spawn_and_bridge` launches it unchanged.
+//! The `maos-wasm-runner` binary IS `BridgeSpawnSpec.program` — a real wasmtime
+//! component runner speaking ADR-032 (Content-Length + CBOR) over stdio, to be
+//! launched by `spawn_and_bridge` under T2 (route: Story 17-6; caller: 17-3c).
 //!
 //! # Decision D2 (11.1a preflight)
 //!

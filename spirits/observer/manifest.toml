@@ -62,9 +62,8 @@ cpu_max_pct = 10
 memory_max_mb = 64
 
 [sandbox]
-# T2 for the testable rust-inproc reference form (matches Butler/Researcher).
-# A read-only production Observer could tighten to T1 — flagged for Winston.
-tier = "T2"
+# rust-inproc runs in the host process, so it declares the unsandboxed T0 tier.
+tier = "T0"
 
 [author]
 name = "MAOS Project"

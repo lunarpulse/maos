@@ -618,3 +618,11 @@
 "maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock_at"  = "supervision"  # trust-anchor + signature admission path; sandbox family
 "maos_kernel_core::security::sandbox::t3::image_verify::normalize_repository"   = "data-movement" # pure string transform on an image URI (digest/tag stripping); no numeric-compare surface
 "maos_kernel_core::security::sandbox::t3::spawn::commit_spawn_report"           = "supervision"  # writes the kernel-managed spawn audit report (taxonomy: audit-log read/write)
+
+# Story 17-6 AC5 — the launch primitive applies the admitted SandboxSpec, so the
+# bridge's three public items re-hash (BridgeSpawnSpec + `sandbox` field,
+# BridgeError + `SandboxRefused`, SpawnedBridge's private child reshaped to a
+# sandbox guard). Sandbox family — same class as SandboxSpec/SandboxedChild.
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeSpawnSpec" = "supervision"  # carries the sandbox admission granted the child
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError"     = "supervision"  # typed spawn/sandbox refusal of the launch primitive
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge"   = "supervision"  # owns the (possibly sandboxed) child + reader threads; RAII kill+reap

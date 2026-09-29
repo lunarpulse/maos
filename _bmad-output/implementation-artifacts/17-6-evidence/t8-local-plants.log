@@ -1,0 +1,176 @@
+# Story 17-6 — local planted faults (RT-10: diff + warning-free build + output), host: CachyOS 7.2.6 x86_64, Seccomp-capable.
+# Each plant applied to the working tree, built with `cargo test --locked --no-run`, run, then restored byte-for-byte.
+# 'warnings in planted file' lists compiler warnings pointing INTO the planted file beyond the pre-existing set (runtime.rs:50 `Read`, :291 `stream` exist at HEAD).
+
+### PLANT: verbatim order (vec![bpf, kill_bpf])
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -375,3 +375,3 @@
+     // so the kill filter must go first (17-3a F1 — the reverse never installed).
+-    Ok(vec![kill_bpf, bpf])
++    Ok(vec![bpf, kill_bpf])
+ }
+
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+build rc=0; warnings in planted file: none beyond pre-existing
+rc=101
+test benign_process_survives_t2_under_same_spec ... FAILED
+test benign_rust_probe_survives_t2_under_same_spec ... FAILED
+test forbidden_syscall_killed_by_t2_with_sigsys ... FAILED
+test granted_fs_capability_works_ungranted_is_refused ... FAILED
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+maos: seccomp apply failed
+thread 'benign_process_survives_t2_under_same_spec' (4005448) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+t2_benign_control: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+maos: seccomp apply failed
+thread 'benign_rust_probe_survives_t2_under_same_spec' (4005450) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+t2_benign_rust_control: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+maos: seccomp apply failed
+thread 'forbidden_syscall_killed_by_t2_with_sigsys' (4005452) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+forbidden_syscall: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+thread 'granted_fs_capability_works_ungranted_is_refused' (4005454) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+fs_granted: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Operation not permitted (os error 1) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+
+### PLANT: no exec-set grant
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -223,3 +223,3 @@
+         );
+-    for (path, access) in rules {
++    for (path, access) in rules.take(0) {
+         let path_fd = PathFd::new(path)
+
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+build rc=0; warnings in planted file: none beyond pre-existing
+rc=101
+test benign_process_survives_t2_under_same_spec ... FAILED
+test benign_rust_probe_survives_t2_under_same_spec ... FAILED
+test forbidden_syscall_killed_by_t2_with_sigsys ... FAILED
+test granted_fs_capability_works_ungranted_is_refused ... FAILED
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+thread 'benign_process_survives_t2_under_same_spec' (4007164) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+t2_benign_control: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Permission denied (os error 13) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+thread 'benign_rust_probe_survives_t2_under_same_spec' (4007166) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+t2_benign_rust_control: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Permission denied (os error 13) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+thread 'forbidden_syscall_killed_by_t2_with_sigsys' (4007168) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+forbidden_syscall: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Permission denied (os error 13) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+thread 'granted_fs_capability_works_ungranted_is_refused' (4007170) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:41:17:
+fs_granted: T2 spawn refused on a runner declared capable (rule 11(b)): PermissionDenied: Permission denied (os error 13) — CI/GITHUB_ACTIONS declares this runner capable; a job that cannot sandbox must be declared incapable in this helper and its YAML (owner + reason), never skipped
+
+### PLANT: drop poll (x86 row)
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -27,3 +27,3 @@
+ const ARCH_SYSCALLS: &[i64] = &[
+-    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access, libc::SYS_poll
++    libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access
+ ];
+
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+build rc=0; warnings in planted file: none beyond pre-existing
+rc=101
+test benign_process_survives_t2_under_same_spec ... T2-OUTCOME benign_process_survives_t2_under_same_spec: exit status: 0
+test benign_rust_probe_survives_t2_under_same_spec ... T2-OUTCOME benign_rust_probe_survives_t2_under_same_spec: signal: 11 (SIGSEGV) (core dumped)
+test forbidden_syscall_killed_by_t2_with_sigsys ... T2-OUTCOME forbidden_syscall_killed_by_t2_with_sigsys: signal: 11 (SIGSEGV) (core dumped)
+test granted_fs_capability_works_ungranted_is_refused ... T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+thread 'benign_rust_probe_survives_t2_under_same_spec' (4007576) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:187:5:
+a Rust binary under the identical T2 spec must reach main, start a thread and exit 0 (observed signal: 11 (SIGSEGV) (core dumped); stdout "")
+thread 'forbidden_syscall_killed_by_t2_with_sigsys' (4007591) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:125:9:
+T2 must classify this exit as a SandboxViolation, not an ordinary failure (observed signal: 11 (SIGSEGV) (core dumped))
+
+### PLANT: drop rt_sigaction
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -299,3 +299,2 @@
+         // (SIGPIPE handler) and std::thread (glibc >= 2.34 pthread_create).
+-        libc::SYS_rt_sigaction,
+         libc::SYS_clone3,
+
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+build rc=0; warnings in planted file: none beyond pre-existing
+rc=101
+test benign_process_survives_t2_under_same_spec ... T2-OUTCOME benign_process_survives_t2_under_same_spec: exit status: 0
+test benign_rust_probe_survives_t2_under_same_spec ... T2-OUTCOME benign_rust_probe_survives_t2_under_same_spec: signal: 11 (SIGSEGV) (core dumped)
+test forbidden_syscall_killed_by_t2_with_sigsys ... T2-OUTCOME forbidden_syscall_killed_by_t2_with_sigsys: signal: 11 (SIGSEGV) (core dumped)
+test granted_fs_capability_works_ungranted_is_refused ... T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+fatal runtime error: assertion failed: signal(libc::SIGPIPE, handler) != libc::SIG_ERR, aborting
+thread 'benign_rust_probe_survives_t2_under_same_spec' (4007997) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:187:5:
+a Rust binary under the identical T2 spec must reach main, start a thread and exit 0 (observed signal: 11 (SIGSEGV) (core dumped); stdout "")
+fatal runtime error: assertion failed: signal(libc::SIGPIPE, handler) != libc::SIG_ERR, aborting
+thread 'forbidden_syscall_killed_by_t2_with_sigsys' (4007999) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:125:9:
+T2 must classify this exit as a SandboxViolation, not an ordinary failure (observed signal: 11 (SIGSEGV) (core dumped))
+
+### PLANT: drop clone3
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -300,3 +300,2 @@
+         libc::SYS_rt_sigaction,
+-        libc::SYS_clone3,
+     ];
+
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture --test-threads=1
+build rc=0; warnings in planted file: none beyond pre-existing
+rc=101
+test benign_process_survives_t2_under_same_spec ... T2-OUTCOME benign_process_survives_t2_under_same_spec: exit status: 0
+test benign_rust_probe_survives_t2_under_same_spec ... T2-OUTCOME benign_rust_probe_survives_t2_under_same_spec: exit status: 101
+test forbidden_syscall_killed_by_t2_with_sigsys ... T2-OUTCOME forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+test granted_fs_capability_works_ungranted_is_refused ... T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+thread 'main' (18446744073709551615) panicked at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/thread/functions.rs:131:29:
+thread 'benign_rust_probe_survives_t2_under_same_spec' (4009714) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:187:5:
+a Rust binary under the identical T2 spec must reach main, start a thread and exit 0 (observed exit status: 101; stdout "")
+
+### PLANT: route T2 bare at the bridge (T2 arm disabled, T2 added to the bare arm)
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -485,6 +485,6 @@
+         #[cfg(target_os = "linux")]
+-        SandboxTier::T2 => spawn_sandboxed(spec, cmd)
++        SandboxTier::T2 if false => spawn_sandboxed(spec, cmd)
+             .map(BridgeChild::Sandboxed)
+             .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}"))),
+-        SandboxTier::T0 | SandboxTier::T3 => cmd
++        SandboxTier::T0 | SandboxTier::T2 | SandboxTier::T3 => cmd
+             .spawn()
+
+warnings in crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs: unplanted ['--> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:291:9', '--> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:50:35']; planted ['--> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:291:9', '--> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:50:35'] -> new: none
+$ CI=true cargo test --locked -p maos-kernel-core --test bridge_t2_route_17_6 -- --nocapture --test-threads=1
+rc=101
+test t0_probe_runs_bare_and_ptrace_returns ... BRIDGE-T2-ROUTE T0: Exited { code: 0 }
+test t1_and_t4_are_refused_typed_before_any_spawn ... BRIDGE-T2-ROUTE T1: SandboxRefused("/home/lunarpulse/dev_ws/crates/maos-kernel-core/../maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe: no spawn path applies tier SandboxTier(1)")
+BRIDGE-T2-ROUTE T4: SandboxRefused("/home/lunarpulse/dev_ws/crates/maos-kernel-core/../maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe: no spawn path applies tier SandboxTier(4)")
+test t2_probe_dies_of_sigsys_at_the_launch_primitive ... BRIDGE-T2-ROUTE T2: Exited { code: 0 }
+test t3_probe_runs_bare_until_17_1 ... BRIDGE-T2-ROUTE T3: Exited { code: 0 }
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+thread 't2_probe_dies_of_sigsys_at_the_launch_primitive' (4014115) panicked at crates/maos-kernel-core/tests/bridge_t2_route_17_6.rs:99:22:
+assertion `left == right` failed: a T2 bridge child calling ptrace must die of SIGSYS (observed Exited { code: 0 })
+
+### PLANT: cli_wrapper floor back to < T3
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+@@ -274,3 +274,3 @@
+     // (Story 17-6 AC5), so both are refused here, typed, before any probe.
+-    if requested != SandboxTier::T3 {
++    if requested < SandboxTier::T3 {
+         return Err(CliWrapperAdmissionError::ECliWrapperRequiresT3 {
+
+$ cargo test --locked -p maos-kernel-core --test cli_wrapper_bridge_8_12 -- --nocapture --test-threads=1
+build rc=0; warnings in planted file: none beyond pre-existing
+rc=101
+test admission_rejects_respawn_with_context_fail_loud ... ok
+test admission_tier_grant_gate ... FAILED
+test antitheater_real_spawn_nonce_pid_and_reaped ... ok
+test cap_binding_mismatch_refuses_to_spawn ... ok
+test crash_detection_latency_under_2s_with_margin ... ok
+test crash_matrix_exit_codes_and_signals ... ok
+test redaction_trap_hex_token_never_lands_in_log ... ok
+test stderr_lines_are_captured_with_stream_provenance ... ok
+test stdout_drains_before_death_no_truncation ... ok
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+thread 'admission_tier_grant_gate' (4010713) panicked at crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs:301:18:
+expected ECliWrapperRequiresT3 for a T4 request, got Ok(SandboxTier(4))

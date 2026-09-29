@@ -140,19 +140,33 @@ pub fn fresh_temp_tl() -> (
     (dir, db_path, tl)
 }
 
-/// Skip gracefully only when the host GENUINELY cannot sandbox — seccomp refused
+/// Skip only OFF CI, and only when the host refuses the sandbox — seccomp refused
 /// (`EPERM`) or absent (`ENOSYS` → `Unsupported`), or an unsupported platform
 /// (`SandboxUnavailable`). Returns `None` to skip; the caller then emits NO
 /// measurement marker, so the gate's live legs stay advisory (not vacuous-green).
-/// A `SandboxSetup` failure (which can signal a REAL seccomp filter-build
-/// regression) and every other error hard-fail (panic). Broadening the skip
-/// cannot mask a capable-host enforcement regression: that surfaces as a MISSING
-/// kill (the child exits 0 → no violation → no marker → leg RED), never as a
-/// spawn refusal, so it never reaches this helper.
+/// A `SandboxSetup` failure and every other error hard-fail (panic).
+///
+/// A capable-host enforcement regression CAN arrive here as a refusal: Story
+/// 17-3a measured the seccomp install order defect (the allow-list refused the
+/// second filter's `prctl`/`seccomp` → `PermissionDenied`) skipping every T2
+/// suite. So in CI (`CI`/`GITHUB_ACTIONS` set — a runner declared capable,
+/// rule 11(b); Story 17-6 AC4) the same refusal PANICS with a named reason that
+/// never begins with `SKIP `, and no `SKIP` line reaches the gate.
 pub fn skip_if_sandbox_unavailable<T>(result: Result<T, SpawnError>, test_name: &str) -> Option<T> {
+    let refused_on_capable_runner = |kind: &str, err: &dyn std::fmt::Display| {
+        if std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some() {
+            panic!(
+                "{test_name}: T2 spawn refused on a runner declared capable (rule 11(b)): \
+                 {kind}: {err} — CI/GITHUB_ACTIONS declares this runner capable; a job that \
+                 cannot sandbox must be declared incapable in this helper and its YAML \
+                 (owner + reason), never skipped"
+            );
+        }
+    };
     match result {
         Ok(v) => Some(v),
-        Err(SpawnError::SandboxUnavailable { .. }) => {
+        Err(SpawnError::SandboxUnavailable { reason }) => {
+            refused_on_capable_runner("SandboxUnavailable", &reason);
             eprintln!("SKIP {test_name}: sandbox unavailable on this host");
             None
         }
@@ -162,6 +176,7 @@ pub fn skip_if_sandbox_unavailable<T>(result: Result<T, SpawnError>, test_name: 
                 std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::Unsupported
             ) =>
         {
+            refused_on_capable_runner(&format!("{:?}", e.kind()), &e);
             eprintln!(
                 "SKIP {test_name}: sandbox spawn refused by host ({:?})",
                 e.kind()

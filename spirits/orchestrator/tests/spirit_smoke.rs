@@ -49,7 +49,7 @@ fn manifest_self_check_is_well_formed() {
     assert_eq!(report.class_name, "orchestrator");
     assert!(report.forms.iter().any(|f| f == "rust-inproc"));
     assert_eq!(report.trust_tier, "local");
-    assert_eq!(report.sandbox_tier, "T2");
+    assert_eq!(report.sandbox_tier, "T0");
     // §6.7 — the founder-loop coordinator runs autonomous-with-halt.
     assert_eq!(report.posture_default, "autonomous-with-halt");
     assert_eq!(report.posture_allowed_max, "autonomous-with-halt");

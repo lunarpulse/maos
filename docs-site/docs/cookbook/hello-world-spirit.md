@@ -36,11 +36,12 @@ description = "A minimal hello-world Spirit."
 name = "you"
 
 [sandbox]
-tier = "baseline"
+tier = "T0" # T0 | T1 | T2 | T3 | T4; an in-process Spirit declares T0
 
 [resources]
-max_memory_mb = 64
-max_cpu_ms = 1000
+cpu_max_pct = 25
+memory_max_mb = 64
+fd_max = 64
 
 [budget]
 max_inference_calls = 0

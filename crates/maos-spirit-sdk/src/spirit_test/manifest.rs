@@ -137,6 +137,13 @@ pub fn manifest_self_check(
             reason: "tier must be one of T0/T1/T2/T3/T4",
         });
     }
+    if parsed.class.forms.iter().any(|form| form == "rust-inproc") && parsed.sandbox.tier != "T0" {
+        return Err(ManifestSelfCheckViolation::InvalidValue {
+            field: "sandbox.tier",
+            value: parsed.sandbox.tier.clone(),
+            reason: "rust-inproc requires sandbox tier T0",
+        });
+    }
 
     Ok(ManifestSelfCheckReport {
         class_name: parsed.class.name,

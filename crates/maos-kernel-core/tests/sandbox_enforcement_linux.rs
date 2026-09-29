@@ -3,9 +3,9 @@
 //! These tests spawn throwaway probe processes under T2 and assert
 //! that forbidden operations are blocked.
 //!
-//! NOTE: If the test runner lacks `CAP_SYS_ADMIN` or seccomp/Landlock
-//! is unavailable, the affected tests skip with a clear message instead
-//! of failing.
+//! NOTE (Story 17-6 AC4, rule 11(b)): off CI, a host whose sandbox setup is
+//! refused (`PermissionDenied`) prints a named `SKIP` line; in CI
+//! (`CI`/`GITHUB_ACTIONS` set — a runner declared capable) it FAILS instead.
 #![cfg(target_os = "linux")]
 
 use std::io;
@@ -19,7 +19,16 @@ use maos_kernel_core::security::sandbox::{
 fn skip_if_perm_denied<T>(result: Result<T, SpawnError>, test_name: &str) -> Option<T> {
     match result {
         Ok(v) => Some(v),
-        Err(SpawnError::Io(ref e)) if e.kind() == io::ErrorKind::PermissionDenied => {
+        Err(SpawnError::Io(e)) if e.kind() == io::ErrorKind::PermissionDenied => {
+            if std::env::var_os("CI").is_some() || std::env::var_os("GITHUB_ACTIONS").is_some() {
+                panic!(
+                    "{test_name}: T2 spawn refused on a runner declared capable (rule 11(b)): \
+                     {:?}: {e} — CI/GITHUB_ACTIONS declares this runner capable; a job that \
+                     cannot sandbox must be declared incapable in this helper and its YAML \
+                     (owner + reason), never skipped",
+                    e.kind()
+                );
+            }
             eprintln!("SKIP {test_name}: sandbox setup requires CAP_SYS_ADMIN / no_new_privs");
             None
         }

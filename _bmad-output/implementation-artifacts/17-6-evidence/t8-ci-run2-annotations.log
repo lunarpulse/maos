@@ -1,0 +1,52 @@
+# Story 17-6 T8 run 2 — throwaway branch t8-17-6 @ 348d9ecf, ubuntu-26.04 + ubuntu-26.04-arm only: every step `if: always()`, image facts, and an strace of the granted `cat` child under T2 (why run 1's 26.04 legs were red)
+# run 36320219812 — https://github.com/lunarpulse/maos/actions/runs/36320219812
+# fetched unauthenticated: GET /repos/lunarpulse/maos/actions/runs/<run>/jobs and /check-runs/<job>/annotations
+
+== job 108622492982 t2 (ubuntu-26.04) conclusion=failure head_sha=348d9ecf
+   step FAILED: Epic-17 exit line 3 — T2 kill proof (Story 17-6 AC1) (failure)
+  [warning] cat diag (ubuntu-26.04) ::       1 open("/proc/self/auxv", O_RDONLY|O_LARGEFILE) = -1 EPERM (Operation not permitted)
+  [warning] cat diag (ubuntu-26.04) ::       1 openat(AT_FDCWD, "/proc/filesystems", O_RDONLY|O_CLOEXEC) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04) ::       1 openat(AT_FDCWD, "/proc/mounts", O_RDONLY|O_CLOEXEC) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04) ::       1 openat(AT_FDCWD, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC) = 4
+  [warning] cat diag (ubuntu-26.04) ::       1 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04) ::       1 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = 3
+  [warning] cat diag (ubuntu-26.04) ::       1 prctl(PR_GET_AUXV, 0x7ffd0e370c70, 0x200, 0, 0) = -1 EPERM (Operation not permitted)
+  [warning] cat diag (ubuntu-26.04) ::       1 prctl(PR_SET_NAME, "granted_fs_capa"...) = 0
+  [warning] cat diag (ubuntu-26.04) ::       3 prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) = 0
+  [notice] Escape detector (ubuntu-26.04) :: rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+  [notice] Kernel T2 suites (ubuntu-26.04) :: rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  [notice] Bridge T2 route (ubuntu-26.04) :: T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T3: Exited { code: 0 };T4: SandboxRefused
+  [failure]  :: Process completed with exit code 101.
+  [notice] T2 exit line 3 (ubuntu-26.04) :: rc=101 test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+  [failure] T2 exit line 3 (ubuntu-26.04) :: a granted FsRead capability must allow reading the declared subtree (observed signal: 11 (SIGSEGV) (core dumped); stdout ""; stderr "\nthread 'main' (18446744073709551615) panicked at /build/rust-coreutils-GrFZ8c/rust-coreutils-0.8.0/rust-vendor/rustix/src/backend/linux_raw/param/auxv.rs:269:22:\ncalled `Result::unwrap()` on an `Err` value: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n")
+  [failure] T2 exit line 3 (ubuntu-26.04) :: thread 'granted_fs_capability_works_ungranted_is_refused' (7420) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:245:5:
+  [notice] T2 exit line 3 (ubuntu-26.04) :: granted_fs_capability_works_ungranted_is_refused/granted: signal: 11 (SIGSEGV) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04) :: forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04) :: benign_process_survives_t2_under_same_spec: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-26.04) :: benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+  [notice] Image facts (ubuntu-26.04) :: 7.0.0-1012-azure; cat=/usr/lib/cargo/bin/coreutils/cat; true=/usr/bin/gnutrue; sh=/usr/bin/dash; cat (uutils coreutils) 0.8.0; pkg=rust-coreutils: /usr/lib/cargo/bin/coreutils/cat; gnu=/usr/bin/gnu[,/usr/bin/gnuarch,/usr/bin/gnub2sum,/usr/bin/gnubase32,/usr/bin/gnubase64; coreutils=coreutils=9.5-1ubuntu2+0.0.0~ubuntu25,coreutils-from-uutils=0.0.0~ubuntu25,gnu-coreutils=9.7-3ubuntu2.1,rust-coreutils=0.8.0-0ubuntu3
+
+== job 108622493135 t2 (ubuntu-26.04-arm) conclusion=failure head_sha=348d9ecf
+   step FAILED: Epic-17 exit line 3 — T2 kill proof (Story 17-6 AC1) (failure)
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 openat(AT_FDCWD, "/proc/filesystems", O_RDONLY|O_CLOEXEC) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 openat(AT_FDCWD, "/proc/mounts", O_RDONLY|O_CLOEXEC) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 openat(AT_FDCWD, "/proc/self/auxv", O_RDONLY|O_LARGEFILE) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 openat(AT_FDCWD, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC) = 4
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = -1 EACCES (Permission denied)
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = 3
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 prctl(PR_GET_AUXV, 0xfffff11f7a38, 0x200, 0, 0) = -1 EPERM (Operation not permitted)
+  [warning] cat diag (ubuntu-26.04-arm) ::       1 prctl(PR_SET_NAME, "granted_fs_capa"...) = 0
+  [warning] cat diag (ubuntu-26.04-arm) ::       3 prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) = 0
+  [notice] Escape detector (ubuntu-26.04-arm) :: rc=0 ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1;ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2;ESCAPE-PRODUCER-WIRED-MEASURED frame=01
+  [notice] Kernel T2 suites (ubuntu-26.04-arm) :: rc=0 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  [notice] Bridge T2 route (ubuntu-26.04-arm) :: T0: Exited { code: 0 };T1: SandboxRefused;T2: Signaled { signal: 31 };T3: Exited { code: 0 };T4: SandboxRefused
+  [failure]  :: Process completed with exit code 101.
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: rc=101 test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+  [failure] T2 exit line 3 (ubuntu-26.04-arm) :: a granted FsRead capability must allow reading the declared subtree (observed signal: 5 (SIGTRAP) (core dumped); stdout ""; stderr "\nthread 'main' (18446744073709551615) panicked at /build/rust-coreutils-5Hih9u/rust-coreutils-0.8.0/rust-vendor/rustix/src/backend/linux_raw/param/auxv.rs:269:22:\ncalled `Result::unwrap()` on an `Err` value: ()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n")
+  [failure] T2 exit line 3 (ubuntu-26.04-arm) :: thread 'granted_fs_capability_works_ungranted_is_refused' (6999) panicked at crates/maos-wasm-host/tests/t2_sandbox_kill.rs:245:5:
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: granted_fs_capability_works_ungranted_is_refused/granted: signal: 5 (SIGTRAP) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+  [notice] T2 exit line 3 (ubuntu-26.04-arm) :: benign_process_survives_t2_under_same_spec: exit status: 0
+  [notice] Image facts (ubuntu-26.04-arm) :: 7.0.0-1012-azure; cat=/usr/lib/cargo/bin/coreutils/cat; true=/usr/bin/gnutrue; sh=/usr/bin/dash; cat (uutils coreutils) 0.8.0; pkg=rust-coreutils: /usr/lib/cargo/bin/coreutils/cat; gnu=/usr/bin/gnu[,/usr/bin/gnuarch,/usr/bin/gnub2sum,/usr/bin/gnubase32,/usr/bin/gnubase64; coreutils=coreutils=9.5-1ubuntu2+0.0.0~ubuntu25,coreutils-from-uutils=0.0.0~ubuntu25,gnu-coreutils=9.7-3ubuntu2.1,rust-coreutils=0.8.0-0ubuntu3
+

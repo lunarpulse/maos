@@ -68,6 +68,9 @@ fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
     let expected_argv_prefix_hash = argv_prefix_hash(&argv_prefix);
     let mut bridge = spawn_and_bridge(BridgeSpawnSpec {
         program,
+        sandbox: maos_kernel_core::security::sandbox::SandboxSpec::new_for_test(
+            maos_domain::invariants::i9::SandboxTier::T0,
+        ),
         argv_prefix,
         task_args,
         expected_argv_prefix_hash,

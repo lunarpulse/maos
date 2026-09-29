@@ -631,14 +631,12 @@ pub fn run_cli_wrapper_manifest(
         }
         worker_cli::ProbeStrategy::Liveness { argv } => {
             // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
-            // this; preserve it on the real-CLI path).
-            if !matches!(granted_tier, maos_domain::invariants::i9::SandboxTier::T3) {
-                return Err(format!(
-                    "maos run: cli_wrapper admission failed: {} requires SandboxTier::T3, \
-                     host-granted {granted_tier:?}",
-                    worker_cli.name()
-                )
-                .into());
+            // this; preserve it on the real-CLI path, typed — Story 17-6 D-17-6-C).
+            if !matches!(granted_tier, SandboxTier::T3) {
+                let e = maos_domain::cli_wrapper::CliWrapperAdmissionError::ECliWrapperRequiresT3 {
+                    observed_tier: format!("{granted_tier:?}"),
+                };
+                return Err(format!("maos run: cli_wrapper admission failed: {e}").into());
             }
             worker_cli::run_liveness_probe(&resolved, &argv, std::time::Duration::from_secs(10))
                 .map_err(|e| {
@@ -783,6 +781,13 @@ pub fn run_cli_wrapper_manifest(
     //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
     let spec = BridgeSpawnSpec {
         program: resolved,
+        sandbox: maos_kernel_core::security::sandbox::SandboxSpec {
+            tier: granted_tier,
+            resolved_caps: Default::default(),
+            declared_scopes: vec![],
+            spirit_id: "worker".to_string(),
+            output_shape_predicate: None,
+        },
         argv_prefix: config.argv_prefix.clone(),
         task_args,
         expected_argv_prefix_hash: aph,

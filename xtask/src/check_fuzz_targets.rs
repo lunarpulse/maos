@@ -39,6 +39,11 @@ const TARGETS: &[FuzzTarget] = &[
         bin_name: "frame_deser",
         report_doc: "docs/compliance/fuzz-wire-report.md",
     },
+    FuzzTarget {
+        crate_dir: "crates/maos-exec-deps/fuzz",
+        bin_name: "fuzz_exec_deps_parse_elf",
+        report_doc: "docs/compliance/fuzz-exec-deps-report.md",
+    },
 ];
 
 #[derive(Debug, Deserialize)]
@@ -248,8 +253,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         make_fuzz_crate(tmp.path(), "crates/maos-manifest/fuzz", "manifest_parser");
         make_fuzz_crate(tmp.path(), "crates/maos-domain/fuzz", "frame_deser");
+        make_fuzz_crate(
+            tmp.path(),
+            "crates/maos-exec-deps/fuzz",
+            "fuzz_exec_deps_parse_elf",
+        );
         make_report(tmp.path(), "docs/compliance/fuzz-manifest-report.md");
         make_report(tmp.path(), "docs/compliance/fuzz-wire-report.md");
+        make_report(tmp.path(), "docs/compliance/fuzz-exec-deps-report.md");
         make_ledger(tmp.path(), r#"{"schema_version":1,"records":[]}"#);
         tmp
     }

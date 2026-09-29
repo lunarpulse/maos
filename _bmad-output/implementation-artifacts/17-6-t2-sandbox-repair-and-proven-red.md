@@ -4,15 +4,15 @@ depends_on: "**`17-3a-wasm-recall-and-componentize-spike` (`done`)** — Q4b MEA
 blocks: "**`17-2-worker-cgroups-applied`** (its AC1 needs a live T2 child — impossible until AC2+AC3 land) and **`17-3c-wasm-spirit-on-the-bus-under-t2`** (its runner runs under T2 through the route AC5 lands). After epic §R7 (R17-51) the hand-offs land on two stories, both FLAG-Winston: **17-3c** takes `memfd_create`, the `maos run` SIGSYS proof (RT-1, R17-47) and the kind-8 row for a production T2 kill (RT-5, R17-48); **`17-3d-wasm-log-recall`** takes `sendto`, `recvfrom` and the inherited-fd hand-off (a CLOEXEC clear in `pre_exec` — `unsafe`, so sandbox zone; RT-4, R17-46). `17-3b-wasm-form-admission-and-contract` (kernel-Δ 0) does not depend on this story. Epic-17 exit line 3 (`epic-17…:21`) is this story's AC1."
 spec_alignment: "Rule 9 applies mid-epic. Creating this story disproved or tightened premises in AC1, AC3, AC4, AC5 and AC6 (§Premise corrections P1–P22); the preflight round-table then re-ruled five of the creation-time decisions for long-term correctness (RT-1…RT-10). **Filed now** (not deferred to the landing commit, because they re-shape another story's ACs): epic §R6 rows R17-46…R17-50 (routed by §R7 R17-51 after the 17-3b split) and the 17-3c/17-3d tracker rows. **Applied by the dev pass in the landing commit:** §Epic OLD→NEW edits to the 17-6 section itself. The ACs are the epic's six, tightened; AC5's `maos run` leg moves to 17-3c because an accepted ADR forbids the only form that could carry it here (RT-1) — none is added."
 split_from: "Not a split. Created 2026-09-25 by operator decision (Lunarpulse, 17-3a RT-8; D2 = a for AC5; R17-37 re-ruled 2026-09-26 for AC6). **Sizing: WHOLE** — AC2/AC3 without AC4 are invisible (a refused spawn still skips), AC4 without AC2/AC3 is permanently red, and AC5 without AC2/AC3 routes children into a sandbox that cannot start them."
-kernel_grant: "◆ **FLAG-Winston — RATIFIED 2026-09-26 by the operator (Lunarpulse: *confirmed*), after the preflight round-table ruled it under his directive (*resolve the issues raised in the story creation for the long-term correctness*); Winston signs the figure.** **`maos-kernel-core` tokei code 19212 → 19283 (+71)**, **`src_lines` 24920 → 25003 (+83)**, across FOUR files: `security/sandbox/linux.rs` +26, `security/sandbox/mod.rs` +4, `lifecycle/cli_wrapper/runtime.rs` +41, `lifecycle/cli_wrapper/admission.rs` 0 (two changed lines — its digest still moves). Measured on the lean prototype (`17-6-evidence/lean-prototype.diff`, `lean-measure.log`). **Plus the aarch64 allow-list entry the arm leave-one-out measures in T8** (hypothesis `ppoll`, ≤ +3 lines for a per-arch arm — RT-6); nothing else. The creation-time figure (+415) is **withdrawn**: 250 of its lines were an ELF reader that now lives in the leaf crate `maos-exec-deps` (RT-3), and its admission/rename lines were for a form ADR-060 forbids (RT-1). The 17-3a figure (+25/−1) stays superseded (P8). The kernel lines land with the re-pin and the `maos-kernel-core` kloc grant (+ `RATIFIED_AT_EASING`) in ONE commit; every artifact is enumerated in §Kernel grant (E16-A7). A count above the ruled figure is a new FLAG — stop and re-ask."
-kloc_grant: "Measured on the lean prototype (tokei 14.0.0 code): **NEW crate `maos-exec-deps` = 243** (its own `kloc.toml` row, set to the exact formatted value at landing — `kloc-check` refuses a crate with no row: *missing KLOC budget for measured crate `maos-exec-deps`*); `maos-bin` **+7** (`worker_spawn.rs` 634 → 641), `xtask` **+3** (`check_skill_conformance.rs`), `maos-bench` **+3** (`j1.rs`). Aggregate 167819 → **168146** with those rows (hardfail 170884 — `kloc.toml:658`; the alarm at 158608 already fires and is not silenced). NOT prototyped (measure at landing): AC6's `maos-bin/src/admission.rs` refusal and the smoke-spirit `T0` fix (`main.rs:6785-6788`); the SDK self-check line(s); the fuzz target's xtask lines — `check_fuzz_targets.rs` `TARGETS` row + its `green_workspace()` fixture, `check_fuzz_floor.rs` `REQUIRED_TARGETS` + its test vectors (RT-3, validation V-3); the probe `--benign` mode (out-of-workspace fixtures, uncounted). **`maos-bin` and `xtask` carry ZERO headroom** — every line there is an operator-authorized raise at the exact formatted measured value citing the bare token `17-6` in the same commit (`d11_xtask_ceiling_ratchet.rs:164`) — AUTHORIZED by the operator 2026-09-26 with the kernel grant. `crates/*/tests/` is uncharged; inline `#[cfg(test)]` is charged."
+kernel_grant: "◆ **FLAG-Winston — original lean-prototype figure RATIFIED 2026-09-26 by the operator (Lunarpulse: confirmed):** `maos-kernel-core` tokei 19212 → 19283 (+71), `src_lines` 24920 → 25003 (+83), across `security/sandbox/linux.rs` +26, `security/sandbox/mod.rs` +4, `lifecycle/cli_wrapper/runtime.rs` +41, `lifecycle/cli_wrapper/admission.rs` 0 (`17-6-evidence/lean-prototype.diff`, `lean-measure.log`). **Landing figure recorded in the Dev Agent Record after T8: tokei 19212 → 19292 (+80), `src_lines` 24920 → 25015 (+95).** The extra +2/+3 is arm-measured `ppoll` (RT-6); +7/+9 is the 2026-09-28 operator-approved, argument-conditioned `prctl(PR_GET_AUXV)` grant required by ubuntu-26.04's uutils `cat` (Dev Agent Record §AC3, final CI run 36425906424). The creation-time +415 and 17-3a +25/−1 figures stay superseded. Kernel lines, pins and kloc grant (`RATIFIED_AT_EASING`) land together; the review guard was separately operator-ratified 2026-09-28: tokei 19292 → 19309 (+17), `src_lines` 25015 → 25032 (+17), final +97/+112 from the 19212/24920 baseline."
+kloc_grant: "Measured on the lean prototype (tokei 14.0.0 code): **NEW crate `maos-exec-deps` = 243** (its own `kloc.toml` row, set to the exact formatted value at landing — `kloc-check` refuses a crate with no row: *missing KLOC budget for measured crate `maos-exec-deps`*); `maos-bin` **+7** (`worker_spawn.rs` 634 → 641), `xtask` **+3** (`check_skill_conformance.rs`), `maos-bench` **+3** (`j1.rs`). Aggregate 167819 → **168146** with those rows (hardfail 170884 — `kloc.toml:658`; the alarm at 158608 already fires and is not silenced). NOT prototyped (measure at landing): AC6's `maos-bin/src/admission.rs` refusal and the smoke-spirit `T0` fix (`main.rs:6785-6788`); the SDK self-check line(s); the fuzz target's xtask lines — `check_fuzz_targets.rs` `TARGETS` row + its `green_workspace()` fixture, `check_fuzz_floor.rs` `REQUIRED_TARGETS` + its test vectors (RT-3, validation V-3); the probe `--benign` mode (out-of-workspace fixtures, uncounted). **`maos-bin` and `xtask` carry ZERO headroom** — every line there is an operator-authorized raise at the exact formatted measured value citing the bare token `17-6` in the same commit (`d11_xtask_ceiling_ratchet.rs:164`) — AUTHORIZED by the operator 2026-09-26 with the kernel grant. `crates/*/tests/` is uncharged; inline `#[cfg(test)]` is charged. Review patch measurement: `maos-exec-deps` 233 → 357 tokei, exact current ceiling; kernel 19292 → 19309 under a separately ratified FLAG."
 model: "frontier-class allowlist {opus-4-6, opus-4-7, opus-4-8, gpt-5.5, gpt-5.6, glm-5.1, glm-5.2, glm-5.3, opus-5, equiv}. `FRONTIER_FAMILIES` (`xtask/src/check_dev_model_tier.rs`) is the machine-checked set; `equiv` is prose, NOT a match token. Keep the literal `allowlist {` — it is a NEGATIVE marker: `check_dev_model_used_populated.rs:302` treats any line containing it as boilerplate and SKIPS it."
 review: "§A6 full-layer net **BINDING and NON-DEGRADABLE** (◆). Layers: Blind + Edge Case + Acceptance + Test-Infra + **Security** (a containment control AND a parser of hostile input running in the unsandboxed daemon — the 16-6 precedent names the layer) + **non-author runtime re-execution in CI** (a non-author reads every recorded run id from public annotations and re-runs the local legs). E15-A6 binds every probe by name: *does this test read the tree/runtime, or only what it set itself?* — and RT-10 adds: *show the planted diff and a warning-free build, or the fault was not planted.*"
 ---
 
 # 17-6 — T2 sandbox repair: a T2 child starts, a forbidden syscall dies, proven red in CI ◆ FLAG-Winston
 
-Status: ready-for-dev
+Status: done
 
 > **The capability:** *A process the kernel launches at `SandboxTier::T2` actually starts, actually runs Rust to
 > `main`, and actually dies of `SIGSYS` the moment it calls `ptrace` — on every runner image the project ships for,
@@ -131,7 +131,7 @@ T8(b), `KO_COVERAGE_MIN=100`, supersession labels, cite ranges, the admission.rs
 | D-17-6-C | Where the cli_wrapper tier floor sits (AC5) | **Exactly T3** (RT-1): `resolve_cli_wrapper_tier` → `if requested != SandboxTier::T3` with the comment citing ADR-060 clause 4; `ECliWrapperRequiresT3` unchanged (its name and catalog row stay true); `probe_and_verify_shape`'s floor (`:52-57`) and the Liveness re-assert (`worker_spawn.rs:635-642`) stay as defence in depth — the Liveness one becomes the typed `ECliWrapperRequiresT3` text instead of a bare `String`. |
 | D-17-6-D | Where exit line 3 runs in CI (P2) | **`wasm-host-tests` becomes a four-image matrix** (`strategy: { fail-fast: false, matrix: { image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm] } }`, `runs-on: ${{ matrix.image }}`, rust-cache key includes the image) with a dedicated step running exit line 3 verbatim (`cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture`) that emits one `::notice` per test outcome (name, signal/rc) — job logs are 403 without a token, annotations are public. The same matrix also runs, after building **both** probe copies, `cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture` and `cargo test --locked -p maos-escape-detector -- --nocapture`, so every un-skipped T2 suite and the primitive's route run on the four images (V-11; `workspace-test-suite` on `ubuntu-latest` still runs them too). `epic-17-exit` stays 17-1 AC1's to create; it carries line 3 verbatim. |
 | D-17-6-E | *A runner declared capable* (rule 11(b)) | **Ambient `CI`/`GITHUB_ACTIONS` ⇒ capable** (RT-7; precedent `journal_fsync_assertion.rs:66`): a refused T2 spawn PANICS with `T2 spawn refused on a runner declared capable (rule 11(b)): <kind>: <err>` — text that never begins with `SKIP `, so `check_escape_detector.rs`'s `observed_substrate_skip` cannot mistake it for an absent substrate; off-CI each helper keeps **exactly its current skip set** and byte-identical `SKIP` text (wasm-host and kernel helpers: `PermissionDenied`; escape-detector: `PermissionDenied`/`Unsupported`/`SandboxUnavailable`) — no helper gains a new skip condition (V-9). No new env var. |
-| D-17-6-F | Which syscalls land here | **`poll` (x86_64 row), `rt_sigaction`, `clone3`** — and on aarch64 exactly what T8 measures (RT-4, RT-6). Never `socket`, `connect`, `ppoll` on x86_64. `memfd_create` → 17-3c; `sendto`/`recvfrom` → 17-3d (R17-46, R17-51). |
+| D-17-6-F | Which syscalls land here | **`poll` (x86_64 row), `rt_sigaction`, `clone3`; `ppoll` on aarch64**, measured by leave-one-out (RT-4, RT-6). The additional T8 grant approved by the operator 2026-09-28 is **only `prctl(PR_GET_AUXV)`**, checked by its first seccomp argument: ubuntu-26.04's uutils `cat` needs it; unrelated `prctl` operations remain refused. Never `socket`, `connect`, `ppoll` on x86_64. `memfd_create` → 17-3c; `sendto`/`recvfrom` → 17-3d (R17-46, R17-51). |
 | D-17-6-G | aarch64 | Measured on `ubuntu-24.04-arm` + `ubuntu-26.04-arm` in T8 (leave-one-out, same ladder as x64) before the kernel commit; the measured entries live in an aarch64 arm of the per-arch list beside `LEGACY_X86_SYSCALLS`. If no arm leg can run: `spawn_sandboxed` returns `SandboxUnavailable { reason: "T2 allow-list not measured on aarch64" }` there (RT-6); the exit-line-3 step then runs on the two x64 images only, the arm legs run a dedicated step asserting that typed refusal, and the refusal's kernel lines go back to the operator as a FLAG before the kernel commit (V-10). |
 | D-17-6-H | The benign control (P1) | The **same probe binary** gains `--benign`: spawn and join one thread (proves `clone3`), print `forbidden-syscall-probe: benign ok`, exit 0 — in **both** copies (`crates/maos-wasm-host/test-fixtures/…`, `crates/maos-escape-detector/test-fixtures/…`). New test `benign_rust_probe_survives_t2_under_same_spec` runs it under the identical spec. `/bin/true` stays as the C control. |
 
@@ -162,16 +162,17 @@ warning-free build are recorded with it (RT-10).
   exec-set grant the `t2_sandbox_kill` CI step reds on `EACCES` (a named panic per AC4, never a skip); run id
   recorded.
 - **AC3 — a Rust program reaches `main`, and the kill filter installs** (`build_seccomp_filters`,
-  `linux.rs:208-347`). (a) **Kill-first**: `Ok(vec![kill_bpf, bpf])` at `:346`; the comments at `:319-322` and
-  `:339-345` rewritten to the real semantics (every installed filter runs; the most restrictive result wins —
-  `KILL_PROCESS` > `ERRNO` > `ALLOW`; the order matters only because installing needs `prctl`/`seccomp`, which the
-  allow-list refuses). (b) Exactly: `rt_sigaction`, `clone3` in `basic_syscalls` (`:214-267`); `poll` in the x86_64
-  `LEGACY_X86_SYSCALLS` row (`:26-28`); on aarch64 the entries T8 measures (D-17-6-G). **No `socket`, `connect`,
-  `memfd_create`, `sendto`, `recvfrom`; no `ppoll` on x86_64.** **Proven red:** (i) the verbatim order reds the CI
-  step (`seccomp apply failed`, a named panic); (ii) dropping `poll` or `rt_sigaction` reds
-  `benign_rust_probe_survives_t2_under_same_spec` with **signal 11**; (iii) dropping `clone3` reds it with
-  **rc 101** (`failed to spawn thread`) [INFERENCE until run — the runner showed rc 101 in CI run #10]; the
-  forbidden probe still dies of `SIGSYS`. Run ids recorded.
+  `linux.rs`). (a) **Kill-first**: `Ok(vec![kill_bpf, bpf])`; every installed filter runs and the most restrictive
+  result wins (`KILL_PROCESS` > `ERRNO` > `ALLOW`). The order matters because installation needs `prctl`/`seccomp`,
+  which the allow-list otherwise refuses. (b) `rt_sigaction`, `clone3` in `basic_syscalls`; `poll` in the x86_64
+  per-arch row; arm-measured `ppoll` on aarch64. The operator-approved 2026-09-28 T8 delta allows
+  **`prctl(PR_GET_AUXV)` only when arg0 is `PR_GET_AUXV`**, needed by ubuntu-26.04's uutils `cat`; unrelated
+  `prctl` operations remain denied. **No `socket`, `connect`, `memfd_create`, `sendto`, `recvfrom`; no `ppoll` on
+  x86_64.** **Proven red:** (i) verbatim filter order causes `seccomp apply failed` and a named panic;
+  (ii) dropping `poll`/`ppoll` or `rt_sigaction` kills the benign Rust probe (signal 11 on x64, 5 on arm);
+  (iii) dropping `clone3` reds it with rc 101 while forbidden `ptrace` still causes SIGSYS;
+  (iv) dropping the conditioned `prctl` rule kills the granted-read control on both 26.04 images.
+  The final T8 run is `36425906424`; 24.04 uses GNU `cat`, so its `prctl` leave-one-out is not a valid red there.
 - **AC4 — the three T2 suites cannot pass by skipping** (`t2_sandbox_kill.rs:32-41`,
   `sandbox_enforcement_linux.rs:19-28`, `maos-escape-detector/tests/common/mod.rs:152-175`). In CI every branch that
   would print `SKIP` panics with the named reason instead; off-CI each helper keeps exactly its current skip set and
@@ -257,6 +258,18 @@ Measured on the lean prototype at `c0a397ea` (`17-6-evidence/lean-prototype.diff
 
 Plus the aarch64 entry T8 measures (≤ +3, RT-6). Not in the kernel figure: `maos-exec-deps` (243, own row), the
 benign probe mode, the helpers, AC6, the CI YAML, the fuzz target, docs.
+
+**Landing reconciliation (2026-09-28):** the table above is the 2026-09-26 lean-prototype
+measurement, not the final grant. Arm `ppoll` adds +2 tokei/+3 physical lines; the operator-approved
+`prctl(PR_GET_AUXV)` rule adds +7/+9. The pre-review landing figure was **19292 tokei (+80)**,
+**25015 `src_lines` (+95)**; `linux.rs` +35, `mod.rs` +4, `runtime.rs` +41, `admission.rs` 0.
+The original pin, `RATIFIED_AT_EASING` and Dev Agent Record record that stage.
+
+**Review grant (operator-ratified 2026-09-28):** matching each opened Landlock exec-set
+rule fd to the inode parsed by the resolver adds +17 tokei/+17 physical lines in
+`linux.rs`. The current pin is **19309 tokei (+97)** and **25032 `src_lines` (+112)**;
+the leaf resolver is **357 tokei**. The 19292/25015 and 233 figures below remain
+historical dev-pass evidence, not the current ceilings.
 
 **Re-pin artifacts — every one in the SAME commit as the kernel lines** (checklist `kernel-core-baseline.toml:728-763`):
 
@@ -397,7 +410,8 @@ must stay clean) · `cargo run -p xtask -- check-fuzz-targets` · `cargo run -p 
 - **Probe build path:** tests read `<fixture>/target/release/forbidden-syscall-probe`; a global `CARGO_TARGET_DIR`
   (`/mnt/build/cargo` here, 17-3a F9) redirects it — build with `env -u CARGO_TARGET_DIR … --target-dir target`.
 - **`BridgeError` stays `Clone + Eq`.**
-- **Kernel lines stop at the ruled figure** (+71, plus the measured aarch64 entry).
+- **Kernel lines stop at the approved landing figure:** +80 tokei / +95 `src_lines`
+  (lean +71/+83, arm-measured `ppoll` +2/+3, operator-approved `prctl(PR_GET_AUXV)` +7/+9).
 - **One commit** for kernel lines + both pins + kloc rows + surface pin (E16-A1 order: class rows → surface pin →
   `src_lines` + HISTORY → `check-service-boundary` + `check-kernel-baseline`).
 
@@ -461,18 +475,18 @@ test re-pins wording. Planted-fault runs are throwaway — commands, diff and ou
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Baseline.** Re-run `check-kernel-baseline` and `kloc-check --json` at the current HEAD; if either
+- [x] **T0 — Baseline.** Re-run `check-kernel-baseline` and `kloc-check --json` at the current HEAD; if either
   moved from the baseline above, re-measure against `lean-prototype.diff` before any kernel commit.
-- [ ] **T1 — AC4 first: the helpers.**
-  - [ ] T1.1 Three helpers per D-17-6-E; docs `:140-151`, `sandbox_enforcement_linux.rs:6-8`, `fuel_t2_matrix.rs:18-21`.
-  - [ ] T1.2 With `CI=true` at HEAD's `linux.rs` the suites PANIC (F1) — capture as the AC4 local red.
-- [ ] **T2 — `maos-exec-deps` (AC2).**
-  - [ ] T2.1 Crate from `lean-prototype.diff`; `Read + Seek` parse entry; workspace member; lock edge.
-  - [ ] T2.2 `tests/`: RT-9 cases (crafted bytes: truncated header, ELF32, big-endian, `phentsize != 56`, strtab
+- [x] **T1 — AC4 first: the helpers.**
+  - [x] T1.1 Three helpers per D-17-6-E; docs `:140-151`, `sandbox_enforcement_linux.rs:6-8`, `fuel_t2_matrix.rs:18-21`.
+  - [x] T1.2 With `CI=true` at HEAD's `linux.rs` the suites PANIC (F1) — capture as the AC4 local red.
+- [x] **T2 — `maos-exec-deps` (AC2).**
+  - [x] T2.1 Crate from `lean-prototype.diff`; `Read + Seek` parse entry; workspace member; lock edge.
+  - [x] T2.2 `tests/`: RT-9 cases (crafted bytes: truncated header, ELF32, big-endian, `phentsize != 56`, strtab
         outside `PT_LOAD`, string past `DT_STRSZ`, unterminated/over-long string, offset overflow, `$ORIGIN`
         runpath, **relative** runpath, missing soname; filesystem: FIFO, directory, `#!` script, symlinked program, PATH-relative,
         static binary, the dynamic probe).
-  - [ ] T2.3 Fuzz target on the house pattern (V-3): `crates/maos-exec-deps/fuzz` (own `[workspace]`, `[[bin]]`,
+  - [x] T2.3 Fuzz target on the house pattern (V-3): `crates/maos-exec-deps/fuzz` (own `[workspace]`, `[[bin]]`,
         `fuzz_targets/<bin>.rs`, `corpus/<bin>/` seeds, committed `Cargo.lock`); a `fuzz-cadence.yml` `fuzz-run-t1` row;
         a `fuzz-build` step (`discipline.yml:2955-2971`) and its summary line (`:4184`); the `TARGETS` row in
         `xtask/src/check_fuzz_targets.rs:31-42` **and** its `green_workspace()` test fixture (`:248-256`); the bin in
@@ -480,42 +494,76 @@ test re-pins wording. Planted-fault runs are throwaway — commands, diff and ou
         hard failure, `:113-117` — consequence stated: the 72 CPU-hour pre-GA floor then applies to this target too);
         `docs/compliance/fuzz-exec-deps-report.md`; `docs/runbooks/fuzz-cadence.md`. xtask lines measured at landing,
         inside the authorized exact raise. `check-fuzz-targets` and `check-fuzz-floor` green.
-- [ ] **T3 — Kernel (AC2, AC3, AC5)** — from `lean-prototype.diff`:
-  - [ ] T3.1 `linux.rs`: exec-set grant; kill-first + comments; `rt_sigaction`, `clone3`, `poll` (x86 row).
-  - [ ] T3.2 `mod.rs`: `child_mut`. `runtime.rs`: `sandbox: SandboxSpec`, `BridgeChild`, `spawn_child`,
+- [x] **T3 — Kernel (AC2, AC3, AC5)** — from `lean-prototype.diff`:
+  - [x] T3.1 `linux.rs`: exec-set grant; kill-first + comments; `rt_sigaction`, `clone3`, `poll` (x86 row).
+  - [x] T3.2 `mod.rs`: `child_mut`. `runtime.rs`: `sandbox: SandboxSpec`, `BridgeChild`, `spawn_child`,
         `SandboxRefused`; restore every comment. `admission.rs`: `!= T3`.
-  - [ ] T3.3 Migrate the five `BridgeSpawnSpec` sites; typed Liveness text (`worker_spawn.rs:635-642`).
-  - [ ] T3.4 Rewrite the false docs listed in AC5.
-- [ ] **T4 — Fixtures + suites (AC1, AC3, AC5).**
-  - [ ] T4.1 `forbidden-syscall-probe --benign` (thread spawn+join) in both copies; `benign_rust_probe_survives_t2_under_same_spec`.
-  - [ ] T4.2 `granted_fs_…` asserts the file in the child's stderr; every assertion prints `ExitStatus`.
-  - [ ] T4.3 `crates/maos-kernel-core/tests/bridge_t2_route_17_6.rs` (`#![cfg(target_os = "linux")]`; T0–T4 table; the
+  - [x] T3.3 Migrate the five `BridgeSpawnSpec` sites; typed Liveness text (`worker_spawn.rs:635-642`).
+  - [x] T3.4 Rewrite the false docs listed in AC5.
+- [x] **T4 — Fixtures + suites (AC1, AC3, AC5).**
+  - [x] T4.1 `forbidden-syscall-probe --benign` (thread spawn+join) in both copies; `benign_rust_probe_survives_t2_under_same_spec`.
+  - [x] T4.2 `granted_fs_…` asserts the file in the child's stderr; every assertion prints `ExitStatus`.
+  - [x] T4.3 `crates/maos-kernel-core/tests/bridge_t2_route_17_6.rs` (`#![cfg(target_os = "linux")]`; T0–T4 table; the
         wasm-host probe path, asserted to exist; D-17-6-E's CI rule on a refused T2 row); T4 row in
         `admission_tier_grant_gate`.
-  - [ ] T4.4 Local: `t2_sandbox_kill`, `sandbox_enforcement_linux`, `maos-escape-detector`, the new bridge test —
+  - [x] T4.4 Local: `t2_sandbox_kill`, `sandbox_enforcement_linux`, `maos-escape-detector`, the new bridge test —
         zero `SKIP`; paste output.
-- [ ] **T5 — AC6.** `AdmissionRefusal` variant + gate-6 check + doc; SDK refusal; nine manifests → `T0` + two
+- [x] **T5 — AC6.** `AdmissionRefusal` variant + gate-6 check + doc; SDK refusal; nine manifests → `T0` + two
   comments; eight `spirit_smoke` pins; kernel test doc; `smoke-spirit` → explicit `T0` (`main.rs:6785-6788`); the cookbook's
   `[sandbox]` + `[resources]` lines in both blocks, en + ko (RT-8 — nothing else in the blocks) + the extraction test
   `crates/maos-manifest/tests/cookbook_sections_17_6.rs`; `KO_COVERAGE_MIN=100 npm run gate:ko-coverage` +
   `npm run gate:glossary-lock` (in `docs-site/`); proven reds.
-- [ ] **T6 — CI (AC1, AC4).** `wasm-host-tests` → four-image matrix; exit-line-3 step with `--nocapture` and
+- [x] **T6 — CI (AC1, AC4).** `wasm-host-tests` → four-image matrix; exit-line-3 step with `--nocapture` and
   per-test annotations; build both probe copies, then `cargo test --locked -p maos-kernel-core --test
   sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture` and `cargo test --locked -p
   maos-escape-detector -- --nocapture` (V-11); delete `:2912-2913`; keep `timeout-minutes`.
-- [ ] **T7 — deferred-work + routing.** Confirm the R17-49 row (cookbook form lesson → 17-3b) is present.
-- [ ] **T8 — CI proofs (throwaway branch, 17-3a recipe; AUTHORIZED by the operator 2026-09-27).** (a) Arm leave-one-out on `ubuntu-24.04-arm` +
+- [x] **T7 — deferred-work + routing.** Confirm the R17-49 row (cookbook form lesson → 17-3b) is present.
+- [x] **T8 — CI proofs (throwaway branch, 17-3a recipe; AUTHORIZED by the operator 2026-09-27).** (a) Arm leave-one-out on `ubuntu-24.04-arm` +
   `ubuntu-26.04-arm` → the aarch64 entries (or the typed aarch64 refusal); (b) planted reds: verbatim order, no
   exec-set grant, drop `poll`, drop `rt_sigaction`, drop `clone3`, delete the bridge T2 arm — diff + warning-free build
   + run id each; if (a) fails, apply D-17-6-G's fallback and tell the operator before the kernel commit;
   (c) record captures; delete the branch.
-- [ ] **T9 — Re-pin + budgets (same commit as the kernel lines).** §Kernel grant 1–10; all commands green.
-- [ ] **T10 — Epic OLD→NEW + tracker (rule 9).** Apply §Epic OLD→NEW to the 17-6 section; tracker row `17-6` →
+- [x] **T9 — Re-pin + budgets (same commit as the kernel lines).** §Kernel grant 1–10; all commands green.
+- [x] **T10 — Epic OLD→NEW + tracker (rule 9).** Apply §Epic OLD→NEW to the 17-6 section; tracker row `17-6` →
   `review` with measured figures; note the E16-A2 half closed.
-- [ ] **T11 — Full gates.** `cargo fmt --all`, `cargo clippy --workspace --all-targets --locked`,
+- [x] **T11 — Full gates.** `cargo fmt --all`, `cargo clippy --workspace --all-targets --locked`,
   `cargo test --workspace --locked --no-fail-fast`, `check-escape-detector --json`, `check-dependency-closure`,
   `error-catalog-check`, `check-workspace-count`, `stability-matrix --check`, `check-fuzz-targets`, `check-fuzz-floor`,
   `templates-regen --check`.
+- [x] **T12 — Clear the three named-prerequisite reds from the workspace run.** *(ADDED 2026-09-28 at the operator's
+  request after T11. It is outside the original AC set, and reviewers should check it as its own change.)*
+  T11's run failed 10 tests in three suites that E16-A2 lists as host-environment gaps.
+  - [x] T12.1 `equiv_harness` (3): **code defect, fixed at origin.** `ensure_native_twin_binary` built the native twin
+        on demand but ignored a global `CARGO_TARGET_DIR`, so the binary landed outside the directory it probes. The
+        build now passes `--target-dir <twin_dir>/target`.
+  - [x] T12.2 `abi_diff_integration` (5): **provisioning, no repo change.** Install `cargo-public-api` 0.51.0 (the
+        `CARGO_PUBLIC_API_VERSION` CI pins).
+  - [x] T12.3 `two_host_reconcile_2c` (2): **provisioning, no repo change.** Put a Python Ed25519 backend
+        (`cryptography`) on `PATH`, as `workspace-test-suite` does (`discipline.yml:3989`).
+  - [x] T12.4 Re-run the whole workspace: 0 failed.
+
+### Review Findings
+
+- [x] [Review][Patch] Refuse directory or non-ELF `PT_INTERP` before granting Landlock rights: a symlink to `/` can bind a root-wide rule, then be retargeted to a real loader before `execve`. [crates/maos-exec-deps/src/lib.rs:74]
+- [x] [Review][Patch] Bound hostile ELF dynamic-entry, dependency and transitive-resolution work in the unsandboxed parent; repeated `DT_NEEDED` entries grow allocations and filesystem lookups without a limit. [crates/maos-exec-deps/src/lib.rs:195]
+- [x] [Review][Patch] Refuse non-regular paths before opening them for ELF parsing; an attacker-controlled RUNPATH can cause the unsandboxed daemon to open side-effectful character devices. [crates/maos-exec-deps/src/lib.rs:145]
+- [x] [Review][Patch] Carry inherited `DT_RPATH` into transitive dependency resolution; an executable whose library's dependency lives in its RPATH is refused even though the loader can start it. [crates/maos-exec-deps/src/lib.rs:79]
+- [x] [Review][Patch] Print the classified T2 violation and the named-file `Permission denied` stderr in AC1's public CI verdicts, not only the exit status. [crates/maos-wasm-host/tests/t2_sandbox_kill.rs:81]
+- [x] [Review][Patch] Test the `prctl(PR_GET_AUXV)` argument constraint directly under T2: the current plant is uncaught on both 24.04 images, and no test detects an unconditional `prctl` grant. [crates/maos-kernel-core/src/security/sandbox/linux.rs:309]
+- [x] [Review][Patch] Make the relative-PATH fixture contain a matching executable so deleting the absolute-directory filter actually reds the resolver test. [crates/maos-exec-deps/tests/resolver_17_6.rs:400]
+- [x] [Review][Patch] Test the defaulted-T2 admission refusal with a `rust-inproc` `[sandbox]` lacking a tier key, not just an explicit `tier = "T2"`. [crates/maos-bin/src/admission.rs:466]
+- [x] [Review][Patch] Rebuild or version-check the release probe before the new `--benign` test; a pre-existing executable ignores that mode and creates a false local SIGSYS failure. [crates/maos-wasm-host/tests/t2_sandbox_kill.rs:66]
+- [x] [Review][Patch] Reconcile AC3 and the story's kernel grant/frontmatter with the operator-approved `prctl(PR_GET_AUXV)` addition and the measured +80/+95 kernel pin. [_bmad-output/implementation-artifacts/17-6-t2-sandbox-repair-and-proven-red.md:164]
+
+Review integration FLAG (operator-ratified 2026-09-28): guarding only `PT_INTERP`
+at parse time left a path-swap race before `PathFd::new` attached the Landlock
+rule. The repair compares each opened rule fd's regular-file device/inode with
+the inode parsed by the resolver. The kernel grew **+17 physical / +17 tokei**
+over the dev-pass figure, to 25032 `src_lines` (+112 from 24920) and 19309
+tokei (+97 from 19212); both kernel pins and `RATIFIED_AT_EASING` moved together.
+The leaf now measures 357 tokei (233 before review). Local resolver, sandbox,
+bridge, admission, kernel-pin and ceiling tests passed; four-image review-patch
+annotations require a new CI run (the recorded run predates this review).
 
 ## Epic OLD→NEW edits
 
@@ -536,9 +584,9 @@ Anchors are measured against the epic **as committed with this story** (after §
 | `:24` exit line 3 (command + comment) | *created by 17-6 AC1 … a refused spawn FAILS — there is no skip path*; no `--locked` | `cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture` (identical to the CI step); *run by `wasm-host-tests` (four-image matrix) from 17-6; a refused spawn FAILS in CI (rule 11(b)); off-CI it prints `SKIP`; `epic-17-exit` (17-1 AC1) carries it verbatim* |
 | `:31` provenance line 3 | *runs it without `--nocapture`* | the 17-6 step + run ids |
 | `:33` runner images | two images | four for T2 jobs (R17-50) |
-| `:38` Kernel-Δ, 17-6 sentence | *measured by a prototype at story creation* | +71 tokei / +83 `src_lines` across 4 files + the measured aarch64 entry; `maos-exec-deps` 243 |
+| `:38` Kernel-Δ, 17-6 sentence | *measured by a prototype at story creation* | lean +71/+83 plus measured aarch64 `ppoll` and approved `prctl(PR_GET_AUXV)` = final +80/+95 across 4 kernel files; `maos-exec-deps` measured at landing |
 | `:64` stories-table row (17-6) | *Q4b count + AC5 prototype count* | the ruled figure |
-| `:161` 17-6 *Closes · Δ* | *the exact count 17-3a Q4b measures … plus AC5's production-path lines in … admission* | +71 / +83 across 4 files + the measured aarch64 entry (E16-A7, RT-3) |
+| `:161` 17-6 *Closes · Δ* | *the exact count 17-3a Q4b measures … plus AC5's production-path lines in … admission* | final +80/+95 across 4 files (E16-A7, RT-3, T8 approved delta) |
 | `:163` 17-6 *Sequence* | *before 17-2 … and 17-3b (its runner runs under T2)* | before 17-2 and **17-3c** (its runner runs under T2); 17-3b runs in parallel (R17-51) |
 | `:165` AC1 | skip labels | fn names + the Rust benign control; four images (or D-17-6-G's x64 fallback) |
 | `:166` AC2 | *whichever Q4b layer 1 selects* | dynamic, resolved by `maos-exec-deps` |
@@ -548,11 +596,106 @@ Anchors are measured against the epic **as committed with this story** (after §
 | `:170` AC6 | *gate 5's `class_section.forms` (`:448`)*; *counted at story creation* | gate 4 binding; 1 inline + 8 `spirit_smoke` pins; the cookbook blocks' `[sandbox]` and `[resources]` parse (RT-8) — the rest of the blocks → 17-3b (R17-49) |
 | `:141`, `:213`, `epic-18…:32`, `epic-20…:45` | `24920` | the new pin |
 
+## 결과와 후속 작업 (쉬운 설명, 2026-09-28)
+
+### 무엇을 만들었나
+
+이전에는 제한된 실행 환경(T2)이 프로그램을 시작하지 못했고, 관련 시험 세 개는
+실행 거부를 건너뛰면서 성공으로 표시할 수 있었다. 이제 실행 전에 프로그램,
+실행을 돕는 로더, 필요한 라이브러리를 찾는다. 프로그램·로더에는 읽기와
+실행, 라이브러리에는 읽기 권한만 주고, 금지된 시스템 호출은 실제로
+종료시킨다. 실행 경로는 선언한 격리 설정을 그대로 적용한다. 프로세스
+격리가 없는 `rust-inproc`은 T2라고 주장할 수 없다.
+경로가 검사 후 바뀌어도 실제로 권한을 줄 파일이 검사한 파일과
+같은지 확인하고, 손상된 실행 파일을 읽는 작업량에도 상한을 뒀다.
+
+### 다음 이야기와 에픽에 미치는 영향
+
+- **Epic 17 / 17-1 → 17-2:** 17-2는 이제 실제 T2 자식 프로세스로 자원 제한을
+  확인할 수 있다. 다만 Worker의 프로세스 구성을 정하는 **17-1이 17-2보다
+  먼저**다. 17-1의 T3 Worker 격리를 이번 T2 성공으로 대신 증명해서는 안 된다.
+- **Epic 17 / 17-3b → 17-3c → 17-3d:** 17-3b는 WASM 형식·계약을
+  준비한다. 17-3c는 이번에 마련한 T2 실행 경로에 실제 WASM Spirit을
+  연결하고, `maos run`을 통한 종료·감사 기록을 입증해야 한다. 17-3d는 그
+  뒤에 로그 회상용 파일 설명자 전달을 맡는다. **이번 이야기에는 실제
+  서비스에서 실행되는 T2 WASM Spirit이 아직 없다.**
+- **Epic 18·19·20:** 18-1 전에는 별도 이야기 17-5가 오래된 모델 지정을
+  정리해야 한다. 19-3의 Worker 운영 검증에는 17-1이 필요하다. 20-1이
+  필요로 하는 공개 WASM 형식·입장 규칙은 17-3b의 몫이며, 모든 시험의
+  건너뛰기 문제는 20-3a가 다룬다. 이 이야기만으로 해당 에픽들의 완료
+  조건이 충족되는 것은 아니다.
+
+### 잘한 점
+
+- 실제 자식 프로세스에서 허용된 읽기와 금지된 읽기, 정상 종료와
+  `SIGSYS` 종료를 각각 관찰했다. 개발 단계의 CI 기록 `36425906424`에는
+  네 운영 이미지의 결과가 있으며, 검토 수정 후 로컬에서는 resolver 19개,
+  T2 5개, bridge 4개, 기본 T2 입장 거부 1개가 통과했다.
+- 파일 권한을 디렉터리 전체로 넓히지 않고 검사한 파일의 식별자까지
+  대조했다. 추가 커널 코드 17줄은 운영자 승인을 받은 뒤 핀과 예산에
+  함께 반영했다. 공개 커널 API는 바뀌지 않았다.
+
+### 더 잘할 수 있었던 점
+
+- 처음부터 로더 이름 검증뿐 아니라 **검사와 권한 부여 사이의 경로 교체**를
+  시험 설계에 넣었으면 재작업과 별도 커널 승인을 줄일 수 있었다. 17-1과
+  17-3c는 경로·설정의 검사 시점과 사용 시점이 다른 곳을 설계 검토 때 찾는다.
+- 상대 경로 시험은 실제로 선택될 후보가 있어야 하고, 시험용 실행 파일은
+  빌드 결과가 최신인지 확인해야 한다. 다음 이야기에서는 회귀 시험마다
+  「고장난 구현이면 이 시험이 실패하는가」를 먼저 점검한다.
+
+### 잘못됐던 점과 다음 개선
+
+- 기존 T2 시험은 실행 실패를 **통과로 잘못 표시**했고, 필터 설치 순서
+  때문에 실제 보호도 적용되지 않았다. 현재 이름 붙은 세 시험은 CI에서
+  건너뛰기를 실패로 취급하지만, **다른 시험 전체**의 같은 문제는
+  20-3a에서 따로 막아야 한다.
+- 첫 검토본은 루트 디렉터리로 바뀔 수 있는 로더 경로, 특수 장치 열기,
+  제한 없는 의존성 탐색, 부모 실행 파일의 검색 경로 누락을 놓쳤다.
+  이번에는 검사한 파일과 권한을 줄 파일을 묶고 작업량을 제한했다.
+  17-3c의 실행 파일·아티팩트 처리에서도 같은 공격자 입력 검토를 반복한다.
+- 개발 단계의 네 이미지 CI 기록은 **검토 수정 이전**의 결과다. 검토 뒤
+  로컬 시험과 예산·커널 경계 검사는 통과했지만, 수정된 공개 알림을 네
+  이미지에서 다시 관찰한 기록은 없다. 다음 CI 실행에서 분류된 T2 위반과
+  거부된 파일 이름을 이미지별 공개 알림으로 확인하고 기록한다. 검토 후
+  전체 작업공간 시험도 다시 실행했다고 주장하지 않는다.
+
+### 다음 추천
+
+**Epic 17의 `17-1-worker-egress-allowlist-and-scoped-credential`**부터 진행한다.
+선행 17-3a는 완료됐고, 17-1은 Worker의 T3 격리·송신 규칙·자격 증명
+경로를 정해 17-2의 자원 제한 작업을 열어 준다. 17-3b는 이 경로와
+독립적으로 병행 가능하지만, 17-2를 바로 시작하면 17-1의 미정 프로세스
+구성에 의존하게 된다. 시작 시 커널 기준 **25032줄 / 19309 tokei**를
+다시 측정하고, T3를 실제 실행으로 증명하며, 새 T2 공개 알림도 확인한다.
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
+anthropic/claude-opus-5-5 (`opus-5` family), the orchestrator. It owned the kernel lines, the helpers, the suites,
+the CI job, T8, the re-pin and every record, and ran two parallel sub-agents on the same model: `ExecDepsTestsAndFuzz`
+(T2.2 resolver tests, T2.3 fuzz target + wiring) and `Ac6InprocTierRefusal` (T5). Both results were reviewed and
+re-run by the orchestrator; one sub-agent edit was revised (the `AdmissionRefusal` doc, cut to two lines, restored to
+an explanatory doc).
+
 ### Debug Log References
+
+All in `_bmad-output/implementation-artifacts/17-6-evidence/`:
+
+- `t1-ac4-local-red.log`: T1.2. At HEAD's `linux.rs`, off CI prints byte-identical `SKIP` lines (rc 0). With `CI=true`,
+  all three suites fail with the named rule-11(b) panic (rc 101): wasm-host 0/3, kernel 2/4, escape-detector red.
+- `t8-local-plants.log`: the local plants. Each entry has its diff and a build with no new warnings in the planted
+  file: verbatim order, no exec-set grant, drop `poll`, drop `rt_sigaction`, drop `clone3`, T2 routed bare at the
+  bridge, cli_wrapper floor back to `< T3`. Every plant is red.
+- `t8-ci-run1-annotations.log`: run **36319846823**, 4 images, 6 plants each. 24.04 and 24.04-arm are all green. 26.04
+  and 26.04-arm are red on the granted `cat`; that finding is described below.
+- `t8-ci-run2-annotations.log`: run **36320219812**, the 26.04 diagnosis (image facts + strace).
+- `t8-ci-run3-annotations.log`: run **36425906424** (FINAL), 4 images, 7 plants. The workflow and the plant harness
+  are kept as `t8-run{1,2,3}-workflow.yml.txt` and `t8-plants.py.txt`. Branch `t8-17-6` was deleted after capture.
+- `t4-final-local-green.log`: the final local run with `CI=true`. Zero `SKIP`; `SIGSYS` (31) on `ptrace`; the bridge
+  table T0 `Exited{0}` / T1 refused / **T2 `Signaled{31}`** / T3 `Exited{0}` / T4 refused; escape-detector
+  `ESCAPE-*-MEASURED` ×3; `maos-exec-deps` 13/13.
 
 ### Completion Notes List
 
@@ -560,5 +703,241 @@ Anchors are measured against the epic **as committed with this story** (after §
 - Preflight round-table 2026-09-26: RT-1…RT-10 applied; kernel figure re-measured on the lean prototype (+71).
 - Operator confirmed 2026-09-26: kernel grant RATIFIED; ADR-060 §D-C amendment RATIFIED and written into the ADR.
 - Validation round 2026-09-27 (two fresh non-author readers): 5 ship-blockers, 13 should-fixes, 5 nits — all applied; T8 CI runs authorized by the operator.
+- **Review patch batch 2026-09-28 (operator-ratified kernel FLAG):** `PT_INTERP` must
+  be absolute, non-root and a regular ELF, and the resolver holds an O_PATH
+  inode before opening any bytes. The sandbox compares the inode behind every
+  opened exec-set Landlock rule with the inode parsed before attachment; a
+  directory or wrong-file path swap refuses the spawn instead of granting an
+  unrelated tree/file. Bounded dynamic tables, sonames, transitive lookups and
+  inherited RPATH close unsandboxed parser work and valid transitive loads.
+  Kernel 19292 → **19309** tokei and 25015 → **25032** physical (both +17);
+  leaf 233 → **357** tokei; aggregate **168381**. Four-image CI annotations
+  for the patched probe/CI output have not yet been observed (prior run
+  36425906424 covers the dev pass only).
+- **Dev pass 2026-09-27/28, landing figures.**
+  - Kernel: **+80 tokei, 19212 → 19292**, and **`src_lines` 24920 → 25015 (+95)**. Per file: `linux.rs` +35,
+    `mod.rs` +4, `runtime.rs` +41, `admission.rs` 0. The operator ruled +71/+83. The remainder is two measured
+    additions.
+    - (a) The aarch64 `ppoll` row, +2/+3, within RT-6's ≤ +3. Measured by arm leave-one-out: dropping it kills the
+      Rust benign probe with SIGTRAP (5) on both arm images.
+    - (b) **A grant delta the operator approved on 2026-09-28 (FLAG-Winston):** `prctl` is allowed only when
+      `arg0 == PR_GET_AUXV` (a seccomp argument condition), +7/+9. This was a T8 finding.
+  - How (b) was found: on `ubuntu-26.04` and `26.04-arm` (kernel 7.0), `/bin/cat` is uutils rust-coreutils 0.8.0. It
+    calls `prctl(PR_GET_AUXV)` (EPERM), then opens `/proc/self/auxv` (Landlock EACCES), and rustix panics. That killed
+    the granted-read half of the fs test with SIGSEGV on x64 and SIGTRAP on arm (run 2 strace). It is not needed on
+    24.04 (GNU cat 9.4).
+  - Proven red: dropping the prctl rule reds the 26.04 images and is green on 24.04. That plant has nothing to catch
+    on 24.04, which is why the two 24.04 jobs of run 3 read `failure` (plant-harness semantics). Every other plant is
+    red there.
+  - `maos-exec-deps` = **233** (lean 243, minus V-7's refusal rework and a chunked bounded string read).
+  - `maos-bin` 23401 → **23423** (+22). `xtask` 44101 → **44123** (+22: fuzz wiring +19,
+    `check_skill_conformance` +3). Both raises cite `17-6`.
+  - `maos-bench` 1534, `maos-wasm-host` 1062, `maos-escape-detector` 284 (the probe fixtures count) and
+    `maos-spirit-sdk` 846 all sit under their ceilings.
+  - Aggregate: **168196**, `kloc-check` passed.
+- **AC1** (run 36425906424, all four images, exit line 3 verbatim with `--locked`):
+  - `forbidden_syscall_killed_by_t2_with_sigsys` shows `signal: 31 (SIGSYS)`.
+  - `benign_process_survives_t2_under_same_spec` and `benign_rust_probe_survives_t2_under_same_spec` exit 0.
+  - Granted `cat` exits 0; ungranted `cat` exits 1. Its stderr names the file with `Permission denied`, which the test
+    asserts.
+  - Zero `SKIP`; 4/4 on every image.
+- **AC2:** the exec set is resolved parent-side by `maos_exec_deps::resolve`. Program and loader get
+  `Execute|ReadFile`; libraries get `ReadFile`.
+  - Refusals: relative or empty RUNPATH/RPATH entries (V-7), `$` substitution, `DT_NEEDED` with `/`, relative PATH
+    entries (skipped), non-regular files (read with O_NONBLOCK), and non-ELF64-LE input.
+  - The `Read + Seek` entry point is `parse_elf`.
+  - Resolver tests pass 13/13, covering every RT-9 case.
+  - The fuzz target `fuzz_exec_deps_parse_elf` built with `cargo +nightly fuzz` and ran twice: 16.1 M execs in 61 s and
+    8.8 M execs in 46 s. No crash.
+  - Proven red by the `no-exec-set-grant` plant: the CI step fails with the rule-11(b) panic and EACCES
+    (`os error 13`) on every image.
+- **AC3:**
+  - Kill-first `vec![kill_bpf, bpf]`, with the comments rewritten.
+  - Allow-list additions: `rt_sigaction`, `clone3`, `poll` (x86_64 row), `ppoll` (aarch64 row) and
+    `prctl(PR_GET_AUXV)`. The per-arch const is renamed `ARCH_SYSCALLS`, since it now carries an aarch64 row.
+  - Proven red on all four images:
+    - verbatim order: `seccomp apply failed`, then the named panic;
+    - drop `poll`/`ppoll` and `rt_sigaction`: signal 11 on x64, signal 5 on arm. AC3 predicted signal 11; that holds
+      on x64 only.
+    - drop `clone3`: rc 101 (the [INFERENCE] is now measured), with the forbidden probe still dying of SIGSYS.
+- **AC4:**
+  - The three helpers panic under `CI`/`GITHUB_ACTIONS`. Off CI their skip sets and `SKIP` text are byte-identical.
+  - Docs rewritten: `sandbox_enforcement_linux.rs:6-8`, the escape-detector helper doc, `fuel_t2_matrix.rs:18-21`,
+    and `check_escape_detector.rs` `:44-46` / `:105-107` (docs only, line-neutral).
+  - `wasm-host-tests` is a four-image matrix with the exit-line-3 step (`--nocapture`, one annotation per test), plus
+    the kernel, bridge and escape-detector steps (V-11). The *self-skips* comment is gone.
+  - `check-escape-detector --json`: every leg `substrate_present: true`, green.
+- **AC5:**
+  - `BridgeSpawnSpec.sandbox: SandboxSpec` with a private `BridgeChild`, `spawn_child` and `SandboxRefused`. The T2
+    arm is `cfg(target_os = "linux")`; elsewhere T2 falls to the typed refusal.
+  - All five construction sites migrated. `worker_spawn.rs` builds the spec from `granted_tier` and raises the typed
+    `ECliWrapperRequiresT3` on the Liveness path.
+  - The cli_wrapper floor is `!= T3`, with a `T4`-under-a-T4-grant row in `admission_tier_grant_gate`. The plant
+    `< T3` makes that row red: `Ok(SandboxTier(4))`.
+  - False docs rewritten: `runtime.rs`, `maos-host`, `maos-wasm-host`, `escape_detector_consumer.rs`,
+    `producer_wired_e2e.rs`, `i9.rs:79/:85`, and the kernel `admission.rs` doc bullet.
+  - `bridge_t2_route_17_6.rs` passes 4/4 on the four images. The route-bare plant makes the T2 row `Exited{0}`
+    everywhere.
+- **AC6** (sub-agent, re-run by the orchestrator):
+  - `AdmissionRefusal::RustInprocRequiresT0` (`rust_inproc_requires_t0`) at gate 6; a defaulted T2 is refused too.
+  - The SDK refuses with `InvalidValue { field: "sandbox.tier" }`.
+  - Nine manifests are relabelled `T0` and their two comments rewritten; the 8 `spirit_smoke` pins are flipped.
+  - smoke-spirit uses an explicit `T0`, and the kernel test doc is reworded.
+  - Cookbook: `[sandbox]` and `[resources]` updated, en + ko. `cookbook_sections_17_6.rs` passes. `gate:ko-coverage`
+    reads 38/38 and `gate:glossary-lock` passes.
+  - Proven reds, recorded in the sub-agent report:
+    - `maos run` prints `rust-inproc requires sandbox tier T0, got T2`.
+    - `maosctl load` returns `rust_inproc_requires_t0 … (HTTP 400)`; this now has a permanent row in
+      `maosctl_load_16_6.rs`.
+    - The SDK returns `InvalidValue{sandbox.tier, T2}`.
+    - Restoring `max_memory_mb` fails with ``unknown field `max_memory_mb` ``.
+  - Obligation (j) bypass tiers: shell hello-spirit T0 (embedded manifest), smoke-spirit explicit T0, hello-spirit
+    boot T0, daemon control Spirit (its first-party manifests, now T0), smoke-abi T0.
+- **Surface pin (E16-A1):**
+  - Class rows added for `runtime::{BridgeSpawnSpec, BridgeError, SpawnedBridge}` (`supervision`).
+  - Exactly three rows re-hash in `kernel-surface-v0.1-beta.json`, 379 rows before and after:
+    - `BridgeError`: `13553a93…` → `a9317d2c…` (+ variant);
+    - `BridgeSpawnSpec`: `542acf62…` → `f7abd467…` (+ pub field);
+    - `SpawnedBridge`: `7fdd42b5…` → `57c22dc9…` (private-field reshape).
+  - `check-service-boundary` passes with 0 violations.
+- **Re-pin (one commit):**
+  - `kernel-core-baseline.toml:505` = 25015, still on line 505. `set_hash` `cdd49863…` and the four digests.
+  - HISTORY row below `:505`.
+  - `kloc.toml` kernel row 19292, with the stale `24796 -> 24918` corrected to `24923`. `RATIFIED_AT_EASING = 19_292`.
+  - The four `24920` literals → 25015.
+  - Workspace 55 → 56: `4-kernel-design.md:117` and `STABILITY.md` regenerated.
+  - Prose pins: epic-17 `:141`/`:213`, epic-18 `:32`, epic-20 `:45`.
+- **Test repaired, not re-pinned:** `kernel_pin_content_hash_16_0.rs::a_line_neutral_kernel_edit_reds_the_gate…` used
+  the LIVE `linux.rs` as the falsifier's "after" side. Growing `linux.rs` (396 → 435) broke its line-neutral premise.
+  The vector now rebuilds BOTH sides from git (`kernel-pin-falsifier-15-4^` vs the tag), so it keeps proving the
+  hash-only red whatever the live file's size.
+- **T11 gates, local:**
+  - `cargo fmt --all --check` passes. `cargo clippy --workspace --all-targets --locked` rc 0, and the one new lint
+    (`unbuffered_bytes` in `maos-exec-deps`) is fixed.
+  - All pass: `check-kernel-baseline` (25015 / 98), `check-service-boundary` (0), `check-dependency-closure`,
+    `check-fuzz-targets`, `check-fuzz-floor` (advisory bootstrap), `check-workspace-count` (56), `stability-matrix
+    --check`, `error-catalog-check` (47/47), `templates-regen --check`, `check-epic-close-coherence` (21 epics at
+    25015), `check-exit-commands`, `check-escape-detector` (all legs green, substrate present), `kloc-check`
+    (aggregate 168196).
+  - `cargo test --workspace --locked --no-fail-fast`: **4508 passed / 10 failed / 121 ignored**. All 10 failures are
+    the pre-existing host-environment gaps E16-A2 already lists, with the same messages:
+    - `abi_diff_integration` (5): `no such command: public-api`;
+    - `equiv_harness` (3): the native twin is not built under the global `CARGO_TARGET_DIR`;
+    - `two_host_reconcile_2c` (2): no Python Ed25519.
+  - `t2_sandbox_kill`, the fourth suite on that list, is now green.
+- **T12 (ADDED 2026-09-28, operator request — review it as its own change).** The 10 environment-gap failures from
+  T11 are cleared (`17-6-evidence/t12-prereq-suites.log`).
+  - `equiv_harness` had a **real test-harness defect**, not a missing tool. Its on-demand
+    `cargo build --release --manifest-path native-twin/Cargo.toml` honoured the global
+    `CARGO_TARGET_DIR=/mnt/build/cargo`, so the binary landed in `/mnt/build/cargo/release/` while the harness asserts
+    `native-twin/target/release/`. This is the same trap as 17-3a F9.
+    - Fix: `.args(["--target-dir", &target_dir])` at `crates/maos-wasm-host/tests/equiv_harness.rs`
+      `ensure_native_twin_binary` (uncharged test code).
+    - Before: 3/20 failed with ``on-demand build reported success but did not produce …``. After: 20/20.
+    - CI never saw it because CI sets no `CARGO_TARGET_DIR` and pre-builds the twin.
+  - `abi_diff_integration` and `two_host_reconcile_2c` have **no repo defect**. Both already fail loud with a named
+    prerequisite, and CI installs both. They went green once the dev host was provisioned the way
+    `workspace-test-suite` provisions CI:
+    - `cargo install cargo-public-api --version 0.51.0 --locked` → 5/5;
+    - Python `cryptography` 50.0.1 in a venv (`~/.venvs/maos-test`), because PEP 668 refuses CI's
+      `pip install --user` on this host, with the venv first on `PATH` → 10/10.
+  - Full `cargo test --workspace --locked --no-fail-fast` with the venv on `PATH`: **4518 passed / 0 failed / 121
+    ignored, 553 binaries, rc 0.**
+  - Rule 10: `20-3a-gate-honesty` keeps the *class* (how an unprovisioned host reports these suites). T12 fixes one
+    instance at origin and changes no gate or skip semantics.
+- Epic OLD→NEW applied (every row in §Epic OLD→NEW edits, figures at landing). The R17-49 row
+  (`deferred-work.md:1050`, owner 17-3b) is present.
+- **For review:**
+  - Obligations (a)–(n) are for the non-author net.
+  - (f) is answered: `/bin/sh` is dash on all four images; `/bin/cat` is GNU on 24.04 and uutils on 26.04, which is
+    what produced the prctl grant delta.
+  - Seen, not fixed: `examples/example-spirit/Cargo.toml` omits the SDK `spirit_test` feature, so
+    `cargo test -p example-spirit` alone fails E0432. This predates 17-6 and is outside its scope.
 
 ### File List
+
+- `.github/workflows/discipline.yml`: `wasm-host-tests` becomes the four-image matrix with T2 steps; `fuzz-build` step
+  and summary rows.
+- `.github/workflows/fuzz-cadence.yml`
+- `Cargo.toml`, `Cargo.lock`
+- `STABILITY.md`
+- `_bmad-output/implementation-artifacts/17-6-t2-sandbox-repair-and-proven-red.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/17-6-evidence/{t1-ac4-local-red.log, t8-local-plants.log,
+  t8-ci-run1-annotations.log, t8-ci-run2-annotations.log, t8-ci-run3-annotations.log, t4-final-local-green.log,
+  t8-plants.py.txt, t8-run1-workflow.yml.txt, t8-run2-workflow.yml.txt, t8-run3-workflow.yml.txt,
+  t12-prereq-suites.log}` (new)
+- `_bmad-output/planning-artifacts/architecture-maos-minimal-opus/4-kernel-design.md`
+- `_bmad-output/planning-artifacts/epics/epic-17-workers-and-third-party-form-w2.md`
+- `_bmad-output/planning-artifacts/epics/epic-18-spirits-that-think-w3.md`
+- `_bmad-output/planning-artifacts/epics/epic-20-ship-it-w5.md`
+- `crates/maos-exec-deps/{Cargo.toml, src/lib.rs, tests/resolver_17_6.rs}` (new)
+- `crates/maos-exec-deps/fuzz/{Cargo.toml, Cargo.lock, fuzz_targets/fuzz_exec_deps_parse_elf.rs,
+  corpus/fuzz_exec_deps_parse_elf/{truncated-elf, static-elf64, dynamic-runpath-elf64}}` (new)
+- `crates/maos-kernel-core/Cargo.toml`
+- `crates/maos-kernel-core/src/security/sandbox/linux.rs`
+- `crates/maos-kernel-core/src/security/sandbox/mod.rs`
+- `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+- `crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs`
+- `crates/maos-kernel-core/tests/bridge_t2_route_17_6.rs` (new)
+- `crates/maos-kernel-core/tests/cli_wrapper_bridge_8_12.rs`
+- `crates/maos-kernel-core/tests/sandbox_enforcement_linux.rs`
+- `crates/maos-kernel-core/tests/operator_posture_ceiling_16_6.rs`
+- `crates/maos-bench/src/harness/j1.rs`
+- `crates/maos-bin/src/{admission.rs, main.rs, worker_spawn.rs, escape_detector_consumer.rs}`
+- `crates/maos-bin/tests/maosctl_load_16_6.rs`
+- `crates/maos-domain/src/invariants/i9.rs`
+- `crates/maos-host/src/lib.rs`
+- `crates/maos-wasm-host/src/lib.rs`
+- `crates/maos-wasm-host/tests/{t2_sandbox_kill.rs, fuel_t2_matrix.rs}`
+- `crates/maos-wasm-host/tests/equiv_harness.rs`: T12.1, the `--target-dir` fix for the on-demand native-twin build
+- `crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/src/main.rs`
+- `crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/src/main.rs`
+- `crates/maos-escape-detector/tests/{common/mod.rs, producer_wired_e2e.rs}`
+- `crates/maos-manifest/tests/cookbook_sections_17_6.rs` (new)
+- `crates/maos-spirit-sdk/src/spirit_test/manifest.rs`
+- `crates/maos-spirit-sdk/tests/spirit_test_smoke.rs`
+- `docs-site/docs/cookbook/{hello-world-spirit.md, manifest-fields.md}` and their ko twins under
+  `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/`
+- `docs/ci-baselines/kernel-surface-v0.1-beta.json`
+- `docs/compliance/fuzz-exec-deps-report.md` (new)
+- `docs/runbooks/fuzz-cadence.md`
+- `spirits/{architect, butler, digest, mira, nash, observer, orchestrator, researcher, reviewer}/manifest.toml`
+- `spirits/{architect, butler, mira, nash, observer, orchestrator, researcher, reviewer}/tests/spirit_smoke.rs`
+- `xtask/kernel-api-classes.toml`
+- `xtask/kernel-core-baseline.toml`
+- `xtask/kloc.toml`
+- `xtask/src/{check_escape_detector.rs, check_fuzz_floor.rs, check_fuzz_targets.rs, check_skill_conformance.rs}`
+- `xtask/tests/{kernel_pin_content_hash_16_0.rs, recovery_lane_ceiling_rule.rs}`
+
+- `crates/maos-exec-deps/src/lib.rs`, `crates/maos-exec-deps/tests/resolver_17_6.rs`
+  (review: bounded parser, safe opens, inode IDs, transitive RPATH and edge tests).
+- `crates/maos-kernel-core/src/security/sandbox/linux.rs` (review: rule-fd inode check).
+- `crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/src/main.rs`,
+  `crates/maos-wasm-host/tests/t2_sandbox_kill.rs`,
+  `crates/maos-kernel-core/tests/bridge_t2_route_17_6.rs`,
+  `crates/maos-bin/tests/maosctl_load_16_6.rs` (review probes and coverage).
+
+### Change Log
+
+- 2026-09-28 — Story 17-6 implemented, and the status moves to `review`.
+  - T2 starts real programs: the exec-set Landlock grant comes from the new leaf crate `maos-exec-deps`, and seccomp
+    installs kill-first. SIGSYS on `ptrace` was proven in CI on four images (run 36425906424).
+  - The three T2 suites can no longer pass by skipping in CI.
+  - `spawn_and_bridge` applies the admitted `SandboxSpec`, with T2 on Linux only. The cli_wrapper floor is exactly T3.
+  - `rust-inproc` manifests must declare T0.
+  - Kernel figure: +80 / +95 = ruled +71/+83, plus the aarch64 `ppoll` row, plus the operator-approved
+    `prctl(PR_GET_AUXV)` grant delta. The re-pin to 25015 is in the same change set.
+- 2026-09-28 — **T12 added at the operator's request.**
+  - `equiv_harness`'s on-demand native-twin build now pins `--target-dir`, fixing a real harness defect under a global
+    `CARGO_TARGET_DIR`.
+  - The dev host was provisioned with `cargo-public-api` 0.51.0 and Python `cryptography`, as CI does.
+  - The workspace test run goes from 4508 passed / 10 failed to **4518 passed / 0 failed**.
+- 2026-09-28 — Full-layer code-review patch batch, all 10 findings closed.
+  - Operator-ratified +17/+17 kernel inode-check guard; current kernel pin
+    19309 tokei / 25032 physical, leaf budget 357. No public kernel surface
+    changed; 98 files remain pinned.
+  - Local resolver 19/19, T2 sandbox 5/5, bridge 4/4 and defaulted-tier
+    admission 1/1; pin/ceiling contracts 34/34; KLOC, kernel-baseline and
+    service-boundary gates passed. Patched four-image CI annotations have not
+    been run; run 36425906424 precedes this review.

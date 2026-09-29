@@ -224,12 +224,9 @@ fn updating_the_operator_ceiling_reclamps_existing_spirit_postures() {
     );
 }
 
-/// Obligation (ab) / §11 row 7 — stated, not assumed: the manifest's
-/// `[sandbox] tier` is parsed and DISCARDED on the admission path
-/// (`effective_sandbox_tier` seeds the manifest leg from
-/// `manifest_scopes[pid].declared_tier`, absent on first admission), so a
-/// manifest cannot select its own sandbox tier and AC1 must not promise a
-/// T1/T3/T4 refusal vector.
+/// The kernel derives the first admission's effective tier from policy, not the
+/// manifest. The outer manifest gate reserves `rust-inproc` for declared T0;
+/// this direct kernel test proves its unchanged post-gate policy behavior.
 #[test]
 fn a_manifest_declared_sandbox_tier_is_ignored_on_first_admission() {
     let h = harness(None);

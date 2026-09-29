@@ -14,8 +14,18 @@
 //! This binary is NOT shipped: it lives outside the main workspace (own
 //! `[workspace]` table) and is built ad hoc by the integration tests, never by
 //! `cargo build`/`cargo test` at the repo root.
+//!
+//! `--benign` (Story 17-6 D-17-6-H): the Rust negative control — spawn and join
+//! one thread (glibc >= 2.34 `pthread_create` issues `clone3`), print
+//! `forbidden-syscall-probe: benign ok`, exit 0. Proves a Rust binary reaches
+//! `main` under the identical T2 spec that kills the `ptrace` mode.
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--benign") {
+        std::thread::spawn(|| {}).join().expect("thread join");
+        println!("forbidden-syscall-probe: benign ok");
+        std::process::exit(0);
+    }
     // SAFETY: ptrace(PTRACE_TRACEME, 0, null, null) is the canonical
     // self-trace request — no pointers are dereferenced by the kernel for this
     // request, and null is passed for both unused addr/data params. This call

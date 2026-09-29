@@ -1,0 +1,66 @@
+name: t8-17-6 (throwaway; Story 17-6 T8)
+'on':
+  push:
+    branches:
+    - t8-17-6
+jobs:
+  t2:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+        - ubuntu-24.04
+        - ubuntu-26.04
+        - ubuntu-24.04-arm
+        - ubuntu-26.04-arm
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+    - uses: actions/checkout@v5
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: t8-17-6-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+    - name: Build both forbidden-syscall-probe fixtures (T2 kill + Rust benign control)
+      run: 'cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+
+        cargo build --locked --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+
+        '
+    - name: Image facts (the programs the T2 suites exec)
+      shell: bash
+      run: 'f="$(uname -r); cat=$(readlink -f /bin/cat); true=$(readlink -f /bin/true); sh=$(readlink -f /bin/sh); $(cat --version 2>&1 | head -1); pkg=$(dpkg -S "$(readlink -f /bin/cat)" 2>&1 | head -1);
+        gnu=$(ls /usr/bin/gnu* 2>/dev/null | head -5 | paste -sd, -); coreutils=$(dpkg -l | grep -i coreutils | awk ''{print $2"="$3}'' | paste -sd, -)"
+
+        echo "::notice title=Image facts (${{ matrix.image }})::$f"'
+    - name: Epic-17 exit line 3 — T2 kill proof (Story 17-6 AC1)
+      shell: bash
+      run: "set +e\ncargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture 2>&1 | tee t2.log\nrc=${PIPESTATUS[0]}\ngrep -o 'T2-OUTCOME .*' t2.log | while IFS= read -r line; do\n  echo\
+        \ \"::notice title=T2 exit line 3 (${{ matrix.image }})::${line#T2-OUTCOME }\"\ndone\ngrep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do\n  echo \"::error title=T2 exit\
+        \ line 3 (${{ matrix.image }})::${line}\"\ndone\nif grep -q '^SKIP ' t2.log; then\n  echo \"::error title=T2 exit line 3 (${{ matrix.image }})::a SKIP line was printed — a T2 suite must run, never\
+        \ skip, in CI\"\n  rc=1\nfi\necho \"::notice title=T2 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)\"\nexit \"$rc\"\n"
+      if: always()
+    - name: Kernel T2 suites — sandbox enforcement + the launch primitive's route (Story 17-6 AC5)
+      shell: bash
+      run: "set +e\ncargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture 2>&1 | tee kernel-t2.log\nrc=${PIPESTATUS[0]}\nroute=$(grep -o 'BRIDGE-T2-ROUTE\
+        \ T[0-9]: [A-Za-z]*[^(]*' kernel-t2.log | sed 's/BRIDGE-T2-ROUTE //' | sort | paste -sd';' -)\necho \"::notice title=Bridge T2 route (${{ matrix.image }})::${route}\"\ngrep -E 'panicked at|rule\
+        \ 11' kernel-t2.log | head -3 | while IFS= read -r line; do\n  echo \"::error title=Kernel T2 suites (${{ matrix.image }})::${line}\"\ndone\nif grep -q '^SKIP ' kernel-t2.log; then rc=1; echo \"\
+        ::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed\"; fi\necho \"::notice title=Kernel T2 suites (${{ matrix.image }})::rc=${rc} $(grep '^test result' kernel-t2.log |\
+        \ paste -sd' ' -)\"\nexit \"$rc\"\n"
+      if: always()
+    - name: Escape-detector suite on a real T2 kill (Story 17-6 AC4)
+      shell: bash
+      run: "set +e\ncargo test --locked -p maos-escape-detector -- --nocapture 2>&1 | tee escape.log\nrc=${PIPESTATUS[0]}\ngrep -E 'panicked at|rule 11' escape.log | head -3 | while IFS= read -r line; do\n\
+        \  echo \"::error title=Escape detector (${{ matrix.image }})::${line}\"\ndone\necho \"::notice title=Escape detector (${{ matrix.image }})::rc=${rc} $(grep -oE 'ESCAPE-[A-Z-]*MEASURED[^ ]*( [a-z_]+=[0-9.]+)*'\
+        \ escape.log | paste -sd';' -)\"\nexit \"$rc\"\n"
+      if: always()
+    - name: Planted faults (RT-10) — each one RED, warning-free
+      if: always()
+      shell: bash
+      env:
+        IMAGE: ${{ matrix.image }}
+      run: python3 .github/t8/plants.py

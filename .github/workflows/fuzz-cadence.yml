@@ -48,8 +48,8 @@ concurrency:
   cancel-in-progress: false # never cancel a soak mid-run
 
 jobs:
-  # T1 — per-target 10 min / 4-worker soak. Matrix over both fuzz targets so a
-  # single target's failure does not starve the other of CPU-hour accrual.
+  # T1 — per-target 10 min / 4-worker soak. Matrix over every fuzz target so a
+  # single target's failure does not starve the others of CPU-hour accrual.
   fuzz-run-t1:
     runs-on: ubuntu-latest
     strategy:
@@ -65,6 +65,10 @@ jobs:
             # serde_cbor 0.11 amplifies tiny CBOR inputs into multi-GB
             # allocations — REQUIRED runtime config (see fuzz-cadence.md).
             rss_flag: "-rss_limit_mb=0"
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            # ELF parsing is bounded; no rss override needed.
+            rss_flag: ""
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1

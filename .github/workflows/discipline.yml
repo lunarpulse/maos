@@ -2909,10 +2909,18 @@ jobs:
   # matrix (AC4), and the frame_bridge lower/lift conversions for all 15
   # FrameKinds (AC2). Without it the 11.1a test suite never executes in CI
   # at all — the CONCERNS finding from the Murat trace audit (2026-07-01).
-  # The T2 column (t2_sandbox_kill.rs) self-skips without CAP_SYS_ADMIN,
-  # mirroring the kernel's own sandbox_enforcement_linux.rs pattern.
+  # Story 17-6 (AC1, AC3, AC4; epic-17 exit line 3): the T2 suites run on all FOUR
+  # shipped Linux images (x64 + arm, R17-50). Every GitHub-hosted Ubuntu image
+  # is declared capable of T2 (rule 11(b)): `CI` is set, so a refused T2 spawn
+  # PANICS in the helpers — no suite can pass by skipping. `ubuntu-latest` is
+  # never used here (it moves to 26.04 in Oct–Nov 2026; the images are pinned).
+  # Job logs are 403 without a token, so each verdict is a public annotation.
   wasm-host-tests:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -2921,9 +2929,54 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: wasm-host-tests-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build forbidden-syscall-probe fixture (AC4 T2 column)
-        run: cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+          key: wasm-host-tests-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)
+        run: |
+          cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+          cargo build --locked --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Epic-17 exit line 3 — T2 kill and narrow-prctl proof (Story 17-6 AC1/AC3)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture 2>&1 | tee t2.log
+          rc=${PIPESTATUS[0]}
+          grep -o 'T2-OUTCOME .*' t2.log | while IFS= read -r line; do
+            echo "::notice title=T2 exit line 3 (${{ matrix.image }})::${line#T2-OUTCOME }"
+          done
+          grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
+            echo "::error title=T2 exit line 3 (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' t2.log; then
+            echo "::error title=T2 exit line 3 (${{ matrix.image }})::a SKIP line was printed — a T2 suite must run, never skip, in CI"
+            rc=1
+          fi
+          echo "::notice title=T2 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)"
+          exit "$rc"
+      - name: Kernel T2 suites — sandbox enforcement + the launch primitive's route (Story 17-6 AC5)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture 2>&1 | tee kernel-t2.log
+          rc=${PIPESTATUS[0]}
+          route=$(grep -o 'BRIDGE-T2-ROUTE T[0-9]: [A-Za-z]*[^(]*' kernel-t2.log | sed 's/BRIDGE-T2-ROUTE //' | sort | paste -sd';' -)
+          echo "::notice title=Bridge T2 route (${{ matrix.image }})::${route}"
+          grep -E 'panicked at|rule 11' kernel-t2.log | head -3 | while IFS= read -r line; do
+            echo "::error title=Kernel T2 suites (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' kernel-t2.log; then rc=1; echo "::error title=Kernel T2 suites (${{ matrix.image }})::a SKIP line was printed"; fi
+          echo "::notice title=Kernel T2 suites (${{ matrix.image }})::rc=${rc} $(grep '^test result' kernel-t2.log | paste -sd' ' -)"
+          exit "$rc"
+      - name: Escape-detector suite on a real T2 kill (Story 17-6 AC4)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-escape-detector -- --nocapture 2>&1 | tee escape.log
+          rc=${PIPESTATUS[0]}
+          grep -E 'panicked at|rule 11' escape.log | head -3 | while IFS= read -r line; do
+            echo "::error title=Escape detector (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=Escape detector (${{ matrix.image }})::rc=${rc} $(grep -oE 'ESCAPE-[A-Z-]*MEASURED[^ ]*( [a-z_]+=[0-9.]+)*' escape.log | paste -sd';' -)"
+          exit "$rc"
       - name: Run maos-host + maos-wasm-host test suites
         run: cargo test -p maos-host -p maos-wasm-host --locked
 
@@ -2968,6 +3021,8 @@ jobs:
         run: cargo +nightly fuzz build --fuzz-dir crates/maos-manifest/fuzz manifest_parser
       - name: Build wire-protocol fuzz target
         run: cargo +nightly fuzz build --fuzz-dir crates/maos-domain/fuzz frame_deser
+      - name: Build exec-deps ELF parser fuzz target
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf
 
   # Story 10.3 AC-4 (NFR-Doc-6) — Korean localization ship gate.
   # KO_COVERAGE_MIN=100 turns the coverage promise into a mechanical gate;
@@ -4140,10 +4195,10 @@ jobs:
           echo "| check-host-surface | ${{ needs.check-host-surface.result }} | cargo run -p xtask -- check-host-surface |"
           echo "| check-dependency-closure | ${{ needs.check-dependency-closure.result }} | cargo run -p xtask -- check-dependency-closure |"
           echo "| check-fuzz-targets | ${{ needs.check-fuzz-targets.result }} | cargo run -p xtask -- check-fuzz-targets |"
-          echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser) |"
+          echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
-          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | cargo test -p maos-host -p maos-wasm-host |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"

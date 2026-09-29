@@ -1,0 +1,35 @@
+# Story 17-6 T4.4 — final local green at the landing kernel (25015), CI=true (capable-runner rule active), host CachyOS 7.2.6 x86_64
+$ CI=true cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture
+T2-OUTCOME benign_process_survives_t2_under_same_spec: exit status: 0
+T2-OUTCOME benign_rust_probe_survives_t2_under_same_spec: exit status: 0
+T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/granted: exit status: 0
+T2-OUTCOME granted_fs_capability_works_ungranted_is_refused/ungranted: exit status: 1
+T2-OUTCOME forbidden_syscall_killed_by_t2_with_sigsys: signal: 31 (SIGSYS) (core dumped)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+rc=0
+$ CI=true cargo test --locked -p maos-kernel-core --test sandbox_enforcement_linux --test bridge_t2_route_17_6 -- --nocapture
+BRIDGE-T2-ROUTE T1: SandboxRefused("/home/lunarpulse/dev_ws/crates/maos-kernel-core/../maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe: no spawn path applies tier SandboxTier(1)")
+BRIDGE-T2-ROUTE T4: SandboxRefused("/home/lunarpulse/dev_ws/crates/maos-kernel-core/../maos-wasm-host/test-fixtures/forbidden-syscall-probe/target/release/forbidden-syscall-probe: no spawn path applies tier SandboxTier(4)")
+BRIDGE-T2-ROUTE T3: Exited { code: 0 }
+BRIDGE-T2-ROUTE T0: Exited { code: 0 }
+BRIDGE-T2-ROUTE T2: Signaled { signal: 31 }
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+rc=0
+$ CI=true cargo test --locked -p maos-escape-detector -- --nocapture
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=3 fp_cases=1
+ESCAPE-DETECTOR-QUALITY-MEASURED tp_rate=1.000 fp_rate=0.000 tp_kills=2 fp_cases=2
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+ESCAPE-PRODUCER-WIRED-MEASURED frame=01a0e823440e522bebf32b3b94f3838c
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+rc=0
+$ CI=true cargo test --locked -p maos-exec-deps -- --nocapture
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+rc=0

@@ -19,11 +19,11 @@
 //! 2. The bridge re-derives the manifest's `argv_prefix_hash` at spawn and
 //!    asserts equality with the hash bound into the cap-token at issue-time
 //!    (TOCTOU correctness per ADR-023). Divergence ⇒ [`BridgeError::CapBindingMismatch`].
-//! 3. Spawns the subprocess via the AC5-resolved sandbox path (the deterministic
-//!    fixture-CLI spawns directly via [`std::process::Command`] — exactly as the
-//!    admission probe already does at `admission.rs:73`; the live agent-CLI path
-//!    routes through the T3 network-permitted container variant — see AC5 grant
-//!    gate in `admission.rs`).
+//! 3. Spawns the subprocess under the admitted [`BridgeSpawnSpec::sandbox`]
+//!    (Story 17-6 AC5): `T2` through `spawn_sandboxed` on Linux (refused on
+//!    every other OS, never a bare fallback); `T0`/`T3` directly via
+//!    [`std::process::Command`] (the T3 container variant is 17-1's); any other
+//!    tier is refused, typed ([`BridgeError::SandboxRefused`]).
 //! 4. Each captured stdout/stderr line is written to the Transparency Log as a
 //!    `FrameKind::CliSubprocessOutput = 21` row via the **real**
 //!    [`TransparencyLogAdapter::insert_frame_event_with_sender`], which routes
@@ -55,9 +55,13 @@ use std::thread::JoinHandle;
 use sha2::Digest;
 
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::invariants::i9::SandboxTier;
 
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
+use crate::security::sandbox::SandboxSpec;
+#[cfg(target_os = "linux")]
+use crate::security::sandbox::{spawn_sandboxed, SandboxedChild};
 
 /// Story 6.2 AC6 — recompute the manifest's `argv_prefix_hash` for cap-token
 /// binding verification. Re-derived at runtime; asserted equal to the
@@ -195,6 +199,10 @@ pub enum BridgeError {
     /// request was seen on the hermetic Tier-1 path (use `--live` for Tier-2).
     #[error("ci_default hermetic guard tripped: {0}")]
     CiGuardTripped(String),
+    /// Story 17-6 AC5 — the admitted sandbox could not be applied (a refused T2
+    /// spawn, or a tier no spawn path applies). Never a bare fallback.
+    #[error("cli bridge sandbox refused: {0}")]
+    SandboxRefused(String),
 }
 
 /// Story 8.12 AC6 — the `ci_default` hermetic guard.
@@ -240,6 +248,9 @@ pub fn ci_default_guard(program: &str, network_requested: bool) -> Result<(), Br
 pub struct BridgeSpawnSpec {
     /// Resolved absolute path or PATH-resolvable name of the CLI binary.
     pub program: String,
+    /// Story 17-6 AC5 — the sandbox admission granted this child (tier, scopes,
+    /// caps, cgroup id). The bridge applies it; it never invents one.
+    pub sandbox: SandboxSpec,
     /// Manifest argv prefix (`["code"]` for `claude code`). Hashed for the
     /// cap-token binding assertion.
     pub argv_prefix: Vec<String>,
@@ -295,7 +306,7 @@ enum ReaderMsg {
               — process-bound resource ownership, not cached kernel domain state"
 )]
 pub struct SpawnedBridge {
-    child: Option<Child>,
+    child: Option<BridgeChild>,
     stdin: Option<ChildStdin>,
     readers: Vec<JoinHandle<()>>,
     rx: Option<Receiver<ReaderMsg>>,
@@ -445,11 +456,49 @@ fn run_reader<R: BufRead>(
     }
 }
 
-/// Spawn a subprocess and start its reader threads (AC1).
-///
-/// Spawns directly via [`std::process::Command`] — the deterministic fixture-CLI
-/// path, identical to the admission probe at `admission.rs:73`. The cap-token
-/// binding is asserted BEFORE the child can produce a single byte.
+/// Story 17-6 AC5 — the bridge child: a bare spawn, or one confined by
+/// `spawn_sandboxed`, whose guard owns the child and its cgroup dir.
+enum BridgeChild {
+    Plain(Child),
+    #[cfg(target_os = "linux")]
+    Sandboxed(SandboxedChild),
+}
+
+impl BridgeChild {
+    fn get(&mut self) -> &mut Child {
+        match self {
+            Self::Plain(child) => child,
+            #[cfg(target_os = "linux")]
+            Self::Sandboxed(guard) => guard.child_mut(),
+        }
+    }
+}
+
+/// Spawn under the admitted spec: T2 through `spawn_sandboxed` on Linux only (never
+/// a bare fallback); T0 and T3 bare (T3 is applied by 17-1 AC4); all else refused.
+fn spawn_child(
+    spec: &SandboxSpec,
+    cmd: &mut Command,
+    program: &str,
+) -> Result<BridgeChild, BridgeError> {
+    match spec.tier {
+        #[cfg(target_os = "linux")]
+        SandboxTier::T2 => spawn_sandboxed(spec, cmd)
+            .map(BridgeChild::Sandboxed)
+            .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}"))),
+        SandboxTier::T0 | SandboxTier::T3 => cmd
+            .spawn()
+            .map(BridgeChild::Plain)
+            .map_err(|e| BridgeError::Spawn(format!("{program}: {e}"))),
+        tier => Err(BridgeError::SandboxRefused(format!(
+            "{program}: no spawn path applies tier {tier:?}"
+        ))),
+    }
+}
+
+/// Spawn a subprocess under its admitted sandbox and start its reader threads
+/// (AC1; Story 17-6 AC5). The cap-token binding is asserted BEFORE the child
+/// can produce a single byte.
 pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeError> {
     // ADR-023 TOCTOU — re-derive the argv_prefix_hash and assert the binding
     // BEFORE spawning. A divergent prefix is exactly the substitution the
@@ -472,11 +521,8 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
         cmd.env(k, v);
     }
 
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| BridgeError::Spawn(format!("{}: {e}", spec.program)))?;
-
-    let child_pid = child.id();
+    let mut child = spawn_child(&spec.sandbox, &mut cmd, &spec.program)?;
+    let child_pid = child.get().id();
     // Close the child's stdin unless stdin IS the control channel. A worker
     // driven by `Signals` (or the fixture) is not fed via stdin, and a real CLI
     // that reads stdin-until-EOF (e.g. `codex exec`) would otherwise DEADLOCK on
@@ -486,16 +532,18 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
     // `write_stdin_line`) keep stdin open — that path drives the worker through it.
     let stdin = match spec.control_channel {
         CliWrapperControlChannel::Signals => {
-            let _ = child.stdin.take(); // drop the ChildStdin → EOF to the child
+            let _ = child.get().stdin.take(); // drop the ChildStdin → EOF to the child
             None
         }
-        _ => child.stdin.take(),
+        _ => child.get().stdin.take(),
     };
     let stdout = child
+        .get()
         .stdout
         .take()
         .ok_or_else(|| BridgeError::Spawn("stdout not captured".into()))?;
     let stderr = child
+        .get()
         .stderr
         .take()
         .ok_or_else(|| BridgeError::Spawn("stderr not captured".into()))?;
@@ -649,7 +697,7 @@ impl SpawnedBridge {
         F: FnOnce(Option<i32>),
     {
         let cause = match self.child.as_mut() {
-            Some(child) => match child.wait() {
+            Some(child) => match child.get().wait() {
                 Ok(status) => ExitCause::classify(status),
                 Err(_) => ExitCause::Unknown,
             },
@@ -785,8 +833,8 @@ impl SpawnedBridge {
         let _ = self.shutdown_signal; // advisory; see doc above
         self.stdin = None;
         if let Some(child) = self.child.as_mut() {
-            let _ = child.kill();
-            let _ = child.wait();
+            let _ = child.get().kill();
+            let _ = child.get().wait();
         }
         self.child = None;
         Ok(())
@@ -799,8 +847,8 @@ impl Drop for SpawnedBridge {
         // any `Block`ed reader), then join the readers (no orphaned threads).
         self.stdin = None;
         if let Some(mut child) = self.child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
+            let _ = child.get().kill();
+            let _ = child.get().wait();
         }
         // Drop the receiver first so any `Block`ed reader send returns Err and
         // the thread exits, then join. This MUST happen before joining — without
@@ -1112,7 +1160,7 @@ mod tests {
 
         // Build a minimal SpawnedBridge without calling spawn_and_bridge
         let bridge = SpawnedBridge {
-            child: Some(child),
+            child: Some(BridgeChild::Plain(child)),
             stdin: None,
             readers: vec![out_handle],
             rx: Some(rx),
@@ -1148,6 +1196,7 @@ mod tests {
         let argv_prefix = vec!["-c".to_string(), "cat >/dev/null; echo done".to_string()];
         let spec = BridgeSpawnSpec {
             program: "/bin/sh".to_string(),
+            sandbox: SandboxSpec::new_for_test(SandboxTier::T0),
             expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
             argv_prefix,
             task_args: vec![],

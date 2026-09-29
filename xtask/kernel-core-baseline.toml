@@ -502,7 +502,14 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 24920
+src_lines = 25032
+# HISTORY: Story 17-6 review security repair (2026-09-28), operator-ratified
+#          FLAG-Winston: 25015 -> 25032 (+17 physical; tokei 19292 -> 19309,
+#          +17). `security/sandbox/linux.rs` compares each Landlock rule fd's
+#          regular-file device/inode against the held inode parsed by
+#          `maos-exec-deps`. A path swapped to `/` or another inode between
+#          resolution and rule attachment now refuses the spawn before granting
+#          unrelated content. No kernel public surface or file-set change.
 # HISTORY: Epic-16 retrospective, E16-A1 follow-through (2026-09-20): 24923 ->
 #          24922 physical lines (-1). OPERATOR-RATIFIED FLAG-Winston, and the
 #          FIRST re-pin taken under the BOTH-KERNEL-PINS obligation recorded at
@@ -549,6 +556,27 @@ src_lines = 24920
 #          SURFACE PIN: re-derived and UNCHANGED -- a local binding is not a
 #          public symbol; `check-service-boundary` green with zero baseline
 #          edits. Both pins verified at the commit that lands this.
+# HISTORY: Story 17-6 (2026-09-28): 24920 -> 25015 physical lines (+95).
+#          ◆ FLAG-Winston, operator-RATIFIED 2026-09-26 (+71 tokei / +83
+#          src_lines on the lean prototype, RT-3) plus two measured additions:
+#          the aarch64 `ppoll` allow-list row (RT-6, arm leave-one-out in CI,
+#          +2/+3) and the operator-approved 2026-09-28 grant delta
+#          prctl(PR_GET_AUXV)-only (T8 finding: ubuntu-26.04's uutils `/bin/cat`
+#          reads its own auxv at start; +7/+9). tokei code 19212 -> 19292 (+80).
+#          DRIVER: T2 repair -- security/sandbox/linux.rs (the exec-set Landlock
+#          grant via the leaf crate `maos-exec-deps`; kill-first seccomp order,
+#          the filter never installed before; rt_sigaction, clone3, x86 poll,
+#          aarch64 ppoll, prctl(PR_GET_AUXV)); security/sandbox/mod.rs
+#          (`SandboxedChild::child_mut`); lifecycle/cli_wrapper/runtime.rs
+#          (`BridgeSpawnSpec.sandbox`, `BridgeChild`, `spawn_child`,
+#          `BridgeError::SandboxRefused` -- T2 at the launch primitive, Linux
+#          only); lifecycle/cli_wrapper/admission.rs (cli_wrapper floor exactly
+#          T3, ADR-060 clause 4). FOUR per-file digests; 98 files, none added
+#          or removed; set hash re-minted via --emit-pin.
+#          SURFACE PIN: three rows re-hash (BridgeError + variant,
+#          BridgeSpawnSpec + pub field, SpawnedBridge private-field reshape);
+#          class rows added in kernel-api-classes.toml; 379 rows before and
+#          after. Both pins verified at the commit that lands this.
 
 
 # HISTORY: Story 16-6 (2026-09-19): 24628 -> 24796 physical lines (+168).
@@ -623,7 +651,7 @@ src_lines = 24920
 #          clamp helper extraction. No kernel file was added or removed.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "957b0de26080edbfc90549ee99e0d1115b0b32fd959f96347dfcbd944e8035ee"
+set_hash = "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -657,10 +685,10 @@ set_hash = "957b0de26080edbfc90549ee99e0d1115b0b32fd959f96347dfcbd944e8035ee"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
 "journal/mod.rs" = "c0e8306b72ed4349ebfde22d4501f5467e354a840fd473e8aee1c03037a47e77"
 "lib.rs" = "a4c3708400196b1c97ac614ead31645d77cc5124bfbd30f4b13139bf4c7f9100"
-"lifecycle/cli_wrapper/admission.rs" = "921310672eabc0d40cadfe30ce6de1234ebde779896c9e3f0ea0ca022724e911"
+"lifecycle/cli_wrapper/admission.rs" = "006b245592fde622bca53dca3e61efd448c106a318d3e4df1d81449bb5fb48d7"
 "lifecycle/cli_wrapper/lifecycle.rs" = "4a3d2e2f631c47195321fc48410efcbc218d69a979195fbc8f741a09ace09599"
 "lifecycle/cli_wrapper/mod.rs" = "c78a43ba26d796315af0ee07f2ce76991c7b0f1785298d49c08ffbdf17c0addc"
-"lifecycle/cli_wrapper/runtime.rs" = "36755713f73b6877a3b65f396e53198f28980698eaa65a5ac3822e20e11a0b97"
+"lifecycle/cli_wrapper/runtime.rs" = "a7ca87178d2faf5440f24634f3a31d015246d3bbf9245559aeb194dd4aaaab5a"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
@@ -700,9 +728,9 @@ set_hash = "957b0de26080edbfc90549ee99e0d1115b0b32fd959f96347dfcbd944e8035ee"
 "security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
-"security/sandbox/linux.rs" = "8964be98eb51c34dd4a7ae75d2d60ab90d8e8d6897205f8787f0ae0563ff29f2"
+"security/sandbox/linux.rs" = "881eb436b17cc959da56c77e20fe16d99d62c92c23626e150d09f95f1dd3abf1"
 "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
-"security/sandbox/mod.rs" = "1732708673ce3294434b5db9919683008a42e24cada8e8af3795032792b711a1"
+"security/sandbox/mod.rs" = "19d5d0cb09d7dd05f9c329f3d5bc6df55e10f97451748aa67c605e6ac4ef149c"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
 "security/sandbox/t3/argv.rs" = "18badaa3d8141e86fb87b852577d1720319a16b765e2dbdc177facad913c5ae0"
 "security/sandbox/t3/cap_audit_bridge.rs" = "c4f77a015d1b21541f82ce35a6a49c66e8e3a0228191de1a68eac330d2093035"

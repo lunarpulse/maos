@@ -35,7 +35,7 @@ fn manifest_self_check_is_well_formed() {
     assert_eq!(report.class_name, "architect");
     assert!(report.forms.iter().any(|f| f == "rust-inproc"));
     assert_eq!(report.trust_tier, "local");
-    assert_eq!(report.sandbox_tier, "T2");
+    assert_eq!(report.sandbox_tier, "T0");
     assert_eq!(report.posture_default, "assistive");
     for f in ["components", "rationale", "interfaces", "risks"] {
         assert!(

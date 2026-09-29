@@ -509,6 +509,16 @@ fn every_refusal_vector_is_typed_and_leaves_nothing_behind() {
          manifest_schema_version = 3\nmin_substrate_version = \"0.0.1\"\n\
          forms = [\"rust-inproc\"]\ntrust_tier = \"local\"\ndescription = \"x\"\n",
     );
+    // Gate 6 — `rust-inproc` is compiled into the host process and must
+    // honestly declare the T0 tier it receives.
+    let reviewer = std::fs::read_to_string(workspace_root().join(REVIEWER_MANIFEST))
+        .expect("read reviewer manifest fixture");
+    let rust_inproc_t2_text = reviewer.replace("tier = \"T0\"", "tier = \"T2\"");
+    assert_ne!(
+        reviewer, rust_inproc_t2_text,
+        "fixture must change the sandbox tier"
+    );
+    let rust_inproc_t2 = write("reviewer-rust-inproc-t2.toml", &rust_inproc_t2_text);
 
     for (label, path, code, refused_id) in [
         (
@@ -535,6 +545,12 @@ fn every_refusal_vector_is_typed_and_leaves_nothing_behind() {
             "unknown_spirit_class",
             "totally-not-a-spirit",
         ),
+        (
+            "rust-inproc above T0",
+            rust_inproc_t2.clone(),
+            "rust_inproc_requires_t0",
+            "reviewer",
+        ),
     ] {
         let out = root.ctl(&["load", &path]);
         assert!(
@@ -558,6 +574,40 @@ fn every_refusal_vector_is_typed_and_leaves_nothing_behind() {
         );
     }
 
+    let run_home = root.scratch.join("run-home");
+    let init = Command::new(maos())
+        .arg("init")
+        .env("HOME", &root.scratch)
+        .env("MAOS_HOME", &run_home)
+        .env("XDG_DATA_HOME", root.scratch.join("run-xdg"))
+        .current_dir(workspace_root())
+        .output()
+        .expect("run maos init for standalone refusal");
+    assert!(
+        init.status.success(),
+        "maos init must succeed for standalone refusal"
+    );
+    let out = Command::new(maos())
+        .args(["run", &rust_inproc_t2, "--once"])
+        .env("HOME", &root.scratch)
+        .env("MAOS_HOME", &run_home)
+        .env("XDG_DATA_HOME", root.scratch.join("run-xdg"))
+        .env("MAOS_INFERENCE_MODE", "replay")
+        .env("MAOS_REPLAY_CASSETTE", BUTLER_CASSETTE)
+        .env("MAOS_NOTIFY_DISABLE", "1")
+        .current_dir(workspace_root())
+        .output()
+        .expect("run standalone rust-inproc refusal");
+    assert!(
+        !out.status.success(),
+        "maos run must refuse rust-inproc above T0"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("rust-inproc requires sandbox tier T0, got T2"),
+        "standalone run must expose the gate-6 refusal: {stderr}"
+    );
+
     // Gate 1 — an unreadable manifest is refused by the CLIENT before any
     // round trip (its own exit 1), which is the honest place for it.
     let out = root.ctl(&["load", &scratch.join("absent.toml").to_string_lossy()]);
@@ -576,6 +626,50 @@ fn every_refusal_vector_is_typed_and_leaves_nothing_behind() {
         "directory refusal must retain its typed code; got: {stderr}"
     );
     assert_eq!(daemon_roster(&root), baseline);
+}
+
+/// Gate 6's fail-closed half: an omitted sandbox tier defaults to T2, so a
+/// `rust-inproc` manifest must be refused through the live load door rather
+/// than accidentally inheriting the T0-only host execution mode.
+#[test]
+fn defaulted_t2_rust_inproc_is_refused_by_gate_6() {
+    let root = Root::butler("defaulted-t2-rust-inproc");
+    let baseline = daemon_roster(&root);
+    let reviewer = std::fs::read_to_string(workspace_root().join(REVIEWER_MANIFEST))
+        .expect("read reviewer manifest fixture");
+    let defaulted_t2 = reviewer.replace("[sandbox]\ntier = \"T0\"", "[sandbox]");
+    assert_ne!(
+        reviewer, defaulted_t2,
+        "fixture must omit the explicit T0 tier and exercise SandboxConfig's T2 default"
+    );
+    let manifest = root.scratch.join("reviewer-rust-inproc-defaulted-t2.toml");
+    std::fs::write(&manifest, defaulted_t2).expect("write defaulted-T2 fixture manifest");
+    let manifest = manifest.to_string_lossy().into_owned();
+
+    let out = root.ctl(&["load", &manifest]);
+    assert!(
+        !out.status.success(),
+        "a rust-inproc manifest defaulting to T2 must be refused, not admitted"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("HTTP 400") && stderr.contains("rust_inproc_requires_t0"),
+        "defaulted T2 must reach the typed gate-6 refusal; got: {stderr}"
+    );
+    assert!(
+        stderr.contains("rust-inproc requires sandbox tier T0, got T2"),
+        "defaulted T2 must be named in the refusal; got: {stderr}"
+    );
+    assert_eq!(
+        root.lifecycle_state("reviewer"),
+        None,
+        "a defaulted-T2 rust-inproc refusal must not leave an SCB behind"
+    );
+    assert_eq!(
+        daemon_roster(&root),
+        baseline,
+        "a defaulted-T2 rust-inproc refusal must leave the daemon roster unchanged"
+    );
 }
 
 /// Admission runs after pid allocation, so a post-load substrate refusal must

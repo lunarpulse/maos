@@ -15,9 +15,9 @@
 //! This is the gap ADR-024 §4 identifies: the producer was unwired (zero
 //! production callers); the seam closes it at the composition-root edge, calling
 //! only PUBLIC kernel-core API → ZERO kernel-core delta. The CLI-wrapper
-//! (`spawn_and_bridge`) is a plain UNSANDBOXED `Command` and is named OUT OF
-//! SCOPE in ink (a separate hardening story); the proven-red runs on the real
-//! `spawn_sandboxed` T2 path (the 11.1a WASM seam substrate).
+//! primitive (`spawn_and_bridge`) routes T2 through `spawn_sandboxed` since
+//! Story 17-6 AC5, but no production T2 child exists until 17-3c; the
+//! proven-red runs on the real `spawn_sandboxed` T2 path directly.
 
 #![cfg(target_os = "linux")]
 

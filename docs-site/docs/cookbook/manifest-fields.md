@@ -32,11 +32,12 @@ url = "https://example.com"
 
 # ── Sandbox & Resources ──────────────────────────────────
 [sandbox]
-tier = "baseline"                 # baseline | hardened | paranoid
+tier = "T0"                      # T0 | T1 | T2 | T3 | T4; an in-process Spirit declares T0
 
 [resources]
-max_memory_mb = 256
-max_cpu_ms = 5000
+cpu_max_pct = 100
+memory_max_mb = 256
+fd_max = 256
 
 # ── Autonomy & Output ────────────────────────────────────
 [posture]

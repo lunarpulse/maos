@@ -1,0 +1,87 @@
+"""Story 17-6 T8 — planted faults in CI (throwaway branch; deleted after capture).
+
+Each plant: apply a textual edit, build (`--no-run`), record compiler warnings
+pointing INTO the planted file beyond the unplanted set (RT-10: a plant is
+proven only with a warning-free build), run the suite, emit ONE public
+annotation with the verdict, restore the file from git.
+"""
+import os
+import platform
+import re
+import subprocess
+import sys
+
+IMAGE = os.environ["IMAGE"]
+ARM = platform.machine() == "aarch64"
+LIN = "crates/maos-kernel-core/src/security/sandbox/linux.rs"
+RT = "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs"
+T2 = ["-p", "maos-wasm-host", "--test", "t2_sandbox_kill"]
+BR = ["-p", "maos-kernel-core", "--test", "bridge_t2_route_17_6"]
+
+ARCH_ROW = (
+    ("const ARCH_SYSCALLS: &[i64] = &[libc::SYS_ppoll];", "const ARCH_SYSCALLS: &[i64] = &[];")
+    if ARM
+    else (", libc::SYS_access, libc::SYS_poll\n", ", libc::SYS_access\n")
+)
+PLANTS = [
+    ("verbatim-order", LIN, [("Ok(vec![kill_bpf, bpf])", "Ok(vec![bpf, kill_bpf])")], T2),
+    ("no-exec-set-grant", LIN, [("for (path, access) in rules {", "for (path, access) in rules.take(0) {")], T2),
+    ("drop-ppoll" if ARM else "drop-poll", LIN, [ARCH_ROW], T2),
+    ("drop-rt_sigaction", LIN, [("        libc::SYS_rt_sigaction,\n", "")], T2),
+    ("drop-clone3", LIN, [("        libc::SYS_clone3,\n", "")], T2),
+    ("drop-prctl-auxv", LIN, [("    rules.insert(libc::SYS_prctl, vec![get_auxv]);", "    drop(get_auxv);")], T2),
+    (
+        "bridge-T2-routed-bare",
+        RT,
+        [
+            ("        SandboxTier::T2 => spawn_sandboxed(spec, cmd)", "        SandboxTier::T2 if false => spawn_sandboxed(spec, cmd)"),
+            ("        SandboxTier::T0 | SandboxTier::T3 => cmd", "        SandboxTier::T0 | SandboxTier::T2 | SandboxTier::T3 => cmd"),
+        ],
+        BR,
+    ),
+]
+
+
+def cargo(args):
+    return subprocess.run(["cargo", "test", "--locked", *args], capture_output=True, text=True)
+
+
+def warnings_in(path, sel):
+    r = cargo(["--no-run", *sel])
+    return r.returncode, {l.strip() for l in r.stderr.splitlines() if "--> " + path + ":" in l}
+
+
+def main():
+    failures = 0
+    for name, path, subs, sel in PLANTS:
+        _, base = warnings_in(path, sel)
+        src = open(path).read()
+        for old, new in subs:
+            if src.count(old) != 1:
+                print(f"::error title=T8 plant {name} ({IMAGE})::anchor not found once: {old!r}")
+                failures += 1
+                break
+            src = src.replace(old, new)
+        else:
+            open(path, "w").write(src)
+            try:
+                brc, planted = warnings_in(path, sel)
+                new_w = sorted(planted - base)
+                r = cargo([*sel, "--", "--nocapture", "--test-threads=1"])
+                out = r.stdout + r.stderr
+                outcomes = re.findall(r"(?:T2-OUTCOME|BRIDGE-T2-ROUTE) ([^\n]*)", out)
+                outcomes = [re.sub(r'SandboxRefused\(".*', "SandboxRefused(..)", o) for o in outcomes]
+                red = r.returncode != 0
+                lvl = "notice" if red and brc == 0 and not new_w else "error"
+                failures += lvl == "error"
+                print(
+                    f"::{lvl} title=T8 plant {name} ({IMAGE})::"
+                    f"build rc={brc} new-warnings={new_w or 'none'}; suite rc={r.returncode} "
+                    f"({'RED' if red else 'GREEN — PLANT NOT CAUGHT'}); " + " | ".join(outcomes)
+                )
+                sys.stdout.flush()
+            finally:
+                subprocess.run(["git", "checkout", "--", path], check=True)
+    sys.exit(1 if failures else 0)
+
+main()

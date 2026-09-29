@@ -47,7 +47,7 @@ cpu_max_pct = 15
 memory_max_mb = 128
 
 [sandbox]
-tier = "T2"
+tier = "T0"
 
 [author]
 name = "MAOS Project"
