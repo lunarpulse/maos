@@ -37,6 +37,7 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("class", "manifest_schema_version"),
     ("class", "min_substrate_version"),
     ("class", "forms"),
+    ("class", "artifact"),
     ("class", "trust_tier"),
     ("class", "description"),
     ("capabilities", "provider_complete"),

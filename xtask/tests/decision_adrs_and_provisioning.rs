@@ -256,6 +256,114 @@ fn anchor_source(
     }
 }
 
+/// Inspect the parsed `frozen_surface_gate` body so prose, comments, and
+/// string literals cannot satisfy the ADR-060 admission anchor. The fixture's
+/// planted red then proves the gate rejects a missing executable refusal.
+fn contains_rust_inproc_registry_refusal(source: &str) -> bool {
+    let Ok(file) = syn::parse_file(source) else {
+        return false;
+    };
+    file.items.iter().any(|item| {
+        let syn::Item::Fn(function) = item else {
+            return false;
+        };
+        function.sig.ident == "frozen_surface_gate"
+            && function.block.stmts.iter().any(|statement| {
+                let syn::Stmt::Expr(syn::Expr::If(branch), _) = statement else {
+                    return false;
+                };
+                rust_inproc_form_predicate(&branch.cond)
+                    && branch
+                        .then_branch
+                        .stmts
+                        .iter()
+                        .any(returns_first_party_form_error)
+            })
+    })
+}
+
+fn rust_inproc_form_predicate(expr: &syn::Expr) -> bool {
+    let syn::Expr::MethodCall(any) = ungroup_expression(expr) else {
+        return false;
+    };
+    if any.method != "any" || any.args.len() != 1 {
+        return false;
+    }
+    let syn::Expr::MethodCall(iter) = ungroup_expression(&any.receiver) else {
+        return false;
+    };
+    if iter.method != "iter" || !iter.args.is_empty() || !is_class_forms(&iter.receiver) {
+        return false;
+    }
+    let Some(syn::Expr::Closure(predicate)) = any.args.first() else {
+        return false;
+    };
+    let syn::Expr::Binary(comparison) = ungroup_expression(&predicate.body) else {
+        return false;
+    };
+    matches!(comparison.op, syn::BinOp::Eq(_))
+        && is_form_identifier(&comparison.left)
+        && is_rust_inproc_literal(&comparison.right)
+}
+
+fn is_class_forms(expr: &syn::Expr) -> bool {
+    let syn::Expr::Field(forms) = ungroup_expression(expr) else {
+        return false;
+    };
+    matches!(&forms.member, syn::Member::Named(member) if member == "forms")
+        && matches!(
+            ungroup_expression(&forms.base),
+            syn::Expr::Path(class) if class.path.is_ident("class")
+        )
+}
+
+fn is_form_identifier(expr: &syn::Expr) -> bool {
+    matches!(
+        ungroup_expression(expr),
+        syn::Expr::Path(form) if form.path.is_ident("form")
+    )
+}
+
+fn is_rust_inproc_literal(expr: &syn::Expr) -> bool {
+    matches!(
+        ungroup_expression(expr),
+        syn::Expr::Lit(literal)
+            if matches!(&literal.lit, syn::Lit::Str(value) if value.value() == "rust-inproc")
+    )
+}
+
+fn returns_first_party_form_error(statement: &syn::Stmt) -> bool {
+    let syn::Stmt::Expr(syn::Expr::Return(returned), _) = statement else {
+        return false;
+    };
+    let Some(value) = &returned.expr else {
+        return false;
+    };
+    let syn::Expr::Call(error) = ungroup_expression(value) else {
+        return false;
+    };
+    matches!(
+        ungroup_expression(&error.func),
+        syn::Expr::Path(err) if err.path.is_ident("Err")
+    ) && error.args.iter().any(|argument| {
+        matches!(
+            ungroup_expression(argument),
+            syn::Expr::Path(error)
+                if error.path.segments.last().is_some_and(
+                    |segment| segment.ident == "FirstPartyFormFromRegistry"
+                )
+        )
+    })
+}
+
+fn ungroup_expression(expr: &syn::Expr) -> &syn::Expr {
+    match expr {
+        syn::Expr::Group(group) => ungroup_expression(&group.expr),
+        syn::Expr::Paren(paren) => ungroup_expression(&paren.expr),
+        _ => expr,
+    }
+}
+
 fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<String>) {
     let context = context_section(body);
     match number {
@@ -272,7 +380,7 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                     "class.forms",
                     "crates/maos-manifest/src/manifest.rs",
                     &manifest,
-                    "matches!(f.as_str(), \"rust-inproc\" | \"subprocess\")",
+                    "matches!(f.as_str(), \"rust-inproc\" | \"subprocess\" | \"wasm-component\")",
                     findings,
                 );
             }
@@ -282,7 +390,11 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                 "crates/maos-registry/src/admission.rs",
                 findings,
             ) {
-                require_absent(
+                // The field-name anchor below preserves the ADR's documented
+                // contract. The second check proves that executable admission
+                // code still rejects first-party rust-inproc packages, so
+                // comments alone cannot satisfy this anchor.
+                require_contains(
                     number,
                     context,
                     "admit_spirit",
@@ -291,6 +403,12 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                     "class.forms",
                     findings,
                 );
+                if !contains_rust_inproc_registry_refusal(&admission) {
+                    findings.push(
+                        "ADR-060 anti-rot anchor moved: crates/maos-registry/src/admission.rs no longer carries an executable `rust-inproc` refusal returning `AdmissionError::FirstPartyFormFromRegistry`"
+                            .into(),
+                    );
+                }
             }
         }
         "061" => {
@@ -895,7 +1013,7 @@ impl Fixture {
                 .find(|(candidate, _)| *candidate == format!("{number:03}"));
             let consumer = required.map_or("99-1-fixture-consumer", |(_, consumer)| *consumer);
             let context = match number {
-                60 => "class.forms accepts rust-inproc and subprocess today; admit_spirit does not read it.",
+                60 => "class.forms accepts rust-inproc, subprocess and wasm-component; admit_spirit reads it and refuses first-party forms.",
                 61 => "env_clear is forbidden before the proxy; --network=none is the T3 model.",
                 62 => "The four GET routes have no 405 today and maos-kernel-core remains excluded.",
                 63 => "RuptureReason lacks the variant and build_server_config uses a flat lookup.",
@@ -939,12 +1057,21 @@ impl Fixture {
         write_file(
             root,
             "crates/maos-manifest/src/manifest.rs",
-            "matches!(f.as_str(), \"rust-inproc\" | \"subprocess\")\n",
+            "matches!(f.as_str(), \"rust-inproc\" | \"subprocess\" | \"wasm-component\")\n",
         );
         write_file(
             root,
             "crates/maos-registry/src/admission.rs",
-            "pub fn admit_spirit() {}\n",
+            concat!(
+                "pub fn admit_spirit() {}\n",
+                "fn frozen_surface_gate(class: &Class) -> Result<(), AdmissionError> {\n",
+                "    if class.forms.iter().any(|form| form == \"rust-inproc\") {\n",
+                "        return Err(AdmissionError::FirstPartyFormFromRegistry);\n",
+                "    }\n",
+                "    Ok(())\n",
+                "}\n",
+                "// forms policy reads class.forms and refuses rust-inproc\n",
+            ),
         );
         write_file(
             root,
@@ -1146,12 +1273,24 @@ fn every_clause_and_denominator_has_a_planted_red() {
     });
     assert_red_contains(&fx, "checklist denominator");
 
-    // require_absent direction: the forbidden control reappears in its anchor.
+    // ADR-060's documented field name may remain in comments, but deleting
+    // its executable rust-inproc refusal must still red.
     let fx = Fixture::complete();
     fx.rewrite("crates/maos-registry/src/admission.rs", |body| {
-        format!("{body}let _ = \"class.forms\";\n")
+        body.replace(
+            "    if class.forms.iter().any(|form| form == \"rust-inproc\") {\n        return Err(AdmissionError::FirstPartyFormFromRegistry);\n    }\n",
+            "",
+        )
     });
-    assert_red_contains(&fx, "now contains `class.forms`");
+    assert_red_contains(&fx, "no longer carries an executable `rust-inproc` refusal");
+
+    // require_contains direction on the ADR-060 registry anchor (Story
+    // 17-3b): a field rename disappears from registry admission.
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-registry/src/admission.rs", |body| {
+        body.replace("class.forms", "class.name")
+    });
+    assert_red_contains(&fx, "no longer contains `class.forms`");
 
     // ADR-064 conflict refusal: deleting the behavior while keeping an
     // unrelated environment registry receipt must red.

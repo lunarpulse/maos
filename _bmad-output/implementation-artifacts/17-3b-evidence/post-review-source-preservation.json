@@ -1,0 +1,12 @@
+{
+  "patch_snapshot_tree": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+  "index_tree_after_architecture_records": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+  "original_index_unchanged": true,
+  "tracked_working_changes_since_snapshot": [
+    "_bmad-output/implementation-artifacts/sprint-status.yaml",
+    "_bmad-output/planning-artifacts/epics/epic-17-workers-and-third-party-form-w2.md"
+  ],
+  "source_and_workflow_unchanged": true,
+  "main_head_unchanged": "5075443c8a87523581cfcf6cb0b6af815f7ebd4f",
+  "scope": "Additional evidence/decision files are new untracked artifacts, not silently staged; tracked differences are requested governance records only."
+}

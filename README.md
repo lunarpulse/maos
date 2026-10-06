@@ -330,7 +330,6 @@ maos/
 ├── spirits/       # the nine reference Spirits (Butler, Researcher, … Mira/Nash)
 ├── examples/      # worked example Spirits (Rust + TypeScript)
 ├── templates/     # cargo-generate Spirit templates (Rust + TS)
-├── sdks/          # Spirit-author SDKs
 ├── schemas/       # JSON schemas (manifest, ComplianceClaim, gateway, halt registry)
 ├── wit/           # WebAssembly Interface Types (v2.0 WASM Spirit form)
 ├── docs/          # invariants, ADRs, dev-discipline, the three-door docs site

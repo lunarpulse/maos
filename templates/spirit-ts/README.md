@@ -1,38 +1,35 @@
 # {{crate_name}}
 
-A MAOS Spirit scaffolded from `templates/spirit-ts/` (Story 7.1 v0.5 binding).
+A TypeScript MAOS Spirit scaffold that builds a `wasm-component` implementing
+`maos:spirit@2.0.0`.
 
-## Build your first TypeScript Spirit in 30 minutes
+## Requirements
 
-This template scaffolds a minimal, testable MAOS Spirit in TypeScript.
-By default it contains a single `onIdle` hook.
+Use Node `^22.20 || ^24.12 || >=25`. The component toolchain is pinned in
+`package.json` and uses only public npm packages. `@bytecodealliance/preview2-shim`
+is pinned explicitly because `componentize-js` 0.23.0 imports it at runtime without
+declaring it; npm 11 (bundled with Node 24) does not hoist it otherwise.
 
-## How to run
+## Build and componentize
 
 ```bash
-npm ci
+npm install
 npm test
+npm run build
+npm run componentize
 ```
 
-The smoke test fires `onIdle` through the `SpiritTest` harness and asserts
-the hook fired exactly once.
+`npm run build` generates type-only WIT bindings under `src/bindings/` and
+compiles the guest entrypoint to `dist/index.js`. `npm run componentize` turns
+that JavaScript into `dist/spirit.wasm`; the component imports no
+`wasi:http` interface.
 
-## v0.5 TypeScript SDK caveat
+The manifest declares the `wasm-component` form, its artifact, and T2. Today
+admission intentionally refuses it as `wasm_engine_off` in the default build
+and `wasm_launch_not_built` in a `wasm-host` build. Story 17-3c supplies the
+production launch path.
 
-The `@maos/spirit-ts` SDK is a **test harness only** at v0.5. Production
-TypeScript Spirits require either:
-- Subprocess form (Story 6.2 `CliWrapperSpirit` wire protocol)
-- A future kernel-side TS runtime (post-v0.5e, not in Epic 7 scope)
-
-See `sdks/spirit-ts/README.md` for details.
-
-## Author your first Spirit — v0.5 path
-
-```bash
-cargo generate --git https://github.com/your-org/maos templates/spirit-ts --name my-ts-spirit
-```
-
-## Status
-
-**v0.5 binding per Story 7.1.** TypeScript template ships at v0.5.
-Python deferred to v1.0; Go deferred to v1.5.
+`handleFrame` echoes the inbound frame only after `onStart`. Before startup it
+throws `{ tag: "fault", val: "..." }`, which is the generated guest binding's
+halt shape. `console.log` output is discarded until the future guest
+diagnostics channel exists.

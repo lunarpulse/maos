@@ -84,8 +84,21 @@ mod wit_ast {
             .collect()
     }
 
+    pub fn package_version() -> String {
+        let r = resolve();
+        r.packages
+            .iter()
+            .find(|(_, package)| package.name.namespace == "maos" && package.name.name == "spirit")
+            .and_then(|(_, package)| package.name.version.as_ref())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| panic!("no versioned maos:spirit package found in wit/spirit.wit"))
+    }
+
     pub fn frame_kinds() -> Vec<String> {
         enum_case_names("frame-kind")
+    }
+    pub fn intent_classes() -> Vec<String> {
+        enum_case_names("intent-class")
     }
     pub fn frame_origins() -> Vec<String> {
         enum_case_names("frame-origin")
@@ -98,6 +111,9 @@ mod wit_ast {
     }
     pub fn payload_variants() -> Vec<String> {
         variant_case_names("frame-payload")
+    }
+    pub fn scopes() -> Vec<String> {
+        variant_case_names("scope")
     }
     pub fn record_names() -> Vec<String> {
         all_record_names()
@@ -131,13 +147,18 @@ fn corpus_covers_all_frame_origins() {
 }
 
 #[test]
+fn corpus_covers_all_intent_classes() {
+    assert_eq!(wit_ast::intent_classes().len(), 3);
+}
+
+#[test]
 fn corpus_covers_all_posture_hints() {
     assert_eq!(wit_ast::posture_hints().len(), 3);
 }
 
 #[test]
 fn corpus_covers_all_rupture_reasons() {
-    assert_eq!(wit_ast::rupture_reasons().len(), 5);
+    assert_eq!(wit_ast::rupture_reasons().len(), 6);
 }
 
 #[test]
@@ -151,23 +172,31 @@ fn corpus_covers_all_payload_variants() {
 }
 
 #[test]
+fn corpus_covers_all_scopes() {
+    assert_eq!(wit_ast::scopes().len(), 20);
+}
+
+#[test]
 fn corpus_covers_all_record_types() {
     let records = wit_ast::record_names();
     assert_eq!(
         records.len(),
-        16,
-        "must cover all 16 record types from the parsed .wit AST, got {records:?}"
+        20,
+        "must cover all 20 record types from the parsed .wit AST, got {records:?}"
     );
     // Every field is also mechanically counted — adding a field to any
     // record without updating this list of expectations trips a test.
     let expected_field_counts: &[(&str, usize)] = &[
         ("frame-address", 3),
+        ("scope-mcp-call", 2),
+        ("scope-cli-subprocess-spawn", 3),
+        ("scope-gateway-send", 2),
         ("posture-preferences", 2),
         ("halt-policy-override", 2),
-        ("prior-distillate-ref", 2),
+        ("prior-distillate-ref", 3),
         ("task-assign-body", 5),
         ("task-complete-body", 1),
-        ("decision-dispatch-body", 2),
+        ("decision-dispatch-body", 3),
         ("epistemic-halt-body", 6),
         ("telemetry-event-body", 2),
         ("consent-request-body", 1),
@@ -176,7 +205,8 @@ fn corpus_covers_all_record_types() {
         ("consent-rupture-body", 6),
         ("rate-limited-body", 7),
         ("budget-envelope", 4),
-        ("iac-frame", 8),
+        ("consent-envelope", 5),
+        ("iac-frame", 11),
     ];
     for (name, expected) in expected_field_counts {
         assert_eq!(
@@ -185,6 +215,40 @@ fn corpus_covers_all_record_types() {
             "record `{name}` field count drifted from the parsed .wit AST"
         );
     }
+}
+
+#[test]
+fn wit_package_version_has_one_ratified_entry() {
+    #[derive(serde::Deserialize)]
+    struct Ratification {
+        status: String,
+        covered_changes: Vec<String>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Ratifications {
+        ratification: Vec<Ratification>,
+    }
+
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../xtask/abi-ratifications.toml"
+    );
+    let source =
+        std::fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
+    let ratifications: Ratifications =
+        toml::from_str(&source).unwrap_or_else(|e| panic!("failed to parse {path}: {e}"));
+    let expected = format!("maos:spirit@{}", wit_ast::package_version());
+    let matches = ratifications
+        .ratification
+        .iter()
+        .filter(|entry| entry.status == "ratified")
+        .flat_map(|entry| entry.covered_changes.iter())
+        .filter(|change| *change == &expected)
+        .count();
+    assert_eq!(
+        matches, 1,
+        "exactly one ratified entry must cover the parsed WIT package version {expected}"
+    );
 }
 
 // ── Canonical CBOR byte-equal oracle: K-encode path ────────────────────

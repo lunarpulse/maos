@@ -1,0 +1,15 @@
+2026-09-29T15:45:16Z
+5075443c
+
+cd docs-site && KO_COVERAGE_MIN=100 npm run gate:ko-coverage && npm run gate:glossary-lock
+RESULT: PASS.
+- Korean canonical coverage: 41/41 (100%); manifest 6/6 and migrate 6/6.
+- glossary-lock: 42 locked terms and 3 denylist entries; 45 Korean translation files checked; no violations.
+
+cd docs-site && npm run build
+RESULT: PASS — Docusaurus production build generated EN and KO static files; fallback postbuild patched 23 KO fallback pages.
+
+cd docs-site && npm run gate:static
+RESULT: PASS — 85 routes; 13 cookbook structural patterns verified in build; troubleshoot/error catalog checks; glossary-lock; 18 ABI pages with explicit anchor IDs.
+
+NOTE: the first static invocation was correctly red because its pre-existing build directory did not yet contain the new cookbook page. It was rebuilt, then the same static gate passed above.

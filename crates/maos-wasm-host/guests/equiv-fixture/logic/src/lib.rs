@@ -6,7 +6,7 @@
 //!
 //! - the WASM `equiv-identity-spirit` / `equiv-divergent-spirit` /
 //!   `equiv-cosmetic-spirit` components (compiled via `wit-bindgen` against
-//!   `maos:spirit@1.0`), and
+//!   `maos:spirit@2.0.0`), and
 //! - the native `equiv-native-twin` subprocess (linked against
 //!   `maos_wasm_host::codec` + `maos_domain::frame`).
 //!

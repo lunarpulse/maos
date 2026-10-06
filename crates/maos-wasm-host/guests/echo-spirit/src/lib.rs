@@ -1,4 +1,4 @@
-//! `echo-spirit` — minimal conformant `maos:spirit@1.0` guest.
+//! `echo-spirit` — minimal conformant `maos:spirit@2.0.0` guest.
 //!
 //! Crypto-free (D9) identity guest: `handle-frame` returns the inbound
 //! frame unchanged (as the single emitted frame); `on-start`/`on-shutdown`

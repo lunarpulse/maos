@@ -1,26 +1,24 @@
-//! Story 11.1a AC3 / Task 9 — End-to-end round-trip.
+//! Story 17-3b AC2 — End-to-end component runner coverage.
 //!
 //! `form=WasmComponent` manifest -> daemon `resolve_launch` -> real runner
-//! -> full ADR-032 round-trip THROUGH the guest's real `handle-frame` export
-//! (not a host-side echo). Uses `echo_spirit_component.wasm`, a real
-//! `maos:spirit@1.0` component built from `guests/echo-spirit` — NOT a core
-//! module, NOT a host echo loop.
+//! -> full ADR-032 round-trip through the guest's real `handle-frame` export
+//! (not a host-side echo). Uses a real `maos:spirit@2.0.0` component.
 //!
-//! This test validates the complete path without test-doubles:
+//! This test validates the complete path without test doubles:
 //! 1. `SpiritHostPort::resolve_launch` resolves a WasmComponent request and
-//!    rejects a non-conformant one (real wasmtime probe, not metadata-only).
+//!    rejects a non-conformant one.
 //! 2. The resolved plan points at the real `maos-wasm-runner` binary.
-//! 3. The runner subprocess is spawned and communicates over real pipes.
-//! 4. A real domain `IacFrame` round-trips through the GUEST's `handle-frame`
-//!    export, byte-identical end to end (guest is an identity Spirit, so the
-//!    emitted frame equals the sent frame at the domain level — but the path
-//!    goes through component instantiation + a typed WIT call, not a
-//!    host-side `read_frame`/`write_frame` echo).
+//! 3. The runner subprocess communicates over real pipes.
+//! 4. A domain `IacFrame` round-trips through component instantiation and a
+//!    typed WIT call, then returns canonical-CBOR-identical ADR-032 bytes.
 
 use std::io::{BufReader, BufWriter};
 use std::sync::Arc;
 
-use maos_domain::frame::{FrameAddress, IacFrame, TaskAssignPayload};
+use maos_domain::frame::{
+    ConsentRupturePayload, FrameAddress, FramePayload, IacFrame, RuptureReason, RuptureRejection,
+    TaskAssignPayload,
+};
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_host::{SpiritForm, SpiritHostPort, SpiritLaunchRequest, WireShape};
@@ -206,18 +204,15 @@ fn real_runner_subprocess_adr032_roundtrip_through_guest() {
         .unwrap()
         .expect("the echo-spirit guest must emit exactly one frame back");
 
+    // The identity guest returns the WIT frame unchanged. The runner must
+    // therefore re-emit canonical-CBOR-identical ADR-032 bytes after its
+    // decode -> lower -> guest call -> lift -> encode path.
+    assert_eq!(
+        emitted_bytes, sent_bytes,
+        "the @2.0.0 guest path must preserve canonical CBOR bytes"
+    );
     let emitted_frame: IacFrame = codec::decode_cbor(&emitted_bytes).unwrap();
-
-    // The guest is an IDENTITY Spirit (handle-frame returns the input frame
-    // unchanged) — so the domain-level content must match on every field the
-    // WIT world carries. This is NOT a host-side echo: the bytes were
-    // decoded, lowered to WIT, passed through a real `call_handle_frame` on
-    // an instantiated component, lifted back, and re-encoded.
-    assert_eq!(emitted_frame.frame_id, sent_frame.frame_id);
-    assert_eq!(emitted_frame.timestamp_ns, sent_frame.timestamp_ns);
-    assert_eq!(emitted_frame.kind, sent_frame.kind);
-    assert_eq!(emitted_frame.from.spirit_id, sent_frame.from.spirit_id);
-    assert_eq!(emitted_frame.payload, sent_frame.payload);
+    assert_eq!(emitted_frame, sent_frame);
 
     // No more frames after the single emission.
     assert!(
@@ -229,6 +224,49 @@ fn real_runner_subprocess_adr032_roundtrip_through_guest() {
     assert!(
         status.success(),
         "runner must exit cleanly (code 0) after stdin EOF, got {status:?}"
+    );
+}
+
+#[test]
+fn peer_identity_rupture_round_trips_through_the_real_runner() {
+    let mut frame = make_test_frame();
+    frame.kind = FrameKind::ConsentRupture;
+    frame.payload = FramePayload::ConsentRupture(ConsentRupturePayload {
+        rupture_id: [0x12; 16],
+        original_frame_id: [0x34; 16],
+        original_kind: FrameKind::TaskAssign,
+        accepted: vec![],
+        rejected: vec![RuptureRejection {
+            address: frame.from.clone(),
+            reason: RuptureReason::PeerIdentityUnverified,
+        }],
+        ruptured_at_ns: frame.timestamp_ns,
+    });
+    let sent = codec::encode_cbor(&frame).unwrap();
+
+    let mut child = std::process::Command::new(require_runner_binary())
+        .arg("--component")
+        .arg(component_fixture_path())
+        .arg("--fuel")
+        .arg("1000000000")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    codec::write_frame(&mut child.stdin.take().unwrap(), &sent).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "the current rupture reason must not terminate the runner: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let emitted = codec::read_frame(&mut BufReader::new(output.stdout.as_slice()))
+        .unwrap()
+        .expect("guest must emit the rupture");
+    assert_eq!(
+        emitted, sent,
+        "runner must preserve the current rupture reason"
     );
 }
 
@@ -276,5 +314,58 @@ fn invalid_component_fails_closed_with_distinct_exit_code() {
     assert!(
         leaked.is_none(),
         "an InvalidComponent failure must not leak a partial frame to stdout"
+    );
+}
+
+/// The import walk runs before `Spirit::instantiate`, so an incompatible
+/// Spirit-world import has a stable typed exit instead of an opaque link/type
+/// error. Components with no `maos:spirit/*` import are not refused here; they
+/// continue to `InvalidComponent` at instantiation.
+#[test]
+fn v1_frames_world_is_refused_with_incompatible_world_exit() {
+    let runner_path = require_runner_binary();
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let fixture = format!("{manifest_dir}/../../tests/fixtures/wasm/spirit_frames_v1_world.wat");
+    let output = std::process::Command::new(runner_path)
+        .arg("--component")
+        .arg(&fixture)
+        .arg("--fuel")
+        .arg("1000000")
+        .output()
+        .expect("runner must execute the committed WAT-text component fixture");
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        String::from_utf8(output.stderr).expect("runner stderr must be UTF-8"),
+        "maos-wasm-runner: IncompatibleWorld: component imports \
+maos:spirit/frames@1.0.0; this runner implements maos:spirit@2.0.0\n"
+    );
+    assert!(
+        output.stdout.is_empty(),
+        "world refusal must not emit an ADR-032 frame"
+    );
+}
+
+#[test]
+fn component_without_spirit_import_reaches_invalid_component_not_world_refusal() {
+    let runner_path = require_runner_binary();
+    let temp = tempfile::tempdir().expect("temporary WAT directory");
+    let component = temp.path().join("no-spirit-import.wat");
+    std::fs::write(&component, "(component)\n").expect("write empty component WAT");
+
+    let output = std::process::Command::new(runner_path)
+        .arg("--component")
+        .arg(&component)
+        .arg("--fuel")
+        .arg("1000000")
+        .output()
+        .expect("runner must execute the no-import WAT component");
+
+    assert_eq!(output.status.code(), Some(3));
+    assert!(
+        String::from_utf8(output.stderr)
+            .expect("runner stderr must be UTF-8")
+            .starts_with("maos-wasm-runner: InvalidComponent:"),
+        "a component with no maos:spirit import must continue to instantiate and fail as InvalidComponent"
     );
 }

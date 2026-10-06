@@ -5,15 +5,20 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "test": "vitest run --reporter verbose"
+  "engines": {
+    "node": "^22.20 || ^24.12 || >=25"
   },
-  "dependencies": {
-    "@maos/spirit-ts": "^0.5.0"
+  "scripts": {
+    "guest-types": "jco guest-types wit --world-name spirit --out-dir src/bindings --strict",
+    "build": "npm run guest-types && tsc",
+    "componentize": "componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.4",
-    "vitest": "^1.6"
+    "@bytecodealliance/componentize-js": "0.23.0",
+    "@bytecodealliance/jco": "1.35.0",
+    "@bytecodealliance/preview2-shim": "0.25.0",
+    "typescript": "5.9.3",
+    "vitest": "1.6.1"
   }
 }

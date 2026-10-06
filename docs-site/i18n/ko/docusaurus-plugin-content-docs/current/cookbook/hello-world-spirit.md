@@ -1,7 +1,7 @@
 ---
 title: Hello-World Spirit
 sidebar_position: 2
-description: 약 30분 만에 단일 on_idle 훅을 가진 최소 MAOS Spirit 빌드.
+description: 약 30분 만에 인트리 퍼스트파티 단일 on_idle 훅 MAOS Spirit 빌드.
 review_status: machine
 ---
 
@@ -9,7 +9,7 @@ review_status: machine
 
 ## Problem
 
-제로에서 실행되는 Spirit까지 가장 빠른 경로를 원합니다. 게시된 ABI에 대해 컴파일되고, 하나의 훅을 구현하며, 스모크 테스트를 통과하는 프로젝트가 필요합니다 — 모두 약 30분 안에.
+제로에서 실행되는 **인트리 퍼스트파티** Spirit까지 가장 빠른 경로를 원합니다. 게시된 ABI에 대해 컴파일되고, 하나의 훅을 구현하며, 스모크 테스트를 통과하는 프로젝트가 필요합니다 — 모두 약 30분 안에. 이 Rust `rust-inproc` 형식은 인프로세스 T0 sandbox tier를 올바르게 선언합니다.
 
 ## Solution
 
@@ -20,14 +20,14 @@ cargo generate --git https://github.com/lunarpulse/maos \
   templates/spirit-rust --name hello-spirit
 ```
 
-`spirit.toml`에 최소 manifest를 추가합니다:
+`spirit.toml`에 구조적으로 유효한 manifest를 추가합니다:
 
 ```toml
 [class]
 name = "hello-spirit"
 version = "0.1.0"
 abi = "1.0"
-manifest_schema_version = 3
+manifest_schema_version = 5
 min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
 trust_tier = "local"
@@ -37,17 +37,26 @@ description = "A minimal hello-world Spirit."
 name = "you"
 
 [sandbox]
-tier = "T0" # T0 | T1 | T2 | T3 | T4; 인프로세스 Spirit은 T0를 선언합니다
+tier = "T0" # An in-process Spirit declares T0.
 
 [resources]
 cpu_max_pct = 25
 memory_max_mb = 64
 fd_max = 64
 
+[posture]
+default = "assistive"
+allowed_max = "assistive"
+
+[output_shape]
+required_fields = ["response"]
+
 [budget]
-max_inference_calls = 0
+context_window_size = 4096
 time_cap_seconds = 60
 ```
+
+`hello-spirit` 이름은 daemon의 내장 class가 아닙니다. 이 manifest는 퍼스트파티 Rust class에 대해 구조적으로 유효합니다. 프로덕션 어드미션 전에 해당 class를 컴파일하고 daemon에 등록하세요.
 
 `src/lib.rs`에 Spirit 트레이트를 구현합니다:
 
@@ -86,3 +95,5 @@ cargo test -p hello-spirit
 - 더 많은 훅을 추가하기 전 컴파일되는 기준을 원하는 경우.
 
 모든 훅은 취소 신호, 역량 핸들, 메일박스 핸들을 전달하는 `&mut Ctx`를 받습니다. 최소 Spirit에서도 비싼 작업 전에 `ctx.cancellation().is_cancelled()`를 확인해야 합니다 — [취소 처리](./cancellation-handling)를 참조하세요.
+
+서드파티 TypeScript Spirit에는 [WASM Component Spirit](./wasm-component-spirit) 레시피를 사용하세요. 이 레시피는 `wasm-component` 형식, 컴포넌트 artifact, T2 샌드박스 경계를 사용하며 인프로세스 Rust 작성 경로가 아닙니다.

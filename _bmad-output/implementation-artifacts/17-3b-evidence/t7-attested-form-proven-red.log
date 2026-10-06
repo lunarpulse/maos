@@ -1,0 +1,16 @@
+2026-09-29T15:39:46Z
+5075443c
+planted diff (temporary, admission.rs attested entry only):
+-    let form_policy = frozen_surface_gate(pkg)?;
++    let form_policy = FormPolicy::Legacy;
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-R CARGO_BUILD_JOBS=12 cargo test --locked -p maos-registry --test form_admission_17_3b rust_inproc_is_refused_before_every_admission_tier
+build output: warning-free for this cached targeted build.
+red output: FAILED (0 passed, 1 failed): the valid attestation path must also refuse rust-inproc; observed AdmissionDecision { effective_tier: PublicVetted, sandbox_tier_floor: T0, admit: true, ... }.
+
+2026-09-29T15:39:46Z
+5075443c
+revert: restored `let form_policy = frozen_surface_gate(pkg)?;` exactly; rustfmt --edition 2021 crates/maos-registry/src/admission.rs.
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-R CARGO_BUILD_JOBS=12 cargo test --locked -p maos-registry --test form_admission_17_3b
+output: 4 passed; 0 failed.
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-R CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- check-fkcs --json
+post-revert output: oracle_green true; admission-path-unmodified passed 1 failed 0.

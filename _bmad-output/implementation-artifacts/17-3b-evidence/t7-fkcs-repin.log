@@ -1,0 +1,18 @@
+2026-09-29T15:39:46Z
+5075443c
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-R CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- check-fkcs --json
+pre-pin output: admission-path-unmodified red; baseline 650f13b939f03618d43fe4b2214f5a2f46ee79d9574272126236a70c466c3c91, worktree 62d99cfa327700e6cfe58037818521d03a58c91aec07cd25af36113b15df8e8e.
+re-pin: xtask/fkcs-baseline.toml [admission_baseline].sha256 = 62d99cfa327700e6cfe58037818521d03a58c91aec07cd25af36113b15df8e8e.
+post-pin output: {"gate":"check-fkcs","passed":true,"oracle_green":true}; admission-path-unmodified passed 1 failed 0.
+
+2026-09-29T15:39:46Z
+5075443c
+command: independent Python hashlib script mirroring xtask/src/check_fkcs.rs::admission_content_hash (for each file: relative path + NUL + little-endian u64 byte length + bytes)
+files: crates/maos-registry/src/admission.rs, crates/maos-skill/src/admission.rs
+independent admission_content_hash: 62d99cfa327700e6cfe58037818521d03a58c91aec07cd25af36113b15df8e8e
+match: true
+
+2026-09-29T15:39:46Z
+5075443c
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-R CARGO_BUILD_JOBS=12 cargo test --locked -p xtask --test fkcs_oracle
+output: 11 passed; 0 failed.

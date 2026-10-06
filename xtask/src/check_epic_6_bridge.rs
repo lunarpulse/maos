@@ -2140,16 +2140,14 @@ fn check_7_1_ts_template_baseline() -> CheckResult {
     // Post-impl: directories MUST exist — serves as a regression guard.
     let ts_template = Path::new("templates/spirit-ts").exists();
     let ts_example = Path::new("examples/example-spirit-ts").exists();
-    let ts_sdk = Path::new("sdks/spirit-ts").exists();
-    let passed = ts_template && ts_example && ts_sdk;
+    let passed = ts_template && ts_example;
     CheckResult {
         id,
         passed,
         message: format!(
-            "blocking_7_1 (regression): templates/spirit-ts exists={} examples/example-spirit-ts exists={} sdks/spirit-ts exists={} → {}",
+            "blocking_7_1 (regression): templates/spirit-ts exists={} examples/example-spirit-ts exists={} → {}",
             ts_template,
             ts_example,
-            ts_sdk,
             if passed { "PASS" } else { "FAIL" }
         ),
     }

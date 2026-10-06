@@ -75,7 +75,7 @@ impl SpiritHostPort for WasmHostAdapter {
                 }
 
                 // Real WIT-conformance probe: parse as a component and check
-                // it exports the maos:spirit@1.0 world's three functions. The
+                // it exports the maos:spirit@2.0.0 world's three functions. The
                 // heavyweight wasmtime compile + the actual call path live in
                 // the runner subprocess (this check is the admission gate,
                 // not the execution); both share the same conformance bar so
@@ -83,7 +83,7 @@ impl SpiritHostPort for WasmHostAdapter {
                 // before a process is even spawned.
                 crate::conformance::probe_component(&request.artifact, self.timeout).map_err(
                     |e| SpiritHostError::InvalidComponent {
-                        reason: format!("component does not conform to maos:spirit@1.0: {e}"),
+                        reason: format!("component does not conform to maos:spirit@2.0.0: {e}"),
                     },
                 )?;
 

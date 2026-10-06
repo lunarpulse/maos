@@ -59,6 +59,7 @@ fn manifest() -> SpiritManifestBundle {
         forms: vec!["rust-inproc".into()],
         trust_tier: "local".into(),
         description: "NFR-Rel-9 benchmark fixture".into(),
+        artifact: None,
     });
     manifest
 }

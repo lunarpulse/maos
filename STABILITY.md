@@ -22,16 +22,16 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 |---|---|
 | `kernel_version` | `0.1.0-alpha.1` |
 | `abi_version` | `1` |
-| `manifest_schema_version` (current) | `4` |
-| supported schema window | `1..=4` |
+| `manifest_schema_version` (current) | `5` |
+| supported schema window | `1..=5` |
 | workspace crates | `56` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
-| `manifest_schema_version = 4` (current) | ✅ strict load (`deny_unknown_fields`) |
-| `manifest_schema_version = 3` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
+| `manifest_schema_version = 5` (current) | ✅ strict load (`deny_unknown_fields`) |
+| `manifest_schema_version = 4` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
 | `manifest_schema_version < 1` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
-| `manifest_schema_version > 4` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
+| `manifest_schema_version > 5` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
 
 The version gate is **fail-closed in both directions**: an out-of-window
@@ -113,14 +113,16 @@ Operators and distributors must confirm applicability with their own counsel
 and the jurisdiction of distribution.
 
 The WASM host remains outside the shipped default closure while export Hold 2
-is open. `crates/maos-bin/Cargo.toml` defines `default = ["network"]`; the
-`wasm-host` feature is opt-in and is the engineering precondition for the
-unresolved **5D002.c.1** classification. Measured with `cargo tree -p maos-bin
---edges all`, the default closure contains zero `wasmtime` packages; `--features
-wasm-host` opts into the engine family (wasmtime/cranelift/pulley/wiggle), whose
-coordinated 46.0.2 → 46.0.3 security upgrade moved 39 lockfile entries. Consequently,
-the wasmtime 46.0.2 RustSec advisories addressed by Story 15-5 did not reach a
-published default binary. Self-builders who opt in must follow
+is open. A default binary validates a WASM-component manifest and reports
+`wasm_engine_off`; it does not instantiate an engine. `crates/maos-bin/Cargo.toml`
+defines `default = ["network"]`; the `wasm-host` feature is opt-in and is the
+engineering precondition for the unresolved **5D002.c.1** classification.
+Measured with `cargo tree -p maos-bin --edges all`, the default closure contains
+zero `wasmtime` packages; `--features wasm-host` opts into the engine family
+(wasmtime/cranelift/pulley/wiggle), whose coordinated 46.0.2 → 46.0.3 security
+upgrade moved 39 lockfile entries. Consequently, the wasmtime 46.0.2 RustSec
+advisories addressed by Story 15-5 did not reach a published default binary.
+Self-builders who opt in must follow
 `docs/compliance/export-counsel-precondition.md`; this is not a legal
 classification or permission to distribute the WASM-enabled artifact.
 <!-- END PRESERVED:export -->

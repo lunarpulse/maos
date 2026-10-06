@@ -14,9 +14,10 @@ Supersedes: ADR-031 rust-inproc deferral clauses in §§4, Alternatives, and Con
 MAOS has two distinct form taxonomies today.
 
 The manifest taxonomy is the string list `ClassSection.forms` in
-`crates/maos-manifest/src/manifest.rs`. Its validator currently accepts exactly
-`rust-inproc` and `subprocess`; the shipped negative test uses `wasm` as the
-unknown value. `wasm-component` is not yet accepted.
+`crates/maos-manifest/src/manifest.rs`. Since Story 17-3b its validator accepts
+`rust-inproc`, `subprocess` and `wasm-component`; `wasm-component` must be the
+only form and requires `[class].artifact` and manifest schema 5. The shipped
+negative test still uses `wasm` as the unknown value.
 
 The host-port taxonomy is `maos_host::SpiritForm` at
 `crates/maos-host/src/lib.rs:48`. It contains `NativeSubprocess` and
@@ -29,12 +30,15 @@ exclusive with `[class]`; combining the two is
 be listed as one of its values. Its own admission control requires T3 through
 `ECliWrapperRequiresT3`.
 
-Form-based admission does not exist. `maos_registry::admit_spirit` at
-`crates/maos-registry/src/admission.rs:179` does not read `class.forms`, and
-`SecurityPolicy::admit` at
-`crates/maos-kernel-core/src/security/mod.rs:266` does not read it either.
-Declaring that registry packages cannot use `rust-inproc` creates a control for
-Story 17-3b; it does not describe current enforcement.
+Form-based admission exists since Story 17-3b.
+`maos_registry::admit_spirit` and `admit_spirit_with_attestation` in
+`crates/maos-registry/src/admission.rs` parse the manifest once as a
+`ManifestDocument`; its `class_section` method reads `class.forms` after the
+same frozen-surface gate both call first: a package declaring `rust-inproc` is
+refused (`FirstPartyFormFromRegistry`) at every trust tier, attested or not. The daemon's
+own gate (`maos_bin::admission::gate_manifest`) refuses a `wasm-component`
+manifest by name until the engine and launch ship. `SecurityPolicy::admit` at
+`crates/maos-kernel-core/src/security/mod.rs` does not read `class.forms`.
 
 First-party in-process loading does exist by construction. The scheduler's
 `load<T: Spirit>` at `scheduler_loop.rs:243` receives a compiled-in Rust type.
@@ -52,9 +56,9 @@ Protocol host planned at v0.1. It does not deny ADR-031's wasmtime runner
 process. The runner at `crates/maos-wasm-host/src/runner.rs:1-5` is
 `BridgeSpawnSpec.program` and speaks the unchanged ADR-032 protocol over stdio.
 
-The current WIT world at `wit/spirit.wit:219-230` has one `use`, three exports,
-and no imports. There is no Unix listener, stream, or datagram implementation
-in the workspace, and no WASM recall path exists yet.
+The WIT world at `wit/spirit.wit` (`maos:spirit@2.0.0` since Story 17-3b) has
+one `use`, three exports, and no imports. There is no Unix listener, stream, or
+datagram implementation in the workspace, and no WASM recall path exists yet.
 
 `Butler::morning_digest` exists at `spirits/butler/src/lib.rs:675` and Butler is
 already linked by `maos-bin`. It has four test/benchmark callers and zero
@@ -154,6 +158,23 @@ from Story 17 work prevents this ADR from claiming controls that do not exist.
 - The phased roadmap and product-scoping text are reconciled with the explicit
   ADR-002/031/040 supersession chain.
 - Kernel-core source remains unchanged by this decision story.
+
+## Implementation note — Story 17-3b (2026-09-29)
+
+Recorded, not a change to clauses 1–4. Story
+`17-3b-wasm-form-admission-and-contract` implemented clauses 1 and 2 as
+follows. "The appropriate registry trust tiers" in clause 2 is **every** tier:
+`local`, `org-internal`, `public-untrusted` and an attested `public-vetted`
+each admit a `wasm-component` package under that tier's existing signature,
+org-key and envelope obligations (epic-17 R17-58). FR5's strictest-of-three
+floor is form-aware: a `wasm-component` package's returned sandbox floor is T2
+at every tier, because its only boundary is ADR-031's T2 runner process plus
+the WIT surface, and `t3_for_public_untrusted` does not apply to it (T3 has no
+WASM path; T4 is the reserved WASM tool sandbox, refused at admission). A
+package without a `[class]` table keeps its legacy admission unchanged. The
+daemon refuses a `wasm-component` manifest as `wasm_engine_off` in every
+default build and as `wasm_launch_not_built` in a `wasm-host` build until
+`17-3c-wasm-spirit-on-the-bus-under-t2` ships the launch.
 
 ## Amendment — §D-C transport (ratified 2026-09-26)
 

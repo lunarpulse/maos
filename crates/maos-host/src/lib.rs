@@ -131,7 +131,7 @@ pub trait SpiritHostPort: Send + Sync {
     ///
     /// For `NativeSubprocess`, this is identity (`program = artifact`).
     /// For `WasmComponent`, the adapter validates the component against the
-    /// `maos:spirit@1.0` WIT world (real wasmtime parse + instantiate probe,
+    /// `maos:spirit@2.0.0` WIT world (real wasmtime parse + instantiate probe,
     /// bounded by a timeout), then returns `program = <runner>`,
     /// `argv = [--component, <artifact>, --fuel, <n>, ...]`.
     fn resolve_launch(

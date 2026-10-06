@@ -68,3 +68,37 @@ covered_changes = [
   "RawLoomCapabilities",
 ]
 ratified_at = "2026-07-19"
+
+# Story 17-3b AC3 — manifest schema 4→5 and the WASM component declaration.
+[[ratification]]
+proposal_id = "17-3b-AC3-manifest-schema-5"
+summary = "MANIFEST_SCHEMA_VERSION 4→5 + ClassSection/RawClassSection wasm-component artifact declaration"
+adr_ref = "ADR-045,ADR-060"
+status = "ratified"
+covered_changes = [
+  "MANIFEST_SCHEMA_VERSION",
+  "ClassSection",
+  "RawClassSection",
+]
+ratified_at = "2026-09-29"
+
+# Story 17-3b AC2 — maos:spirit WIT 1.0.0→2.0.0 contract break.
+[[ratification]]
+proposal_id = "17-3b-AC2-wit-spirit-2.0.0"
+summary = "maos:spirit@2.0.0 lossless frame contract: expanded iac-frame, typed scope and intent, consent-envelope, all current rupture reasons, and nested lineage/digest references"
+adr_ref = "ADR-031,ADR-045,ADR-060"
+status = "ratified"
+covered_changes = [
+  "maos:spirit@2.0.0",
+  "iac-frame",
+  "scope",
+  "intent-class",
+  "consent-envelope",
+  "scope-mcp-call",
+  "scope-cli-subprocess-spawn",
+  "scope-gateway-send",
+  "rupture-reason",
+  "prior-distillate-ref",
+  "decision-dispatch-body",
+]
+ratified_at = "2026-09-29"

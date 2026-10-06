@@ -13,25 +13,30 @@ review_status: machine
 
 | 버전 | 상태 | 설명 |
 |---------|--------|-------------|
-| [v3](./v3) | **현재(Current)** | `[model_provenance]` 추가(Story 9.4b). |
-| [v2](./v2) | 지원(N-1) | `[[cli_wrapper]]`, `[[schedule]]`, `[[gateway]]` 추가(Epic 6). |
-| [v1](./v1) | 거부(N-2) | 기준 스키마(Epic 1b). |
+| [v5](./v5) | **현재(Current)** | `wasm-component`와 `[class].artifact` 추가(Story 17-3b). |
+| [v4](./v4) | 지원(N-1) | `[capabilities.required.loom]` 추가(Story 13.5d). |
+| [v3](./v3) | 지원 | `[model_provenance]` 추가(Story 9.4b). |
+| [v2](./v2) | 지원 | `[[cli_wrapper]]`, `[[schedule]]`, `[[gateway]]` 추가(Epic 6). |
+| [v1](./v1) | 지원 | 기준 스키마(Epic 1b). |
 
 ## 버전 정책
 
-kernel은 **N-1 지원 / N-2 거부** 정책을 시행합니다.
+kernel은 구성된 포괄 범위에 속하는 스키마 버전만 어드미션합니다:
 
-- **현재(N):** 전체 기능 세트, 기능 저하 없음.
-- **N-1:** 문서화된 저하와 함께 허용 — 새 섹션은 `#[serde(default)]`로 기본값 처리됩니다. kernel은 기본값 처리된 각 섹션에 대해 `WARN` 수준 알림을 내보냅니다.
-- **N-2 이하:** 어드미션 시점에 `EAbiTooOld`로 거부됩니다.
+- **현재 구성 범위:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, 현재 `1..=5`.
+- **`MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` 미만:** 어드미션 시점에 `EAbiTooOld`로 거부됩니다.
+- **`MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` 초과:** 어드미션 시점에 `EAbiTooNew`로 거부됩니다.
 
 권위 있는 버전 상수는 `crates/maos-spirit-abi/src/lib.rs`에 있습니다:
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 5;
 pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 5;
 ```
+
+향후 kernel은 두 경계 중 하나를 변경할 수 있습니다. 대상 kernel의 지원 범위에 manifest 버전이 더 이상 포함되지 않기 전에 마이그레이션하세요.
 
 ## 최신
 
-최신 스키마 참조는 **[v3](./v3)** 입니다.
+최신 스키마 참조는 **[v5](./v5)** 입니다.

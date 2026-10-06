@@ -9,7 +9,7 @@
 - [cancellation Module](./cancellation) — `CancellationSignal` used in hooks
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 5*
 
 Lifecycle hooks trait — the in-process Rust trait contract between
 the kernel and a Spirit.

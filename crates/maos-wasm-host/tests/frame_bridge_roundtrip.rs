@@ -1,39 +1,35 @@
-//! Story 11.1a AC2/AC3 — direct round-trip coverage for `frame_bridge::lower`/`lift`.
+//! Story 17-3b AC2 — direct lossless round-trip coverage for
+//! `frame_bridge::lower`/`lift`.
 //!
-//! The e2e suite (`e2e_roundtrip.rs`) proves ONE frame kind (`TaskAssign`) end to
-//! end through a real wasmtime guest subprocess. That is the right integration
-//! depth for "the pipe works" but it leaves 14 of 15 `FrameKind` discriminants
-//! and 8 of 9 `FramePayload` variants unexercised across the WIT boundary — the
-//! single most likely place for a silent lower/lift asymmetry to hide.
+//! The e2e suite proves a real guest subprocess path. These tests isolate the
+//! codec and cover every payload and frame-kind discriminator without a
+//! wasmtime process. Every WIT-representable domain field must survive:
+//! `encode_cbor(lift(lower(frame))) == encode_cbor(frame)`.
 //!
-//! These tests pin the round-trip contract directly (no subprocess, no wasmtime):
-//! for every payload variant and every frame-kind discriminator, `lift(lower(f))`
-//! MUST preserve the fields the WIT world carries, and MUST drop/default the
-//! three documented-lossy fields (`intent`, `consent_envelope`, `intent_lineage`)
-//! and the lossy `Scope` Debug-string projection — explicitly, so a future WIT
-//! revision that adds them flips these assertions RED rather than passing
-//! silently on stale assumptions.
-//!
-//! Per D5, the byte-equal oracle's correctness rests on the lower/lift pair
-//! being a faithful (if intentionally narrowed) projection; this file makes
-//! that faithfulness mechanical, not hoped.
+//! The hostile vectors exercise guest-controlled fixed-size byte fields and
+//! future domain variants. The bridge is a codec rather than an authorization
+//! point, but it must never construct invalid fixed-size domain values or
+//! silently map an unrepresentable variant.
 
 #![cfg(test)]
 
 use maos_domain::frame::{
-    self, ConsentRequestPayload, ConsentRupturePayload, DecisionDispatchPayload,
-    EpistemicHaltPayload, FrameAddress, FramePayload, IacFrame, PosturePreferences,
-    RateLimitedPayload, RetractPayload, RuptureRejection, TaskAssignPayload, TaskCompletePayload,
-    TelemetryEventPayload,
+    self, ConsentEnvelope, ConsentRequestPayload, ConsentRupturePayload, DecisionDispatchPayload,
+    EpistemicHaltPayload, FrameAddress, FramePayload, HaltPolicyOverride, IacFrame, PostureHint,
+    PosturePreferences, PriorDistillateRef, RateLimitedPayload, RetractPayload, RuptureRejection,
+    TaskAssignPayload, TaskCompletePayload, TelemetryEventPayload,
 };
-use maos_domain::invariants::i1::IntentClass;
-use maos_domain::invariants::i1::Scope;
+use maos_domain::invariants::i1::{IntentClass, Scope};
+use maos_domain::invariants::i12::WorkingMemoryDigestRefs;
 use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::invariants::i8::A2AIntent;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::SmallVec;
 
-use maos_wasm_host::frame_bridge::{lift, lower};
+use maos_wasm_host::codec;
+use maos_wasm_host::frame_bridge::{lift, lower, BridgeError};
+use maos_wasm_host::wit_guest::maos::spirit::frames as wit;
 
 // ── Envelope scaffolding ────────────────────────────────────────────────
 
@@ -70,9 +66,7 @@ fn envelope(kind: FrameKind, payload: FramePayload) -> IacFrame {
     }
 }
 
-/// Assert the WIT-carried envelope fields survive `lower`/`lift`. The three
-/// lossy fields (`intent`, `consent_envelope`, `intent_lineage`) are checked in
-/// their own dedicated tests below — never silently folded into a pass here.
+/// Assert all envelope fields survive the lossless WIT projection.
 fn assert_envelope_round_trips(original: &IacFrame, round: &IacFrame) {
     assert_eq!(
         round.frame_id, original.frame_id,
@@ -85,23 +79,16 @@ fn assert_envelope_round_trips(original: &IacFrame, round: &IacFrame) {
         round.auto_marker, original.auto_marker,
         "FrameOrigin must round-trip"
     );
-    assert_eq!(round.from.spirit_id, original.from.spirit_id);
-    assert_eq!(round.from.host_id, original.from.host_id);
-    assert_eq!(round.from.role, original.from.role);
-    assert_eq!(
-        round.to.len(),
-        original.to.len(),
-        "recipient count must round-trip"
-    );
-    for (got, want) in round.to.iter().zip(original.to.iter()) {
-        assert_eq!(got.spirit_id, want.spirit_id);
-        assert_eq!(got.host_id, want.host_id);
-        assert_eq!(got.role, want.role);
-    }
+    assert_eq!(round.from, original.from);
+    assert_eq!(round.to, original.to);
+    assert_eq!(round.intent, original.intent);
+    assert_eq!(round.consent_envelope, original.consent_envelope);
+    assert_eq!(round.intent_lineage, original.intent_lineage);
 }
 
 fn round_trip(frame: &IacFrame) -> IacFrame {
-    lift(lower(frame)).expect("lower/lift must succeed for a well-formed frame")
+    let lowered = lower(frame).expect("lower must represent a well-formed frame");
+    lift(lowered).expect("lift must accept a lowered well-formed frame")
 }
 
 /// Minimal defaults — `TaskAssignPayload` has no `Default`, so spell it out.
@@ -175,34 +162,6 @@ fn task_assign_payload_round_trips() {
     assert_eq!(got.goal, "ship 11.1a");
     assert_eq!(got.success_criteria, "all gates green");
     assert_eq!(got.prior_distillate_ref, None);
-}
-
-#[test]
-fn task_assign_scope_round_trips_lossy_debug_projection() {
-    // D5 documented limitation: `Scope` has no WIT type and rides as its Debug
-    // string; `scope_from_debug_string` returns None, so a non-empty scope
-    // round-trips to EMPTY. Pin this explicitly — if a future WIT revision adds
-    // a real Scope type, this assertion flips RED and forces the fix.
-    let payload = TaskAssignPayload {
-        scope: vec![
-            Scope::FsRead {
-                subtree: "/tmp".into(),
-            },
-            Scope::SelfTelemetryRead,
-        ],
-        ..task_assign_defaults()
-    };
-    let frame = envelope(FrameKind::TaskAssign, FramePayload::TaskAssign(payload));
-    let round = round_trip(&frame);
-    let FramePayload::TaskAssign(got) = &round.payload else {
-        panic!("expected TaskAssign");
-    };
-    assert!(
-        got.scope.is_empty(),
-        "Scope is a lossy Debug projection today — non-empty scope MUST collapse to empty \
-         (tracked D5 limitation); got {} entries",
-        got.scope.len()
-    );
 }
 
 #[test]
@@ -328,7 +287,7 @@ fn retract_payload_round_trips() {
 }
 
 #[test]
-fn consent_rupture_payload_round_trips() {
+fn consent_rupture_peer_identity_unverified_round_trips() {
     let payload = ConsentRupturePayload {
         rupture_id: [0x02; 16],
         original_frame_id: [0x03; 16],
@@ -336,7 +295,7 @@ fn consent_rupture_payload_round_trips() {
         accepted: vec![address(Some(SpiritRole::Worker))],
         rejected: vec![RuptureRejection {
             address: address(None),
-            reason: frame::RuptureReason::TokenRevoked,
+            reason: frame::RuptureReason::PeerIdentityUnverified,
         }],
         ruptured_at_ns: 9_999,
     };
@@ -354,7 +313,10 @@ fn consent_rupture_payload_round_trips() {
     assert_eq!(got.original_kind, FrameKind::DecisionDispatch);
     assert_eq!(got.accepted.len(), 1);
     assert_eq!(got.rejected.len(), 1);
-    assert_eq!(got.rejected[0].reason, frame::RuptureReason::TokenRevoked);
+    assert_eq!(
+        got.rejected[0].reason,
+        frame::RuptureReason::PeerIdentityUnverified
+    );
     assert_eq!(got.ruptured_at_ns, 9_999);
 }
 
@@ -381,38 +343,195 @@ fn rate_limited_payload_round_trips() {
     assert_eq!(got.schedule_id.as_deref(), Some("sched-3"));
 }
 
-// ── Documented-lossy fields: pinned explicitly (flip RED when WIT grows) ─
+// ── Lossless nested-field oracles and hostile guest vectors ─────────────
 
-#[test]
-fn intent_field_round_trips_lossy_to_readonly() {
-    // The WIT `iac-frame` omits `intent`; lift defaults to Readonly. Pinned so a
-    // future WIT revision carrying intent flips this RED instead of silently
-    // discarding a Standard frame.
-    let frame = envelope(
+fn lineage(values: &[&str]) -> IntentLineage {
+    IntentLineage::new(values.iter().map(|value| A2AIntent::new(*value)).collect())
+}
+
+fn all_scope_variants() -> Vec<Scope> {
+    vec![
+        Scope::FsRead {
+            subtree: "/read".into(),
+        },
+        Scope::FsWrite {
+            subtree: "/write".into(),
+        },
+        Scope::NetHttps {
+            domain: "api.example.test".into(),
+        },
+        Scope::ProcExec {
+            binary: "/usr/bin/true".into(),
+        },
+        Scope::SubSpiritSpawn {
+            class: "worker".into(),
+        },
+        Scope::ProviderInfer {
+            provider: "example-provider".into(),
+        },
+        Scope::IacSend {
+            peer_class: "director".into(),
+        },
+        Scope::MemRead {
+            scope: "notes".into(),
+        },
+        Scope::MemWrite {
+            scope: "notes".into(),
+        },
+        Scope::SelfTelemetryRead,
+        Scope::LogRecall,
+        Scope::LogFetch,
+        Scope::DistillateWrite,
+        Scope::McpCall {
+            server: "tools".into(),
+            tool: "search".into(),
+        },
+        Scope::CliSubprocessSpawn {
+            cli_binary_path: "/usr/bin/git".into(),
+            argv_prefix_hash: [0x41; 32],
+            output_shape_version: "v1".into(),
+        },
+        Scope::GatewaySend {
+            gateway_id: "gateway-a".into(),
+            recipient: "recipient-a".into(),
+        },
+        Scope::SkillAuthorSelf,
+        Scope::LoomRead,
+        Scope::LoomWrite,
+        Scope::LoomScan,
+    ]
+}
+
+fn task_assign_oracle_frame() -> IacFrame {
+    let mut frame = envelope(
         FrameKind::TaskAssign,
-        FramePayload::TaskAssign(task_assign_defaults()),
+        FramePayload::TaskAssign(TaskAssignPayload {
+            goal: "preserve every scope".into(),
+            scope: all_scope_variants(),
+            success_criteria: "byte-identical canonical CBOR".into(),
+            posture_preferences: PosturePreferences {
+                preferred_posture: Some(PostureHint::Assistive),
+                halt_policy_overrides: vec![HaltPolicyOverride {
+                    tag: "confidence".into(),
+                    recall_vs_precision: 0.25,
+                }],
+            },
+            prior_distillate_ref: Some(PriorDistillateRef {
+                digest_frame_id: [0xD1; 16],
+                distillation_depth: 3,
+                intent_lineage: lineage(&["source", "distillate"]),
+            }),
+        }),
     );
-    let round = round_trip(&frame);
+    frame.intent = IntentClass::HighPrivilege;
+    frame.intent_lineage = lineage(&["request", "assignment"]);
+    frame
+}
+
+fn assert_canonical_round_trip(frame: &IacFrame) -> usize {
+    let expected = codec::encode_cbor(frame).expect("canonical input must encode");
+    let actual =
+        codec::encode_cbor(&round_trip(frame)).expect("canonical round-trip output must encode");
     assert_eq!(
-        round.intent,
-        IntentClass::Readonly,
-        "intent is dropped on lower and defaulted to Readonly on lift (tracked gap)"
+        actual, expected,
+        "lower/lift must preserve canonical CBOR bytes"
     );
-    assert_ne!(
-        round.intent, frame.intent,
-        "sanity: the original was NOT Readonly"
-    );
+    actual.len()
 }
 
 #[test]
-fn consent_envelope_round_trips_lossy_to_none() {
-    let frame = envelope(
-        FrameKind::TaskAssign,
-        FramePayload::TaskAssign(task_assign_defaults()),
+fn task_assign_nested_fields_and_all_scope_variants_are_byte_lossless() {
+    let bytes = assert_canonical_round_trip(&task_assign_oracle_frame());
+    println!("TaskAssign oracle canonical CBOR byte count: {bytes}");
+}
+
+#[test]
+fn decision_dispatch_digest_refs_are_byte_lossless() {
+    let mut frame = envelope(
+        FrameKind::DecisionDispatch,
+        FramePayload::DecisionDispatch(DecisionDispatchPayload {
+            decision_id: 47,
+            approved: true,
+            working_memory_digest_refs: WorkingMemoryDigestRefs::new(vec![
+                "digest-a".into(),
+                "digest-b".into(),
+            ]),
+        }),
     );
-    let round = round_trip(&frame);
-    assert_eq!(
-        round.consent_envelope, None,
-        "consent_envelope is not representable in WIT v2.0 (tracked gap)"
+    frame.intent_lineage = lineage(&["decision", "operator-approved"]);
+    assert_canonical_round_trip(&frame);
+}
+
+#[test]
+fn consent_envelope_intent_and_lineage_are_byte_lossless() {
+    let mut frame = envelope(
+        FrameKind::TaskComplete,
+        FramePayload::TaskComplete(TaskCompletePayload {
+            result: "completed with consent".into(),
+        }),
     );
+    frame.intent = IntentClass::HighPrivilege;
+    frame.consent_envelope = Some(ConsentEnvelope {
+        consent_id: [0xC0; 16],
+        granter: address(Some(SpiritRole::Observer)),
+        timestamp_ns: 9_876_543,
+        intent_class: Some(A2AIntent::new("diagnosis-handoff:read-only-evidence")),
+        valid_until_ns: Some(9_999_999),
+    });
+    frame.intent_lineage = lineage(&["operator", "handoff"]);
+    assert_canonical_round_trip(&frame);
+}
+
+#[test]
+fn guest_frame_id_with_15_bytes_is_rejected() {
+    let mut wire = lower(&task_assign_oracle_frame()).expect("oracle frame must lower");
+    wire.frame_id = vec![0; 15];
+    assert!(matches!(lift(wire), Err(BridgeError::BadFrameIdLen(15))));
+}
+
+#[test]
+fn guest_argv_prefix_hash_with_31_bytes_is_rejected() {
+    let mut wire = lower(&task_assign_oracle_frame()).expect("oracle frame must lower");
+    let wit::FramePayload::TaskAssign(task) = &mut wire.payload else {
+        panic!("oracle frame must lower as TaskAssign");
+    };
+    let Some(wit::Scope::CliSubprocessSpawn(spawn)) = task
+        .scope
+        .iter_mut()
+        .find(|scope| matches!(scope, wit::Scope::CliSubprocessSpawn(_)))
+    else {
+        panic!("oracle frame must carry a CLI subprocess scope");
+    };
+    spawn.argv_prefix_hash = vec![0; 31];
+
+    assert!(matches!(lift(wire), Err(BridgeError::BadHashLen(31))));
+}
+
+#[test]
+fn four_mib_guest_intent_lineage_lifts_without_panicking_or_truncation() {
+    const ENTRIES: usize = 4_096;
+    const ENTRY_BYTES: usize = 1_024;
+    let mut guest_frame = lower(&task_assign_oracle_frame()).expect("oracle frame must lower");
+    let suffix = "x".repeat(ENTRY_BYTES - 4);
+    guest_frame.intent_lineage = (0..ENTRIES)
+        .map(|index| format!("{index:04}{suffix}"))
+        .collect();
+    let guest_lineage = guest_frame.intent_lineage.clone();
+
+    let domain = lift(guest_frame).expect("4 MiB guest lineage must lift");
+    assert_eq!(domain.intent_lineage.as_slice().len(), ENTRIES);
+    assert!(
+        domain
+            .intent_lineage
+            .as_slice()
+            .iter()
+            .map(|s| s.as_str().len())
+            .sum::<usize>()
+            >= 4 * 1024 * 1024
+    );
+    let returned = lower(&domain).expect("lifted lineage must lower");
+    assert_eq!(returned.intent_lineage, guest_lineage);
+    let encoded = codec::encode_cbor(&domain).expect("4 MiB frame fits ADR-032 cap");
+    assert!(encoded.len() > 4 * 1024 * 1024);
+    assert!(encoded.len() <= codec::MAX_FRAME_BYTES);
 }

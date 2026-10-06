@@ -24,7 +24,7 @@ equiv-fault-inject = []
 maos-host = { path = "../maos-host" }
 
 # Domain frame types — the real `IacFrame`/`FramePayload` this host bridges
-# between the ADR-032 wire and the `maos:spirit@1.0` WIT world (AC2/AC3).
+# between the ADR-032 wire and the `maos:spirit@2.0.0` WIT world (AC2/AC3).
 # Allowed direction: maos-wasm-host -> maos-domain. Forbidden direction
 # (asserted by xtask check-dependency-closure) is wasmtime leaking INTO
 # maos-domain/maos-kernel-core, which this does not do.
@@ -66,3 +66,4 @@ libc = "0.2"
 # WIT AST parsing for the corpus completeness denominator (D5: "enumerated
 # mechanically from the .wit AST", not a hand-maintained const array).
 wit-parser = "0.251"
+toml = "0.8"

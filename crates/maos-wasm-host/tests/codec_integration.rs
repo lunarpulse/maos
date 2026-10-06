@@ -35,6 +35,25 @@ fn large_payload_roundtrips() {
 }
 
 #[test]
+fn outbound_frame_cap_rejects_oversized_guest_data_before_writing() {
+    let oversized = vec![0u8; codec::MAX_FRAME_BYTES + 1];
+    let mut wire = Vec::new();
+    let error = codec::write_frame(&mut wire, &oversized).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    assert!(wire.is_empty(), "no partial ADR-032 header may escape");
+
+    let encode_error = codec::encode_cbor(&oversized).unwrap_err();
+    assert!(
+        encode_error.contains("frame cap"),
+        "serialization must refuse before accumulating an oversized CBOR buffer: {encode_error}"
+    );
+
+    let mut accepted = Vec::new();
+    codec::write_frame(&mut accepted, &oversized[..codec::MAX_FRAME_BYTES]).unwrap();
+    assert!(accepted.starts_with(b"Content-Length: 16777216\r\n\r\n"));
+}
+
+#[test]
 fn cbor_canonical_map_key_ordering() {
     // RFC 8949 §4.2.1: map keys sorted by byte (deterministic).
     // BTreeMap guarantees sorted iteration in Rust, so encoding should

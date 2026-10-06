@@ -9,7 +9,7 @@
 - [deprecation Module](./deprecation) — `DeprecationWarning` returned by `Ctx::deprecation_warnings()`
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 5*
 
 Spirit-author-facing context type.
 

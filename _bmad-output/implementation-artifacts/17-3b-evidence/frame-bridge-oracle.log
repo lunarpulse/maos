@@ -1,0 +1,7 @@
+2026-09-29T15:47:06Z
+5075443c
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test frame_bridge_roundtrip -- --nocapture
+
+Result: 17 passed, 0 failed.
+TaskAssign oracle canonical CBOR byte count: 1289.
+The large-lineage hostile vector uses 4,096 A2A intent strings and bounds its canonical-CBOR output below 1 MiB; it passed without panic.

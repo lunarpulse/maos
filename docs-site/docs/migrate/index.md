@@ -12,29 +12,30 @@ MAOS uses a **manifest schema version** to track breaking changes to the Spirit 
 
 | Constant | Value |
 |---|---|
-| `MANIFEST_SCHEMA_VERSION` (current) | `3` |
+| `MANIFEST_SCHEMA_VERSION` (current) | `5` |
 | `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `1` |
-| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `3` |
+| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `5` |
 
-The supported window is `1..=3`. A manifest below `MIN_SUPPORTED` is refused with `SecurityError::EAbiTooOld`; above `MAX_SUPPORTED` with `SecurityError::EAbiTooNew`.
+The supported window is `1..=5`. A manifest below `MIN_SUPPORTED` is refused with `SecurityError::EAbiTooOld`; above `MAX_SUPPORTED` with `SecurityError::EAbiTooNew`.
 
 ## Migration Paths
 
-| From | To | Guide | Kernel behavior at v3 |
+| From | To | Guide | Kernel behavior at v5 |
 |---|---|---|---|
-| v1 | v2 | [v1 → v2](./v1-to-v2) | ✅ Loads (within N-1 window) |
-| v2 | v3 | [v2 → v3](./v2-to-v3) | ✅ Current version |
-| v1 | v3 | Apply [v1 → v2](./v1-to-v2) then [v2 → v3](./v2-to-v3) | ✅ Loads (within supported window) |
+| v1 | v2 | [v1 → v2](./v1-to-v2) | ✅ Loads (within supported window) |
+| v2 | v3 | [v2 → v3](./v2-to-v3) | ✅ Loads (within supported window) |
+| v3 | v4 | [v3 → v4](./v3-to-v4) | ✅ Loads (within supported window) |
+| v4 | v5 | [v4 → v5](./v4-to-v5) | ✅ Current version |
 
 ## Compatibility Policy
 
-MAOS follows an **N-1 supported / N-2 hard-refusal** policy:
+MAOS admits the inclusive range configured by its manifest schema bounds:
 
-- **N** (current): Full support, strict load with `deny_unknown_fields`.
-- **N-1**: Supported with WARN-level degradation notes for omitted sections.
-- **N-2 and below**: Hard refusal at admission (`SecurityError::EAbiTooOld`).
+- `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` is currently `1..=5`.
+- A manifest below the minimum is refused at admission with `SecurityError::EAbiTooOld`.
+- A manifest above the maximum is refused at admission with `SecurityError::EAbiTooNew`.
 
-When the kernel bumps to schema version 4, version 1 manifests will hit the N-2 boundary and be refused. Migrate proactively.
+Future kernels may change either bound. Migrate proactively before targeting a kernel whose supported window no longer includes your manifest version.
 
 For the full stability policy, see [ABI Stability](./abi-stability).
 

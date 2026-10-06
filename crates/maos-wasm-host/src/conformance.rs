@@ -1,4 +1,4 @@
-//! Admission-time `maos:spirit@1.0` conformance probe.
+//! Admission-time `maos:spirit@2.0.0` conformance probe.
 //!
 //! Used by `WasmHostAdapter::resolve_launch` to reject a present-but-bad
 //! `.wasm` BEFORE a runner subprocess is even spawned (AC3: "a malformed /
@@ -14,7 +14,7 @@ use wasmtime::{Config, Engine, Store};
 
 use crate::wit_guest::Spirit;
 
-/// Parse + instantiate `path` against the `maos:spirit@1.0` world on a
+/// Parse + instantiate `path` against the `maos:spirit@2.0.0` world on a
 /// dedicated thread bounded by `timeout`. Returns `Ok(())` if the component
 /// is well-formed AND exports `handle-frame`/`on-start`/`on-shutdown`;
 /// `Err` with a human-readable reason otherwise (never panics, never hangs

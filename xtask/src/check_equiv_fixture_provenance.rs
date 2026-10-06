@@ -12,9 +12,8 @@
 //!   - `wasm_sha256` mismatch: the component changed without the manifest;
 //!   - `source_sha256` mismatch: source or WIT changed without regeneration.
 //!
-//! The residual gap (regeneration plus updating both hashes together) is a
-//! legitimate fixture update and is closed by the scoped-nightly byte-rebuild
-//! job. This gate enforces per-commit source↔WIT↔binary↔manifest synchronization.
+//! Blob bytes and source bytes are pinned per commit; the toolchain is recorded;
+//! reproduction is a manual recipe (story 17-3b §Dev Notes), not a CI control.
 
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -23,8 +22,19 @@ const FIXTURES_DIR: &str = "tests/fixtures/wasm";
 const MANIFEST_REL: &str = "tests/fixtures/wasm/equiv-fixtures.provenance.toml";
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Manifest {
+    toolchain: Toolchain,
     fixture: Vec<FixtureEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Toolchain {
+    rustc: String,
+    wit_bindgen: String,
+    target: String,
+    wasi_imports: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -56,6 +66,22 @@ fn source_hash(paths: &[String]) -> Result<String, String> {
     Ok(sha256_hex(&combined))
 }
 
+fn require_toolchain(toolchain: &Toolchain) -> Result<(), String> {
+    for (name, value) in [
+        ("rustc", &toolchain.rustc),
+        ("wit_bindgen", &toolchain.wit_bindgen),
+        ("target", &toolchain.target),
+        ("wasi_imports", &toolchain.wasi_imports),
+    ] {
+        if value.trim().is_empty() {
+            return Err(format!(
+                "check-equiv-fixture-provenance: FAIL — required [toolchain] field `{name}` is empty"
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn run(json: bool) -> Result<(), String> {
     let manifest_path = Path::new(MANIFEST_REL);
     if !manifest_path.exists() {
@@ -67,6 +93,8 @@ pub fn run(json: bool) -> Result<(), String> {
         .map_err(|e| format!("cannot read {MANIFEST_REL}: {e}"))?;
     let manifest: Manifest =
         toml::from_str(&manifest_src).map_err(|e| format!("cannot parse {MANIFEST_REL}: {e}"))?;
+
+    require_toolchain(&manifest.toolchain)?;
 
     if manifest.fixture.is_empty() {
         return Err(format!(
@@ -101,8 +129,8 @@ pub fn run(json: bool) -> Result<(), String> {
                 if src_actual != entry.source_sha256 {
                     mismatches.push(format!(
                         "{}: source_sha256 drift — manifest={}, actual={} \
-                         (component source or WIT changed since this .wasm was built; rebuild via \
-                         the scoped-nightly regen and update both hashes in {})",
+                         (component source or WIT changed since this .wasm was built; reissue \
+                         the component and update both hashes in {})",
                         entry.component, entry.source_sha256, src_actual, MANIFEST_REL
                     ));
                 }
@@ -167,5 +195,16 @@ mod tests {
         let h2 = source_hash(&[b_s, a_s]).unwrap();
         assert_eq!(h1, h2, "source hash must be independent of input order");
         std::fs::remove_dir_all(&dir).ok();
+    }
+    #[test]
+    fn missing_toolchain_is_rejected() {
+        let manifest = r#"
+[[fixture]]
+component = "fixture.wasm"
+wasm_sha256 = "a"
+source_sha256 = "b"
+source = []
+"#;
+        assert!(toml::from_str::<super::Manifest>(manifest).is_err());
     }
 }

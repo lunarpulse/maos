@@ -1,0 +1,123 @@
+2026-09-29 UTC
+5075443c
+
+Preserved pre-reissue component:
+$ cp tests/fixtures/wasm/echo_spirit_component.wasm /tmp/echo-v1.wasm && sha256sum /tmp/echo-v1.wasm
+1ab9c5b8e019ff64988152c3b7b9fddd2408d2e3c2300919931ad3a407f00c2f  /tmp/echo-v1.wasm
+
+Tool versions:
+$ rustc -V
+rustc 1.98.1 (48a229cea 2026-09-01)
+$ wasm-tools --version
+wasm-tools 1.259.0
+
+Guest build commands follow. All use the private target directory required by story 17-3b.
+
+$ CARGO_BUILD_JOBS=12 cargo build --locked --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/echo-spirit/Cargo.toml --target-dir /mnt/build/cargo-maos-17-3b-guests
+Finished `release` profile [optimized] target(s) in 8.94s
+$ CARGO_BUILD_JOBS=12 cargo build --locked --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/Cargo.toml --target-dir /mnt/build/cargo-maos-17-3b-guests
+Finished `release` profile [optimized] target(s) in 0.78s
+$ CARGO_BUILD_JOBS=12 cargo build --locked --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml --target-dir /mnt/build/cargo-maos-17-3b-guests
+Finished `release` profile [optimized] target(s) in 0.68s
+$ CARGO_BUILD_JOBS=12 cargo build --locked --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml --target-dir /mnt/build/cargo-maos-17-3b-guests
+Finished `release` profile [optimized] target(s) in 0.62s
+
+$ cp /mnt/build/cargo-maos-17-3b-guests/wasm32-wasip2/release/{echo_spirit,equiv_identity_spirit,equiv_divergent_spirit,equiv_cosmetic_spirit}.wasm tests/fixtures/wasm/...
+$ wc -c tests/fixtures/wasm/echo_spirit_component.wasm tests/fixtures/wasm/equiv_identity_spirit_component.wasm tests/fixtures/wasm/equiv_divergent_spirit_component.wasm tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+76029 tests/fixtures/wasm/echo_spirit_component.wasm
+76090 tests/fixtures/wasm/equiv_identity_spirit_component.wasm
+76090 tests/fixtures/wasm/equiv_divergent_spirit_component.wasm
+76129 tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+304338 total
+
+$ sha256sum tests/fixtures/wasm/echo_spirit_component.wasm tests/fixtures/wasm/equiv_identity_spirit_component.wasm tests/fixtures/wasm/equiv_divergent_spirit_component.wasm tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+4b8d4ba7fc5e30ed4ffdbec2c125b0f6e2f7d4930c6befd7e5a5af500c637e48  tests/fixtures/wasm/echo_spirit_component.wasm
+db8fb389ad57c1c71fd2df2e66f01d96b2702635920e81a37332b2ff424ba77f  tests/fixtures/wasm/equiv_identity_spirit_component.wasm
+5f31d0c4dbacec25cf8f959beb2629386bae164e67dcb896331e948afcc9eead  tests/fixtures/wasm/equiv_divergent_spirit_component.wasm
+533ee16285f795f8e56cd766db60892293f56c9d505bab6e4a799719eb39c74f  tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+
+$ python3 -c '<sorted source-byte SHA-256 recipe from check-equiv-fixture-provenance::source_hash>'
+354bc10499d9160aecd1f3a29b718315f8457765979af7dcce7afd816520f14c  echo source
+333011ae15f45c7d09cae4544432e3b9ac58011b628f62397fa14371aa2f69ec  identity source
+87a3ffeb6550c171e727007ed137c41191575a96209b766d0e58a001f85f0cb6  divergent source
+3f0aba23e7dce9115da689bdc2a1ccd28dad422f189b13e02db9286a1499dab9  cosmetic source
+
+$ wasm-tools component wit tests/fixtures/wasm/echo_spirit_component.wasm
+$ wasm-tools component wit tests/fixtures/wasm/equiv_identity_spirit_component.wasm
+$ wasm-tools component wit tests/fixtures/wasm/equiv_divergent_spirit_component.wasm
+$ wasm-tools component wit tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+Each command reported the same component-import portion of its WIT output:
+package root:component;
+world root {
+  import maos:spirit/frames@2.0.0;
+  import wasi:io/poll@0.2.9;
+  import wasi:clocks/monotonic-clock@0.2.9;
+  import wasi:io/error@0.2.9;
+  import wasi:io/streams@0.2.9;
+  import wasi:cli/stdout@0.2.9;
+  import wasi:cli/stderr@0.2.9;
+  import wasi:cli/stdin@0.2.9;
+  import wasi:cli/environment@0.2.9;
+  import wasi:cli/exit@0.2.9;
+  import wasi:cli/terminal-input@0.2.9;
+  import wasi:cli/terminal-output@0.2.9;
+  import wasi:cli/terminal-stdin@0.2.9;
+  import wasi:cli/terminal-stdout@0.2.9;
+  import wasi:cli/terminal-stderr@0.2.9;
+  use maos:spirit/frames@2.0.0.{iac-frame, halt};
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+The emitted declarations identified package maos:spirit@2.0.0 and all WASI imports above as @0.2.9.
+
+Recorded [toolchain]:
+rustc = rustc 1.98.1 (48a229cea 2026-09-01)
+wit_bindgen = 0.44.0
+target = wasm32-wasip2
+wasi_imports = wasi:*@0.2.9
+
+Verification:
+$ CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w2 CARGO_BUILD_JOBS=12 cargo test --locked -p xtask --bin xtask check_equiv_fixture_provenance::tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 517 filtered out.
+
+Planted-red controls (each mutation was reverted immediately; the direct test/gate executables were already built from the final source and produced no diagnostics during the controls):
+
+(iv) WIT version binding:
+temporary mutation: `package maos:spirit@2.0.0;` → `package maos:spirit@2.0.1;`
+$ git diff --stat -- wit/spirit.wit
+wit/spirit.wit | 106 ++++++++++++++++++++++++++++++++++++++++++++++-----------
+1 file changed, 87 insertions(+), 19 deletions(-)
+(The worktree already contains the story's WIT delta; this control changed the package line only.)
+$ /mnt/build/cargo-maos-17-3b-w2/debug/deps/wit_corpus-2877c281ee38ecee wit_package_version_has_one_ratified_entry --exact
+FAILED: exactly one ratified entry must cover the parsed WIT package version maos:spirit@2.0.1; left: 0, right: 1.
+Reverted to `package maos:spirit@2.0.0;`; the same direct test then passed (1 passed; 20 filtered out).
+
+(v) Stale component on one WIT comment byte:
+temporary mutation: WIT line 1 `typed` → `Typed`
+$ git diff --stat -- wit/spirit.wit
+wit/spirit.wit | 106 ++++++++++++++++++++++++++++++++++++++++++++++-----------
+1 file changed, 87 insertions(+), 19 deletions(-)
+(The worktree already contains the story's WIT delta; this control changed the comment byte only.)
+$ /mnt/build/cargo-maos-17-3b-w2/debug/xtask check-equiv-fixture-provenance
+FAILED: 4 fixture source_sha256 drifts (echo actual 207d3716b30d0e0028b573fdbed7514f732f377be5f5e2a64edda1f57cb5aa7f; identity actual 43bada67bb1fec0b7659abd597d856e4e58c419df21b6be3f0b84596fd9112aa; divergent actual a767c78fc19c2e7b6711ff21381068ca77008ac7eed21de57ae122374dde445a; cosmetic actual 4f61c2296ccccce5bf5e5955f7b4625b61a50fd9df04c8e90a5b4e1244852dbf).
+Reverted line 1; direct gate passed (4 fixtures in sync).
+
+Missing [toolchain]:
+temporary mutation: removed the five-line `[toolchain]` table.
+$ git diff --stat -- tests/fixtures/wasm/equiv-fixtures.provenance.toml
+tests/fixtures/wasm/equiv-fixtures.provenance.toml | 27 ++++++++++------------
+1 file changed, 12 insertions(+), 15 deletions(-)
+(The worktree already contains the story's header/pin reissue delta; this control removed only the toolchain table.)
+$ /mnt/build/cargo-maos-17-3b-w2/debug/xtask check-equiv-fixture-provenance
+FAILED: cannot parse tests/fixtures/wasm/equiv-fixtures.provenance.toml: missing field `toolchain`.
+Reinstated the five-line table; direct gate passed (4 fixtures in sync).
+
+$ CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w2 CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- check-equiv-fixture-provenance
+check-equiv-fixture-provenance: PASSED (4 fixtures in sync with source, WIT, and manifest)
+$ CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w2 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test wit_corpus
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out.
+
+`check-abi-ratification` is the xtask gate that parses `xtask/abi-ratifications.toml` (confirmed by `grep "abi-ratifications"`):
+$ /mnt/build/cargo-maos-17-3b-w2/debug/xtask check-abi-ratification --baseline /tmp/maos-17-3b-no-abi-baseline
+check-abi-ratification: PASS (no ABI changes — base case)

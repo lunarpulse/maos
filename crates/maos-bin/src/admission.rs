@@ -192,11 +192,11 @@ pub fn emit_model_provenance_event(
 /// gate" is discharged by exhaustiveness.
 ///
 /// The manifest's `[sandbox] tier` never SELECTS the effective tier (admission
-/// admits at `SandboxTier::DEFAULT_FLOOR`), but it can be FALSE: a `rust-inproc`
-/// Spirit runs inside the daemon, so its only true tier is `T0` and gate 6
-/// refuses any other (Story 17-6 AC6). Spawned forms get their tier applied by
-/// the launch primitive — `spawn_and_bridge` routes T2 through `spawn_sandboxed`
-/// on Linux (AC5); the first production T2 child is 17-3c's.
+/// admits at `SandboxTier::DEFAULT_FLOOR`), but it must honestly name the
+/// form's boundary: `rust-inproc` declares `T0`; `wasm-component` declares
+/// `T2`. The latter is parsed through every remaining section before a
+/// compile-time engine/launch refusal. A spawned component is launched only by
+/// 17-3c; the default binary keeps the WASM engine off for export Hold 2.
 #[derive(Debug, Clone)]
 pub enum AdmissionRefusal {
     /// Gate 1 — the manifest file could not be read.
@@ -211,14 +211,21 @@ pub enum AdmissionRefusal {
     CliWrapperUnsupported,
     /// Gate 4 — `[class]` is absent or does not parse.
     ClassSection { detail: String },
-    /// Gate 5 — the class name is not one of the eight compiled into this
-    /// binary. `rust-inproc` means first-party compiled-in (ADR-060); the
-    /// third-party form is Epic 17's `wasm-component`.
+    /// Gate 5 — a non-WASM class name is not one of the eight compiled into
+    /// this binary. `rust-inproc` means first-party compiled-in (ADR-060).
     UnknownClass { name: String },
     /// Gate 6 — `rust-inproc` is compiled into this process and declares T0.
     RustInprocRequiresT0 {
         tier: maos_domain::invariants::i9::SandboxTier,
     },
+    /// Gate 6 — a WASM component runs through the T2 process boundary.
+    WasmComponentRequiresT2 {
+        tier: maos_domain::invariants::i9::SandboxTier,
+    },
+    /// Last gate — the published default build omits the WASM engine.
+    WasmEngineOff,
+    /// Last gate — a WASM-host build has no component launch path until 17-3c.
+    WasmLaunchNotBuilt,
     /// Gates 6 and 7 — a declared section did not parse.
     SectionParse {
         section: &'static str,
@@ -254,6 +261,9 @@ impl AdmissionRefusal {
             Self::ClassSection { .. } => "class_section_invalid",
             Self::UnknownClass { .. } => "unknown_spirit_class",
             Self::RustInprocRequiresT0 { .. } => "rust_inproc_requires_t0",
+            Self::WasmComponentRequiresT2 { .. } => "wasm_component_requires_t2",
+            Self::WasmEngineOff => "wasm_engine_off",
+            Self::WasmLaunchNotBuilt => "wasm_launch_not_built",
             Self::SectionParse { .. } => "manifest_section_invalid",
             Self::ModelProvenance { .. } => "model_provenance_refused",
             Self::AlreadyLoaded { .. } => "already_loaded",
@@ -295,6 +305,17 @@ impl std::fmt::Display for AdmissionRefusal {
             Self::RustInprocRequiresT0 { tier } => {
                 write!(f, "rust-inproc requires sandbox tier T0, got {tier}")
             }
+            Self::WasmComponentRequiresT2 { tier } => {
+                write!(f, "wasm_component_requires_t2: wasm-component requires sandbox tier T2, got {tier}")
+            }
+            Self::WasmEngineOff => f.write_str(
+                "wasm_engine_off: WASM engine disabled while Export Hold 2 is open; \
+                 `wasm-host` is the 5D002.c.1 export-control precondition",
+            ),
+            Self::WasmLaunchNotBuilt => f.write_str(
+                "wasm_launch_not_built: wasm-component launch is deferred to \
+                 17-3c-wasm-spirit-on-the-bus-under-t2",
+            ),
             Self::SectionParse { section, detail } => {
                 write!(f, "[{section}] section: {detail}")
             }
@@ -455,8 +476,10 @@ pub fn gate_manifest(
         }
     })?;
 
-    // Gate 5 — a class this binary can actually construct.
-    if !known_class(&class_section.name) {
+    let wasm = class_section.forms == ["wasm-component"];
+
+    // Gate 5 — only first-party in-process classes map into this binary.
+    if !wasm && !known_class(&class_section.name) {
         return Err(AdmissionRefusal::UnknownClass {
             name: class_section.name.clone(),
         });
@@ -465,7 +488,13 @@ pub fn gate_manifest(
     // Gate 6 — the mediation sections.
     let sandbox_cfg = SandboxConfig::from_toml_str(&required("sandbox")?)
         .map_err(|e| parse_err("sandbox")(e.to_string()))?;
-    if class_section.forms.iter().any(|form| form == "rust-inproc")
+    if wasm && sandbox_cfg.tier != maos_domain::invariants::i9::SandboxTier::T2 {
+        return Err(AdmissionRefusal::WasmComponentRequiresT2 {
+            tier: sandbox_cfg.tier,
+        });
+    }
+    if !wasm
+        && class_section.forms.iter().any(|form| form == "rust-inproc")
         && sandbox_cfg.tier != maos_domain::invariants::i9::SandboxTier::T0
     {
         return Err(AdmissionRefusal::RustInprocRequiresT0 {
@@ -503,6 +532,16 @@ pub fn gate_manifest(
     let budget = section("budget")
         .map(|s| Budget::from_toml_str(&s).map_err(|e| parse_err("budget")(e.to_string())))
         .transpose()?;
+    // The component's manifest has now passed every structural gate. The
+    // refusal is feature-selected because a published binary's engine closure
+    // is an export-control property, not runtime configuration.
+    if wasm {
+        #[cfg(not(feature = "wasm-host"))]
+        return Err(AdmissionRefusal::WasmEngineOff);
+
+        #[cfg(feature = "wasm-host")]
+        return Err(AdmissionRefusal::WasmLaunchNotBuilt);
+    }
 
     Ok(GatedManifest {
         spirit_id: class_section.name.clone(),

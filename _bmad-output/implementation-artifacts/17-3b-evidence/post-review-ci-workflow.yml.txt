@@ -1,0 +1,80 @@
+name: 17-3b post-review patch evidence
+'on':
+  push:
+    branches:
+    - ci-17-3b-post-review-c544b66ee206
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_NET_RETRY: '10'
+jobs:
+  example-spirit-ts-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v5
+    - uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ hashFiles('**/Cargo.lock') }}
+    - name: Capture patched template and kernel provenance
+      shell: bash
+      run: 'set -euo pipefail
+
+        cargo run --locked -p xtask -- templates-regen --check --json 2>&1 | tee regen.log
+
+        echo ''::notice title=AC1(a) patched template drift::templates-regen --check rc=0''
+
+        cargo run --locked -p xtask -- check-kernel-baseline --json 2>&1 | tee kernel-baseline.log
+
+        echo ''::notice title=17-3b kernel baseline::check-kernel-baseline rc=0 pin=25032''
+
+        cargo run --locked -p xtask -- check-equiv-fixture-provenance --json 2>&1 | tee fixture-provenance.log
+
+        echo ''::notice title=17-3b fixture provenance::check-equiv-fixture-provenance rc=0''
+
+        '
+    - name: Build, test, and componentize the TypeScript scaffold (Story 17-3b AC1)
+      shell: bash
+      run: "set +e\n(\n  cd examples/example-spirit-ts\n  npm ci &&\n    npm test &&\n    npm run build &&\n    npm run componentize\n) 2>&1 | tee example-spirit-ts.log\nrc=${PIPESTATUS[0]}\nvitest_verdict=\"$(\n  sed -E $'s/\\x1B\\\\[[0-?]*[ -/]*[@-~]//g' example-spirit-ts.log |\n    tr -d '\\r' |\n    grep -E '^[[:space:]]*Tests[[:space:]]+' |\n    paste -sd';' -\n)\"\nif [ \"$rc\" -eq 0 ] && [ -z \"$vitest_verdict\" ]; then\n  echo \"::error title=TypeScript scaffold::rc=0 vitest=not reported\"\n  exit 1\nfi\nif [ \"$rc\" -eq 0 ]; then\n  echo \"::notice title=TypeScript scaffold::rc=0 vitest=$vitest_verdict\"\nelse\n  echo \"::error title=TypeScript scaffold::rc=$rc vitest=${vitest_verdict:-not run}\"\nfi\nexit \"$rc\"\n"
+    - name: Record TypeScript component outcome
+      shell: bash
+      run: "component=examples/example-spirit-ts/dist/spirit.wasm\nif [ ! -s \"$component\" ]; then\n  echo \"::error title=TypeScript component artifact::missing or empty $component\"\n  exit 1\nfi\necho \"::notice title=TypeScript component artifact::bytes=$(stat -c%s \"$component\") sha256=$(sha256sum \"$component\" | cut -d' ' -f1)\"\n"
+    - name: Upload TypeScript component
+      uses: actions/upload-artifact@v4
+      with:
+        name: example-spirit-ts-component
+        path: examples/example-spirit-ts/dist/spirit.wasm
+        if-no-files-found: error
+    - name: Build the release WASM runner
+      shell: bash
+      run: "set +e\ncargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner 2>&1 | tee runner-build.log\nrc=${PIPESTATUS[0]}\nif [ \"$rc\" -eq 0 ]; then\n  echo \"::notice title=Release WASM runner build::rc=0\"\nelse\n  echo \"::error title=Release WASM runner build::rc=$rc\"\nfi\nexit \"$rc\"\n"
+    - name: Drive the TypeScript component through the release runner
+      shell: bash
+      run: "set +e\nMAOS_TS_COMPONENT=$PWD/examples/example-spirit-ts/dist/spirit.wasm cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture 2>&1 | tee ts-component-driver.log\nrc=${PIPESTATUS[0]}\nif [ \"$rc\" -eq 0 ]; then\n  echo \"::notice title=TypeScript component driver::rc=0 $(grep 'TS-COMPONENT-OUTCOME' ts-component-driver.log | paste -sd';' -)\"\nelse\n  echo \"::error title=TypeScript component driver::rc=$rc\"\nfi\nexit \"$rc\"\n"
+    - name: Build maosctl for the admission door test
+      shell: bash
+      run: "set +e\ncargo build --locked -p maos-cli --bin maosctl 2>&1 | tee maosctl-build.log\nrc=${PIPESTATUS[0]}\nif [ \"$rc\" -eq 0 ]; then\n  echo \"::notice title=maosctl build::rc=0\"\nelse\n  echo \"::error title=maosctl build::rc=$rc\"\nfi\nexit \"$rc\"\n"
+    - name: Assert default-build WASM admission refusal
+      shell: bash
+      run: "set +e\ncargo test --locked -p maos-bin --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-default.log\nrc=${PIPESTATUS[0]}\nif [ \"$rc\" -eq 0 ]; then\n  echo \"::notice title=Default WASM admission::rc=0 $(grep -E 'wasm_engine_off|test result' wasm-admission-default.log | paste -sd';' -)\"\nelse\n  echo \"::error title=Default WASM admission::rc=$rc\"\nfi\nexit \"$rc\"\n"
+    - name: 'Observe actual CLI refusal: wasm_engine_off'
+      shell: bash
+      run: "set -euo pipefail\nscratch=$(mktemp -d)\nexport HOME=\"$scratch/home\" MAOS_HOME=\"$scratch/maos-home\" XDG_DATA_HOME=\"$scratch/xdg\"\ntarget/debug/maos init > init-wasm_engine_off.log 2>&1\nset +e\ntarget/debug/maos run examples/example-spirit-ts/manifest.toml --once > cli-wasm_engine_off.log 2>&1\nrc=$?\nset -e\ncat cli-wasm_engine_off.log\nif [ \"$rc\" -eq 0 ] || ! grep -F 'wasm_engine_off:' cli-wasm_engine_off.log; then\n  echo '::error title=Actual CLI refusal::wasm_engine_off not observed'; exit 1\nfi\necho \"::notice title=Actual CLI refusal::wasm_engine_off rc=$rc $(tr '\\n' ' ' < cli-wasm_engine_off.log)\"\n"
+    - name: Assert wasm-host-build WASM admission refusal
+      shell: bash
+      run: "set +e\ncargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log\nrc=${PIPESTATUS[0]}\nif [ \"$rc\" -eq 0 ]; then\n  echo \"::notice title=wasm-host WASM admission::rc=0 $(grep -E 'wasm_launch_not_built|test result' wasm-admission-wasm-host.log | paste -sd';' -)\"\nelse\n  echo \"::error title=wasm-host WASM admission::rc=$rc\"\nfi\nexit \"$rc\"\n"
+    - name: 'Observe actual CLI refusal: wasm_launch_not_built'
+      shell: bash
+      run: "set -euo pipefail\nscratch=$(mktemp -d)\nexport HOME=\"$scratch/home\" MAOS_HOME=\"$scratch/maos-home\" XDG_DATA_HOME=\"$scratch/xdg\"\ntarget/debug/maos init > init-wasm_launch_not_built.log 2>&1\nset +e\ntarget/debug/maos run examples/example-spirit-ts/manifest.toml --once > cli-wasm_launch_not_built.log 2>&1\nrc=$?\nset -e\ncat cli-wasm_launch_not_built.log\nif [ \"$rc\" -eq 0 ] || ! grep -F 'wasm_launch_not_built:' cli-wasm_launch_not_built.log; then\n  echo '::error title=Actual CLI refusal::wasm_launch_not_built not observed'; exit 1\nfi\necho \"::notice title=Actual CLI refusal::wasm_launch_not_built rc=$rc $(tr '\\n' ' ' < cli-wasm_launch_not_built.log)\"\n"
+    - name: Upload raw rehearsal evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: 17-3b-post-review-logs
+        path: '*.log'
+        if-no-files-found: error

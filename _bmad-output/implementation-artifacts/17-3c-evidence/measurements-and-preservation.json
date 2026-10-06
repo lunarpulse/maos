@@ -1,0 +1,210 @@
+{
+  "date": "2026-10-01",
+  "status": "isolated feasibility only; no numerical grant or production cutover",
+  "prototype_base": "c544b66ee206122a0de001f88c7be95a03017873",
+  "prototype_worktree": "/tmp/maos-17-3c-prototype-fema1px_",
+  "measurements": {
+    "original": {
+      "physical_src_lines": 25032,
+      "rust_code_lines": 19427,
+      "src_rs_files": 97
+    },
+    "prototype": {
+      "physical_src_lines": 25127,
+      "rust_code_lines": 19495,
+      "src_rs_files": 97
+    },
+    "delta": {
+      "physical_src_lines": 95,
+      "rust_code_lines": 68,
+      "src_rs_files": 0
+    }
+  },
+  "preservation": {
+    "main_head": "5075443c8a87523581cfcf6cb0b6af815f7ebd4f",
+    "staged_index_tree": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+    "runtime_blob": "551af28ef9bfbaa4607194e332c0cc5af39fcafa",
+    "snapshot_runtime_blob": "551af28ef9bfbaa4607194e332c0cc5af39fcafa",
+    "prototype_policy_blob": "efbffa42127c6a261856e151022e148a234098c9",
+    "original_policy_blob": "efbffa42127c6a261856e151022e148a234098c9"
+  },
+  "patch_sha256": "e2ec9fd6b11e9136cae2ac76b1550789f6e4a179d04a657706ad86928fda2377",
+  "commands": {
+    "combined_green": "MAOS_PROTO_RUNNER=/mnt/build/cargo/release/maos-wasm-runner CARGO_TARGET_DIR=/mnt/build/cargo cargo test --locked -p maos-kernel-core --test cli_wrapper_framed_bridge_17_3c_proto -- --nocapture && CARGO_TARGET_DIR=/mnt/build/cargo cargo test --locked --release -p maos-wasm-host --test equiv_harness prototype_live_frames_reach_kernel_policy_eight_cases -- --exact --nocapture",
+    "compiled_mutant_red": "cargo test --locked --release -p maos-wasm-host --test equiv_harness prototype_live_frames_reach_kernel_policy_eight_cases -- --exact --nocapture",
+    "restored_green": "CARGO_TARGET_DIR=/mnt/build/cargo cargo test --locked --release -p maos-wasm-host --test equiv_harness prototype_live_frames_reach_kernel_policy_eight_cases -- --exact --nocapture",
+    "dependency_closure": "CARGO_TARGET_DIR=/mnt/build/cargo cargo run --locked -p xtask -- check-dependency-closure --json",
+    "measurement": "tokei crates/maos-kernel-core -e tests -e benches --output json; physical Rust src line count with bytes.splitlines()",
+    "original_governance": "CARGO_TARGET_DIR=/mnt/build/cargo cargo build --locked -p xtask --bin xtask && /mnt/build/cargo/debug/xtask check-kernel-baseline --json && /mnt/build/cargo/debug/xtask kloc-check --json && /mnt/build/cargo/debug/xtask check-epic-close-coherence --json && /mnt/build/cargo/debug/xtask check-dev-record-completeness --json"
+  },
+  "results": {
+    "kernel_bridge_suite": {
+      "passed": 4,
+      "failed": 0
+    },
+    "real_forms": {
+      "native": "T0, four output frames, exit 0",
+      "wasm": "T2, four output frames, exit 0"
+    },
+    "actual_kernel_cases": 8,
+    "compiled_mutant_exit": 101,
+    "compiled_mutant_failure": "native case 2 allowed=true, expected=false",
+    "restored_gate_exit": 0,
+    "memfd_omission_runner_exit": 3,
+    "memfd_allow_runner_exit": 0,
+    "dependency_closure": "passed, zero violations for kernel-core and domain"
+  },
+  "logs": {
+    "integrated-green-before.log": {
+      "sha256": "53a08a3e54affc3c9c23e814778d11f34406aafdbbe10561ec7f67e3517845f6",
+      "captured_lines": 1103
+    },
+    "integrated-kernel-bypass-red.log": {
+      "sha256": "fe112741aad0778ba5d33ef3b2fe501ebbaadf4f2d30b0f9fb660a145e990b03",
+      "captured_lines": 568
+    },
+    "integrated-restored-green.log": {
+      "sha256": "70cf71d386ce879c73dfb060b90daa763d0a911ecc2621574d5719339b220726",
+      "captured_lines": 555
+    },
+    "t2-memfd-omission-red.log": {
+      "sha256": "0b86d566134e13245c0295f61b30f2636c47901ce9bd5c3d85d5498c655aaa0a",
+      "captured_lines": 568
+    },
+    "t2-memfd-allow-green.log": {
+      "sha256": "f56347a822310b073d5a72f0eed09f54bc5cfd30475bad78e35294c8d6c7cf74",
+      "captured_lines": 545
+    },
+    "dependency-closure.log": {
+      "sha256": "8b53fddc834889b0b935a2f0bcf1d82b3984715903f85b8c6363daa5a301db00",
+      "captured_lines": 796
+    },
+    "governance.log": {
+      "sha256": "f3f20dd2891c2ab9a85fcb6213400e9b4fe97ae68bf850b74b8bb0f606d5eae2",
+      "captured_lines": 283
+    }
+  },
+  "capture_note": "Paged tool stdout/stderr capture, all non-empty output lines retained; terminal blank-line normalization is not byte-exact process-stream capture. Existing compiler warnings retained, not suppressed.",
+  "limitations": [
+    "Manual trusted fixture pid/class; no production SCB/enterprise/bus binding",
+    "Test-seeded FsRead grant; not production manifest permission",
+    "Local Linux x64 only; no four-image/arm64 proof",
+    "No writable cgroup; existing setrlimit fallback observed",
+    "Shared bounded codec, binary journaling, runner-only conformance, guest pre-serialization allocation bound and halt receipts absent"
+  ],
+  "relative_path_incident": "Initial original runtime edit was reversed; blob independently equals verified snapshot. Final original kernel source is unchanged.",
+  "temporary_worktree_disposition": "Patch archived; disposable worktree removed after evidence retention.",
+  "governance": {
+    "kernel_baseline": {
+      "passed": true,
+      "actual-lines": 25032,
+      "pinned-lines": 25032,
+      "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+      "file-set-entries": 98,
+      "set-hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776",
+      "pinned-set-hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776",
+      "changed": [],
+      "added": [],
+      "removed": []
+    },
+    "kloc": {
+      "passed": true,
+      "alarm": true,
+      "aggregate": 168632,
+      "per_crate": {
+        "(unknown:spikes)": 144,
+        "(unknown:templates)": 11,
+        "maos-a2a": 303,
+        "maos-a2a-core": 4937,
+        "maos-a2a-tcp": 1442,
+        "maos-acp": 642,
+        "maos-attrs": 20,
+        "maos-audit": 7243,
+        "maos-bench": 1534,
+        "maos-bin": 23472,
+        "maos-cap-registry": 0,
+        "maos-capability": 1129,
+        "maos-cli": 6106,
+        "maos-cohort": 5857,
+        "maos-compliance": 2032,
+        "maos-control": 1286,
+        "maos-corpus-gen": 2341,
+        "maos-director-surface": 784,
+        "maos-domain": 9270,
+        "maos-egress": 0,
+        "maos-escape-detector": 284,
+        "maos-eval": 3661,
+        "maos-exec-deps": 357,
+        "maos-fkcs": 491,
+        "maos-host": 39,
+        "maos-iac": 7084,
+        "maos-journal": 0,
+        "maos-journey-test": 626,
+        "maos-kernel-core": 19309,
+        "maos-loom-lite": 5277,
+        "maos-manifest": 4401,
+        "maos-mcp": 999,
+        "maos-notify-push": 248,
+        "maos-orchestrator-buffer": 0,
+        "maos-pdp": 438,
+        "maos-persistence": 1,
+        "maos-providers": 1392,
+        "maos-registry": 3392,
+        "maos-secrets": 536,
+        "maos-shell": 606,
+        "maos-siem": 447,
+        "maos-skill": 800,
+        "maos-spirit-abi": 1038,
+        "maos-spirit-cli": 753,
+        "maos-spirit-derive": 350,
+        "maos-spirit-hello": 399,
+        "maos-spirit-sdk": 846,
+        "maos-sso": 391,
+        "maos-telemetry": 547,
+        "maos-wasm-host": 1328,
+        "maos-wire": 0,
+        "xtask": 44039
+      },
+      "over_budget": []
+    },
+    "epic_close_coherence": {
+      "passed": true,
+      "epics-checked": 21,
+      "authoritative-src-lines": 25032,
+      "violations": []
+    },
+    "dev_record_completeness": {
+      "passed": true,
+      "violation_count": 0,
+      "violations": [],
+      "done_stories_checked": 162,
+      "deferred_owner_assertions": 79,
+      "owned_but_deferred": [],
+      "not_a_vehicle": [],
+      "ownerless_undispositioned": [],
+      "ownerless_dispositioned": [
+        "deferred-work.md:6: ownerless and open, with a recorded disposition",
+        "deferred-work.md:7: ownerless and open, with a recorded disposition",
+        "deferred-work.md:8: ownerless and open, with a recorded disposition",
+        "deferred-work.md:15: ownerless and open, with a recorded disposition",
+        "deferred-work.md:179: ownerless and open, with a recorded disposition",
+        "deferred-work.md:482: ownerless and open, with a recorded disposition",
+        "deferred-work.md:494: ownerless and open, with a recorded disposition",
+        "deferred-work.md:556: ownerless and open, with a recorded disposition",
+        "deferred-work.md:624: ownerless and open, with a recorded disposition",
+        "deferred-work.md:639: ownerless and open, with a recorded disposition",
+        "deferred-work.md:828: ownerless and open, with a recorded disposition",
+        "deferred-work.md:829: ownerless and open, with a recorded disposition",
+        "deferred-work.md:831: ownerless and open, with a recorded disposition",
+        "deferred-work.md:908: ownerless and open, with a recorded disposition",
+        "deferred-work.md:909: ownerless and open, with a recorded disposition",
+        "deferred-work.md:910: ownerless and open, with a recorded disposition",
+        "deferred-work.md:922: ownerless and open, with a recorded disposition",
+        "deferred-work.md:923: ownerless and open, with a recorded disposition",
+        "deferred-work.md:924: ownerless and open, with a recorded disposition"
+      ],
+      "total_stories_scanned": 163
+    }
+  },
+  "measurement_note": "Raw tokei measurement excludes tests/benches; xtask kloc-check additionally excludes memory/spill_test_faults.rs. Original gated kernel count 19309 differs from raw tokei 19427. No full-candidate prototype KLOC gate or grant claimed."
+}

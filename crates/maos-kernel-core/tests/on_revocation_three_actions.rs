@@ -117,6 +117,7 @@ fn manifest(name: &str, action: RevocationAction) -> SpiritManifestBundle {
             forms: vec!["rust-inproc".into()],
             trust_tier: "local".into(),
             description: "revocation action fixture".into(),
+            artifact: None,
         }),
         on_revocation: Some(OnRevocationSection { action }),
         supervision: Some(SupervisionSection {

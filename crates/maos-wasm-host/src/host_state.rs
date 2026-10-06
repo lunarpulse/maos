@@ -5,8 +5,9 @@
 //! `wasi:cli`/`wasi:io` interfaces even when the guest code itself never
 //! calls them — the Rust std runtime startup pulls them in. `HostState` +
 //! `wasmtime_wasi::p2::add_to_linker_sync` satisfy those imports with a
-//! minimal (no filesystem/network access — T2 confinement, not WASI's own
-//! sandboxing, is the security boundary per ADR-031 §1) WASI context.
+//! minimal WASI context. The runner runs inside ADR-031's T2 process boundary
+//! once launched by `spawn_and_bridge`; the production launch is
+//! `17-3c-wasm-spirit-on-the-bus-under-t2`. WASI is not that security boundary.
 
 use wasmtime::component::ResourceTable;
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};

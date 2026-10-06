@@ -12,7 +12,7 @@ review: "§A6 full-layer net **BINDING and NON-DEGRADABLE** (◆). Layers: Blind
 
 # 17-3b — The third-party WASM form: its contract, its admission and its TypeScript toolchain ◆
 
-Status: ready-for-dev
+Status: done
 
 > **The capability:** *A TypeScript author runs the scaffold, builds, and gets a real `maos:spirit@2.0.0` component
 > that the release `maos-wasm-runner` drives through `on-start` and one ADR-032 frame — with intent, consent envelope,
@@ -83,7 +83,7 @@ launch it without re-deciding the form, the manifest shape or the frame projecti
 
 | # | Fork | Decision |
 |---|---|---|
-| D-17-3b-A | The `@2.0.0` WIT (AC2, R17-41 option (a)) | `package maos:spirit@2.0.0;`. `interface frames` = the spike's `wit-1.1-frame` frames projection **without** `interface recall`/`import recall` (17-3d's `@2.1.0`), **plus** the two nested fields P1 found missing: `prior-distillate-ref { digest-frame-id, distillation-depth, intent-lineage: list<string> }` and `decision-dispatch-body { decision-id, approved, working-memory-digest-refs: list<string> }`. New types: `enum intent-class` (3), `record consent-envelope` (5), `variant scope` (20 cases, one per `Scope` variant, `i1.rs:59-131`), records `scope-mcp-call` (2), `scope-cli-subprocess-spawn` (3; `argv-prefix-hash: list<u8>` = 32 bytes), `scope-gateway-send` (2); `task-assign-body.scope: list<scope>`; `iac-frame` 8 → **11** fields (`intent`, `consent-envelope: option<consent-envelope>`, `intent-lineage: list<string>`). World unchanged: `use frames.{iac-frame, halt}`, three exports, **no imports**. Counts after: records **20**, iac-frame 11, prior-distillate-ref 3, decision-dispatch-body 3, task-assign-body 5, frame-kind 17, origin 4, posture 3, rupture 5, payload 11, intent-class 3, scope 20. The header comment and the world comment (`:213-218`) are rewritten in the same edit (D-17-3b-C). No dual world, no `@1.x` host support: no `@1.x` component was ever published. |
+| D-17-3b-A | The `@2.0.0` WIT (AC2, R17-41 option (a)) | `package maos:spirit@2.0.0;`. `interface frames` = the spike's `wit-1.1-frame` frames projection **without** `interface recall`/`import recall` (17-3d's `@2.1.0`), **plus** the two nested fields P1 found missing: `prior-distillate-ref { digest-frame-id, distillation-depth, intent-lineage: list<string> }` and `decision-dispatch-body { decision-id, approved, working-memory-digest-refs: list<string> }`. New types: `enum intent-class` (3), `record consent-envelope` (5), `variant scope` (20 cases, one per `Scope` variant, `i1.rs:59-131`), records `scope-mcp-call` (2), `scope-cli-subprocess-spawn` (3; `argv-prefix-hash: list<u8>` = 32 bytes), `scope-gateway-send` (2); `task-assign-body.scope: list<scope>`; `iac-frame` 8 → **11** fields (`intent`, `consent-envelope: option<consent-envelope>`, `intent-lineage: list<string>`). World unchanged: `use frames.{iac-frame, halt}`, three exports, **no imports**. Counts after: records **20**, iac-frame 11, prior-distillate-ref 3, decision-dispatch-body 3, task-assign-body 5, frame-kind 17, origin 4, posture 3, rupture **6** (including today's `PeerIdentityUnverified`), payload 11, intent-class 3, scope 20. The header comment and the world comment (`:213-218`) are rewritten in the same edit (D-17-3b-C). No dual world, no `@1.x` host support: no `@1.x` component was ever published. |
 | D-17-3b-B | Losslessness and the future-variant policy (AC2) | `lower` becomes `fn lower(&domain::IacFrame) -> Result<wit::IacFrame, BridgeError>`; `lift` stays `Result`. **Any domain value the WIT cannot name is refused, typed — never mapped**: new `BridgeError::Unrepresentable { ty: &'static str }` returned for a future `Scope`, `PostureHint` or `RuptureReason` variant (the `_ =>` arms at `:147`, `:196` stop mapping to `Cautious`/`RecipientUnloaded`). Lift is exhaustive over closed WIT types; byte lengths are checked (`frame-id`, `digest-frame-id`, `consent-id`, `rupture-id`, `original-frame-id` = 16 → `BadFrameIdLen`; `argv-prefix-hash` = 32 → new `BadHashLen(usize)`). `A2AIntent` and `WorkingMemoryDigestRefs` strings lift through their unvalidated constructors (`A2AIntent::new`, `i8.rs:53` — ADR-012's vocabulary is open; canonical-form checking is the consent router's, `is_canonical` `:85`) — the bridge is a **codec, not an authorization point**: a guest-emitted intent or consent envelope is a claim the kernel's frame ingress judges (17-3c AC2), exactly as for a native Spirit. The dead `BridgeError::{UnknownFrameKind, PayloadKindMismatch}` (never constructed, `:30-37`) are deleted. The runner maps a lower failure on an inbound frame to a new exit **5 `UnrepresentableFrame`** naming the type. |
 | D-17-3b-C | The typed `@1.x` refusal, and the two R17-39 rows on the same lines (AC2) | Before `Spirit::instantiate`, the runner walks the compiled component's imports (`Component::component_type()` → `types::Component::imports(&engine)` yielding `(&str, ComponentExtern)` — verified in the locked source, `wasmtime-46.0.3/src/runtime/component/component.rs:396`, `types.rs:1042-1049`) for names starting `maos:spirit/`; any `maos:spirit/frames@<v>` whose major ≠ 2 → new exit **2 `IncompatibleWorld`**, stderr `maos-wasm-runner: IncompatibleWorld: component imports maos:spirit/frames@<v>; this runner implements maos:spirit@2.0.0`. The measured `@2`-host × `@1`-guest behaviour (P6 — never measured) is recorded in T1 before the check is written. **R17-39(a):** an instantiate-time `Trap::OutOfFuel` goes through `classify_trap` → exit 4 (not 3). **R17-39(d):** the WIT header and world comment and the `runner.rs:30-37` / `host_state.rs:8-9` docs stop claiming the runner *is* sandboxed: *"the runner runs inside ADR-031's T2 process boundary once launched by `spawn_and_bridge` — the production launch is `17-3c-wasm-spirit-on-the-bus-under-t2`"* (rule 11(a): a named, not-done key). Negative fixture: a committed **WAT-text** component (`tests/fixtures/wasm/spirit_frames_v1_world.wat`, a few lines importing `maos:spirit/frames@1.0.0`) — source-controlled like the `.wat` core fixtures, outside the provenance gate; parsed by wasmtime's `wat` feature, which is on (`maos-wasm-host/Cargo.toml:40` keeps wasmtime's default features; `wat` is in its `default` list). |
 | D-17-3b-D | The 4 pinned components and their provenance (AC2, R17-28, R17-40) | Rebuild all four (`guests/echo-spirit`, `guests/equiv-fixture/{wasm-guest,divergent-guest,cosmetic-guest}`) against `@2.0.0` with `cargo build --locked --release --target wasm32-wasip2 --manifest-path <guest>/Cargo.toml` under a **private** `--target-dir` (F9), rename per the existing names, re-pin all **8** hashes. `equiv-fixtures.provenance.toml` gains a **required** `[toolchain]` table — `rustc` (full `rustc -V`), `wit_bindgen` (locked version), `target = "wasm32-wasip2"`, `wasi_imports` (the `wasi:*@` version the blobs import, read with `wasm-tools component wit`) — which `check-equiv-fixture-provenance` parses with `deny_unknown_fields` and requires non-empty, so a re-issue that does not record its toolchain reds. **No CI rebuild-and-compare step**: rebuilds are measured non-reproducible (P4, F10); the phantom *scoped-nightly* text is **deleted** from `check_equiv_fixture_provenance.rs:15-17,:104-105` and the TOML header `:11-16`, replaced by the true boundary: *"blob bytes and source bytes are pinned per commit; the toolchain is recorded; reproduction is a manual recipe (story 17-3b §Dev Notes), not a CI control"*. The native twin (links `maos-domain`, not the WIT) needs no rebuild. |
@@ -92,11 +92,11 @@ launch it without re-deciding the form, the manifest shape or the frame projecti
 | D-17-3b-G | The manifest shape (AC3) | `RawClassSection` gains `#[serde(default)] artifact: Option<String>`; `ClassSection` gains `pub artifact: Option<String>` (every literal site — 13, re-grep — + `artifact: None`). The forms validator (`manifest.rs:385-398`) accepts `rust-inproc`, `subprocess`, `wasm-component`; `wasm` stays invalid (ADR-060 cl. 2; test `:2588-2593` unchanged); `ts-inproc` is an orphan and simply leaves the two TS manifests. Validation (typed `validation_msg("class.forms"/"class.artifact", …)`): `wasm-component` must be the **only** form; `artifact` is **required** with `wasm-component` and **forbidden** otherwise; `artifact` is non-empty UTF-8 ≤ 4096 bytes, **relative**, no `..` component, ends in `.wasm` (resolved against the manifest's directory by 17-3c — this story never opens it); `wasm-component`/`artifact` require a declared `manifest_schema_version` ≥ a **private named const** `WASM_COMPONENT_SINCE_SCHEMA: u32 = 5` in `manifest.rs` (the xtask scanner forbids literal compares of `manifest_schema_version`, `check_manifest_schema_version.rs:67`). `class.artifact` is a field, not a section: **not** added to `POST_V1_SCHEMA_SECTIONS` (`:253`), so `RATIFIED_POST_V1_SCHEMA_SECTIONS` (`xtask/src/check_manifest_schema_version.rs:37-43`) is unchanged and no v1–v4 manifest gains a warning. The `[class].abi = "1.0"` rule (`:331-337`) is unchanged — it is the Spirit ABI, not the WIT version. |
 | D-17-3b-H | Schema 5 | Lands here (P12; R17-51 — 17-1 and 17-2 later add their fields to v5 with no second bump). `MANIFEST_SCHEMA_VERSION` 4 → 5 (`lib.rs:114`), ledger row `:33`, doctests `:112`, `:156-160` (+ a `5` row); tripwire `manifest_n_minus_1_test.rs:103-107`; above-max probe → 6 (`manifest.rs:2576-2586`); `gen-abi-docs` + `stability-matrix` regenerated (never hand-edited); `docs-site/docs/manifest/v5.md` + `docs-site/docs/migrate/v4-to-v5.md` (+ ko twins, glossary-lock) on the 13.5d precedent; `manifest_field_coverage` gets `("class","artifact")` + 3 fixtures; the 17-3b-AC3 ratification entry. A v4 manifest still loads (N-1); a v4 manifest declaring `wasm-component` is refused by D-17-3b-G's schema rule. |
 | D-17-3b-I | maos-bin admission (AC3) | In `gate_manifest` (`admission.rs:413`), after gate 4 binds `class_section`: `let wasm = class_section.forms == ["wasm-component"]` (the validator already guarantees it is then the sole form). **Gate 5 runs only for non-wasm** (third-party class names are arbitrary). Gate 6: `[sandbox]` stays required and parsed by the same `SandboxConfig::from_toml_str`; for `wasm`, `tier != T2` → new **`WasmComponentRequiresT2 { tier }`** (code `wasm_component_requires_t2`; T4 never reaches it — P9); `rust-inproc` keeps `RustInprocRequiresT0`. Gates 6–7 then parse every remaining section for both forms (an author gets every section error even in a default build). **Last step of `gate_manifest`, wasm only:** `#[cfg(not(feature = "wasm-host"))]` → **`WasmEngineOff`** (code `wasm_engine_off`; Display names Hold 2 and the `wasm-host` export-control precondition, `RELEASE-HOLDS.md:28,32-38`); `#[cfg(feature = "wasm-host")]` → **`WasmLaunchNotBuilt`** (code `wasm_launch_not_built`; Display names `17-3c`). Compile-time, because the published binary's truth is its feature set (epic-20 exit line 9). **The Display of all three new variants begins with its code** (`wasm_engine_off: …`, `wasm_launch_not_built: …`, `wasm_component_requires_t2: …`): `maos run` prints only `format!("maos run: {refusal}")` (`main.rs:4880`) and no existing Display carries a code (`admission.rs:275-313`), so without it the code never reaches `maos run`'s stderr. No new module (`SCANNED_SOURCE_FILES` unchanged); no new `CapabilitiesRequired` parser call (P11). The three `.expect` sites stay true (a wasm manifest never passes `gate_manifest` here); the `UnknownClass` doc `:214-216` is rewritten. The door returns HTTP 400 with the code through its wildcard arm (`operator_door.rs:628-631`) — no door change. |
-| D-17-3b-J | Registry admission by form (AC4) | (a) **Reader:** new `ClassSection::from_manifest_toml(manifest_toml: &[u8]) -> Result<Option<ClassSection>, ManifestError>` in `maos-manifest` (the `ModelProvenanceSection::from_manifest_toml` shape): `None` iff the document has no `[class]` table; otherwise the full `from_toml_str` validation. (b) **One private helper**, `fn form_policy(pkg: &SignedPackage) -> Result<FormPolicy, AdmissionError>`, called in **both** `admit_spirit` and `admit_spirit_with_attestation` right after the FKCS refusal, before any tier logic: no `[class]` → `FormPolicy::Legacy` (behaviour unchanged — maos-bin gate 4 refuses such a package at load anyway); invalid `[class]` → new **`AdmissionError::ClassSectionInvalid(String)`**; `forms` contains `rust-inproc` → new **`AdmissionError::FirstPartyFormFromRegistry`** (ADR-060 cl. 1), at **every** tier and with or without attestation; `wasm-component` → `FormPolicy::WasmComponent`; `subprocess` → `FormPolicy::Legacy` (ADR-060 cl. 3, unchanged). (c) **Every tier** admits `wasm-component` through today's tier arms (signature / org key / envelope obligations unchanged — R17-58); the returned `sandbox_tier_floor` for a `wasm-component` package is **`SandboxTier::T2` at every tier**, and `t3_for_public_untrusted` does not apply to it (P17). (d) `AdmissionError` stays `Clone`; both variants get rows in `xtask/fr63-typed-errors.toml` (convention — that catalog has no gate; `error-catalog.toml` does not scan the registry) and the module doc `:1-10` is corrected (it still says PublicVetted is rejected). (e) **FKCS (P18) — re-pin its own reviewed diff, same commit.** D8 is closed and the hold is gone. After `cargo fmt --all`, read the new hash from `cargo run -p xtask -- check-fkcs --json` (the `admission-path-unmodified` detail) and set `xtask/fkcs-baseline.toml` `[admission_baseline].sha256` in the same commit, with a comment naming this story, what changed in the admission path (form policy; structural FKCS read — (g)) and the §A6 review that covered it. `xtask/tests/fkcs_oracle.rs::every_declared_admission_file_reds_a_one_byte_mutation` stays green only if the pin matches. The `form_policy` call goes **inside or right after** `frozen_surface_gate` in both entry points — never a second copied prelude (the L4 landmine, ADR-052 §3 and its 2026-09-29 amendment). (g) **The FKCS parse becomes structural** (routed here by D8, `deferred-work.md` D8 section): `extract_fkcs_internal_references` / `parse_manifest_string_array` are line-based, so a multi-line `internal_references = [` array, a `[fkcs] # comment` header or a dotted `fkcs.internal_references` key evades the refusal. Replace them with a structural read in `maos-manifest` beside `ClassSection::from_manifest_toml` (one TOML parse of the document serves both); a manifest that is not valid TOML is refused before any tier work (typed, existing or new variant — state which); vectors for each evasion shape plus the existing single-line form; the FKCS negative control (`cargo test -p maos-fkcs`) stays green. (f) `kernel-api-classes.toml:585` (`admit_spirit` = `data-movement`, name-keyed) is unaffected; signatures do not change. |
+| D-17-3b-J | Registry admission by form (AC4) | (a) **Reader:** one `ManifestDocument::parse(manifest_toml: &[u8])` in `maos-manifest`, followed by `ManifestDocument::class_section()` on the same parsed document: `None` iff the document has no `[class]` table; otherwise the full `from_toml_str` validation. (b) **One private helper**, `fn frozen_surface_gate(pkg: &SignedPackage) -> Result<FormPolicy, AdmissionError>`, called first in **both** `admit_spirit` and `admit_spirit_with_attestation` and checking FKCS before form, before any tier logic: no `[class]` → `FormPolicy::Legacy` (behaviour unchanged — maos-bin gate 4 refuses such a package at load anyway); invalid `[class]` → new **`AdmissionError::ClassSectionInvalid(String)`**; `forms` contains `rust-inproc` → new **`AdmissionError::FirstPartyFormFromRegistry`** (ADR-060 cl. 1), at **every** tier and with or without attestation; `wasm-component` → `FormPolicy::WasmComponent`; `subprocess` → `FormPolicy::Legacy` (ADR-060 cl. 3, unchanged). (c) **Every tier** admits `wasm-component` through today's tier arms (signature / org key / envelope obligations unchanged — R17-58); the returned `sandbox_tier_floor` for a `wasm-component` package is **`SandboxTier::T2` at every tier**, and `t3_for_public_untrusted` does not apply to it (P17). (d) `AdmissionError` stays `Clone`; both variants get rows in `xtask/fr63-typed-errors.toml` (convention — that catalog has no gate; `error-catalog.toml` does not scan the registry) and the module doc `:1-10` is corrected (it still says PublicVetted is rejected). (e) **FKCS (P18) — re-pin its own reviewed diff, same commit.** D8 is closed and the hold is gone. After `cargo fmt --all`, read the new hash from `cargo run -p xtask -- check-fkcs --json` (the `admission-path-unmodified` detail) and set `xtask/fkcs-baseline.toml` `[admission_baseline].sha256` in the same commit, with a comment naming this story, what changed in the admission path (form policy; structural FKCS read — (g)) and the §A6 review that covered it. `xtask/tests/fkcs_oracle.rs::every_declared_admission_file_reds_a_one_byte_mutation` stays green only if the pin matches. The `form_policy` call goes **inside or right after** `frozen_surface_gate` in both entry points — never a second copied prelude (the L4 landmine, ADR-052 §3 and its 2026-09-29 amendment). (g) **The FKCS parse becomes structural** (routed here by D8, `deferred-work.md` D8 section): `extract_fkcs_internal_references` / `parse_manifest_string_array` are line-based, so a multi-line `internal_references = [` array, a `[fkcs] # comment` header or a dotted `fkcs.internal_references` key evades the refusal. Replace them with a structural read in `maos-manifest` through the shared `ManifestDocument` parser (one TOML parse of the document serves both); a manifest that is not valid TOML is refused before any tier work (typed, existing or new variant — state which); vectors for each evasion shape plus the existing single-line form; the FKCS negative control (`cargo test -p maos-fkcs`) stays green. (f) `kernel-api-classes.toml:585` (`admit_spirit` = `data-movement`, name-keyed) is unaffected; signatures do not change. |
 | D-17-3b-K | The TypeScript scaffold (AC5, R17-53) | `templates/spirit-ts` (the example regenerates from it): **manifest** — schema 5, `forms = ["wasm-component"]`, `artifact = "dist/spirit.wasm"`, `trust_tier = "local"` (20-1 sets `"public-untrusted"`, **hyphen** — P20), `[sandbox] tier = "T2"`, **no `[capabilities.required]`** (P23), `min_substrate_version` = the workspace's `0.1.0` line (not `0.5.0`), posture/output_shape/budget/resources kept valid. **`wit/spirit.wit`** — a byte copy of the root `wit/spirit.wit` (a scaffolded project outside the repo has no `../../wit`), guarded by an uncharged test asserting root == template == example bytes. **`package.json`** — exact pins `@bytecodealliance/componentize-js` `0.23.0` (the direct CLI; never `jco componentize`, which nests 0.22.0), `@bytecodealliance/jco` `1.35.0` (guest-types only), `typescript` `5.9.3`, `vitest` `1.6.1` (what the example lockfile resolves today, `package-lock.json:1767-1768`; Node 24 compatibility [INFERENCE — confirmed by T9's run]); `"engines": { "node": "^22.20 \|\| ^24.12 \|\| >=25" }` (the locked `@napi-rs/lzma@1.5.1` range); scripts `guest-types` = `jco guest-types wit --world-name spirit --out-dir src/bindings --strict`, `build` = guest-types + `tsc`, `componentize` = `componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm`, `test` = `vitest run`. `src/bindings/` is generated and git-ignored. **`src/index.ts`** — `import type { IacFrame } from "maos:spirit/spirit@2.0.0"`; exports `handleFrame`, `onStart`, `onShutdown`; a comment documents the thrown-halt shape (`throw { tag: "fault", val: "<reason>" }` → `Halt::Fault`, because `jco guest-types` declares `handleFrame(…): IacFrame[]` and omits `result<…, halt>` — R17-39c) and that `console.log` is discarded (R17-39b, `host_state.rs:25`). **`tests/spirit.test.ts`** — pure vitest over the exports: `handleFrame` before `onStart` throws `{ tag: "fault", … }`; after `onStart` it returns the frame. **The v0.5 SDK `sdks/spirit-ts` is RETIRED (operator ruling 2026-09-29, Q3)** and the scaffold is **self-contained**: it depends only on public npm packages (componentize-js, jco, typescript, vitest), so a project generated outside this repo can `npm ci` — the unpublished-SDK defect ADR-043 `:33` records. The scaffold carries its own `src/halt.ts` (`export function halt(reason: string): never { throw { tag: "fault", val: reason }; }` — the typed shape `jco guest-types` omits, R17-39c) and its tests import from `../src`. Deleted in the same commit: `sdks/spirit-ts/` (the whole package; `sdks/` itself if then empty, with the `README.md:333` tree line), the `example-spirit-ts-tests` "Build TS SDK" step (`discipline.yml:1095-1096`), `templates_regen.rs`'s dead `rewrite_npm_sdk_dep_to_path` (`:265-274`) and `{{package_name}}` substitution with their tests adjusted, and the `sdks/spirit-ts` existence leg of `check_7_1_ts_template_baseline` (`xtask/src/check_epic_6_bridge.rs:2143-2152` — the check keeps the template and example legs). `cross_template_field_consistency` is rewritten to what is true (both templates are valid manifests of their form — no shared `provider.complete`). The example's `package-lock.json` is regenerated (example-only, unchecked by regen). Both scaffold READMEs (`:20-25`) are rewritten; `discipline.yml:1121`'s retirement comment gains *"SDK retired by 17-3b"*. The synthetic `'@maos/spirit-ts/spirit_test'` string in `coverage_matrix_nfr_test_3.rs:290` is a walker fixture, not a dependency — leave it. |
 | D-17-3b-L | Where AC1 runs in CI | `example-spirit-ts-tests` (`discipline.yml:1080-1098`; key kept — aggregate `:4310-4311` and three report tables need it) becomes the 17-3b job: `actions/setup-node` **`'24'`** (Active LTS; ≥ 24.12; 22 is maintenance-only to 2027-04-30); step "scaffold" `cd examples/example-spirit-ts && npm ci && npm test && npm run build && npm run componentize`; `actions/upload-artifact` for `dist/spirit.wasm` (never committed — 12.26 MB, non-reproducible); `cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner`; `MAOS_TS_COMPONENT=$PWD/examples/example-spirit-ts/dist/spirit.wasm cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture`; `cargo build --locked -p maos-cli --bin maosctl` (cargo never builds a sibling package's `[[bin]]` for `-p maos-bin` — the 16-6 precedent, `maosctl_load_16_6.rs:68-83`); `cargo test --locked -p maos-bin --test wasm_form_admission_17_3b -- --nocapture` (default build → `wasm_engine_off`); `cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture` (→ `wasm_launch_not_built`; a test build, never published). AC1(a)'s drift check stays in `example-spirit-drift` (`:1066-1078`) — same run, cited by run id. Every verdict is a `::notice`/`::error` annotation (job logs are 403 without a token). `ubuntu-latest` is acceptable here: no step proves a sandbox (epic D6/R17-50 bind sandbox jobs only). |
 | D-17-3b-M | The frame driver for AC1 | No spike driver merges (`q1-driver` is `.rs.txt`). New uncharged `crates/maos-wasm-host/tests/ts_component_17_3b.rs`, modelled on `e2e_roundtrip.rs:32-62,179`: resolves the release runner beside the test binary (asserts it exists), reads `MAOS_TS_COMPONENT`. The test is `#[ignore = "needs the componentize-js artifact; run by example-spirit-ts-tests with --ignored"]` — the input exists in one job only, and `wasm-host-tests` (`cargo test -p maos-host -p maos-wasm-host`, `discipline.yml:2981`, four images) and `workspace-test-suite` (`:4043`) run the crate's tests without it; in an `--ignored` run an absent `MAOS_TS_COMPONENT` **panics** with a named rule-11(b) reason (never a skip). Feeds one fully populated `@2.0.0` frame (intent, consent envelope, lineage, every `Scope` shape, a `prior_distillate_ref` with lineage) over real pipes, reads exactly one emitted frame, asserts canonical-CBOR byte equality with the input, runner exit 0, and prints `TS-COMPONENT-OUTCOME …` for the annotation step. |
-| D-17-3b-N | Cookbook and ADR texts (AC5, R17-49, R17-57) | **New page** `docs-site/docs/cookbook/wasm-component-spirit.md` (+ ko twin; index table `cookbook/index.md:13-17`): the third-party TypeScript path — scaffold, `npm run build && npm run componentize`, the manifest, the admission outcome today (`wasm_engine_off` in published builds until Hold 2; `wasm_launch_not_built` in a `wasm-host` build until 17-3c), the halt shape, `console.log` discarded, Node range. `hello-world-spirit.md` is re-framed as **in-tree first-party** authoring (`rust-inproc` / `T0` is right for that audience) with a pointer to the third-party page — and its block (`:24-48`) is **completed to an admissible manifest**: today it fails `gate_manifest` three ways (no `[output_shape]`, no `[posture]` — both `required()`, `admission.rs:476-483`; `[budget] max_inference_calls` is refused by `RawBudget`'s `deny_unknown_fields`, which also requires `context_window_size`, `manifest.rs:846-850`) → add `[posture]` (`assistive`/`assistive`) and `[output_shape] required_fields`, replace `[budget]` with `context_window_size` + `time_cap_seconds`. `manifest-fields.md`'s reference block becomes a manifest that passes admission (refused values replaced; `forms`/`artifact`/schema 5 documented; *"currently 3"* fixed); `compliance-claim.md:94`'s `audited` becomes a real tier (same class, same test). `cli-wrapper-spirit.md` stays **17-1 AC5**'s. **Test:** `crates/maos-manifest/tests/cookbook_sections_17_6.rs` is superseded by uncharged `crates/maos-bin/tests/cookbook_manifests_17_3b.rs`, which (measured inventory: only `hello-world-spirit.md`, `manifest-fields.md`, `compliance-claim.md` and `cli-wrapper-spirit.md` carry a `[class]`-bearing ```` ```toml ```` block) runs the three **whole-manifest** blocks — `hello-world-spirit.md`, `manifest-fields.md`, the new `wasm-component-spirit.md` — through **`maos_bin::admission::gate_manifest(block, &\|_\| true)`** (the daemon's own section parsers, every section), expecting `Ok` for the `rust-inproc`/T0 blocks and exactly `WasmEngineOff` for the `wasm-component` block (the refusal is `gate_manifest`'s last step, so it proves every section parsed); parses the `compliance-claim.md` **fragment** table by table (`[class]` → `ClassSection::from_toml_str`, `[model_provenance]` → `ModelProvenanceSection::from_manifest_toml`); leaves `cli-wrapper-spirit.md` to 17-1 AC5; and asserts each ko twin's blocks are byte-identical to en — **red at HEAD** (the ko pages translate comments inside the blocks: hello-world en `:39` vs ko `:40`, manifest-fields en `:35` vs ko `:36`), so the ko blocks are made byte-identical (code comments stay English; prose around them is translated). The cookbook index row (`cookbook/index.md:13-17`, *"all schema v3 sections"*) is corrected. **ADRs:** ADR-060's Context (`:12-62`) restated to post-17-3b facts, plus a dated *Implementation note (17-3b)* recording "every tier" (R17-58) and the form-aware T2 floor — clause text itself unchanged; ADR-031's `@1.0` references (`:3`, `:47`, `:77`) → `@2.0.0` with a dated note; `compliance.rs:228-229` → *"T4 — the reserved WASM tool sandbox; refused at admission. WASM-component Spirits run at T2 (ADR-031) + WIT."* (matching `i9.rs:85`); `STABILITY.md`'s `PRESERVED:export` fence gains the refusal code `wasm_engine_off` (keeping `wasm-host` + `5D002`, which `decision_adrs_and_provisioning.rs:780-782` requires). |
+| D-17-3b-N | Cookbook and ADR texts (AC5, R17-49, R17-57) | **New page** `docs-site/docs/cookbook/wasm-component-spirit.md` (+ ko twin; index table `cookbook/index.md:13-17`): the third-party TypeScript path — scaffold, `npm run build && npm run componentize`, the manifest, the admission outcome today (`wasm_engine_off` in published builds until Hold 2; `wasm_launch_not_built` in a `wasm-host` build until 17-3c), the halt shape, `console.log` discarded, Node range. `hello-world-spirit.md` is re-framed as **in-tree first-party** authoring (`rust-inproc` / `T0` is right for that audience) with a pointer to the third-party page — and its block (`:24-48`) is **completed to a structurally valid manifest for a compiled and registered first-party class**: today it fails `gate_manifest` three ways (no `[output_shape]`, no `[posture]` — both `required()`, `admission.rs:476-483`; `[budget] max_inference_calls` is refused by `RawBudget`'s `deny_unknown_fields`, which also requires `context_window_size`, `manifest.rs:846-850`) → add `[posture]` (`assistive`/`assistive`) and `[output_shape] required_fields`, replace `[budget]` with `context_window_size` + `time_cap_seconds`. `manifest-fields.md`'s reference block becomes a manifest that passes admission (refused values replaced; `forms`/`artifact`/schema 5 documented; *"currently 3"* fixed); `compliance-claim.md:94`'s `audited` becomes a real tier (same class, same test). `cli-wrapper-spirit.md` stays **17-1 AC5**'s. **Test:** `crates/maos-manifest/tests/cookbook_sections_17_6.rs` is superseded by uncharged `crates/maos-bin/tests/cookbook_manifests_17_3b.rs`, which (measured inventory: only `hello-world-spirit.md`, `manifest-fields.md`, `compliance-claim.md` and `cli-wrapper-spirit.md` carry a `[class]`-bearing ```` ```toml ```` block) runs the three **whole-manifest** blocks — `hello-world-spirit.md`, `manifest-fields.md`, the new `wasm-component-spirit.md` — through **`maos_bin::admission::gate_manifest(block, &\|_\| true)`** (the daemon's own section parsers, every section), expecting `Ok` for the `rust-inproc`/T0 blocks and exactly `WasmEngineOff` for the `wasm-component` block (the refusal is `gate_manifest`'s last step, so it proves every section parsed); parses the `compliance-claim.md` **fragment** table by table (`[class]` → `ClassSection::from_toml_str`, `[model_provenance]` → `ModelProvenanceSection::from_manifest_toml`); leaves `cli-wrapper-spirit.md` to 17-1 AC5; and asserts each ko twin's blocks are byte-identical to en — **red at HEAD** (the ko pages translate comments inside the blocks: hello-world en `:39` vs ko `:40`, manifest-fields en `:35` vs ko `:36`), so the ko blocks are made byte-identical (code comments stay English; prose around them is translated). The cookbook index row (`cookbook/index.md:13-17`, *"all schema v3 sections"*) is corrected. **ADRs:** ADR-060's Context (`:12-62`) restated to post-17-3b facts, plus a dated *Implementation note (17-3b)* recording "every tier" (R17-58) and the form-aware T2 floor — clause text itself unchanged; ADR-031's `@1.0` references (`:3`, `:47`, `:77`) → `@2.0.0` with a dated note; `compliance.rs:228-229` → *"T4 — the reserved WASM tool sandbox; refused at admission. WASM-component Spirits run at T2 (ADR-031) + WIT."* (matching `i9.rs:85`); `STABILITY.md`'s `PRESERVED:export` fence gains the refusal code `wasm_engine_off` (keeping `wasm-host` + `5D002`, which `decision_adrs_and_provisioning.rs:780-782` requires). |
 
 ## Acceptance Criteria
 
@@ -154,7 +154,7 @@ warning-free build are recorded with it (17-6 RT-10). No test re-pins wording.
   `artifact` → refused; a v4 `rust-inproc` manifest still loads (N-1). **Proven red:** move the engine refusal before
   gate 6 → the `T3` vector reads `wasm_engine_off` (the tier check became unreachable).
 - **AC4 — registry admission by form.** `admit_spirit` (`crates/maos-registry/src/admission.rs:179`) **and**
-  `admit_spirit_with_attestation` (`:278`) read `[class]` through `ClassSection::from_manifest_toml` (D-17-3b-J(a))
+  `admit_spirit_with_attestation` (`:278`) read `[class]` through `ManifestDocument::class_section` via the shared frozen-surface parse (D-17-3b-J(a))
   and refuse any package whose `forms` include `rust-inproc` with `AdmissionError::FirstPartyFormFromRegistry` at
   every trust tier, attested or not (ADR-060 cl. 1); they admit `wasm-component` at **every** tier (R17-58 — the old
   *"≥ `PublicUntrusted`"* is ill-posed, `compliance.rs:194-203`) with `sandbox_tier_floor = T2`; a malformed `[class]`
@@ -447,53 +447,105 @@ throwaway — commands, diff and output go in the Dev Agent Record.
 
 ## Tasks / Subtasks
 
-- [ ] **T0 — Baseline (AC all).** Re-run `check-kernel-baseline` (25032) and `kloc-check --json` at the starting HEAD;
+- [x] **T0 — Baseline (AC all).** Re-run `check-kernel-baseline` (25032) and `kloc-check --json` at the starting HEAD;
   if any figure moved from `baseline_commit`, re-derive the budget table before editing. Confirm `lib.rs:114` is still
   4 (else 17-1 landed schema 5 — drop D-17-3b-H's bump and add fields to v5).
-- [ ] **T1 — Measure, then write the runner refusal (AC2, D-17-3b-C).**
-  - [ ] Build today's runner and the spike's `@1.1`-frame bridge scratch; record the `@2`-host × `@1`-guest failure
+- [x] **T1 — Measure, then write the runner refusal (AC2, D-17-3b-C).**
+  - [x] Build today's runner and the spike's `@1.1`-frame bridge scratch; record the `@2`-host × `@1`-guest failure
     text and where it surfaces (link vs type-check) → `17-3b-evidence/t1-v1-guest-on-v2-host.log`.
-  - [ ] Using the import walk (D-17-3b-C), write `IncompatibleWorld` (exit 2), fuel at
+  - [x] Using the import walk (D-17-3b-C), write `IncompatibleWorld` (exit 2), fuel at
     instantiate → 4, `UnrepresentableFrame` (5); `spirit_frames_v1_world.wat`; doc `:1-62` rewritten.
-- [ ] **T2 — The `@2.0.0` WIT and the lossless bridge (AC2, D-17-3b-A/B).**
-  - [ ] Port the frames projection (no recall), add the two nested fields, rewrite header + world comment.
-  - [ ] Port `bridge.rs.txt`, add nested fields, fallible `lower`, `Unrepresentable`, `BadHashLen`; delete dead
+- [x] **T2 — The `@2.0.0` WIT and the lossless bridge (AC2, D-17-3b-A/B).**
+  - [x] Port the frames projection (no recall), add the two nested fields, rewrite header + world comment.
+  - [x] Port `bridge.rs.txt`, add nested fields, fallible `lower`, `Unrepresentable`, `BadHashLen`; delete dead
     variants and `scope_from_debug_string`; runner `:250`/`:263` call sites.
-  - [ ] Oracle tests (all nested shapes, all 20 scopes, byte count recorded); delete lossy pins; hostile-guest vectors.
-- [ ] **T3 — Re-issue the 4 components (AC2, D-17-3b-D).** Rebuild with a private target dir; `wasm-tools component
+  - [x] Oracle tests (all nested shapes, all 20 scopes, byte count recorded); delete lossy pins; hostile-guest vectors.
+- [x] **T3 — Re-issue the 4 components (AC2, D-17-3b-D).** Rebuild with a private target dir; `wasm-tools component
   wit` each (imports `frames@2.0.0`, record `wasi@`); re-pin 8 hashes; `[toolchain]` table + gate parse; delete the
   phantom text; `check-equiv-fixture-provenance` green; planted red (edit WIT w/o re-issue).
-- [ ] **T4 — Corpus, equivalence, record (AC2, D-17-3b-E/F).** `wit_corpus.rs` counts + `intent-class`/`scope` gates;
+- [x] **T4 — Corpus, equivalence, record (AC2, D-17-3b-E/F).** `wit_corpus.rs` counts + `intent-class`/`scope` gates;
   equiv harness F3 → ∅ and the rewritten forged-consent control; `check-wasm-form-equiv --json` non-vacuous both legs +
   tripwire; two ratification entries; the version-binding test + its planted `@2.0.1` red.
-- [ ] **T5 — Manifest + schema 5 (AC3, D-17-3b-G/H).** `artifact` field + validation + named const; forms validator;
+- [x] **T5 — Manifest + schema 5 (AC3, D-17-3b-G/H).** `artifact` field + validation + named const; forms validator;
   `from_manifest_toml`; every `ClassSection {` literal (13); schema bump artifacts (lib.rs rows/doctests, tripwire, probe → 6,
   `gen-abi-docs`, `stability-matrix`, `manifest/v5.md`, `migrate/v4-to-v5.md` + ko); `manifest_field_coverage` row +
   3 fixtures; `check-manifest-schema-version` green; `compliance.rs:228-229`.
-- [ ] **T6 — maos-bin admission (AC1/AC3, D-17-3b-I).** Fork, three variants + codes + Display; `UnknownClass` doc;
+- [x] **T6 — maos-bin admission (AC1/AC3, D-17-3b-I).** Fork, three variants + codes + Display; `UnknownClass` doc;
   `wasm_form_admission_17_3b.rs` (every AC3 vector, `maos run` default + `wasm-host` legs, the door row); planted red
   (engine refusal moved before gate 6).
-- [ ] **T7 — Registry (AC4, D-17-3b-J).** `form_policy` in both entry points; two `AdmissionError` variants; T2 floor
+- [x] **T7 — Registry (AC4, D-17-3b-J).** `form_policy` in both entry points; two `AdmissionError` variants; T2 floor
   for wasm; vectors across tiers/attestation; `maosctl import` binary test; fr63 rows; module doc; ledger re-book;
   planted red (attested path unchecked).
-- [ ] **T8 — Gates that pin the old world (AC3/AC4).** FKCS re-pinned to this story's reviewed diff (`check-fkcs --json` → `oracle_green: true`; D-17-3b-J(e)); ADR-060 anchors/fixture/vectors flipped with both directions still planted; ADR-060 Context + note;
+- [x] **T8 — Gates that pin the old world (AC3/AC4).** FKCS re-pinned to this story's reviewed diff (`check-fkcs --json` → `oracle_green: true`; D-17-3b-J(e)); ADR-060 anchors/fixture/vectors flipped with both directions still planted; ADR-060 Context + note;
   ADR-031 note; STABILITY fence sentence.
-- [ ] **T9 — TS scaffold (AC1/AC5, D-17-3b-K).** Retire `sdks/spirit-ts` (package, CI step, `README.md:333`,
+- [x] **T9 — TS scaffold (AC1/AC5, D-17-3b-K).** Retire `sdks/spirit-ts` (package, CI step, `README.md:333`,
   `check_7_1_ts_template_baseline`'s SDK leg). Template rewrite (manifest, `wit/`, package.json, index.ts, `halt.ts`, tests,
   .gitignore, README); `templates-regen` regen; example `package-lock.json` regenerated under Node 24; dead regen code
   removed and tests adjusted; WIT-copy byte-equality test; three READMEs. `coverage-matrix --measure-nfr-test-3
   --dry-run` still reads 100 for `example-spirit-ts` (`tests/coverage-matrix.yaml:1775-1780`) because a manifest with
   no declared capabilities scores 100 (`xtask/src/coverage_matrix_nfr_test_3.rs:139-141`) — confirm, do not re-pin.
-- [ ] **T10 — AC1 driver and CI (D-17-3b-L/M).** `ts_component_17_3b.rs`; `example-spirit-ts-tests` rewrite with
+- [x] **T10 — AC1 driver and CI (D-17-3b-L/M).** `ts_component_17_3b.rs`; `example-spirit-ts-tests` rewrite with
   annotations; one CI run (throwaway branch over SSH if needed) with every leg green, and the planted reds of AC1 once;
   run ids + annotation captures in `17-3b-evidence/`.
-- [ ] **T11 — Cookbook (AC5, D-17-3b-N).** New en+ko page + index row; hello-world re-frame; reference block and
+- [x] **T11 — Cookbook (AC5, D-17-3b-N).** New en+ko page + index row; hello-world re-frame; reference block and
   `compliance-claim.md:94` fixed; `cookbook_manifests_17_3b.rs` replaces `cookbook_sections_17_6.rs`; `check-ko-coverage`
   and glossary-lock green.
-- [ ] **T12 — Budget.** `cargo fmt --all`; `kloc-check`; exact raises (maos-bin; xtask if net > 0) with full-key
+- [x] **T12 — Budget.** `cargo fmt --all`; `kloc-check`; exact raises (maos-bin; xtask if net > 0) with full-key
   comments; `check-kernel-baseline` 25032; the ceiling tests.
-- [ ] **T13 — Records (landing commit).** Apply §Epic OLD→NEW edits; close `deferred-work.md:1050`'s section; tracker
+- [x] **T13 — Records (landing commit).** Apply §Epic OLD→NEW edits; close `deferred-work.md:1050`'s section; tracker
   row; the full workspace suite (`cargo test --workspace --locked`) and `check-exit-commands` once, results recorded.
+
+
+### Review Findings — priority contract/runner slice (2026-09-29)
+
+- [x] [Review][Patch] Include `PeerIdentityUnverified` in `@2.0.0` WIT and both bridge directions; all current rupture reasons round-trip. Six-case corpus, all three WIT copies, four rebuilt components, eight provenance hashes and the ratification record updated. [wit/spirit.wit:182]
+- [x] [Review][Patch] **Kernel-verdict finding — independently verified 2026-10-06 (non-author §A6 bmad-code-review of 17-3c).** Admitted native and WASM sessions route clean and forged TaskAssign frames through scheduler-bound identity, the shared kernel issuance decision and real enterprise governance. The gate is `crates/maos-bin/tests/spawned_scope_17_3c.rs` `eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims`, which passed 15/15 on the final 17-3c tree.
+  - **Verdicts:** all eight are nonvacuous and match the grant across forms. Forged `from`/`role`/`intent`/`auto_marker`/consent claims are recorded as claims only.
+  - **Independent compiled mutation:** removing `PolicyDecision::Deny => return Err(PolicyDenied)` in `capability/mod.rs` turns the gate RED (`delivered_frames` 1 where 0 is required). Restoring it turns the gate GREEN. Logs: 17-3c `17-3c-evidence/review-2026-10-06/logs/mutation-kernel-deny-bypass-{red,green}.log`.
+  - **Scope limit:** the proof covers scope kinds, not MCP selectors (deferred-work).
+- [x] [Review][Patch] CBOR serialization now stops at the 16 MiB ADR-032 limit and outbound framing rejects oversized bodies before writing headers; a guest-shaped 4 MiB lineage lifts, lowers and encodes losslessly. The limit does not constrain Wasmtime's allocation of the guest return value before serialization; 17-3c's T2 resource boundary remains prerequisite for production launch. [crates/maos-wasm-host/src/codec.rs:22]
+
+Review patch verification (2026-09-30): `maos-wasm-host` bridge/corpus/codec/e2e/equivalence suites 74/74 plus the new peer-identity rupture runner regression 1/1; WIT-copy test 1/1; `check-equiv-fixture-provenance`, `check-wasm-form-equiv --json` (base 19/0; injected 22/0), `templates-regen --check --json`, `kloc-check --json` (aggregate 168631; wasm-host 1328/1577), `cargo fmt --all -- --check` and the ratification binding test passed. Node 24.21.0/npm 11.20.0 rebuilt the example (`npm ci`, test, build, componentize); release runner `ts_component_17_3b --ignored` returned exit 0 and 1506 byte-identical canonical CBOR bytes. The 2026-09-29 CI annotations above predate this WIT re-issue; they are not CI proof of this patched artifact. The kernel-verdict control remains open pending the 17-3c ingress; the TypeScript/CI and documentation/governance groups remain unreviewed.
+
+### Review Findings — admission and registry slice (2026-09-30)
+
+- [x] [Review][Patch][High] Refuse `wasm-component` successor manifests on the operator-door hot-swap path. `load_bundle_from_file` now parses the form, but `successor_factory` builds a compiled-in Rust Spirit from `class.name` alone; the swap retains the predecessor sandbox while recording the successor's WASM manifest. The normal `gate_manifest` engine/T2 refusals are bypassed. Add a form check before constructing or swapping the successor, with a production-path regression. [crates/maos-bin/src/main.rs:3076]
+- [x] [Review][Patch][Low] Remove the unused `ClassSection::from_manifest_toml` wrapper and correct the story/ADR-060 reader description to name the actual single-parse `ManifestDocument::class_section` path; routing through the wrapper would parse the same document twice. [crates/maos-manifest/src/manifest.rs:246]
+- [x] [Review][Patch][Medium] Exercise gate 7 failure on a valid T2 WASM manifest: the existing vectors would still pass if the engine refusal moved ahead of `[output_shape]`, `[posture]` or `[budget]` parsing, returning `wasm_engine_off` rather than a section error. [crates/maos-bin/tests/wasm_form_admission_17_3b.rs:87]
+- [x] [Review][Patch][Medium] Anchor the ADR-060 registry refusal on executable form-check code, not `class.forms` text: the current anti-rot check remains green when the refusal is deleted because comments and its fixture contain that token. Make the planted fault delete the actual refusal while retaining the comment. [xtask/tests/decision_adrs_and_provisioning.rs:288]
+
+Review patch verification (admission/registry, 2026-09-30): the real `maosctl spirit upgrade` regression failed before the factory guard (success exit, blank stderr) and passed after it, leaving the daemon roster unchanged. `wasm_form_admission_17_3b` passed 4/4 in default and `wasm-host` builds; `form_admission_17_3b` 4/4; CLI import refusal 1/1; `decision_adrs_and_provisioning` 3/3 including its planted refusal-deletion fault; `recovery_lane_ceiling_rule` 10/10. `check-fkcs --json` (oracle green), `check-manifest-schema-version`, `check-kernel-baseline` (25032), `cargo fmt --all -- --check`, and `kloc-check --json` passed (aggregate 168635; maos-bin measured/pinned 23472). Security review found no additional reproducible vulnerability. The kernel-verdict finding remains open; the TypeScript/CI and documentation/governance groups were reviewed separately below.
+
+### Review Findings — TypeScript/CI slice (2026-09-30)
+
+- [x] [Review][Patch][High] Make the scaffold CI step propagate failures from `npm ci`, `npm test`, and `npm run build`. Its `set +e` subshell returns only `npm run componentize`'s status; a failing test or typecheck can receive a green annotation. Chain the commands or enable errexit inside the subshell. [.github/workflows/discipline.yml:1098]
+- [x] [Review][Patch][High] Render the generated TS manifest's `[class].name` from `{{project-name}}`, not cargo-generate's snake_case `{{crate_name}}`: `my-wasm-spirit` currently becomes `my_wasm_spirit`, which fails the `[a-z0-9-]` class validator before the promised engine refusal. Correct the post-generate directory hint and make the drift renderer model the built-ins accurately. [templates/spirit-ts/manifest.toml:2]
+- [x] [Review][Patch][Medium] Publish the vitest verdict in the scaffold CI annotation. The `grep '^ ✓'` extraction is empty in both recorded CI runs, leaving only `rc=0`; use a stable, ANSI-independent test summary. [.github/workflows/discipline.yml:1108]
+- [x] [Review][Patch][Low] Remove the unused TS `class_name` cargo-generate prompt and its TS-only renderer substitution; the rewritten template has no `{{class_name}}` consumer, yet generation still asks for it. [templates/spirit-ts/cargo-generate.toml:9]
+- [x] [Review][Patch][Low] On a runner refusal before the first output frame, the TS driver panics before reading stderr or waiting for the exit status. Include the runner's reason and code in the failure instead of an uninformative missing-frame assertion. [crates/maos-wasm-host/tests/ts_component_17_3b.rs:180]
+- [x] [Review][Patch][Low] Delete the `ts_template_renders_correctly` assertion that merely echoes its literal `maos:spirit/spirit@2.0.0` fixture; it exercises no substitution or component behavior. Keep the placeholder-bearing package-name assertion. [xtask/src/templates_regen.rs:314]
+
+### Review Findings — documentation/governance slice (2026-09-30)
+
+- [x] [Review][Patch][High] Both en/ko third-party WASM cookbook recipes run `npm ci` on a generated TS template without a lockfile; npm exits `EUSAGE` before building. Use `npm install`, as the template README and post-generate hint already do. [docs-site/docs/cookbook/wasm-component-spirit.md:21]
+- [x] [Review][Patch][Medium] The Korean ABI reference still declares current/max manifest schema 4 after the v5 bump, contradicting the Korean v5 and migration pages; update the translated ABI constants/index and their version examples. [docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/constants.md:16]
+- [x] [Review][Patch][Medium] The rust-inproc cookbook examples call `my-spirit` and `hello-spirit` daemon-admissible, but production `classify_spirit` knows neither. Their test bypasses the class gate with `&|_| true`. Describe them as structurally valid for a first-party class that must be compiled/registered, and make the test's scope explicit. [docs-site/docs/cookbook/manifest-fields.md:11]
+- [x] [Review][Patch][Medium] Manifest and migration indexes now say schemas `1..=5` are accepted while retaining an N-2-and-older hard-refusal policy, which would reject v3 and older. Align en/ko policy text with the real MIN/MAX version gate. [docs-site/docs/manifest/index.md:23]
+
+Review verification: inspected the shipped CI subshell and both recorded public annotations; an isolated `npm ci` on the template package without a lockfile exited `EUSAGE`. The cargo-generate built-in documentation defines `crate_name` as snake_case of `project-name`; cargo-generate itself is unavailable locally, so the generated-name failure is based on that published contract and the executable class-name validator. No product files were changed in this review pass. The priority kernel-verdict finding remains open; the story stays `in-progress`.
+Review patch verification (2026-10-01): the shipped CI scaffold shell step was executed under Node 24/npm 11 against a real copied example, both with a planted failing Vitest (exit 1, error annotation, no componentize) and green (notice `Tests 1 passed`, 12,414,052-byte component). The example built under Node 24; its release driver returned exit 0 with 1,506 byte-identical canonical CBOR bytes, and a v1-world component produced the expected red with runner exit 2 and `IncompatibleWorld` stderr. `templates_regen` 7/7, `cookbook_manifests_17_3b` 3/3 in both builds, `templates-regen --check`, `gen-abi-docs --check`, `kloc-check --json` (aggregate 168632, maos-bin 23472/23472, xtask 44039), `check-kernel-baseline` (25032), and formatting passed. The bilingual docs built; ko coverage 41/41 and glossary-lock passed; built HTML exposes the en/ko `npm install` recipe and ko schema-5 ABI reference. A Chromium visual pass was unavailable because the browser binary lacks `libnspr4.so`. `cargo generate` is not installed locally; the generated-name fix follows its documented built-in placeholder contract and the corrected drift-renderer regression. The 2026-09-29 public CI annotations predate this patch; no new public CI run is claimed. The kernel-verdict finding remains unchecked; story status remains `in-progress`.
+
+### Final review disposition (2026-10-01)
+
+The contract/runner, admission/registry, TypeScript/CI, and documentation/governance file groups have all been reviewed. Sixteen patch findings are checked off; the forged-consent **kernel-verdict** finding remains unchecked and is not waived. `gate_manifest` returns `WasmEngineOff` or `WasmLaunchNotBuilt` before WASM launch, so the live-form transport control cannot observe a kernel authorization decision. The actual runner-output-to-kernel ingress belongs to 17-3c AC2. Review complete does **not** mean 17-3b acceptance complete: keep this story `in-progress`, with no claim of equal kernel verdicts. Final missing-artifact controls: the ordinary `ts_component_17_3b` run reported one ignored test, and the explicit `--ignored` run with `MAOS_TS_COMPONENT` unset failed with the named rule-11(b) prerequisite (exit 101). Fresh post-patch public CI evidence is now recorded below; it does not close the verdict finding.
+
+### Post-review CI snapshot and 17-3c early-start disposition (2026-10-01)
+
+- **Fresh public CI:** [run `36860382516`](https://github.com/lunarpulse/maos/actions/runs/36860382516), job `110362853040`, **success**. Preserved staged patch snapshot `c544b66ee206122a0de001f88c7be95a03017873` / tree `4fd937d15144c0a01a934d072b90a1d27215cbe2`; CI revision `4c1b561d9fcb4f973ec2194220397d79593e36af` adds only the isolated push-only workflow. The harness retains all 12 shipped `example-spirit-ts-tests` steps unchanged, removes unrelated job dependencies, and adds provenance and actual CLI observations. This is targeted AC1 evidence, not a full `discipline`/aggregate run or kernel-verdict proof.
+- **Observed public annotations:** patched template drift, kernel pin `25032`, and fixture provenance passed; Node 24 scaffold reports `Tests 1 passed`; component **12,391,644 bytes**, SHA-256 `c789bf1576a6959c37a3f4ccdabd1565aec6d9686819b01beee6e80b7791b3a5`; release driver exits 0 with **1,506** byte-identical canonical-CBOR bytes. Admission tests pass **4/4** in each build. Separate real `maos run` observations in scratch homes exit 1 and publicly name **`wasm_engine_off`** and **`wasm_launch_not_built`**.
+- **Evidence retained:** `post-review-ci-snapshot.json`, `post-review-ci-workflow.yml.txt`, `post-review-ci-api.json`, `post-review-ci-annotations.log`, and `post-review-source-preservation.json` under `17-3b-evidence/`. Component artifact `11161713380` and raw-log artifact `11162660560` were uploaded; their API metadata/digests are retained. Anonymous raw-log ZIP download returns HTTP 401, so no local raw-log download is claimed; artifacts expire 2026-12-30. The original index and `main` HEAD were preserved. The older 2026-09-29 annotations remain historical evidence only.
+- **17-3c preparation:** `17-3c-early-start-flag-winston-decision.md` records D-17-3c-ES-01…05. Verified contract/admission plus the refusal snapshot and 17-6 evidence permit preparation without requiring 17-3b `done`. Runtime implementation, an isolated measured prototype, and an explicit numerical kernel/KLOC grant remain separate prerequisites; no kernel source or baseline changed here. 17-3c remains `backlog` (preparation only), 17-3b remains `in-progress`, and 17-3d is not a prerequisite.
+- **Isolated 17-3c preflight:** traced `issue_with_mediation` → `PolicyTable::evaluate` and the production enterprise wrapper. Archived a raw native T0/WASM T2 bridge prototype, eight actual kernel verdicts, compiled deny-bypass RED/restored GREEN, local memfd leave-one-out, dependency-closure GREEN, and measured minimum kernel seam **+95 physical src / +68 tokei code** under `17-3c-evidence/`. This fixture supplies trusted policy context manually; it is not production SCB/bus/enterprise ingress, safe conformance/resource proof, or four-image acceptance. The unchecked review finding remains open, the original kernel/index are preserved, and no numerical grant or baseline re-pin was applied.
 
 ## Epic OLD→NEW edits
 
@@ -537,7 +589,20 @@ re-grep each anchor, symbol-first):
 
 ### Agent Model Used
 
+opus-5 (anthropic/claude-opus-5-5) — integrator, with six opus-5 slice sub-agents (W1 bridge/runner, W2 components/corpus, M schema-5/admission, R registry, S TS scaffold/CI, C cookbook).
+
 ### Debug Log References
+
+All under `_bmad-output/implementation-artifacts/17-3b-evidence/`:
+- `t1-v1-guest-on-v2-host.log` — T1, measured BEFORE the import walk: the pinned `@1.0` echo blob (sha256 `1ab9c5b8…`) on a `@2.0.0` host fails at `Spirit::instantiate` type-checking — `type-checking export func handle-frame: expected record of 11 fields, found 8 fields` (not at compile/link). `runner-v1-world-exit2.log` — the finished runner refuses the same blob and `tests/fixtures/wasm/spirit_frames_v1_world.wat` with exit 2 `maos-wasm-runner: IncompatibleWorld: component imports maos:spirit/frames@1.0.0; this runner implements maos:spirit@2.0.0`.
+- `frame-bridge-oracle.log`, `planted-red-controls.log`, `post-restore-validation.log`, `typescript-component-roundtrip.log` — AC2 oracle (TaskAssign canonical CBOR **1,289 B**, replacing the spike's 1,025), hostile vectors, W1 plants.
+- `t3-reissue.log` — the 4 re-issued components (commands, sizes, sha256, `wasm-tools component wit`).
+- `m-*.log` — schema 5, gen-abi-docs, admission vectors, plants, review (g).
+- `t7-fkcs-repin.log`, `t7-attested-form-proven-red.log` — FKCS re-pin + independent hash, AC4 plant.
+- `t9-*.log` — Node 24 scaffold build, out-of-repo public scaffold, no-`--disable http` plant, runner green, `smoke-spirit-author-7-1` attempt.
+- `t11-cookbook-red.log` — AC5 plants.
+- `t10-workflow.yml.txt`, `t10-ci-run1-annotations.log`, `t10-ci-run2-annotations.log` — the throwaway CI proof (branch `t10-17-3b`, deleted after capture).
+- `post-review-ci-snapshot.json`, `post-review-ci-workflow.yml.txt`, `post-review-ci-api.json`, `post-review-ci-annotations.log`, `post-review-source-preservation.json` — fresh post-patch targeted CI run `36860382516`, immutable snapshot/harness provenance, public annotations and artifact metadata, and preserved source/index evidence.
 
 ### Completion Notes List
 
@@ -549,8 +614,211 @@ re-grep each anchor, symbol-first):
   enhancements and ~20 drifted cites corrected. Baselines at HEAD: `check-exit-commands` PASS (no Epic-17 token owed);
   `decision_adrs_and_provisioning` 3/3; `check-fkcs` passed only through the held advisory (`oracle_green: false`) — since fixed by the D8 discharge (Q2).
 
+- **DEV PASS 2026-09-29 — all 14 tasks done; status → review.** Integrator + six slice agents (W1/W2/M/R/S/C); every figure below was run, not inferred.
+- **AC1 — CI proof (rule 11(c)): throwaway branch `t10-17-3b`, workflow `17-3b-evidence/t10-workflow.yml.txt` (the `example-spirit-ts-tests` job verbatim + AC1(a) drift step + two plants), FINAL runs `36596709149` and `36596708376` @ `03b280d3` — both `success`**, every verdict a public annotation (`t10-ci-run2-annotations.log`): (a) `templates-regen --check` passed; (b) Node 24 `npm ci && npm test && npm run build && npm run componentize` rc=0, `dist/spirit.wasm` 12,391,351 B uploaded as artifact (never committed); (c) release runner + `ts_component_17_3b --ignored` → `TS-COMPONENT-OUTCOME … exit=0 canonical_cbor_bytes=1506`; (d) default build `wasm_form_admission_17_3b` 3/3 (`wasm_engine_off`, `maos run` + door row); (e) `--features wasm-host` 3/3 (`wasm_launch_not_built`). **Proven red in CI:** Node 20 → componentize rc=1 (`EBADENGINE`, native binding); componentize without `--disable http fetch-event` → driver rc=101. Run 1 (`36594477563`, RED, `t10-ci-run1-annotations.log`) found two real defects fixed before run 2: (i) the npm-9-generated example lock was refused by npm 11 (Node 24's npm) — regenerated under npm 11.20.0; (ii) `componentize-js` 0.23.0 imports the undeclared `@bytecodealliance/preview2-shim` at runtime — pinned `0.25.0` (the spike's version) as a devDependency in template + example, README says why. Run 1 also exposed that slice S had deleted the `coverage-matrix-nfr-test-3` job from `discipline.yml` (GitHub rejected the workflow: `aggregate` needs it) — restored verbatim; `actionlint` clean except the pre-existing `ubuntu-26.04` label warnings. Branch deleted after capture.
+- **AC2:** `wit/spirit.wit` = `maos:spirit@2.0.0` (records 20, iac-frame 11, scope 20, intent-class 3). `frame_bridge` lossless; `lower` fallible; future `Scope`/`PostureHint`/`RuptureReason` → `BridgeError::Unrepresentable`; 16/32-byte length checks (`BadFrameIdLen`/`BadHashLen`). Oracle TaskAssign canonical CBOR **1,289 B** (replaces 1,025); lossy pins deleted. Runner: exit 2 `IncompatibleWorld` (T1 measured first: `@1` blob fails at instantiate type-check, 11 vs 8 fields), instantiate-time fuel → 4, exit 5 `UnrepresentableFrame`; a component importing no `maos:spirit/*` is not refused by the walk (stays exit 3 `InvalidComponent`). 4 components re-issued (rustc 1.98.1, wit-bindgen 0.44.0, wasm32-wasip2, `wasi:*@0.2.9`), 8 hashes re-pinned, required `[toolchain]`, phantom nightly text deleted; `check-equiv-fixture-provenance` green; `check-wasm-form-equiv --json` green (base 19/0, fault-inject 22/0). Two ratification entries + the `wit_corpus` version-binding test. Plants (all red, reverted): digest-ref default, `intent: Readonly` lift, F3 re-populated, `@2.0.1` without entry, WIT byte without re-issue, `[toolchain]` removed; plant (ii) used the reachable `RuptureReason::PeerIdentityUnverified → RecipientUnloaded` backstop — `PostureHint` has no unmatched constructible variant today, its `_ => Err` arm is future-proofing.
+- **Security (hostile guest, review (d)):** 15-byte frame-id / 31-byte argv-prefix-hash → typed `BadFrameIdLen`/`BadHashLen`, no panic; a 4,096-entry lineage lifts under 1 MiB. Input bounded by the 16 MiB ADR-032 frame cap (`codec.rs`); fuel bounds guest computation, and the 16 MiB cap bounds serialized outbound frames; neither bounds Wasmtime allocation of a guest return value before serialization (17-3c T2 prerequisite). **`lift` is a codec, not an authorization point** — guest-emitted intent/consent claims are judged by the kernel frame ingress that `17-3c-wasm-spirit-on-the-bus-under-t2` (AC2) wires.
+- **AC3:** schema 5 landed (`MANIFEST_SCHEMA_VERSION` 5; v5 + v4-to-v5 pages en+ko; `gen-abi-docs --check`, `stability-matrix --check`, `check-manifest-schema-version`, `abi-diff --base abi-baseline/v1-pre-bump.txt` all green). `[class].artifact` + form rules (`ManifestDocument::parse` and `class_section`). `gate_manifest` forks: wasm skips gate 5, T2 required (`wasm_component_requires_t2`; T4 → `manifest_section_invalid` at parse), final `wasm_engine_off` / `wasm_launch_not_built`, codes lead the Display. Plants: engine refusal before gate 6 → T3 vector reads `wasm_engine_off`; fork deleted → `unknown Spirit class` / door `unknown_spirit_class`. Review (g): every bypass constructs a first-party `rust-inproc`/T0 class except `admit_daemon_control_spirit` (config-named manifest straight to `security.admit_spirit`) — **hardened by the integrator**: it now refuses a `wasm-component` policy identity.
+- **AC4:** `frozen_surface_gate` (still the one prelude, first in both entry points) parses once structurally, refuses FKCS internals (multi-line / header-comment / dotted evasions now refused), then `class.forms`: `rust-inproc` → `FirstPartyFormFromRegistry` at every tier incl. attested PublicVetted; `wasm-component` → floor T2 at every tier and on the attested path (`t3_for_public_untrusted` ignored); invalid `[class]` → `ClassSectionInvalid`; non-TOML → existing `ManifestTrustTierInvalid` (unchanged outcome). `maosctl import` binary test refuses a `rust-inproc` bundle. FKCS re-pinned `650f13b9…` → `62d99cfa…` (independently recomputed), `check-fkcs --json` `oracle_green: true`. Plant: attested path skips the policy → attested `rust-inproc` admits (red).
+- **AC5:** TS scaffold self-contained (`sdks/spirit-ts` retired), example regenerated; out-of-repo scaffold builds from public npm only (`t9-public-scaffold-node24.log`). `smoke-spirit-author-7-1` could not be measured on this host: `cargo generate` is not installed (recorded, `t9-smoke-spirit-author-7-1.log`). Cookbook: new `wasm-component-spirit.md` en+ko, hello-world + manifest-fields structurally valid for registered first-party classes; compliance-claim fragment parses; `cookbook_manifests_17_3b` 3/3 both builds; ko-coverage 41/41, glossary-lock green. Plants red: `supervised` posture; one ko block edit.
+- **Budget:** after `cargo fmt --all`, tokei 14.0.0: `maos-bin` 23423 → **23465 (+42) — exact raise**, full key cited (`kloc.toml`); `xtask` 44022 → 44042 (absorbs, ≤ 44123); `maos-wasm-host` 1106 → 1304; `maos-manifest` 4214 → 4404; `maos-registry` 3515 → 3392 (−123, ledger re-booked); aggregate 168280 → 168607 (hardfail 170884); `kloc-check` passed. `check-kernel-baseline` **25032** (kernel-Δ 0). `decision_adrs_and_provisioning` 3/3 (ADR-060 anchors flipped; the registry anchor now `require_contains` with its own planted red), `recovery_lane_ceiling_rule` 10/10, `d11_xtask_ceiling_ratchet` 7/7.
+- **Full suite** `cargo test --workspace --locked --no-fail-fast`: 4,550 passed, 122 ignored, 3 failed → (1) `check_dev_record_completeness::stale_owner_sweep_reds_on_a_planted_done_owner` — caused by this story's `deferred-work.md` edit (the closed FKCS heading was last in the file, swallowing the planted row); fixed by moving the open D8 row under an open `### Open rows` heading; `cargo test -p xtask` then 941/941. (2)(3) `maos-cli --test two_host_reconcile_2c` Python-twin tests — environmental: this host's Python has no Ed25519 library (`verify.py`: install `cryptography`/PyNaCl); untouched code, not installed here. `check-exit-commands` PASS; `check-dev-record-completeness` PASSED.
+- **Records:** ADR-060 Context restated + Implementation note; ADR-031 `@2.0.0` note; epic-17 schema paragraph and landed-AC note (OLD→NEW); `deferred-work.md` cookbook section and the FKCS row closed; `kloc.toml` registry ledger re-booked; `requirements-inventory.md:568` was already applied at creation. The full-suite side effect on `intent-lineage-coverage-report.md` was reverted (not story work).
+- **Admission annotation gap resolved in fresh evidence (2026-10-01):** the shipped test annotations still report their 4/4 result summaries; separate real CLI observations in the isolated rehearsal publicly name `wasm_engine_off` and `wasm_launch_not_built` (run `36860382516`). No launch or kernel-verdict proof is inferred from those refusals.
+
 ### File List
+
+- `.github/workflows/discipline.yml`
+- `Cargo.lock`
+- `README.md`
+- `STABILITY.md`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/frame-bridge-oracle.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-snapshot.json`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-workflow.yml.txt`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-api.json`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-annotations.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/post-review-source-preservation.json`
+- (new) `_bmad-output/implementation-artifacts/17-3c-early-start-flag-winston-decision.md`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/isolated-prototype.patch`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/measurements-and-preservation.json`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/integrated-green-before.log`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/integrated-kernel-bypass-red.log`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/integrated-restored-green.log`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/t2-memfd-omission-red.log`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/t2-memfd-allow-green.log`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/dependency-closure.log`
+- (new) `_bmad-output/implementation-artifacts/17-3c-evidence/governance.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/m-admission-validation.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/m-docs-localization.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/m-gen-abi-docs.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/m-main-bypass-review.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/m-planted-red-controls.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/m-schema-docs-validation.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/planted-red-controls.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/post-restore-validation.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/runner-v1-world-exit2.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t1-v1-guest-on-v2-host.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t10-ci-run1-annotations.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t10-ci-run2-annotations.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t10-workflow.yml.txt`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t11-cookbook-red.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t3-reissue.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t7-attested-form-proven-red.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t7-fkcs-repin.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t9-planted-red-no-disable-http.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t9-public-scaffold-node24.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t9-runner-green.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t9-scaffold-node24.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/t9-smoke-spirit-author-7-1.log`
+- (new) `_bmad-output/implementation-artifacts/17-3b-evidence/typescript-component-roundtrip.log`
+- `_bmad-output/implementation-artifacts/17-3b-wasm-form-admission-and-contract.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/planning-artifacts/epics/epic-17-workers-and-third-party-form-w2.md`
+- `crates/maos-bin/src/admission.rs`
+- `crates/maos-bin/src/main.rs`
+- (new) `crates/maos-bin/tests/cookbook_manifests_17_3b.rs`
+- (new) `crates/maos-bin/tests/wasm_form_admission_17_3b.rs`
+- `crates/maos-cli/Cargo.toml`
+- (new) `crates/maos-cli/tests/import_rust_inproc_refusal_17_3b.rs`
+- `crates/maos-host/src/lib.rs`
+- `crates/maos-kernel-core/benches/revocation_propagation_p99.rs`
+- `crates/maos-kernel-core/tests/abi_stability_admit.rs`
+- (new) `crates/maos-kernel-core/tests/fixtures/manifest/class/edge-case/artifact.toml`
+- (new) `crates/maos-kernel-core/tests/fixtures/manifest/class/malformed-rejected/artifact.toml`
+- (new) `crates/maos-kernel-core/tests/fixtures/manifest/class/well-formed/artifact.toml`
+- `crates/maos-kernel-core/tests/hot_swap_cross_major_migration.rs`
+- `crates/maos-kernel-core/tests/manifest_field_coverage.rs`
+- `crates/maos-kernel-core/tests/on_revocation_three_actions.rs`
+- `crates/maos-kernel-core/tests/operator_posture_ceiling_16_6.rs`
+- `crates/maos-kernel-core/tests/provider_switched_journal.rs`
+- `crates/maos-kernel-core/tests/revocation_applier_pipeline.rs`
+- `crates/maos-kernel-core/tests/sandbox_admission.rs`
+- `crates/maos-manifest/src/lib.rs`
+- `crates/maos-manifest/src/manifest.rs`
+- (deleted) `crates/maos-manifest/tests/cookbook_sections_17_6.rs`
+- `crates/maos-registry/src/admission.rs`
+- (new) `crates/maos-registry/tests/form_admission_17_3b.rs`
+- `crates/maos-spirit-abi/src/compliance.rs`
+- `crates/maos-spirit-abi/src/lib.rs`
+- `crates/maos-spirit-abi/tests/manifest_n_minus_1_test.rs`
+- `crates/maos-wasm-host/Cargo.toml`
+- `crates/maos-wasm-host/guests/echo-spirit/src/lib.rs`
+- `crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs`
+- `crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/src/lib.rs`
+- `crates/maos-wasm-host/src/adapter.rs`
+- `crates/maos-wasm-host/src/codec.rs`
+- `crates/maos-wasm-host/src/conformance.rs`
+- `crates/maos-wasm-host/src/frame_bridge.rs`
+- `crates/maos-wasm-host/src/host_state.rs`
+- `crates/maos-wasm-host/src/lib.rs`
+- `crates/maos-wasm-host/src/runner.rs`
+- `crates/maos-wasm-host/src/wit_guest.rs`
+- `crates/maos-wasm-host/tests/codec_integration.rs`
+- `crates/maos-wasm-host/tests/e2e_roundtrip.rs`
+- `crates/maos-wasm-host/tests/equiv_harness.rs`
+- `crates/maos-wasm-host/tests/frame_bridge_roundtrip.rs`
+- (new) `crates/maos-wasm-host/tests/ts_component_17_3b.rs`
+- (new) `crates/maos-wasm-host/tests/wit_copies_17_3b.rs`
+- `crates/maos-wasm-host/tests/wit_corpus.rs`
+- `docs-site/abi/v1/cancellation.md`
+- `docs-site/abi/v1/compliance.md`
+- `docs-site/abi/v1/constants.md`
+- `docs-site/abi/v1/ctx.md`
+- `docs-site/abi/v1/deprecation.md`
+- `docs-site/abi/v1/gateway.md`
+- `docs-site/abi/v1/identity.md`
+- `docs-site/abi/v1/index.md`
+- `docs-site/abi/v1/lifecycle.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/cancellation.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/compliance.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/constants.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/ctx.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/deprecation.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/gateway.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/identity.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/index.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs-abi/current/lifecycle.md`
+- `docs-site/docs/cookbook/compliance-claim.md`
+- `docs-site/docs/cookbook/hello-world-spirit.md`
+- `docs-site/docs/cookbook/index.md`
+- `docs-site/docs/cookbook/manifest-fields.md`
+- (new) `docs-site/docs/cookbook/wasm-component-spirit.md`
+- `docs-site/docs/manifest/index.md`
+- (new) `docs-site/docs/manifest/v5.md`
+- `docs-site/docs/migrate/index.md`
+- (new) `docs-site/docs/migrate/v4-to-v5.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/compliance-claim.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/hello-world-spirit.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/index.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/manifest-fields.md`
+- (new) `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/wasm-component-spirit.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/manifest/index.md`
+- (new) `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/manifest/v5.md`
+- `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/migrate/index.md`
+- (new) `docs-site/i18n/ko/docusaurus-plugin-content-docs/current/migrate/v4-to-v5.md`
+- `docs/adr/ADR-031-wasm-component-model-spirit-form.md`
+- `docs/adr/ADR-060-spirit-forms-by-trust-tier.md`
+- `examples/example-spirit-ts/.gitignore`
+- `examples/example-spirit-ts/README.md`
+- `examples/example-spirit-ts/manifest.toml`
+- `examples/example-spirit-ts/package-lock.json`
+- `examples/example-spirit-ts/package.json`
+- (new) `examples/example-spirit-ts/src/halt.ts`
+- `examples/example-spirit-ts/src/index.ts`
+- `examples/example-spirit-ts/tests/spirit.test.ts`
+- `examples/example-spirit-ts/tsconfig.json`
+- (new) `examples/example-spirit-ts/wit/spirit.wit`
+- (deleted) `sdks/spirit-ts/.gitignore`
+- (deleted) `sdks/spirit-ts/README.md`
+- (deleted) `sdks/spirit-ts/package-lock.json`
+- (deleted) `sdks/spirit-ts/package.json`
+- (deleted) `sdks/spirit-ts/src/ctx.ts`
+- (deleted) `sdks/spirit-ts/src/halt.ts`
+- (deleted) `sdks/spirit-ts/src/identity.ts`
+- (deleted) `sdks/spirit-ts/src/index.ts`
+- (deleted) `sdks/spirit-ts/src/spirit.ts`
+- (deleted) `sdks/spirit-ts/src/spirit_test/index.ts`
+- (deleted) `sdks/spirit-ts/src/spirit_test/types.ts`
+- (deleted) `sdks/spirit-ts/tests/sdk.test.ts`
+- (deleted) `sdks/spirit-ts/tsconfig.json`
+- `templates/spirit-ts/.gitignore`
+- `templates/spirit-ts/README.md`
+- `templates/spirit-ts/cargo-generate.toml`
+- `templates/spirit-ts/manifest.toml`
+- `templates/spirit-ts/package.json`
+- (new) `templates/spirit-ts/src/halt.ts`
+- `templates/spirit-ts/src/index.ts`
+- `templates/spirit-ts/tests/spirit.test.ts`
+- `templates/spirit-ts/tsconfig.json`
+- (new) `templates/spirit-ts/wit/spirit.wit`
+- `tests/fixtures/wasm/echo_spirit_component.wasm`
+- `tests/fixtures/wasm/equiv-fixtures.provenance.toml`
+- `tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm`
+- `tests/fixtures/wasm/equiv_divergent_spirit_component.wasm`
+- `tests/fixtures/wasm/equiv_identity_spirit_component.wasm`
+- (new) `tests/fixtures/wasm/spirit_frames_v1_world.wat`
+- `wit/spirit.wit`
+- `xtask/abi-ratifications.toml`
+- `xtask/fkcs-baseline.toml`
+- `xtask/fr63-typed-errors.toml`
+- `xtask/kloc.toml`
+- `xtask/src/check_epic_6_bridge.rs`
+- `xtask/src/check_equiv_fixture_provenance.rs`
+- `xtask/src/templates_regen.rs`
+- `xtask/tests/decision_adrs_and_provisioning.rs`
+- `xtask/tests/story_10_4a_ac1_proven_red.rs`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ### Change Log
 
 - 2026-09-29 — Story created (`backlog` → `ready-for-dev`).
+- 2026-09-29 — Dev pass complete (`ready-for-dev` → `in-progress` → `review`): WIT `@2.0.0` + lossless bridge + runner refusals, 4 components re-issued, schema 5, daemon + registry admission by form, TS scaffold (SDK retired), cookbook; CI proof runs `36596709149` / `36596708376`; `maos-bin` exact raise +42.
+- 2026-10-01 — Captured fresh post-review CI snapshot evidence (run `36860382516` success), public typed CLI refusals, and D-17-3c-ES-01…05 preparation/FLAG-Winston policy; no runtime/kernel grant and no status completion.
+- 2026-10-01 — Ran and archived isolated 17-3c kernel-oracle/framed-T2 feasibility and compiled mutation evidence; measured the minimum seam and refined grant prerequisites. No production source cutover, status completion, or numerical grant.
+- 2026-10-05 — Review-readiness reconciliation: `in-progress` → `review`. Production-session kernel-verdict and mutation evidence is supplied by the completed detached 17-3c candidate, not inferred from the old raw bridge or refusals. Final finding awaits independent verification; no story closure or original code cutover.
+- 2026-10-06 — Final kernel-verdict finding independently verified by the non-author 17-3c §A6 review (eight-case gate plus a fresh compiled deny-bypass mutation, RED/GREEN). `review` → `done`. This commit lands 17-3b's own tree, which still refuses launch with `WasmLaunchNotBuilt`. The launch, and the kernel pin re-pin, land with 17-3c.
+
+### Current review disposition (2026-10-05)
+
+- Superseded 2026-10-06: the final finding is independently verified and checked off, and the story is `done`. The 17-3c candidate evidence it cites lands with the 17-3c commit.
+

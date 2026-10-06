@@ -1,0 +1,32 @@
+2026-09-29T15:45:16Z
+5075443c
+
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo test --locked -p maos-spirit-abi -p maos-manifest
+RESULT: PASS — 258 passed (6 suites), 3 ignored, 2 existing warnings (0.27s).
+
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo test --locked -p maos-kernel-core --test manifest_field_coverage
+RESULT: PASS — 3 passed (1 suite), 2 existing warnings (0.00s).
+
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- check-manifest-schema-version
+RESULT: PASS — check-manifest-schema-version: PASSED (current=5, min=1, max=5).
+
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- gen-abi-docs
+INITIAL RESULT: expected target-directory mismatch: rustdoc JSON format_version is 61 (expected 57). `gen_abi_docs` reads repo-local target/doc while this command wrote to the private target directory.
+
+CARGO_TARGET_DIR=target CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- gen-abi-docs
+RESULT: PASS — {"version":"0.1.0-alpha.1","abi_version":1,"manifest_schema_version":5,"pages":9}.
+
+CARGO_TARGET_DIR=target CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- gen-abi-docs --check
+RESULT: PASS (exit 0).
+
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- stability-matrix
+RESULT: PASS — stability-matrix: wrote STABILITY.md from workspace state.
+
+CARGO_TARGET_DIR=target CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- stability-matrix --check --json
+RESULT: PASS — {"passed":true,"in_sync":true,"deprecation_issues":[],"export_issue":null}.
+
+CARGO_TARGET_DIR=target CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- abi-diff --base abi-baseline/v1-pre-bump.txt --json
+RESULT: PASS — JSON reports passed=true and removed=[]; the baseline observes pre-existing additive API only.
+
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- check-abi-ratification
+RESULT: PASS — check-abi-ratification: PASS (no ABI changes — base case).

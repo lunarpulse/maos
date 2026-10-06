@@ -1,0 +1,283 @@
+warning: unused variable: `reason`
+  --> crates/maos-attrs/src/lib.rs:18:9
+   |
+18 |     let reason: Option<String> = None;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_reason`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-attrs` (lib) generated 1 warning (run `cargo fix --lib -p maos-attrs` to apply 1 suggestion)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Child`
+ --> crates/maos-mcp/src/transport/stdio.rs:8:20
+  |
+8 | use std::process::{Child, Command, Stdio};
+  |                    ^^^^^
+
+warning: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1237:21
+     |
+1237 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::HashSet`
+  --> crates/maos-iac/src/adapter/log_recall.rs:24:5
+   |
+24 | use std::collections::HashSet;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/maos-iac/src/adapter/transparency_log.rs:939:13
+    |
+939 |         let mut inner = self
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `intent_str` is never read
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:54:5
+   |
+49 | struct Submission {
+   |        ---------- field in this struct
+...
+54 |     intent_str: String,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+[…544ln elided…]
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `detail` is never used
+   --> xtask/src/evidence_ledger.rs:536:12
+    |
+494 | impl SignatureCheck {
+    | ------------------- method in this implementation
+...
+536 |     pub fn detail(&self) -> &str {
+    |            ^^^^^^
+
+warning: field `substrate_present` is never read
+    --> xtask/src/evidence_ledger.rs:1259:9
+     |
+1254 | pub struct PublishedLeg {
+     |            ------------ field in this struct
+...
+1259 |     pub substrate_present: bool,
+     |         ^^^^^^^^^^^^^^^^^
+     |
+     = note: `PublishedLeg` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `synthetic` is never used
+   --> xtask/src/check_fkcs.rs:117:12
+    |
+116 | impl FkcsSurfaceSnapshot {
+    | ------------------------ associated function in this implementation
+117 |     pub fn synthetic<A, H, AS, HS>(src_lines: usize, abi_items: A, host_items: H) -> Self
+    |            ^^^^^^^^^
+
+warning: function `read_nonempty_lines` is never used
+   --> xtask/src/check_fkcs.rs:744:8
+    |
+744 | pub fn read_nonempty_lines(path: &str) -> Result<BTreeSet<String>, String> {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: field `owasp_methodology_commit` is never read
+  --> xtask/src/check_pentest_gate.rs:24:9
+   |
+19 | pub struct GateSection {
+   |            ----------- field in this struct
+...
+24 |     pub owasp_methodology_commit: String,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `GateSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `fixture_path` and `conformance_date` are never read
+  --> xtask/src/check_skill_conformance.rs:35:9
+   |
+29 | pub struct ConformanceSection {
+   |            ------------------ fields in this struct
+...
+35 |     pub fixture_path: String,
+   |         ^^^^^^^^^^^^
+36 |     pub conformance_date: String,
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+{
+  "passed": true,
+  "actual-lines": 25032,
+  "pinned-lines": 25032,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 98,
+  "set-hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776",
+  "pinned-set-hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776",
+  "changed": [],
+  "added": [],
+  "removed": []
+}
+{
+  "passed": true,
+  "alarm": true,
+  "aggregate": 168632,
+  "per_crate": {
+    "(unknown:spikes)": 144,
+    "(unknown:templates)": 11,
+    "maos-a2a": 303,
+    "maos-a2a-core": 4937,
+    "maos-a2a-tcp": 1442,
+    "maos-acp": 642,
+    "maos-attrs": 20,
+    "maos-audit": 7243,
+    "maos-bench": 1534,
+    "maos-bin": 23472,
+    "maos-cap-registry": 0,
+    "maos-capability": 1129,
+    "maos-cli": 6106,
+    "maos-cohort": 5857,
+    "maos-compliance": 2032,
+    "maos-control": 1286,
+    "maos-corpus-gen": 2341,
+    "maos-director-surface": 784,
+    "maos-domain": 9270,
+    "maos-egress": 0,
+    "maos-escape-detector": 284,
+    "maos-eval": 3661,
+    "maos-exec-deps": 357,
+    "maos-fkcs": 491,
+    "maos-host": 39,
+    "maos-iac": 7084,
+    "maos-journal": 0,
+    "maos-journey-test": 626,
+    "maos-kernel-core": 19309,
+    "maos-loom-lite": 5277,
+    "maos-manifest": 4401,
+    "maos-mcp": 999,
+    "maos-notify-push": 248,
+    "maos-orchestrator-buffer": 0,
+    "maos-pdp": 438,
+    "maos-persistence": 1,
+    "maos-providers": 1392,
+    "maos-registry": 3392,
+    "maos-secrets": 536,
+    "maos-shell": 606,
+    "maos-siem": 447,
+    "maos-skill": 800,
+    "maos-spirit-abi": 1038,
+    "maos-spirit-cli": 753,
+    "maos-spirit-derive": 350,
+    "maos-spirit-hello": 399,
+    "maos-spirit-sdk": 846,
+    "maos-sso": 391,
+    "maos-telemetry": 547,
+    "maos-wasm-host": 1328,
+    "maos-wire": 0,
+    "xtask": 44039
+  },
+  "over_budget": []
+}
+{
+  "passed": true,
+  "epics-checked": 21,
+  "authoritative-src-lines": 25032,
+  "violations": []
+}
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:6: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:7: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:8: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:15: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:179: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:482: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:494: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:556: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:624: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:639: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:828: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:829: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:831: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:908: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:909: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:910: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:922: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:923: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:924: ownerless and open, with a recorded disposition
+{"passed":true,"violation_count":0,"violations":[],"done_stories_checked":162,"deferred_owner_assertions":79,"owned_but_deferred":[],"not_a_vehicle":[],"ownerless_undispositioned":[],"ownerless_dispositioned":["deferred-work.md:6: ownerless and open, with a recorded disposition","deferred-work.md:7: ownerless and open, with a recorded disposition","deferred-work.md:8: ownerless and open, with a recorded disposition","deferred-work.md:15: ownerless and open, with a recorded disposition","deferred-work.md:179: ownerless and open, with a recorded disposition","deferred-work.md:482: ownerless and open, with a recorded disposition","deferred-work.md:494: ownerless and open, with a recorded disposition","deferred-work.md:556: ownerless and open, with a recorded disposition","deferred-work.md:624: ownerless and open, with a recorded disposition","deferred-work.md:639: ownerless and open, with a recorded disposition","deferred-work.md:828: ownerless and open, with a recorded disposition","deferred-work.md:829: ownerless and open, with a recorded disposition","deferred-work.md:831: ownerless and open, with a recorded disposition","deferred-work.md:908: ownerless and open, with a recorded disposition","deferred-work.md:909: ownerless and open, with a recorded disposition","deferred-work.md:910: ownerless and open, with a recorded disposition","deferred-work.md:922: ownerless and open, with a recorded disposition","deferred-work.md:923: ownerless and open, with a recorded disposition","deferred-work.md:924: ownerless and open, with a recorded disposition"],"total_stories_scanned":163}
+[raw output: artifact://518]
+
+
+Wall time: 0.56 seconds

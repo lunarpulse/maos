@@ -29,9 +29,13 @@ ratifier = "Lunarpulse"
 # admission.rs` is byte-identical to 461eb213. Evidence:
 # epic-14-preflight-decisions.md §D8 ruling; the drift proof is
 # xtask/tests/fkcs_oracle.rs::every_declared_admission_file_reds_a_one_byte_mutation.
+# RE-PINNED 2026-09-29 — Story 17-3b-wasm-form-admission-and-contract:
+# the reviewed admission diff adds form policy in `frozen_surface_gate` and a
+# structural FKCS read. The §A6(e)/(h) review covers the shared gate, attested
+# path, structural TOML shapes, and independent hash recomputation.
 [admission_baseline]
 files = [
     "crates/maos-registry/src/admission.rs",
     "crates/maos-skill/src/admission.rs",
 ]
-sha256 = "650f13b939f03618d43fe4b2214f5a2f46ee79d9574272126236a70c466c3c91"
+sha256 = "62d99cfa327700e6cfe58037818521d03a58c91aec07cd25af36113b15df8e8e"

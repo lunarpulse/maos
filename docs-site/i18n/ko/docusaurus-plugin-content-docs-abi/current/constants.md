@@ -11,9 +11,10 @@ review_status: machine
 - [ABI Stability Policy](/migrate/abi-stability) — 전체 호환성 윈도우 문서
 - [v1 → v2 Migration](/migrate/v1-to-v2) — manifest 스키마 버전 2에서 변경된 점
 - [v2 → v3 Migration](/migrate/v2-to-v3) — manifest 스키마 버전 3에서 변경된 점
+- [v4 → v5 Migration](/migrate/v4-to-v5) — manifest 스키마 버전 5에서 변경된 점
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 5*
 
 
 ## Constants {#maos-spirit-abi-constants}
@@ -65,6 +66,8 @@ Epic 6 §A4(소급 2026-05-28)에서 Epic 6 스토리 6.2 / 6.4 / 6.5에 걸쳐 
 (`from_manifest_toml`은 없으면 `None`을 반환), 따라서 `MANIFEST_SCHEMA_VERSION = 3`의 kernel은 여전히 `= 2` 기준으로 작성된 manifest를 허용합니다
 (N-1 지원 하한선) — AC-11 append-only 호환. `xtask/abi-ratifications.toml`에 하나의 비준된 `[[ratification]]` 항목으로 기록됩니다.
 
+Story 13.5d에서 `[capabilities.required.loom]` 섹션을 추적하기 위해 `4`로 올려졌습니다. Story 17-3b에서 `wasm-component` 형식과 `[class].artifact`를 위해 `5`로 올려졌습니다. 현재 kernel은 `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION`과 `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`이 정의하는 `1..=5` 범위를 지원합니다.
+
 이 상수는 `maos-manifest::ClassSection` 검증과 `xtask
 check-manifest-schema-version` 게이트가 소비하는 단일 권위 원천입니다. Story 7.5a의 ABI Stability Triple
 `(kernel_version, abi_version, manifest_schema_version)`이 이 상수를 직접 소비합니다.
@@ -74,19 +77,17 @@ check-manifest-schema-version` 게이트가 소비하는 단일 권위 원천입
 ```rust
 use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 
-assert_eq!(MANIFEST_SCHEMA_VERSION, 4);
+assert_eq!(MANIFEST_SCHEMA_VERSION, 5);
 ```
 
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 4u32;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 5u32;
 ```
 
 ### `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` {#maos-spirit-abi-min-supported-manifest-schema-version}
 
-이 kernel이 어드미션 시점에 수락하는 가장 낮은 manifest 스키마 버전.
-
-Story 7.5a가 N-1 지원 / N-2 거부 정책에 따라 각 ABI 범프 시 이 하한선을 올립니다. v0.5-α에서 하한선은 `1`로 유지됩니다 — Epic 1b 기준 manifest가 변경 없이 로드됩니다.
+`MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`과 함께 이 kernel이 어드미션 시점에 수락하는 범위의 하한을 정의합니다. 현재 하한은 `1`이고, 지원 범위는 `1..=5`입니다.
 
 # Example {#maos-spirit-abi-min-supported-manifest-schema-version-example}
 
@@ -99,6 +100,7 @@ fn check_manifest_version(declared: u32) -> bool {
 
 assert!(check_manifest_version(1));
 assert!(check_manifest_version(3));
+assert!(check_manifest_version(5));
 assert!(!check_manifest_version(0));
 ```
 
@@ -111,7 +113,7 @@ pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1u32;
 
 이 kernel이 내보내거나 수락하는 가장 높은 manifest 스키마 버전.
 
-현재 `MANIFEST_SCHEMA_VERSION`과 같습니다. Story 7.5a가 순방향 호환 실험을 위한 명시적 N+1 수락 윈도우를 도입할 때까지 두 상수는 동의어로 유지됩니다.
+현재 `MANIFEST_SCHEMA_VERSION`과 같으며 두 값은 모두 `5`입니다. Story 7.5a가 순방향 호환 실험을 위한 명시적 N+1 수락 윈도우를 도입할 때까지 두 상수는 동의어로 유지됩니다.
 
 # Example {#maos-spirit-abi-max-supported-manifest-schema-version-example}
 
@@ -126,14 +128,14 @@ fn is_version_supported(v: u32) -> bool {
         && v <= MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION
 }
 
-assert!(is_version_supported(1));  // N-1 — supported
-assert!(is_version_supported(2));  // N-1 — supported
-assert!(is_version_supported(3));  // Current — supported
-assert!(is_version_supported(4)); // 현재 — 지원됨
+assert!(is_version_supported(1)); // 현재 지원 범위의 최솟값
+assert!(is_version_supported(3)); // 현재 지원됨
+assert!(is_version_supported(5)); // 현재 버전
 assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
+assert!(!is_version_supported(6)); // Above ceiling — EAbiTooNew
 ```
 
 
 ```rust
-pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 4u32;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 5u32;
 ```

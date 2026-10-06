@@ -1,0 +1,22 @@
+2026-09-29T15:30:52Z
+5075443c
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1-t1 CARGO_BUILD_JOBS=12 cargo run (cwd=/tmp/t1-scratch)
+
+Measured old echo fixture copied before re-issue:
+sha256: 1ab9c5b8e019ff64988152c3b7b9fddd2408d2e3c2300919931ad3a407f00c2f
+
+The failure surfaces during Spirit::instantiate type-checking, not component compilation or linker setup.
+
+instantiate failed: type-checking export func `handle-frame`: expected record of 11 fields, found 8 fields
+
+Process exit: 1
+
+2026-09-29T15:45:27Z
+5075443c
+command: /mnt/build/cargo-maos-17-3b-w1/debug/maos-wasm-runner --component /tmp/echo-v1.wasm --fuel 1000000
+
+After the compatibility import walk was added, the same preserved old echo blob is refused before instantiate.
+
+maos-wasm-runner: IncompatibleWorld: component imports maos:spirit/frames@1.0.0; this runner implements maos:spirit@2.0.0
+
+Process exit: 2

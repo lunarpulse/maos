@@ -7,18 +7,20 @@
 #   - wasm_sha256 mismatch   → the .wasm blob was swapped without updating this
 #                              manifest (binary/manifest desync);
 #   - source_sha256 mismatch → a guest/logic source file drifted since the .wasm
-#                              was built — a stale blob the gate would otherwise
-#                              keep consuming until the scoped-nightly regen.
-#
-# The residual gap (regen-from-changed-source + updating both hashes together)
-# is a legitimate regen and is closed by the scoped-nightly byte-rebuild job
-# (the 11.1a D9 idiom); this manifest is the per-commit source↔binary↔manifest
-# sync guard that runs in the check-wasm-form-equiv CI job.
+#                              was built (stale blob/source desync);
+# blob bytes and source bytes are pinned per commit; the toolchain is recorded;
+# reproduction is a manual recipe (story 17-3b §Dev Notes), not a CI control.
+
+[toolchain]
+rustc = "rustc 1.98.1 (48a229cea 2026-09-01)"
+wit_bindgen = "0.44.0"
+target = "wasm32-wasip2"
+wasi_imports = "wasi:*@0.2.9"
 
 [[fixture]]
 component = "echo_spirit_component.wasm"
-wasm_sha256 = "1ab9c5b8e019ff64988152c3b7b9fddd2408d2e3c2300919931ad3a407f00c2f"
-source_sha256 = "9ab91c1f15b73a73fc7ab9a232220cfeaed685a8b2d2588f54eb21a2e55ec8df"
+wasm_sha256 = "221260bc014e54af8880a6d041d7f9be6158ebf4e3f4dda3ab0960130e938c74"
+source_sha256 = "b78a43fcca3ed5d5fe94f3518fb7cf7a8744dd2188798e954eca1dbb1ab99418"
 source = [
     "crates/maos-wasm-host/guests/echo-spirit/Cargo.toml",
     "crates/maos-wasm-host/guests/echo-spirit/src/lib.rs",
@@ -27,8 +29,8 @@ source = [
 
 [[fixture]]
 component = "equiv_identity_spirit_component.wasm"
-wasm_sha256 = "7a5a46d895689e99094d1b59c16223ae4252cc4325472bf67b85b72af88fae5f"
-source_sha256 = "c358af8481abe23721a4f7860d28fd3de355338853d22fb03803af9490c104c1"
+wasm_sha256 = "84bdf818cc3a4f08b8a3c3315bcb7210a817af71804962f18ca6d472dafd1d4e"
+source_sha256 = "94a5d9e5feab35ff142bf7f9f3b0eb28f1f9c9b010aa88c78b225834559b2c71"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
@@ -39,8 +41,8 @@ source = [
 
 [[fixture]]
 component = "equiv_divergent_spirit_component.wasm"
-wasm_sha256 = "eafcc329d8961f0a9627d9ecde4ba206f15984f7a356409974234ec8b1de5c11"
-source_sha256 = "7d8792dc776d48164404547b660db7b4e49d91e0b5e6baf6898136ab948050c0"
+wasm_sha256 = "0eb8cbdb707907f75fe5067422bba360467d0c9d9f17cd58ee9407f783897c2a"
+source_sha256 = "9815436c2ecd989a03bf972f1816dc2bd0f1c328635e23fa781bb7c9e6f05aea"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/src/lib.rs",
@@ -51,8 +53,8 @@ source = [
 
 [[fixture]]
 component = "equiv_cosmetic_spirit_component.wasm"
-wasm_sha256 = "6eba896d5a5df3824d64fcbd1658442b9aec639fb56d1606378858846e2a4ac7"
-source_sha256 = "685ae4a38dde3171d9122127bae70bfb527b9a4a48f218f1db7c5408f947616a"
+wasm_sha256 = "c204ef359b9473cc2ef3256e0f92efcf48d49df922087f4ea6d5edd3a078e3c2"
+source_sha256 = "f0acf5fe3d892122a63156257406ea1a14c0694c451a0003fc5199358b899437"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/src/lib.rs",

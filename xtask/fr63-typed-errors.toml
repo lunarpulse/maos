@@ -129,6 +129,26 @@ since_version = "0.5.0"
 rust_variant = "AdmissionError::PublicVettedDeferred"
 
 [[error]]
+code = "EAdmissionClassSectionInvalid"
+description = "Manifest [class] section is malformed or violates the class schema"
+severity = "config"
+recovery_class = "fix_config"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::ClassSectionInvalid"
+
+[[error]]
+code = "EAdmissionFirstPartyFormFromRegistry"
+description = "Registry package declares the forbidden first-party rust-inproc form"
+severity = "policy"
+recovery_class = "reject"
+owner = "maos-registry"
+emitter = "kernel"
+since_version = "0.5.0"
+rust_variant = "AdmissionError::FirstPartyFormFromRegistry"
+
+[[error]]
 code = "EAdmissionOrgSignatureInvalid"
 description = "Org signature does not match operator-configured org key for org_internal tier"
 severity = "security"

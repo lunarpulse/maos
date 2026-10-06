@@ -54,3 +54,4 @@ rustix = { version = "1.1", features = ["fs"] }
 # workspace via `maos-audit`, so `Cargo.lock` may grow by maos-iac's transitive deps.
 rusqlite = { version = "0.31", features = ["bundled"] }
 tempfile = "3"
+tar = { version = "0.4", default-features = false }

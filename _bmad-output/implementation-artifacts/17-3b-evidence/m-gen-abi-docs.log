@@ -1,0 +1,6 @@
+2026-09-29T15:37:41Z
+5075443c
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- gen-abi-docs
+RESULT: FAIL (no generated files written)
+rustdoc JSON format_version is 61 (expected 57). Update NIGHTLY and EXPECTED_FORMAT_VERSION if rustdoc changed.
+The command also emitted pre-existing workspace warnings.

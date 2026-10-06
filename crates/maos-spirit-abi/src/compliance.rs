@@ -225,7 +225,8 @@ pub enum SandboxTier {
     T2 = 2,
     /// T2 + container.
     T3 = 3,
-    /// WASM-component sandbox (speculative-vNext).
+    /// T4 — the reserved WASM tool sandbox; refused at admission.
+    /// WASM-component Spirits run at T2 (ADR-031) + WIT.
     T4 = 4,
 }
 

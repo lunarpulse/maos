@@ -12,25 +12,30 @@ Every Spirit ships a `manifest.toml` describing its identity, resource budget, c
 
 | Version | Status | Description |
 |---------|--------|-------------|
-| [v3](./v3) | **Current** | Adds `[model_provenance]` (Story 9.4b). |
-| [v2](./v2) | Supported (N-1) | Adds `[[cli_wrapper]]`, `[[schedule]]`, `[[gateway]]` (Epic 6). |
-| [v1](./v1) | Hard-refused (N-2) | Baseline schema (Epic 1b). |
+| [v5](./v5) | **Current** | Adds `wasm-component` and `[class].artifact` (Story 17-3b). |
+| [v4](./v4) | Supported (N-1) | Adds `[capabilities.required.loom]` (Story 13.5d). |
+| [v3](./v3) | Supported | Adds `[model_provenance]` (Story 9.4b). |
+| [v2](./v2) | Supported | Adds `[[cli_wrapper]]`, `[[schedule]]`, `[[gateway]]` (Epic 6). |
+| [v1](./v1) | Supported | Baseline schema (Epic 1b). |
 
 ## Version policy
 
-The kernel enforces an **N-1 supported / N-2 hard-refusal** policy:
+The kernel admits exactly the schema versions in its configured inclusive range:
 
-- **Current (N):** full feature set, no degradation.
-- **N-1:** admitted with documented degradation — newer sections default via `#[serde(default)]`. The kernel emits `WARN`-level notices for each defaulted section.
-- **N-2 and older:** rejected at admission with `EAbiTooOld`.
+- **Current configured range:** `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`, currently `1..=5`.
+- **Below `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION`:** rejected at admission with `EAbiTooOld`.
+- **Above `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`:** rejected at admission with `EAbiTooNew`.
 
 The authoritative version constant lives at `crates/maos-spirit-abi/src/lib.rs`:
 
 ```rust
-pub const MANIFEST_SCHEMA_VERSION: u32 = 3;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 5;
 pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 5;
 ```
+
+Future kernels may change either bound. Migrate before targeting a kernel whose supported range no longer contains your manifest version.
 
 ## Latest
 
-The latest schema reference is **[v3](./v3)**.
+The latest schema reference is **[v5](./v5)**.

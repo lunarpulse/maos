@@ -1,0 +1,585 @@
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index 551af28e..978da514 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -315,6 +315,7 @@ pub struct SpawnedBridge {
+     control_channel: CliWrapperControlChannel,
+     shutdown_signal: Option<String>,
+     dropped: std::sync::Arc<std::sync::atomic::AtomicU64>,
++    stdio_shape: CliWrapperStdioShape,
+ }
+ 
+ /// Outcome of draining the child's streams to the journal.
+@@ -383,6 +384,15 @@ fn read_content_length<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Vec
+     reader.read_exact(&mut body)?;
+     Ok(Some(body))
+ }
++
++/// Write one `Content-Length:`-framed record — the encode half of
++/// [`read_content_length`]; the body is written verbatim.
++fn write_content_length<W: Write>(writer: &mut W, body: &[u8]) -> std::io::Result<()> {
++    write!(writer, "Content-Length: {}\r\n\r\n", body.len())?;
++    writer.write_all(body)?;
++    writer.flush()
++}
++
+ /// Reader-thread body: frame `reader` per `shape`, hand frames to `tx` per the
+ /// backpressure policy. Sends a terminal `Eof` then returns (closing the thread).
+ fn run_reader<R: BufRead>(
+@@ -523,15 +533,20 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+ 
+     let mut child = spawn_child(&spec.sandbox, &mut cmd, &spec.program)?;
+     let child_pid = child.get().id();
+-    // Close the child's stdin unless stdin IS the control channel. A worker
+-    // driven by `Signals` (or the fixture) is not fed via stdin, and a real CLI
+-    // that reads stdin-until-EOF (e.g. `codex exec`) would otherwise DEADLOCK on
+-    // the bridge's held-open pipe: it blocks reading stdin while the bridge blocks
++    // Close the child's stdin unless stdin IS the control channel or the stdio
++    // shape is the framed request/response session. A worker driven by `Signals`
++    // (or the fixture) is not fed via stdin, and a real CLI that reads
++    // stdin-until-EOF (e.g. `codex exec`) would otherwise DEADLOCK on the
++    // bridge's held-open pipe: it blocks reading stdin while the bridge blocks
+     // reading its output. Dropping the `ChildStdin` sends EOF so the child
+     // proceeds on its argv prompt. `StdinCommands` (and the J1 bench's
+-    // `write_stdin_line`) keep stdin open — that path drives the worker through it.
+-    let stdin = match spec.control_channel {
+-        CliWrapperControlChannel::Signals => {
++    // `write_stdin_line`) keep stdin open — that path drives the worker through
++    // it — and so does `JsonRpcOverStdio`, whose frames are written by
++    // `write_stdin_frame`.
++    let stdin = match (spec.control_channel, spec.stdio_shape) {
++        (CliWrapperControlChannel::Signals, shape)
++            if shape != CliWrapperStdioShape::JsonRpcOverStdio =>
++        {
+             let _ = child.get().stdin.take(); // drop the ChildStdin → EOF to the child
+             None
+         }
+@@ -570,6 +585,13 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+         })
+         .map_err(|e| BridgeError::Io(format!("spawn stdout reader: {e}")))?;
+ 
++    // stderr is diagnostic text, never frames: under the framed shape it stays
++    // LF-delimited so a plain-text diagnostic cannot kill the reader as a
++    // Content-Length framing error.
++    let stderr_shape = match shape {
++        CliWrapperStdioShape::JsonRpcOverStdio => CliWrapperStdioShape::Raw,
++        other => other,
++    };
+     let drop_err = std::sync::Arc::clone(&dropped);
+     let err_handle = std::thread::Builder::new()
+         .name(format!("cli-bridge-stderr-{child_pid}"))
+@@ -577,7 +599,7 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+             run_reader(
+                 BufReader::new(stderr),
+                 SubStream::Stderr,
+-                shape,
++                stderr_shape,
+                 tx,
+                 bp,
+                 drop_err,
+@@ -595,6 +617,7 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+         control_channel: spec.control_channel,
+         shutdown_signal: spec.shutdown_signal,
+         dropped,
++        stdio_shape: spec.stdio_shape,
+     })
+ }
+ 
+@@ -750,6 +773,54 @@ impl SpawnedBridge {
+         }
+     }
+ 
++    /// Write one raw `Content-Length:`-framed record to the child's stdin
++    /// (`JsonRpcOverStdio` shape only — the same codec the reader decodes with,
++    /// [`write_content_length`]). `body` is opaque bytes (e.g. CBOR); it is never
++    /// interpreted, re-encoded or newline-terminated. Fails `InvalidInput` for
++    /// any other shape and `BrokenPipe` if stdin is closed.
++    pub fn write_stdin_frame(&mut self, body: &[u8]) -> std::io::Result<()> {
++        if self.stdio_shape != CliWrapperStdioShape::JsonRpcOverStdio {
++            return Err(std::io::Error::new(
++                std::io::ErrorKind::InvalidInput,
++                format!(
++                    "write_stdin_frame requires JsonRpcOverStdio, bridge is {:?}",
++                    self.stdio_shape
++                ),
++            ));
++        }
++        match self.stdin.as_mut() {
++            Some(stdin) => write_content_length(stdin, body),
++            None => Err(std::io::Error::new(
++                std::io::ErrorKind::BrokenPipe,
++                "bridge stdin already closed",
++            )),
++        }
++    }
++
++    /// Send frame-input EOF without killing the supervised process.
++    pub fn close_frame_input(&mut self) {
++        self.stdin = None;
++    }
++
++    /// Block for the next record from either stream, WITHOUT journaling it. Unlike
++    /// [`Self::recv_line`] a framing/read error is surfaced, never swallowed.
++    /// stdout records are raw frame bodies under `JsonRpcOverStdio` (byte-exact);
++    /// stderr records are always LF-delimited diagnostic lines. `Ok(None)` once
++    /// both readers are gone.
++    pub fn recv_frame(&mut self) -> Result<Option<(SubStream, Vec<u8>)>, BridgeError> {
++        let rx = self.rx.as_ref().expect("recv_frame: rx already taken");
++        loop {
++            match rx.recv() {
++                Ok(ReaderMsg::Line { stream, bytes, .. }) => return Ok(Some((stream, bytes))),
++                Ok(ReaderMsg::Eof { .. }) => continue,
++                Ok(ReaderMsg::FramingError { stream, error }) => {
++                    return Err(BridgeError::Io(format!("{stream:?} framing: {error}")))
++                }
++                Err(_) => return Ok(None),
++            }
++        }
++    }
++
+     /// Bench/test support — block for the next framed line from the reader
+     /// thread, WITHOUT journaling it. Returns `None` on EOF/disconnect. Used by
+     /// the J1 measurement to isolate the bridge IPC overhead from SQLite writes.
+@@ -1109,6 +1180,26 @@ mod tests {
+         assert_eq!(String::from_utf8(got).unwrap(), body);
+     }
+ 
++    /// Byte-oriented codec seam: `write_content_length` → `read_content_length`
++    /// is the identity on arbitrary (non-UTF-8, CRLF-bearing, NUL-bearing) bodies.
++    #[test]
++    fn content_length_codec_is_byte_exact_for_binary_bodies() {
++        let bodies: [&[u8]; 3] = [
++            &[0xA2, 0x61, b'k', 0x43, 0xFF, 0xFE, 0x00],
++            b"\r\n\r\nContent-Length: 3\r\n\r\nabc",
++            b"",
++        ];
++        let mut wire = Vec::new();
++        for body in bodies {
++            write_content_length(&mut wire, body).unwrap();
++        }
++        let mut r = std::io::BufReader::new(wire.as_slice());
++        for body in bodies {
++            assert_eq!(read_content_length(&mut r).unwrap().unwrap(), body);
++        }
++        assert!(read_content_length(&mut r).unwrap().is_none());
++    }
++
+     /// P-6: Drop-without-pump must NOT deadlock when the child has filled the
+     /// bounded channel. The fix (self.rx.take() before join) prevents the reader
+     /// thread from blocking on a full channel whose receiver is still alive.
+@@ -1169,6 +1260,7 @@ mod tests {
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+             dropped,
++            stdio_shape: CliWrapperStdioShape::NdjsonOverStdio,
+         };
+ 
+         // Drop without ever calling pump_to_journal. The channel may be full.
+diff --git a/crates/maos-kernel-core/src/security/sandbox/linux.rs b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+index b71e293b..4d75ce02 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -323,6 +323,9 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
+     for &syscall in basic_syscalls.iter().chain(ARCH_SYSCALLS) {
+         rules.insert(syscall as i64, vec![]);
+     }
++    if tier == SandboxTier::T2 {
++        rules.insert(libc::SYS_memfd_create, vec![]);
++    }
+     // prctl(PR_GET_AUXV) only: rustix-based programs (uutils coreutils, the
+     // ubuntu-26.04 `/bin/cat`) read their own auxv at start (17-6 T8 finding).
+     const PR_GET_AUXV: u64 = 0x4155_5856;
+diff --git a/crates/maos-wasm-host/tests/equiv_harness.rs b/crates/maos-wasm-host/tests/equiv_harness.rs
+index cd0badda..3486bb4d 100644
+--- a/crates/maos-wasm-host/tests/equiv_harness.rs
++++ b/crates/maos-wasm-host/tests/equiv_harness.rs
+@@ -2167,3 +2167,186 @@ fn fault_injection_boundary_moves_under_distinct_perturbation() {
+     );
+     assert_ne!(clean.invariant_match_pct, red.invariant_match_pct);
+ }
++
++// Isolated 17-3c feasibility probe: real framed bridge output, local T2 WASM,
++// and real kernel policy. Not production SCB/enterprise/bus ingress proof.
++#[test]
++fn prototype_live_frames_reach_kernel_policy_eight_cases() {
++    use maos_domain::invariants::i1::Scope;
++    use maos_domain::ports::capability::CapError;
++
++    let component = component_fixture_path("identity");
++    require_component(&component);
++    let mut inputs = Vec::new();
++    for _ in 0..2 {
++        let mut clean = sample_identity_frame();
++        let FramePayload::TaskAssign(task) = &mut clean.payload else {
++            panic!("identity probe must be a task assignment");
++        };
++        task.scope = vec![Scope::FsRead {
++            subtree: "/tmp".into(),
++        }];
++        let mut forged = clean.clone();
++        forged.intent = IntentClass::HighPrivilege;
++        forged.consent_envelope = Some(ConsentEnvelope {
++            consent_id: [0xFE; 16],
++            granter: forged.from.clone(),
++            timestamp_ns: forged.timestamp_ns,
++            intent_class: Some(A2AIntent::new("forged:escalation")),
++            valid_until_ns: None,
++        });
++        inputs.extend([clean, forged]);
++    }
++
++    let native = prototype_bridge_frames(
++        &ensure_native_twin_binary(),
++        &["--mode", "identity"],
++        &inputs,
++        None,
++    );
++    let wasm = prototype_bridge_frames(
++        &require_binary("maos-wasm-runner"),
++        &["--component", &component, "--fuel", WASM_FUEL_BUDGET],
++        &inputs,
++        Some(&component),
++    );
++    assert_eq!(native.len(), 4, "native must emit all requested frames");
++    assert_eq!(wasm.len(), 4, "WASM must emit all requested frames");
++    let (kernel, _audit_rx) = kernel_oracle::cap_registry();
++    let mut decisions = Vec::new();
++    for (form, output) in [("native", &native), ("wasm", &wasm)] {
++        let mut form_decisions = Vec::new();
++        for (case, (emitted, input)) in output.iter().zip(&inputs).enumerate() {
++            assert_eq!(
++                normalize(emitted),
++                normalize(input),
++                "claims must reach the probe unchanged"
++            );
++            let FramePayload::TaskAssign(task) = &emitted.payload else {
++                panic!("emitted request did not reach the selected decision shape");
++            };
++            assert_eq!(task.scope.len(), 1);
++            // PID and posture are bound by the host; guest identity/claims cannot
++            // choose them. Kernel issue_with_mediation derives policy intent
++            // from the requested scope, rather than the in-band intent claim.
++            let result = kernel.issue_with_mediation(
++                if case < 2 { 7 } else { 8 },
++                task.scope[0].clone(),
++                60,
++                [0xAB; 32],
++                IntentClass::Standard,
++            );
++            let verdict = match result {
++                Ok(_) => true,
++                Err(CapError::PolicyDenied) => false,
++                Err(error) => {
++                    panic!("{form} case {case}: not a terminal policy verdict: {error:?}")
++                }
++            };
++            let expected = case < 2;
++            println!(
++                "PROTOTYPE-KERNEL-VERDICT form={form} case={case} forged={} allowed={verdict}",
++                case % 2 == 1
++            );
++            assert_eq!(
++                verdict, expected,
++                "{form} case {case}: actual kernel policy result"
++            );
++            form_decisions.push(verdict);
++        }
++        assert_eq!(form_decisions[0], form_decisions[1]);
++        assert_eq!(form_decisions[2], form_decisions[3]);
++        assert_ne!(
++            form_decisions[0], form_decisions[2],
++            "allow and deny controls must discriminate"
++        );
++        decisions.push(form_decisions);
++    }
++    assert_eq!(
++        decisions[0], decisions[1],
++        "equivalent forms must get identical policy results"
++    );
++}
++
++fn prototype_bridge_frames(
++    binary: &Path,
++    args: &[&str],
++    inputs: &[IacFrame],
++    component: Option<&str>,
++) -> Vec<IacFrame> {
++    use maos_domain::invariants::i1::Scope;
++    use maos_domain::invariants::i9::SandboxTier;
++    use maos_kernel_core::lifecycle::cli_wrapper::{
++        argv_prefix_hash, spawn_and_bridge, Backpressure, BridgeSpawnSpec, ExitCause, SubStream,
++    };
++    use maos_kernel_core::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
++    use maos_kernel_core::security::sandbox::SandboxSpec;
++    let argv_prefix: Vec<String> = args.iter().map(|arg| (*arg).into()).collect();
++    let mut sandbox = SandboxSpec::new_for_test(if component.is_some() {
++        SandboxTier::T2
++    } else {
++        SandboxTier::T0
++    });
++    if let Some(component) = component {
++        sandbox.declared_scopes = vec![Scope::FsRead {
++            subtree: Path::new(component)
++                .canonicalize()
++                .expect("component path")
++                .display()
++                .to_string(),
++        }];
++    }
++    let mut bridge = spawn_and_bridge(BridgeSpawnSpec {
++        program: binary.display().to_string(),
++        sandbox,
++        expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
++        argv_prefix,
++        task_args: Vec::new(),
++        from_spirit_id: "prototype-host-bound".into(),
++        stdio_shape: CliWrapperStdioShape::JsonRpcOverStdio,
++        control_channel: CliWrapperControlChannel::Signals,
++        shutdown_signal: None,
++        channel_capacity: 8,
++        backpressure: Backpressure::Block,
++        env: Vec::new(),
++    })
++    .expect("actual framed bridge spawn, no skip");
++    for frame in inputs {
++        bridge
++            .write_stdin_frame(&codec::encode_cbor(frame).expect("encode"))
++            .expect("framed input");
++    }
++    bridge.close_frame_input();
++    let mut frames = Vec::new();
++    while let Some((stream, bytes)) = bridge.recv_frame().expect("framed output") {
++        match stream {
++            SubStream::Stdout => {
++                frames.push(codec::decode_cbor(&bytes).expect("actual IacFrame output"))
++            }
++            SubStream::Stderr => eprintln!(
++                "PROTOTYPE-BRIDGE-STDERR {}",
++                String::from_utf8_lossy(&bytes)
++            ),
++        }
++    }
++    let journal =
++        maos_kernel_core::iac::transparency_log::TransparencyLogAdapter::open_in_memory(0);
++    let exit = bridge.wait_and_finalize(&journal, 7, |code| {
++        assert_eq!(
++            code,
++            Some(0),
++            "form finalization must observe a successful exit"
++        );
++    });
++    assert_eq!(
++        exit.cause,
++        ExitCause::Exited { code: 0 },
++        "real form must exit cleanly"
++    );
++    println!(
++        "PROTOTYPE-BRIDGE-OUTCOME tier={} frames={} exit=0",
++        if component.is_some() { "T2" } else { "T0" },
++        frames.len()
++    );
++    frames
++}
+diff --git a/crates/maos-kernel-core/tests/cli_wrapper_framed_bridge_17_3c_proto.rs b/crates/maos-kernel-core/tests/cli_wrapper_framed_bridge_17_3c_proto.rs
+new file mode 100755
+index 00000000..a729bbfa
+--- /dev/null
++++ b/crates/maos-kernel-core/tests/cli_wrapper_framed_bridge_17_3c_proto.rs
+@@ -0,0 +1,197 @@
++#![forbid(unsafe_code)]
++//! 17-3c PROTOTYPE — raw-byte `Content-Length`-framed session through the real
++//! `spawn_and_bridge` against REAL native programs (no WASM, no wasmtime).
++//!
++//! The subject is `cat` (a native binary that echoes stdin to stdout verbatim),
++//! so a frame written by `write_stdin_frame` comes back through the child's own
++//! stdout and the bridge's `Content-Length` reader. Each test fails if: the
++//! body is passed through a lossy `String`, a newline is appended/stripped,
++//! stdin is closed under `Signals` + `JsonRpcOverStdio`, or a framing error is
++//! swallowed.
++
++use maos_kernel_core::lifecycle::cli_wrapper::{
++    argv_prefix_hash, spawn_and_bridge, Backpressure, BridgeError, BridgeSpawnSpec, SpawnedBridge,
++    SubStream,
++};
++use maos_kernel_core::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
++
++fn spec(shape: CliWrapperStdioShape, script: &str) -> BridgeSpawnSpec {
++    let argv_prefix = vec!["-c".to_string()];
++    BridgeSpawnSpec {
++        program: "sh".to_string(),
++        sandbox: maos_kernel_core::security::sandbox::SandboxSpec::new_for_test(
++            maos_domain::invariants::i9::SandboxTier::T0,
++        ),
++        expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
++        argv_prefix,
++        task_args: vec![script.to_string()],
++        from_spirit_id: "worker".to_string(),
++        stdio_shape: shape,
++        control_channel: CliWrapperControlChannel::Signals,
++        shutdown_signal: None,
++        channel_capacity: 2,
++        backpressure: Backpressure::Block,
++        env: vec![],
++    }
++}
++
++/// Next stdout record; stderr diagnostics are collected, errors fail the test.
++fn next_stdout(bridge: &mut SpawnedBridge, stderr: &mut Vec<Vec<u8>>) -> Vec<u8> {
++    loop {
++        match bridge.recv_frame().expect("framing error") {
++            Some((SubStream::Stdout, body)) => return body,
++            Some((SubStream::Stderr, line)) => stderr.push(line),
++            None => panic!("bridge closed before the expected stdout frame"),
++        }
++    }
++}
++
++/// A valid CBOR map `{"k": h'FFFE00', "v": h'0D0A0D0A'}` — not UTF-8, NUL- and
++/// CRLF-bearing, so lossy decode, NUL termination, or header-style trimming all
++/// change it.
++fn cbor_probe() -> Vec<u8> {
++    let mut b = vec![0xA2, 0x61, b'k', 0x43, 0xFF, 0xFE, 0x00];
++    b.extend_from_slice(&[0x61, b'v', 0x44, b'\r', b'\n', b'\r', b'\n']);
++    b
++}
++
++#[test]
++fn non_utf8_cbor_frames_round_trip_byte_exact_with_stdin_kept_open() {
++    let probe = cbor_probe();
++    assert!(
++        std::str::from_utf8(&probe).is_err(),
++        "probe must be non-UTF-8"
++    );
++    // Every byte value, larger than a pipe buffer: boundary + length must hold
++    // while the bounded channel (capacity 2) applies backpressure.
++    let big: Vec<u8> = (0..70_000u32).map(|i| (i % 256) as u8).collect();
++
++    // `echo diag >&2` first: plain-text stderr must NOT be parsed as a frame.
++    let mut bridge = spawn_and_bridge(spec(
++        CliWrapperStdioShape::JsonRpcOverStdio,
++        "echo diag >&2; exec cat",
++    ))
++    .expect("spawn sh");
++
++    let mut stderr = Vec::new();
++    bridge
++        .write_stdin_frame(&probe)
++        .expect("Signals + JsonRpcOverStdio must keep stdin open for frames");
++    assert_eq!(
++        next_stdout(&mut bridge, &mut stderr),
++        probe,
++        "CBOR frame not byte-exact"
++    );
++
++    // Back-to-back frames: a frame boundary is the length, not content.
++    bridge.write_stdin_frame(b"").expect("empty frame");
++    bridge
++        .write_stdin_frame(&probe)
++        .expect("frame after empty frame");
++    // Write both, then read both: the child echoes, the reader thread drains.
++    assert_eq!(
++        next_stdout(&mut bridge, &mut stderr),
++        b"",
++        "empty frame lost"
++    );
++    assert_eq!(next_stdout(&mut bridge, &mut stderr), probe);
++
++    bridge.write_stdin_frame(&big).expect("large frame");
++    assert_eq!(
++        next_stdout(&mut bridge, &mut stderr),
++        big,
++        "large frame corrupted"
++    );
++
++    // The stderr line arrives as a stderr record. It may have been collected
++    // above, or still be queued: drain until seen.
++    while stderr.is_empty() {
++        match bridge.recv_frame().expect("framing error") {
++            Some((SubStream::Stderr, line)) => stderr.push(line),
++            Some((SubStream::Stdout, _)) => panic!("unexpected extra stdout frame"),
++            None => break,
++        }
++    }
++    assert_eq!(
++        stderr,
++        vec![b"diag".to_vec()],
++        "stderr must stay LF-delimited text"
++    );
++}
++
++#[test]
++fn frame_write_is_refused_for_text_shapes_and_after_stdin_close() {
++    // Text shape under Signals: stdin is closed (existing 8-12 behavior kept) and
++    // frame writes are refused rather than silently emitting a bare body.
++    let mut text = spawn_and_bridge(spec(
++        CliWrapperStdioShape::NdjsonOverStdio,
++        "cat >/dev/null",
++    ))
++    .expect("spawn sh");
++    let err = text
++        .write_stdin_frame(b"x")
++        .expect_err("text shape must refuse frames");
++    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
++    assert!(
++        text.write_stdin_line(b"x").is_err(),
++        "Signals+text keeps closing stdin"
++    );
++
++    // Framed shape: stdin is open until the bridge is unloaded, then BrokenPipe.
++    let mut framed = spawn_and_bridge(spec(CliWrapperStdioShape::JsonRpcOverStdio, "exec cat"))
++        .expect("spawn sh");
++    framed.write_stdin_frame(b"ok").expect("stdin open");
++    framed.on_unload().expect("unload");
++    let err = framed
++        .write_stdin_frame(b"late")
++        .expect_err("stdin closed after unload");
++    assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);
++}
++
++#[test]
++fn malformed_stdout_framing_is_an_error_not_silence() {
++    let mut bridge = spawn_and_bridge(spec(
++        CliWrapperStdioShape::JsonRpcOverStdio,
++        "printf 'not a header\\n\\n'",
++    ))
++    .expect("spawn sh");
++    match bridge.recv_frame() {
++        Err(BridgeError::Io(msg)) => assert!(msg.contains("Stdout"), "{msg}"),
++        other => panic!("bad Content-Length header must surface, got {other:?}"),
++    }
++}
++
++#[test]
++fn observe_actual_wasm_runner_under_t2() {
++    use maos_domain::invariants::i1::Scope;
++    use maos_domain::invariants::i9::SandboxTier;
++    use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec};
++    use std::process::{Command, Stdio};
++
++    let runner = std::env::var("MAOS_PROTO_RUNNER").expect("MAOS_PROTO_RUNNER is required");
++    let component = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
++        .join("../../tests/fixtures/wasm/equiv_identity_spirit_component.wasm")
++        .canonicalize()
++        .expect("committed identity component");
++    let mut sandbox = SandboxSpec::new_for_test(SandboxTier::T2);
++    sandbox.declared_scopes = vec![Scope::FsRead {
++        subtree: component.display().to_string(),
++    }];
++    let mut command = Command::new(&runner);
++    command
++        .args([
++            "--component",
++            component.to_str().expect("UTF-8 component path"),
++        ])
++        .stdin(Stdio::null())
++        .stdout(Stdio::null())
++        .stderr(Stdio::inherit());
++    let mut child = spawn_sandboxed(&sandbox, &mut command)
++        .unwrap_or_else(|error| panic!("PROTOTYPE-T2-OUTCOME spawn refused, no skip: {error:?}"));
++    let status = child.wait().expect("wait real T2 runner");
++    println!("PROTOTYPE-T2-OUTCOME {status}");
++    assert!(
++        status.success(),
++        "T2 runner compilation/startup not yet supported: {status}"
++    );
++}

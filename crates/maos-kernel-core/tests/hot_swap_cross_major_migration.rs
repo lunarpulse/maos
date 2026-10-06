@@ -77,6 +77,7 @@ fn class_section(version: &str) -> ClassSection {
         forms: vec!["rust-inproc".into()],
         trust_tier: "local".into(),
         description: "adjacent-major migration regression".into(),
+        artifact: None,
     }
 }
 
@@ -364,6 +365,7 @@ async fn run_migrator_names_the_specific_absent_hop_at_run_time() {
             forms: vec!["rust-inproc".into()],
             trust_tier: "local".into(),
             description: "migration hop probe".into(),
+            artifact: None,
         }
     }
 

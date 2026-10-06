@@ -67,6 +67,7 @@ fn class() -> ClassSection {
         forms: vec!["rust-inproc".into()],
         trust_tier: "local".into(),
         description: "posture ceiling fixture".into(),
+        artifact: None,
     }
 }
 

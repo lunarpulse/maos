@@ -14,7 +14,8 @@ review_status: machine
 | 패턴 | 요약 |
 |---|---|
 | [Hello-World Spirit](./hello-world-spirit) | 단일 `on_idle` 훅을 가진 최소 Spirit — 30분 경로 |
-| [Manifest 필드](./manifest-fields) | 스키마 v3의 모든 섹션을 다루는 전체 `spirit.toml` manifest |
+| [서드파티 WASM Component Spirit](./wasm-component-spirit) | TypeScript 스캐폴드, 컴포넌트 artifact, 현재의 타입화된 어드미션 결과 |
+| [Manifest 필드](./manifest-fields) | 어드미션 가능한 스키마 v5 `spirit.toml` 참조 |
 | [라이프사이클 훅](./lifecycle-hooks) | 하나의 Spirit에서 여러 라이프사이클 훅 구현 |
 
 ## 신뢰성 및 운영

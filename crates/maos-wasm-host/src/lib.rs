@@ -6,12 +6,14 @@
 //!
 //! This crate implements the `SpiritHostPort` trait (from `maos-host`) for the
 //! WASM component form. It validates `.wasm` components against the
-//! `maos:spirit@1.0` WIT world and resolves launch requests into concrete
+//! `maos:spirit@2.0.0` WIT world and resolves launch requests into concrete
 //! subprocess launch plans pointing at the `maos-wasm-runner` binary.
 //!
-//! The `maos-wasm-runner` binary IS `BridgeSpawnSpec.program` — a real wasmtime
-//! component runner speaking ADR-032 (Content-Length + CBOR) over stdio, to be
-//! launched by `spawn_and_bridge` under T2 (route: Story 17-6; caller: 17-3c).
+//! The `maos-wasm-runner` binary is `BridgeSpawnSpec.program`, a real wasmtime
+//! component runner speaking ADR-032 (Content-Length + CBOR) over stdio. It
+//! runs inside ADR-031's T2 process boundary once launched by
+//! `spawn_and_bridge`; the production launch is
+//! `17-3c-wasm-spirit-on-the-bus-under-t2`.
 //!
 //! # Decision D2 (11.1a preflight)
 //!

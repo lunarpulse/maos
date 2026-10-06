@@ -1,0 +1,29 @@
+2026-09-29T15:45:16Z
+5075443c
+
+CONTROL 1 — engine refusal moved before gate 6 (temporary diff):
+- block after optional behavioral parsing: `if wasm { ... WasmEngineOff/WasmLaunchNotBuilt ... }`
++ same block immediately after the gate-5 class check, before sandbox parsing/T2 enforcement.
+
+RUSTFLAGS=-Awarnings CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo test --locked -p maos-bin --test wasm_form_admission_17_3b --no-run
+RESULT: PASS — warning-suppressed control build completed (40.22s).
+
+/mnt/build/cargo-maos-17-3b-M/debug/deps/wasm_form_admission_17_3b-711ce7cd16f2304d --exact gate_manifest_enforces_wasm_component_form_and_tier_before_engine_refusal --nocapture
+RESULT: EXPECTED RED — 0 passed, 1 failed. T3 returned `wasm_engine_off`; test expected `wasm_component_requires_t2`.
+
+The temporary relocation was reverted and `rustfmt --edition 2021 crates/maos-bin/src/admission.rs` completed successfully.
+
+CONTROL 2 — WASM class fork deleted (temporary diff):
+- `if !wasm && !known_class(&class_section.name) {`
++ `if !known_class(&class_section.name) {`
+
+RUSTFLAGS=-Awarnings CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-M CARGO_BUILD_JOBS=12 cargo test --locked -p maos-bin --test wasm_form_admission_17_3b --no-run
+RESULT: PASS — warning-suppressed control build completed (4.45s).
+
+/mnt/build/cargo-maos-17-3b-M/debug/deps/wasm_form_admission_17_3b-711ce7cd16f2304d --exact maos_run_refuses_wasm_component_manifests_by_named_engine_state --nocapture
+RESULT: EXPECTED RED — 0 passed, 1 failed. `maos run` stderr ended `unknown Spirit class 'wasm-form-17-3b'`; expected `wasm_engine_off`.
+
+/mnt/build/cargo-maos-17-3b-M/debug/deps/wasm_form_admission_17_3b-711ce7cd16f2304d --exact maosctl_load_returns_wasm_engine_refusal_and_preserves_roster --nocapture
+RESULT: EXPECTED RED — 0 passed, 1 failed. Door response was HTTP 400 `unknown_spirit_class`; expected `wasm_engine_off`.
+
+The temporary class-fork deletion was reverted. Final rebuilt executable passed all 3 admission tests (see m-admission-validation.log).

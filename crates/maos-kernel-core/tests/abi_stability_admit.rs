@@ -74,6 +74,7 @@ fn class_section(min_substrate: &str, schema: u32) -> ClassSection {
         forms: vec!["rust-inproc".into()],
         trust_tier: "local".into(),
         description: "test".into(),
+        artifact: None,
     }
 }
 

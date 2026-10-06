@@ -61,6 +61,7 @@ fn manifest() -> SpiritManifestBundle {
         forms: vec!["rust-inproc".into()],
         trust_tier: "local".into(),
         description: "revocation integration fixture".into(),
+        artifact: None,
     });
     manifest
 }

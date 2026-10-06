@@ -68,17 +68,10 @@ pub fn run(
                 workspace_root.join("templates/spirit-ts"),
                 workspace_root.join("examples/example-spirit-ts"),
                 vec![
-                    ("{{crate_name}}", "example-spirit-ts"),
-                    // cargo-generate built-in (0.23): the generated project
-                    // directory name. The TS package.json names the package
-                    // `@local/{{project-name}}`; mirror the built-in here so the
-                    // drift renderer resolves it the same way `cargo generate`
-                    // does (the `package_name` placeholder was removed in the
-                    // Epic-10 retro template repair — 0.23 does not interpolate
-                    // `default` values).
+                    // cargo-generate's `crate_name` is the snake_case form of
+                    // its hyphen-preserving `project-name` built-in.
+                    ("{{crate_name}}", "example_spirit_ts"),
                     ("{{project-name}}", "example-spirit-ts"),
-                    ("{{class_name}}", "ExampleTsSpirit"),
-                    ("{{package_name}}", "@local/example-spirit-ts"),
                 ],
             ),
         };
@@ -212,22 +205,14 @@ fn render_template(
             substituted = substituted.replace(*placeholder, value);
         }
 
-        // Handle cargo-generate filter expressions
-        substituted = substituted.replace("{{crate_name | snake_case}}", "example_spirit");
-        substituted = substituted.replace(
-            "{{class_name}}",
-            match language {
-                Language::Rust => "ExampleSpirit",
-                Language::TypeScript => "ExampleTsSpirit",
-            },
-        );
+        // These Rust-only placeholders do not exist in the TypeScript template.
+        if language == Language::Rust {
+            substituted = substituted.replace("{{crate_name | snake_case}}", "example_spirit");
+            substituted = substituted.replace("{{class_name}}", "ExampleSpirit");
+        }
 
         if rel_path == "Cargo.toml" && language == Language::Rust {
             substituted = rewrite_git_deps_to_path(&substituted);
-        }
-
-        if rel_path == "package.json" && language == Language::TypeScript {
-            substituted = rewrite_npm_sdk_dep_to_path(&substituted);
         }
 
         rendered.insert(rel_path.clone(), substituted);
@@ -259,18 +244,6 @@ fn rewrite_git_deps_to_path(cargo_toml: &str) -> String {
         out.push('\n');
     }
     out
-}
-
-/// The baked in-repo `examples/example-spirit-ts` references the LOCAL,
-/// unpublished `@maos/spirit-ts` SDK by a `file:` path — mirroring how the Rust
-/// example rewrites git deps to path deps. The template keeps the registry spec
-/// (`^0.5.0`) for real authors, who get the published package once it ships.
-/// Without this, `npm ci` in the example cannot resolve `@maos/spirit-ts`.
-fn rewrite_npm_sdk_dep_to_path(package_json: &str) -> String {
-    package_json.replace(
-        "\"@maos/spirit-ts\": \"^0.5.0\"",
-        "\"@maos/spirit-ts\": \"file:../../sdks/spirit-ts\"",
-    )
 }
 
 fn extract_features(line: &str) -> String {
@@ -314,15 +287,15 @@ mod tests {
     fn ts_template_renders_correctly() {
         let dir = tempfile::tempdir().unwrap();
         let template = dir.path().join("templates/spirit-ts");
-        std::fs::create_dir_all(template.join("src")).unwrap();
+        std::fs::create_dir_all(&template).unwrap();
         std::fs::write(
-            template.join("src/index.ts"),
-            "export class {{class_name}} {}",
+            template.join("manifest.toml"),
+            "[class]\nname = \"{{project-name}}\"\n",
         )
         .unwrap();
         std::fs::write(
             template.join("package.json"),
-            "{\"name\":\"{{package_name}}\"}",
+            "{\"name\":\"@local/{{project-name}}\"}",
         )
         .unwrap();
 
@@ -330,28 +303,19 @@ mod tests {
         read_template_files(&template, &mut files).unwrap();
         let rendered = render_template(
             &files,
-            &vec![
-                ("{{crate_name}}", "example-spirit-ts"),
-                ("{{class_name}}", "ExampleTsSpirit"),
-                ("{{package_name}}", "@local/example-spirit-ts"),
+            &[
+                ("{{crate_name}}", "my_wasm_spirit"),
+                ("{{project-name}}", "my-wasm-spirit"),
             ],
             Language::TypeScript,
         );
-        let index_ts = rendered
-            .get("src/index.ts")
-            .expect("src/index.ts should be in rendered map");
-        assert!(
-            index_ts.contains("export class ExampleTsSpirit {}"),
-            "got: {}",
-            index_ts
+        assert_eq!(
+            rendered.get("manifest.toml").map(String::as_str),
+            Some("[class]\nname = \"my-wasm-spirit\"\n")
         );
-        let pkg_json = rendered
-            .get("package.json")
-            .expect("package.json should be in rendered map");
-        assert!(
-            pkg_json.contains("@local/example-spirit-ts"),
-            "got: {}",
-            pkg_json
+        assert_eq!(
+            rendered.get("package.json").map(String::as_str),
+            Some("{\"name\":\"@local/my-wasm-spirit\"}")
         );
     }
 
@@ -403,21 +367,27 @@ mod tests {
 
     #[test]
     fn cross_template_field_consistency() {
-        // Both Rust and TS templates should declare the same capabilities.required shape
         let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let rust_manifest =
+        let rust_manifest: toml::Value =
             std::fs::read_to_string(workspace_root.join("templates/spirit-rust/manifest.toml"))
-                .unwrap_or_default();
-        let ts_manifest =
+                .unwrap()
+                .parse()
+                .expect("Rust template must be a valid TOML manifest");
+        let ts_manifest: toml::Value =
             std::fs::read_to_string(workspace_root.join("templates/spirit-ts/manifest.toml"))
-                .unwrap_or_default();
-        assert!(
-            rust_manifest.contains("provider.complete"),
-            "Rust manifest missing provider.complete"
+                .unwrap()
+                .parse()
+                .expect("TypeScript template must be a valid TOML manifest");
+
+        assert_eq!(rust_manifest["class"]["forms"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            rust_manifest["class"]["forms"][0].as_str(),
+            Some("rust-inproc")
         );
-        assert!(
-            ts_manifest.contains("provider.complete"),
-            "TS manifest missing provider.complete"
+        assert_eq!(ts_manifest["class"]["forms"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            ts_manifest["class"]["forms"][0].as_str(),
+            Some("wasm-component")
         );
     }
 }

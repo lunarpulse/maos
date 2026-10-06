@@ -1,0 +1,12 @@
+2026-09-29T15:51:07Z
+5075443c
+command: env MAOS_TS_COMPONENT=/home/lunarpulse/dev_ws/examples/example-spirit-ts/dist/spirit.wasm CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture
+
+TS-COMPONENT-OUTCOME component=/home/lunarpulse/dev_ws/examples/example-spirit-ts/dist/spirit.wasm exit=0 canonical_cbor_bytes=1506
+Result: 1 passed, 0 failed, 0 ignored.
+
+2026-09-29T15:51:07Z
+5075443c
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test ts_component_17_3b -- --nocapture
+
+Result: standard test invocation reports 1 ignored, as required by its exact componentize-js availability reason.

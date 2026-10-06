@@ -1,0 +1,1843 @@
+UTC: 2026-09-29T15:37:26Z
+HEAD: 5075443c
+command: Node 24 npm install --package-lock-only, npm ci, npm test, npm run build, npm run componentize, wasm-tools component wit
+v24.21.0
+(node:582591) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+up to date in 544ms
+(node:582805) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+added 242 packages in 2s
+
+> @local/example-spirit-ts@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /home/lunarpulse/dev_ws/examples/example-spirit-ts
+
+ ✓ tests/spirit.test.ts  (1 test) 2ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  15:37:32
+   Duration  665ms (transform 27ms, setup 0ms, collect 26ms, tests 2ms, environment 0ms, prepare 42ms)
+
+
+> @local/example-spirit-ts@0.1.0 build
+> npm run guest-types && tsc
+
+
+> @local/example-spirit-ts@0.1.0 guest-types
+> jco guest-types wit --world-name spirit --out-dir src/bindings --strict
+
+
+  Generated Guest Typescript Definition Files (.d.ts):
+
+ - src/bindings/interfaces/maos-spirit-frames.d.ts  12.4 KiB
+ - src/bindings/spirit.d.ts                          0.8 KiB
+
+
+> @local/example-spirit-ts@0.1.0 componentize
+> componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm
+
+[2026-09-29T15:37:41Z DEBUG] inferring the WIT of a concrete component
+[2026-09-29T15:37:41Z DEBUG] decoding component import `maos:spirit/frames@2.0.0`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-address`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-address` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-kind`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-kind` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `intent-class`
+[2026-09-29T15:37:41Z DEBUG] type export for `intent-class` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope-mcp-call`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope-mcp-call` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope-cli-subprocess-spawn`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope-cli-subprocess-spawn` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope-gateway-send`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope-gateway-send` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `posture-hint`
+[2026-09-29T15:37:41Z DEBUG] type export for `posture-hint` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `halt-policy-override`
+[2026-09-29T15:37:41Z DEBUG] type export for `halt-policy-override` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `posture-preferences`
+[2026-09-29T15:37:41Z DEBUG] type export for `posture-preferences` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `prior-distillate-ref`
+[2026-09-29T15:37:41Z DEBUG] type export for `prior-distillate-ref` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `task-assign-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `task-assign-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `task-complete-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `task-complete-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `decision-dispatch-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `decision-dispatch-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `epistemic-halt-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `epistemic-halt-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `telemetry-event-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `telemetry-event-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `consent-request-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `consent-request-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `retract-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `retract-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `budget-envelope`
+[2026-09-29T15:37:41Z DEBUG] type export for `budget-envelope` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `rupture-reason`
+[2026-09-29T15:37:41Z DEBUG] type export for `rupture-reason` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `rupture-rejection`
+[2026-09-29T15:37:41Z DEBUG] type export for `rupture-rejection` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `consent-rupture-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `consent-rupture-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `rate-limited-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `rate-limited-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-payload`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-payload` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-origin`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-origin` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `consent-envelope`
+[2026-09-29T15:37:41Z DEBUG] type export for `consent-envelope` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `iac-frame`
+[2026-09-29T15:37:41Z DEBUG] type export for `iac-frame` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `halt`
+[2026-09-29T15:37:41Z DEBUG] type export for `halt` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:io/poll@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `pollable`
+[2026-09-29T15:37:41Z DEBUG] type export for `pollable` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]pollable.block`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `poll`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:clocks/monotonic-clock@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `instant`
+[2026-09-29T15:37:41Z DEBUG] type export for `instant` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `pollable`
+[2026-09-29T15:37:41Z DEBUG] type export for `pollable` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `duration`
+[2026-09-29T15:37:41Z DEBUG] type export for `duration` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `now`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `subscribe-instant`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `subscribe-duration`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:io/error@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error`
+[2026-09-29T15:37:41Z DEBUG] type export for `error` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:io/streams@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `input-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `input-stream` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error`
+[2026-09-29T15:37:41Z DEBUG] type export for `error` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `stream-error`
+[2026-09-29T15:37:41Z DEBUG] type export for `stream-error` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `pollable`
+[2026-09-29T15:37:41Z DEBUG] type export for `pollable` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]input-stream.read`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]input-stream.blocking-read`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]input-stream.subscribe`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.check-write`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.write`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.blocking-write-and-flush`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.blocking-flush`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.subscribe`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/stdin@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `input-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `input-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-stdin`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/stdout@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-stdout`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/stderr@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-stderr`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-input@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-input`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-input` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-output@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-output`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-output` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-stdin@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-input`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-input` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-terminal-stdin`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-stdout@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-output`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-output` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-terminal-stdout`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-stderr@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-output`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-output` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-terminal-stderr`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:clocks/wall-clock@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `datetime`
+[2026-09-29T15:37:41Z DEBUG] type export for `datetime` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `now`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:filesystem/types@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error`
+[2026-09-29T15:37:41Z DEBUG] type export for `error` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error-code`
+[2026-09-29T15:37:41Z DEBUG] type export for `error-code` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor-flags`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor-flags` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor-type`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor-type` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `filesize`
+[2026-09-29T15:37:41Z DEBUG] type export for `filesize` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `link-count`
+[2026-09-29T15:37:41Z DEBUG] type export for `link-count` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `datetime`
+[2026-09-29T15:37:41Z DEBUG] type export for `datetime` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor-stat`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor-stat` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.write-via-stream`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.append-via-stream`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.get-flags`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.get-type`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.stat`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `filesystem-error-code`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:filesystem/preopens@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-directories`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:random/random@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-random-bytes`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-random-u64`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `iac-frame`
+[2026-09-29T15:37:41Z DEBUG] type export for `iac-frame` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding component import `halt`
+[2026-09-29T15:37:41Z DEBUG] type export for `halt` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding component export `handle-frame`
+[2026-09-29T15:37:41Z DEBUG] decoding component export `on-start`
+[2026-09-29T15:37:41Z DEBUG] decoding component export `on-shutdown`
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.0.0;
+  import wasi:io/poll@0.2.12;
+  import wasi:clocks/monotonic-clock@0.2.12;
+  import wasi:io/error@0.2.12;
+  import wasi:io/streams@0.2.12;
+  import wasi:cli/stdin@0.2.12;
+  import wasi:cli/stdout@0.2.12;
+  import wasi:cli/stderr@0.2.12;
+  import wasi:cli/terminal-input@0.2.12;
+  import wasi:cli/terminal-output@0.2.12;
+  import wasi:cli/terminal-stdin@0.2.12;
+  import wasi:cli/terminal-stdout@0.2.12;
+  import wasi:cli/terminal-stderr@0.2.12;
+  import wasi:clocks/wall-clock@0.2.12;
+  import wasi:filesystem/types@0.2.12;
+  import wasi:filesystem/preopens@0.2.12;
+  import wasi:random/random@0.2.12;
+  use maos:spirit/frames@2.0.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.0.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.12 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream {
+      read: func(len: u64) -> result<list<u8>, stream-error>;
+      blocking-read: func(len: u64) -> result<list<u8>, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-write-and-flush: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.12 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.12.{pollable};
+
+    type instant = u64;
+
+    type duration = u64;
+
+    now: func() -> instant;
+
+    subscribe-instant: func(when: instant) -> pollable;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+  interface wall-clock {
+    record datetime {
+      seconds: u64,
+      nanoseconds: u32,
+    }
+
+    now: func() -> datetime;
+  }
+}
+
+
+package wasi:cli@0.2.12 {
+  interface stdin {
+    use wasi:io/streams@0.2.12.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface stdout {
+    use wasi:io/streams@0.2.12.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.12.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+
+package wasi:filesystem@0.2.12 {
+  interface types {
+    use wasi:io/streams@0.2.12.{error, output-stream};
+    use wasi:clocks/wall-clock@0.2.12.{datetime};
+
+    enum error-code {
+      access,
+      would-block,
+      already,
+      bad-descriptor,
+      busy,
+      deadlock,
+      quota,
+      exist,
+      file-too-large,
+      illegal-byte-sequence,
+      in-progress,
+      interrupted,
+      invalid,
+      io,
+      is-directory,
+      loop,
+      too-many-links,
+      message-size,
+      name-too-long,
+      no-device,
+      no-entry,
+      no-lock,
+      insufficient-memory,
+      insufficient-space,
+      not-directory,
+      not-empty,
+      not-recoverable,
+      unsupported,
+      no-tty,
+      no-such-device,
+      overflow,
+      not-permitted,
+      pipe,
+      read-only,
+      invalid-seek,
+      text-file-busy,
+      cross-device,
+    }
+
+    resource descriptor {
+      write-via-stream: func(offset: filesize) -> result<output-stream, error-code>;
+      append-via-stream: func() -> result<output-stream, error-code>;
+      get-flags: func() -> result<descriptor-flags, error-code>;
+      get-type: func() -> result<descriptor-type, error-code>;
+      stat: func() -> result<descriptor-stat, error-code>;
+    }
+
+    flags descriptor-flags {
+      read,
+      write,
+      file-integrity-sync,
+      data-integrity-sync,
+      requested-write-sync,
+      mutate-directory,
+    }
+
+    enum descriptor-type {
+      unknown,
+      block-device,
+      character-device,
+      directory,
+      fifo,
+      symbolic-link,
+      regular-file,
+      socket,
+    }
+
+    type filesize = u64;
+
+    type link-count = u64;
+
+    record descriptor-stat {
+      %type: descriptor-type,
+      link-count: link-count,
+      size: filesize,
+      data-access-timestamp: option<datetime>,
+      data-modification-timestamp: option<datetime>,
+      status-change-timestamp: option<datetime>,
+    }
+
+    filesystem-error-code: func(err: borrow<error>) -> option<error-code>;
+  }
+  interface preopens {
+    use types.{descriptor};
+
+    get-directories: func() -> list<tuple<descriptor, string>>;
+  }
+}
+
+
+package wasi:random@0.2.12 {
+  interface random {
+    get-random-bytes: func(len: u64) -> list<u8>;
+
+    get-random-u64: func() -> u64;
+  }
+}
+[2026-09-29T15:37:41Z DEBUG] inferring the WIT of a concrete component
+[2026-09-29T15:37:41Z DEBUG] decoding component import `maos:spirit/frames@2.0.0`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-address`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-address` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-kind`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-kind` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `intent-class`
+[2026-09-29T15:37:41Z DEBUG] type export for `intent-class` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope-mcp-call`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope-mcp-call` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope-cli-subprocess-spawn`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope-cli-subprocess-spawn` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope-gateway-send`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope-gateway-send` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `scope`
+[2026-09-29T15:37:41Z DEBUG] type export for `scope` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `posture-hint`
+[2026-09-29T15:37:41Z DEBUG] type export for `posture-hint` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `halt-policy-override`
+[2026-09-29T15:37:41Z DEBUG] type export for `halt-policy-override` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `posture-preferences`
+[2026-09-29T15:37:41Z DEBUG] type export for `posture-preferences` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `prior-distillate-ref`
+[2026-09-29T15:37:41Z DEBUG] type export for `prior-distillate-ref` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `task-assign-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `task-assign-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `task-complete-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `task-complete-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `decision-dispatch-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `decision-dispatch-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `epistemic-halt-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `epistemic-halt-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `telemetry-event-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `telemetry-event-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `consent-request-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `consent-request-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `retract-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `retract-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `budget-envelope`
+[2026-09-29T15:37:41Z DEBUG] type export for `budget-envelope` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `rupture-reason`
+[2026-09-29T15:37:41Z DEBUG] type export for `rupture-reason` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `rupture-rejection`
+[2026-09-29T15:37:41Z DEBUG] type export for `rupture-rejection` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `consent-rupture-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `consent-rupture-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `rate-limited-body`
+[2026-09-29T15:37:41Z DEBUG] type export for `rate-limited-body` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-payload`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-payload` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `frame-origin`
+[2026-09-29T15:37:41Z DEBUG] type export for `frame-origin` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `consent-envelope`
+[2026-09-29T15:37:41Z DEBUG] type export for `consent-envelope` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `iac-frame`
+[2026-09-29T15:37:41Z DEBUG] type export for `iac-frame` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `halt`
+[2026-09-29T15:37:41Z DEBUG] type export for `halt` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:io/poll@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `pollable`
+[2026-09-29T15:37:41Z DEBUG] type export for `pollable` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]pollable.block`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `poll`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:clocks/monotonic-clock@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `instant`
+[2026-09-29T15:37:41Z DEBUG] type export for `instant` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `pollable`
+[2026-09-29T15:37:41Z DEBUG] type export for `pollable` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `duration`
+[2026-09-29T15:37:41Z DEBUG] type export for `duration` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `now`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `subscribe-instant`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `subscribe-duration`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:io/error@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error`
+[2026-09-29T15:37:41Z DEBUG] type export for `error` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:io/streams@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `input-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `input-stream` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error`
+[2026-09-29T15:37:41Z DEBUG] type export for `error` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `stream-error`
+[2026-09-29T15:37:41Z DEBUG] type export for `stream-error` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `pollable`
+[2026-09-29T15:37:41Z DEBUG] type export for `pollable` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]input-stream.read`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]input-stream.blocking-read`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]input-stream.subscribe`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.check-write`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.write`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.blocking-write-and-flush`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.blocking-flush`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]output-stream.subscribe`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/stdin@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `input-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `input-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-stdin`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/stdout@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-stdout`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/stderr@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-stderr`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-input@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-input`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-input` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-output@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-output`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-output` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-stdin@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-input`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-input` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-terminal-stdin`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-stdout@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-output`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-output` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-terminal-stdout`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:cli/terminal-stderr@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `terminal-output`
+[2026-09-29T15:37:41Z DEBUG] type export for `terminal-output` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-terminal-stderr`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:clocks/wall-clock@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `datetime`
+[2026-09-29T15:37:41Z DEBUG] type export for `datetime` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `now`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:filesystem/types@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error`
+[2026-09-29T15:37:41Z DEBUG] type export for `error` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `error-code`
+[2026-09-29T15:37:41Z DEBUG] type export for `error-code` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor-flags`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor-flags` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor-type`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor-type` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `output-stream`
+[2026-09-29T15:37:41Z DEBUG] type export for `output-stream` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `filesize`
+[2026-09-29T15:37:41Z DEBUG] type export for `filesize` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `link-count`
+[2026-09-29T15:37:41Z DEBUG] type export for `link-count` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `datetime`
+[2026-09-29T15:37:41Z DEBUG] type export for `datetime` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor-stat`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor-stat` is a new type
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.write-via-stream`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.append-via-stream`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.get-flags`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.get-type`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `[method]descriptor.stat`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `filesystem-error-code`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:filesystem/preopens@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `descriptor`
+[2026-09-29T15:37:41Z DEBUG] type export for `descriptor` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-directories`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `wasi:random/random@0.2.12`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-random-bytes`
+[2026-09-29T15:37:41Z DEBUG] decoding import instance export `get-random-u64`
+[2026-09-29T15:37:41Z DEBUG] decoding component import `iac-frame`
+[2026-09-29T15:37:41Z DEBUG] type export for `iac-frame` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding component import `halt`
+[2026-09-29T15:37:41Z DEBUG] type export for `halt` is an alias
+[2026-09-29T15:37:41Z DEBUG] decoding component export `handle-frame`
+[2026-09-29T15:37:41Z DEBUG] decoding component export `on-start`
+[2026-09-29T15:37:41Z DEBUG] decoding component export `on-shutdown`
+WASI_HTTP_IMPORT=absent
+component_bytes=12391256
+23ecac2ba70e6dac9ed912abc43320cafebfd0cbb72fc1a288f0c134d88f1dfb  dist/spirit.wasm
+
+
+UTC: 2026-09-29T15:45:28Z
+HEAD: 5075443c
+command: node --version && npm --version && npm install --package-lock-only && npm ci && npm test && npm run build && npm run componentize && wasm-tools component wit dist/spirit.wasm
+v24.21.0
+9.2.0
+
+up to date, audited 237 packages in 404ms
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+10 vulnerabilities (5 moderate, 3 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+added 236 packages, and audited 237 packages in 2s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+10 vulnerabilities (5 moderate, 3 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> @local/example-spirit-ts@0.1.0 test
+> vitest run
+
+
+ RUN  v1.6.1 /home/lunarpulse/dev_ws/examples/example-spirit-ts
+
+ ✓ tests/spirit.test.ts  (1 test) 1ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  15:45:25
+   Duration  422ms (transform 25ms, setup 0ms, collect 22ms, tests 1ms, environment 0ms, prepare 98ms)
+
+
+> @local/example-spirit-ts@0.1.0 build
+> npm run guest-types && tsc
+
+
+> @local/example-spirit-ts@0.1.0 guest-types
+> jco guest-types wit --world-name spirit --out-dir src/bindings --strict
+
+
+  Generated Guest Typescript Definition Files (.d.ts):
+
+ - src/bindings/interfaces/maos-spirit-frames.d.ts  12.4 KiB
+ - src/bindings/spirit.d.ts                          0.8 KiB
+
+
+> @local/example-spirit-ts@0.1.0 componentize
+> componentize-js dist/index.js --wit wit --world-name spirit --disable http fetch-event -o dist/spirit.wasm
+
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.0.0;
+  import wasi:io/poll@0.2.12;
+  import wasi:clocks/monotonic-clock@0.2.12;
+  import wasi:io/error@0.2.12;
+  import wasi:io/streams@0.2.12;
+  import wasi:cli/stdin@0.2.12;
+  import wasi:cli/stdout@0.2.12;
+  import wasi:cli/stderr@0.2.12;
+  import wasi:cli/terminal-input@0.2.12;
+  import wasi:cli/terminal-output@0.2.12;
+  import wasi:cli/terminal-stdin@0.2.12;
+  import wasi:cli/terminal-stdout@0.2.12;
+  import wasi:cli/terminal-stderr@0.2.12;
+  import wasi:clocks/wall-clock@0.2.12;
+  import wasi:filesystem/types@0.2.12;
+  import wasi:filesystem/preopens@0.2.12;
+  import wasi:random/random@0.2.12;
+  use maos:spirit/frames@2.0.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.0.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.12 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream {
+      read: func(len: u64) -> result<list<u8>, stream-error>;
+      blocking-read: func(len: u64) -> result<list<u8>, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-write-and-flush: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.12 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.12.{pollable};
+
+    type instant = u64;
+
+    type duration = u64;
+
+    now: func() -> instant;
+
+    subscribe-instant: func(when: instant) -> pollable;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+  interface wall-clock {
+    record datetime {
+      seconds: u64,
+      nanoseconds: u32,
+    }
+
+    now: func() -> datetime;
+  }
+}
+
+
+package wasi:cli@0.2.12 {
+  interface stdin {
+    use wasi:io/streams@0.2.12.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface stdout {
+    use wasi:io/streams@0.2.12.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.12.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+
+package wasi:filesystem@0.2.12 {
+  interface types {
+    use wasi:io/streams@0.2.12.{error, output-stream};
+    use wasi:clocks/wall-clock@0.2.12.{datetime};
+
+    enum error-code {
+      access,
+      would-block,
+      already,
+      bad-descriptor,
+      busy,
+      deadlock,
+      quota,
+      exist,
+      file-too-large,
+      illegal-byte-sequence,
+      in-progress,
+      interrupted,
+      invalid,
+      io,
+      is-directory,
+      loop,
+      too-many-links,
+      message-size,
+      name-too-long,
+      no-device,
+      no-entry,
+      no-lock,
+      insufficient-memory,
+      insufficient-space,
+      not-directory,
+      not-empty,
+      not-recoverable,
+      unsupported,
+      no-tty,
+      no-such-device,
+      overflow,
+      not-permitted,
+      pipe,
+      read-only,
+      invalid-seek,
+      text-file-busy,
+      cross-device,
+    }
+
+    resource descriptor {
+      write-via-stream: func(offset: filesize) -> result<output-stream, error-code>;
+      append-via-stream: func() -> result<output-stream, error-code>;
+      get-flags: func() -> result<descriptor-flags, error-code>;
+      get-type: func() -> result<descriptor-type, error-code>;
+      stat: func() -> result<descriptor-stat, error-code>;
+    }
+
+    flags descriptor-flags {
+      read,
+      write,
+      file-integrity-sync,
+      data-integrity-sync,
+      requested-write-sync,
+      mutate-directory,
+    }
+
+    enum descriptor-type {
+      unknown,
+      block-device,
+      character-device,
+      directory,
+      fifo,
+      symbolic-link,
+      regular-file,
+      socket,
+    }
+
+    type filesize = u64;
+
+    type link-count = u64;
+
+    record descriptor-stat {
+      %type: descriptor-type,
+      link-count: link-count,
+      size: filesize,
+      data-access-timestamp: option<datetime>,
+      data-modification-timestamp: option<datetime>,
+      status-change-timestamp: option<datetime>,
+    }
+
+    filesystem-error-code: func(err: borrow<error>) -> option<error-code>;
+  }
+  interface preopens {
+    use types.{descriptor};
+
+    get-directories: func() -> list<tuple<descriptor, string>>;
+  }
+}
+
+
+package wasi:random@0.2.12 {
+  interface random {
+    get-random-bytes: func(len: u64) -> list<u8>;
+
+    get-random-u64: func() -> u64;
+  }
+}
+(node:744749) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+node24_clean_relock_rc=0
+
+
+UTC: 2026-09-29T15:51:24Z
+HEAD: 5075443c
+command: node --version && wasm-tools component wit dist/spirit.wasm && stat -c component_bytes=%s dist/spirit.wasm && sha256sum dist/spirit.wasm
+v24.21.0
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.0.0;
+  import wasi:io/poll@0.2.12;
+  import wasi:clocks/monotonic-clock@0.2.12;
+  import wasi:io/error@0.2.12;
+  import wasi:io/streams@0.2.12;
+  import wasi:cli/stdin@0.2.12;
+  import wasi:cli/stdout@0.2.12;
+  import wasi:cli/stderr@0.2.12;
+  import wasi:cli/terminal-input@0.2.12;
+  import wasi:cli/terminal-output@0.2.12;
+  import wasi:cli/terminal-stdin@0.2.12;
+  import wasi:cli/terminal-stdout@0.2.12;
+  import wasi:cli/terminal-stderr@0.2.12;
+  import wasi:clocks/wall-clock@0.2.12;
+  import wasi:filesystem/types@0.2.12;
+  import wasi:filesystem/preopens@0.2.12;
+  import wasi:random/random@0.2.12;
+  use maos:spirit/frames@2.0.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.0.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.12 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream {
+      read: func(len: u64) -> result<list<u8>, stream-error>;
+      blocking-read: func(len: u64) -> result<list<u8>, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-write-and-flush: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.12 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.12.{pollable};
+
+    type instant = u64;
+
+    type duration = u64;
+
+    now: func() -> instant;
+
+    subscribe-instant: func(when: instant) -> pollable;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+  interface wall-clock {
+    record datetime {
+      seconds: u64,
+      nanoseconds: u32,
+    }
+
+    now: func() -> datetime;
+  }
+}
+
+
+package wasi:cli@0.2.12 {
+  interface stdin {
+    use wasi:io/streams@0.2.12.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface stdout {
+    use wasi:io/streams@0.2.12.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.12.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+
+package wasi:filesystem@0.2.12 {
+  interface types {
+    use wasi:io/streams@0.2.12.{error, output-stream};
+    use wasi:clocks/wall-clock@0.2.12.{datetime};
+
+    enum error-code {
+      access,
+      would-block,
+      already,
+      bad-descriptor,
+      busy,
+      deadlock,
+      quota,
+      exist,
+      file-too-large,
+      illegal-byte-sequence,
+      in-progress,
+      interrupted,
+      invalid,
+      io,
+      is-directory,
+      loop,
+      too-many-links,
+      message-size,
+      name-too-long,
+      no-device,
+      no-entry,
+      no-lock,
+      insufficient-memory,
+      insufficient-space,
+      not-directory,
+      not-empty,
+      not-recoverable,
+      unsupported,
+      no-tty,
+      no-such-device,
+      overflow,
+      not-permitted,
+      pipe,
+      read-only,
+      invalid-seek,
+      text-file-busy,
+      cross-device,
+    }
+
+    resource descriptor {
+      write-via-stream: func(offset: filesize) -> result<output-stream, error-code>;
+      append-via-stream: func() -> result<output-stream, error-code>;
+      get-flags: func() -> result<descriptor-flags, error-code>;
+      get-type: func() -> result<descriptor-type, error-code>;
+      stat: func() -> result<descriptor-stat, error-code>;
+    }
+
+    flags descriptor-flags {
+      read,
+      write,
+      file-integrity-sync,
+      data-integrity-sync,
+      requested-write-sync,
+      mutate-directory,
+    }
+
+    enum descriptor-type {
+      unknown,
+      block-device,
+      character-device,
+      directory,
+      fifo,
+      symbolic-link,
+      regular-file,
+      socket,
+    }
+
+    type filesize = u64;
+
+    type link-count = u64;
+
+    record descriptor-stat {
+      %type: descriptor-type,
+      link-count: link-count,
+      size: filesize,
+      data-access-timestamp: option<datetime>,
+      data-modification-timestamp: option<datetime>,
+      status-change-timestamp: option<datetime>,
+    }
+
+    filesystem-error-code: func(err: borrow<error>) -> option<error-code>;
+  }
+  interface preopens {
+    use types.{descriptor};
+
+    get-directories: func() -> list<tuple<descriptor, string>>;
+  }
+}
+
+
+package wasi:random@0.2.12 {
+  interface random {
+    get-random-bytes: func(len: u64) -> list<u8>;
+
+    get-random-u64: func() -> u64;
+  }
+}
+component_bytes=12391258
+da390d25f9e2ff4c1b8cef77dc26af96c961b2df6ca111472949aad18e84e7a9  dist/spirit.wasm
+WASI_HTTP_IMPORT=absent
+final_node24_component_measurement_rc=0

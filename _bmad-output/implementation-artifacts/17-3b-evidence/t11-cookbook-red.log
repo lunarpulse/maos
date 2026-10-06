@@ -1,0 +1,20 @@
+2026-09-29T15:41:12Z
+5075443c
+CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-c CARGO_BUILD_JOBS=12 cargo test --locked -p maos-bin --test cookbook_manifests_17_3b
+
+Plant 1: posture parser refusal
+Diff summary (temporary, reverted):
+- docs-site/docs/cookbook/manifest-fields.md: [posture] default = "assistive" -> "supervised"
+- docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/manifest-fields.md: identical TOML change, preserving the equality control
+Warning-free cached test invocation: no compiler warnings were emitted.
+Observed red (exit 101; 2 passed, 1 failed):
+manifest-fields.md: whole-manifest admission section must pass gate_manifest for rust-inproc/T0, got Err(SectionParse { section: "posture", detail: "... unknown variant `supervised`, expected one of `cautious`, `assistive`, `autonomous-with-halt`, `autonomous`" })
+Reverted both temporary lines to default = "assistive".
+
+Plant 2: Korean TOML byte-equality refusal
+Diff summary (temporary, reverted):
+- docs-site/i18n/ko/docusaurus-plugin-content-docs/current/cookbook/hello-world-spirit.md: TOML [class].description = "A minimal hello-world Spirit." -> "A changed hello-world Spirit."
+Warning-free cached test invocation: no compiler warnings were emitted.
+Observed red (exit 101; 2 passed, 1 failed):
+assertion `left == right` failed: hello-world-spirit.md: TOML fenced section blocks must be byte-identical between English and Korean
+Reverted the temporary line to description = "A minimal hello-world Spirit.".

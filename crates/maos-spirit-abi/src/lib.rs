@@ -30,7 +30,7 @@
 //! | `compliance` | Story 1b.4 | Frozen schema, ABI_VERSION bump trigger |
 //! | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 //! | `deprecation` | Story 7.1 | Empty-present deprecation channel |
-//! | `MANIFEST_SCHEMA_VERSION = 4` | Story 13.5d | `[capabilities.required.loom]` section |
+//! | `MANIFEST_SCHEMA_VERSION = 5` | Story 17-3b | `wasm-component` form and `[class].artifact` |
 //!
 //! ## Modules
 //! | Module | Description | Introduced |
@@ -98,6 +98,10 @@ pub const ABI_VERSION: u32 = 1;
 /// (the N-1 supported floor) — AC-11 append-only compat. Recorded as one
 /// ratified `[[ratification]]` entry in `xtask/abi-ratifications.toml`.
 ///
+/// Bumped to `5` in Story 17-3b (D-17-3b-H) for the `wasm-component` form
+/// and its required `[class].artifact` path. Schema 4 remains supported as
+/// the N-1 manifest floor.
+///
 /// This constant is the single authoritative source consumed by
 /// `maos-manifest::ClassSection` validation and by the `xtask
 /// check-manifest-schema-version` gate. Story 7.5a's ABI Stability Triple
@@ -109,9 +113,9 @@ pub const ABI_VERSION: u32 = 1;
 /// ```rust
 /// use maos_spirit_abi::MANIFEST_SCHEMA_VERSION;
 ///
-/// assert_eq!(MANIFEST_SCHEMA_VERSION, 4);
+/// assert_eq!(MANIFEST_SCHEMA_VERSION, 5);
 /// ```
-pub const MANIFEST_SCHEMA_VERSION: u32 = 4;
+pub const MANIFEST_SCHEMA_VERSION: u32 = 5;
 
 /// Lowest manifest schema version this kernel accepts at admission.
 ///
@@ -153,10 +157,11 @@ pub const MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = 1;
 ///         && v <= MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION
 /// }
 ///
-/// assert!(is_version_supported(1));  // N-1 — supported
-/// assert!(is_version_supported(2));  // N-1 — supported
-/// assert!(is_version_supported(3));  // Current — supported
-/// assert!(is_version_supported(4)); // Current — supported
+/// assert!(is_version_supported(1));  // Oldest supported
+/// assert!(is_version_supported(2));  // Supported
+/// assert!(is_version_supported(3));  // Supported
+/// assert!(is_version_supported(4));  // N-1 — supported
+/// assert!(is_version_supported(5));  // Current — supported
 /// assert!(!is_version_supported(0)); // Below floor — EAbiTooOld
 /// ```
 pub const MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION: u32 = MANIFEST_SCHEMA_VERSION;

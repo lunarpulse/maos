@@ -19,11 +19,9 @@
 
 use std::io::{self, BufRead, Write};
 
-/// Hard cap on a single ADR-032 frame body. Guest-emitted `Content-Length`
-/// values are untrusted input at this trust boundary (the runner speaks to
-/// a WASM guest over stdio) — an unbounded allocation here is a
-/// guest-triggerable denial of service.
-const MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
+/// Hard cap on a single ADR-032 frame body, in either direction. Enforce it
+/// while serializing guest output, before growing an unbounded host buffer.
+pub const MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
 
 /// Hard cap on the length of a single header line before the blank
 /// separator. Guards against an unbounded `read_line` buffer growth on a
@@ -123,16 +121,42 @@ fn parse_and_read(header_line: &str, reader: &mut impl BufRead) -> io::Result<Op
 ///
 /// Format: `Content-Length: <decimal>\r\n\r\n` followed by N bytes of CBOR.
 pub fn write_frame(writer: &mut impl Write, cbor_data: &[u8]) -> io::Result<()> {
+    if cbor_data.len() > MAX_FRAME_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("outbound frame exceeds the {MAX_FRAME_BYTES}-byte frame cap"),
+        ));
+    }
     write!(writer, "Content-Length: {}\r\n\r\n", cbor_data.len())?;
     writer.write_all(cbor_data)?;
     writer.flush()
 }
 
-/// Encode a serde-serializable value to canonical CBOR bytes.
+/// Encode a serde-serializable value to CBOR, without allocating beyond the
+/// ADR-032 frame limit. This is also used on guest-controlled output.
 pub fn encode_cbor<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, String> {
-    let mut buf = Vec::new();
+    struct BoundedBuffer(Vec<u8>);
+
+    impl Write for BoundedBuffer {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if bytes.len() > MAX_FRAME_BYTES - self.0.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "CBOR output exceeds the ADR-032 frame cap",
+                ));
+            }
+            self.0.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut buf = BoundedBuffer(Vec::new());
     ciborium::into_writer(value, &mut buf).map_err(|e| format!("CBOR encode error: {e}"))?;
-    Ok(buf)
+    Ok(buf.0)
 }
 
 /// Decode canonical CBOR bytes to a serde-deserializable value.

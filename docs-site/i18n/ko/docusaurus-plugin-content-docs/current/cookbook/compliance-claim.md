@@ -92,7 +92,7 @@ abi = "1.0"
 manifest_schema_version = 3
 min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
-trust_tier = "audited"
+trust_tier = "public-vetted"
 description = "A Spirit with a compliance claim."
 
 [model_provenance]

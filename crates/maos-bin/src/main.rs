@@ -3079,6 +3079,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     reason: "successor manifest lacks [class]".into(),
                 }
             })?;
+            // A successor must not relabel a compiled-in Rust object as a T2
+            // component. This path does not pass through gate_manifest.
+            if class.forms.iter().any(|form| form == "wasm-component") {
+                return Err(
+                    maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                        reason: "wasm-component successor cannot use in-process hot-swap".into(),
+                    },
+                );
+            }
             // Story 16-6 (§15 V4 / §17 R20) — ONE class-dispatch switch. The
             // factory used to carry its own, covering SEVEN of the eight
             // compiled-in classes plus `smoke-spirit` and missing
@@ -6675,6 +6684,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 forms: vec!["rust-inproc".into()],
                 trust_tier: "local".into(),
                 description: "smoke test spirit".into(),
+                artifact: None,
             });
             let pid_v0 = scheduler
                 .load("smoke-spirit", manifest_v0, SmokeSpirit, boot_nonce)
@@ -6776,6 +6786,7 @@ description = "smoke test spirit successor"
                 forms: vec!["rust-inproc".into()],
                 trust_tier: "local".into(),
                 description: "smoke test spirit successor".into(),
+                artifact: None,
             };
             let smoke_posture = maos_kernel_core::security::manifest::PostureSection {
                 default: maos_kernel_core::security::manifest::Posture::Cautious,
@@ -9874,6 +9885,15 @@ fn admit_daemon_control_spirit(
         .transpose()?;
     let class_section =
         maos_kernel_core::security::ClassSection::from_toml_str(&section("class")?)?;
+    // Story 17-3b review (g): this path admits a policy identity without
+    // `gate_manifest`, so it must not accept the third-party form.
+    if class_section
+        .forms
+        .iter()
+        .any(|form| form == "wasm-component")
+    {
+        return Err("control Spirit must be a first-party class, not wasm-component".into());
+    }
     let caps_required =
         caps_required.degrade_for_schema_version(class_section.manifest_schema_version);
 
@@ -12989,6 +13009,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         forms: vec!["rust-inproc".into()],
         trust_tier: "local".into(),
         description: "ABI stability smoke Spirit".into(),
+        artifact: None,
     };
     let empty_caps = CapabilitiesRequired {
         provider: ProviderCapabilities { complete: vec![] },

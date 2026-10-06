@@ -13,7 +13,8 @@ Bite-sized recipes for common MAOS tasks. Every pattern follows the same structu
 | Pattern | Summary |
 |---|---|
 | [Hello-World Spirit](./hello-world-spirit) | Minimal Spirit with a single `on_idle` hook — the 30-minute path |
-| [Manifest Fields](./manifest-fields) | Complete `spirit.toml` manifest covering all schema v3 sections |
+| [Third-Party WASM Component Spirit](./wasm-component-spirit) | TypeScript scaffold, component artifact, and today’s typed admission outcome |
+| [Manifest Fields](./manifest-fields) | Admissible schema v5 `spirit.toml` reference |
 | [Lifecycle Hooks](./lifecycle-hooks) | Implementing multiple lifecycle hooks in one Spirit |
 
 ## Reliability & Operations

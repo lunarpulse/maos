@@ -1,16 +1,20 @@
 //! Strictest-of-floor admission per ADR-009, with attestation-conditional
-//! `public-vetted` promotion (Story 13.4, FR37 / ADR-056).
+//! `public-vetted` promotion (Story 13.4, FR37 / ADR-056) and form-aware
+//! registry admission (Story 17-3b, ADR-060).
 //!
 //! Both public entry points — [`admit_spirit`] and
-//! [`admit_spirit_with_attestation`] — call [`frozen_surface_gate`] first. They
-//! then:
+//! [`admit_spirit_with_attestation`] — call [`frozen_surface_gate`] first. It
+//! parses the manifest structurally before tier work, rejects FKCS off-surface
+//! references and `rust-inproc` class forms, and returns the applicable form
+//! policy. A legacy package keeps its existing tier behavior; a
+//! `wasm-component` package has a `T2` sandbox floor at every tier.
 //!
-//! 1. Parse the manifest's declared trust tier (structural TOML, fail-closed).
-//! 2. Compute `effective_tier = strictest_of(manifest_declared, registry_origin, op_cfg.tier_floor)`.
-//! 3. Branch on tier: `Local` (unsigned allowed per policy), `OrgInternal` (org key required),
-//!    `PublicUntrusted` (signature + ComplianceClaim envelope required),
-//!    `PublicVetted` (admitted only with a verified vetting attestation, above
-//!    `strictest_of`; otherwise `PublicVettedDeferred`).
+//! The entry points then parse the manifest's declared trust tier, compute
+//! `effective_tier = strictest_of(manifest_declared, registry_origin, op_cfg.tier_floor)`,
+//! and enforce the unchanged tier obligations: `Local` (unsigned allowed per
+//! policy), `OrgInternal` (org key required), `PublicUntrusted` (signature +
+//! ComplianceClaim envelope required), and `PublicVetted` (a verified vetting
+//! attestation above `strictest_of`; otherwise `PublicVettedDeferred`).
 
 use maos_domain::ports::registry::{SignedPackage, TrustTier};
 use maos_spirit_abi::compliance::{CryptoProviderId, ProviderEndpointPin, SandboxTier};
@@ -40,6 +44,12 @@ pub enum AdmissionError {
 
     #[error("manifest trust_tier is malformed: {0}")]
     ManifestTrustTierInvalid(String),
+
+    #[error("manifest [class] section is invalid: {0}")]
+    ClassSectionInvalid(String),
+
+    #[error("registry refuses the first-party rust-inproc form")]
+    FirstPartyFormFromRegistry,
 
     #[error("org signature does not match operator-configured org key (operator must set [registry].org_signing_pubkey)")]
     OrgSignatureInvalid,
@@ -95,6 +105,26 @@ pub enum AdmissionError {
     /// refusal is honest and journaled with its own cause.
     #[error("vetting attestation rejected: {0}")]
     VettingAttestationRejected(String),
+}
+
+/// Admission behavior selected from a structurally validated `class.forms`
+/// declaration. `class.forms` containing `rust-inproc` is refused in
+/// [`frozen_surface_gate`] rather than represented here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FormPolicy {
+    /// A package without `[class]`, or one declaring `subprocess`.
+    Legacy,
+    /// A `wasm-component` package always runs at its fixed T2 boundary.
+    WasmComponent,
+}
+
+impl FormPolicy {
+    fn sandbox_tier_floor(self, legacy_floor: SandboxTier) -> SandboxTier {
+        match self {
+            Self::Legacy => legacy_floor,
+            Self::WasmComponent => SandboxTier::T2,
+        }
+    }
 }
 
 /// Configuration for the admission path.
@@ -178,26 +208,49 @@ fn verify_public_untrusted_baseline(
     })
 }
 
-/// Story 11.5 AC3 (literal) — the FKCS off-frozen-surface gate, and the ONE
-/// place it lives.
+/// Story 11.5 AC3 / Story 17-3b AC4 — the single frozen admission prelude.
 ///
-/// A package whose manifest declares a non-empty `[fkcs].internal_references`
-/// array (off-surface / `pub(crate)`-style internals) is refused HERE, before
-/// tier, signature, ComplianceClaim or vetting-attestation resolution:
-/// off-surface conformance is orthogonal to the trust-tier axis. An absent or
-/// empty declaration admits — backward compatible with pre-11.5 manifests.
+/// One [`maos_manifest::ManifestDocument`] parse structurally serves both
+/// `[fkcs].internal_references` and `[class]`. A non-UTF-8 or non-TOML document,
+/// and a malformed `[fkcs]` declaration, are mapped to the existing
+/// [`AdmissionError::ManifestTrustTierInvalid`] before any tier work; a malformed
+/// `[class]` is [`AdmissionError::ClassSectionInvalid`]. This preserves the
+/// historical typed outcome for unparseable manifests while failing closed on
+/// all structural FKCS shapes.
+///
+/// A package declaring an FKCS internal is refused before tier, signature,
+/// ComplianceClaim, or vetting-attestation resolution. A `[class]` with
+/// `rust-inproc` is likewise refused at every trust tier; `wasm-component`
+/// receives [`FormPolicy::WasmComponent`] and `subprocess` stays legacy.
 ///
 /// Invariant (ADR-052 §3, the L4 landmine): every public admission entry point
 /// calls this as its FIRST statement. A second copy that could drift from this
 /// one would fork the frozen admission floor.
-fn frozen_surface_gate(pkg: &SignedPackage) -> Result<(), AdmissionError> {
-    let off_surface_refs = extract_fkcs_internal_references(&pkg.manifest_toml);
-    if off_surface_refs.is_empty() {
-        Ok(())
-    } else {
-        Err(AdmissionError::OffFrozenSurface {
+fn frozen_surface_gate(pkg: &SignedPackage) -> Result<FormPolicy, AdmissionError> {
+    let document = maos_manifest::ManifestDocument::parse(&pkg.manifest_toml)
+        .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
+    let off_surface_refs = document
+        .fkcs_internal_references()
+        .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
+    if !off_surface_refs.is_empty() {
+        return Err(AdmissionError::OffFrozenSurface {
             symbols: off_surface_refs,
-        })
+        });
+    }
+
+    let class = document
+        .class_section()
+        .map_err(|error| AdmissionError::ClassSectionInvalid(error.to_string()))?;
+    let Some(class) = class else {
+        return Ok(FormPolicy::Legacy);
+    };
+    if class.forms.iter().any(|form| form == "rust-inproc") {
+        return Err(AdmissionError::FirstPartyFormFromRegistry);
+    }
+    if class.forms.iter().any(|form| form == "wasm-component") {
+        Ok(FormPolicy::WasmComponent)
+    } else {
+        Ok(FormPolicy::Legacy)
     }
 }
 
@@ -207,7 +260,7 @@ pub fn admit_spirit(
     pkg: &SignedPackage,
     op_cfg: &AdmissionConfig,
 ) -> Result<AdmissionDecision, AdmissionError> {
-    frozen_surface_gate(pkg)?;
+    let form_policy = frozen_surface_gate(pkg)?;
 
     let manifest_declared_tier = maos_manifest::parse_manifest_trust_tier(&pkg.manifest_toml)
         .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
@@ -220,7 +273,8 @@ pub fn admit_spirit(
     match effective_tier {
         TrustTier::PublicVetted => Err(AdmissionError::PublicVettedDeferred),
         TrustTier::PublicUntrusted => {
-            let sandbox_tier_floor = verify_public_untrusted_baseline(pkg, op_cfg)?;
+            let sandbox_tier_floor =
+                form_policy.sandbox_tier_floor(verify_public_untrusted_baseline(pkg, op_cfg)?);
             Ok(AdmissionDecision {
                 effective_tier,
                 sandbox_tier_floor,
@@ -244,7 +298,7 @@ pub fn admit_spirit(
             }
             Ok(AdmissionDecision {
                 effective_tier,
-                sandbox_tier_floor: SandboxTier::T0,
+                sandbox_tier_floor: form_policy.sandbox_tier_floor(SandboxTier::T0),
                 admit: true,
                 journal_note: format!(
                     "admitted org_internal spirit '{}' v{} with org signature",
@@ -259,7 +313,7 @@ pub fn admit_spirit(
                     if pkg.publisher_pubkey == org_key && verify_publisher_sig(pkg) {
                         return Ok(AdmissionDecision {
                             effective_tier,
-                            sandbox_tier_floor: SandboxTier::T0,
+                            sandbox_tier_floor: form_policy.sandbox_tier_floor(SandboxTier::T0),
                             admit: true,
                             journal_note: format!(
                                 "admitted local spirit '{}' v{} with org signature match",
@@ -273,7 +327,7 @@ pub fn admit_spirit(
             }
             Ok(AdmissionDecision {
                 effective_tier,
-                sandbox_tier_floor: SandboxTier::T0,
+                sandbox_tier_floor: form_policy.sandbox_tier_floor(SandboxTier::T0),
                 admit: true,
                 journal_note: format!(
                     "admitted local spirit '{}' v{} (unsigned local allowed)",
@@ -305,7 +359,7 @@ pub fn admit_spirit_with_attestation(
     expected_operator_root: &[u8; 32],
     now_unix_ms: u64,
 ) -> Result<AdmissionDecision, AdmissionError> {
-    frozen_surface_gate(pkg)?;
+    let form_policy = frozen_surface_gate(pkg)?;
 
     let manifest_declared_tier = maos_manifest::parse_manifest_trust_tier(&pkg.manifest_toml)
         .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))?;
@@ -329,7 +383,8 @@ pub fn admit_spirit_with_attestation(
     }
     let attestation = attestation.ok_or(AdmissionError::PublicVettedDeferred)?;
 
-    let sandbox_tier_floor = verify_public_untrusted_baseline(pkg, op_cfg)?;
+    let sandbox_tier_floor =
+        form_policy.sandbox_tier_floor(verify_public_untrusted_baseline(pkg, op_cfg)?);
     let verified = maos_compliance::verify_attestation(
         attestation,
         &pkg.manifest_toml,
@@ -486,52 +541,6 @@ fn strictest_of(
 pub fn extract_manifest_tier(manifest_toml: &[u8]) -> Result<TrustTier, AdmissionError> {
     maos_manifest::parse_manifest_trust_tier(manifest_toml)
         .map_err(|error| AdmissionError::ManifestTrustTierInvalid(error.to_string()))
-}
-
-/// Parse the optional `[fkcs].internal_references` array from a manifest
-/// (Story 11.5 AC3 — the FKCS conformance declaration).
-///
-/// A conformant Spirit either omits the `[fkcs]` section or lists only symbols
-/// on the frozen public ABI/host surface; a negative-control / non-conformant
-/// package lists `pub(crate)`-style internals here. Returns the declared
-/// off-surface references in declaration order. Empty when the `[fkcs]` section
-/// or the `internal_references` key is absent (or the array is empty) —
-/// backward compatible with pre-11.5 manifests, which carry no `[fkcs]` section
-/// and therefore admit.
-fn extract_fkcs_internal_references(manifest_toml: &[u8]) -> Vec<String> {
-    let text = String::from_utf8_lossy(manifest_toml);
-    let mut in_fkcs_table = false;
-    for line in text.lines() {
-        let trimmed = line.trim();
-        // A TOML table header toggles which section subsequent keys belong to.
-        if trimmed.starts_with('[') {
-            in_fkcs_table = trimmed == "[fkcs]";
-            continue;
-        }
-        if !in_fkcs_table {
-            continue;
-        }
-        if let Some(eq) = trimmed.find('=') {
-            if trimmed[..eq].trim() == "internal_references" {
-                return parse_manifest_string_array(trimmed[eq + 1..].trim());
-            }
-        }
-    }
-    Vec::new()
-}
-
-/// Parse a single-line TOML inline string array (`["a", "b"]`) into owned
-/// strings, tolerating surrounding whitespace and quotes. Line-based: a
-/// multi-line array or a dotted `fkcs.internal_references` key is not seen
-/// (owned by Story 17-3b, which replaces this with a structural read).
-fn parse_manifest_string_array(s: &str) -> Vec<String> {
-    let s = s.trim();
-    let s = s.strip_prefix('[').unwrap_or(s);
-    let s = s.strip_suffix(']').unwrap_or(s);
-    s.split(',')
-        .map(|part| part.trim().trim_matches('"').to_string())
-        .filter(|part| !part.is_empty())
-        .collect()
 }
 
 /// Verify the publisher's Ed25519 signature over `sha256(manifest_len_u64 || manifest_toml || artifact_len_u64 || artifact_bytes)`.

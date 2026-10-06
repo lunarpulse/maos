@@ -1,0 +1,23 @@
+# Story 17-3b T10 CI run 1 — throwaway branch t10-17-3b @ 48df282a
+# run 36594477563 — https://github.com/lunarpulse/maos/actions/runs/36594477563
+# fetched unauthenticated 2026-09-29T16:19:19Z: GET /repos/lunarpulse/maos/actions/runs/<run>/jobs and /check-runs/<job>/annotations
+# Reading: the scaffold step RED (rc=127) — npm 11 (Node 24's bundled npm) refused the npm-9-generated package-lock (npm ci EUSAGE: lock missing cross-platform optional deps), so vitest/jco/componentize-js were not found. Diagnosed locally (npm 11.20.0 clean cache): regenerating the lock under npm 11 then exposed componentize-js 0.23.0 importing the UNDECLARED @bytecodealliance/preview2-shim at runtime (ERR_MODULE_NOT_FOUND; npm 11 marks the jco-std peer copy extraneous). Fix: explicit devDependency @bytecodealliance/preview2-shim 0.25.0 (the version the 17-3a spike ran with) + lock regenerated under npm 11. Both planted reds (Node 20; no --disable http) and both admission builds were already green in this run.
+
+== job 109495727467
+  [notice] AC1 plant no-disable-http :: componentize rc=1; driver rc=101 (RED as required); thread 'typescript_component_round_trips_a_fully_populated_frame' (22757) panicked at crates/maos-wasm-host/tests/ts_component_17_3b.rs:147:5:
+  [notice] wasm-host WASM admission :: rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.05s
+  [notice] Default WASM admission :: rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.41s
+  [notice] maosctl build :: rc=0
+  [failure]  :: Process completed with exit code 101.
+  [failure] TypeScript component driver :: rc=101
+  [notice] Release WASM runner build :: rc=0
+  [failure]  :: Process completed with exit code 1.
+  [failure] TypeScript component artifact :: missing or empty examples/example-spirit-ts/dist/spirit.wasm
+  [failure]  :: Process completed with exit code 127.
+  [failure] TypeScript scaffold :: rc=127
+  [notice] AC1(a) templates-regen --check :: rc=0 "passed": true
+  [notice]  :: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+
+== job 109495727898
+  [notice] AC1 plant node20 :: v20.20.2 build/componentize rc=1 (RED as required); npm warn EBADENGINE Unsupported engine { npm warn EBADENGINE   package: '@local/example-spirit-ts@0.1.0',
+  [notice]  :: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"

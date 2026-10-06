@@ -1,0 +1,37 @@
+{
+  "captured_at": "2026-10-01",
+  "baseline": "4f677bc1",
+  "parent_sha": "5075443c8a87523581cfcf6cb0b6af815f7ebd4f",
+  "patch_snapshot_sha": "c544b66ee206122a0de001f88c7be95a03017873",
+  "patch_snapshot_tree": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+  "ci_sha": "4c1b561d9fcb4f973ec2194220397d79593e36af",
+  "ci_tree": "646d7a98682767c7e7188998e5f09bbf226bbbe9",
+  "branch": "ci-17-3b-post-review-c544b66ee206",
+  "run_id": 36860382516,
+  "run_url": "https://github.com/lunarpulse/maos/actions/runs/36860382516",
+  "harness_delta": [
+    ".github/workflows/17-3b-post-review-evidence.yml"
+  ],
+  "shipped_job": "example-spirit-ts-tests",
+  "harness_changes": [
+    "Drop unrelated needs dependencies; preserve all 12 original shipped steps byte-for-byte as parsed mappings",
+    "Add template/kernel/fixture provenance annotations",
+    "Observe actual maos run refusal codes in isolated homes in both builds",
+    "Upload raw logs"
+  ],
+  "main_branch_modified": false,
+  "snapshot_includes": "Entire staged tree; no excluded story changes",
+  "conclusion": "success",
+  "check_run_id": 110362853040,
+  "cleanup": "Owned remote rehearsal branch deleted; detached worktree and collector removed after evidence capture. Main/index unchanged.",
+  "raw_logs": "Uploaded artifact 11162660560; anonymous ZIP download HTTP 401. Public API/annotations archived locally.",
+  "governance_verification": {
+    "check-exit-commands": "PASS; 5 epics, 5 blocks, 16 tokens resolved, 3 separately owed",
+    "check-dev-record-completeness": "PASSED; 162 done-status stories checked"
+  },
+  "not_proven": [
+    "Full discipline workflow/aggregate success",
+    "Kernel authorization verdict equality",
+    "Production WASM launch or containment"
+  ]
+}

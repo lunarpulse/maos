@@ -228,6 +228,12 @@ pub struct ClassSection {
     pub forms: Vec<String>,
     pub trust_tier: String,
     pub description: String,
+    /// Story 17-3b (ADR-060 cl. 2) — the component path of a `wasm-component`
+    /// Spirit, relative to the manifest's directory. Required with
+    /// `forms = ["wasm-component"]`, forbidden with every other form. Resolved
+    /// and opened by the launch (`17-3c-wasm-spirit-on-the-bus-under-t2`),
+    /// never by the parser.
+    pub artifact: Option<String>,
 }
 
 impl ClassSection {
@@ -237,6 +243,83 @@ impl ClassSection {
         raw.validate()
     }
 }
+
+/// Story 17-3b (D-17-3b-J(a)/(g)) — one structural TOML parse of a whole
+/// manifest document, serving the registry's frozen-surface (`[fkcs]`) and
+/// form (`[class]`) reads. Structural, never line-based: a multi-line array, a
+/// header comment and a dotted key (`fkcs.internal_references = [...]`,
+/// `class.forms = [...]`) all land in the same table.
+#[derive(Debug, Clone)]
+pub struct ManifestDocument {
+    root: toml::Table,
+}
+
+impl ManifestDocument {
+    /// Parse a manifest document. Non-UTF-8 or non-TOML bytes are
+    /// `ManifestError::Toml`.
+    pub fn parse(manifest_toml: &[u8]) -> Result<Self, ManifestError> {
+        let text = std::str::from_utf8(manifest_toml)
+            .map_err(|error| ManifestError::Toml(format!("manifest is not UTF-8: {error}")))?;
+        let root: toml::Table =
+            toml::from_str(text).map_err(|error| ManifestError::Toml(error.to_string()))?;
+        Ok(Self { root })
+    }
+
+    /// The `[class]` table, validated. `Ok(None)` iff absent.
+    pub fn class_section(&self) -> Result<Option<ClassSection>, ManifestError> {
+        let Some(value) = self.root.get("class") else {
+            return Ok(None);
+        };
+        if !value.is_table() {
+            return Err(ManifestError::Toml(validation_msg(
+                "class",
+                "must be a table",
+            )));
+        }
+        let body = toml::to_string(value).map_err(|e| ManifestError::Toml(e.to_string()))?;
+        ClassSection::from_toml_str(&body).map(Some)
+    }
+
+    /// The declared `[fkcs].internal_references` (Story 11.5 AC3), in
+    /// declaration order. Empty when `[fkcs]` or the key is absent. Fail-closed:
+    /// a non-table `fkcs` or a non-array / non-string entry is an error, never
+    /// an empty (admitting) result.
+    pub fn fkcs_internal_references(&self) -> Result<Vec<String>, ManifestError> {
+        let Some(fkcs) = self.root.get("fkcs") else {
+            return Ok(Vec::new());
+        };
+        let fkcs = fkcs
+            .as_table()
+            .ok_or_else(|| ManifestError::Toml(validation_msg("fkcs", "must be a table")))?;
+        let Some(refs) = fkcs.get("internal_references") else {
+            return Ok(Vec::new());
+        };
+        let refs = refs.as_array().ok_or_else(|| {
+            ManifestError::Toml(validation_msg(
+                "fkcs.internal_references",
+                "must be an array of strings",
+            ))
+        })?;
+        refs.iter()
+            .map(|entry| {
+                entry.as_str().map(str::to_owned).ok_or_else(|| {
+                    ManifestError::Toml(validation_msg(
+                        "fkcs.internal_references",
+                        "must be an array of strings",
+                    ))
+                })
+            })
+            .collect()
+    }
+}
+
+/// Story 17-3b (D-17-3b-G) — the first manifest schema that can declare
+/// `forms = ["wasm-component"]` and `[class].artifact`. A named const because
+/// `check-manifest-schema-version` forbids literal schema compares.
+const WASM_COMPONENT_SINCE_SCHEMA: u32 = 5;
+
+/// Story 17-3b (D-17-3b-G) — upper bound on `[class].artifact`'s byte length.
+const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 
 /// Schema sections added AFTER `manifest_schema_version = 1` (Epic 6 §A4 bump,
 /// retro 2026-05-28): `[[cli_wrapper]]`, `[[schedule]]`, `[gateway]`; and the
@@ -297,6 +380,8 @@ struct RawClassSection {
     forms: Vec<String>,
     trust_tier: String,
     description: String,
+    #[serde(default)]
+    artifact: Option<String>,
 }
 
 impl RawClassSection {
@@ -382,7 +467,8 @@ impl RawClassSection {
                 )));
             }
         }
-        // forms: non-empty + every value ∈ {rust-inproc, subprocess}.
+        // forms: non-empty + every value ∈ {rust-inproc, subprocess,
+        // wasm-component} (Story 17-3b, ADR-060 cl. 2). `wasm` stays refused.
         if self.forms.is_empty() {
             return Err(ManifestError::Toml(validation_msg(
                 "class.forms",
@@ -390,12 +476,44 @@ impl RawClassSection {
             )));
         }
         for f in &self.forms {
-            if !matches!(f.as_str(), "rust-inproc" | "subprocess") {
+            if !matches!(f.as_str(), "rust-inproc" | "subprocess" | "wasm-component") {
                 return Err(ManifestError::Toml(validation_msg(
                     "class.forms",
                     &format!("unknown form: {f}"),
                 )));
             }
+        }
+        let wasm_component = self.forms.iter().any(|f| f == "wasm-component");
+        if wasm_component && self.forms.len() != 1 {
+            return Err(ManifestError::Toml(validation_msg(
+                "class.forms",
+                "wasm-component must be the only form",
+            )));
+        }
+        if wasm_component && self.manifest_schema_version < WASM_COMPONENT_SINCE_SCHEMA {
+            return Err(ManifestError::Toml(validation_msg(
+                "class.forms",
+                &format!(
+                    "wasm-component requires manifest_schema_version >= {WASM_COMPONENT_SINCE_SCHEMA}, got {}",
+                    self.manifest_schema_version
+                ),
+            )));
+        }
+        match (&self.artifact, wasm_component) {
+            (None, true) => {
+                return Err(ManifestError::Toml(validation_msg(
+                    "class.artifact",
+                    "required with forms = [\"wasm-component\"]",
+                )));
+            }
+            (Some(_), false) => {
+                return Err(ManifestError::Toml(validation_msg(
+                    "class.artifact",
+                    "only a wasm-component Spirit declares an artifact",
+                )));
+            }
+            (Some(artifact), true) => validate_artifact_path(artifact)?,
+            (None, false) => {}
         }
         // trust_tier ∈ {local, org-internal, public-untrusted, public-vetted}.
         // Story 13.4 (FR37 / ADR-056): `public-vetted` is accepted as a declared
@@ -433,8 +551,44 @@ impl RawClassSection {
             forms: self.forms,
             trust_tier: self.trust_tier,
             description: self.description,
+            artifact: self.artifact,
         })
     }
+}
+
+/// Story 17-3b (D-17-3b-G) — `[class].artifact` is a non-empty, relative,
+/// `..`-free path ending in `.wasm`, at most [`ARTIFACT_PATH_MAX_BYTES`]. Both
+/// `/` and `\` separate segments so no platform reading of the path escapes
+/// the manifest's directory.
+fn validate_artifact_path(artifact: &str) -> Result<(), ManifestError> {
+    let refuse = |reason: &str| {
+        Err(ManifestError::Toml(validation_msg(
+            "class.artifact",
+            reason,
+        )))
+    };
+    if artifact.is_empty() {
+        return refuse("empty");
+    }
+    if artifact.len() > ARTIFACT_PATH_MAX_BYTES {
+        return refuse(&format!(
+            "len {} > {ARTIFACT_PATH_MAX_BYTES}",
+            artifact.len()
+        ));
+    }
+    if artifact.contains('\0') {
+        return refuse("contains NUL");
+    }
+    if artifact.starts_with(['/', '\\']) || artifact.contains(':') {
+        return refuse(&format!("must be relative to the manifest: {artifact}"));
+    }
+    if artifact.split(['/', '\\']).any(|segment| segment == "..") {
+        return refuse(&format!("must not contain a '..' segment: {artifact}"));
+    }
+    if !artifact.ends_with(".wasm") {
+        return refuse(&format!("must end in .wasm: {artifact}"));
+    }
+    Ok(())
 }
 
 // ------------------------------------------------------------------
@@ -2576,12 +2730,12 @@ description = "MAOS reference Spirit"
     fn class_section_rejects_above_max_schema_version() {
         // Anything beyond MAX_SUPPORTED is hard-rejected — the kernel does not
         // gamble on future schemas it has not been compiled against.
-        // (Story 13.5d bumped MAX_SUPPORTED 3→4, so the above-max probe is 5.)
+        // Story 17-3b bumped MAX_SUPPORTED 4→5, so the above-max probe is 6.
         let s =
-            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 5");
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 6");
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(
-            matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.manifest_schema_version"))
+            matches!(&err, ManifestError::Toml(msg) if msg.contains("class.manifest_schema_version"))
         );
     }
 
@@ -2590,6 +2744,80 @@ description = "MAOS reference Spirit"
         let s = class_toml_full().replace(r#"["rust-inproc"]"#, r#"["wasm"]"#);
         let err = ClassSection::from_toml_str(&s).unwrap_err();
         assert!(matches!(err, ManifestError::Toml(ref msg) if msg.contains("class.forms")));
+    }
+
+    fn wasm_component_toml(artifact: &str) -> String {
+        class_toml_full()
+            .replace("manifest_schema_version = 1", "manifest_schema_version = 5")
+            .replace(r#"["rust-inproc"]"#, r#"["wasm-component"]"#)
+            + &format!("artifact = {artifact:?}\n")
+    }
+
+    #[test]
+    fn class_section_accepts_wasm_component_with_artifact_at_schema_v5() {
+        let class = ClassSection::from_toml_str(&wasm_component_toml("dist/spirit.wasm")).unwrap();
+        assert_eq!(class.forms, ["wasm-component"]);
+        assert_eq!(class.artifact.as_deref(), Some("dist/spirit.wasm"));
+    }
+
+    #[test]
+    fn class_section_rejects_wasm_component_without_artifact() {
+        let manifest = class_toml_full()
+            .replace("manifest_schema_version = 1", "manifest_schema_version = 5")
+            .replace(r#"["rust-inproc"]"#, r#"["wasm-component"]"#);
+        let err = ClassSection::from_toml_str(&manifest).unwrap_err();
+        assert!(matches!(&err, ManifestError::Toml(msg) if msg.contains("class.artifact")));
+    }
+
+    #[test]
+    fn class_section_rejects_unsafe_wasm_component_artifacts() {
+        let overlong = format!("{}.wasm", "a".repeat(4092));
+        for artifact in [
+            "/absolute.wasm",
+            "../escape.wasm",
+            "component.txt",
+            &overlong,
+        ] {
+            let err = ClassSection::from_toml_str(&wasm_component_toml(artifact)).unwrap_err();
+            assert!(
+                matches!(&err, ManifestError::Toml(msg) if msg.contains("class.artifact")),
+                "{artifact:?} must be rejected as a component artifact"
+            );
+        }
+    }
+
+    #[test]
+    fn class_section_rejects_wasm_component_with_another_form() {
+        let manifest = wasm_component_toml("dist/spirit.wasm").replace(
+            r#"["wasm-component"]"#,
+            r#"["wasm-component", "rust-inproc"]"#,
+        );
+        let err = ClassSection::from_toml_str(&manifest).unwrap_err();
+        assert!(matches!(&err, ManifestError::Toml(msg) if msg.contains("class.forms")));
+    }
+
+    #[test]
+    fn class_section_rejects_wasm_component_before_schema_v5() {
+        let manifest = wasm_component_toml("dist/spirit.wasm")
+            .replace("manifest_schema_version = 5", "manifest_schema_version = 4");
+        let err = ClassSection::from_toml_str(&manifest).unwrap_err();
+        assert!(matches!(&err, ManifestError::Toml(msg) if msg.contains("class.forms")));
+    }
+
+    #[test]
+    fn class_section_rejects_artifact_for_rust_inproc() {
+        let manifest = class_toml_full() + "artifact = \"dist/spirit.wasm\"\n";
+        let err = ClassSection::from_toml_str(&manifest).unwrap_err();
+        assert!(matches!(&err, ManifestError::Toml(msg) if msg.contains("class.artifact")));
+    }
+
+    #[test]
+    fn class_section_still_accepts_v4_rust_inproc_manifest() {
+        let manifest =
+            class_toml_full().replace("manifest_schema_version = 1", "manifest_schema_version = 4");
+        let class = ClassSection::from_toml_str(&manifest).unwrap();
+        assert_eq!(class.forms, ["rust-inproc"]);
+        assert_eq!(class.manifest_schema_version, 4);
     }
 
     #[test]

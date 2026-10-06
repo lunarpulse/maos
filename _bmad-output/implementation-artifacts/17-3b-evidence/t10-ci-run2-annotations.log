@@ -1,0 +1,39 @@
+# Story 17-3b T10 CI run 2 (FINAL) — throwaway branch t10-17-3b @ 03b280d3 (working tree + preview2-shim pin + npm-11 lock + restored coverage-matrix-nfr-test-3 job)
+# run 36596709149 — https://github.com/lunarpulse/maos/actions/runs/36596709149 (the force-push delivered two push events; both runs recorded)
+# run 36596708376 — https://github.com/lunarpulse/maos/actions/runs/36596708376 (the force-push delivered two push events; both runs recorded)
+# fetched unauthenticated 2026-09-29T16:32:38Z: GET /repos/lunarpulse/maos/actions/runs/<run>/jobs and /check-runs/<job>/annotations
+# discipline.yml produced NO zero-job 'workflow invalid' run for 03b280d3 (run 1's 36594475560 was that failure: aggregate needed the job S had deleted)
+
+== run 36596709149 job 109503375023 node20-plant conclusion=success
+  [notice] AC1 plant node20 :: v20.20.2 build/componentize rc=1 (RED as required); npm warn EBADENGINE Unsupported engine { npm warn EBADENGINE   package: '@local/example-spirit-ts@0.1.0',
+  [notice]  :: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+
+== run 36596709149 job 109503375571 example-spirit-ts-tests conclusion=success
+  [warning]  :: Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  [notice] AC1 plant no-disable-http :: componentize rc=0; driver rc=101 (RED as required); thread 'typescript_component_round_trips_a_fully_populated_frame' (22895) panicked at crates/maos-wasm-host/tests/ts_component_17_3b.rs:182:10:
+  [notice] wasm-host WASM admission :: rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.75s
+  [notice] Default WASM admission :: rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
+  [notice] maosctl build :: rc=0
+  [notice] TypeScript component driver :: rc=0 TS-COMPONENT-OUTCOME component=/home/runner/work/maos/maos/examples/example-spirit-ts/dist/spirit.wasm exit=0 canonical_cbor_bytes=1506
+  [notice] Release WASM runner build :: rc=0
+  [notice] TypeScript component artifact :: bytes=12391351 sha256=26d5150e4931afbaf8489418f656bac85eee95749809f2f47a262adeb2f0c069
+  [notice] TypeScript scaffold :: rc=0 
+  [notice] AC1(a) templates-regen --check :: rc=0 "passed": true
+  [notice]  :: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+
+== run 36596708376 job 109503372190 example-spirit-ts-tests conclusion=success
+  [warning]  :: Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  [notice] AC1 plant no-disable-http :: componentize rc=0; driver rc=101 (RED as required); thread 'typescript_component_round_trips_a_fully_populated_frame' (23118) panicked at crates/maos-wasm-host/tests/ts_component_17_3b.rs:182:10:
+  [notice] wasm-host WASM admission :: rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+  [notice] Default WASM admission :: rc=0 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+  [notice] maosctl build :: rc=0
+  [notice] TypeScript component driver :: rc=0 TS-COMPONENT-OUTCOME component=/home/runner/work/maos/maos/examples/example-spirit-ts/dist/spirit.wasm exit=0 canonical_cbor_bytes=1506
+  [notice] Release WASM runner build :: rc=0
+  [notice] TypeScript component artifact :: bytes=12391340 sha256=10e599a6ee4e0d179467b8b26d2cae052950a7c27f8354ff4a44a18688af2088
+  [notice] TypeScript scaffold :: rc=0 
+  [notice] AC1(a) templates-regen --check :: rc=0 "passed": true
+  [notice]  :: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+
+== run 36596708376 job 109503372567 node20-plant conclusion=success
+  [notice] AC1 plant node20 :: v20.20.2 build/componentize rc=1 (RED as required); npm warn EBADENGINE Unsupported engine { npm warn EBADENGINE   package: '@local/example-spirit-ts@0.1.0',
+  [notice]  :: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"

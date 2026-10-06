@@ -1,7 +1,7 @@
 //! `equiv-identity-spirit` — WASM fixture for the Story 11.1b cross-form
 //! equivalence gate (IDENTITY mode).
 //!
-//! Crypto-free (D9) identity guest compiled against `maos:spirit@1.0`: it
+//! Crypto-free (D9) identity guest compiled against `maos:spirit@2.0.0`: it
 //! delegates every field transform to [`equiv_fixture_logic`] with
 //! [`FixtureMode::Identity`], so `handle-frame` echoes the inbound frame
 //! unchanged. This is the WASM half of the gate's PASS case — its native twin

@@ -4,9 +4,9 @@ ignore = []
 
 # NOTE: `crate_name` / `project-name` are RESERVED built-ins in cargo-generate >=0.19
 # (fed by `--name`); declaring them as [placeholders] aborts generation on 0.23+.
-# Do not re-add a `crate_name` placeholder here. `{{crate_name}}` below is the built-in.
+# This TypeScript template uses `project-name`; do not re-add a `crate_name`
+# placeholder.
 [placeholders]
-class_name = { type = "string", prompt = "Spirit class name (PascalCase, e.g., 'MySpirit')", regex = "^[A-Z][a-zA-Z0-9]+$" }
 # No `package_name` placeholder: cargo-generate >=0.23 does NOT interpolate `default` values,
 # so a templated default renders the literal `{{...}}` into package.json (an invalid npm name).
 # package.json instead interpolates the built-in `project-name` directly (`@local/<name>`).
@@ -14,5 +14,5 @@ class_name = { type = "string", prompt = "Spirit class name (PascalCase, e.g., '
 [template.scripts]
 post-generate = '''
 print("✅ TypeScript Spirit scaffolded successfully!");
-print("   Next: cd {{crate_name}} && npm ci && npm test");
+print("   Next: cd {{project-name}} && npm install && npm test && npm run build && npm run componentize");
 '''

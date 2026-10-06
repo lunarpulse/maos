@@ -13,29 +13,30 @@ MAOS는 Spirit manifest 포맷의 브레이킹 체인지를 추적하기 위해 
 
 | 상수 | 값 |
 |---|---|
-| `MANIFEST_SCHEMA_VERSION` (현재) | `3` |
+| `MANIFEST_SCHEMA_VERSION` (현재) | `5` |
 | `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `1` |
-| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `3` |
+| `MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION` | `5` |
 
-지원 윈도우는 `1..=3`입니다. `MIN_SUPPORTED` 미만의 manifest는 `SecurityError::EAbiTooOld`로, `MAX_SUPPORTED` 초과는 `SecurityError::EAbiTooNew`로 거부됩니다.
+지원 윈도우는 `1..=5`입니다. `MIN_SUPPORTED` 미만의 manifest는 `SecurityError::EAbiTooOld`로, `MAX_SUPPORTED` 초과는 `SecurityError::EAbiTooNew`로 거부됩니다.
 
 ## 마이그레이션 경로
 
-| 시작 | 도착 | 가이드 | v3에서의 kernel 동작 |
+| 시작 | 도착 | 가이드 | v5에서의 kernel 동작 |
 |---|---|---|---|
-| v1 | v2 | [v1 → v2](./v1-to-v2) | ✅ 로드(N-1 윈도우 내) |
-| v2 | v3 | [v2 → v3](./v2-to-v3) | ✅ 현재 버전 |
-| v1 | v3 | [v1 → v2](./v1-to-v2) 후 [v2 → v3](./v2-to-v3) 적용 | ✅ 로드(지원 윈도우 내) |
+| v1 | v2 | [v1 → v2](./v1-to-v2) | ✅ 로드(지원 윈도우 내) |
+| v2 | v3 | [v2 → v3](./v2-to-v3) | ✅ 로드(지원 윈도우 내) |
+| v3 | v4 | [v3 → v4](./v3-to-v4) | ✅ 로드(지원 윈도우 내) |
+| v4 | v5 | [v4 → v5](./v4-to-v5) | ✅ 현재 버전 |
 
 ## 호환성 정책
 
-MAOS는 **N-1 지원 / N-2 거부** 정책을 따릅니다:
+MAOS는 manifest 스키마 경계로 구성된 포괄 범위를 어드미션합니다:
 
-- **N** (현재): 전체 지원, `deny_unknown_fields`로 엄격한 로드.
-- **N-1**: 생략된 섹션에 대해 WARN 수준 저하 노트와 함께 지원.
-- **N-2 이하**: 어드미션 시점에 거부(`SecurityError::EAbiTooOld`).
+- `MIN_SUPPORTED_MANIFEST_SCHEMA_VERSION..=MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION`은 현재 `1..=5`입니다.
+- 최솟값 미만 manifest는 어드미션 시점에 `SecurityError::EAbiTooOld`로 거부됩니다.
+- 최댓값 초과 manifest는 어드미션 시점에 `SecurityError::EAbiTooNew`로 거부됩니다.
 
-kernel이 스키마 버전 4로 올라가면 버전 1 manifest가 N-2 경계에 도달하여 거부됩니다. 미리 마이그레이션하세요.
+향후 kernel은 두 경계 중 하나를 변경할 수 있습니다. 대상 kernel의 지원 범위에 manifest 버전이 더 이상 포함되지 않기 전에 마이그레이션하세요.
 
 전체 안정성 정책은 [ABI Stability](./abi-stability)를 참조하세요.
 

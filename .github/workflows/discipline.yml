@@ -1085,17 +1085,116 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build TS SDK
-        run: cd sdks/spirit-ts && npm ci && npm run build
-      - name: Run example-spirit-ts tests
-        run: cd examples/example-spirit-ts && npm ci && npm test --silent
+      - name: Build, test, and componentize the TypeScript scaffold (Story 17-3b AC1)
+        shell: bash
+        run: |
+          set +e
+          (
+            cd examples/example-spirit-ts
+            npm ci &&
+              npm test &&
+              npm run build &&
+              npm run componentize
+          ) 2>&1 | tee example-spirit-ts.log
+          rc=${PIPESTATUS[0]}
+          vitest_verdict="$(
+            sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g' example-spirit-ts.log |
+              tr -d '\r' |
+              grep -E '^[[:space:]]*Tests[[:space:]]+' |
+              paste -sd';' -
+          )"
+          if [ "$rc" -eq 0 ] && [ -z "$vitest_verdict" ]; then
+            echo "::error title=TypeScript scaffold::rc=0 vitest=not reported"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=TypeScript scaffold::rc=0 vitest=$vitest_verdict"
+          else
+            echo "::error title=TypeScript scaffold::rc=$rc vitest=${vitest_verdict:-not run}"
+          fi
+          exit "$rc"
+      - name: Record TypeScript component outcome
+        shell: bash
+        run: |
+          component=examples/example-spirit-ts/dist/spirit.wasm
+          if [ ! -s "$component" ]; then
+            echo "::error title=TypeScript component artifact::missing or empty $component"
+            exit 1
+          fi
+          echo "::notice title=TypeScript component artifact::bytes=$(stat -c%s "$component") sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+      - name: Upload TypeScript component
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-spirit-ts-component
+          path: examples/example-spirit-ts/dist/spirit.wasm
+          if-no-files-found: error
+      - name: Build the release WASM runner
+        shell: bash
+        run: |
+          set +e
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner 2>&1 | tee runner-build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Release WASM runner build::rc=0"
+          else
+            echo "::error title=Release WASM runner build::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Drive the TypeScript component through the release runner
+        shell: bash
+        run: |
+          set +e
+          MAOS_TS_COMPONENT=$PWD/examples/example-spirit-ts/dist/spirit.wasm cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture 2>&1 | tee ts-component-driver.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=TypeScript component driver::rc=0 $(grep 'TS-COMPONENT-OUTCOME' ts-component-driver.log | paste -sd';' -)"
+          else
+            echo "::error title=TypeScript component driver::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Build maosctl for the admission door test
+        shell: bash
+        run: |
+          set +e
+          cargo build --locked -p maos-cli --bin maosctl 2>&1 | tee maosctl-build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=maosctl build::rc=0"
+          else
+            echo "::error title=maosctl build::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Assert default-build WASM admission refusal
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-bin --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-default.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Default WASM admission::rc=0 $(grep -E 'wasm_engine_off|test result' wasm-admission-default.log | paste -sd';' -)"
+          else
+            echo "::error title=Default WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Assert wasm-host-build WASM admission refusal
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=wasm-host WASM admission::rc=0 $(grep -E 'wasm_launch_not_built|test result' wasm-admission-wasm-host.log | paste -sd';' -)"
+          else
+            echo "::error title=wasm-host WASM admission::rc=$rc"
+          fi
+          exit "$rc"
 
   coverage-matrix-nfr-test-3:
     runs-on: ubuntu-latest
@@ -1118,7 +1217,7 @@ jobs:
   # RETIRED 2026-06-12 by Story 8.16 per ADR-043 — `smoke-spirit-author-7-1` was
   # an advisory smoke for the v0.5 spirit-authoring template; it broke on Epic-7
   # template bit-rot (cargo-generate >=0.23 `crate_name` reservation, missing
-  # post-generate.rhai, unpublished @maos/spirit-ts). Spirit-authoring stays
+  # post-generate.rhai, unpublished SDK). SDK retired by 17-3b. Spirit-authoring stays
   # covered by example-spirit-tests / example-spirit-drift / example-spirit-ts-tests
   # / spirit-test-tests. A future template-repair story may re-introduce a fixed
   # authoring smoke. Job removed rather than parked `if: false` (no fake-green).

@@ -1,12 +1,20 @@
-import { describe, it, expect } from "vitest";
-import { SpiritTest, assert } from "@maos/spirit-ts/spirit_test";
-import { ExampleTsSpirit } from "../src/index";
+import { describe, expect, it } from "vitest";
 
-describe("ExampleTsSpirit smoke", () => {
-  it("on_idle fires without error", () => {
-    const spirit = new ExampleTsSpirit();
-    const harness = new SpiritTest(spirit);
-    const report = harness.run();
-    assert(report.hooksFired.get("on_idle") === 1, "on_idle did not fire exactly once");
+import { handleFrame, onShutdown, onStart } from "../src/index.js";
+
+describe("WASM component guest", () => {
+  it("faults before start and echoes the inbound frame after start", () => {
+    const frame = {} as Parameters<typeof handleFrame>[0];
+
+    try {
+      handleFrame(frame);
+      throw new Error("handleFrame should halt before onStart");
+    } catch (thrown) {
+      expect(thrown).toMatchObject({ tag: "fault" });
+    }
+
+    onStart();
+    expect(handleFrame(frame)).toEqual([frame]);
+    onShutdown();
   });
 });

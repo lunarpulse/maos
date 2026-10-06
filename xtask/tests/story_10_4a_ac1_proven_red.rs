@@ -1019,6 +1019,7 @@ allowed_max = "cautious""#,
                 forms: vec!["rust-inproc".into()],
                 trust_tier: "local".into(),
                 description: "Story 13.5d admission witness".into(),
+                artifact: None,
             }),
         )
         .expect("real manifest admission succeeds");

@@ -92,6 +92,7 @@ fn admit_with_provider(
                 forms: vec!["rust-inproc".into()],
                 trust_tier: "local".into(),
                 description: "test".into(),
+                artifact: None,
             }),
         )
         .unwrap();

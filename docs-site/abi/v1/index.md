@@ -8,7 +8,7 @@
 - [Constants](./constants) — `ABI_VERSION` and `MANIFEST_SCHEMA_VERSION` reference
 
 
-*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 4*
+*ABI_VERSION = 1 · MANIFEST_SCHEMA_VERSION = 5*
 
 `maos-spirit-abi` — wire-stable types ONLY (`#![no_std]`).
 
@@ -39,7 +39,7 @@ All additions are ABI-additive per §8.5 rows 7+8. `ABI_VERSION` remains `1`.
 | `compliance` | Story 1b.4 | Frozen schema, ABI_VERSION bump trigger |
 | `gateway` | Story 6.5 | ADR-029 binding-v1.0 |
 | `deprecation` | Story 7.1 | Empty-present deprecation channel |
-| `MANIFEST_SCHEMA_VERSION = 4` | Story 13.5d | `[capabilities.required.loom]` section |
+| `MANIFEST_SCHEMA_VERSION = 5` | Story 17-3b | `wasm-component` form and `[class].artifact` |
 
 ## Modules {#maos-spirit-abi-modules}
 | Module | Description | Introduced |

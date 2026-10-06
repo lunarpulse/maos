@@ -1,0 +1,172 @@
+name: t10-17-3b (throwaway; Story 17-3b T10)
+'on':
+  push:
+    branches:
+    - t10-17-3b
+env:
+  CARGO_TERM_COLOR: never
+jobs:
+  example-spirit-ts-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: AC1(a) — example regenerated from the template (templates-regen --check)
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cargo run --locked -p xtask -- templates-regen --check --json 2>&1 | tee regen.log
+          rc=${PIPESTATUS[0]}
+          echo "::notice title=AC1(a) templates-regen --check::rc=${rc} $(grep -o '"passed": *[a-z]*' regen.log | head -1)"
+          exit "$rc"
+      - name: Build, test, and componentize the TypeScript scaffold (Story 17-3b AC1)
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          (
+            cd examples/example-spirit-ts
+            npm ci
+            npm test
+            npm run build
+            npm run componentize
+          ) 2>&1 | tee example-spirit-ts.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=TypeScript scaffold::rc=0 $(grep '^ ✓' example-spirit-ts.log | paste -sd';' -)"
+          else
+            echo "::error title=TypeScript scaffold::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Record TypeScript component outcome
+        if: always()
+        shell: bash
+        run: |
+          component=examples/example-spirit-ts/dist/spirit.wasm
+          if [ ! -s "$component" ]; then
+            echo "::error title=TypeScript component artifact::missing or empty $component"
+            exit 1
+          fi
+          echo "::notice title=TypeScript component artifact::bytes=$(stat -c%s "$component") sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+      - name: Upload TypeScript component
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-spirit-ts-component
+          path: examples/example-spirit-ts/dist/spirit.wasm
+          if-no-files-found: error
+      - name: Build the release WASM runner
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner 2>&1 | tee runner-build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Release WASM runner build::rc=0"
+          else
+            echo "::error title=Release WASM runner build::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Drive the TypeScript component through the release runner
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          MAOS_TS_COMPONENT=$PWD/examples/example-spirit-ts/dist/spirit.wasm cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture 2>&1 | tee ts-component-driver.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=TypeScript component driver::rc=0 $(grep 'TS-COMPONENT-OUTCOME' ts-component-driver.log | paste -sd';' -)"
+          else
+            echo "::error title=TypeScript component driver::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Build maosctl for the admission door test
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cargo build --locked -p maos-cli --bin maosctl 2>&1 | tee maosctl-build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=maosctl build::rc=0"
+          else
+            echo "::error title=maosctl build::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Assert default-build WASM admission refusal
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-bin --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-default.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Default WASM admission::rc=0 $(grep -E 'wasm_engine_off|test result' wasm-admission-default.log | paste -sd';' -)"
+          else
+            echo "::error title=Default WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+      - name: Assert wasm-host-build WASM admission refusal
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=wasm-host WASM admission::rc=0 $(grep -E 'wasm_launch_not_built|test result' wasm-admission-wasm-host.log | paste -sd';' -)"
+          else
+            echo "::error title=wasm-host WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+      - name: AC1 planted red — componentize WITHOUT `--disable http fetch-event` (expect the driver to RED)
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          cd examples/example-spirit-ts
+          npx componentize-js dist/index.js --wit wit --world-name spirit -o dist/spirit-plant.wasm > ../../plant-http.log 2>&1
+          crc=$?
+          http=$(npx --yes wasm-tools@1 component wit dist/spirit-plant.wasm 2>/dev/null | grep -c 'wasi:http' || true)
+          cd ../..
+          MAOS_TS_COMPONENT=$PWD/examples/example-spirit-ts/dist/spirit-plant.wasm cargo test --locked --release -p maos-wasm-host --test ts_component_17_3b -- --ignored --nocapture >> plant-http.log 2>&1
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "::notice title=AC1 plant no-disable-http::componentize rc=${crc}; driver rc=${rc} (RED as required); $(grep -E 'panicked at|TS-COMPONENT' plant-http.log | head -2 | paste -sd' ' -)"
+          else
+            echo "::error title=AC1 plant no-disable-http::driver rc=0 — PLANT NOT CAUGHT"
+            exit 1
+          fi
+
+  node20-plant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+      - name: AC1 planted red — Node 20 instead of the Node 24 pin (expect componentize to RED)
+        shell: bash
+        run: |
+          set +e
+          cd examples/example-spirit-ts
+          node -v > ../../node20.log
+          (npm ci && npm run build && npm run componentize) >> ../../node20.log 2>&1
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "::notice title=AC1 plant node20::$(head -1 ../../node20.log) build/componentize rc=${rc} (RED as required); $(grep -E 'Cannot find module|EBADENGINE|Error' ../../node20.log | head -2 | paste -sd' ' -)"
+          else
+            echo "::error title=AC1 plant node20::componentize succeeded under Node 20 — PLANT NOT CAUGHT"
+            exit 1
+          fi

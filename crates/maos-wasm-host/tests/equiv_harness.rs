@@ -27,18 +27,14 @@
 //! NOT vacuous: a corpus with enough `spirit_pid` drift drops cosmetic below
 //! 75 % and flips the gate RED while the invariant tier stays 100 %.
 //!
-//! # F3 exclusion (tier-map honesty)
+//! # Frame invariants
 //!
-//! Four domain fields are NOT carried by the `maos:spirit@1.0` WIT projection
-//! and therefore cannot be compared cross-form: `intent`, `consent_envelope`,
-//! `intent_lineage`, and `scope`. They are enumerated in
-//! [`F3_EXCLUDED_FIELDS`] so the set is explicit, grep-able, and guarded by
-//! mutation tests ([`f3_allowlist_is_pinned_to_the_dropped_set`],
-//! [`normalize_ignores_exactly_the_f3_excluded_fields`], and
-//! [`all_invariant_fields_are_guarded_against_demotion`]). Adding an invariant
-//! field to the excluded set would silently turn a real divergence GREEN —
-//! those tests prove that does not happen for every preserved field, not just
-//! `logical_clock`.
+//! `maos:spirit@2.0.0` carries the complete frame projection. `intent`,
+//! `consent_envelope`, `intent_lineage`, and typed task `scope` are all
+//! invariant-tier data: a cross-form divergence in any one is RED.
+//! [`F3_EXCLUDED_FIELDS`] is therefore empty. The behavioral normalizer test
+//! proves that each of those fields survives normalization and cannot be
+//! silently demoted from the oracle.
 //!
 //! # Form-identity reflex (Task 6)
 //!
@@ -69,11 +65,16 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, TaskAssignPayload};
+use maos_domain::frame::{
+    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, TaskAssignPayload,
+};
 use maos_domain::halt::{HaltId, HaltReceipt};
 use maos_domain::invariants::i1::IntentClass;
+use maos_domain::invariants::i13::IntentLineage;
 use maos_domain::invariants::i3::FrameOrigin;
+use maos_domain::invariants::i8::A2AIntent;
 use maos_domain::ports::capability::CapError;
+#[cfg(feature = "equiv-fault-inject")]
 use maos_domain::region::Region;
 use maos_spirit_abi::identity::FrameKind;
 use maos_wasm_host::codec;
@@ -264,36 +265,16 @@ fn content_hash<T: std::fmt::Debug>(value: &T) -> u64 {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// §2  Frame normalization + F3 exclusion allowlist
+// §2  Frame normalization
 // ════════════════════════════════════════════════════════════════════════
 
-/// The four domain fields the `maos:spirit@1.0` WIT projection does NOT
-/// carry, so they cannot participate in a cross-form comparison. Enumerated
-/// as an explicit `const` (not derived/looped) so:
-///
-/// 1. The excluded set is grep-able and reviewable.
-/// 2. [`f3_allowlist_is_pinned_to_the_dropped_set`] pins the exact membership
-///    — editing this `const` flips that test.
-/// 3. [`normalize_ignores_exactly_the_f3_excluded_fields`] proves behaviorally
-///    that `normalize` actually drops exactly these fields, and
-///    [`all_invariant_fields_are_guarded_against_demotion`] proves the
-///    preserved fields are NOT in this set (demoting one would flip RED).
-///
-/// Adding a field to this list requires editing this `const` AND keeping the
-/// mutation tests green; the set and the behavior are coupled by design.
-const F3_EXCLUDED_FIELDS: &[&str] = &["intent", "consent_envelope", "intent_lineage", "scope"];
+/// Fields excluded from the invariant projection. This must remain empty:
+/// `maos:spirit@2.0.0` represents the entire domain frame projection.
+const F3_EXCLUDED_FIELDS: &[&str] = &[];
 
-/// The bridge-PRESERVED projection of an [`IacFrame`], with the per-run
-/// nondeterministic fields (`frame_id`, `timestamp_ns`) zeroed so two
-/// captures of the same logical effect compare equal regardless of when or
-/// how they were emitted.
-///
-/// Only the fields that survive the `maos:spirit@1.0` lower/lift round-trip
-/// are retained (see [`F3_EXCLUDED_FIELDS`]); the `scope` sub-field of a
-/// `TaskAssign` payload is collapsed to the bridge's empty projection for a
-/// fair native-vs-wasm comparison. The F3-excluded fields
-/// (`intent`/`consent_envelope`/`intent_lineage`) are structurally absent
-/// from this struct — there is no field through which they could survive.
+/// A deterministic frame projection with only per-run nondeterministic
+/// `frame_id` and `timestamp_ns` zeroed. Every semantic frame field remains
+/// an invariant.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NormalizedFrame {
     pub frame_id: [u8; 16],
@@ -302,31 +283,16 @@ pub struct NormalizedFrame {
     pub from: FrameAddress,
     pub to: SmallVec<[FrameAddress; 1]>,
     pub kind: FrameKind,
+    pub intent: IntentClass,
     pub payload: FramePayload,
     pub auto_marker: FrameOrigin,
+    pub consent_envelope: Option<ConsentEnvelope>,
+    pub intent_lineage: IntentLineage,
 }
 
-/// Normalize a domain frame for cross-form comparison.
-///
-/// - `frame_id` → `[0u8; 16]` (a fresh random UUID per emission).
-/// - `timestamp_ns` → `0` (wall-clock at emission).
-/// - `scope` (inside a `TaskAssign` payload) → empty `Vec` (F3-excluded:
-///   lossy across the WIT bridge).
-/// - The F3-excluded top-level fields (`intent`, `consent_envelope`,
-///   `intent_lineage`) are structurally dropped — `NormalizedFrame` has no
-///   field for them.
-/// - All other bridge-preserved fields (`logical_clock`, `from`, `to`,
-///   `kind`, `payload` minus `scope`, `auto_marker`) are preserved exactly.
+/// Normalize a domain frame for cross-form comparison by removing only fresh
+/// frame identity and wall-clock timestamps.
 fn normalize(frame: &IacFrame) -> NormalizedFrame {
-    // Collapse the F3-excluded `scope` sub-field to the bridge's projection.
-    let payload = match &frame.payload {
-        FramePayload::TaskAssign(ta) => FramePayload::TaskAssign(TaskAssignPayload {
-            scope: Vec::new(),
-            ..ta.clone()
-        }),
-        other => other.clone(),
-    };
-
     NormalizedFrame {
         frame_id: [0u8; 16],
         timestamp_ns: 0,
@@ -334,8 +300,11 @@ fn normalize(frame: &IacFrame) -> NormalizedFrame {
         from: frame.from.clone(),
         to: frame.to.clone(),
         kind: frame.kind,
-        payload,
+        intent: frame.intent,
+        payload: frame.payload.clone(),
         auto_marker: frame.auto_marker,
+        consent_envelope: frame.consent_envelope.clone(),
+        intent_lineage: frame.intent_lineage.clone(),
     }
 }
 
@@ -715,12 +684,12 @@ fn ensure_native_twin_binary() -> PathBuf {
 /// `variant`. Committed artifacts under `tests/fixtures/wasm/`, never
 /// `target/` (gitignored, profile/triple-dependent, non-canonical).
 ///
-/// Each variant resolves to its DEDICATED component only — there is NO silent
+/// Each variant resolves to its dedicated component only — there is no silent
 /// fallback to `echo_spirit_component.wasm`. The identity/divergent/cosmetic
-/// fixtures are distinct `maos:spirit@1.0` components; the identity test
+/// fixtures are distinct `maos:spirit@2.0.0` components; the identity test
 /// calls [`require_component`] exactly like the divergent/cosmetic tests, so a
-/// missing or semantically-drifting identity fixture fails LOUD (never passes
-/// for the wrong reason over an unrelated echo fixture).
+/// missing or semantically-drifting identity fixture fails loud rather than
+/// passing against an unrelated echo fixture.
 fn component_fixture_path(variant: &str) -> String {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let dir = format!("{manifest_dir}/../../tests/fixtures/wasm");
@@ -938,6 +907,7 @@ fn effect_halt(receipt: &HaltReceipt) -> EffectData {
 /// Build a `CapabilityDenial` effect from a REAL [`CapError`]. The invariant
 /// projection is the denial taxonomy (`error_kind`, derived from the real
 /// `CapError` variant); `spirit_pid` is the cosmetic projection.
+#[cfg(feature = "equiv-fault-inject")]
 fn effect_capability_denial(err: &CapError, spirit_pid: u32) -> EffectData {
     EffectData::CapabilityDenial {
         error_kind: cap_error_kind(err).to_string(),
@@ -965,6 +935,7 @@ fn cap_error_kind(err: &CapError) -> &'static str {
 /// Build a `RegionViolation` effect from REAL [`Region`]s. Both the attempted
 /// and home regions are invariant (region-pin is kernel/operator config,
 /// invariant to form by construction).
+#[cfg(feature = "equiv-fault-inject")]
 fn effect_region_violation(attempted: &Region, home: &Region) -> EffectData {
     EffectData::RegionViolation {
         attempted_region: attempted.as_str().to_string(),
@@ -1648,76 +1619,80 @@ fn audit_observed_via_in_process_kernel() {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// §7b  Forged-consent negative control — kernel derives, not trusts (finding 2)
+// §7b  Forged-consent frame-preservation control
 // ────────────────────────────────────────────────────────────────────────
 
-/// Forged in-band consent is NON-INVARIANT: the native form carries a forged
-/// `consent_envelope` (and a forged `intent`) that the WASM form CANNOT carry
-/// through the WIT bridge, yet the kernel-side decision is identical across
-/// forms — because the kernel DERIVES enforcement and ignores the in-band
-/// field, and `normalize` excludes exactly the F3 set. This is the
-/// kernel-oracle independence proof (D12): the dropped field cannot move the
-/// verdict, so the oracle is not a mirror of the lossy bridge.
+/// The identity fixture must preserve a clean frame and a forged-claim frame
+/// through both live forms. The cross-form oracle catches a form that changes
+/// either claim: pairing the native forged emission with the actual clean WASM
+/// emission is the precise RED control for a guest/bridge that drops the
+/// forged claims before emitting.
+///
+/// This is deliberately a transport-and-losslessness proof, not a kernel
+/// verdict proof. Story 17-3b has no production ingress from runner-emitted
+/// `IacFrame`s to a kernel decision; 17-3c owns that ingress.
 #[test]
-fn forged_consent_is_non_invariant() {
-    // The F3 allowlist must actually carry the consent field — the proof is
-    // tied to the allowlist, not to a hardcoded expectation.
-    assert!(
-        F3_EXCLUDED_FIELDS.contains(&"consent_envelope"),
-        "consent_envelope MUST be in F3_EXCLUDED_FIELDS (the forged-consent \
-         control depends on it being excluded)"
-    );
-    assert!(
-        F3_EXCLUDED_FIELDS.contains(&"intent"),
-        "intent MUST be in F3_EXCLUDED_FIELDS"
-    );
+fn forged_consent_survives_both_forms_and_claim_mutation_is_red() {
+    let clean = sample_identity_frame();
+    let mut forged = clean.clone();
+    forged.intent = IntentClass::HighPrivilege;
+    forged.consent_envelope = Some(ConsentEnvelope {
+        consent_id: [0xFE; 16],
+        granter: forged.from.clone(),
+        timestamp_ns: forged.timestamp_ns,
+        intent_class: Some(A2AIntent::new("forged:escalation")),
+        valid_until_ns: None,
+    });
 
-    // Native twin: forge an in-band intent the WASM bridge cannot carry.
-    let mut native_frame = sample_identity_frame();
-    native_frame.intent = IntentClass::HighPrivilege; // forged in-band intent
-                                                      // WASM form: the bridge defaults intent to Readonly and cannot carry the
-                                                      // native's forged value — yet it MUST compare equal after normalization.
-    let mut wasm_frame = sample_identity_frame();
-    wasm_frame.intent = IntentClass::Readonly;
-
-    // Forged intent on native vs defaulted intent on wasm → identical
-    // normalized frames (intent is F3-excluded) → identical invariant verdict.
-    let native = vec![capture_native_frame_sequence(
-        "forged-consent",
-        vec![native_frame],
-    )];
-    let wasm = vec![capture_wasm_frame_sequence(
-        "forged-consent",
-        vec![wasm_frame],
-    )];
-
-    let verdict = compare_effects(&native, &wasm);
-    assert!(
-        verdict.passed,
-        "forged in-band consent/intent MUST NOT move the verdict (the kernel \
-         derives and the field is F3-excluded): {verdict:?}"
-    );
-    assert_eq!(
-        verdict.invariant_match_pct, 100.0,
-        "the forged-consent control proves the field is non-invariant — \
-         invariant tier stays 100%"
+    assert_ne!(
+        normalize(&clean),
+        normalize(&forged),
+        "intent and consent claims remain frame invariants in the equivalence oracle"
     );
 
-    // Control-of-the-control: a REAL invariant divergence (logical_clock)
-    // still flips RED, proving the oracle is not blind — it just correctly
-    // ignores the non-invariant consent/intent field.
-    let mut divergent_frame = sample_identity_frame();
-    divergent_frame.intent = IntentClass::HighPrivilege;
-    divergent_frame.logical_clock = sample_identity_frame().logical_clock + 1;
-    let wasm_div = vec![capture_wasm_frame_sequence(
-        "forged-consent",
-        vec![divergent_frame],
-    )];
-    let red = compare_effects(&native, &wasm_div);
+    let component = component_fixture_path("identity");
+    require_component(&component);
+
+    let native_clean =
+        run_native_twin_capturing("forged-consent-clean", "identity", &[clean.clone()]);
+    let wasm_clean = run_wasm_form_capturing("forged-consent-clean", &component, &[clean.clone()]);
+    let native_forged =
+        run_native_twin_capturing("forged-consent-forged", "identity", &[forged.clone()]);
+    let wasm_forged =
+        run_wasm_form_capturing("forged-consent-forged", &component, &[forged.clone()]);
+
+    for (form, emitted, input) in [
+        ("native clean", &native_clean, &clean),
+        ("wasm clean", &wasm_clean, &clean),
+        ("native forged", &native_forged, &forged),
+        ("wasm forged", &wasm_forged, &forged),
+    ] {
+        assert_eq!(
+            &emitted.data,
+            &effect_frame_sequence(vec![input.clone()]),
+            "{form} form must preserve every consent claim it received"
+        );
+    }
+
+    for (scenario, native, wasm) in [
+        ("clean", &native_clean, &wasm_clean),
+        ("forged", &native_forged, &wasm_forged),
+    ] {
+        let verdict = compare_effects(std::slice::from_ref(native), std::slice::from_ref(wasm));
+        assert!(
+            verdict.passed && verdict.invariant_match_pct == 100.0,
+            "{scenario} frame must remain GREEN across live forms: {verdict:?}"
+        );
+    }
+
+    let dropped_claim = compare_effects(
+        std::slice::from_ref(&native_forged),
+        std::slice::from_ref(&wasm_clean),
+    );
     assert!(
-        !red.passed && red.invariant_match_pct < 100.0,
-        "a real invariant divergence MUST still be RED even with forged \
-         consent present: {red:?}"
+        !dropped_claim.passed && dropped_claim.invariant_match_pct < 100.0,
+        "a form that emits clean claims for forged input must turn the oracle RED: \
+         {dropped_claim:?}"
     );
 }
 
@@ -1738,7 +1713,7 @@ fn cosmetic_threshold_bites_through_invariant_green() {
     let mut wasm = Vec::new();
     for i in 0..4u32 {
         let r = HaltReceipt::new(
-            HaltId::new(&format!("halt-{i}")).unwrap(),
+            HaltId::new(format!("halt-{i}")).unwrap(),
             receipt.timestamp_ns,
             100,
             receipt.boot_nonce,
@@ -1748,7 +1723,7 @@ fn cosmetic_threshold_bites_through_invariant_green() {
         // Drift spirit_pid on half the effects (cosmetic divergence).
         let drifted_pid = if i >= 2 { 777 } else { 100 };
         let r_wasm = HaltReceipt::new(
-            HaltId::new(&format!("halt-{i}")).unwrap(),
+            HaltId::new(format!("halt-{i}")).unwrap(),
             receipt.timestamp_ns,
             drifted_pid,
             receipt.boot_nonce,
@@ -1845,57 +1820,55 @@ fn duplicate_key_pairing_is_robust() {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// §7e  F3 tier-map honesty — allowlist pinned + behaviorally matched (finding 10)
+// §7e  F3 tier-map honesty — complete frame projection
 // ────────────────────────────────────────────────────────────────────────
 
-/// The F3 excluded set is pinned to exactly the four fields the WIT bridge
-/// drops. Editing [`F3_EXCLUDED_FIELDS`] flips this test — the set is
-/// grep-able and mutation-guarded.
+/// Frames differing only in one formerly excluded field must normalize
+/// differently. This is behavioral: the values must survive into the
+/// comparison projection, and no F3 exception remains.
 #[test]
-fn f3_allowlist_is_pinned_to_the_dropped_set() {
-    assert_eq!(
-        F3_EXCLUDED_FIELDS,
-        &["intent", "consent_envelope", "intent_lineage", "scope"],
-        "F3_EXCLUDED_FIELDS is the enumerated contract — editing it MUST be \
-         a deliberate act that updates this assertion"
+fn normalize_preserves_every_former_f3_field() {
+    assert!(
+        F3_EXCLUDED_FIELDS.is_empty(),
+        "the complete @2.0.0 frame projection has no excluded invariant fields"
     );
-}
 
-/// `normalize` behaviorally drops EXACTLY the F3-excluded fields: frames
-/// differing ONLY in an excluded field normalize equal, while frames
-/// differing in a PRESERVED field normalize different. This ties the
-/// allowlist const to actual normalization behavior.
-#[test]
-fn normalize_ignores_exactly_the_f3_excluded_fields() {
-    // Excluded `intent`: two distinct values → same normalized frame.
-    let mut a = sample_identity_frame();
-    a.intent = IntentClass::Standard;
-    let mut b = sample_identity_frame();
-    b.intent = IntentClass::Readonly;
-    assert_eq!(normalize(&a), normalize(&b), "intent is F3-excluded");
+    let base = sample_identity_frame();
 
-    // Excluded `scope` (TaskAssign sub-field): non-empty vs empty → same.
-    let mut c = sample_identity_frame();
-    if let FramePayload::TaskAssign(ta) = &mut c.payload {
-        ta.scope.push(maos_domain::invariants::i1::Scope::FsRead {
-            subtree: "/tmp".to_string(),
-        });
-    }
-    let d = sample_identity_frame();
-    assert_eq!(normalize(&c), normalize(&d), "scope is F3-excluded");
-    // ...and the scope really is zeroed, not merely equal-by-luck.
-    if let FramePayload::TaskAssign(ta) = &normalize(&c).payload {
-        assert!(ta.scope.is_empty(), "normalize must zero the scope");
-    }
+    let mut intent = base.clone();
+    intent.intent = IntentClass::Readonly;
+    assert_ne!(normalize(&base), normalize(&intent), "intent is invariant");
 
-    // Preserved `logical_clock`: a difference survives normalization.
-    let mut e = sample_identity_frame();
-    e.logical_clock += 1;
+    let mut consent = base.clone();
+    consent.consent_envelope = Some(ConsentEnvelope {
+        consent_id: [0xC0; 16],
+        granter: consent.from.clone(),
+        timestamp_ns: consent.timestamp_ns,
+        intent_class: Some(A2AIntent::new("review:consent")),
+        valid_until_ns: Some(consent.timestamp_ns + 1),
+    });
     assert_ne!(
-        normalize(&sample_identity_frame()),
-        normalize(&e),
-        "logical_clock is preserved — its divergence MUST survive normalize"
+        normalize(&base),
+        normalize(&consent),
+        "consent_envelope is invariant"
     );
+
+    let mut lineage = base.clone();
+    lineage.intent_lineage = IntentLineage::new(vec![A2AIntent::new("review:lineage")]);
+    assert_ne!(
+        normalize(&base),
+        normalize(&lineage),
+        "intent_lineage is invariant"
+    );
+
+    let mut scope = base.clone();
+    let FramePayload::TaskAssign(task) = &mut scope.payload else {
+        panic!("identity frame must carry TaskAssign");
+    };
+    task.scope.push(maos_domain::invariants::i1::Scope::FsRead {
+        subtree: "/tmp".into(),
+    });
+    assert_ne!(normalize(&base), normalize(&scope), "scope is invariant");
 }
 
 /// EVERY preserved `NormalizedFrame` field is invariant: diverging any one of
@@ -1903,16 +1876,18 @@ fn normalize_ignores_exactly_the_f3_excluded_fields() {
 /// broadens the tier-map honesty guard beyond `logical_clock` alone.
 #[test]
 fn all_invariant_fields_are_guarded_against_demotion() {
-    // No preserved field may silently appear in the excluded set.
+    // No semantic frame field may silently appear in the excluded set.
     for field in [
-        "frame_id",
-        "timestamp_ns",
         "logical_clock",
         "from",
         "to",
         "kind",
+        "intent",
         "payload",
+        "scope",
         "auto_marker",
+        "consent_envelope",
+        "intent_lineage",
     ] {
         assert!(
             !F3_EXCLUDED_FIELDS.contains(&field),
@@ -1960,6 +1935,32 @@ fn all_invariant_fields_are_guarded_against_demotion() {
         other => other,
     };
     assert_red_on_single_divergence(&base, am, "auto_marker");
+
+    let mut intent = base.clone();
+    intent.intent = IntentClass::Readonly;
+    assert_red_on_single_divergence(&base, intent, "intent");
+
+    let mut consent = base.clone();
+    consent.consent_envelope = Some(ConsentEnvelope {
+        consent_id: [0xCC; 16],
+        granter: consent.from.clone(),
+        timestamp_ns: consent.timestamp_ns,
+        intent_class: Some(A2AIntent::new("guard:consent")),
+        valid_until_ns: None,
+    });
+    assert_red_on_single_divergence(&base, consent, "consent_envelope");
+
+    let mut lineage = base.clone();
+    lineage.intent_lineage = IntentLineage::new(vec![A2AIntent::new("guard:lineage")]);
+    assert_red_on_single_divergence(&base, lineage, "intent_lineage");
+
+    let mut scope = base.clone();
+    let FramePayload::TaskAssign(task) = &mut scope.payload else {
+        panic!("identity frame must carry TaskAssign");
+    };
+    task.scope
+        .push(maos_domain::invariants::i1::Scope::LogRecall);
+    assert_red_on_single_divergence(&base, scope, "scope");
 }
 
 /// Helper: two single-frame captures differing ONLY by `divergent` must be RED.

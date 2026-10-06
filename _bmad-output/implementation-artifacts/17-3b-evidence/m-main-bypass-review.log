@@ -1,0 +1,13 @@
+2026-09-29T15:45:16Z
+5075443c
+
+SOURCE REVIEW (g): `gate_manifest(` occurrences in crates/maos-bin/src are only the shared function plus main.rs topology (4446), standalone `maos run` (4877), operator door (8608), and a unit test (13356). Each production caller supplies `classify_spirit(name).is_some()`.
+
+Direct security admission paths reviewed in main.rs:
+- Shell hello-spirit (3662-3750): parses compile-time `maos_spirit_hello::MANIFEST_TOML` and constructs `HelloSpirit`; the embedded first-party manifest is rust-inproc/T0.
+- Smoke-spirit (6668-6807): constructs two explicit `ClassSection` values with forms=["rust-inproc"], artifact=None, and admits with T0.
+- One-shot hello-spirit (7949-8053): opens the fixed in-tree `spirits/hello-spirit/manifest.toml`, then admits the named first-party hello Spirit; its manifest is rust-inproc/T0.
+- Smoke ABI (12985-13027): closure constructs forms=["rust-inproc"], artifact=None, and admits with T0.
+- Daemon control policy identity (9828-9903): this does not construct or execute a Spirit. It reads the configured control manifest directly. Hardened by the integrator in main.rs:9879-9883 to refuse any forms containing `wasm-component` before `security.admit_spirit`; intended error text is `control Spirit must be a first-party class, not wasm-component` (no wasm-engine code prefix because this is not a component-launch path).
+
+SOURCE REVIEW: crates/maos-bin/src/admission.rs has exactly one `CapabilitiesRequired::from_toml_str` occurrence (line 573), the pre-existing helper; the WASM branch adds none.

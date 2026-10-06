@@ -1,0 +1,11 @@
+2026-09-29T15:57:57Z
+5075443c
+
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host -p maos-host
+result: pass; 102 passed across 15 suites, 1 ignored (the intentional TypeScript CI-artifact driver), 0 failed. Cargo reported 2 existing dependency warnings.
+
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo clippy --locked -p maos-wasm-host --all-targets
+result: pass (exit 0). The workspace emits existing warnings in dependencies and pre-existing maos-wasm-host host_state/fuel_t2_matrix targets; the updated bridge, runner, E2E, TypeScript-driver, and equivalence-harness paths add no clippy diagnostic.
+
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo run --locked -p xtask -- check-wasm-form-equiv --json
+result: {"gate":"check-wasm-form-equiv","passed":true,"oracle_green":true,"blocking_now":false,"ship_phase":"v1_5","base_passed":19,"base_failed":0,"fault_inject_passed":22,"fault_inject_failed":0,"oracle":"tiered-behavioral-deterministic"}

@@ -1,0 +1,30 @@
+2026-09-29T15:52:54Z
+5075443c
+
+All mutations below were applied one at a time, observed, and reverted before the post-restore green checks.
+
+1) Digest-reference lift loss
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test frame_bridge_roundtrip decision_dispatch_digest_refs_are_byte_lossless -- --nocapture
+diff summary: WorkingMemoryDigestRefs::new(b.working_memory_digest_refs) -> Default::default()
+observed: exit 101; decision_dispatch_digest_refs_are_byte_lossless failed the canonical-CBOR equality assertion because ["digest-a", "digest-b"] became [].
+
+2) Envelope-field lift loss
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test frame_bridge_roundtrip consent_envelope_intent_and_lineage_are_byte_lossless -- --nocapture
+diff summary: intent_from_wit(frame.intent) -> IntentClass::Readonly
+observed: exit 101; consent_envelope_intent_and_lineage_are_byte_lossless failed the canonical-CBOR equality assertion (HighPrivilege became Readonly).
+
+3) Reintroducing F3
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test equiv_harness normalize_preserves_every_former_f3_field -- --nocapture
+diff summary: F3_EXCLUDED_FIELDS: &[] -> &["intent"]
+observed: exit 101; normalize_preserves_every_former_f3_field failed with "the complete @2.0.0 frame projection has no excluded invariant fields".
+
+4) Reachable unrepresentable-variant loss
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test frame_bridge_roundtrip unrepresentable_rupture_reason_is_refused_not_mapped -- --nocapture
+diff summary: the non-exhaustive RuptureReason fallback error -> wit::RuptureReason::RecipientUnloaded
+observed: exit 101; unrepresentable_rupture_reason_is_refused_not_mapped failed because PeerIdentityUnverified was silently mapped instead of returning BridgeError::Unrepresentable.
+note: this is the reachable form of the requested `_ =>`-maps-a-value plant. The PostureHint future-proofing arm has no unmatched constructible variant in the current domain enum, so a `_ => Cautious` mutation alone cannot produce a behavioral red.
+
+5) Incompatible-world fixture
+command: CARGO_TARGET_DIR=/mnt/build/cargo-maos-17-3b-w1 CARGO_BUILD_JOBS=12 cargo test --locked -p maos-wasm-host --test e2e_roundtrip v1_frames_world_is_refused_with_incompatible_world_exit -- --nocapture
+input: tests/fixtures/wasm/spirit_frames_v1_world.wat imports maos:spirit/frames@1.0.0
+observed: pass; runner process exit 2 and exact typed IncompatibleWorld stderr. See runner-v1-world-exit2.log.
