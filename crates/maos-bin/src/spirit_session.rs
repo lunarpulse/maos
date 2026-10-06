@@ -247,6 +247,11 @@ pub async fn run_admitted_session(
         if admitted.sandbox.tier != SandboxTier::T2 {
             return Err(SessionError::SandboxTier);
         }
+        // Declared `iac.send` peer classes come from the kernel's own admission
+        // result (the SCB adopted above), never from the policy table: the
+        // composition root neither seeds nor reads the manifest-derived table.
+        let declared_sends: Vec<Scope> = admitted.sandbox.declared_scopes.iter()
+            .filter(|scope| matches!(scope, Scope::IacSend { .. })).cloned().collect();
         let mut sandbox = admitted.sandbox;
         if let Some(artifact) = launch.component_artifact.as_ref() {
             sandbox.declared_scopes.push(Scope::FsRead {
@@ -409,7 +414,8 @@ pub async fn run_admitted_session(
                             .ok_or(SessionError::Protocol("active export has no deadline"))?
                             .0;
                         if authorize_and_deliver(&deps, &runtime, admitted.pid,
-                            &admitted.spirit_id, frame, until, &mut leases, &mut turn)?
+                            &admitted.spirit_id, &declared_sends, frame, until, &mut leases,
+                            &mut turn)?
                         {
                             report.delivered_frames += 1;
                         } else {
@@ -742,6 +748,7 @@ fn authorize_and_deliver(
     runtime: &tokio::runtime::Handle,
     pid: u32,
     spirit_id: &str,
+    declared_sends: &[Scope],
     mut frame: IacFrame,
     deadline: Instant,
     leases: &mut Vec<TokenId>,
@@ -784,20 +791,10 @@ fn authorize_and_deliver(
     // A declared peer class must match; undeclared `iac.send` is the kernel's
     // own deny.
     let send_scope = send_scope(&frame);
-    let declared_sends = policy
-        .manifest_scopes
-        .get(&pid)
-        .map_or(Vec::new(), |manifest| {
-            manifest
-                .scopes
-                .iter()
-                .filter(|scope| matches!(scope, Scope::IacSend { .. }))
-                .collect()
-        });
     let mut send = None;
     let mut send_token = None;
     if allowed {
-        let decision = if declared_sends.is_empty() || declared_sends.contains(&&send_scope) {
+        let decision = if declared_sends.is_empty() || declared_sends.contains(&send_scope) {
             mint(deps, pid, posture_hash, &send_scope, &mut issued)
         } else {
             ScopeDecision {

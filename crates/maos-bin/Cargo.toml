@@ -125,7 +125,7 @@ maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 
 [dev-dependencies]
 tempfile = "3"
-wit-parser = "0.251"
+wit-parser = "0.254"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test
 tokio-postgres = "0.7"   # Story 13.6c CI remediation — raw physical row oracle for live two-datname tests
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

@@ -646,7 +646,7 @@ location = "crates/maos-iac/src/adapter/payload.rs:39"
 location = "crates/maos-kernel-core/src/bin/assert-revocation-p99-floor.rs:69"
 
 [[allow]]
-location = "crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs:45"
+location = "crates/maos-kernel-core/src/capability/cap_audit/writer_task.rs:39"  # 17-3c CI repair, 2026-10-06: pin re-derived, 17-3c removed a local helper above this frozen site; the serde call is unchanged
 
 [[allow]]
 location = "crates/maos-kernel-core/src/compliance/mod.rs:144"
@@ -889,7 +889,7 @@ location = "crates/maos-spirit-cli/tests/compliance_claim_autopopulate_test.rs:1
 location = "crates/maos-spirit-cli/tests/publish_happy_path_test.rs:138"
 
 [[allow]]
-location = "crates/maos-spirit-hello/src/bin/hello_spirit_bench.rs:48"
+location = "crates/maos-spirit-hello/src/bin/hello_spirit_bench.rs:31"  # 17-3c CI repair, 2026-10-06: pin re-derived, 17-3c moved framing into maos-frame-codec above this frozen site; the serde call is unchanged
 
 [[allow]]
 location = "crates/maos-spirit-hello/src/lib.rs:204"

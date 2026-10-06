@@ -918,8 +918,10 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // production ShellHost). Story 16-3 — 21 → 22: `supervision.rs` joins it.
     // Story 16-4 — 22 → 23: `purge.rs` joins it.
     // Story 16-6 — 23 → 24: `admission.rs` joins it.
+    // Story 17-3c — 24 → 25: `spirit_session.rs` joins it (CI repair
+    // 2026-10-06: 17-3c added the file without ringing this doorbell).
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 24] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 25] = [
         ("main.rs", include_str!("../src/main.rs")),
         // Story 16-6 — the extracted `load → admit → start` path. Enrolled
         // deliberately and NOT whitelisted below: the door's load must never
@@ -1011,6 +1013,14 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // Story 16-4 — authoritative typed MAOS-footprint enumeration and
         // offline purge. It must not seed manifest-derived policy scopes.
         ("purge.rs", include_str!("../src/purge.rs")),
+        // Story 17-3c — governed sessions over the subprocess frame bridge.
+        // The session adopts one admitted SCB and reads its declared
+        // `iac.send` peer classes from that admission result, never from the
+        // manifest-derived policy table.
+        (
+            "spirit_session.rs",
+            include_str!("../src/spirit_session.rs"),
+        ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

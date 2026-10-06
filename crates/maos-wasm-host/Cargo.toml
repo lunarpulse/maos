@@ -42,8 +42,11 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 # host-side dependency is needed (that crate is for GUEST code generation;
 # guests live in guests/echo-spirit, a standalone `[workspace]`, and pull
 # their own `wit-bindgen` dependency there).
-wasmtime = { version = "46", features = ["component-model"] }
-wasmtime-wasi = "46"
+# 48 is a Wasmtime LTS line (supported 24 months). 46.x has no fix for
+# RUSTSEC-2026-0314/0316/0321/0322/0323/0324/0327; 48.0.4 is the first
+# fixed 48.x (CI repair 2026-10-06, `cargo deny check`).
+wasmtime = { version = "48.0.4", features = ["component-model"] }
+wasmtime-wasi = "48.0.4"
 
 # ADR-032 wire protocol: Content-Length + CBOR
 ciborium = "0.2"
@@ -70,5 +73,5 @@ maos-kernel-core = { path = "../maos-kernel-core" }
 libc = "0.2"
 # WIT AST parsing for the corpus completeness denominator (D5: "enumerated
 # mechanically from the .wit AST", not a hand-maintained const array).
-wit-parser = "0.251"
+wit-parser = "0.254"
 toml = "0.8"

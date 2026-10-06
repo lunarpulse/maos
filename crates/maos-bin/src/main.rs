@@ -5615,7 +5615,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
 
-            if run.once || spawned_result.is_some() {
+            let spawned_session = spawned_result.is_some();
+            if run.once || spawned_session {
                 // Story 16-3 (D-16-3-M) — the `--once` tail moved into ONE async
                 // block whose result the teardown below takes. Five post-`start`
                 // early returns live inside it (the researcher round-trip, the
@@ -5816,7 +5817,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "maos run: interrupted by signal before the --once pass completed".into(),
                     );
                 }
-                eprintln!("maos run: session complete — exiting cleanly");
+                // A `--once` root's last word is pinned by 16-3 (AC4 v2); a
+                // 17-3c spawned session completes as a session, not a pass.
+                if spawned_session {
+                    eprintln!("maos run: session complete — exiting cleanly");
+                } else {
+                    eprintln!("maos run: --once complete — exiting cleanly");
+                }
                 return Ok(());
             }
 

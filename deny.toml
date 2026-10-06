@@ -103,7 +103,7 @@ skip = [
     # coexists with the workspace's established versions. Provenance (verified
     # via `cargo deny check bans`): cedar-policy-core → miette → {winnow,
     # toml, toml_datetime, serde_spanned, unicode-width, phf_shared} +
-    # cedar-policy-core/build → {fixedbitset, petgraph, wasm-encoder, wast,
+    # cedar-policy-core/build → {fixedbitset, petgraph, wast,
     # object} + arrayvec. None is a vulnerability — `advisories`, `licenses`,
     # `sources` all pass; this trips only the `multiple-versions` hygiene rule.
     # Unifying would mean upgrading workspace parser/serde stacks to match
@@ -118,7 +118,6 @@ skip = [
     { name = "toml" },
     { name = "toml_datetime" },
     { name = "unicode-width" },
-    { name = "wasm-encoder" },
     { name = "wast" },
     { name = "winnow" },
     # Story 16-4 OS keyring — keyring 4.2's Linux secret-service backend
@@ -129,6 +128,13 @@ skip = [
     { name = "hkdf" },
     { name = "syn" },
     { name = "toml_edit" },
+    # Wasmtime 48 LTS (CI repair 2026-10-06, RUSTSEC-2026-0314/0316/0321-0324/
+    # 0327) — wasmtime-wasi 48 → cap-primitives 4.0.3, which needs
+    # io-lifetimes 3 directly AND fs-set-times 0.20 (latest), which still
+    # needs io-lifetimes 2. The duplicate is inside one upstream crate's own
+    # dependency set, so no workspace choice can unify it. Drop when
+    # fs-set-times moves to io-lifetimes 3.
+    { name = "io-lifetimes" },
 ]
 skip-tree = []
 

@@ -3081,7 +3081,7 @@ jobs:
       - name: Run maos-host + maos-wasm-host test suites
         run: cargo test -p maos-host -p maos-wasm-host --locked
       - name: Install the pinned component fixture assembler
-        run: cargo install --locked wasm-tools --version 0.251.0
+        run: cargo install --locked wasm-tools --version 1.259.0
       - name: Fetch locked standalone fixture dependencies for offline process gates
         run: |
           for fixture in \

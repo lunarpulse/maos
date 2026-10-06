@@ -331,6 +331,17 @@ Candidate `_bmad-output/implementation-artifacts/17-3c-evidence/`:
 - Integration verification of the commit tree found `check-manifest-schema-version` red. Its independent ratified
   post-v1 inventory lacked the new `capabilities.required.iac` section (FR4 `iac.send`, ratification
   `17-3c-iac-send-capability`). The section was added to `RATIFIED_POST_V1_SCHEMA_SECTIONS` (xtask +1, within headroom), and the gate is green.
+- CI repair 2026-10-06 (discipline run 37484518010, each failure reproduced locally on rustc 1.99.0 x86_64, then fixed):
+  - `spirit_session.rs` was never enrolled in `cohort_daemon_smoke_13_5c::composition_root_does_not_seed_manifest_scopes`
+    (roster 24 vs 25 files). It also read `manifest_scopes` from the policy table for the `iac.send` peer-class check. It now
+    takes the declared `IacSend` scopes from the adopted SCB's admission result (`SandboxSpec.declared_scopes`, the set
+    admission wrote), and the roster is 25. This red the J1 delegation controls, Reza's `composition-root…` leg and Loom's
+    whole-package leg.
+  - The `--once` completion line had been renamed to `session complete` for every root, but 16-3 AC4 v2 pins
+    `--once complete — exiting cleanly`. It is restored for `--once` roots; spawned sessions keep `session complete`.
+  - `cargo deny`: wasmtime 46.0.3 has no fix for RUSTSEC-2026-0314/0316/0321-0324/0327, so it moved to the Wasmtime 48 LTS
+    line (48.0.5, wit-parser 0.254) and rustls to 0.23.45. RUSTSEC-2026-0316 is the hostcall-fuel lifting bound that
+    `candidate-planning.json` cites for 46.0.3. Re-verified on 48.0.5: `spawned_scope_17_3c` 15/15 with every marker count.
 
 ### File List
 
@@ -467,3 +478,4 @@ Cargo.lock files are not source changes.
 - 2026-10-05 — User accepts completed Ubuntu25.10 x86_64 testing as sufficient. Implementation/amended acceptance complete; independent review pending.
 - 2026-10-05 — Canonical story, sprint rows, approved specification status, 17-3b finding, early-start record, parent epic and context reconciled to review. No original runtime cutover, staging, commit or publication.
 - 2026-10-06 — §A6 bmad-code-review complete (43 patches; decisions D1, D2 and FR4 `iac.send` built; D3 dismissed; `gpt-6.1` ratified). Approved kernel/KLOC/surface re-pins, fresh AC1 remote proof and four mutation pairs, all RED then GREEN. 17-3b verified and closed. Candidate integrated into the original checkout; `review` → `done`. Local commit only, no push.
+- 2026-10-06 — CI repair: enrolled `spirit_session.rs` in the 13.5d manifest-scope negative (the peer-class check now reads the admitted SCB, not the policy table); restored the 16-3 `--once` completion line; moved wasmtime to 48.0.5 (LTS) and rustls to 0.23.45 for new RustSec advisories. See Completion Notes.

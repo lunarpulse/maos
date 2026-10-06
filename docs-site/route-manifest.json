@@ -29,6 +29,10 @@
       "content_floor": "link list"
     },
     {
+      "path": "/manifest/v5",
+      "label": "Manifest v5 Reference"
+    },
+    {
       "path": "/manifest/v4",
       "label": "Manifest v4 Reference"
     },
@@ -113,9 +117,18 @@
       "content_floor": "code fence"
     },
     {
+      "path": "/cookbook/wasm-component-spirit",
+      "label": "WASM Component Spirit",
+      "content_floor": "code fence"
+    },
+    {
       "path": "/migrate/",
       "label": "Migration (index)",
       "content_floor": "link list"
+    },
+    {
+      "path": "/migrate/v4-to-v5",
+      "label": "v4 to v5 Migration"
     },
     {
       "path": "/migrate/v3-to-v4",
