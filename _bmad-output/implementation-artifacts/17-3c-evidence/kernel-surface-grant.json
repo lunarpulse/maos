@@ -1,0 +1,40 @@
+{
+  "candidate_only": true,
+  "explicit_operator_approval": true,
+  "removed_hash_entries": [
+    [
+      "enum",
+      "maos_kernel_core::security::sandbox::SpawnError",
+      "beb8412ac42947057bc065146c941444adfcbd609a2241fcd0824f3ec7a65328"
+    ],
+    [
+      "struct",
+      "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
+      "57c22dc9243bfdff0b4e7ba184b94405e842ce96ce0a8264c27e02eebd56bbae"
+    ]
+  ],
+  "added_hash_entries": [
+    [
+      "enum",
+      "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgePoll",
+      "8ccb34956bec32e5dc7f8984e13e02fe37b5af0b3445e74d81f9244aacaf9b6f"
+    ],
+    [
+      "enum",
+      "maos_kernel_core::security::sandbox::SpawnError",
+      "ea6af057156ef7f16f11d049a7ed8c9760bfa8c58a32095d5767d1cd0f859c28"
+    ],
+    [
+      "struct",
+      "maos_kernel_core::lifecycle::cli_wrapper::runtime::FrameWriter",
+      "a01851a0d3a00bf1f92c998fdb511bb297676e883962933dd6c7e047762a4a99"
+    ],
+    [
+      "struct",
+      "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
+      "8c13f825fc3583bb321d3389a82bf6b8a3ce67071194503df88a91f8313736d2"
+    ]
+  ],
+  "removed_symbols": [],
+  "note": "SpawnedBridge private ownership field rehash and additive SpawnError::CgroupUnavailable are not removed symbols. BridgePoll and FrameWriter classified data-movement before snapshot generation. No original pin or publication."
+}

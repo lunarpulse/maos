@@ -192,7 +192,7 @@ impl InferencePortAdapter {
         // Best-effort synchronous delivery on the current runtime. If the
         // runtime is shutting down, the frame may be dropped — the
         // synchronous InferenceError::RateLimited is the primary contract.
-        let _ = iac.deliver_typed(frame);
+        let _ = iac.deliver_typed(frame, 0, None);
     }
 
     /// Parse `retry-after` value from provider response body. Accepts

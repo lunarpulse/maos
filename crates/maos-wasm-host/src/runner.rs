@@ -27,7 +27,15 @@
 //! `17-3c-wasm-spirit-on-the-bus-under-t2`. Wasmtime fuel metering is
 //! defense-in-depth, not a substitute for that process boundary.
 
-use std::io::{self, BufReader, BufWriter};
+// `runner-fault-inject` is dev/CI-only: it adds a forbidden-syscall probe arm.
+// A release build (`not(debug_assertions)`) with the feature MUST NOT compile.
+#[cfg(all(feature = "runner-fault-inject", not(debug_assertions)))]
+compile_error!(
+    "runner-fault-inject is a dev/CI-only fault-injection feature and MUST NOT \
+     appear in release builds (Story 17.3c ship-blocker)."
+);
+
+use std::io::{self, BufReader, BufWriter, Read};
 use std::process::ExitCode;
 
 use wasmtime::component::{Component, Linker};
@@ -94,6 +102,8 @@ fn main() -> ExitCode {
 struct RunnerArgs {
     component_path: String,
     fuel: u64,
+    #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
+    forbidden_syscall_after_ready: bool,
 }
 
 enum RunError {
@@ -113,6 +123,8 @@ impl From<String> for RunError {
 fn parse_args() -> Result<RunnerArgs, String> {
     let mut component_path = None;
     let mut fuel = 10_000_000u64;
+    #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
+    let mut forbidden_syscall_after_ready = false;
     let mut iter = std::env::args().skip(1);
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -130,12 +142,16 @@ fn parse_args() -> Result<RunnerArgs, String> {
                     .parse()
                     .map_err(|e| format!("invalid --fuel value '{v}': {e}"))?;
             }
+            #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
+            "--test-forbidden-syscall-after-ready" => forbidden_syscall_after_ready = true,
             other => return Err(format!("unknown argument: {other}")),
         }
     }
     Ok(RunnerArgs {
         component_path: component_path.ok_or_else(|| "--component is required".to_string())?,
         fuel,
+        #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
+        forbidden_syscall_after_ready,
     })
 }
 
@@ -143,19 +159,56 @@ fn parse_args() -> Result<RunnerArgs, String> {
 /// the runner gives up — a compile-bomb `.wasm` has no fuel backstop (fuel
 /// only meters guest *execution*, not host-side validation/compilation), so
 /// this is the dedicated guard for that window.
-const COMPILE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const COMPILE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(360);
 
 fn run(args: RunnerArgs) -> Result<(), RunError> {
-    let wasm_bytes = std::fs::read(&args.component_path).map_err(|e| {
-        RunError::InvalidComponent(format!(
-            "cannot read component '{}': {e}",
-            args.component_path
-        ))
-    })?;
+    // Read the opened file through a cap: metadata alone cannot bound a file
+    // changed between resolution and the contained runner's open.
+    const MAX_COMPONENT_BYTES: u64 = 64 * 1024 * 1024;
+    let mut file = std::fs::File::open(&args.component_path)
+        .map_err(|e| RunError::InvalidComponent(format!("cannot open component: {e}")))?;
+    let metadata = file
+        .metadata()
+        .map_err(|e| RunError::InvalidComponent(e.to_string()))?;
+    if !metadata.is_file() {
+        return Err(RunError::InvalidComponent(
+            "component is not a regular file".into(),
+        ));
+    }
+    if metadata.len() > MAX_COMPONENT_BYTES {
+        return Err(RunError::InvalidComponent(
+            "component exceeds 64 MiB cap".into(),
+        ));
+    }
+    let mut wasm_bytes = Vec::new();
+    wasm_bytes
+        .try_reserve_exact(metadata.len() as usize)
+        .map_err(|e| RunError::InvalidComponent(format!("component buffer: {e}")))?;
+    (&mut file)
+        .take(metadata.len())
+        .read_to_end(&mut wasm_bytes)
+        .map_err(|e| RunError::InvalidComponent(format!("component read: {e}")))?;
+    let mut extra = [0u8; 1];
+    if wasm_bytes.len() as u64 != metadata.len()
+        || file
+            .read(&mut extra)
+            .map_err(|e| RunError::InvalidComponent(e.to_string()))?
+            != 0
+    {
+        return Err(RunError::InvalidComponent(
+            "component length changed during read".into(),
+        ));
+    }
 
     let mut engine_config = Config::new();
     engine_config.consume_fuel(true);
     engine_config.wasm_component_model(true);
+    engine_config.wasm_threads(false);
+    engine_config.wasm_memory64(false);
+    engine_config.parallel_compilation(false);
+    engine_config.memory_reservation(0);
+    engine_config.memory_guard_size(0);
+    engine_config.memory_reservation_for_growth(0);
 
     let engine = Engine::new(&engine_config)
         .map_err(|e| RunError::Other(format!("wasmtime engine init: {e}")))?;
@@ -163,13 +216,17 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     // Compile under a watchdog thread: a pathological .wasm cannot hang the
     // runner indefinitely at validation/compile time (fuel does not meter
     // this phase).
-    let component = compile_with_timeout(&engine, &wasm_bytes)?;
+    let component = compile_with_timeout(&engine, wasm_bytes)?;
 
     if let Some(import) = incompatible_spirit_frames_import(&component, &engine) {
         return Err(RunError::IncompatibleWorld(import));
     }
 
     let mut store = Store::new(&engine, maos_wasm_host::host_state::HostState::new());
+    store.limiter(|state| &mut state.limits);
+    // Wasmtime charges aggregate list/string lifting BEFORE host allocations,
+    // including repeated aliases into the same guest linear memory.
+    store.set_hostcall_fuel(maos_frame_codec::MAX_FRAME_BYTES);
     store
         .set_fuel(args.fuel)
         .map_err(|e| RunError::Other(format!("set fuel: {e}")))?;
@@ -191,6 +248,9 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     };
 
     // Lifecycle: on-start.
+    store
+        .set_fuel(args.fuel)
+        .map_err(|e| RunError::Other(e.to_string()))?;
     match spirit.call_on_start(&mut store) {
         Ok(Ok(())) => {}
         Ok(Err(halt)) => {
@@ -204,20 +264,45 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = BufWriter::new(stdout.lock());
 
-    let result = pump_frames(&mut store, &spirit, &mut reader, &mut writer);
+    // Empty bodies are transport controls, never CBOR: initial Ready, then one
+    // TurnComplete after each successful export, including exports emitting none.
+    maos_frame_codec::write_frame(&mut writer, &[])
+        .map_err(|e| RunError::Other(format!("Ready write: {e}")))?;
+    #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
+    if args.forbidden_syscall_after_ready {
+        // Exercise the actual runner's seccomp boundary, never a synthetic
+        // SandboxBlock row or a signal sent by the test parent.
+        unsafe extern "C" {
+            fn ptrace(
+                request: std::ffi::c_uint,
+                pid: std::ffi::c_int,
+                address: *mut std::ffi::c_void,
+                data: *mut std::ffi::c_void,
+            ) -> std::ffi::c_long;
+        }
+        // SAFETY: PTRACE_TRACEME uses no pointed-to memory. Under admitted T2
+        // the existing hostile-syscall rule terminates this process with SIGSYS.
+        unsafe {
+            ptrace(0, 0, std::ptr::null_mut(), std::ptr::null_mut());
+        }
+        return Err(RunError::Other(
+            "forbidden syscall unexpectedly returned".into(),
+        ));
+    }
+    let result = pump_frames(&mut store, &spirit, &mut reader, &mut writer, args.fuel);
 
     // Lifecycle: on-shutdown — best-effort, runs even if the pump errored,
     // mirroring the native form's halt-then-shutdown ordering. A shutdown
     // trap does not override the pump's own error/cause.
+    let _ = store.set_fuel(args.fuel);
     let _ = spirit.call_on_shutdown(&mut store);
 
     result
 }
 
 /// Compile a component on a dedicated thread with a hard wall-clock cap.
-fn compile_with_timeout(engine: &Engine, wasm_bytes: &[u8]) -> Result<Component, RunError> {
+fn compile_with_timeout(engine: &Engine, bytes: Vec<u8>) -> Result<Component, RunError> {
     let engine = engine.clone();
-    let bytes = wasm_bytes.to_vec();
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let result = Component::new(&engine, &bytes);
@@ -230,9 +315,12 @@ fn compile_with_timeout(engine: &Engine, wasm_bytes: &[u8]) -> Result<Component,
              component — core-module fallback was removed once a real component fixture \
              landed): {e}"
         ))),
-        Err(_) => Err(RunError::InvalidComponent(format!(
-            "component compile exceeded {COMPILE_TIMEOUT:?} — treating as a compile-bomb"
-        ))),
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => Err(RunError::InvalidComponent(
+            "component compiler thread terminated".into(),
+        )),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Err(RunError::InvalidComponent(
+            format!("component compile exceeded {COMPILE_TIMEOUT:?} — treating as a compile-bomb"),
+        )),
     }
 }
 
@@ -255,7 +343,7 @@ fn classify_trap(err: wasmtime::Error) -> RunError {
             return RunError::OutOfFuel;
         }
     }
-    RunError::Other(format!("guest trapped: {err}"))
+    RunError::Other(format!("guest call failed: {err:#}"))
 }
 
 fn pump_frames<T>(
@@ -263,9 +351,10 @@ fn pump_frames<T>(
     spirit: &Spirit,
     reader: &mut impl io::BufRead,
     writer: &mut impl io::Write,
+    fuel: u64,
 ) -> Result<(), RunError> {
     loop {
-        let frame_bytes = match maos_wasm_host::codec::read_frame(reader) {
+        let frame_bytes = match maos_frame_codec::read_frame(reader) {
             Ok(Some(b)) => b,
             Ok(None) => return Ok(()), // Clean EOF — Halt::Voluntary.
             Err(e) => return Err(RunError::Other(format!("stdin read error: {e}"))),
@@ -282,23 +371,45 @@ fn pump_frames<T>(
                 other => RunError::Other(format!("inbound frame lower error: {other}")),
             })?;
 
+        store
+            .set_fuel(fuel)
+            .map_err(|e| RunError::Other(e.to_string()))?;
         let emitted = match spirit.call_handle_frame(&mut *store, &wit_frame) {
             Ok(Ok(frames)) => frames,
+            Ok(Err(maos_wasm_host::wit_guest::maos::spirit::frames::Halt::Voluntary)) => {
+                maos_frame_codec::write_frame(writer, &[])
+                    .map_err(|e| RunError::Other(format!("TurnComplete write: {e}")))?;
+                return Ok(());
+            }
             Ok(Err(halt)) => {
                 return Err(RunError::Other(format!(
                     "guest handle-frame halted: {halt:?}"
                 )));
             }
-            Err(trap) => return Err(classify_trap(trap)),
+            Err(trap) => {
+                // Machine-readable stage: the guest/canonical call failed before
+                // domain conversion, CBOR encoding, or stdout data emission.
+                eprintln!("{{\"event\":\"guest_export_failed\",\"export\":\"handle-frame\",\"stage\":\"canonical-call\"}}");
+                return Err(classify_trap(trap));
+            }
         };
 
-        for wit_out in emitted {
-            let domain_out = maos_wasm_host::frame_bridge::lift(wit_out)
-                .map_err(|e| RunError::Other(format!("outbound frame lift error: {e}")))?;
-            let cbor = maos_wasm_host::codec::encode_cbor(&domain_out)
-                .map_err(|e| RunError::Other(format!("outbound frame encode error: {e}")))?;
-            maos_wasm_host::codec::write_frame(writer, &cbor)
+        // Turn atomicity: lift and encode every emitted frame before writing
+        // any, so a failure on frame N leaves no partial turn on stdout.
+        let encoded = emitted
+            .into_iter()
+            .map(|wit_out| {
+                let domain_out = maos_wasm_host::frame_bridge::lift(wit_out)
+                    .map_err(|e| RunError::Other(format!("outbound frame lift error: {e}")))?;
+                maos_wasm_host::codec::encode_cbor(&domain_out)
+                    .map_err(|e| RunError::Other(format!("outbound frame encode error: {e}")))
+            })
+            .collect::<Result<Vec<_>, RunError>>()?;
+        for cbor in &encoded {
+            maos_frame_codec::write_frame(writer, cbor)
                 .map_err(|e| RunError::Other(format!("stdout write error: {e}")))?;
         }
+        maos_frame_codec::write_frame(writer, &[])
+            .map_err(|e| RunError::Other(format!("TurnComplete write: {e}")))?;
     }
 }

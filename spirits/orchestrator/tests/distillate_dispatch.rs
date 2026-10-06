@@ -131,7 +131,7 @@ async fn scenario_2_1_first_dispatch_none_accepted() {
 
     let orch = Orchestrator::new("orchestrator");
     let frame = orch.first_dispatch(1, "worker", SpiritRole::Worker, "design", "done", lineage());
-    let result = adapter.deliver_typed(frame).await;
+    let result = adapter.deliver_typed(frame, 0, None).await;
     assert!(
         result.is_ok(),
         "first dispatch with no predecessor must be accepted: {:?}",
@@ -156,18 +156,15 @@ async fn scenario_2_2_followup_with_producer_distillate_accepted() {
 
     // First dispatch establishes the fan-out; worker completes.
     adapter
-        .deliver_typed(orch.first_dispatch(
-            1,
-            "worker",
-            SpiritRole::Worker,
-            "design",
-            "done",
-            lineage(),
-        ))
+        .deliver_typed(
+            orch.first_dispatch(1, "worker", SpiritRole::Worker, "design", "done", lineage()),
+            0,
+            None,
+        )
         .await
         .expect("first dispatch ok");
     adapter
-        .deliver_typed(worker_task_complete(2))
+        .deliver_typed(worker_task_complete(2), WORKER_PID, None)
         .await
         .expect("task complete ok");
 
@@ -203,7 +200,7 @@ async fn scenario_2_2_followup_with_producer_distillate_accepted() {
         prior,
         lineage(),
     );
-    let result = adapter.deliver_typed(frame).await;
+    let result = adapter.deliver_typed(frame, 0, None).await;
     assert!(
         result.is_ok(),
         "follow-up with a producer-authored distillate ref must be accepted: {:?}",
@@ -226,18 +223,15 @@ async fn scenario_2_3_followup_none_after_completion_rejected() {
 
     let orch = Orchestrator::new("orchestrator");
     adapter
-        .deliver_typed(orch.first_dispatch(
-            1,
-            "worker",
-            SpiritRole::Worker,
-            "design",
-            "done",
-            lineage(),
-        ))
+        .deliver_typed(
+            orch.first_dispatch(1, "worker", SpiritRole::Worker, "design", "done", lineage()),
+            0,
+            None,
+        )
         .await
         .expect("first ok");
     adapter
-        .deliver_typed(worker_task_complete(2))
+        .deliver_typed(worker_task_complete(2), WORKER_PID, None)
         .await
         .expect("complete ok");
 
@@ -247,7 +241,7 @@ async fn scenario_2_3_followup_none_after_completion_rejected() {
     let payload = orch.build_task_assign("review", "ok", None);
     let frame = orch.assign_frame(3, "reviewer", SpiritRole::Worker, payload, lineage());
     let err = adapter
-        .deliver_typed(frame)
+        .deliver_typed(frame, 0, None)
         .await
         .expect_err("raw follow-up must be rejected");
     match err {
@@ -273,18 +267,15 @@ async fn scenario_2_4_followup_pointing_at_raw_task_complete_rejected() {
 
     let orch = Orchestrator::new("orchestrator");
     adapter
-        .deliver_typed(orch.first_dispatch(
-            1,
-            "worker",
-            SpiritRole::Worker,
-            "design",
-            "done",
-            lineage(),
-        ))
+        .deliver_typed(
+            orch.first_dispatch(1, "worker", SpiritRole::Worker, "design", "done", lineage()),
+            0,
+            None,
+        )
         .await
         .expect("first ok");
     adapter
-        .deliver_typed(worker_task_complete(2))
+        .deliver_typed(worker_task_complete(2), WORKER_PID, None)
         .await
         .expect("complete ok");
     // The raw TaskComplete row id — NOT a Distillate row.
@@ -305,7 +296,7 @@ async fn scenario_2_4_followup_pointing_at_raw_task_complete_rejected() {
         lineage(),
     );
     let err = adapter
-        .deliver_typed(frame)
+        .deliver_typed(frame, 0, None)
         .await
         .expect_err("a ref to a raw TaskComplete must be rejected");
     assert!(

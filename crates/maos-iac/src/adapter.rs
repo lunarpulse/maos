@@ -35,6 +35,7 @@ pub use mailbox::*;
 pub use mailbox_stub::MailboxStub;
 pub use metrics::IacRtMetrics;
 pub use redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
+use transparency_log::capability_token_column;
 pub use transparency_log::{
     reconcile_correlated_frames, AuditError, FrameFilter, FrameKind, FrameRowWrite,
     TeamTransparencyLogEntry, TransparencyLogAdapter, TransparencyLogEntry,
@@ -317,9 +318,17 @@ impl IacBusAdapter {
     /// (on host B: spawning a worker) would be the actual bug. That makes the typed
     /// path idempotent end-to-end, which matches what the transport already is —
     /// at-most-once (G3), never at-least-once.
+    ///
+    /// `spirit_pid` is supplied by the trusted local caller, never taken from
+    /// frame claims. Zero is reserved for kernel/root-owned emissions.
+    /// `capability_token` (Story 17-3c) is the kernel-minted `iac.send` token
+    /// mediating this delivery; it is journaled in the row's `capability_token`
+    /// column (`None` ⇒ NULL, an unmediated kernel/host emission).
     pub async fn deliver_typed(
         &self,
         frame: maos_domain::frame::IacFrame,
+        spirit_pid: u32,
+        capability_token: Option<maos_domain::invariants::i1::TokenId>,
     ) -> Result<
         maos_domain::invariants::i2::LogBeforeDeliver<
             crate::adapter::transparency_log::FrameRowWrite,
@@ -490,7 +499,6 @@ impl IacBusAdapter {
         })?;
 
         // 2. Log before deliver (I2)
-        let spirit_pid = 0u32; // v0.3-β: PID not yet relevant for pure routing
         let intent_str = match &frame.intent {
             maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
             maos_domain::invariants::i1::IntentClass::Standard => "standard",
@@ -553,6 +561,7 @@ impl IacBusAdapter {
         // I2: log before deliver.
         // Story 6.1 — use DRR scheduler if present, otherwise synchronous write.
         let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
+        let token_column = capability_token.as_ref().map(capability_token_column);
         let write = if let Some(drr) = &self.drr_scheduler {
             let lineage_bytes = match serde_json::to_vec(&frame.intent_lineage) {
                 Ok(b) => b,
@@ -566,6 +575,7 @@ impl IacBusAdapter {
                 intent_str.to_string(),
                 frame.auto_marker,
                 lineage_bytes,
+                token_column,
             )
             .await?
             .into_inner()
@@ -577,7 +587,7 @@ impl IacBusAdapter {
                     spirit_pid,
                     frame.from.spirit_id.as_str(),
                     to_spirit_id,
-                    None,
+                    token_column.as_ref(),
                     intent_str,
                     &payload_bytes,
                     frame.auto_marker,
@@ -625,11 +635,14 @@ impl IacBusAdapter {
     /// 4. Write a new TL row of kind `Retract` (via DRR if configured).
     /// 5. Mark the original frame as retracted in the companion table.
     /// 6. Route the Retract frame through the mailbox to the ORIGINAL RECIPIENT.
+    /// `capability_token` (Story 17-3c) mediates the retract; journaled on the
+    /// Retract row exactly as in [`Self::deliver_typed`].
     pub async fn retract(
         &self,
         original_frame_id: [u8; 16],
         reason: String,
         retracting_spirit: &maos_spirit_abi::identity::SpiritId,
+        capability_token: Option<maos_domain::invariants::i1::TokenId>,
     ) -> Result<maos_domain::iac_bus_types::RetractOutcome, maos_domain::iac_bus_types::IacBusError>
     {
         use maos_domain::frame::RetractPayload;
@@ -787,7 +800,8 @@ impl IacBusAdapter {
             }
 
             // Step 4: Log the retract frame (I2), routing through DRR if configured
-            if let Some(ref drr) = self.drr_scheduler {
+            let token_column = capability_token.as_ref().map(capability_token_column);
+            if let Some(drr) = &self.drr_scheduler {
                 let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
                     maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
                 })?;
@@ -799,6 +813,7 @@ impl IacBusAdapter {
                     "retract".to_string(),
                     maos_domain::invariants::i3::FrameOrigin::Kernel,
                     Vec::new(),
+                    token_column,
                 )
                 .await?;
                 self.transparency_log.last_frame_id()
@@ -814,7 +829,7 @@ impl IacBusAdapter {
                         .to
                         .first()
                         .map_or("", |a| a.spirit_id.as_str()),
-                    None,
+                    token_column.as_ref(),
                     "retract",
                     &payload_bytes,
                     maos_domain::invariants::i3::FrameOrigin::Kernel,
@@ -913,7 +928,7 @@ mod decision_audit_tests {
         // Construct and deliver 10 decision frames
         for id in 0..10 {
             let frame = make_decision_frame(id as u64);
-            let _ = adapter.deliver_typed(frame).await;
+            let _ = adapter.deliver_typed(frame, 0, None).await;
         }
 
         // Query the Transparency Log for decision-dispatch frames
@@ -983,7 +998,7 @@ mod decision_audit_tests {
             intent_lineage: IntentLineage::default(),
         };
 
-        let _ = adapter.deliver_typed(task_frame).await;
+        let _ = adapter.deliver_typed(task_frame, 0, None).await;
 
         let entries = log
             .query_frames(FrameFilter {
@@ -1054,7 +1069,7 @@ mod decision_audit_tests {
             frame.intent_lineage.is_empty(),
             "precondition: empty lineage"
         );
-        let result = adapter.deliver_typed(frame).await;
+        let result = adapter.deliver_typed(frame, 0, None).await;
         assert!(result.is_ok(), "human-authored cross-spirit should succeed");
 
         let entries = log.query_frames(FrameFilter::default()).unwrap();
@@ -1071,7 +1086,7 @@ mod decision_audit_tests {
             .unwrap();
 
         let frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
-        let result = adapter.deliver_typed(frame).await;
+        let result = adapter.deliver_typed(frame, 0, None).await;
         assert!(
             result.is_err(),
             "spirit-auto cross-spirit with empty lineage should be rejected"
@@ -1103,7 +1118,7 @@ mod decision_audit_tests {
             IntentLineage::new(vec![maos_domain::invariants::i8::A2AIntent::new(
                 "standard",
             )]);
-        let result = adapter.deliver_typed(frame).await;
+        let result = adapter.deliver_typed(frame, 0, None).await;
         assert!(
             result.is_ok(),
             "spirit-auto with non-empty lineage should succeed"
@@ -1126,7 +1141,7 @@ mod decision_audit_tests {
             host_id: None,
             role: None,
         }];
-        let result = adapter.deliver_typed(frame).await;
+        let result = adapter.deliver_typed(frame, 0, None).await;
         assert!(
             result.is_ok(),
             "same-spirit with empty lineage should succeed per ADR-018"
@@ -1141,7 +1156,7 @@ mod decision_audit_tests {
 
         let mut frame = make_cross_spirit_frame("spirit-a", "spirit-b", FrameOrigin::SpiritAuto);
         frame.to = smallvec![]; // broadcast — bypass lineage check
-        let result = adapter.deliver_typed(frame).await;
+        let result = adapter.deliver_typed(frame, 0, None).await;
         assert!(
             result.is_ok(),
             "broadcast with empty lineage should succeed"
@@ -1161,7 +1176,7 @@ mod decision_audit_tests {
         let existing =
             IntentLineage::new(vec![maos_domain::invariants::i8::A2AIntent::new("consult")]);
         frame.intent_lineage = existing.clone();
-        let result = adapter.deliver_typed(frame).await;
+        let result = adapter.deliver_typed(frame, 0, None).await;
         assert!(
             result.is_ok(),
             "human-authored with pre-existing lineage should succeed"

@@ -1,0 +1,2099 @@
+   Compiling ring v0.17.14
+warning: unused variable: `reason`
+  --> crates/maos-attrs/src/lib.rs:18:9
+   |
+18 |     let reason: Option<String> = None;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_reason`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-attrs` (lib) generated 1 warning (run `cargo fix --lib -p maos-attrs` to apply 1 suggestion)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Child`
+ --> crates/maos-mcp/src/transport/stdio.rs:8:20
+  |
+8 | use std::process::{Child, Command, Stdio};
+  |                    ^^^^^
+
+warning: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1287:21
+     |
+1287 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused variable: `notification`
+   --> spirits/butler/src/lib.rs:557:13
+    |
+557 |         let notification = last_notif_guard
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_notification`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `butler` (lib) generated 1 warning (run `cargo fix --lib -p butler` to apply 1 suggestion)
+   Compiling rustls v0.23.40
+   Compiling maos-corpus-gen v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-corpus-gen)
+   Compiling rustls-webpki v0.103.13
+   Compiling maos-capability v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-capability)
+   Compiling maos-compliance v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-compliance)
+   Compiling jsonwebtoken v9.3.1
+   Compiling rcgen v0.13.2
+   Compiling maos-secrets v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-secrets)
+   Compiling maos-sso v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-sso)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-iac v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-iac)
+   Compiling maos-acp v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-acp)
+   Compiling maos-registry v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-registry)
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+   Compiling maos-director-surface v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-director-surface)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:149:27
+    |
+149 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/maos-iac/src/adapter/transparency_log.rs:946:13
+    |
+946 |         let mut inner = self
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `intent_str` is never read
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:54:5
+   |
+49 | struct Submission {
+   |        ---------- field in this struct
+...
+54 |     intent_str: String,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+   Compiling maos-spirit-cli v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-spirit-cli)
+   Compiling maos-fkcs v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-fkcs)
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+   Compiling maos-a2a-core v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-a2a-core)
+   Compiling ureq v2.12.1
+   Compiling tokio-rustls v0.26.4
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: `maos-iac` (lib) generated 5 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+   Compiling maos-cohort v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-cohort)
+   Compiling maos-a2a v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-a2a)
+   Compiling maos-a2a-tcp v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-a2a-tcp)
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-cli v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-cli)
+   Compiling maos-digest v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/digest)
+warning: `maos-cohort` (lib) generated 1 warning
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-kernel-core)
+   Compiling maos-notify-push v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-notify-push)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:392:21
+    |
+392 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+   |
+22 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::halt::TerminationKind`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+   |
+12 | use maos_domain::halt::TerminationKind;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::halt::terminate_spirit`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+   |
+16 | use crate::halt::terminate_spirit;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ClassSection` and `GatewaysSection`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+   |
+22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+   |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+  --> crates/maos-kernel-core/src/scheduler/resource_ceiling.rs:14:5
+   |
+14 | use maos_domain::invariants::i9::SandboxTier;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+   |
+28 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+    |
+157 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+    |
+229 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:195:13
+    |
+195 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:84:5
+   |
+79 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+84 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:710:8
+    |
+117 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+710 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: associated function `now_ns` is never used
+  --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+   |
+37 | impl PrincipalNamespaceIndex {
+   | ---------------------------- associated function in this implementation
+...
+51 |     fn now_ns() -> u64 {
+   |        ^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:44:5
+   |
+42 | struct DiskCandidate {
+   |        ------------- field in this struct
+43 |     name: String,
+44 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:146:8
+    |
+ 69 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+146 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+   Compiling maos-bench v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-bench)
+   Compiling maos-shell v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-shell)
+   Compiling maos-control v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-control)
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> crates/maos-control/src/lib.rs:960:28
+    |
+960 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `header` is never used
+   --> crates/maos-control/src/lib.rs:772:8
+    |
+771 | impl Incoming<'_> {
+    | ----------------- method in this implementation
+772 |     fn header(&self, name: &str) -> Option<&str> {
+    |        ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-bin v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-bin)
+warning: `maos-control` (lib) generated 3 warnings
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (lib) generated 42 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+   Compiling xtask v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/xtask)
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+warning: function `fixture` is never used
+ --> xtask/tests/check_corpus_integration.rs:3:4
+  |
+3 | fn fixture(path: &str) -> String {
+  |    ^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `reference_spirits`, `reproducibility`, and `methodology` are never read
+  --> xtask/tests/pentest_gate_tests.rs:15:5
+   |
+13 | struct EngagementManifest {
+   |        ------------------ fields in this struct
+14 |     environment: EngagementEnvironment,
+15 |     reference_spirits: ReferenceSpirits,
+   |     ^^^^^^^^^^^^^^^^^
+16 |     reproducibility: Reproducibility,
+   |     ^^^^^^^^^^^^^^^
+17 |     methodology: Methodology,
+   |     ^^^^^^^^^^^
+   |
+   = note: `EngagementManifest` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `build_command`, `binary_path`, `maosctl_path`, and `maosctl_verify` are never read
+  --> xtask/tests/pentest_gate_tests.rs:23:5
+   |
+21 | struct EngagementEnvironment {
+   |        --------------------- fields in this struct
+22 |     pinned_commit_sha: String,
+23 |     build_command: String,
+   |     ^^^^^^^^^^^^^
+24 |     binary_path: String,
+   |     ^^^^^^^^^^^
+25 |     maosctl_path: String,
+   |     ^^^^^^^^^^^^
+26 |     maosctl_verify: String,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `EngagementEnvironment` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `hello_spirit`, `butler`, `worker`, `mira`, and `nash` are never read
+  --> xtask/tests/pentest_gate_tests.rs:31:5
+   |
+30 | struct ReferenceSpirits {
+   |        ---------------- fields in this struct
+31 |     hello_spirit: String,
+   |     ^^^^^^^^^^^^
+32 |     butler: String,
+   |     ^^^^^^
+33 |     worker: String,
+   |     ^^^^^^
+34 |     mira: String,
+   |     ^^^^
+35 |     nash: String,
+   |     ^^^^
+   |
+   = note: `ReferenceSpirits` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `rust_toolchain`, `cargo_lock`, `os`, and `instructions` are never read
+  --> xtask/tests/pentest_gate_tests.rs:40:5
+   |
+39 | struct Reproducibility {
+   |        --------------- fields in this struct
+40 |     rust_toolchain: String,
+   |     ^^^^^^^^^^^^^^
+41 |     cargo_lock: String,
+   |     ^^^^^^^^^^
+42 |     os: String,
+   |     ^^
+43 |     instructions: String,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `Reproducibility` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `owasp_frozen_doc`, `scope_doc`, `triage_protocol`, and `findings_schema` are never read
+  --> xtask/tests/pentest_gate_tests.rs:48:5
+   |
+47 | struct Methodology {
+   |        ----------- fields in this struct
+48 |     owasp_frozen_doc: String,
+   |     ^^^^^^^^^^^^^^^^
+49 |     scope_doc: String,
+   |     ^^^^^^^^^
+50 |     triage_protocol: String,
+   |     ^^^^^^^^^^^^^^^
+51 |     findings_schema: String,
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: `Methodology` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `PenTestSummary` is never constructed
+   --> xtask/tests/pentest_gate_tests.rs:102:8
+    |
+102 | struct PenTestSummary {
+    |        ^^^^^^^^^^^^^^
+
+warning: struct `GateSection` is never constructed
+   --> xtask/tests/pentest_gate_tests.rs:107:8
+    |
+107 | struct GateSection {
+    |        ^^^^^^^^^^^
+
+warning: function `workspace_path` is never used
+ --> xtask/tests/coverage_matrix_completeness_tests.rs:6:4
+  |
+6 | fn workspace_path(rel: &str) -> std::path::PathBuf {
+  |    ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `register_fixture_story` is never used
+   --> xtask/src/gate_common.rs:119:15
+    |
+119 | pub(crate) fn register_fixture_story(dir: &Path, file_name: &str) {
+    |               ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `xtask` (test "pentest_gate_tests") generated 7 warnings
+warning: `xtask` (test "coverage_matrix_completeness_tests") generated 1 warning
+warning: `xtask` (test "check_corpus_integration") generated 1 warning
+warning: unused variable: `root`
+  --> xtask/tests/example_spirit_regen_integration.rs:66:9
+   |
+66 |     let root = workspace_root();
+   |         ^^^^ help: if this is intentional, prefix it with an underscore: `_root`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `xtask` (test "example_spirit_regen_integration") generated 1 warning (run `cargo fix --test "example_spirit_regen_integration" -p xtask` to apply 1 suggestion)
+warning: `xtask` (lib test) generated 1 warning
+warning: unnecessary parentheses around function argument
+   --> xtask/src/check_migration_merkle.rs:342:41
+    |
+342 |             let payload: Vec<u8> = vec![(0x11u8 + i as u8); 64];
+    |                                         ^                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+342 -             let payload: Vec<u8> = vec![(0x11u8 + i as u8); 64];
+342 +             let payload: Vec<u8> = vec![0x11u8 + i as u8; 64];
+    |
+
+warning: unused import: `std::path::Path`
+   --> xtask/src/gen_termination_corpus.rs:210:9
+    |
+210 |     use std::path::Path;
+    |         ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::io::Write`
+   --> xtask/src/templates_regen.rs:261:9
+    |
+261 |     use std::io::Write;
+    |         ^^^^^^^^^^^^^^
+
+warning: fields `summary` and `adr_ref` are never read
+  --> xtask/src/check_abi_ratification.rs:22:9
+   |
+20 | pub struct RatificationEntry {
+   |            ----------------- fields in this struct
+21 |     pub proposal_id: String,
+22 |     pub summary: String,
+   |         ^^^^^^^
+23 |     pub adr_ref: String,
+   |         ^^^^^^^
+   |
+   = note: `RatificationEntry` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `detail` is never used
+   --> xtask/src/evidence_ledger.rs:536:12
+    |
+494 | impl SignatureCheck {
+    | ------------------- method in this implementation
+...
+536 |     pub fn detail(&self) -> &str {
+    |            ^^^^^^
+
+warning: field `substrate_present` is never read
+    --> xtask/src/evidence_ledger.rs:1259:9
+     |
+1254 | pub struct PublishedLeg {
+     |            ------------ field in this struct
+...
+1259 |     pub substrate_present: bool,
+     |         ^^^^^^^^^^^^^^^^^
+     |
+     = note: `PublishedLeg` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `synthetic` is never used
+   --> xtask/src/check_fkcs.rs:117:12
+    |
+116 | impl FkcsSurfaceSnapshot {
+    | ------------------------ associated function in this implementation
+117 |     pub fn synthetic<A, H, AS, HS>(src_lines: usize, abi_items: A, host_items: H) -> Self
+    |            ^^^^^^^^^
+
+warning: function `read_nonempty_lines` is never used
+   --> xtask/src/check_fkcs.rs:744:8
+    |
+744 | pub fn read_nonempty_lines(path: &str) -> Result<BTreeSet<String>, String> {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: field `owasp_methodology_commit` is never read
+  --> xtask/src/check_pentest_gate.rs:24:9
+   |
+19 | pub struct GateSection {
+   |            ----------- field in this struct
+...
+24 |     pub owasp_methodology_commit: String,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `GateSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `fixture_path` and `conformance_date` are never read
+  --> xtask/src/check_skill_conformance.rs:35:9
+   |
+29 | pub struct ConformanceSection {
+   |            ------------------ fields in this struct
+...
+35 |     pub fixture_path: String,
+   |         ^^^^^^^^^^^^
+36 |     pub conformance_date: String,
+   |         ^^^^^^^^^^^^^^^^
+   |
+   = note: `ConformanceSection` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `AlwaysDisagree` is never constructed
+  --> xtask/src/tests/rebaseline_check_tests.rs:55:12
+   |
+55 |     struct AlwaysDisagree;
+   |            ^^^^^^^^^^^^^^
+
+warning: `xtask` (bin "xtask") generated 7 warnings
+warning: `xtask` (bin "xtask" test) generated 10 warnings (6 duplicates) (run `cargo fix --bin "xtask" -p xtask --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.78s
+     Running unittests src/lib.rs (/tmp/r17-3c-tgt-xtask/debug/deps/xtask-7dbb025219f4e93c)
+
+running 16 tests
+test abi_diff::tests::line_diff_add_remove ... ok
+test abi_diff::tests::line_diff_identical ... ok
+test abi_diff::tests::resolve_fallback ... ok
+test check_host_surface::tests::empty_baseline_is_red ... ok
+test check_host_surface::tests::addition_and_removal_reds_on_addition_only ... ok
+test check_host_surface::tests::addition_is_red ... ok
+test check_host_surface::tests::empty_current_is_green_everything_removed ... ok
+test check_host_surface::tests::identical_is_green ... ok
+test check_host_surface::tests::mutation_proven_red ... ok
+test gate_common::evidence_projection_tests::only_the_two_proven_states_carry_evidence ... ok
+test check_host_surface::tests::whitespace_only_lines_ignored ... ok
+test gate_common::evidence_projection_tests::projection_truth_table_is_exhaustive ... ok
+test gate_common::evidence_projection_tests::wire_spellings_match_the_epic_vocabulary ... ok
+test gate_common::option_c_tests::advisory_substrate_blocks_only_when_the_substrate_is_present ... ok
+test gate_common::option_c_tests::blocking_class_hard_fails_a_red_oracle_regardless_of_substrate ... ok
+test gate_common::option_c_tests::phase_disposition_inherits_the_nearest_earlier_phase ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/tmp/r17-3c-tgt-xtask/debug/deps/xtask-698e102e4bcee543)
+
+running 520 tests
+test abi_diff::tests::line_diff_add_remove ... ok
+test abi_diff::tests::resolve_fallback ... ok
+test abi_diff::tests::line_diff_identical ... ok
+test calibrate::tests::n100_ci_width_within_threshold_passes ... ok
+test calibrate::tests::n500_ci_width_above_threshold_fails ... ok
+test calibrate::tests::wilson_ci_successes_gt_n_is_err ... ok
+test calibrate::tests::json_round_trip ... ok
+test calibrate::tests::calibrate_vacuous_on_absent_corpus ... ok
+test calibrate::tests::calibrate_reads_real_corpus_pass_rate ... ok
+test calibrate::tests::calibrate_surfaces_malformed_items ... ok
+test calibrate::tests::calibrate_detects_item_mismatch ... ok
+test calibrate::tests::calibrate_scanner_counts_all_items ... ok
+test calibrate::tests::wilson_empty_set ... ok
+test calibrate::tests::wilson_textbook_n500_p95_z1645 ... ok
+test calibrate::tests::wilson_textbook_n100_p50_z196 ... ok
+test check_a2a_sender_completeness::tests::brace_in_comment_does_not_desync_body_extraction ... ok
+test check_a2a_sender_completeness::tests::brace_in_string_does_not_desync_body_extraction ... ok
+test check_a2a_sender_completeness::tests::exempt_marker_ignored_on_production_sender_path ... ok
+test check_a2a_sender_completeness::tests::exempt_with_justification_suppresses_in_maos_bin_only ... ok
+test check_a2a_sender_completeness::tests::exempt_without_justification_is_violation ... ok
+test check_a2a_sender_completeness::tests::extract_fn_body_isolates_the_named_fn ... ok
+test check_a2a_sender_completeness::tests::flags_unclassified_frame_literal ... ok
+test check_a2a_sender_completeness::tests::missing_fn_in_body_extractor_returns_none ... ok
+test check_a2a_sender_completeness::tests::passes_classified_frame_literal ... ok
+test check_a2a_sender_completeness::tests::preceding_line_exempt_marker_suppresses ... ok
+test check_a2a_sender_completeness::tests::raw_string_braces_do_not_desync ... ok
+test check_abi_ratification::tests::base_case_no_changes_passes ... ok
+test check_abi_ratification::tests::partial_coverage_fails ... ok
+test check_abi_ratification::tests::proposed_entry_does_not_cover ... ok
+test check_abi_ratification::tests::r7_a_matching_ratification_passes ... ok
+test check_abi_ratification::tests::r7_b_withheld_ratification_fails ... ok
+test check_abi_ratification::tests::manifest_empty_loads ... ok
+test check_abi_ratification::tests::r7_c_canary_non_matching_fails ... ok
+test check_abi_ratification::tests::manifest_with_entry_loads ... ok
+test check_adr_040_accepted::tests::missing_file_reports_blocked ... ok
+test check_adr_040_accepted::tests::parse_frontmatter_extracts_status ... ok
+test check_adr_040_accepted::tests::parse_frontmatter_no_dashes ... ok
+test check_adr_040_accepted::tests::missing_status_field_reports ... ok
+test check_adr_040_accepted::tests::malformed_frontmatter_reports ... ok
+test check_adr_040_accepted::tests::status_accepted_passes ... ok
+test check_adr_040_accepted::tests::status_proposed_fails ... ok
+test check_bare_review_findings::tests::test_one_placeholder_exit_1 ... ok
+test check_cert_rotation_trigger::tests::a_file_that_derives_zero_tests_is_a_per_file_error ... ok
+test check_breaking_md::tests::fails_when_file_absent ... ok
+test check_cert_rotation_trigger::tests::derivation_matches_test_attributes_structurally ... ok
+test check_cert_rotation_trigger::tests::method_call_probe_skips_cfg_test_functions ... ok
+test check_cert_rotation_trigger::tests::test_summary_parser_folds_every_result_line ... ok
+test check_cert_rotation_trigger::tests::test_summary_parser_reports_zero_when_nothing_ran ... ok
+test check_breaking_md::tests::multiple_well_formed_entries_pass ... ok
+test check_cert_rotation_trigger::tests::the_gate_has_four_non_empty_legs ... ok
+test check_cert_rotation_trigger::tests::method_call_probe_sees_a_method_call_that_the_free_function_probe_cannot ... ok
+test check_cert_rotation_trigger::tests::method_call_probe_is_not_satisfied_by_a_free_function_of_the_same_name ... ok
+test check_bare_review_findings::tests::test_template_excluded ... ok
+test check_bare_review_findings::tests::test_multiple_placeholders_full_list ... ok
+test check_breaking_md::tests::fails_when_entry_missing_migration ... ok
+test check_bare_review_findings::tests::test_zero_placeholders_exit_0 ... ok
+test check_breaking_md::tests::passes_with_one_dated_entry_and_migration ... ok
+test check_corpus::tests::json_round_trip ... ok
+test check_breaking_md::tests::fails_when_no_dated_entry ... ok
+test check_cert_rotation_trigger::tests::method_call_probe_skips_cfg_test_modules ... ok
+test check_cross_region_consensus::tests::a_red_live_leg_blocks_now_that_binding_is_leg_level ... ok
+test check_cross_region_consensus::tests::every_consensus_leg_runs_one_exact_trusted_test ... ok
+test check_cert_rotation_trigger::tests::the_runtime_control_leg_requires_a_derived_marker ... ok
+test check_cross_region_consensus::tests::ledger_leg_names_are_derived_from_live_legs ... ok
+test check_cross_region_consensus::tests::skipped_leg_is_absent_not_green ... ok
+test check_dependency_closure::tests::clean_tree_line_not_flagged ... ok
+test check_dependency_closure::tests::scan_clean_closure_green ... ok
+test check_dependency_closure::tests::both_trees_are_checked ... ok
+test check_dependency_closure::tests::scan_clean_domain_tree_green ... ok
+test check_dependency_closure::tests::forbidden_line_detected ... ok
+test check_dependency_closure::tests::forbidden_list_includes_wasm_stack ... ok
+test check_corpus::tests::missing_file_detection ... ok
+test check_dependency_closure::tests::wasm_forbidden_line_detected ... ok
+test check_corpus::tests::empty_manifest_passes ... ok
+test check_dependency_closure::tests::scan_detects_buried_forbidden_crate_red ... ok
+test check_corpus::tests::mismatch_detection ... ok
+test check_dependency_closure::tests::scan_domain_tree_wasm_leak_red ... ok
+test check_dependency_closure::tests::scan_kernel_tree_wasm_leak_red ... ok
+test check_corpus::tests::parse_error_detection ... ok
+test check_dependency_closure::tests::forbidden_list_is_nonempty ... ok
+test check_corpus::tests::orphan_detection ... ok
+test check_dev_model_tier::tests::an_undeclared_md_file_is_not_a_story ... ok
+test check_dev_model_used_populated::tests::test_parse_dev_model_used_found ... ok
+test check_dev_model_used_populated::tests::test_parse_no_frontmatter ... ok
+test check_dev_model_tier::tests::pre_dev_story_is_skipped_not_failed ... ok
+test check_dev_model_tier::tests::frontier_model_with_review_marker_passes ... ok
+test check_dev_model_tier::tests::blocked_story_is_skipped_not_failed ... ok
+test check_dev_record_completeness::tests::an_ownerless_row_citing_no_disposition_is_the_blocking_half ... ok
+test check_dev_model_tier::tests::status_parser_strips_trailing_comment ... ok
+test check_dev_record_completeness::tests::completed_retrospective_owner_becomes_stale ... ok
+test check_dev_model_used_populated::tests::test_tbd_placeholder_exit_1 ... ok
+test check_dev_model_tier::tests::pre_frontier_epic_is_out_of_scope ... ok
+test check_corpus::tests::known_hash_round_trip ... ok
+test check_dev_model_tier::tests::non_frontier_model_reds_the_gate ... ok
+test check_dev_record_completeness::tests::unresolved_heading_keeps_open_ownerless_rows_visible ... ok
+test check_dev_model_tier::tests::unextractable_model_fails_closed ... ok
+test check_empty_kernel::tests::detects_hashmap_field ... ok
+test check_dev_model_used_populated::tests::blocked_story_is_skipped_not_failed ... ok
+test check_dev_model_tier::tests::unknown_status_is_still_checked ... ok
+test check_empty_kernel::tests::detects_mutex_field ... ok
+test check_cert_rotation_trigger::tests::every_leg_filter_names_a_test_that_exists ... ok
+test check_dev_model_tier::tests::missing_review_marker_reds_the_gate ... ok
+test check_dev_model_used_populated::tests::test_all_populated_exit_0 ... ok
+test check_dev_model_used_populated::tests::done_story_is_checked_and_fails_without_a_model ... ok
+test check_dev_model_used_populated::tests::test_one_empty_exit_1 ... ok
+test check_empty_kernel::tests::ignores_vec_of_primitive ... ok
+test check_empty_kernel::tests::ignores_vec_of_u8 ... ok
+test check_empty_kernel::tests::json_round_trip ... ok
+test check_dev_model_used_populated::tests::test_one_missing_exit_1 ... ok
+test check_empty_kernel::tests::detects_vec_of_struct ... ok
+test check_dev_record_completeness::tests::fails_when_dev_model_used_is_tbd ... ok
+test check_empty_kernel::tests::missing_exemption_doc_fires ... ok
+test check_empty_kernel::tests::recognizes_i9_exempt ... ok
+test check_empty_kernel::tests::whitelist_has_exactly_three_paths ... ok
+test check_epic_close_coherence::tests::draft_ready_for_preflight_agrees_with_backlog ... ok
+test check_empty_kernel::tests::whitelist_hit_skips_struct ... ok
+test check_epic_close_coherence::tests::epic_of_story_ignores_non_numeric_heads ... ok
+test check_epic_close_coherence::tests::index_claims_reads_count_and_status ... ok
+test check_epic_close_coherence::tests::pins_on_line_reads_both_assertion_forms ... ok
+test check_dev_record_completeness::tests::completion_notes_accepts_no_list_suffix ... ok
+test check_equiv_fixture_provenance::tests::missing_toolchain_is_rejected ... ok
+test check_equiv_fixture_provenance::tests::sha256_hex_is_lower_case ... ok
+test check_dev_record_completeness::tests::fails_when_completion_notes_empty ... ok
+test check_env_contract::tests::non_read_literals_and_registered_prefix_scans_stay_green ... ok
+test check_dev_record_completeness::tests::run_fails_when_deferred_register_is_missing ... ok
+test check_dev_model_tier::tests::same_story_marked_done_is_checked_and_reds ... ok
+test check_error_catalog::tests::is_e_prefixed_negative ... ok
+test check_error_catalog::tests::is_e_prefixed_positive ... ok
+test check_error_catalog::tests::invalid_severity_detected ... ok
+test check_dev_record_completeness::tests::fails_when_file_list_empty ... ok
+test check_error_catalog::tests::generator_is_deterministic ... ok
+test check_error_catalog::tests::link_shape_test ... ok
+test check_error_catalog::tests::negative_meta_test_stale_detected ... ok
+test check_error_catalog::tests::negative_meta_test_missing_field_detected ... ok
+test check_error_catalog::tests::negative_meta_test_uncatalogued_detected ... ok
+test check_error_catalog::tests::scan_excludes_cfg_test ... ok
+test check_error_catalog::tests::scan_excludes_non_error_e_enum ... ok
+test check_error_catalog::tests::scan_finds_e_prefixed_error_enum_variants ... ok
+test check_error_catalog::tests::scan_finds_e_prefixed_variant ... ok
+test check_export_control::tests::extract_fence_ignores_inline_marker_in_prose ... ok
+test check_error_catalog::tests::validate_passes_on_perfect_bijection ... ok
+test check_export_control::tests::extract_fence_returns_inner_content ... ok
+test check_export_control::tests::extract_fence_returns_none_without_markers ... ok
+test check_env_contract::tests::registered_multiline_raw_and_parenthesized_reads_stay_green ... ok
+test check_epic_close_coherence::tests::closed_epic_keeps_its_historical_pin ... ok
+test check_dev_record_completeness::tests::comment_stripped_done_story_is_checked_not_skipped ... ok
+test check_epic_close_coherence::tests::proven_red_epic_key_never_advanced ... ok
+test check_epic_close_coherence::tests::proven_red_planning_prose_disagrees ... ok
+test check_epic_close_coherence::tests::proven_red_story_count_disagrees ... ok
+test check_export_control::tests::fails_when_eccn_doc_empty ... ok
+test check_export_control::tests::fails_when_fence_is_stub ... ok
+test check_export_control::tests::scan_wasm_host_leak_clean_closure_green ... ok
+test check_export_control::tests::scan_wasm_host_leak_dedupes_repeated_wasmtime ... ok
+test check_export_control::tests::scan_wasm_host_leak_detects_wasm_host_crates_red ... ok
+test check_export_control::tests::scan_wasm_host_leak_detects_wasmtime_red ... ok
+test check_export_control::tests::wasm_host_leak_indicators_listed ... ok
+test check_env_contract::tests::partial_prefix_scan_fails ... ok
+test check_dev_record_completeness::tests::model_resolved_from_agent_model_used_body ... ok
+test check_export_control::tests::fails_when_stability_fence_missing ... ok
+test check_equiv_fixture_provenance::tests::source_hash_is_order_independent ... ok
+test check_dev_record_completeness::tests::sprint_status_loader_strips_the_provenance_comment ... ok
+test check_dev_record_completeness::tests::run_accepts_an_explicit_open_ownerless_row ... ok
+test check_dev_record_completeness::tests::file_list_with_only_prose_still_fails ... ok
+test check_fr47::tests::fixture_with_anthropic_dep_fails ... ok
+test check_fr47::tests::fixture_without_vendor_sdk_passes ... ok
+test check_epic_close_coherence::tests::clean_sources_pass ... ok
+test check_fr47::tests::fixture_with_renamed_dep_fails ... ok
+test check_dev_record_completeness::tests::file_list_accepts_markdown_table_paths ... ok
+test check_env_contract::tests::unregistered_multiline_raw_helper_read_fails ... ok
+test check_epic_close_coherence::tests::proven_red_epic_closed_over_an_open_story ... ok
+test check_fuzz_floor::tests::passes_when_floor_met_with_mature_history ... ok
+test check_epic_close_coherence::tests::proven_red_open_epic_cites_a_stale_pin ... ok
+test check_export_control::tests::fails_when_crypto_primitive_missing ... ok
+test check_export_control::tests::fails_when_sha256_only_as_substring ... ok
+test check_export_control::tests::fails_when_eccn_doc_absent ... ok
+test check_host_surface::tests::addition_and_removal_reds_on_addition_only ... ok
+test check_dev_record_completeness::tests::model_resolved_from_model_preamble ... ok
+test check_host_surface::tests::addition_is_red ... ok
+test check_host_surface::tests::empty_baseline_is_red ... ok
+test check_host_surface::tests::empty_current_is_green_everything_removed ... ok
+test check_host_surface::tests::identical_is_green ... ok
+test check_host_surface::tests::mutation_proven_red ... ok
+test check_host_surface::tests::whitespace_only_lines_ignored ... ok
+test check_error_catalog::tests::live_catalog_link_shape ... ok
+test check_fuzz_floor::tests::advisory_when_ledger_empty ... ok
+test check_judge_config::tests::json_round_trip ... ok
+test check_error_catalog::tests::live_catalog_golden_file_determinism ... ok
+test check_fuzz_floor::tests::advisory_when_history_under_90_days_even_if_below_floor ... ok
+test check_loom::tests::allowlist_hit_skips ... ok
+test check_fuzz_floor::tests::fails_below_floor_once_history_is_mature ... ok
+test check_loom::tests::blocklist_has_expected_entries ... ok
+test check_dev_record_completeness::tests::passes_when_record_is_complete ... ok
+test check_dev_record_completeness::tests::skips_non_done_stories ... ok
+test check_dev_record_completeness::tests::file_list_accepts_h2_header_and_subheadings ... ok
+test check_fuzz_floor::tests::rejects_unknown_target ... ok
+test check_export_control::tests::fails_when_crypto_crate_missing ... ok
+test check_dev_record_completeness::tests::stale_owner_sweep_reds_on_a_planted_done_owner ... ok
+test check_dev_record_completeness::tests::stale_owner_sweep_finds_every_measured_instance ... ok
+test check_fuzz_floor::tests::advisory_when_ledger_absent ... ok
+test check_dev_record_completeness::tests::no_model_anywhere_fails ... ok
+test check_loom::tests::detects_use_orchestrator ... ok
+test check_loom::tests::detects_planner_struct ... ok
+test check_loom::tests::ignores_comment_loom ... ok
+test check_loom::tests::ignores_planner_in_cfg_test ... ok
+test check_loom::tests::json_round_trip ... ok
+test check_loom::tests::ignores_planner_in_tests_mod ... ok
+test check_loom_substrate_drift::tests::contract_table_matches_ac2 ... ok
+test check_export_control::tests::passes_when_all_artifacts_present ... ok
+test check_loom_substrate_drift::tests::datname_extraction_handles_both_connection_shapes ... ok
+test check_fuzz_floor::tests::hard_fails_on_string_cpu_seconds_no_advisory_coercion ... ok
+test check_loom_substrate_drift::tests::slo_routes_cover_read_path_chokepoint ... ok
+test check_fuzz_floor::tests::ignores_records_outside_90_day_window ... ok
+test check_dev_record_completeness::tests::file_list_accepts_labeled_bullets ... ok
+test check_loom_substrate_drift::tests::filtered_reader_scan_excludes_unreachable_tests ... ok
+test check_judge_config::tests::bad_prompt_hash_format_fails ... ok
+test check_manifest_schema_version::tests::parse_const_finds_literal ... ok
+test check_manifest_schema_version::tests::parse_const_follows_alias ... ok
+test check_judge_config::tests::non_zero_temperature_fails ... ok
+test check_loom_substrate_drift::tests::bench_slo_reads_only_region_axis ... ok
+test check_manifest_schema_version::tests::parse_const_missing_returns_none ... ok
+test check_manifest_schema_version::tests::parse_post_v1_sections_extracts_entries ... ok
+test check_manifest_schema_version::tests::parse_post_v1_sections_returns_empty_vec ... ok
+test check_manifest_schema_version::tests::parse_post_v1_sections_returns_none_on_missing ... ok
+test check_judge_config::tests::empty_judge_config_passes ... ok
+test check_manifest_schema_version::tests::scan_flags_hardcoded_inequality_in_production ... ok
+test check_manifest_schema_version::tests::scan_allows_lines_referencing_min_supported_constant ... ok
+test check_manifest_schema_version::tests::scan_skips_test_module_and_toml_string_literals ... ok
+test check_migration_merkle::tests::manifest_corpus_entry_is_present_and_pinned ... ok
+test check_fuzz_targets::tests::fails_when_bin_target_missing ... ok
+test check_multi_provider_drift::tests::median_of_three_equal_flags_nothing ... ok
+test check_judge_config::tests::direct_call_identifier_in_test_code_fails ... ok
+test check_multi_provider_drift::tests::median_of_three_with_outlier_flags_one_row ... ok
+test check_multi_region_slo::tests::a_red_roundtrip_slo_leg_blocks_and_is_indeterminate ... ok
+test check_multi_region_slo::tests::halt_presence_is_hermetic_and_binds_without_substrate ... ok
+test check_multi_region_slo::tests::ledger_leg_names_are_derived_from_raw_labels ... ok
+test check_multi_region_slo::tests::parse_count_sums_passed_and_failed ... ok
+test check_multi_region_slo::tests::skipped_live_leg_is_absent_and_unmeasured ... ok
+test check_multi_region_slo::tests::structural_chokepoint_failure_blocks_without_postgres ... ok
+test check_multi_tenant_loom::tests::kernel_source_read_error_is_blocking_not_absent ... ok
+test check_multi_tenant_loom::tests::ledger_leg_names_are_derived_from_specs ... ok
+test check_multi_tenant_loom::tests::nested_transport_cause_match_is_detected ... ok
+test check_multi_provider_drift::tests::empty_report_returns_no_flags_and_zero_exit ... ok
+test check_multi_provider_drift::tests::missing_provider_row_flags ... ok
+test check_multi_provider_drift::tests::stop_reason_disagreement_flags ... ok
+test check_fuzz_targets::tests::passes_with_populated_ledger ... ok
+test check_fuzz_targets::tests::fails_when_corpus_empty ... ok
+test check_review_findings_resolved::tests::fails_when_open_finding_and_status_done ... ok
+test check_reza_production_path::tests::escape_wiring_probe_requires_a_real_call_expression ... ok
+test check_reza_production_path::tests::ledger_leg_names_are_derived_from_specs ... ok
+test check_reza_production_path::tests::successor_ownership_is_machine_read_and_non_required ... ok
+test check_rto::tests::default_thresholds_are_correct ... ok
+test check_review_findings_resolved::tests::flags_closed_finding_without_file_reference ... ok
+test check_rto::tests::rpo_violation_detected ... ok
+test check_rto::tests::rpo_within_threshold_for_fresh_backup ... ok
+test check_review_findings_resolved::tests::passes_when_no_open_findings_and_status_done ... ok
+test check_fuzz_targets::tests::fails_when_corpus_only_gitkeep ... ok
+test check_fuzz_targets::tests::fails_when_ledger_malformed ... ok
+test check_fuzz_targets::tests::fails_when_ledger_missing ... ok
+test check_review_findings_resolved::tests::permits_no_findings_with_deferral_marker ... ok
+test check_review_findings_resolved::tests::passes_when_open_finding_and_status_in_review ... ok
+test check_review_findings_resolved::tests::permits_no_findings_for_bootstrap_stories ... ok
+test check_fuzz_targets::tests::passes_when_all_mechanics_present ... ok
+test check_fuzz_targets::tests::fails_when_cargo_toml_malformed ... ok
+test check_rto_gate::tests::rto_drill_failure_fails ... ok
+test check_rto_gate::tests::rto_exceeds_threshold_fails ... ok
+test check_rto_gate::tests::rto_future_dated_evidence_fails_recency ... ok
+test check_rto_gate::tests::rto_stale_evidence_fails_recency ... ok
+test check_security_md::tests::fails_when_file_absent ... ok
+test check_fuzz_targets::tests::fails_when_target_source_absent ... ok
+test check_security_md::tests::extra_h2_sections_are_allowed ... ok
+test check_rto_gate::tests::rto_within_threshold_passes ... ok
+test check_security_md::tests::gpg_placeholder_control_passes_when_placeholder_absent ... ok
+test check_rto_gate::tests::rto_no_evidence_is_skipped_not_silent_pass ... ok
+test check_security_md::tests::fails_when_any_section_missing ... ok
+test check_security_md::tests::version_row_control_rejects_11_0_x_substring_row ... ok
+test check_security_md::tests::fails_when_required_section_is_at_h1_not_h2 ... ok
+test check_security_md::tests::gpg_placeholder_control_fails_when_placeholder_present ... ok
+test check_security_md::tests::passes_when_all_four_h2_sections_present ... ok
+test check_security_md::tests::version_row_control_fails_without_1_0_x_row ... ok
+test check_security_md::tests::version_row_control_passes_with_1_0_x_row ... ok
+test check_security_md::tests::version_row_control_rejects_prose_mention_outside_table_row ... ok
+test check_service_boundary::tests::check_p4_allows_shutdown_exit_code ... ok
+test check_service_boundary::tests::check_p4_flags_bare_exit ... ok
+test check_service_boundary::tests::doc_attr_stripper_handles_escapes_and_brackets ... ok
+test check_service_boundary::tests::doc_comment_change_is_not_a_surface_change ... ok
+test check_service_boundary::tests::fn_body_change_is_not_a_surface_change ... ok
+test check_serde_error_handling::tests::ignores_explicit_allow_marker ... ok
+test check_service_boundary::tests::json_round_trip ... ok
+test check_service_boundary::tests::p1_reports_enforced_when_no_main_rs ... ok
+test check_service_boundary::tests::p2_reports_enforced_when_no_api_rs ... ok
+test check_service_boundary::tests::fn_signature_change_is_a_surface_change ... ok
+test check_serde_error_handling::tests::ignores_commented_code ... ok
+test check_service_boundary::tests::snapshot_empty_crate_stable ... ok
+test check_service_boundary::tests::p3_reports_supervisor_exception_and_enforced_when_no_kernel ... ok
+test check_serde_error_handling::tests::ignores_question_mark_propagation ... ok
+test check_service_boundary::tests::signature_hash_changes_on_return_type ... ok
+test check_serde_error_handling::tests::detects_unwrap_multiline ... ok
+test check_serde_error_handling::tests::detects_unwrap_or_default_inline ... ok
+test check_serde_error_handling::tests::detects_expect_after_serde_cbor ... ok
+test check_serde_error_handling::tests::ignores_map_err_chain ... ok
+test check_ship_gate_completeness::tests::asserted_badge_with_no_published_ledger_reds ... ok
+test check_ship_gate_completeness::tests::detects_missing_gate ... ok
+test check_ship_gate_completeness::tests::advisory_gate_may_report_not_proven ... ok
+test check_ship_gate_completeness::tests::advisory_gate_still_must_publish_its_ledger ... ok
+test check_serde_error_handling::tests::detects_ciborium_nested_module ... ok
+test check_service_boundary::tests::struct_field_change_is_still_a_surface_change ... ok
+test check_ship_gate_completeness::tests::asserted_badge_over_not_proven_evidence_reds ... ok
+test check_serde_error_handling::tests::detects_multiple_violations_in_one_file ... ok
+test check_ship_gate_completeness::tests::extracts_needs_from_sample_yaml ... ok
+test check_ship_gate_completeness::tests::ledger_consumption_is_scoped_to_the_artifact_consuming_job ... ok
+test check_ship_gate_completeness::tests::asserted_badge_over_proven_evidence_passes ... ok
+test check_unsafe::tests::clean_code_has_no_violations ... ok
+test check_unsafe::tests::detects_allow_unsafe_code ... ok
+test check_unsafe::tests::detects_cfg_attr_allow_unsafe ... ok
+test check_unsafe::tests::detects_unsafe_fn ... ok
+test check_unsafe::tests::detects_unsafe_block ... ok
+test check_unsafe::tests::allowed_list_is_empty ... ok
+test check_wasm_form_equiv::tests::parse_count_skips_space_before_key ... ok
+test check_wasm_form_equiv::tests::parses_failure_summary ... ok
+test check_wasm_form_equiv::tests::parses_no_summary_as_zero ... ok
+test check_wasm_form_equiv::tests::parses_passed_and_failed_counts ... ok
+test check_loom_substrate_drift::tests::service_block_drift_catches_unregistered_fifth_job ... ok
+test check_loom_substrate_drift::tests::service_block_drift_catches_manual_unregistered_fifth_gate_job ... ok
+test check_wasm_form_equiv::tests::parses_real_cargo_summary_line ... ok
+test check_unsafe::tests::json_output_round_trip ... ok
+test check_loom_substrate_drift::tests::reza_routes_trace_invoked_live_tests ... ok
+test check_wasm_form_equiv::tests::phase_logic_advisory_now_blocking_at_v2_0 ... ok
+test check_unsafe::tests::recognizes_forbid_unsafe_code ... ok
+test check_workspace_count::tests::extract_declared_count_from_markdown ... ok
+test check_workspace_count::tests::count_members_from_toml ... ok
+test check_loom_substrate_drift::tests::real_topology_is_axis_distinct_and_its_aliases_are_ratified ... ok
+test check_workspace_count::tests::missing_workspace_section_is_error ... ok
+test corpus_staleness::tests::json_round_trip ... ok
+test check_workspace_count::tests::sentinel_not_found_is_error ... ok
+test check_workspace_count::tests::multiple_sentinels_is_error ... ok
+test check_workspace_count::tests::missing_members_key_is_error ... ok
+test check_workspace_count::tests::non_array_members_is_error ... ok
+test check_workspace_count::tests::extract_declared_count_sentinel_alone_on_line ... ok
+test check_workspace_count::tests::sentinel_present_but_unparseable_count_is_error ... ok
+test check_loom_substrate_drift::tests::service_block_drift_catches_divergence ... ok
+test check_workspace_count::tests::negative_mismatch_reports_failed ... ok
+test corpus_staleness::tests::expired_row_violates ... ok
+test coverage_matrix::tests::json_round_trip ... ok
+test corpus_staleness::tests::manifest_expired_violates ... ok
+test check_ship_gate_completeness::tests::every_expected_gate_but_the_four_legacy_ones_has_a_disposition ... ok
+test corpus_staleness::tests::within_warn_window_emits_warning ... ok
+test corpus_staleness::tests::not_yet_due_row_passes ... ok
+test check_loom_substrate_drift::tests::topology_value_control_catches_an_unratified_shared_standin_alias ... ok
+test coverage_matrix_nfr_test_3::tests::t5_5_unknown_spirit_fails ... ok
+test check_wasm_form_equiv::tests::registry_disposition_graduates_to_blocking_at_v2_0 ... ok
+test coverage_matrix_nfr_test_3::tests::t5_10_soft_floor_never_fails_at_v05 ... ok
+test demo_j1::tests::a_completion_before_its_own_delegation_fails_the_order_beat ... ok
+test demo_j1::tests::a_crashed_worker_exit_fails_the_idle_beat ... ok
+test demo_j1::tests::a_delegation_to_the_wrong_host_fails ... ok
+test demo_j1::tests::a_drain_timeout_fails_the_scene ... ok
+test demo_j1::tests::a_fixture_take_never_claims_tier2 ... ok
+test demo_j1::tests::a_missing_delegation_event_fails_the_frame_borne_beat ... ok
+test check_loom_substrate_drift::tests::topology_value_control_catches_a_collapsed_region_axis ... ok
+test demo_j1::tests::a_missing_worker_exit_row_fails_the_idle_beat ... ok
+test coverage_matrix::tests::uncovered_delivered_row_violates ... ok
+test check_loom_substrate_drift::tests::ratified_alias_list_is_held_non_vacuous ... ok
+test demo_j1::tests::a_repeated_lifecycle_stage_fails_the_order_beat ... ok
+test coverage_matrix_nfr_test_3::tests::t5_4_butler_not_yet_shipped ... ok
+test demo_j1::tests::absent_beats_are_visible_and_never_fail_the_scene ... ok
+test demo_j1::tests::a_spirit_that_never_idled_fails_the_idle_beat ... ok
+test coverage_matrix_nfr_test_3::tests::t5_6_walk_all_spirits ... ok
+test coverage_matrix::tests::mode_warning_returns_zero_with_violations ... ok
+test demo_j1::tests::a_writer_task_failure_fails_the_drain_beat ... ok
+test coverage_matrix::tests::empty_coverage_passes ... ok
+test coverage_matrix::tests::phase_config_mismatch_fails ... ok
+test coverage_matrix_nfr_test_3::tests::t5_7_dry_run_does_not_write ... ok
+test coverage_matrix::tests::dangling_gate_ref_fails ... ok
+test coverage_matrix::tests::dangling_corpus_ref_fails ... ok
+test check_loom_substrate_drift::tests::topology_value_control_catches_a_collapsed_team_axis ... ok
+test coverage_matrix::tests::deferred_row_goes_to_out_of_scope ... ok
+test coverage_matrix_nfr_test_3::tests::t5_2_example_spirit_reports_100 ... ok
+test coverage_matrix_nfr_test_3::tests::t5_3_example_spirit_ts_reports_100 ... ok
+test coverage_matrix_nfr_test_3::tests::t5_1_hello_spirit_reports_100 ... ok
+test demo_j1::tests::an_ambient_journal_warning_fails_the_clean_home_beat ... ok
+test demo_j1::tests::an_executed_beat_that_did_not_hold_fails ... ok
+test demo_j1::tests::command_metadata_is_derived_and_never_says_injected ... ok
+test demo_j1::tests::completion_comes_from_the_oracle_not_from_a_tl_ref ... ok
+test demo_j1::tests::entry_count_reads_the_verify_line ... ok
+test coverage_matrix_nfr_test_3::tests::t5_9_zero_declared_caps_vacuous_floor_100 ... ok
+test demo_j1::tests::the_refusal_beat_is_no_longer_declared_unlanded ... ok
+test coverage_matrix_nfr_test_3::tests::t5_8_partial_coverage_reports_50 ... ok
+test demo_j1::tests::the_refusal_beat_is_emitted_by_the_gate_judging_path ... ok
+test demo_j1::tests::the_signable_allowlist_admits_both_real_adapters_and_refuses_the_fixture ... ok
+test demo_j1::tests::the_full_post_1a_stream_proves_every_executed_beat ... ok
+test demo_j1::tests::two_host_beat_with_present_capture_renders_indeterminate_not_fail ... ok
+test demo_j1::tests::two_host_beat_with_refused_capture_still_renders_indeterminate_not_fail ... ok
+test demo_reza::tests::host_args_default_the_port_when_absent ... ok
+test demo_j1::tests::two_host_beats_are_owned_by_their_crosshost_stories ... ok
+test demo_reza::tests::host_args_parse_a_full_connection_string ... ok
+test demo_reza::tests::substrate_env_keeps_both_axes_pairwise_distinct ... ok
+test demo_j1::tests::resolve_topology_worker_refuses_an_unsupported_cli ... ok
+test demo_reza::tests::substrate_env_points_the_legacy_singular_at_team_b ... ok
+test demo_j1::tests::resolve_topology_worker_refuses_a_topology_with_no_wrapper ... ok
+test evidence_ledger::tests::configured_audit_key_errors_fail_loudly ... ok
+test evidence_ledger::tests::absent_successors_are_derived_from_absent_legs ... ok
+test evidence_ledger::tests::green_but_unsigned_live_leg_refuses_the_claim_without_blocking_a_lane ... ok
+test evidence_ledger::tests::empty_signature_block_is_not_proven ... ok
+test evidence_ledger::tests::green_unsigned_success_is_reported_as_advisory ... ok
+test evidence_ledger::tests::ledger_set_is_derived_from_contracts ... ok
+test demo_j1::tests::resolve_topology_worker_refuses_multiple_wrappers ... ok
+test demo_j1::tests::resolve_topology_worker_resolves_the_single_wrapper ... ok
+test evidence_ledger::tests::planted_absent_required_leg_blocks_on_the_enforced_lane ... ok
+test evidence_ledger::tests::planted_red_live_leg_blocks ... ok
+test evidence_ledger::tests::missing_operator_key_downgrades_with_a_written_reason ... ok
+test evidence_ledger::tests::product_claim_is_proven_only_when_every_required_leg_is_proven ... ok
+test evidence_ledger::tests::correctly_signed_and_bound_record_is_proven_live_signed ... ok
+test evidence_ledger::tests::published_ledger_rejects_another_workflow_run_binding ... ok
+test evidence_ledger::tests::published_leg_cannot_reassign_a_valid_test_record ... ok
+test evidence_ledger::tests::red_live_leg_still_blocks_on_both_lanes ... ok
+test evidence_ledger::tests::required_defaults_on_and_exempts_only_the_drift_tripwires ... ok
+test evidence_ledger::tests::the_declared_absent_successor_is_exempt_from_required ... ok
+test evidence_ledger::tests::worktree_binding_changes_with_uncommitted_content ... ok
+test gate_common::evidence_projection_tests::only_the_two_proven_states_carry_evidence ... ok
+test gate_common::evidence_projection_tests::projection_truth_table_is_exhaustive ... ok
+test gate_common::evidence_projection_tests::wire_spellings_match_the_epic_vocabulary ... ok
+test evidence_ledger::tests::signature_not_bound_to_this_build_is_not_proven ... ok
+test demo_j1::tests::the_sealed_export_pubkey_is_carried_into_verification ... ok
+test gate_common::option_c_tests::advisory_substrate_blocks_only_when_the_substrate_is_present ... ok
+test gate_common::option_c_tests::phase_disposition_inherits_the_nearest_earlier_phase ... ok
+test evidence_ledger::tests::signed_record_is_bound_to_expected_test_and_passed_outcome ... ok
+test evidence_ledger::tests::published_ledger_rejects_missing_required_gate_owned_leg ... ok
+test evidence_ledger::tests::missing_journey_leg_refuses_proven_claim_before_claim_comparison ... ok
+test evidence_ledger::tests::published_ledger_rejects_unknown_gate_leg ... ok
+test check_loom_substrate_drift::tests::topology_value_control_rejects_missing_and_empty_axis_values ... ok
+test evidence_ledger::tests::signature_that_fails_verification_is_not_proven ... ok
+test evidence_ledger::tests::serialized_empty_signature_cannot_claim_proven ... ok
+test evidence_ledger::tests::published_claim_is_rederived_from_full_ledger ... ok
+test gate_common::option_c_tests::blocking_class_hard_fails_a_red_oracle_regardless_of_substrate ... ok
+test gen_isolation_corpus::tests::each_category_floor_25_aggregate ... ok
+test gen_abi_docs::tests::empty_diff_floor ... ok
+test gen_isolation_corpus::tests::generator_counts_total_200 ... ok
+test gen_abi_docs::tests::cross_gate_contract_module_coverage ... ok
+test invariant_lock::tests::detect_regression_runtime_to_ci ... ok
+test invariant_lock::tests::json_output_round_trip ... ok
+test invariant_lock::tests::parse_cadence_handles_tabs ... ok
+test invariant_lock::tests::parse_cadence_handles_14_distinct_files ... ok
+test invariant_lock::tests::parse_cadence_works ... ok
+test invariant_lock::tests::regression_detection_in_14_invariant_batch ... ok
+test invariant_lock::tests::detect_revert_captures_both_idioms_when_present ... ok
+test kloc_check::tests::alarm_fires_at_threshold ... ok
+test check_cert_rotation_trigger::tests::derivation_is_attribute_aware_not_prefix_based ... ok
+test invariant_lock::tests::detect_revert_matches_this_reverts_commit_idiom ... ok
+test invariant_lock::tests::detect_revert_returns_none_on_unreadable_body_path ... ok
+test kloc_check::tests::hardfail_at_aggregate_threshold ... ok
+test kloc_check::tests::hardfail_at_per_crate_threshold ... ok
+test kloc_check::tests::infer_crate_empty_for_target ... ok
+test kloc_check::tests::infer_crate_fallback_for_unknown_path ... ok
+test kloc_check::tests::infer_crate_from_crates_path ... ok
+test kloc_check::tests::infer_crate_from_xtask_path ... ok
+test gen_abi_docs::tests::generated_abi_pages_have_explicit_heading_ids ... ok
+test invariant_lock::tests::detect_revert_rejects_non_numeric_pr_ref ... ok
+test invariant_lock::tests::detect_revert_matches_reverts_pr_idiom ... ok
+test invariant_lock::tests::no_invariant_touch_passes ... ok
+test invariant_lock::tests::detect_revert_returns_none_on_non_revert_body ... ok
+test invariant_lock::tests::detect_revert_rejects_too_short_sha ... ok
+test gen_abi_docs::tests::generated_abi_pages_have_unique_heading_ids ... ok
+test kloc_check::tests::tokei_version_parser_names_both_versions ... ok
+test gen_abi_docs::tests::value_provenance_manifest_schema_version ... ok
+test check_cert_rotation_trigger::tests::every_derived_rotation_test_is_named_by_a_leg ... ok
+test nfr_onb_1_gate::tests::gate_passes_against_committed_artifacts ... ok
+test rebaseline_check::tests::json_round_trip ... ok
+test rebaseline_check::tests::offline_mode_fails_mismatched_items ... ok
+test rebaseline_check::tests::offline_mode_passes_matching_items ... ok
+test kloc_check::tests::absent_tokei_binary_is_named_not_skipped ... ok
+test rebaseline_check::tests::empty_manifest_vacuous_truth ... ok
+test rebaseline_check::tests::ratio_below_threshold_violates ... ok
+test kloc_check::tests::missing_or_non_integer_aggregate_threshold_is_named ... ok
+test stability_matrix::tests::export_non_stub_issue_flags_empty_fence ... ok
+test kloc_check::tests::quoted_or_negative_crate_budget_is_named ... ok
+test stability_matrix::tests::export_non_stub_issue_flags_missing_fence ... ok
+test stability_matrix::tests::export_non_stub_issue_flags_nested_marker ... ok
+test stability_matrix::tests::export_non_stub_issue_flags_placeholder ... ok
+test stability_matrix::tests::export_non_stub_issue_passes_real_content ... ok
+test gen_abi_docs::tests::anti_rot_gate_catches_semantic_drift ... ok
+test check_loom_substrate_drift::tests::cross_region_live_reads_include_all_three_axes ... ok
+test gen_abi_docs::tests::anti_rot_gate_catches_orphan_generated_page ... ok
+test kloc_check::tests::missing_or_non_integer_hardfail_threshold_is_named ... ok
+test check_loom_substrate_drift::tests::consensus_oracle_pg_tests_acquire_guard ... ok
+test stability_matrix::tests::lts_clock_is_placeholder_without_v1_tag ... ok
+test templates_regen::tests::check_mode_passes_when_in_lockstep ... ok
+test templates_regen::tests::deprecated_alias_emits_warning ... ok
+test templates_regen::tests::invalid_language_fails ... ok
+test templates_regen::tests::cross_template_field_consistency ... ok
+test stability_matrix::tests::render_contains_full_nfr_comp_3_scope ... ok
+test templates_regen::tests::ts_template_renders_correctly ... ok
+test templates_regen::tests::check_mode_fails_on_drift ... ok
+test templates_regen::tests::rust_template_renders_correctly ... ok
+test kloc_check::tests::measured_crate_without_budget_is_named ... ok
+test kloc_check::tests::budget_row_nested_below_a_table_header_is_named ... ok
+test kloc_check::tests::per_crate_only_breach_does_not_claim_an_aggregate_hard_fail ... ok
+test kloc_check::tests::operator_output_names_the_configured_thresholds ... ok
+test kloc_check::tests::inverted_aggregate_thresholds_are_named ... ok
+test stability_matrix::tests::render_is_deterministic_and_sources_live_triple ... ok
+test stability_matrix::tests::extract_preserved_export_refuses_malformed_fence_proven_red ... ok
+test stability_matrix::tests::check_detects_drift_proven_red ... ok
+test stability_matrix::tests::render_preserves_committed_export_fence_content ... ok
+test stability_matrix::tests::check_passes_with_nonstub_export_fence ... ok
+test stability_matrix::tests::check_rejects_stub_export_fence_proven_red ... ok
+test kloc_check::tests::tokei_version_pin_is_enforced_at_the_call_site ... ok
+test kloc_check::tests::alarm_binds_at_the_configured_threshold_and_stays_advisory ... ok
+test kloc_check::tests::kloc_check_produces_report_on_workspace ... ok
+test kloc_check::tests::kloc_check_runs_on_workspace ... ok
+test gen_termination_corpus::tests::gen_produces_exactly_1000_files ... ok
+test check_migration_merkle::tests::rederive_corpus_oracles_is_deterministic_green ... ok
+test gen_termination_corpus::tests::gen_kind_distribution ... ok
+test invariant_lock::tests::multi_invariant_with_corpus_delta_clears_that_leg ... ok
+test invariant_lock::tests::multi_invariant_touched_set_complete ... ok
+test gen_termination_corpus::tests::gen_is_deterministic_two_runs_yield_identical_files ... ok
+test check_loom_substrate_drift::tests::env_consistency_catches_d4_missing_export ... ok
+test check_loom_substrate_drift::tests::env_consistency_catches_d7_extra_export ... ok
+test check_loom_substrate_drift::tests::env_consistency_ignores_env_on_non_gate_step ... ok
+test check_migration_merkle::tests::rederive_corpus_oracles_detects_tampered_frame_id_red ... ok
+test check_error_catalog::tests::live_catalog_check_passes ... ok
+test check_rto::tests::synthetic_tl_round_trip ... ok
+test check_rto::tests::full_drill_synthetic_passes ... ok
+
+test result: ok. 520 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.60s
+
+     Running tests/abi_diff_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/abi_diff_integration-5529a346c7ed1e27)
+
+running 5 tests
+test generic_bound_reorder_deterministic ... ok
+test pub_use_reexport_removal_detected ... ok
+test pub_use_reexport_preserved ... ok
+test quote_whitespace_no_false_positive ... ok
+test inline_mod_items_visible ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s
+
+     Running tests/calibrate_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/calibrate_integration-22b145a5612a443f)
+
+running 4 tests
+test calibrate_passes_on_mismatch_but_within_ci ... ok
+test calibrate_fails_on_mismatch_at_p_0_99 ... ok
+test calibrate_passes_on_clean_corpus ... ok
+test calibrate_surfaces_malformed_items ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.03s
+
+     Running tests/check_corpus_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_corpus_integration-7a913ae5b2059673)
+
+running 3 tests
+test clean_calibration_corpus_smoke ... ok
+test clean_corpus_passes ... ok
+test violation_corpus_fails ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+     Running tests/check_exit_commands_gate.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_exit_commands_gate-6fc0f0a499bfd131)
+
+running 32 tests
+test a_hash_inside_quotes_is_not_a_comment ... ok
+test a_glued_subshell_paren_does_not_become_the_head ... ok
+test a_non_done_epic_with_no_exit_block_reds ... ok
+test an_empty_corpus_reds_rather_than_passing_vacuously ... ok
+test a_plain_cargo_invocation_is_declared_not_resolved ... ok
+test bare_maos_with_a_declared_mode_is_green ... ok
+test cargo_run_p_xtask_resolves_the_verb_after_the_double_dash ... ok
+test command_substitution_is_matched_before_separator_splitting ... ok
+test bogus_one_shot_mode_reds_even_though_bare_maos_is_legal ... ok
+test done_epics_are_out_of_the_roster ... ok
+test exit_block_without_a_closing_fence_reds ... ok
+test env_wrapper_does_not_hide_its_child_command ... ok
+test malformed_shell_boundaries_red_instead_of_resolving ... ok
+test extra_files_without_a_block_are_not_a_finding ... ok
+test green_control_block_passes_and_is_not_vacuous ... ok
+test nested_and_secondary_cli_commands_are_resolved_at_every_level ... ok
+test quoted_placeholder_is_green ... ok
+test quoted_placeholder_still_requires_a_declaration ... ok
+test planted_absent_verb_reds ... ok
+test sprint_status_epic_without_any_candidate_file_reds ... ok
+test two_exit_block_files_for_one_epic_reds ... ok
+test unquoted_placeholder_reds_as_a_redirection_hazard ... ok
+test unreadable_required_help_surface_is_a_finding ... ok
+test whole_line_comments_carry_no_tokens ... ok
+test unrecognised_token_reds_instead_of_being_skipped ... ok
+test owner_claim_requires_token_boundaries ... ok
+test resolve_or_be_named_reds_when_the_owner_never_claims_the_token ... ok
+test owed_token_binds_to_the_exact_exit_line_and_full_command_path ... ok
+test resolve_or_be_named_reds_when_the_owning_story_is_done ... ok
+test unreadable_planned_binary_is_owed_by_its_exact_exit_line ... ok
+test unreadable_unowned_binary_is_a_surface_finding ... ok
+test resolve_or_be_named_accepts_a_token_owed_by_an_open_story ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/check_judge_config_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_judge_config_integration-a8b0c35c2e68da0f)
+
+running 4 tests
+test clean_judge_direct_call_passes ... ok
+test violation_judge_direct_call_fails ... ok
+test clean_judge_config_passes ... ok
+test violation_judge_config_fails ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.89s
+
+     Running tests/check_mock_not_in_release_smoke.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_mock_not_in_release_smoke-15bcf123e19cb081)
+
+running 2 tests
+test gate_passes_on_clean_binary ... ok
+test gate_json_output_serializes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/check_multi_provider_drift_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_multi_provider_drift_integration-35fa92e1f78a3827)
+
+running 3 tests
+test with_outlier_report_returns_zero_exit_annotation_mode ... ok
+test with_outlier_strict_mode_returns_nonzero_exit ... ok
+test clean_report_returns_zero_exit ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests/check_release_precondition_gate.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_release_precondition_gate-b14d6c99264de45f)
+
+running 9 tests
+test empty_check_run_set_refuses_over_the_stdin_transport ... ok
+test success_allows_over_the_stdin_transport_the_workflow_uses ... ok
+test completed_failure_refuses ... ok
+test empty_check_run_set_refuses_and_names_the_main_branch_cause ... ok
+test completed_skipped_refuses ... ok
+test a_similarly_named_check_run_is_not_the_aggregate ... ok
+test a_trailing_success_cannot_mask_the_latest_failure ... ok
+test completed_success_allows ... ok
+test in_progress_refuses ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/check_unsafe_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/check_unsafe_integration-568b14d0928e0cc1)
+
+running 2 tests
+test with_unsafe_fails ... ok
+test without_unsafe_passes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+
+     Running tests/corpus_staleness_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/corpus_staleness_integration-cd0ef80041df436e)
+
+running 2 tests
+test violation_staleness_fails ... ok
+test clean_staleness_passes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/coverage_matrix_completeness_tests.rs (/tmp/r17-3c-tgt-xtask/debug/deps/coverage_matrix_completeness_tests-62ca205840f682dd)
+
+running 3 tests
+test fails_on_empty_v1_0_gates ... ok
+test passes_on_populated_v1_0_gates ... ok
+test advisory_until_engagement_counts_as_non_empty ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/coverage_matrix_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/coverage_matrix_integration-c4673473fa9312e5)
+
+running 4 tests
+test violation_coverage_matrix_warning_passes ... ok
+test violation_coverage_matrix_hard_fails ... ok
+test coverage_matrix_lint_fails_on_missing_fr ... ok
+test clean_coverage_matrix_passes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+
+     Running tests/d11_xtask_ceiling_ratchet.rs (/tmp/r17-3c-tgt-xtask/debug/deps/d11_xtask_ceiling_ratchet-1726a1b553a3f259)
+
+running 7 tests
+test ceiling_raise_citing_a_done_story_reds ... ok
+test ceiling_raise_citing_an_open_story_passes ... ok
+test ceiling_raise_after_every_numbered_epic_is_done_reds ... ok
+test ceiling_raise_without_a_story_citation_reds ... ok
+test the_tree_bound_inputs_exist ... ok
+test the_ceiling_is_not_frozen_while_a_numbered_epic_is_open ... ok
+test the_live_xtask_ceiling_cites_a_real_sprint_story ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/d19_story_file_governance.rs (/tmp/r17-3c-tgt-xtask/debug/deps/d19_story_file_governance-04fb8051ccd9017d)
+
+running 11 tests
+test a_j1_story_with_an_open_finding_while_done_reds ... ok
+test an_empty_development_status_block_reds_too ... ok
+test epic_rollups_and_retrospectives_are_not_governed ... ok
+test a_j1_story_with_a_bare_review_findings_placeholder_reds ... ok
+test a_j1_story_with_no_recorded_model_reds ... ok
+test the_same_defect_reds_under_a_numeric_key_too ... ok
+test a_j1_story_with_a_missing_dev_record_reds_the_blocking_gate ... ok
+test a_missing_sprint_status_reds_rather_than_governing_nothing ... ok
+test a_complete_fixture_is_green_on_every_converted_gate ... ok
+test an_ungoverned_md_file_reds_nothing ... ok
+test an_active_declared_story_with_no_file_reds_every_walker ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/decision_adrs_and_provisioning.rs (/tmp/r17-3c-tgt-xtask/debug/deps/decision_adrs_and_provisioning-97f490cee47a7f1e)
+
+running 3 tests
+test complete_fixture_is_green_before_any_red_is_credited ... ok
+test real_repository_satisfies_decision_adrs_and_provisioning_contract ... ok
+test every_clause_and_denominator_has_a_planted_red ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/decision_register_gate.rs (/tmp/r17-3c-tgt-xtask/debug/deps/decision_register_gate-3daaad7c90f7cea2)
+
+running 30 tests
+test a_declared_unqueryable_deadline_is_reported_but_never_counted_green ... ok
+test a_complete_current_register_is_green ... ok
+test a_deadline_cannot_bind_to_an_incidental_story_token ... ok
+test a_missing_opening_pipe_cannot_hide_following_rows ... ok
+test a_reaches_done_anchor_that_is_merely_in_progress_has_not_passed ... ok
+test a_register_with_no_findable_table_is_an_error_not_a_pass ... ok
+test a_phrase_that_defers_naming_a_vehicle_reds ... ok
+test a_re_anchored_unqueryable_row_still_has_its_expiry_evaluated ... ok
+test a_retrospective_action_target_reds ... ok
+test a_row_declaring_no_status_reds_and_is_treated_as_open ... ok
+test a_status_outside_the_vocabulary_is_not_silently_accepted ... ok
+test a_table_row_with_an_unnamable_id_reds_instead_of_disappearing ... ok
+test a_table_whose_targets_all_fail_to_resolve_is_an_error_not_a_pass ... ok
+test a_table_with_zero_data_rows_is_an_error_not_a_pass ... ok
+test a_valid_target_cannot_hide_an_unresolved_nonnumeric_target ... ok
+test an_ambiguous_short_form_target_reds_rather_than_resolving_by_accident ... ok
+test an_empty_story_list_cannot_green_a_register ... ok
+test an_epic_key_target_reds_even_though_it_is_a_real_tracker_key ... ok
+test an_undeclared_key_target_reds ... ok
+test an_undeclared_unqueryable_deadline_reds ... ok
+test contradictory_status_declarations_red ... ok
+test duplicate_decision_ids_red ... ok
+test every_nonempty_deadline_clause_is_validated ... ok
+test malformed_decision_ids_red_instead_of_normalizing ... ok
+test malformed_formatted_targets_red_instead_of_disappearing ... ok
+test open_row_past_a_leaves_backlog_anchor_reds ... ok
+test open_row_past_a_reaches_done_anchor_reds ... ok
+test pipes_inside_a_code_span_do_not_shift_a_rows_columns ... ok
+test the_same_row_declared_closed_is_green ... ok
+test unqueryable_must_be_declared_on_each_nonmechanical_clause ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/empty_kernel_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/empty_kernel_integration-d11999b78d6adb50)
+
+running 4 tests
+test exempt_and_documented_struct_passes ... ok
+test exempt_but_undocumented_struct_reds ... ok
+test violation_i9_fails ... ok
+test clean_i9_passes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+     Running tests/example_spirit_regen_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/example_spirit_regen_integration-aacb5b5fabcf6e98)
+
+running 4 tests
+test check_mode_fails_on_drift ... ok
+test check_mode_passes_on_committed_example ... ok
+test regen_mode_overwrites_files ... ok
+test regen_mode_preserves_readme ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/fkcs_oracle.rs (/tmp/r17-3c-tgt-xtask/debug/deps/fkcs_oracle-f494995c3b795f55)
+
+running 11 tests
+test diff_oracle_ignores_forged_self_report_even_when_it_claims_red ... ok
+test diff_oracle_reports_kernel_unchanged_for_identical_surfaces ... ok
+test diff_oracle_derives_kernel_unchanged_and_ignores_self_reported_flags ... ok
+test disposition_inline_parser_extracts_phase_keys_and_rejects_malformed_stanzas ... ok
+test oracle_fault_injections_red_kernel_unchanged_around_a_stable_base ... ok
+test phase_disposition_inherits_downward_and_resolves_the_blocking_window ... ok
+test read_disposition_extracts_exactly_the_check_fkcs_stanza ... ok
+test frozen_baseline_files_carry_real_public_surfaces_not_synthetic_tokens ... ok
+test every_declared_admission_file_reds_a_one_byte_mutation ... ok
+test frozen_baseline_reconciles_live_triple_and_rejects_src_line_drift ... ok
+test frozen_snapshot_and_current_kernel_baselines_are_independently_valid ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/j1_crosshost_1a_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/j1_crosshost_1a_proven_red-a29e5b7fba0a2773)
+
+running 11 tests
+test baseline_fixture_tree_is_green ... ok
+test boundary_leg_reds_when_the_shared_intake_stops_self_asserting ... ok
+test consent_intent_must_name_effect_authority_not_a_job_category ... ok
+test delegation_becomes_decorative_when_the_env_shortcut_returns ... ok
+test loopback_from_host_is_recorded_as_unverified_not_as_a_failure ... ok
+test route_locally_anyway_by_dropping_the_topology_host_key ... ok
+test route_locally_anyway_but_keep_a_matching_expression_in_a_test_module ... ok
+test route_locally_anyway_by_emitting_the_same_host_frame ... ok
+test dotted_consent_intent_is_caught_but_the_pin_test_is_not ... ok
+test delegation_breaks_when_the_pump_stops_stripping_host_id ... ok
+test route_locally_anyway_by_removing_the_production_fail_closed_error ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/j1_crosshost_1b_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/j1_crosshost_1b_proven_red-c5889cf162584217)
+
+running 29 tests
+test commenting_out_an_assertion_does_not_satisfy_the_leg ... ok
+test a_missing_refusal_proof_file_is_a_finding_never_a_skip ... ok
+test baseline_fixture_tree_is_green ... ok
+test emptying_the_derived_enrollment_set_must_red_as_VACUOUS ... ok
+test boundary_leg_reds_when_the_loopback_arm_is_removed ... ok
+test dropping_the_accept_seam_typed_binding_must_red ... ok
+test dropping_the_minus_32001_deny_assertion_must_red ... ok
+test deleting_the_consent_refusal_enrollment_line_must_red ... ok
+test dropping_a_reachable_unclassified_reason_must_red ... ok
+test ledger_leg_names_reconciles_with_the_legs_actually_invoked ... ok
+test collapsing_minus_32001_into_minus_32009_must_red ... ok
+test consent_enrollment_moved_to_another_job_must_red ... ok
+test dropping_the_minus_32009_send_seam_must_red ... ok
+test dropping_the_destination_peer_binding_must_red ... ok
+test deleting_a_test_attribute_must_red ... ok
+test dropping_the_expiry_code_assertion_must_red ... ok
+test collapsing_minus_32009_into_minus_32001_must_red ... ok
+test reformatting_the_refusal_proofs_does_not_flip_the_leg ... ok
+test dropping_the_minus_32009_accept_seam_must_red ... ok
+test dropping_the_source_host_assertion_must_red ... ok
+test every_leg_publishes_a_non_zero_check_count ... ok
+test the_unverified_boundary_is_published_and_does_not_fail_the_gate ... ok
+test dropping_the_typed_reason_readback_must_red ... ok
+test unpinning_the_source_peer_id_literal_must_red ... ok
+test planting_an_epic_numbered_foreign_lane_test_file_stays_green ... ok
+test planting_a_numeric_j1_stem_must_red ... ok
+test planting_an_unenrolled_j1_test_file_must_red ... ok
+test enrollment_in_prose_is_not_enrollment_must_red ... ok
+test dropping_the_positive_control_assertion_must_red ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/j1_crosshost_2a_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/j1_crosshost_2a_proven_red-4b045d16d004dab9)
+
+running 15 tests
+test a_missing_workflow_is_a_finding_never_a_skip ... ok
+test baseline_fixture_tree_is_green ... ok
+test a_second_test_invisible_copy_of_the_adapter_seam_must_red ... ok
+test a_test_module_mention_of_the_retired_oracle_is_not_a_regression ... ok
+test an_unwired_oracle_keeps_the_name_but_not_the_call_must_red ... ok
+test an_adapter_must_be_able_to_demand_the_flag_its_oracle_parses ... ok
+test claude_may_not_go_back_to_having_no_ambient_credential_path ... ok
+test deleting_the_manifest_reader_enrollment_line_must_red ... ok
+test reformatting_the_enrollment_step_does_not_flip_the_leg ... ok
+test deleting_the_completion_vector_enrollment_line_must_red ... ok
+test returning_the_tests_to_an_in_src_module_must_red ... ok
+test re_orphaning_the_adapter_seam_from_the_tests_must_red ... ok
+test the_shared_final_stdout_line_oracle_may_not_come_back ... ok
+test enrollment_lines_moved_to_another_job_must_red ... ok
+test each_real_adapter_must_keep_its_own_structured_oracle ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/j1_crosshost_2b_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/j1_crosshost_2b_proven_red-90d20d52e52c5fc8)
+
+running 7 tests
+test unenrolling_two_host_proof_reds_completion_vectors_leg ... ok
+test baseline_fixture_tree_is_green ... ok
+test deleting_any_identity_proof_needle_reds_under_its_leg ... ok
+test inert_outcome_bindings_red_identity_proof_leg ... ok
+test fewer_than_three_registered_identity_tests_reds ... ok
+test missing_identity_proof_is_a_finding_not_a_skip ... ok
+test fork_shape_keeps_the_loopback_boundary_true_and_green ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/j1_crosshost_2c_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/j1_crosshost_2c_proven_red-2d19cf771a793001)
+
+running 43 tests
+test a_capture_naming_one_host_twice_reds ... ok
+test a_present_capture_still_claims_nothing ... ok
+test a_negation_smuggle_in_one_field_reds ... ok
+test an_adjacent_negation_still_excuses ... ok
+test dropping_the_skip_serializing_if_reds_byte_identity ... ok
+test a_scan_that_rederives_the_rules_reds ... ok
+test adding_the_loom_lite_edge_to_maos_audit_reds ... ok
+test a_bundle_missing_a_required_field_reds_the_schema_leg ... ok
+test a_capture_with_a_rewritten_claim_scope_reds ... ok
+test a_capture_without_both_bundle_halves_reds ... ok
+test a_capture_disagreeing_with_its_bundle_host_reds ... ok
+test pushing_after_observing_in_the_reply_path_reds ... ok
+test a_host_field_outside_the_signature_reds ... ok
+test an_unenrolled_story_test_target_reds ... ok
+test an_invalid_json_capture_reds ... ok
+test a_services_block_on_this_job_reds ... ok
+test deleting_the_gates_job_reds ... ok
+test projecting_correlation_id_reds ... ok
+test an_extra_field_in_a_bundle_reds_the_schema_leg ... ok
+test dropping_the_partition_config_read_reds ... ok
+test an_extra_entry_field_reds_the_schema_leg ... ok
+test baseline_fixture_tree_is_green ... ok
+test an_unenrolled_t_prefixed_target_reds ... ok
+test adding_kernel_core_to_a2a_tcp_production_deps_reds ... ok
+test fixing_only_one_signing_site_reds ... ok
+test an_invalid_json_bundle_half_reds ... ok
+test published_capture_template_is_admissible_by_the_real_gate ... ok
+test an_overclaiming_capture_reds ... ok
+test an_empty_stranger_verification_reds ... ok
+test a_surviving_unconditional_base_key_print_reds ... ok
+test dropping_either_side_of_the_pin_journal_reds ... ok
+test publishing_the_dedup_before_the_commit_guard_reds ... ok
+test reading_attester_pubkey_inside_reconciliation_reds ... ok
+test removing_the_shared_root_refusal_reds ... ok
+test removing_the_hex_run_class_reds ... ok
+test removing_the_stdout_pubkey_line_reds ... ok
+test removing_the_verify_derivation_path_reds ... ok
+test a_false_sworn_property_reds ... ok
+test unbounding_either_operation_reds ... ok
+test untyping_either_nack_code_reds ... ok
+test a_capture_missing_a_human_step_property_reds ... ok
+test a_schema_omitting_an_emitted_field_reds ... ok
+test a_missing_governed_file_is_a_finding_not_a_skip ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/kernel_pin_content_hash_16_0.rs (/tmp/r17-3c-tgt-xtask/debug/deps/kernel_pin_content_hash_16_0-c37f4cc78368689b)
+
+running 24 tests
+test no_key_before_src_lines_begins_with_src_lines ... ok
+test the_gate_carries_no_hold_or_waiver_constant ... ok
+test the_three_other_readers_still_resolve_the_pin ... ok
+test the_pin_is_readable_by_a_real_toml_parser ... ok
+test an_empty_tree_is_a_failure_never_a_pass ... ok
+test falsifier_tag_is_annotated_and_peels_to_the_pinned_commit ... ok
+test the_reflow_vector_left_the_tracked_tree_untouched ... ok
+test the_non_rs_trust_anchor_is_inside_the_pinned_set ... ok
+test the_pin_block_is_emitted_byte_sorted ... ok
+test the_digests_are_distinct_per_file ... ok
+test io_and_parse_failures_stay_err ... ok
+test emit_pin_prints_a_parseable_block_and_refuses_json ... ok
+test live_tree_matches_the_committed_pin ... ok
+test a_self_inconsistent_pin_is_a_parse_error_not_a_policy_red ... ok
+test a_mismatch_is_ok_passed_false_and_never_err ... ok
+test paths_that_cannot_roundtrip_through_toml_are_refused ... ok
+test an_added_file_is_named_not_absorbed ... ok
+test non_regular_entries_are_refused_not_skipped ... ok
+test a_deleted_file_is_named_not_absorbed ... ok
+test the_hash_is_independent_of_directory_creation_order ... ok
+test a_line_neutral_kernel_edit_reds_the_gate_and_names_the_file ... ok
+test a_reflow_moves_the_hash_and_rustfmt_restores_it ... ok
+test every_one_of_the_pinned_files_reds_a_line_neutral_mutation ... ok
+test a_composite_gates_json_stdout_is_machine_clean ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.84s
+
+     Running tests/loom_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/loom_integration-5e85bea84f5b86f6)
+
+running 2 tests
+test violation_loom_fails ... ok
+test clean_loom_passes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/owner_assertion_epic_key_rejected.rs (/tmp/r17-3c-tgt-xtask/debug/deps/owner_assertion_epic_key_rejected-bdd2b7e854562054)
+
+running 9 tests
+test an_epic_key_owner_reds ... ok
+test a_stale_owner_still_reds ... ok
+test an_ownerless_row_that_cites_its_disposition_is_reported_not_blocked ... ok
+test an_epic_retrospective_owner_keeps_its_existing_deferred_disposition ... ok
+test a_row_owned_by_a_real_story_key_is_green ... ok
+test a_different_epic_key_owner_also_reds_so_the_rule_is_the_class ... ok
+test an_ownerless_row_with_no_recorded_disposition_reds ... ok
+test disposition_markers_require_a_real_authority ... ok
+test negated_disposition_markers_do_not_green_ownerless_rows ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pentest_gate_tests.rs (/tmp/r17-3c-tgt-xtask/debug/deps/pentest_gate_tests-a86bd10c1183998e)
+
+running 7 tests
+test manifest_fails_with_deleted_section ... ok
+test manifest_deserializes_successfully ... ok
+test pentest_gate_passes_advisory_when_absent ... ok
+test pentest_gate_fails_on_malformed_toml ... ok
+test pentest_gate_fails_on_p1_only ... ok
+test pentest_gate_passes_on_both_zero ... ok
+test pentest_gate_fails_on_p0_only ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/recovery_lane_ceiling_rule.rs (/tmp/r17-3c-tgt-xtask/debug/deps/recovery_lane_ceiling_rule-8bf652b8a43fc210)
+
+running 10 tests
+test a_raise_with_no_cited_story_is_refused ... ok
+test a_raise_citing_an_absent_story_is_refused ... ok
+test a_raise_citing_a_shipped_story_is_refused ... ok
+test kernel_core_is_outside_the_easing ... ok
+test lowering_is_always_allowed_even_for_kernel_core_and_even_when_sealed ... ok
+test the_easing_is_real_any_crate_may_raise_citing_an_open_story ... ok
+test the_lane_seals_when_every_numbered_epic_is_done ... ok
+test kernel_core_ceiling_has_not_moved_under_the_easing ... ok
+test the_lane_is_not_sealed_while_a_numbered_epic_is_open ... ok
+test the_tree_bound_inputs_exist ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/release_dry_run_gate.rs (/tmp/r17-3c-tgt-xtask/debug/deps/release_dry_run_gate-b004fb38a7f346c5)
+
+running 7 tests
+test missing_binary_target_pair_is_refused ... ok
+test declared_artifact_outside_requested_targets_is_refused ... ok
+test manifest_denominator_matches_declared_artifact_count_before_hash_checks ... ok
+test zero_length_declared_artifact_is_refused ... ok
+test regenerating_the_manifest_drops_the_previous_signature ... ok
+test regular_build_cleanup_removes_stale_release_outputs_only ... ok
+test packaging_file_and_symlink_do_not_expand_the_declared_denominator ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/release_workflow_15_4.rs (/tmp/r17-3c-tgt-xtask/debug/deps/release_workflow_15_4-f513ebe3f7f593fe)
+
+running 2 tests
+test release_workflow_flattens_and_publishes_the_explicit_six_binary_set ... ok
+test discipline_runs_both_linux_release_targets_in_the_aggregate_only ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/retro_action_items.rs (/tmp/r17-3c-tgt-xtask/debug/deps/retro_action_items-fae1be76ad20bec3)
+
+running 10 tests
+test a_closed_retrospective_with_no_rows_is_refused ... ok
+test a_closed_retrospective_with_rows_is_accepted ... ok
+test a_row_with_no_retrospective_document_is_refused ... ok
+test an_empty_action_is_refused ... ok
+test an_open_retrospective_owes_nothing_yet ... ok
+test an_empty_owner_is_refused ... ok
+test epics_below_the_convention_floor_are_out_of_scope ... ok
+test an_unqueryable_status_is_refused ... ok
+test the_tree_bound_inputs_exist ... ok
+test every_closed_retrospective_in_this_repository_has_its_actions_in_the_tracker ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/service_boundary_integration.rs (/tmp/r17-3c-tgt-xtask/debug/deps/service_boundary_integration-4559a9fd155b8462)
+
+running 12 tests
+test p4_clean_fixture_passes ... ok
+test clean_service_boundary_passes ... ok
+test p4_violation_fixture_fails_with_message_containing_p4_violation_and_denylist_pattern ... ok
+test p1_violation_fixture_fails_with_message_containing_p1_violation ... ok
+test p3_clean_fixture_passes ... ok
+test shipped_baseline_symbol_absent_from_surface_reds ... ok
+test p1_clean_fixture_passes ... ok
+test p2_violation_fixture_fails_with_message_containing_p2_violation ... ok
+test p3_violation_fixture_fails_with_message_containing_p3_violation_and_check_empty_kernel_reference ... ok
+test p2_clean_fixture_passes ... ok
+test violation_service_boundary_fails ... ok
+test shipped_baseline_matches_live_kernel_surface ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.19s
+
+     Running tests/story_10_2_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/story_10_2_proven_red-f32484b2cd1c968d)
+
+running 30 tests
+test cross_form_gate_passes_advisory_when_absent ... ok
+test cross_form_gate_errors_when_hashes_absent ... ok
+test cross_form_gate_warns_on_low_p_value ... ok
+test trial_gate_passes_advisory_when_absent ... ok
+test ship_gate_completeness_passes_with_all_gates ... ok
+test red_team_gate_passes_advisory_when_absent ... ok
+test cross_form_recompute_path_with_hashes ... ok
+test ship_gate_completeness_fails_with_missing_gate ... ok
+test cross_form_gate_passes_clean ... ok
+test red_team_gate_fails_on_duplicate_classes ... ok
+test trial_gate_fails_on_low_successes ... ok
+test red_team_gate_rejects_non_string_optional_notes ... ok
+test red_team_gate_fails_on_corpus_sha_mismatch ... ok
+test trial_gate_fails_on_empty_participants_with_fabricated_successes ... ok
+test red_team_gate_logs_would_block_on_low_classes ... ok
+test red_team_gate_logs_would_block_on_low_class ... ok
+test red_team_gate_passes_clean ... ok
+test producer_emit_writes_file_the_consumer_accepts_round_trip ... ok
+test trial_gate_fails_on_low_stratification ... ok
+test trial_gate_accepts_valid_record_with_producer_signed_attestation_at_v2_0 ... ok
+test trial_gate_rejects_tampered_producer_signature_at_v2_0 ... ok
+test trial_gate_rejects_unknown_ship_phase ... ok
+test trial_gate_rejects_when_signed_sbom_false_overrides_self_reported_true_at_v2_0 ... ok
+test trial_gate_rejects_missing_producer_signed_attestation_at_v2_0 ... ok
+test cross_form_gate_fails_on_malformed_json ... ok
+test red_team_gate_fails_on_malformed_toml ... ok
+test red_team_gate_logs_would_block_on_unmitigated ... ok
+test trial_gate_fails_on_malformed_toml ... ok
+test trial_gate_refuses_public_dev_producer_key_at_v2_0 ... ok
+test trial_gate_passes_on_valid_results ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/story_10_4a_ac1_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/story_10_4a_ac1_proven_red-d8efd49c9ee78d58)
+
+running 22 tests
+test story_13_5b_one_sided_collective_erase_is_red ... ok
+test story_13_5d_loom_scope_reaches_policy_table ... ok
+test story_10_4a_ac1_loom_down_typed_timeout ... ok
+test story_10_4a_ac1_dependency_closure_red ... ok
+test story_10_4a_ac1_nfr_test_9_backing_store_red ... ok
+test story_10_4a_ac1_nfr_test_9_grep_red ... ok
+test story_10_4a_ac1_nfr_test_9_grep_green ... ok
+test story_10_4a_ac1_rto_drill_red ... ok
+test story_10_4a_ac1_rto_drill_green ... ok
+test story_10_4a_ac1_i1_unmediated_trait_path_denied_red ... ok
+test story_10_4a_ac1_i9_retention_detected_red ... ok
+test story_10_4a_ac1_i9_zero_kernel_retention ... ok
+test story_10_4a_ac1_i1_wrong_scope_denied_red ... ok
+test story_13_5d_forged_pid_is_denied_before_collective_write ... ok
+test story_13_5d_forged_pid_is_denied_before_collective_scan ... ok
+test story_10_4a_ac1_i1_valid_loomwrite_allows_green ... ok
+test story_13_5d_request_route_row_audit_correlation ... ok
+test story_13_5d_forged_pid_is_denied_before_collective_read ... ok
+test story_13_5d_forged_token_is_verified_before_pid_mismatch ... ok
+test story_10_4a_ac1_dependency_closure_green ... ok
+test story_10_4a_ac1_weekly_backup_tamper_red ... ok
+test story_10_4a_ac1_weekly_backup_green ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running tests/story_10_4a_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/story_10_4a_proven_red-969b2c24952ad025)
+
+running 7 tests
+test vector_5_empty_corpus_all_zeros_green ... ok
+test vector_5_empty_payload_oracle_is_deterministic ... ok
+test vector_3_row_count_mismatch_red ... ok
+test vector_1_faithful_migration_green ... ok
+test vector_2_payload_corruption_root_matches_but_payload_mismatch_red ... ok
+test vector_1_altered_frame_id_roots_differ_red ... ok
+test vector_4_rollback_detects_source_drift_red ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/story_10_5_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/story_10_5_proven_red-62ad1c1be40aa1c0)
+
+running 7 tests
+test skill_conformance_fails_on_corrupt_valid_fixture ... ok
+test skill_conformance_passes_advisory_when_results_absent ... ok
+test skill_conformance_fails_when_invalid_fixture_is_accepted ... ok
+test skill_conformance_fails_on_false_abi_unchanged ... ok
+test skill_conformance_fails_on_malformed_toml ... ok
+test skill_conformance_fails_on_false_executed_without_kernel_modification ... ok
+test skill_conformance_passes_clean_with_valid_results ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/story_13_6e_evidence_ledger.rs (/tmp/r17-3c-tgt-xtask/debug/deps/story_13_6e_evidence_ledger-e646468dea08760b)
+
+running 1 test
+test kernel_collective_cause_is_distinguishable ... ignored, Blocking successor oracle: invoked exactly once the kernel source probe detects distinct causes
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/trial_attestation_proven_red.rs (/tmp/r17-3c-tgt-xtask/debug/deps/trial_attestation_proven_red-e5428ade7d2cbaf6)
+
+running 8 tests
+test empty_chinese_wall_proxy_cohort_is_na_not_a_vacuous_pass ... ok
+test self_report_ignored_when_real_signing_derivation_contradicts_forged_self_report ... ok
+test tampered_and_wrong_key_signatures_derive_false_at_real_verify_path ... ok
+test valid_signature_derives_signing_chain_verified_true_at_real_ed25519_path ... ok
+test ship_gate_completeness_enrolls_check_trial_attestation ... ok
+test recompute_cargo_tree_locked_runs_the_real_cargo_tree_subprocess ... ok
+test release_graph_excludes_trial_attestation_feature_and_maos_fkcs ... ok
+test producer_gate_json_reports_non_vacuous_legs_and_v2_0_blocking_disposition ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+   Doc-tests xtask
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

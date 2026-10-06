@@ -146,7 +146,7 @@ async fn architect_to_reviewer_loop_is_fr21_clean_end_to_end() {
         _ => panic!("expected TaskAssign"),
     }
     adapter
-        .deliver_typed(f1)
+        .deliver_typed(f1, 0, None)
         .await
         .expect("dispatch to architect accepted");
 
@@ -159,7 +159,11 @@ async fn architect_to_reviewer_loop_is_fr21_clean_end_to_end() {
         "bit-identical (no live LLM)"
     );
     adapter
-        .deliver_typed(worker_complete("architect", 2, &proposal.digest_text()))
+        .deliver_typed(
+            worker_complete("architect", 2, &proposal.digest_text()),
+            ARCHITECT_PID,
+            None,
+        )
         .await
         .expect("architect task.complete ok");
 
@@ -191,7 +195,7 @@ async fn architect_to_reviewer_loop_is_fr21_clean_end_to_end() {
         _ => panic!("expected TaskAssign"),
     }
     adapter
-        .deliver_typed(f2)
+        .deliver_typed(f2, 0, None)
         .await
         .expect("FR21-clean dispatch to reviewer accepted");
 
@@ -208,7 +212,11 @@ async fn architect_to_reviewer_loop_is_fr21_clean_end_to_end() {
         "bit-identical critique"
     );
     adapter
-        .deliver_typed(worker_complete("reviewer", 4, &critique.digest_text()))
+        .deliver_typed(
+            worker_complete("reviewer", 4, &critique.digest_text()),
+            REVIEWER_PID,
+            None,
+        )
         .await
         .expect("reviewer task.complete ok");
 
@@ -230,7 +238,7 @@ async fn architect_to_reviewer_loop_is_fr21_clean_end_to_end() {
         lineage(),
     );
     adapter
-        .deliver_typed(f3)
+        .deliver_typed(f3, 0, None)
         .await
         .expect("critique distillate flows back, FR21-clean");
 

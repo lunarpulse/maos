@@ -1,0 +1,18 @@
+{
+  "refusal_revision": "Preserved original source/index; feature wasm-host ON; isolated target cache; no source edits",
+  "original_head": "5075443c8a87523581cfcf6cb0b6af815f7ebd4f",
+  "original_index_tree": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+  "daemon_sha256": "89664a72d142cecfe2a19558a6d34fcee035a0d8aaea2fd474a909db81754481",
+  "manifest_sha256": "ad5b19e71b9acebff3f1405e4075d243fdfc2b66f1236bce48b48fb1fcbb8f89",
+  "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+  "resources": {
+    "cpu_max_pct": 10,
+    "memory_max_mb": 768,
+    "time_cap_seconds": 360
+  },
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos-17-3c-baseline-refusal-360-fts9jnvk/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: warn: wasm-host feature enabled but maos-wasm-runner not found next to the daemon binary \u2014 WASM Spirit form disabled, native form only\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator HTTP listening on 127.0.0.1:44451\nmaos: Ollama provider registered\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos: root supervision armed\nError: \"maos run: wasm_launch_not_built: wasm-component launch is deferred to 17-3c-wasm-spirit-on-the-bus-under-t2\"\n",
+  "typed_refusal": "wasm_launch_not_built",
+  "actual_source_cache_issue": "Shared-target attempt used incompatible cached candidate IAC metadata (artifact://779); actual original signature is one-argument. Isolated-target original-source build succeeded (artifact://785). No original-source fix made."
+}

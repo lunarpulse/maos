@@ -60,7 +60,7 @@ pub enum SpawnError {
     SandboxSetup(String),
     #[error("IO error during spawn: {0}")]
     Io(#[from] std::io::Error),
-    #[error("cgroups v2 unavailable and no fallback configured")]
+    #[error("declared CPU percentage cap requires a writable delegated cgroup")]
     CgroupUnavailable,
     #[error("sandbox unavailable on this platform: {reason}")]
     SandboxUnavailable { reason: String },
@@ -102,7 +102,34 @@ enum Cleanup {
     None,
 }
 
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        #[cfg(target_os = "linux")]
+        if let Cleanup::Cgroup { path } = self {
+            let _ = std::fs::write(path.join("cgroup.kill"), b"1");
+            // `cgroup.kill` is asynchronous: rmdir answers EBUSY until the killed
+            // members are gone. Retry with a short bounded backoff (~0.25 s total).
+            for delay_ms in [0, 1, 2, 4, 8, 16, 32, 64, 128] {
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                match std::fs::remove_dir(path.as_path()) {
+                    Err(error) if error.raw_os_error() == Some(libc::EBUSY) => {}
+                    _ => break,
+                }
+            }
+        }
+    }
+}
+
 impl SandboxedChild {
+    /// The child's cgroup directory, when it was placed in one (Linux).
+    #[cfg(target_os = "linux")]
+    pub fn cgroup_path(&self) -> Option<&std::path::Path> {
+        match &self.cleanup {
+            Cleanup::Cgroup { path } => Some(path),
+            Cleanup::None => None,
+        }
+    }
+
     /// Story 17-6 AC5 — the confined child, for a caller that pipes its stdio.
     /// The guard keeps owning it (and the cgroup dir) until drop.
     #[cfg(target_os = "linux")]
@@ -128,10 +155,6 @@ impl Drop for SandboxedChild {
         // Kill first to ensure the child exits before we clean up resources.
         let _ = self.child.kill();
         let _ = self.child.wait();
-        #[cfg(target_os = "linux")]
-        if let Cleanup::Cgroup { path } = &self.cleanup {
-            let _ = std::fs::remove_dir(path);
-        }
     }
 }
 
@@ -181,12 +204,6 @@ pub fn classify_exit(status: ExitStatus) -> Option<SandboxViolation> {
             if signal == libc::SIGSYS {
                 return Some(SandboxViolation {
                     attempted_syscall: "unknown".into(),
-                    sandbox_tier: SandboxTier::T2,
-                });
-            }
-            if signal == libc::SIGKILL {
-                return Some(SandboxViolation {
-                    attempted_syscall: "possible-oom-or-resource-cap".into(),
                     sandbox_tier: SandboxTier::T2,
                 });
             }

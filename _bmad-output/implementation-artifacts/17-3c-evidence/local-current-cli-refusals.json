@@ -1,0 +1,74 @@
+{
+  "candidate_only": true,
+  "accepted_launch": false,
+  "same_manifest_and_component": true,
+  "feature_on": {
+    "platform": {
+      "os_release": {
+        "PRETTY_NAME": "\"Debian GNU/Linux 13 (trixie)\"",
+        "NAME": "\"Debian GNU/Linux\"",
+        "VERSION_ID": "\"13\"",
+        "VERSION": "\"13 (trixie)\"",
+        "VERSION_CODENAME": "trixie",
+        "DEBIAN_VERSION_FULL": "13.7",
+        "ID": "debian",
+        "HOME_URL": "\"https://www.debian.org/\"",
+        "SUPPORT_URL": "\"https://www.debian.org/support\"",
+        "BUG_REPORT_URL": "\"https://bugs.debian.org/\""
+      },
+      "arch": "x86_64",
+      "kernel": "7.2.6-1-cachyos"
+    },
+    "exit_code": 1,
+    "elapsed_seconds": 0.176627139095217,
+    "manifest_sha256": "2ee93955e0e9c69cb64e75f2503cbe105ae597a8dbdfcd1c3db846bcb1473bd7",
+    "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+    "daemon_sha256": "782d08fdb071058f9eef08265962eafca957207f95d146f3b5318c37900b1c82",
+    "runner_sha256": "f2f8e0b2fb99a583c139aa20acf66005deeef001ab60c250f9edebd0a30d9467",
+    "declared_resources": {
+      "cpu_max_pct": 10,
+      "memory_max_mb": 768
+    },
+    "time_cap_seconds": 180,
+    "instruction_fuel": 10000000,
+    "guest_memory_bytes": 67108864
+  },
+  "feature_off": {
+    "platform": {
+      "os_release": {
+        "PRETTY_NAME": "\"Debian GNU/Linux 13 (trixie)\"",
+        "NAME": "\"Debian GNU/Linux\"",
+        "VERSION_ID": "\"13\"",
+        "VERSION": "\"13 (trixie)\"",
+        "VERSION_CODENAME": "trixie",
+        "DEBIAN_VERSION_FULL": "13.7",
+        "ID": "debian",
+        "HOME_URL": "\"https://www.debian.org/\"",
+        "SUPPORT_URL": "\"https://www.debian.org/support\"",
+        "BUG_REPORT_URL": "\"https://bugs.debian.org/\""
+      },
+      "arch": "x86_64",
+      "kernel": "7.2.6-1-cachyos"
+    },
+    "exit_code": 1,
+    "elapsed_seconds": 0.21441306616179645,
+    "manifest_sha256": "2ee93955e0e9c69cb64e75f2503cbe105ae597a8dbdfcd1c3db846bcb1473bd7",
+    "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+    "daemon_sha256": "9e47d688b11c9fe6823dc64b2b5d7d7ac85abbde16c8aa9553565be069cd5071",
+    "runner_sha256": "f2f8e0b2fb99a583c139aa20acf66005deeef001ab60c250f9edebd0a30d9467",
+    "declared_resources": {
+      "cpu_max_pct": 10,
+      "memory_max_mb": 768
+    },
+    "time_cap_seconds": 180,
+    "instruction_fuel": 10000000,
+    "guest_memory_bytes": 67108864
+  },
+  "feature_on_stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos-17-3c-current-refusal/home/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Spirit host (WASM component form, ADR-031) initialized\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator HTTP listening on 127.0.0.1:44275\nmaos: Ollama provider registered\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos: root supervision armed\nError: Bridge(\"cli bridge sandbox refused: /tmp/maos-17-3c-current-release/maos-wasm-runner: declared CPU percentage cap requires a writable delegated cgroup\")\n",
+  "feature_off_stderr": "maos 0.1.0-alpha.1 (v0.1-\u03b2 scaffold; worker_threads target = 32)\nmaos: crypto provider = ring-default (FR48 swap point: maos-bin/src/main.rs)\nmaos: capability registry initialized (Story 1b.2)\nmaos: enterprise PDP not configured \u2014 set MAOS_PDP_POLICY_FILE or MAOS_PDP_POLICY_INLINE to enable (Cedar)\nmaos: enterprise identity/at-rest/SIEM NOT configured \u2014 set MAOS_SSO_*/MAOS_KMS_*/MAOS_SIEM_* to enable (Story 11.4c)\nmaos: orchestrator buffer registry initialized (Story 3.4)\nmaos: Transparency Log opened on-disk at /tmp/maos-17-3c-current-engine-off/home/maos/audit/transparency.sqlite\nmaos: collective tier (Loom-lite) not configured \u2014 set MAOS_LOOM_POSTGRES to enable\nmaos: Memory Manager initialized (three tiers + principal namespace, Story 4.3)\nmaos: LogRecallAdapter + DistillateWriter initialized (Story 4.4)\nmaos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)\nmaos: Mailbox TL installer wired (Story 6.4)\nmaos: A2A delegation leg installed (founder-loop-host -> developer-remote-host, intent development-task:write-workspace) (j1-crosshost-1a/2b)\nmaos: Spirit Scheduler wired (Story 5.1)\nmaos: CrashDetector wired (Story 5.3)\nmaos: KernelLifecycleResolver wired (Story 5.1)\nmaos: HotSwapCoordinator wired (Story 5.2)\nmaos: RevocationApplier + RevocationPoller wired (Story 5.4)\nmaos: registry uri= tier_floor=Local t3_public_untrusted=false allow_unsigned_local=true require_server_tier_signature=false\nmaos: UpgradeOrchestrator wired (Story 5.4)\nmaos: Approval Manager initialized (v0.3-\u03b2 auto-allow)\nmaos: operator HTTP listening on 127.0.0.1:39109\nmaos: Ollama provider registered\nmaos: ProviderRateLimiter initialized (Story 6.4 / NFR-Scale-4)\nmaos: Inference Port initialized with rate-limit + IAC frame emission (Story 6.4)\nmaos: root supervision armed\nError: \"maos run: wasm_engine_off: WASM engine disabled while Export Hold 2 is open; `wasm-host` is the 5D002.c.1 export-control precondition\"\n",
+  "classification": {
+    "feature_on": "Fails closed before Ready because declared CPU 10% cannot obtain writable delegated cgroup",
+    "feature_off": "Typed wasm_engine_off refusal"
+  },
+  "pending": "Fresh matching accepted launch at exactly these declared resource limits on delegated runtime; four required Ubuntu images and syscall leave-one-out still unexecuted. Prior 64MiB echo or uncapped TS roundtrip is not substituted."
+}

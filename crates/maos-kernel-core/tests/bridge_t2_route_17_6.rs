@@ -117,7 +117,7 @@ fn launch(tier: SandboxTier) -> Result<ExitCause, BridgeError> {
     let mut bridge = spawn_and_bridge(spec(tier))?;
     let pid = bridge.child_pid();
     bridge.pump_to_journal(&journal, 1, "bridge-t2-route", "probe", &[]);
-    let exit = bridge.wait_and_finalize(&journal, 1, |_| {});
+    let exit = bridge.wait_and_finalize(&journal, 1, None, |_| {});
     assert!(
         !PathBuf::from(format!("/proc/{pid}")).exists(),
         "the bridge must reap the T{} child (pid {pid})",
@@ -179,5 +179,65 @@ fn t1_and_t4_are_refused_typed_before_any_spawn() {
             }
             other => panic!("T{} must be refused typed, observed {other:?}", tier.0),
         }
+    }
+}
+
+/// Story 17-3c — a T2 SIGSYS kill is reported on the capability audit channel,
+/// and when that channel cannot take it the bridge journals the same fact
+/// itself: the only record of a seccomp kill is never silently dropped.
+#[test]
+fn t2_sigsys_block_is_audited_or_journaled_never_dropped() {
+    use maos_kernel_core::capability::cap_audit;
+    use maos_kernel_core::iac::transparency_log::FrameFilter;
+    for audit_open in [true, false] {
+        let (sender, mut receiver) = cap_audit::channel();
+        if !audit_open {
+            receiver.close();
+        }
+        let journal = TransparencyLogAdapter::open_in_memory(0);
+        let mut bridge = match spawn_and_bridge(spec(SandboxTier::T2)) {
+            Ok(bridge) => bridge,
+            Err(BridgeError::SandboxRefused(msg)) if !ci_has_prebuilt_probe() => {
+                eprintln!("SKIP t2_sigsys_block: sandbox setup refused off CI: {msg}");
+                return;
+            }
+            Err(error) => panic!("T2 spawn failed: {error:?}"),
+        };
+        bridge.pump_to_journal(&journal, 1, "bridge-t2-route", "probe", &[]);
+        let exit = bridge.wait_and_finalize(&journal, 1, Some(&sender), |_| {});
+        assert_eq!(exit.cause, ExitCause::Signaled { signal: 31 });
+        let journaled = journal
+            .query_frames(FrameFilter {
+                spirit_pid: Some(1),
+                ..Default::default()
+            })
+            .unwrap()
+            .into_iter()
+            .filter(|row| {
+                row.kind == maos_kernel_core::iac::transparency_log::FrameKind::SandboxBlock
+                    && row.intent.starts_with("sandbox.block.")
+            })
+            .count();
+        let delivered = receiver.try_recv().ok();
+        if audit_open {
+            assert!(
+                matches!(
+                    delivered,
+                    Some(cap_audit::CapAuditEvent::SandboxBlock { spirit_pid: 1, .. })
+                ),
+                "the open audit channel carries the SandboxBlock: {delivered:?}"
+            );
+            assert_eq!(
+                journaled, 0,
+                "no duplicate journal row when the audit took it"
+            );
+        } else {
+            assert!(delivered.is_none());
+            assert_eq!(
+                journaled, 1,
+                "a closed audit channel falls back to the journal"
+            );
+        }
+        println!("BRIDGE-T2-SANDBOX-BLOCK audit_open={audit_open} journaled={journaled}");
     }
 }

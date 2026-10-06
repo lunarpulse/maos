@@ -44,6 +44,7 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("capabilities", "loom_read"),
     ("capabilities", "loom_write"),
     ("capabilities", "loom_scan"),
+    ("capabilities", "iac_send"),
     ("posture", "default"),
     ("posture", "allowed_max"),
     ("output_shape", "required_fields"),
@@ -219,13 +220,20 @@ fn capabilities_fixtures_deserialize_to_their_declared_outcomes() {
                     Some("loom_scan") => {
                         assert!(!capabilities_required_to_scopes(&caps).contains(&Scope::LoomScan))
                     }
+                    Some("iac_send") => {
+                        assert_eq!(caps.iac.send.len(), 2);
+                        let degraded = caps.clone().degrade_for_schema_version(4);
+                        assert!(!capabilities_required_to_scopes(&degraded)
+                            .iter()
+                            .any(|scope| matches!(scope, Scope::IacSend { .. })))
+                    }
                     _ => {}
                 }
             }
         }
     }
     assert_eq!(
-        fixture_count, 12,
+        fixture_count, 15,
         "every capabilities fixture must be exercised"
     );
 }

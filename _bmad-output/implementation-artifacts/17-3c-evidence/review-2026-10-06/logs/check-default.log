@@ -1,0 +1,343 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+crates/maos-attrs/src/lib.rs:18:9: warning: unused variable: `reason`: help: if this is intentional, prefix it with an underscore: `_reason`
+warning: `maos-attrs` (lib) generated 1 warning (run `cargo fix --lib -p maos-attrs` to apply 1 suggestion)
+crates/maos-domain/src/ports/iac_bus.rs:44:5: warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+crates/maos-domain/src/ports/iac_bus.rs:58:5: warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+warning: `maos-domain` (lib) generated 2 warnings
+crates/maos-mcp/src/client.rs:15:70: warning: unused import: `McpResponse`
+crates/maos-mcp/src/transport/stdio.rs:8:20: warning: unused import: `Child`
+warning: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+crates/maos-capability/src/working_memory/mod.rs:19:5: warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+    Checking maos-manifest v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-manifest)
+crates/maos-providers/src/anthropic.rs:10:5: warning: unused import: `InferenceOptions`
+crates/maos-providers/src/ollama.rs:11:5: warning: unused import: `InferenceOptions`
+crates/maos-providers/src/openai.rs:11:5: warning: unused import: `InferenceOptions`
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+    Checking maos-iac v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-iac)
+    Checking maos-audit v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-audit)
+crates/maos-acp/src/server.rs:13:45: warning: unused import: `DecisionId`
+crates/maos-acp/src/server.rs:223:25: warning: unused variable: `other`: help: if this is intentional, prefix it with an underscore: `_other`
+    Checking maos-spirit-hello v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-spirit-hello)
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+crates/maos-director-surface/src/halt_ui.rs:59:9: warning: unused variable: `halt_id`: help: if this is intentional, prefix it with an underscore: `_halt_id`
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+    Checking example-spirit v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/examples/example-spirit)
+crates/maos-sso/tests/fault_inject.rs:23:5: warning: unused import: `maos_domain::ports::IdentityAssertionPort`
+crates/maos-sso/tests/fault_inject.rs:24:16: warning: unused imports: `OidcAlgorithm` and `OidcVerifier`
+warning: `maos-sso` (test "fault_inject") generated 2 warnings (run `cargo fix --test "fault_inject" -p maos-sso` to apply 2 suggestions)
+crates/maos-providers/tests/ollama_round_trip_test.rs:9:41: warning: unused imports: `InferenceResponse`, `ProviderAttribution`, and `TokenUsage`
+crates/maos-providers/tests/openai_round_trip_test.rs:9:41: warning: unused imports: `InferenceResponse`, `ProviderAttribution`, and `TokenUsage`
+warning: `maos-director-surface` (lib test) generated 1 warning (1 duplicate)
+warning: `maos-providers` (test "ollama_round_trip_test") generated 1 warning (run `cargo fix --test "ollama_round_trip_test" -p maos-providers` to apply 1 suggestion)
+warning: `maos-providers` (test "openai_round_trip_test") generated 1 warning (run `cargo fix --test "openai_round_trip_test" -p maos-providers` to apply 1 suggestion)
+warning: `maos-acp` (lib test) generated 2 warnings (2 duplicates)
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:55:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:73:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:90:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:104:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:117:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:134:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:152:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:169:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:242:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:271:9: warning: variable does not need to be mutable
+crates/maos-spirit-sdk/tests/spirit_test_v05_macros.rs:12:8: warning: struct `TestSpirit` is never constructed
+warning: `maos-spirit-sdk` (test "spirit_test_v05_macros") generated 11 warnings (run `cargo fix --test "spirit_test_v05_macros" -p maos-spirit-sdk` to apply 10 suggestions)
+warning: `maos-attrs` (lib) generated 1 warning (1 duplicate)
+warning: `maos-attrs` (lib test) generated 1 warning (1 duplicate)
+warning: `maos-capability` (lib test) generated 1 warning (1 duplicate)
+    Checking maos-frame-codec v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-frame-codec)
+warning: `maos-mcp` (lib test) generated 2 warnings (2 duplicates)
+warning: `maos-domain` (lib test) generated 2 warnings (2 duplicates)
+    Checking maos-wasm-host v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-wasm-host)
+crates/maos-iac/src/adapter/drr_scheduler.rs:18:29: warning: unused import: `Instant`
+crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9: warning: unused variable: `referenced`: help: if this is intentional, prefix it with an underscore: `_referenced`
+crates/maos-iac/src/adapter/transparency_log.rs:946:13: warning: variable does not need to be mutable
+    Checking maos-eval v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-eval)
+    Checking maos-loom-lite v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-loom-lite)
+    Checking butler v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/butler)
+    Checking maos-siem v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-siem)
+crates/maos-iac/src/adapter/drr_scheduler.rs:54:5: warning: field `intent_str` is never read
+crates/maos-iac/src/adapter/metrics.rs:230:21: warning: hiding a lifetime that's elided elsewhere is confusing: the lifetime is elided here, the same lifetime is hidden here
+spirits/butler/src/lib.rs:557:13: warning: unused variable: `notification`: help: if this is intentional, prefix it with an underscore: `_notification`
+warning: `maos-iac` (lib) generated 5 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+    Checking maos-cohort v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-cohort)
+    Checking maos-telemetry v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-telemetry)
+warning: `butler` (lib) generated 1 warning (run `cargo fix --lib -p butler` to apply 1 suggestion)
+crates/maos-cohort/src/state.rs:1513:75: warning: unused import: `TelemetryEventPayload`
+warning: `maos-iac` (lib test) generated 5 warnings (5 duplicates)
+crates/maos-cohort/src/state.rs:388:19: warning: methods `accept_consent` and `outbound_consent_context` are never used
+crates/maos-manifest/src/manifest.rs:1287:21: warning: unused variable: `on_confidence_below`: help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+crates/maos-cohort/src/state.rs:408:19: warning: method `outbound_consent_context` is never used
+warning: `maos-cohort` (lib) generated 1 warning
+    Checking maos-digest v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/digest)
+    Checking maos-a2a-tcp v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-a2a-tcp)
+crates/maos-eval/src/distillate_corpus.rs:106:17: warning: unused variable: `file_name`: help: if this is intentional, prefix it with an underscore: `_file_name`
+warning: `maos-cohort` (lib test) generated 2 warnings (run `cargo fix --lib -p maos-cohort --tests` to apply 1 suggestion)
+crates/maos-a2a-tcp/tests/t_11_3_scale_churn.rs:140:44: warning: unused import: `A2ATransport`
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+    Checking maos-registry v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-registry)
+    Checking reviewer v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/reviewer)
+crates/maos-a2a-tcp/tests/t_11_3_scale_churn.rs:1081:14: warning: unused variable: `first_peer`: help: if this is intentional, prefix it with an underscore: `_first_peer`
+crates/maos-a2a-tcp/tests/t_11_3_scale_churn.rs:916:5: warning: variants `SweepThenEscalate` and `SweepOnly` are never constructed
+    Checking nash v1.5.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/nash)
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+    Checking maos-kernel-core v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-kernel-core)
+crates/maos-registry/src/fixture_replay.rs:6:5: warning: unused import: `std::sync::Mutex`
+crates/maos-registry/src/fixture_replay.rs:9:5: warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+crates/maos-registry/src/handlers/manifest.rs:9:36: warning: unused import: `SignedManifest`
+warning: `maos-a2a-tcp` (test "t_11_3_scale_churn") generated 3 warnings (run `cargo fix --test "t_11_3_scale_churn" -p maos-a2a-tcp` to apply 2 suggestions)
+warning: `maos-manifest` (lib test) generated 1 warning (1 duplicate)
+crates/maos-registry/src/server.rs:309:39: warning: unused imports: `ComplianceClaimEnvelope` and `SigningAlg`
+crates/maos-registry/src/server.rs:310:19: warning: unused imports: `Read` and `Write`
+crates/maos-registry/src/server.rs:311:9: warning: unused import: `std::net::TcpStream`
+crates/maos-registry/src/server.rs:312:9: warning: unused import: `std::time::Duration`
+crates/maos-registry/src/compliance_verify.rs:129:24: warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+    Checking maos-journey-test v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-journey-test)
+crates/maos-registry/src/client.rs:149:27: warning: unused variable: `server_sig`: help: if this is intentional, prefix it with an underscore: `_server_sig`
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5: warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+crates/maos-kernel-core/src/capability/mod.rs:392:21: warning: unexpected `cfg` condition value: `test-introspection`
+crates/maos-kernel-core/src/halt/mod.rs:29:34: warning: unused import: `HaltJournal`
+crates/maos-kernel-core/src/iac.rs:19:5: warning: private item shadows public glob re-export
+crates/maos-kernel-core/src/inference/mod.rs:22:5: warning: unused import: `crate::capability::WorkingMemoryStore`
+crates/maos-kernel-core/src/isolation/runner.rs:10:5: warning: unused import: `std::sync::Arc`
+crates/maos-kernel-core/src/isolation/runner.rs:13:5: warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+crates/maos-kernel-core/src/journal/mod.rs:60:5: warning: unused import: `maos_domain::invariants::i1::TokenId`
+crates/maos-kernel-core/src/journal/mod.rs:61:65: warning: unused import: `LifecycleEntry`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5: warning: unused import: `maos_domain::halt::TerminationKind`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5: warning: unused import: `crate::halt::terminate_spirit`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33: warning: unused imports: `ClassSection` and `GatewaysSection`
+crates/maos-kernel-core/src/mcp/mod.rs:12:59: warning: unused import: `TokenId`
+crates/maos-kernel-core/src/mcp/mod.rs:13:73: warning: unused import: `McpRequest`
+crates/maos-kernel-core/src/memory/private.rs:12:17: warning: unused import: `Path`
+crates/maos-registry/src/yank.rs:164:16: warning: unused variable: `applied`: help: if this is intentional, prefix it with an underscore: `_applied`
+crates/maos-registry/src/yank.rs:171:28: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-registry/src/yank.rs:176:17: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-registry/src/yank.rs:189:16: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25: warning: unused import: `AtomicU64`
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5: warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+crates/maos-kernel-core/src/scheduler/resource_ceiling.rs:14:5: warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17: warning: unused import: `DispositionOutcome`
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+    Checking maos-cli v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-cli)
+    Checking maos-spirit-cli v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-spirit-cli)
+    Checking maos-fkcs v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-fkcs)
+crates/maos-registry/tests/search_lock_contention_test.rs:3:25: warning: unused imports: `AtomicUsize` and `Ordering`
+crates/maos-registry/tests/search_lock_contention_test.rs:4:5: warning: unused import: `std::sync::Arc`
+crates/maos-registry/tests/search_lock_contention_test.rs:7:18: warning: unused imports: `SearchResultItem` and `YankEntry`
+crates/maos-registry/tests/runtime_drift_test.rs:47:20: warning: use of deprecated function `maos_compliance::builder::seeded_keypair`: TEST/CORPUS/SMOKE ONLY — never use in production admission
+crates/maos-registry/tests/fr59_yank_propagation_within_5min_test.rs:16:5: warning: field `clock_ns` is never read
+crates/maos-kernel-core/src/capability/cap_policy/mod.rs:625:41: warning: unused imports: `EpistemicAction`, `EpistemicPolicySection`, and `Posture`
+crates/maos-kernel-core/src/capability/cap_policy/mod.rs:626:13: warning: unused import: `crate::security::posture::PostureState`
+crates/maos-kernel-core/src/compliance/mod.rs:126:41: warning: unused imports: `EvidenceKind`, `ProviderEndpointPin`, `SandboxTier`, and `TrustTier`
+warning: `maos-registry` (test "search_lock_contention_test") generated 3 warnings (run `cargo fix --test "search_lock_contention_test" -p maos-registry` to apply 3 suggestions)
+crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:1288:13: warning: unused import: `std::io::Write`
+crates/maos-kernel-core/src/scheduler/control_block.rs:506:9: warning: unused import: `maos_spirit_abi::lifecycle::SpiritVtable`
+warning: `maos-registry` (test "runtime_drift_test") generated 1 warning
+warning: `maos-registry` (test "fr59_yank_propagation_within_5min_test") generated 1 warning
+crates/maos-registry/src/server.rs:314:8: warning: function `temp_storage` is never used
+crates/maos-spirit-cli/src/signing.rs:27:7: warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+warning: `maos-spirit-cli` (lib test) generated 1 warning
+warning: `maos-registry` (lib test) generated 12 warnings (6 duplicates) (run `cargo fix --lib -p maos-registry --tests` to apply 4 suggestions)
+crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21: warning: unreachable pattern: no value can reach this
+warning: `maos-spirit-cli` (lib) generated 1 warning (1 duplicate)
+crates/maos-kernel-core/src/inference/mod.rs:28:5: warning: unused import: `maos_providers::Provider`
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13: warning: unused variable: `event`: help: if this is intentional, prefix it with an underscore: `_event`
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5: warning: unused variable: `spirit_id`: help: if this is intentional, prefix it with an underscore: `_spirit_id`
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5: warning: unused variable: `spirit_pid`: help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25: warning: value assigned to `outcome` is never read
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25: warning: value assigned to `outcome` is never read
+crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17: warning: unused variable: `ctx`: help: if this is intentional, prefix it with an underscore: `_ctx`
+crates/maos-kernel-core/src/supervision/crash_detector.rs:195:13: warning: unused variable: `now_ns`: help: if this is intentional, prefix it with an underscore: `_now_ns`
+crates/maos-kernel-core/src/supervision/disposition.rs:22:9: warning: unused variable: `total`: help: if this is intentional, prefix it with an underscore: `_total`
+crates/maos-kernel-core/src/halt/resolver.rs:101:5: warning: field `boot_nonce` is never read
+crates/maos-kernel-core/src/memory/mod.rs:84:5: warning: field `next_frame_counter` is never read
+crates/maos-kernel-core/src/memory/mod.rs:710:8: warning: method `mint_frame_id` is never used
+crates/maos-kernel-core/src/memory/principal.rs:51:8: warning: associated function `now_ns` is never used
+crates/maos-kernel-core/src/memory/private.rs:44:5: warning: field `kind` is never read
+crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5: warning: field `iac_rt_metrics` is never read
+crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8: warning: associated function `resolution_label` is never used
+crates/maos-kernel-core/src/memory/shared.rs:52:8: warning: associated function `kind_to_str` is never used
+crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:146:8: warning: method `build_kernel_ctx` is never used
+crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5: warning: field `attestation` is never read
+crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5: warning: field `notification_dispatcher` is never read
+crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5: warning: field `notification_dispatcher` is never read
+warning: `maos-kernel-core` (lib) generated 42 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+    Checking maos-bench v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-bench)
+    Checking maos-shell v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-shell)
+    Checking maos-control v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-control)
+    Checking maos-escape-detector v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-escape-detector)
+    Checking observer v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/observer)
+    Checking researcher v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/researcher)
+    Checking mira v1.5.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/mira)
+    Checking worker v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/worker)
+    Checking orchestrator v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/orchestrator)
+    Checking architect v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/architect)
+    Checking maos-secrets v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-secrets)
+crates/maos-secrets/tests/at_rest_seal.rs:26:26: warning: unused import: `CryptoProvider`
+crates/maos-audit/tests/fr4_classifier_16_2.rs:745:4: warning: function `workspace_src` is never used
+crates/maos-control/src/lib.rs:17:11: warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+warning: `maos-audit` (test "fr4_classifier_16_2") generated 1 warning
+crates/maos-control/src/lib.rs:960:28: warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+warning: `maos-secrets` (test "at_rest_seal") generated 1 warning (run `cargo fix --test "at_rest_seal" -p maos-secrets` to apply 1 suggestion)
+crates/maos-eval/src/distillate_corpus.rs:134:9: warning: unused import: `std::io::Write`
+    Checking maos-pdp v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-pdp)
+crates/maos-kernel-core/tests/abi_stability_admit.rs:84:4: warning: function `default_test_class` is never used
+crates/maos-kernel-core/src/halt/mod.rs:692:9: warning: unused `Result` that must be used
+crates/maos-kernel-core/src/halt/mod.rs:710:9: warning: unused `Result` that must be used
+crates/maos-kernel-core/src/hot_swap/precheck.rs:126:9: warning: unused `Result` that must be used
+crates/maos-control/src/lib.rs:772:8: warning: method `header` is never used
+crates/maos-audit/tests/fr4_worker_rows_16_3.rs:15:5: warning: unused import: `std::path::Path`
+crates/maos-kernel-core/tests/halt_resolution_writes_memory.rs:6:25: warning: unused import: `HaltId`
+warning: `maos-kernel-core` (test "abi_stability_admit") generated 1 warning
+warning: `maos-control` (lib) generated 3 warnings
+    Checking maos-bin v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-bin)
+warning: `maos-kernel-core` (test "halt_resolution_writes_memory") generated 1 warning (run `cargo fix --test "halt_resolution_writes_memory" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/tests/common/mod.rs:9:8: warning: function `skip_if_no_container_runtime` is never used
+crates/maos-kernel-core/tests/common/upgrade.rs:43:9: warning: fields `journal` and `transparency_log` are never read
+warning: `maos-audit` (test "fr4_worker_rows_16_3") generated 1 warning (run `cargo fix --test "fr4_worker_rows_16_3" -p maos-audit` to apply 1 suggestion)
+crates/maos-kernel-core/tests/drr_priority_weighted_dispatch.rs:13:34: warning: unused import: `SCHEDULER_QUANTUM`
+warning: `maos-kernel-core` (lib test) generated 46 warnings (38 duplicates) (run `cargo fix --lib -p maos-kernel-core --tests` to apply 5 suggestions)
+crates/maos-bench/tests/t_10_4c_j4_latency_gate.rs:36:4: warning: function `run_j4_in_subprocess` is never used
+warning: `maos-kernel-core` (test "upgrade_orchestrator_three_policies") generated 2 warnings
+crates/maos-shell/tests/shell_test.rs:3:5: warning: unused import: `std::sync::Arc`
+warning: `maos-eval` (lib test) generated 2 warnings (1 duplicate) (run `cargo fix --lib -p maos-eval --tests` to apply 1 suggestion)
+warning: `maos-shell` (test "shell_test") generated 1 warning (run `cargo fix --test "shell_test" -p maos-shell` to apply 1 suggestion)
+warning: `maos-bench` (test "t_10_4c_j4_latency_gate") generated 1 warning
+warning: `maos-kernel-core` (test "drr_priority_weighted_dispatch") generated 1 warning (run `cargo fix --test "drr_priority_weighted_dispatch" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-bin/src/cross_team_crossing.rs:1014:5: warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+crates/maos-kernel-core/tests/fr4_1000_call_fixture.rs:7:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+crates/maos-shell/tests/shell_halt_repl_16_2.rs:175:5: warning: field `pid` is never read
+crates/maos-bin/src/cross_team_crossing.rs:925:9: warning: unused import: `maos_domain::invariants::i3::FrameOrigin`
+crates/maos-shell/tests/shell_halt_repl_16_2.rs:318:5: warning: fields `prompts` and `done` are never read
+crates/maos-shell/tests/shell_halt_repl_16_2.rs:412:8: warning: associated function `clone_from` is never used
+crates/maos-bin/src/cross_team_crossing.rs:928:20: warning: unused import: `FrameKind`
+crates/maos-audit/tests/erasure_smoke_test.rs:15:5: warning: unused import: `maos_domain::invariants::i3::FrameOrigin`
+crates/maos-kernel-core/tests/nfr_rel_9_revoke_latency.rs:14:55: warning: unused import: `TokenId`
+crates/maos-bench/tests/t_10_4c_j4_gate_integrity.rs:16:4: warning: function `run_j4_in_subprocess` is never used
+warning: `maos-shell` (test "shell_halt_repl_16_2") generated 3 warnings
+warning: `maos-bench` (test "t_10_4c_j4_gate_integrity") generated 1 warning
+warning: `maos-kernel-core` (test "nfr_rel_9_revoke_latency") generated 1 warning (run `cargo fix --test "nfr_rel_9_revoke_latency" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "fr4_1000_call_fixture") generated 1 warning (run `cargo fix --test "fr4_1000_call_fixture" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-audit` (test "erasure_smoke_test") generated 1 warning (run `cargo fix --test "erasure_smoke_test" -p maos-audit` to apply 1 suggestion)
+crates/maos-kernel-core/tests/cap_registry_integration.rs:5:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs:13:5: warning: unused import: `maos_domain::halt::HaltState`
+crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs:14:36: warning: unused import: `JournalEntry`
+crates/maos-kernel-core/tests/retract_corpus_v0.rs:11:64: warning: unused import: `RetractPayload`
+crates/maos-eval/tests/upgrade_policy_corpus.rs:30:9: warning: variable does not need to be mutable
+crates/maos-eval/tests/halt_recall_floor.rs:62:9: warning: variable `tn` is assigned to, but never used
+crates/maos-eval/tests/upgrade_policy_corpus.rs:29:9: warning: unused variable: `valid_policies`: help: if this is intentional, prefix it with an underscore: `_valid_policies`
+crates/maos-eval/tests/upgrade_policy_corpus.rs:30:9: warning: unused variable: `policy_idx`: help: if this is intentional, prefix it with an underscore: `_policy_idx`
+crates/maos-eval/tests/halt_recall_floor.rs:84:21: warning: value assigned to `tn` is never read: this value is reassigned later and never used
+crates/maos-eval/tests/halt_recall_floor.rs:94:21: warning: value assigned to `tn` is never read
+warning: `maos-kernel-core` (test "scalar_predicate_to_halt_integration") generated 2 warnings (run `cargo fix --test "scalar_predicate_to_halt_integration" -p maos-kernel-core` to apply 2 suggestions)
+crates/maos-kernel-core/tests/retract_corpus_v0.rs:16:5: warning: unused import: `maos_domain::ports::IacBusPort`
+warning: `maos-kernel-core` (test "cap_registry_integration") generated 1 warning (run `cargo fix --test "cap_registry_integration" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "upgrade_migrator_cross_major") generated 2 warnings (2 duplicates)
+warning: `maos-eval` (test "upgrade_policy_corpus") generated 3 warnings (run `cargo fix --test "upgrade_policy_corpus" -p maos-eval` to apply 3 suggestions)
+crates/maos-kernel-core/tests/schedule_watchdog_fr26.rs:37:8: warning: methods `count` and `last_payload` are never used
+warning: `maos-eval` (test "halt_recall_floor") generated 3 warnings
+warning: `maos-kernel-core` (test "schedule_watchdog_fr26") generated 1 warning
+crates/maos-kernel-core/tests/memory_md_opaque_write.rs:6:69: warning: unused import: `ValueKind`
+warning: `maos-kernel-core` (test "retract_corpus_v0") generated 2 warnings (run `cargo fix --test "retract_corpus_v0" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/tests/memory_md_opaque_write.rs:29:19: warning: unused variable: `tmp`: help: if this is intentional, prefix it with an underscore: `_tmp`
+warning: `maos-kernel-core` (test "upgrade_cold_swap_with_inflight_tasks") generated 2 warnings (2 duplicates)
+warning: `maos-kernel-core` (test "memory_md_opaque_write") generated 2 warnings (run `cargo fix --test "memory_md_opaque_write" -p maos-kernel-core` to apply 2 suggestions)
+crates/maos-kernel-core/benches/hot_swap_latency.rs:72:5: warning: fields `scheduler` and `predecessor_pid` are never read
+crates/maos-kernel-core/tests/self_telemetry_scope.rs:10:5: warning: unused import: `maos_domain::self_telemetry::SelfTelemetryError`
+crates/maos-kernel-core/tests/scalar_slot_set_and_tap.rs:9:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+crates/maos-kernel-core/tests/scalar_slot_set_and_tap.rs:53:9: warning: unused variable: `topic`: help: if this is intentional, prefix it with an underscore: `_topic`
+crates/maos-kernel-core/tests/cap_audit_backpressure.rs:7:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+warning: `maos-kernel-core` (bench "hot_swap_latency") generated 1 warning
+warning: `maos-kernel-core` (test "self_telemetry_scope") generated 1 warning (run `cargo fix --test "self_telemetry_scope" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "scalar_slot_set_and_tap") generated 2 warnings (run `cargo fix --test "scalar_slot_set_and_tap" -p maos-kernel-core` to apply 2 suggestions)
+crates/maos-kernel-core/tests/provider_switched_journal.rs:4:41: warning: unused imports: `LifecycleSection`, `OnCrashSection`, `OnRevocationSection`, `OutputShape`, `SchedulingSection`, and `SupervisionSection`
+warning: `maos-kernel-core` (test "cap_audit_backpressure") generated 1 warning (run `cargo fix --test "cap_audit_backpressure" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/tests/common/upgrade.rs:24:12: warning: struct `CorpusSpirit` is never constructed
+crates/maos-kernel-core/tests/common/upgrade.rs:40:12: warning: struct `UpgradeHarness` is never constructed
+crates/maos-kernel-core/tests/common/upgrade.rs:49:12: warning: associated items `new` and `write_manifest` are never used
+crates/maos-kernel-core/tests/common/upgrade.rs:138:8: warning: function `parse_manifest_bundle` is never used
+warning: `maos-kernel-core` (test "provider_switched_journal") generated 6 warnings (1 duplicate) (run `cargo fix --test "provider_switched_journal" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/benches/hello_spirit_p95.rs:28:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:11:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:14:35: warning: unused imports: `CapabilityToken`, `IntentClass`, `Scope`, and `TokenId`
+crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:15:5: warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:16:5: warning: unused import: `maos_domain::ports::capability::CapError`
+warning: `butler` (lib test) generated 1 warning (1 duplicate)
+warning: `maos-kernel-core` (test "scalar_policy_runtime_test") generated 4 warnings (run `cargo fix --test "scalar_policy_runtime_test" -p maos-kernel-core` to apply 4 suggestions)
+crates/maos-kernel-core/tests/cold_restart_recover_in_flight.rs:7:5: warning: unused import: `std::path::PathBuf`
+warning: `maos-kernel-core` (bench "hello_spirit_p95") generated 1 warning (run `cargo fix --bench "hello_spirit_p95" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-eval/tests/t3_escape_corpus.rs:7:4: warning: function `skip_if_no_container_runtime` is never used
+crates/maos-secrets/tests/default_plaintext_preserved.rs:42:26: warning: unused imports: `CryptoProvider` and `KeyManagementPort`
+warning: `maos-kernel-core` (test "cold_restart_recover_in_flight") generated 1 warning (run `cargo fix --test "cold_restart_recover_in_flight" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/tests/scalar_predicate_truth_table.rs:24:5: warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+warning: `maos-eval` (test "t3_escape_corpus") generated 1 warning
+crates/maos-kernel-core/tests/halt_invoke_test.rs:14:47: warning: unused import: `HaltState`
+warning: `maos-secrets` (test "default_plaintext_preserved") generated 1 warning (run `cargo fix --test "default_plaintext_preserved" -p maos-secrets` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "scalar_predicate_truth_table") generated 1 warning (run `cargo fix --test "scalar_predicate_truth_table" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/tests/spirit_boundary_invariants.rs:12:5: warning: unused import: `maos_domain::invariants::i1::Scope`
+warning: `maos-control` (lib test) generated 3 warnings (3 duplicates)
+warning: `maos-kernel-core` (test "halt_invoke_test") generated 1 warning (run `cargo fix --test "halt_invoke_test" -p maos-kernel-core` to apply 1 suggestion)
+crates/maos-kernel-core/tests/sandbox_admission.rs:67:4: warning: function `hello_spirit_output_shape` is never used
+warning: `maos-kernel-core` (test "sandbox_admission") generated 1 warning
+crates/maos-kernel-core/tests/spirit_boundary_invariants.rs:27:5: warning: field `notes` is never read
+warning: `maos-kernel-core` (test "spirit_boundary_invariants") generated 2 warnings (run `cargo fix --test "spirit_boundary_invariants" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+    Checking xtask v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/xtask)
+crates/maos-bin/tests/butler_8_14b.rs:184:17: warning: variable `header_end` is assigned to, but never used
+crates/maos-bin/tests/butler_8_14b.rs:195:21: warning: value assigned to `header_end` is never read
+crates/maos-bin/tests/butler_8_14b.rs:162:5: warning: fields `method` and `body` are never read
+warning: `maos-bin` (test "butler_8_14b") generated 3 warnings
+warning: `maos-bin` (lib test) generated 3 warnings (1 duplicate) (run `cargo fix --lib -p maos-bin --tests` to apply 2 suggestions)
+crates/maos-bin/tests/audit_refusal_16_5.rs:12:35: warning: unused import: `IntentClass`
+crates/maos-bin/tests/audit_refusal_16_5.rs:18:5: warning: unused import: `CapabilityRegistryPort`
+crates/maos-bin/tests/consent_refusal_1b.rs:84:5: warning: unused import: `tokio::sync::mpsc::UnboundedReceiver`
+warning: `maos-bin` (test "audit_refusal_16_5") generated 2 warnings (run `cargo fix --test "audit_refusal_16_5" -p maos-bin` to apply 2 suggestions)
+warning: `maos-bin` (test "consent_refusal_1b") generated 1 warning (run `cargo fix --test "consent_refusal_1b" -p maos-bin` to apply 1 suggestion)
+crates/maos-bin/tests/inference_mode_15_6.rs:157:5: warning: unused import: `maos_domain::ports::capability::TokenIssuer`
+crates/maos-bin/tests/f4_pairing.rs:531:4: warning: function `sql_i64` is never used
+warning: `maos-bin` (test "f4_pairing") generated 1 warning
+warning: `maos-bin` (test "inference_mode_15_6") generated 1 warning
+crates/maos-bin/tests/worker_supervision_16_3.rs:254:5: warning: field `active_paths` is never read
+warning: `maos-bin` (test "worker_supervision_16_3") generated 1 warning
+xtask/src/gate_common.rs:119:15: warning: function `register_fixture_story` is never used
+warning: `xtask` (lib test) generated 1 warning
+xtask/tests/example_spirit_regen_integration.rs:66:9: warning: unused variable: `root`: help: if this is intentional, prefix it with an underscore: `_root`
+warning: `xtask` (test "example_spirit_regen_integration") generated 1 warning (run `cargo fix --test "example_spirit_regen_integration" -p xtask` to apply 1 suggestion)
+xtask/tests/check_corpus_integration.rs:3:4: warning: function `fixture` is never used
+warning: `xtask` (test "check_corpus_integration") generated 1 warning
+xtask/tests/coverage_matrix_completeness_tests.rs:6:4: warning: function `workspace_path` is never used
+warning: `xtask` (test "coverage_matrix_completeness_tests") generated 1 warning
+xtask/tests/pentest_gate_tests.rs:15:5: warning: fields `reference_spirits`, `reproducibility`, and `methodology` are never read
+xtask/tests/pentest_gate_tests.rs:23:5: warning: fields `build_command`, `binary_path`, `maosctl_path`, and `maosctl_verify` are never read
+xtask/tests/pentest_gate_tests.rs:31:5: warning: fields `hello_spirit`, `butler`, `worker`, `mira`, and `nash` are never read
+xtask/tests/pentest_gate_tests.rs:40:5: warning: fields `rust_toolchain`, `cargo_lock`, `os`, and `instructions` are never read
+xtask/tests/pentest_gate_tests.rs:48:5: warning: fields `owasp_frozen_doc`, `scope_doc`, `triage_protocol`, and `findings_schema` are never read
+xtask/tests/pentest_gate_tests.rs:102:8: warning: struct `PenTestSummary` is never constructed
+xtask/tests/pentest_gate_tests.rs:107:8: warning: struct `GateSection` is never constructed
+warning: `xtask` (test "pentest_gate_tests") generated 7 warnings
+xtask/src/check_migration_merkle.rs:342:41: warning: unnecessary parentheses around function argument
+xtask/src/gen_termination_corpus.rs:210:9: warning: unused import: `std::path::Path`
+xtask/src/templates_regen.rs:261:9: warning: unused import: `std::io::Write`
+crates/maos-bin/src/env_contract.rs:1:12: warning: struct `EnvVar` is never constructed
+crates/maos-bin/src/env_contract.rs:8:10: warning: enum `EnvStability` is never used
+crates/maos-bin/src/env_contract.rs:13:11: warning: constant `MAOS_ENV_REGISTRY` is never used
+crates/maos-bin/src/env_contract.rs:511:8: warning: function `lookup` is never used
+crates/maos-bin/src/env_contract.rs:3:9: warning: fields `purpose` and `stability` are never read
+warning: `maos-bin` (bin "maos") generated 4 warnings
+warning: `maos-bin` (bin "maos" test) generated 1 warning
+xtask/src/check_abi_ratification.rs:22:9: warning: fields `summary` and `adr_ref` are never read
+xtask/src/evidence_ledger.rs:536:12: warning: method `detail` is never used
+xtask/src/evidence_ledger.rs:1259:9: warning: field `substrate_present` is never read
+xtask/src/check_fkcs.rs:117:12: warning: associated function `synthetic` is never used
+xtask/src/check_fkcs.rs:744:8: warning: function `read_nonempty_lines` is never used
+xtask/src/check_pentest_gate.rs:24:9: warning: field `owasp_methodology_commit` is never read
+xtask/src/check_skill_conformance.rs:35:9: warning: fields `fixture_path` and `conformance_date` are never read
+xtask/src/tests/rebaseline_check_tests.rs:55:12: warning: struct `AlwaysDisagree` is never constructed
+warning: `xtask` (bin "xtask") generated 7 warnings
+warning: `xtask` (bin "xtask" test) generated 10 warnings (6 duplicates) (run `cargo fix --bin "xtask" -p xtask --tests` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 32.06s

@@ -176,6 +176,12 @@ daemon refuses a `wasm-component` manifest as `wasm_engine_off` in every
 default build and as `wasm_launch_not_built` in a `wasm-host` build until
 `17-3c-wasm-spirit-on-the-bus-under-t2` ships the launch.
 
+> **Amendment (2026-10-06, 17-3c):** `wasm_launch_not_built` no longer exists.
+> The default/published build still refuses `wasm_engine_off`; a `wasm-host`
+> build launches the component in the contained T2 runner via `maos run`, and
+> refuses unsupported in-process surfaces (operator door, topology, hot-swap
+> successor) as `spawned_surface_unsupported`.
+
 ## Amendment — §D-C transport (ratified 2026-09-26)
 
 Ratified by the operator (Lunarpulse) on 2026-09-26, on Story 17-3a's measured

@@ -1062,3 +1062,38 @@ run and is filed with a live owner rather than patched here.
 ### Open rows (D8 review)
 
 - **The vetting attestation binds the manifest, not the artifact or publisher key** [`crates/maos-compliance/src/vetting/mod.rs:209,236`, `crates/maos-registry/src/admission.rs` (promoted branch of `admit_spirit_with_attestation`)] — `VettingClaim` covers `sha256(manifest_toml)`, `spirit_id` and version only; the publisher signature and ComplianceClaim envelope are self-attested at public-untrusted, so a holder of a valid attestation for manifest M can pair M with different artifact bytes under a fresh key and be admitted `PublicVetted`. Reachable through `maosctl import --vetting-attestation --vetter-keyring`, but no attestation is issued outside tests yet. Not an FKCS violation (ADR-056 amendment 2026-09-29). **Owner: `20-1-registry-client-install-verb-vetter-and-yank`** — bind `artifact_sha256` (and the publisher key) into `VettingClaim` + `verify_attestation` (golden byte-pin + ADR-056 §1 amendment) before it ships `maos-spirit vet issue`.
+
+
+## Deferred from: code review of 17-3c-wasm-spirit-on-the-bus-under-t2 — chunk A (2026-10-05)
+
+Paths are in-tree as of the 17-3c commit (2026-10-06).
+
+- **Delegation and host-B frames still journal sender pid 0** [`crates/maos-bin/src/delegation.rs:273,384,484,553`]: `deliver_typed(frame, 0)` keeps the old hardcoded pid, including for `SpiritAuto` frames from real Spirits. Only guest sessions pass the real pid. Pre-existing.
+- **`spawn_and_bridge` never calls `env_clear()`** [`crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:526`]: the T2 runner inherits the daemon environment. The WASI guest gets no env, so the exposure needs a Wasmtime escape first. Pre-existing.
+- **The escape-detector consumer has no production caller** [`crates/maos-bin/src/escape_detector_consumer.rs:24`]: `report_escape_anomalies` is called only from tests. A real SIGSYS persists a SandboxBlock row but no anomaly is surfaced. The module was dead before 17-3c. The overstated doc claim is a separate 17-3c patch.
+- **The in-process refusal under `wasm-host` is a per-caller convention** [`crates/maos-bin/src/admission.rs:386`]: `gate_manifest` admits a pure `wasm-component` manifest. Each in-process surface must call `require_in_process`, and a future surface that forgets would admit it by name. Hardening idea: return a typed `InProcess`/`Spawned` gate result.
+- **MCP selector-level entitlement is not enforced** [`crates/maos-kernel-core/src/capability/mod.rs:57`]: `McpCall{server,tool}` maps to the action `mcp.call` only. Disclosed in the 17-3c story; the policy is unchanged.
+- **The stdout NDJSON/Raw reader is unbounded** [`crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:364`]: `read_newline_delimited` reads into a `Vec` with no cap. Only the Content-Length and stderr paths were bounded in 17-3c. Pre-existing.
+- **Issuance quota is charged before scope mapping and policy** [`crates/maos-kernel-core/src/capability/mod.rs:184`]: `check_and_increment` runs before `scope_to_intent` and policy evaluation, with no refund on deny or rollback. Pre-existing ordering.
+
+## Deferred from: code review of 17-3c-wasm-spirit-on-the-bus-under-t2 — chunks B+C (2026-10-05)
+
+Paths are in-tree as of the 17-3c commit (2026-10-06).
+
+- **A voluntary halt cannot be told apart from a completed turn** [`crates/maos-wasm-host/src/runner.rs:371-375`]: `Halt::Voluntary` from `handle-frame` writes the same TurnComplete record as a normal turn. If the kernel has already dispatched a queued frame, the session ends `UnexpectedEof`; the task is still dispositioned. Fixing this needs an ADR-032 halt control record.
+- **The runner's compile timeout can never fire first** [`crates/maos-wasm-host/src/runner.rs:154`]: `COMPILE_TIMEOUT` (360 s) is never shorter than the kernel's startup deadline, so a compile bomb surfaces as `Deadline("startup")`, not as exit 3. Needs a separate compile budget passed to the runner.
+- **Runner exit codes are misattributed** [`crates/maos-wasm-host/src/runner.rs`, `adapter.rs:95-101`]:
+  - environment failures exit 3;
+  - hostcall-fuel exhaustion and memory-limiter traps exit 1;
+  - inbound decode errors exit 1 rather than 5;
+  - `fuel = 0` and unparsable fuel values are accepted silently.
+- **Runner hardening gaps**:
+  - no `trap_on_grow_failure`;
+  - zero memory reservation makes every grow copy;
+  - a FIFO at the component path blocks before the watchdog starts;
+  - `on-shutdown` is skipped when the Ready write fails.
+- **Missing runner-binary tests**: exits 4/5, voluntary halt, stdout isolation, and directory/oversize components. The equiv harness also loses diagnostics and can use a stale twin binary.
+- **CI coupling**: the `wasm-host-tests` matrix `needs: [example-spirit-ts-tests]`, so an npm failure skips the existing T2 evidence. Split the TS proof into its own job; this needs a workflow run to validate.
+- **Historical runtime evidence has no source tree hash or toolchain record.** Future proofs must record `HEAD^{tree}`, a dirty-diff hash, and the rustc version.
+- **The new I9 exemption lacks sign-offs** [`docs/invariants/i9-exemptions.md:576-583`]: the register requires ≥2 maintainer sign-offs. 17-3c landed without them, so they are still owed by human maintainers.
+- **The memfd leave-one-out was not re-run on the shipped runner configuration.** This is waived by the operator's platform amendment; the retained evidence stands.

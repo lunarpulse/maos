@@ -67,14 +67,6 @@ allowed_max = "assistive"
     )
 }
 
-fn expected_engine_refusal() -> &'static str {
-    if cfg!(feature = "wasm-host") {
-        "wasm_launch_not_built"
-    } else {
-        "wasm_engine_off"
-    }
-}
-
 fn assert_gate_code(manifest: &str, expected: &str) {
     let refusal = gate_manifest(manifest, &|_| true).expect_err("manifest must be refused");
     assert_eq!(
@@ -90,7 +82,13 @@ fn gate_manifest_enforces_wasm_component_form_and_tier_before_engine_refusal() {
         assert_gate_code(&wasm_manifest(Some(tier)), "wasm_component_requires_t2");
     }
     assert_gate_code(&wasm_manifest(Some("T4")), "manifest_section_invalid");
-    assert_gate_code(&wasm_manifest(None), expected_engine_refusal());
+    #[cfg(not(feature = "wasm-host"))]
+    assert_gate_code(&wasm_manifest(None), "wasm_engine_off");
+    #[cfg(feature = "wasm-host")]
+    assert!(
+        gate_manifest(&wasm_manifest(None), &|_| true).is_ok(),
+        "with the engine compiled in, a well-formed T2 component manifest passes the structural gates"
+    );
 
     let missing_output_shape =
         wasm_manifest(Some("T2")).replace("[output_shape]\nrequired_fields = [\"result\"]\n\n", "");
@@ -151,6 +149,7 @@ fn init_root(scratch: &TempDir) -> PathBuf {
     home
 }
 
+#[cfg(not(feature = "wasm-host"))]
 fn run_component_manifest(manifest: &Path, label: &str) {
     let scratch = TempDir::new().expect("create isolated standalone root");
     let home = init_root(&scratch);
@@ -168,18 +167,23 @@ fn run_component_manifest(manifest: &Path, label: &str) {
     assert!(!output.status.success(), "{label} must be refused");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains(expected_engine_refusal()),
-        "{label} must expose {} on stderr, got: {stderr}",
-        expected_engine_refusal()
+        stderr.contains("wasm_engine_off"),
+        "{label} must expose wasm_engine_off on stderr, got: {stderr}"
     );
     assert!(
-        !stderr.contains("unknown_spirit_class")
-            && !stderr.contains("unknown Spirit class")
-            && !stderr.contains("class_section_invalid"),
-        "{label} must pass the form gate before the engine refusal, got: {stderr}"
+        !stderr.contains("unknown_spirit_class") && !stderr.contains("class_section_invalid"),
+        "{label} must reach the engine refusal, got: {stderr}"
+    );
+    assert!(
+        !String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .any(|event| event["event"] == "spirit_loaded"),
+        "a disabled engine must not announce a loaded Spirit"
     );
 }
 
+#[cfg(not(feature = "wasm-host"))]
 #[test]
 fn maos_run_refuses_wasm_component_manifests_by_named_engine_state() {
     let fixture = TempDir::new().expect("create component fixture directory");
@@ -309,14 +313,19 @@ fn maosctl_load_returns_wasm_engine_refusal_and_preserves_roster() {
         "the door must refuse a component manifest"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
+    #[cfg(not(feature = "wasm-host"))]
     assert!(
-        stderr.contains("HTTP 400") && stderr.contains(expected_engine_refusal()),
-        "the door must return HTTP 400 with {}, got: {stderr}",
-        expected_engine_refusal()
+        stderr.contains("HTTP 400") && stderr.contains("wasm_engine_off"),
+        "the door must return HTTP 400 with wasm_engine_off, got: {stderr}"
+    );
+    #[cfg(feature = "wasm-host")]
+    assert!(
+        stderr.contains("spawned_surface_unsupported") && stderr.contains("operator door"),
+        "the door must return spawned_surface_unsupported for the operator door, got: {stderr}"
     );
     assert!(
         !stderr.contains("unknown_spirit_class") && !stderr.contains("class_section_invalid"),
-        "the door must reach the engine refusal, got: {stderr}"
+        "the door must reach the engine/surface refusal, got: {stderr}"
     );
     assert_eq!(
         root.roster(),
@@ -342,7 +351,12 @@ fn maosctl_upgrade_refuses_wasm_successor_before_replacing_the_loaded_spirit() {
         "{successor}\n[scheduling]\npriority_weight = 100\n[lifecycle]\nenabled_hooks = []\n"
     );
     let path = root.scratch.path().join("successor.toml");
-    std::fs::write(&path, successor).expect("write wasm successor manifest");
+    std::fs::write(&path, &successor).expect("write wasm successor manifest");
+    #[cfg(feature = "wasm-host")]
+    assert!(
+        gate_manifest(&successor, &|_| true).is_ok(),
+        "the successor manifest must itself pass the structural gates so the refusal is not vacuous"
+    );
 
     let output = root.ctl(&[
         "spirit",
@@ -353,8 +367,12 @@ fn maosctl_upgrade_refuses_wasm_successor_before_replacing_the_loaded_spirit() {
     ]);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        !output.status.success() && stderr.contains("wasm-component"),
-        "a WASM successor must not enter the in-process hot-swap: {stderr}"
+        !output.status.success(),
+        "a spawned successor must not enter the in-process hot-swap: {stderr}"
+    );
+    assert!(
+        stderr.contains("spawned_surface_unsupported") && stderr.contains("hot-swap successor"),
+        "the successor must be refused as an unsupported spawned surface, got: {stderr}"
     );
     assert_eq!(
         root.roster(),

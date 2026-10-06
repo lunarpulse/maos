@@ -602,6 +602,15 @@ mod worker {
         record: TaskAssignmentRecord,
         on_crash_action: OnCrashAction,
         dispositioned: bool,
+        /// True exactly while the kept task belongs to the SCB's active ledger.
+        record_active: bool,
+        /// True for an adopted spawned session: its ledger record exists only
+        /// while a mailbox turn is active, so a record still active at exit
+        /// is an abandoned task, never a completed one.
+        turn_scoped: bool,
+        /// A turn-scoped session's runner has announced `Ready`. Before that,
+        /// a typed runner refusal exit (2/3/5) is a launch refusal, not a crash.
+        ready: bool,
     }
 
     /// The lock-guarded state the observer thread and the Worker's call stack
@@ -631,6 +640,20 @@ mod worker {
             self.spirit_pid.load(Ordering::Acquire)
         }
 
+        /// Admission's on-loaded callback binds the only scheduler-owned PID.
+        pub fn bind_scheduler_pid(&self, pid: u32) {
+            assert_ne!(pid, 0, "scheduler PID must not be a placeholder");
+            self.spirit_pid
+                .compare_exchange(0, pid, Ordering::AcqRel, Ordering::Acquire)
+                .expect("scheduler PID is already bound");
+        }
+
+        /// A session timeout/error marks the kill as planned before signalling.
+        pub fn stop_session(&self) {
+            let action = self.begin_stop();
+            self.execute(action);
+        }
+
         /// The current phase.
         pub fn phase(&self) -> BindingPhase {
             self.lock().phase
@@ -639,6 +662,24 @@ mod worker {
         /// The kept record's task id.
         pub fn task_id(&self) -> String {
             self.lock().record.task_id.clone()
+        }
+
+        /// The turn-scoped session's runner announced `Ready`: from now on every
+        /// non-zero exit is a crash.
+        pub fn mark_ready(&self) {
+            self.lock().ready = true;
+        }
+
+        /// A turn-scoped session's runner exit with a typed refusal code
+        /// (`maos-wasm-runner`: 2 incompatible world, 3 invalid component,
+        /// 5 unrepresentable frame) before `Ready` is the launch refusing the
+        /// component, not the Spirit crashing.
+        fn is_typed_refusal(&self, facts: &ExitFacts) -> bool {
+            let state = self.lock();
+            state.turn_scoped
+                && !state.ready
+                && facts.signal.is_none()
+                && matches!(facts.code, Some(2 | 3 | 5))
         }
 
         fn lock(&self) -> std::sync::MutexGuard<'_, BindingState> {
@@ -656,7 +697,11 @@ mod worker {
         /// the documented non-blocking exception.
         pub(super) fn on_child_exit(&self, facts: ExitFacts) {
             let pid = self.spirit_pid();
-            let cause = self.exec.classify_exit(pid, facts);
+            let cause = if self.is_typed_refusal(&facts) {
+                CrashCause::Voluntary
+            } else {
+                self.exec.classify_exit(pid, facts)
+            };
             let mut state = self.lock();
             let (next, action) = state.phase.on_exit(&cause);
             state.phase = next;
@@ -759,8 +804,23 @@ mod worker {
                     self.exec.unload(pid);
                 }
                 BindingAction::UnloadClean => {
-                    let task_id = self.lock().record.task_id.clone();
-                    self.exec.take_record(pid, &task_id);
+                    // A turn-scoped session that exits with its turn record still
+                    // active abandoned that task: it gets the FR50 disposition.
+                    // Any other clean exit completed its task: take the record
+                    // out WITHOUT one. The lock is released before the executor.
+                    let (turn_scoped, record_active, task_id) = {
+                        let state = self.lock();
+                        (
+                            state.turn_scoped,
+                            state.record_active,
+                            state.record.task_id.clone(),
+                        )
+                    };
+                    if turn_scoped {
+                        self.disposition();
+                    } else if record_active {
+                        self.exec.take_record(pid, &task_id);
+                    }
                     self.exec.unload(pid);
                 }
                 BindingAction::RunCrashHandlerThenMaybeDisposition(cause) => {
@@ -835,7 +895,7 @@ mod worker {
         fn disposition(&self) {
             let (action, record) = {
                 let mut state = self.lock();
-                if state.dispositioned {
+                if state.dispositioned || !state.record_active {
                     return;
                 }
                 state.dispositioned = true;
@@ -1021,6 +1081,9 @@ mod worker {
                 code: None,
             },
         };
+        if core.is_typed_refusal(&facts) {
+            return None;
+        }
         match core.exec.classify_exit(core.spirit_pid(), facts) {
             CrashCause::Voluntary => None,
             cause => Some(cause),
@@ -1131,6 +1194,140 @@ mod worker {
     }
 
     impl WorkerSupervisor {
+        fn prepare_core(
+            &self,
+            spirit_id: String,
+            task: &WorkerTask,
+            bundle: &SpiritManifestBundle,
+            record_active: bool,
+        ) -> Arc<BindingCore> {
+            let (task_id, originator_spirit_id) = task.record_ids(&spirit_id);
+            Arc::new(BindingCore {
+                spirit_id,
+                spirit_pid: AtomicU32::new(0),
+                state: Mutex::new(BindingState {
+                    phase: BindingPhase::Running,
+                    child: None,
+                    child_pid: None,
+                    handler: None,
+                    record: TaskAssignmentRecord {
+                        task_id,
+                        capability_token: None,
+                        ttl_deadline_ns: u64::MAX,
+                        intent_class: IntentClass::Standard,
+                        originator_spirit_id,
+                    },
+                    on_crash_action: bundle
+                        .on_crash
+                        .as_ref()
+                        .map(|section| section.action)
+                        .unwrap_or_default(),
+                    dispositioned: false,
+                    record_active,
+                    turn_scoped: !record_active,
+                    ready: false,
+                }),
+                exec: Arc::clone(&self.exec) as Arc<dyn BindingExecutor>,
+                strategy: Arc::clone(&self.strategy),
+                counters: Arc::clone(&self.counters),
+                seams: self.seams.clone(),
+            })
+        }
+
+        /// Prepare lifecycle ownership without allocating another SCB or PID.
+        pub fn prepare_spawned(
+            &self,
+            spirit_id: &str,
+            bundle: &SpiritManifestBundle,
+        ) -> Result<
+            (
+                Arc<BindingCore>,
+                Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>,
+            ),
+            WorkerSupervisionError,
+        > {
+            if self.is_stopping() {
+                return Err(WorkerSupervisionError::WorkerStopping);
+            }
+            let core =
+                self.prepare_core(spirit_id.to_owned(), &WorkerTask::Standalone, bundle, false);
+            let spirit = maos_kernel_core::scheduler::control_block::make_spirit_obj(
+                WorkerSpirit::new(Arc::clone(&core)),
+            );
+            Ok((core, spirit))
+        }
+
+        fn adopt_core(&self, core: Arc<BindingCore>) -> WorkerBinding {
+            self.active_paths.enter();
+            self.registry.register(Arc::clone(&core));
+            if self.is_stopping() {
+                core.stop_session();
+            }
+            WorkerBinding {
+                core,
+                armed: true,
+                active_paths: Arc::clone(&self.active_paths),
+                registry: Arc::clone(&self.registry),
+            }
+        }
+
+        /// Adopt admission's existing SCB; never call scheduler.load here.
+        pub fn adopt_spawned(
+            &self,
+            core: Arc<BindingCore>,
+        ) -> Result<WorkerBinding, WorkerSupervisionError> {
+            assert_ne!(core.spirit_pid(), 0, "adopt requires successful admission");
+            let binding = self.adopt_core(core);
+            if self.is_stopping() {
+                return Err(WorkerSupervisionError::WorkerStopping);
+            }
+            Ok(binding)
+        }
+
+        /// Only an active mailbox export belongs in the progress watchdog ledger.
+        pub fn begin_turn(
+            &self,
+            core: &Arc<BindingCore>,
+            task_id: String,
+        ) -> Result<(), WorkerSupervisionError> {
+            let (pid, record) = {
+                let mut state = core.lock();
+                if self.is_stopping() || state.phase != BindingPhase::Running {
+                    return Err(WorkerSupervisionError::WorkerStopping);
+                }
+                assert!(
+                    !state.record_active,
+                    "a spawned session already has an active turn"
+                );
+                state.record.task_id = task_id;
+                state.record.capability_token = None;
+                state.record.ttl_deadline_ns = u64::MAX;
+                state.dispositioned = false;
+                state.record_active = true;
+                (core.spirit_pid(), state.record.clone())
+            };
+            // The binding lock is not held across the executor. A stop that
+            // lands before the push dispositions this (already active) record
+            // from the kept copy; the late ledger entry is then retired here.
+            self.exec.push_record(pid, record.clone());
+            if core.phase() != BindingPhase::Running {
+                self.exec.take_record(pid, &record.task_id);
+                return Err(WorkerSupervisionError::WorkerStopping);
+            }
+            Ok(())
+        }
+
+        pub fn complete_turn(&self, core: &Arc<BindingCore>) {
+            let (pid, task_id) = {
+                let mut state = core.lock();
+                assert!(state.record_active, "TurnComplete without an active turn");
+                state.record_active = false;
+                state.record.capability_token = None;
+                state.record.ttl_deadline_ns = u64::MAX;
+                (core.spirit_pid(), state.record.task_id.clone())
+            };
+            self.exec.take_record(pid, &task_id);
+        }
         /// Build the root's supervisor. Construct it AFTER
         /// `set_crash_detector` — that call needs `Arc::get_mut(&mut scheduler)`
         /// and therefore strong count 1 (Trap 1).
@@ -1291,39 +1488,7 @@ mod worker {
             } else {
                 format!("worker-{}", seq + 1)
             };
-            let (task_id, originator_spirit_id) = task.record_ids(&spirit_id);
-            let on_crash_action = bundle
-                .on_crash
-                .as_ref()
-                .map(|section| section.action)
-                .unwrap_or_default();
-            let record = TaskAssignmentRecord {
-                task_id,
-                // Patched to `Some` after a `CliSubprocessSpawn` capability is
-                // minted; remains `None` under host-grant authority.
-                capability_token: None,
-                ttl_deadline_ns: u64::MAX,
-                intent_class: IntentClass::Standard,
-                originator_spirit_id,
-            };
-            let core = Arc::new(BindingCore {
-                spirit_id: spirit_id.clone(),
-                spirit_pid: AtomicU32::new(0),
-                state: Mutex::new(BindingState {
-                    phase: BindingPhase::Running,
-                    child: None,
-                    child_pid: None,
-                    handler: None,
-                    record: record.clone(),
-                    on_crash_action,
-                    dispositioned: false,
-                }),
-                exec: Arc::clone(&self.exec) as Arc<dyn BindingExecutor>,
-                strategy: Arc::clone(&self.strategy),
-                counters: Arc::clone(&self.counters),
-                seams: self.seams.clone(),
-            });
-
+            let core = self.prepare_core(spirit_id.clone(), task, &bundle, true);
             let spirit = WorkerSpirit::new(Arc::clone(&core));
             let pid = self
                 .exec
@@ -1334,7 +1499,7 @@ mod worker {
                         .load(&spirit_id, bundle, spirit, self.boot_nonce),
                 )
                 .map_err(|e| WorkerSupervisionError::Load(e.to_string()))?;
-            core.spirit_pid.store(pid, Ordering::Release);
+            core.bind_scheduler_pid(pid);
 
             if let Err(e) = self.exec.handle.block_on(self.exec.scheduler.start(pid)) {
                 // Story 16-6 — this used to read "the SCB is `Loaded` and
@@ -1349,15 +1514,8 @@ mod worker {
 
             // The record is pushed AFTER `start`: the ProgressWatchdog only
             // looks at `Running` SCBs with a non-empty ledger.
-            self.exec.push_record(pid, record);
-            self.active_paths.enter();
-            self.registry.register(Arc::clone(&core));
-            Ok(WorkerBinding {
-                core,
-                armed: true,
-                active_paths: Arc::clone(&self.active_paths),
-                registry: Arc::clone(&self.registry),
-            })
+            self.exec.push_record(pid, core.lock().record.clone());
+            Ok(self.adopt_core(core))
         }
 
         fn watch(&self, core: &Arc<BindingCore>, child_pid: u32) {
@@ -1437,6 +1595,14 @@ mod worker {
             };
             if let Some(scb) = guard.get(&spirit_pid) {
                 if let Ok(mut ledger) = scb.task_assignments_in_flight.lock() {
+                    // A new active turn starts its own no-progress window.
+                    // Healthy mailbox idle must not age the next export.
+                    if ledger.is_empty() {
+                        scb.last_progress_iac_ns.store(
+                            maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                            Ordering::Relaxed,
+                        );
+                    }
                     ledger.push(record);
                 }
             }

@@ -1,0 +1,215 @@
+{
+  "failed_fast_compile_experiment": {
+    "provenance": {
+      "platform": {
+        "os_release": {
+          "PRETTY_NAME": "\"Ubuntu 25.10\"",
+          "NAME": "\"Ubuntu\"",
+          "VERSION_ID": "\"25.10\"",
+          "VERSION": "\"25.10 (Questing Quokka)\"",
+          "VERSION_CODENAME": "questing",
+          "ID": "ubuntu",
+          "ID_LIKE": "debian",
+          "HOME_URL": "\"https://www.ubuntu.com/\"",
+          "SUPPORT_URL": "\"https://help.ubuntu.com/\"",
+          "BUG_REPORT_URL": "\"https://bugs.launchpad.net/ubuntu/\"",
+          "PRIVACY_POLICY_URL": "\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"",
+          "UBUNTU_CODENAME": "questing",
+          "LOGO": "ubuntu-logo"
+        },
+        "arch": "x86_64",
+        "kernel": "6.17.0-41-generic"
+      },
+      "exit_code": 1,
+      "elapsed_seconds": 180.1865398770001,
+      "manifest_sha256": "2ee93955e0e9c69cb64e75f2503cbe105ae597a8dbdfcd1c3db846bcb1473bd7",
+      "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+      "daemon_sha256": "782d08fdb071058f9eef08265962eafca957207f95d146f3b5318c37900b1c82",
+      "runner_sha256": "0c120c4642a879f8e89b642b81c6b5adf92a7406f5eeb2e8d5034062491d22e1",
+      "declared_resources": {
+        "cpu_max_pct": 10,
+        "memory_max_mb": 768
+      },
+      "time_cap_seconds": 180,
+      "instruction_fuel": 10000000,
+      "guest_memory_bytes": 67108864
+    },
+    "process_observations": {
+      "2990": {
+        "child_pid": 2990,
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/maos-17-3c-proof.service/maos.slice/spirit-example-spirit-ts-2970-1",
+        "cpu_max": "10000 100000",
+        "memory_max": "805306368",
+        "argv": [
+          "/home/cosmo/maos-17-3c-proof.a99GPA/maos-wasm-runner",
+          "--component",
+          "/home/cosmo/maos-17-3c-proof.a99GPA/examples/example-spirit-ts/dist/spirit.wasm",
+          "--fuel",
+          "10000000"
+        ],
+        "peak_vm_kib": 359444,
+        "peak_rss_kib": 219864
+      }
+    },
+    "result": "OptLevel::None still failed Deadline(startup); experiment reverted, not retained as a fix."
+  },
+  "verified_cpu100_measurement_only": {
+    "measurement_only": true,
+    "provenance": {
+      "platform": {
+        "os_release": {
+          "PRETTY_NAME": "\"Ubuntu 25.10\"",
+          "NAME": "\"Ubuntu\"",
+          "VERSION_ID": "\"25.10\"",
+          "VERSION": "\"25.10 (Questing Quokka)\"",
+          "VERSION_CODENAME": "questing",
+          "ID": "ubuntu",
+          "ID_LIKE": "debian",
+          "HOME_URL": "\"https://www.ubuntu.com/\"",
+          "SUPPORT_URL": "\"https://help.ubuntu.com/\"",
+          "BUG_REPORT_URL": "\"https://bugs.launchpad.net/ubuntu/\"",
+          "PRIVACY_POLICY_URL": "\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"",
+          "UBUNTU_CODENAME": "questing",
+          "LOGO": "ubuntu-logo"
+        },
+        "arch": "x86_64",
+        "kernel": "6.17.0-41-generic"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 30.714718036000022,
+      "manifest_sha256": "5499c968904d45514fdd8807e4724a832b76b0206a40220ac5f1762d8b6703d1",
+      "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+      "daemon_sha256": "782d08fdb071058f9eef08265962eafca957207f95d146f3b5318c37900b1c82",
+      "runner_sha256": "f2f8e0b2fb99a583c139aa20acf66005deeef001ab60c250f9edebd0a30d9467",
+      "declared_resources": {
+        "cpu_max_pct": 100,
+        "memory_max_mb": 768
+      },
+      "time_cap_seconds": 180,
+      "instruction_fuel": 10000000,
+      "guest_memory_bytes": 67108864,
+      "measurement_only": true
+    },
+    "actual_proof": {
+      "loaded": {
+        "event": "spirit_loaded",
+        "spirit_id": "example-spirit-ts",
+        "pid": 1,
+        "child_pid": 3433,
+        "ready": true
+      },
+      "enforced_resources": {
+        "child_pid": 3433,
+        "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/maos-17-3c-proof.service/maos.slice/spirit-example-spirit-ts-3413-1",
+        "cpu_max": "100000 100000",
+        "memory_max": "805306368",
+        "argv": [
+          "/home/cosmo/maos-17-3c-proof.a99GPA/measurement/maos-wasm-runner",
+          "--component",
+          "/home/cosmo/maos-17-3c-proof.a99GPA/measurement/examples/example-spirit-ts/dist/spirit.wasm",
+          "--fuel",
+          "10000000"
+        ],
+        "peak_vm_kib": 605360,
+        "peak_rss_kib": 459516,
+        "cpu_stat": "usage_usec 30597467\nuser_usec 30311499\nsystem_usec 285968\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 306\nnr_throttled 19\nthrottled_usec 927\nnr_bursts 0\nburst_usec 0\n"
+      },
+      "attributed_intents": [
+        "cap.revoke",
+        "cli.subprocess.exit",
+        "lifecycle.admit",
+        "lifecycle.load",
+        "lifecycle.start",
+        "lifecycle.unload",
+        "planned_unload",
+        "spirit.frame.authorization",
+        "standard"
+      ],
+      "authorization": {
+        "event": "spawned_frame_authorization",
+        "spirit_pid": 1,
+        "trusted_sender": "example-spirit-ts",
+        "trusted_intent": "standard",
+        "trusted_origin": "SpiritAuto",
+        "allowed": true,
+        "decisions": [],
+        "claims": {
+          "frame_id": [
+            1,
+            161,
+            9,
+            52,
+            219,
+            74,
+            183,
+            117,
+            11,
+            149,
+            39,
+            143,
+            158,
+            105,
+            41,
+            44
+          ],
+          "timestamp_ns": 1791155821391463250,
+          "logical_clock": 0,
+          "from": {
+            "spirit_id": "operator",
+            "host_id": null,
+            "role": null
+          },
+          "to": [
+            {
+              "spirit_id": "example-spirit-ts",
+              "host_id": null,
+              "role": null
+            }
+          ],
+          "kind": "TaskAssign",
+          "intent": "Standard",
+          "payload": {
+            "TaskAssign": {
+              "goal": "maos run /home/cosmo/maos-17-3c-proof.a99GPA/measurement/examples/example-spirit-ts/manifest.toml --once",
+              "scope": [],
+              "success_criteria": "Complete one mailbox export",
+              "posture_preferences": {
+                "preferred_posture": null,
+                "halt_policy_overrides": []
+              },
+              "prior_distillate_ref": null
+            }
+          },
+          "auto_marker": "HumanAuthored",
+          "consent_envelope": null,
+          "intent_lineage": [
+            "standard"
+          ]
+        }
+      },
+      "terminal": {
+        "event": "cli_subprocess_exit",
+        "cli_child_pid": 3433,
+        "exit_cause": "exited(code=0)",
+        "is_crash": false
+      },
+      "database": "/home/cosmo/maos-17-3c-proof.a99GPA/measurement/proof-verified/home/maos/audit/transparency.sqlite"
+    },
+    "not_cpu10_acceptance": true,
+    "runtime_artifact": "artifact://763"
+  },
+  "approved_candidate_grant": {
+    "candidate_only": true,
+    "explicit_user_selection": "CPU 10% \uc720\uc9c0, \uc2dc\uac04 360\ucd08 \uc2b9\uc778",
+    "process_memory_mib": 768,
+    "manifest_time_seconds": 360,
+    "compile_guard_seconds": 360,
+    "retained_cpu_percent": 10,
+    "retained_guest_memory_mib": 64,
+    "retained_instruction_fuel": 10000000,
+    "endpoint": "cosmo@192.168.100.20",
+    "new_manifest_sha256": "ad5b19e71b9acebff3f1405e4075d243fdfc2b66f1236bce48b48fb1fcbb8f89",
+    "new_runner_sha256": "4dc938fa81bab7ca15a37f78040d3e180f8da02569e7c7dc31b561c370dcdc7c",
+    "supersedes": "Prior candidate 180-second manifest/compile guard only; original checkout, physical/KLOC grants, CPU/guest/fuel/memory limits unchanged. No git publication or cutover."
+  }
+}

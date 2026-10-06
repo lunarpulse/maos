@@ -1,0 +1,23 @@
+{
+  "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+  "static_inspection_command": "wasm-tools print --skeleton examples/example-spirit-ts/dist/spirit.wasm",
+  "static_capacity": {
+    "core_module_definitions": 4,
+    "core_module_instantiate_sites": 4,
+    "core_module_names": ["main", "wit-component:adapter:wasi_snapshot_preview1", "wit-component-shim-module", "wit-component-fixup"],
+    "defined_memories": 1,
+    "initial_memory_pages_64k": 145,
+    "initial_memory_bytes": 9502720,
+    "defined_tables": 2,
+    "fixed_table_elements": [7688, 25],
+    "synthetic_core_instance_declarations": "Also present for host export bundles; not counted as allocated core module instances. Adapter/fixup import existing memory/table identities."
+  },
+  "existing_store_limits": {"memory_bytes_each": 67108864, "instances": 16, "memories": 4, "tables": 16, "table_elements_each": 65536},
+  "actual_approved_cpu10_run": {
+    "process_memory_max_bytes": 805306368,
+    "peak_observed_vm_kib": 590816,
+    "peak_observed_rss_kib": 505852,
+    "guest_instantiation_on_start_and_one_export": "Actual Ready + one turn + one delivery + clean exit under these unchanged StoreLimits",
+    "measurement_limit": "Static declarations are not a runtime guest-memory high-water measurement; procfs peaks describe the whole runner including compilation."
+  }
+}

@@ -49,6 +49,9 @@ cpu_max_pct = 25
 memory_max_mb = 64
 fd_max = 64
 
+[capabilities.required.iac]
+send = ["spirit:peer"]
+
 [posture]
 default = "assistive"
 allowed_max = "assistive"
@@ -61,12 +64,12 @@ context_window_size = 4096
 time_cap_seconds = 60
 ```
 
-Do not add `[capabilities.required]`: the WASM world imports no MAOS capabilities. Inside `[class]`, trust tiers use hyphenated values such as `org-internal`, `public-untrusted`, and `public-vetted`.
+Declare only `[capabilities.required.iac]`: bus emission requires the `iac.send` grant, and the kernel mediates each delivered frame with a capability token (`"spirit:peer"` for frames addressed to Spirits, `"broadcast"` for frames with no recipient), so the Spirit's deliveries appear in `maosctl audit query --spirit`. Do not add `[capabilities.required.provider]`: the WASM world imports no provider capability. Inside `[class]`, trust tiers use hyphenated values such as `org-internal`, `public-untrusted`, and `public-vetted`.
 
 ## Discussion
 
-The manifest validates every section before its form-specific result. Today, a published/default MAOS build refuses this form as `wasm_engine_off` until Hold 2 permits the `wasm-host` engine. A build made with `--features wasm-host` instead refuses it as `wasm_launch_not_built` until `17-3c-wasm-spirit-on-the-bus-under-t2` supplies the production launch path. These are intentional typed refusals, not an unknown class or unknown form.
+The manifest validates every section before its form-specific result. A published/default MAOS build refuses this form as `wasm_engine_off` while Hold 2 keeps the `wasm-host` engine disabled. A build made with `--features wasm-host` launches the component through `maos run` inside the contained T2 runner (`maos-wasm-runner`, installed next to `maos`). In-process surfaces the contained runner does not provide — the operator door, topology, and a hot-swap successor — are refused as `spawned_surface_unsupported`. These are intentional typed refusals, not an unknown class or unknown form.
 
-The generated TypeScript guest implements the world's `onStart`, `handleFrame`, and `onShutdown` exports. To halt from guest code, throw the value `throw { tag: "fault", val: "<reason>" }`; the host maps that shape to `Halt::Fault`. `console.log` is discarded today and is not a guest diagnostics channel.
+The generated TypeScript guest implements the world's `onStart`, `handleFrame`, and `onShutdown` exports. To halt from guest code, throw the value `throw { tag: "fault", val: "<reason>" }`; the host maps that shape to `Halt::Fault`. Guest WASI stdout/stderr (including `console.log`) is routed to the runner's stderr and journaled as `spirit.diagnostic` rows. Treat them as untrusted guest text: they are bounded per session (256 rows / 64 KiB, overflow counted in `dropped_diagnostics`), over-long lines are truncated with a marker, and they never become frames.
 
 Use [Hello-World Spirit](./hello-world-spirit) for in-tree first-party Rust authoring. Its `rust-inproc` form and T0 tier are deliberately different from this third-party component route.

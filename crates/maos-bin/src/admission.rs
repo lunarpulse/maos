@@ -224,8 +224,8 @@ pub enum AdmissionRefusal {
     },
     /// Last gate — the published default build omits the WASM engine.
     WasmEngineOff,
-    /// Last gate — a WASM-host build has no component launch path until 17-3c.
-    WasmLaunchNotBuilt,
+    /// The selected composition surface has no spawned-session implementation.
+    SpawnedSurfaceUnsupported { surface: &'static str },
     /// Gates 6 and 7 — a declared section did not parse.
     SectionParse {
         section: &'static str,
@@ -263,7 +263,7 @@ impl AdmissionRefusal {
             Self::RustInprocRequiresT0 { .. } => "rust_inproc_requires_t0",
             Self::WasmComponentRequiresT2 { .. } => "wasm_component_requires_t2",
             Self::WasmEngineOff => "wasm_engine_off",
-            Self::WasmLaunchNotBuilt => "wasm_launch_not_built",
+            Self::SpawnedSurfaceUnsupported { .. } => "spawned_surface_unsupported",
             Self::SectionParse { .. } => "manifest_section_invalid",
             Self::ModelProvenance { .. } => "model_provenance_refused",
             Self::AlreadyLoaded { .. } => "already_loaded",
@@ -312,9 +312,9 @@ impl std::fmt::Display for AdmissionRefusal {
                 "wasm_engine_off: WASM engine disabled while Export Hold 2 is open; \
                  `wasm-host` is the 5D002.c.1 export-control precondition",
             ),
-            Self::WasmLaunchNotBuilt => f.write_str(
-                "wasm_launch_not_built: wasm-component launch is deferred to \
-                 17-3c-wasm-spirit-on-the-bus-under-t2",
+            Self::SpawnedSurfaceUnsupported { surface } => write!(
+                f,
+                "spawned_surface_unsupported: {surface} supports only rust-inproc Spirits",
             ),
             Self::SectionParse { section, detail } => {
                 write!(f, "[{section}] section: {detail}")
@@ -333,6 +333,8 @@ impl std::fmt::Display for AdmissionRefusal {
         }
     }
 }
+
+impl std::error::Error for AdmissionRefusal {}
 
 /// The eight class names `maos-bin` can construct, in `classify_spirit` order.
 ///
@@ -378,6 +380,19 @@ impl GatedManifest {
             class: Some(self.class_section.clone()),
             budget: self.budget.clone(),
             ..Default::default()
+        }
+    }
+
+    pub fn require_in_process(&self, surface: &'static str) -> Result<(), AdmissionRefusal> {
+        if self
+            .class_section
+            .forms
+            .iter()
+            .any(|form| form == "rust-inproc")
+        {
+            Ok(())
+        } else {
+            Err(AdmissionRefusal::SpawnedSurfaceUnsupported { surface })
         }
     }
 }
@@ -535,12 +550,9 @@ pub fn gate_manifest(
     // The component's manifest has now passed every structural gate. The
     // refusal is feature-selected because a published binary's engine closure
     // is an export-control property, not runtime configuration.
+    #[cfg(not(feature = "wasm-host"))]
     if wasm {
-        #[cfg(not(feature = "wasm-host"))]
         return Err(AdmissionRefusal::WasmEngineOff);
-
-        #[cfg(feature = "wasm-host")]
-        return Err(AdmissionRefusal::WasmLaunchNotBuilt);
     }
 
     Ok(GatedManifest {
@@ -580,6 +592,7 @@ fn caps_required_or_empty(root: &toml::Value) -> Result<CapabilitiesRequired, Ad
                 servers: Vec::new(),
             },
             loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
+            iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
         }),
     }
 }
@@ -618,7 +631,7 @@ pub enum StartPolicy {
 pub struct Admitted {
     pub pid: u32,
     pub spirit_id: String,
-    pub effective_sandbox_tier: maos_domain::invariants::i9::SandboxTier,
+    pub sandbox: maos_kernel_core::security::sandbox::SandboxSpec,
     /// The `[posture] allowed_max` the manifest asked for.
     pub requested_posture_ceiling: Posture,
     /// The ceiling actually in force after the operator clamp. When the two
@@ -781,7 +794,7 @@ pub async fn load_admit_start(
     Ok(Admitted {
         pid,
         spirit_id,
-        effective_sandbox_tier: spec.tier,
+        sandbox: spec,
         requested_posture_ceiling: gated.posture_section.allowed_max,
         effective_posture_ceiling,
     })

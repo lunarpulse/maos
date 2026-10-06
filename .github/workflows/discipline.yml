@@ -1183,14 +1183,14 @@ jobs:
             echo "::error title=Default WASM admission::rc=$rc"
           fi
           exit "$rc"
-      - name: Assert wasm-host-build WASM admission refusal
+      - name: Assert WASM admission and unsupported in-process surface refusals
         shell: bash
         run: |
           set +e
           cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 0 ]; then
-            echo "::notice title=wasm-host WASM admission::rc=0 $(grep -E 'wasm_launch_not_built|test result' wasm-admission-wasm-host.log | paste -sd';' -)"
+            echo "::notice title=wasm-host WASM admission::rc=0 $(grep 'test result' wasm-admission-wasm-host.log | paste -sd';' -)"
           else
             echo "::error title=wasm-host WASM admission::rc=$rc"
           fi
@@ -3015,17 +3015,19 @@ jobs:
   # never used here (it moves to 26.04 in Oct–Nov 2026; the images are pinned).
   # Job logs are 403 without a token, so each verdict is a public annotation.
   wasm-host-tests:
+    needs: [example-spirit-ts-tests]
     strategy:
       fail-fast: false
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
     runs-on: ${{ matrix.image }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
           key: wasm-host-tests-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
@@ -3078,6 +3080,84 @@ jobs:
           exit "$rc"
       - name: Run maos-host + maos-wasm-host test suites
         run: cargo test -p maos-host -p maos-wasm-host --locked
+      - name: Install the pinned component fixture assembler
+        run: cargo install --locked wasm-tools --version 0.251.0
+      - name: Fetch locked standalone fixture dependencies for offline process gates
+        run: |
+          for fixture in \
+            crates/maos-wasm-host/guests/echo-spirit \
+            crates/maos-wasm-host/guests/routed-relay \
+            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
+            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
+          done
+      - name: Standalone native-twin fixture tests (Story 17-3c)
+        run: cargo test --locked --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
+      - name: Real admitted native/WASM verdict, hostile lifting, idle, and SIGSYS gates
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          cargo test --locked -p maos-bin --features wasm-host --test spawned_scope_17_3c -- --nocapture 2>&1 | tee spawned-17-3c.log
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
+          grep -q '^test result: ok\. 15 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 15 passed;'"; fail=1; }
+          for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :6' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
+                      'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
+                      'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
+                      'HOSTILE-IAC-SEND :1'; do
+            prefix=${spec%:*}; want=${spec##*:}
+            got=$(grep -oF -- "$prefix" spawned-17-3c.log | wc -l)
+            [ "$got" -eq "$want" ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::marker '${prefix}' seen $got times, want $want"; fail=1; }
+          done
+          if grep -q '^SKIP ' spawned-17-3c.log; then
+            grep '^SKIP ' spawned-17-3c.log | while IFS= read -r line; do
+              echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          grep -E 'SCOPED-VERDICT |GOVERNED-ATOMIC |HOSTILE-|RUNNER-SIGSYS |REPEATED-MAILBOX ' spawned-17-3c.log | while IFS= read -r line; do
+            echo "::notice title=17-3c admitted runtime (${{ matrix.image }})::$line"
+          done
+          if [ "$fail" -ne 0 ]; then
+            grep -E 'panicked at' spawned-17-3c.log | while IFS= read -r line; do
+              echo "::error title=17-3c process gates (${{ matrix.image }})::${line}"
+            done
+          fi
+          echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
+          exit "$fail"
+      - uses: actions/download-artifact@v4
+        with:
+          name: example-spirit-ts-component
+          path: examples/example-spirit-ts/dist
+      - name: Build the actual feature-enabled CLI and release runner
+        run: |
+          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
+          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
+          cargo build --locked --release -p maos-cli --bin maosctl
+      - name: Actual CPU-capped TS CLI with delegated controllers and attributed receipts
+        shell: bash
+        run: |
+          version=${{ matrix.image }}
+          version=${version#ubuntu-}
+          version=${version%-arm}
+          arch=x86_64
+          if [[ '${{ matrix.image }}' == *-arm ]]; then arch=aarch64; fi
+          sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
+            --uid="$(id -u)" --gid="$(id -g)" \
+            --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
+            --property="WorkingDirectory=$PWD" \
+            "$PWD/scripts/run_17_3c_delegated.sh" /usr/bin/python3 -I \
+            "$PWD/scripts/prove_17_3c.py" --binary "$PWD/target/release/maos" \
+            --output "$PWD/17-3c-proof" --expected-os "$version" --expected-arch "$arch"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admitted-17-3c-${{ matrix.image }}
+          path: |
+            spawned-17-3c.log
+            17-3c-proof/
+          if-no-files-found: error
 
   # RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
   # job stood here (Story 10.3 AC-5, NFR-Ops-4). The gate ran its LIVE
@@ -4297,7 +4377,7 @@ jobs:
           echo "| fuzz-build | ${{ needs.fuzz-build.result }} | cargo +nightly fuzz build (manifest_parser + frame_deser + fuzz_exec_deps_parse_elf) |"
           echo "| check-ko-coverage | ${{ needs.check-ko-coverage.result }} | KO_COVERAGE_MIN=100 npm run gate:ko-coverage |"
           echo "| check-ff-j6 | ${{ needs.check-ff-j6.result }} | cargo run -p xtask -- check-ff-j6 |"
-          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host |"
+          echo "| wasm-host-tests | ${{ needs.wasm-host-tests.result }} | 4 images: cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture (exit line 3) + kernel/escape-detector T2 suites + cargo test -p maos-host -p maos-wasm-host + native-twin fixture tests + 17-3c spawned_scope_17_3c gate (15 passed, exact marker counts, no SKIP; iac.send-mediated deliveries and FR4 maosctl audit view) |"
           echo "| check-wasm-form-equiv | ${{ needs.check-wasm-form-equiv.result }} | cargo test -p maos-wasm-host --test equiv_harness |"
           echo "| check-cross-region-consensus | ${{ needs.check-cross-region-consensus.result }} | cargo run -p xtask -- check-cross-region-consensus |"
           echo "| check-multi-region-slo | ${{ needs.check-multi-region-slo.result }} | cargo run -p xtask -- check-multi-region-slo |"

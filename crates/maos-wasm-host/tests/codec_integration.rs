@@ -4,53 +4,67 @@
 //! encoding is canonical (RFC 8949 §4.2.1) and round-trips correctly.
 
 use std::collections::BTreeMap;
-use std::io::{BufReader, Cursor};
 
 use maos_wasm_host::codec;
 
-/// Helper: write a frame, read it back, assert byte-equality.
-fn roundtrip_bytes(data: &[u8]) {
-    let mut buf = Vec::new();
-    codec::write_frame(&mut buf, data).unwrap();
-
-    let mut reader = BufReader::new(Cursor::new(buf));
-    let out = codec::read_frame(&mut reader).unwrap().unwrap();
-    assert_eq!(out, data, "frame roundtrip should be byte-identical");
-}
-
 #[test]
-fn empty_payload_roundtrips() {
-    roundtrip_bytes(&[]);
-}
-
-#[test]
-fn binary_payload_roundtrips() {
-    roundtrip_bytes(&[0x00, 0x01, 0xFF, 0xFE, 0x80]);
-}
-
-#[test]
-fn large_payload_roundtrips() {
-    let data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
-    roundtrip_bytes(&data);
-}
-
-#[test]
-fn outbound_frame_cap_rejects_oversized_guest_data_before_writing() {
-    let oversized = vec![0u8; codec::MAX_FRAME_BYTES + 1];
-    let mut wire = Vec::new();
-    let error = codec::write_frame(&mut wire, &oversized).unwrap_err();
-    assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
-    assert!(wire.is_empty(), "no partial ADR-032 header may escape");
-
+fn cbor_output_cap_rejects_oversized_guest_data() {
+    let max = maos_frame_codec::MAX_FRAME_BYTES;
+    let oversized = vec![0u8; max + 1];
     let encode_error = codec::encode_cbor(&oversized).unwrap_err();
     assert!(
-        encode_error.contains("frame cap"),
+        encode_error.starts_with("CBOR encode error:")
+            && encode_error.contains("serialized body exceeds frame cap"),
         "serialization must refuse before accumulating an oversized CBOR buffer: {encode_error}"
     );
 
-    let mut accepted = Vec::new();
-    codec::write_frame(&mut accepted, &oversized[..codec::MAX_FRAME_BYTES]).unwrap();
-    assert!(accepted.starts_with(b"Content-Length: 16777216\r\n\r\n"));
+    // Framing accepts a body of exactly MAX bytes and refuses MAX + 1 before
+    // writing any header byte.
+    let mut wire = Vec::new();
+    let error = maos_frame_codec::write_frame(&mut wire, &oversized).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    assert!(wire.is_empty(), "no partial ADR-032 header may escape");
+    maos_frame_codec::write_frame(&mut wire, &oversized[..max]).unwrap();
+    assert!(wire.starts_with(b"Content-Length: 16777216\r\n\r\n"));
+}
+
+/// One validity rule: every node costs 1 KiB of the 16 MiB expansion budget
+/// plus its string length, so the largest decodable single byte string is
+/// `MAX - 1024` bytes (wire `MAX - 1019`). An exact-MAX wire body is therefore
+/// never decodable, and `encode_cbor` must refuse what `decode_cbor` refuses.
+#[test]
+fn encode_accepts_exactly_what_decode_accepts() {
+    let max = maos_frame_codec::MAX_FRAME_BYTES;
+    let boundary = ciborium::Value::Bytes(vec![0xab; max - 1024]);
+    let encoded = codec::encode_cbor(&boundary).expect("largest decodable byte string encodes");
+    assert_eq!(encoded.len(), max - 1019);
+    let decoded: ciborium::Value = codec::decode_cbor(&encoded).unwrap();
+    assert_eq!(decoded, boundary);
+
+    // One byte more still fits the wire cap but not the decode budget.
+    let over = ciborium::Value::Bytes(vec![0xab; max - 1023]);
+    assert_eq!(
+        codec::encode_cbor(&over).unwrap_err(),
+        "CBOR encode bound: expanded string budget exceeded"
+    );
+
+    // 16,383 elements plus the array node fill the node budget exactly.
+    let units = vec![(); 16_383];
+    let encoded = codec::encode_cbor(&units).unwrap();
+    assert_eq!(codec::decode_cbor::<Vec<()>>(&encoded).unwrap(), units);
+    assert_eq!(
+        codec::encode_cbor(&vec![(); 16_384]).unwrap_err(),
+        "CBOR encode bound: container expansion budget exceeded"
+    );
+
+    // 65 nested arrays exceed the 64-level nesting limit on encode too.
+    let nested = (0..65).fold(ciborium::Value::Null, |inner, _| {
+        ciborium::Value::Array(vec![inner])
+    });
+    assert_eq!(
+        codec::encode_cbor(&nested).unwrap_err(),
+        "CBOR encode bound: nesting limit exceeded"
+    );
 }
 
 #[test]
@@ -177,20 +191,42 @@ fn cbor_boundary_255_256() {
 }
 
 #[test]
-fn multi_frame_sequence() {
-    let frames = vec![b"frame1".to_vec(), b"frame2".to_vec(), b"frame3".to_vec()];
+fn valid_container_crosses_expansion_limit_below_wire_limit() {
+    // One array node plus 16,383 scalar nodes exactly fills the expansion
+    // budget. The next scalar is refused although the wire body is only 16 KiB.
+    let mut body = vec![0x99, 0x3f, 0xff];
+    body.resize(3 + 16_383, 0xf6);
+    let decoded: Vec<ciborium::Value> = codec::decode_cbor(&body).unwrap();
+    assert_eq!(decoded.len(), 16_383);
+    assert!(decoded
+        .iter()
+        .all(|item| matches!(item, ciborium::Value::Null)));
+    body[1] = 0x40;
+    body[2] = 0;
+    body.push(0xf6);
+    assert_eq!(
+        codec::decode_cbor::<Vec<ciborium::Value>>(&body).unwrap_err(),
+        "CBOR decode bound: container expansion budget exceeded"
+    );
+}
 
-    let mut buf = Vec::new();
-    for f in &frames {
-        codec::write_frame(&mut buf, f).unwrap();
-    }
-
-    let mut reader = BufReader::new(Cursor::new(buf));
-    for expected in &frames {
-        let actual = codec::read_frame(&mut reader).unwrap().unwrap();
-        assert_eq!(&actual, expected);
-    }
-
-    // After all frames: clean EOF
-    assert!(codec::read_frame(&mut reader).unwrap().is_none());
+#[test]
+fn nesting_and_trailing_items_are_refused() {
+    let mut body = vec![0x81; 64];
+    body.push(0xf6);
+    let _: ciborium::Value = codec::decode_cbor(&body).unwrap();
+    body.insert(0, 0x81);
+    assert_eq!(
+        codec::decode_cbor::<ciborium::Value>(&body).unwrap_err(),
+        "CBOR decode bound: nesting limit exceeded"
+    );
+    assert_eq!(
+        codec::decode_cbor::<u8>(&[0, 1]).unwrap_err(),
+        "CBOR decode bound: trailing CBOR item"
+    );
+    assert_eq!(
+        codec::decode_cbor::<Vec<u8>>(&[0x9b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
+            .unwrap_err(),
+        "CBOR decode bound: container expansion budget exceeded"
+    );
 }

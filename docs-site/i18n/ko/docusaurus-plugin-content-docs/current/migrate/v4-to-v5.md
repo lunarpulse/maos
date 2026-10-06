@@ -32,7 +32,7 @@ tier = "T2"
 
 schema v5 kernel은 v4 manifest를 계속 로드합니다. component 선언을 in-process Spirit로 되돌리려면 `artifact`를 제거하고 `forms = ["rust-inproc"]`로 설정하며 sandbox tier를 `T0`로 설정한 뒤, v4 kernel을 대상으로 할 때 schema version을 `4`로 설정합니다.
 
-기본 MAOS binary는 WASM-component Spirit를 검증하지만 Export Hold 2 동안 `wasm-host` engine이 비활성화되어 `wasm_engine_off`를 보고합니다. `wasm-host` build는 17-3c가 launch를 구현할 때까지 `wasm_launch_not_built`를 보고합니다.
+기본 MAOS binary는 WASM-component Spirit를 검증하지만 Export Hold 2 동안 `wasm-host` engine이 비활성화되어 `wasm_engine_off`를 보고합니다. `wasm-host` build는 `maos run`을 통해 격리된 T2 runner에서 이를 실행하며, 지원하지 않는 in-process 기능(operator door, topology, hot-swap 후속 Spirit)은 `spawned_surface_unsupported`로 거부합니다.
 
 ## 비준
 

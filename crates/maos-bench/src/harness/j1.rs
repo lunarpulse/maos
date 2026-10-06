@@ -67,34 +67,13 @@ fn send_frame(stdin: &mut dyn Write, task_id: u64, content: &str) -> Result<(), 
         "content": content
     });
     let payload = serde_json::to_vec(&frame).map_err(|e| BenchError::Serialize(e.to_string()))?;
-    let header = format!("Content-Length: {}\r\n\r\n", payload.len());
-    stdin.write_all(header.as_bytes())?;
-    stdin.write_all(&payload)?;
-    stdin.flush()?;
+    maos_frame_codec::write_frame(stdin, &payload)?;
     Ok(())
 }
 
 fn read_frame(reader: &mut dyn BufRead) -> Result<String, BenchError> {
-    let mut header = String::new();
-    reader.read_line(&mut header)?;
-    if header.is_empty() {
-        return Err(BenchError::SubprocessCrash(
-            "stdin closed (subprocess dead)".into(),
-        ));
-    }
-    let content_length: usize = header
-        .trim()
-        .strip_prefix("Content-Length: ")
-        .and_then(|s| s.trim().parse().ok())
-        .ok_or_else(|| {
-            BenchError::SubprocessCrash(format!("bad Content-Length header: {:?}", header))
-        })?;
-
-    let mut blank = String::new();
-    reader.read_line(&mut blank)?;
-
-    let mut body = vec![0u8; content_length];
-    reader.read_exact(&mut body)?;
+    let body = maos_frame_codec::read_frame(reader)?
+        .ok_or_else(|| BenchError::SubprocessCrash("stdout closed (subprocess dead)".into()))?;
     String::from_utf8(body)
         .map_err(|e| BenchError::SubprocessCrash(format!("non-UTF8 response: {}", e)))
 }
@@ -308,29 +287,24 @@ mod tests {
     }
 
     #[test]
-    fn send_frame_produces_valid_header() {
+    fn send_frame_decodes_with_frame_codec() {
         let mut buf = Vec::new();
         send_frame(&mut buf, 42, "echo:test").unwrap();
-        let output = String::from_utf8(buf).unwrap();
-        assert!(output.starts_with("Content-Length: "));
-        assert!(output.contains("\r\n\r\n"));
-        assert!(output.contains("\"task_id\":42"));
-        assert!(output.contains("echo:test"));
-    }
-
-    #[test]
-    fn read_frame_parses_content_length() {
-        let payload = r#"{"kind":"task.complete","task_id":1,"response":"ok"}"#;
-        let input = format!("Content-Length: {}\r\n\r\n{}", payload.len(), payload);
-        let mut reader = std::io::Cursor::new(input.as_bytes());
-        let result = read_frame(&mut reader).unwrap();
-        assert_eq!(result, payload);
+        let body = maos_frame_codec::read_frame(&mut std::io::Cursor::new(buf))
+            .unwrap()
+            .expect("one complete frame");
+        let frame: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(frame["task_id"], 42);
+        assert_eq!(frame["content"], "echo:test");
     }
 
     #[test]
     fn read_frame_empty_stream_returns_crash() {
         let mut reader = std::io::Cursor::new(b"");
         let result = read_frame(&mut reader);
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(BenchError::SubprocessCrash(_))),
+            "expected SubprocessCrash, got {result:?}"
+        );
     }
 }

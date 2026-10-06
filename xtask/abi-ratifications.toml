@@ -102,3 +102,22 @@ covered_changes = [
   "decision-dispatch-body",
 ]
 ratified_at = "2026-09-29"
+
+# Story 17-3c — manifest-declared iac.send capability (schema 5, no bump).
+# Operator ruling 2026-10-06 (17-3c §A6 review, option 1: build roadmap iac.send mediation).
+# `abi-diff` scopes maos-spirit-abi only (unchanged); the covered names are the
+# maos-manifest types this proposal changes.
+[[ratification]]
+proposal_id = "17-3c-iac-send-capability"
+summary = "[capabilities.required.iac].send closed peer-class set (broadcast, spirit:peer) on manifest schema 5 + optional [capabilities.required.provider] section"
+adr_ref = "ADR-045,ADR-060"
+status = "ratified"
+covered_changes = [
+  "CapabilitiesRequired",
+  "RawCapabilitiesRequired",
+  "RawProviderCapabilities",
+  "IacCapabilities",
+  "RawIacCapabilities",
+  "IAC_SEND_PEER_CLASSES",
+]
+ratified_at = "2026-10-06"

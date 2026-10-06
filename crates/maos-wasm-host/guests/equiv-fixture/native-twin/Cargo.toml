@@ -11,14 +11,18 @@ description = "Story 11.1b cross-form equivalence gate — native twin subproces
 name = "equiv-native-twin"
 path = "src/main.rs"
 
+# Story 17-3c — deliberately hostile session child for the governed-session gates.
+[[bin]]
+name = "hostile-twin"
+path = "src/bin/hostile_twin.rs"
+
 [dependencies]
 # Domain frame types — the real `IacFrame` this twin deserializes directly
 # (no WIT bridge on the native path; the codec round-trips the SAME CBOR the
 # WASM runner speaks).
 maos-domain = { path = "../../../../maos-domain" }
-# ADR-032 wire protocol codec: Content-Length + CBOR. The SAME `read_frame` /
-# `write_frame` / `encode_cbor` / `decode_cbor` the `maos-wasm-runner` uses, so
-# both Spirit forms speak byte-identical wire bytes.
+maos-frame-codec = { path = "../../../../maos-frame-codec" }
+# Shared ADR-032 framing and host-side CBOR conversion match the WASM runner.
 maos-wasm-host = { path = "../../../" }
 # FrameKind / IntentClass (re-exported by maos-domain; pinned here so the twin
 # can name them if a future mode needs to inspect/construct kinds).

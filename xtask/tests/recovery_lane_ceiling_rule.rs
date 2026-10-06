@@ -265,7 +265,7 @@ fn the_tree_bound_inputs_exist() {
 /// half — that no one silently raised the row while the easing was in force.
 #[test]
 fn kernel_core_ceiling_has_not_moved_under_the_easing() {
-    const RATIFIED_AT_EASING: i64 = 19_309; // Story 17-6 review FLAG-Winston operator-ratified 2026-09-28: 19_292 -> 19_309 (+17), opened Landlock rule fd matches parsed inode; baseline 25015 -> 25032. PRIOR: Story 17-6 T2 repair (+80 tokei; aarch64 ppoll and argument-conditioned prctl included), baseline 24920 -> 25015.
+    const RATIFIED_AT_EASING: i64 = 19_529; // Detached 17-3c §A6 review, operator-approved 2026-10-06: 19_412 -> 19_529 (+117; KLOC sign-off), baseline 25149 -> 25293 (kernel-baseline approval). PRIOR: detached 17-3c candidate grant 19_309 -> 19_412, baseline 25032 -> 25149. PRIOR: Story 17-6 review FLAG-Winston operator-ratified 2026-09-28: 19_292 -> 19_309 (+17), opened Landlock rule fd matches parsed inode; baseline 25015 -> 25032. PRIOR: Story 17-6 T2 repair (+80 tokei; aarch64 ppoll and argument-conditioned prctl included), baseline 24920 -> 25015.
     let budgets = real_kloc_toml();
     let actual = budgets
         .get("maos-kernel-core")

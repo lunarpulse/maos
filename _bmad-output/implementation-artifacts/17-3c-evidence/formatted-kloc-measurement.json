@@ -1,0 +1,75 @@
+{
+  "formatted": true,
+  "tokei_version": "tokei 14.0.0 compiled with serialization support: json",
+  "aggregate": 169654,
+  "aggregate_alarm": 158608,
+  "aggregate_hardfail": 170884,
+  "per_crate": {
+    "(unknown:spikes)": 144,
+    "(unknown:templates)": 11,
+    "maos-a2a": 303,
+    "maos-a2a-core": 4937,
+    "maos-a2a-tcp": 1442,
+    "maos-acp": 642,
+    "maos-attrs": 20,
+    "maos-audit": 7243,
+    "maos-bench": 1482,
+    "maos-bin": 24213,
+    "maos-capability": 1129,
+    "maos-cli": 6106,
+    "maos-cohort": 5857,
+    "maos-compliance": 2032,
+    "maos-control": 1286,
+    "maos-corpus-gen": 2341,
+    "maos-director-surface": 784,
+    "maos-domain": 9270,
+    "maos-escape-detector": 284,
+    "maos-eval": 3661,
+    "maos-exec-deps": 357,
+    "maos-fkcs": 491,
+    "maos-frame-codec": 218,
+    "maos-host": 37,
+    "maos-iac": 7088,
+    "maos-journey-test": 626,
+    "maos-kernel-core": 19412,
+    "maos-loom-lite": 5277,
+    "maos-manifest": 4401,
+    "maos-mcp": 999,
+    "maos-notify-push": 248,
+    "maos-pdp": 438,
+    "maos-persistence": 1,
+    "maos-providers": 1392,
+    "maos-registry": 3392,
+    "maos-secrets": 536,
+    "maos-shell": 606,
+    "maos-siem": 447,
+    "maos-skill": 800,
+    "maos-spirit-abi": 1038,
+    "maos-spirit-cli": 753,
+    "maos-spirit-derive": 350,
+    "maos-spirit-hello": 382,
+    "maos-spirit-sdk": 846,
+    "maos-sso": 391,
+    "maos-telemetry": 547,
+    "maos-wasm-host": 1355,
+    "xtask": 44039
+  },
+  "ungranted": {
+    "maos-bin": {
+      "actual": 24213,
+      "ceiling": 23472
+    },
+    "maos-frame-codec": {
+      "actual": 218,
+      "ceiling": null
+    },
+    "maos-iac": {
+      "actual": 7088,
+      "ceiling": 7084
+    },
+    "maos-kernel-core": {
+      "actual": 19412,
+      "ceiling": 19309
+    }
+  }
+}

@@ -36,6 +36,8 @@ pub mod enterprise_identity;
 /// reads it by `include_str!`.
 #[cfg(feature = "network")]
 pub mod enterprise_pdp_runtime;
+/// Read-only sandbox-anomaly consumer, shared with actual process-boundary proofs.
+pub mod escape_detector_consumer;
 /// Story 15-6 — the one authoritative live/record/replay selector. Public so
 /// integration tests execute the production lattice; an in-`src` test module
 /// would be budget-charged and CI-invisible.
@@ -49,6 +51,8 @@ pub mod operator_door;
 /// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
 pub mod purge;
 pub mod shell_host;
+#[cfg(all(feature = "network", feature = "wasm-host"))]
+pub mod spirit_session;
 /// Story 16-3 — Worker supervision (the Worker's SCB, its exit observer, its
 /// progress stamp and its task record) and root shutdown (`unload_all_loaded`,
 /// the one unload function every `maos run` root leaves through).

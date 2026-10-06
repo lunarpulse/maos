@@ -233,7 +233,7 @@ async fn assert_chain_uninterrupted(s: &IntentLineageScenario) -> Result<(), Str
         let mut cloned = frame.clone();
         cloned.frame_id = next_frame_id();
         adapter
-            .deliver_typed(cloned)
+            .deliver_typed(cloned, 0, None)
             .await
             .map_err(|e| format!("hop deliver: {e:?}"))?;
         // Next hop carries the same lineage.
@@ -279,7 +279,7 @@ async fn assert_broken_spirit_auto(s: &IntentLineageScenario) -> Result<(), Stri
         FrameOrigin::SpiritAuto,
         IntentLineage::default(), // empty — the laundering attack
     );
-    match adapter.deliver_typed(frame).await {
+    match adapter.deliver_typed(frame, 0, None).await {
         Err(IacBusError::EIntentLineageBroken { .. }) => Ok(()),
         Err(other) => Err(format!(
             "{}: expected EIntentLineageBroken, got {other:?}",
@@ -328,7 +328,7 @@ async fn assert_retract_continuity(s: &IntentLineageScenario) -> Result<(), Stri
         intent_lineage: originating_lineage.clone(),
     };
     adapter
-        .deliver_typed(f1)
+        .deliver_typed(f1, 0, None)
         .await
         .map_err(|e| format!("F1 deliver: {e:?}"))?;
     let original_frame_id = tl.last_frame_id();
@@ -339,6 +339,7 @@ async fn assert_retract_continuity(s: &IntentLineageScenario) -> Result<(), Stri
             original_frame_id,
             "test retract continuity".to_string(),
             &SpiritId::from("spirit-a"),
+            None,
         )
         .await
         .map_err(|e| format!("retract: {e:?}"))?;

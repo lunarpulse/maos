@@ -54,8 +54,8 @@ use cap_quota::CapQuotaTracker;
 use cap_tokens::CapTokensShardRing;
 use maos_domain::ports::TelemetryStreamPort;
 
-fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
-    match scope {
+fn scope_to_intent(scope: &Scope) -> Result<cap_policy::decision::Intent, CapError> {
+    Ok(match scope {
         Scope::FsRead { subtree } => cap_policy::decision::Intent::FsRead {
             subtree: subtree.clone(),
         },
@@ -102,13 +102,17 @@ fn scope_to_intent(scope: &Scope) -> cap_policy::decision::Intent {
         } => cap_policy::decision::Intent::ProcExec {
             binary: cli_binary_path.clone(),
         },
-        _ => {
-            panic!(
-                "scope_to_intent: unmapped Scope variant {:?} — add an explicit arm before calling this function",
-                scope
-            )
-        }
-    }
+        // A framed caller can supply any ABI Scope variant. An action the
+        // issuance path cannot mediate has no authority to mint a token.
+        // Reject before issuance instead of panicking across this boundary.
+        _ => return Err(CapError::PolicyDenied),
+    })
+}
+
+/// `true` exactly when the kernel can mediate `scope` (`scope_to_intent` maps
+/// it); a scope the issuance path would refuse as `PolicyDenied` is unmediated.
+pub fn is_mediated_scope(scope: &Scope) -> bool {
+    scope_to_intent(scope).is_ok()
 }
 
 /// Composite adapter — holds the four ADR-030 sub-modules and the
@@ -167,6 +171,11 @@ impl CapabilityRegistryAdapter {
         }
     }
 
+    /// Primitive process-boundary events use the same supervised audit writer.
+    pub fn audit_sender(&self) -> &Sender {
+        &self.audit
+    }
+
     /// Issue a capability token with full mediation: quota → policy → tokens.
     pub fn issue_with_mediation(
         &self,
@@ -181,10 +190,10 @@ impl CapabilityRegistryAdapter {
         let _quota_state = self.quota.check_and_increment(spirit_pid, 1, budget)?;
 
         // 2. Policy check: derive Intent from the actual scope
+        let intent = scope_to_intent(&scope)?;
         let cap = cap_policy::decision::Capability {
             scope: scope.clone(),
         };
-        let intent = scope_to_intent(&scope);
         let decision = self.policy.evaluate(spirit_pid, &cap, &intent);
         match decision {
             cap_policy::decision::PolicyDecision::Allow => {}

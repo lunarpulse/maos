@@ -24,7 +24,7 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 | `abi_version` | `1` |
 | `manifest_schema_version` (current) | `5` |
 | supported schema window | `1..=5` |
-| workspace crates | `56` |
+| workspace crates | `57` |
 
 | Manifest schema | Kernel behavior |
 |---|---|

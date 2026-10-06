@@ -1,0 +1,718 @@
+crates/maos-attrs/src/lib.rs:18:9: warning: unused variable: `reason`: help: if this is intentional, prefix it with an underscore: `_reason`
+warning: `maos-attrs` (lib) generated 1 warning (run `cargo fix --lib -p maos-attrs` to apply 1 suggestion)
+crates/maos-domain/src/ports/iac_bus.rs:44:5: warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+crates/maos-domain/src/ports/iac_bus.rs:58:5: warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+warning: `maos-domain` (lib) generated 2 warnings
+crates/maos-capability/src/working_memory/mod.rs:19:5: warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/maos-iac/src/adapter/transparency_log.rs:946:13
+    |
+946 |         let mut inner = self
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `intent_str` is never read
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:54:5
+   |
+49 | struct Submission {
+   |        ---------- field in this struct
+...
+54 |     intent_str: String,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+crates/maos-mcp/src/client.rs:15:70: warning: unused import: `McpResponse`
+crates/maos-mcp/src/transport/stdio.rs:8:20: warning: unused import: `Child`
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1287:21
+     |
+1287 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-iac` (lib) generated 5 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+warning: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+crates/maos-acp/src/server.rs:13:45: warning: unused import: `DecisionId`
+crates/maos-acp/src/server.rs:223:25: warning: unused variable: `other`: help: if this is intentional, prefix it with an underscore: `_other`
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+   Compiling maos-audit v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-audit)
+crates/maos-director-surface/src/halt_ui.rs:59:9: warning: unused variable: `halt_id`: help: if this is intentional, prefix it with an underscore: `_halt_id`
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+crates/maos-eval/src/distillate_corpus.rs:106:17: warning: unused variable: `file_name`: help: if this is intentional, prefix it with an underscore: `_file_name`
+crates/maos-providers/src/anthropic.rs:10:5: warning: unused import: `InferenceOptions`
+crates/maos-providers/src/ollama.rs:11:5: warning: unused import: `InferenceOptions`
+crates/maos-providers/src/openai.rs:11:5: warning: unused import: `InferenceOptions`
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:392:21
+    |
+392 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+   |
+22 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::halt::TerminationKind`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+   |
+12 | use maos_domain::halt::TerminationKind;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::halt::terminate_spirit`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+   |
+16 | use crate::halt::terminate_spirit;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ClassSection` and `GatewaysSection`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+   |
+22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+   |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+  --> crates/maos-kernel-core/src/scheduler/resource_ceiling.rs:14:5
+   |
+14 | use maos_domain::invariants::i9::SandboxTier;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+   |
+28 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+    |
+157 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+    |
+229 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:195:13
+    |
+195 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:84:5
+   |
+79 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+84 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:710:8
+    |
+117 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+710 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: associated function `now_ns` is never used
+  --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+   |
+37 | impl PrincipalNamespaceIndex {
+   | ---------------------------- associated function in this implementation
+...
+51 |     fn now_ns() -> u64 {
+   |        ^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:44:5
+   |
+42 | struct DiskCandidate {
+   |        ------------- field in this struct
+43 |     name: String,
+44 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:146:8
+    |
+ 69 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+146 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:149:27
+    |
+149 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (lib) generated 42 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: `maos-cohort` (lib) generated 1 warning
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> crates/maos-control/src/lib.rs:960:28
+    |
+960 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `header` is never used
+   --> crates/maos-control/src/lib.rs:772:8
+    |
+771 | impl Incoming<'_> {
+    | ----------------- method in this implementation
+772 |     fn header(&self, name: &str) -> Option<&str> {
+    |        ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-control` (lib) generated 3 warnings
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+   Compiling butler v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/spirits/butler)
+   Compiling maos-loom-lite v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-loom-lite)
+   Compiling maos-siem v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-siem)
+warning: unused variable: `notification`
+   --> spirits/butler/src/lib.rs:557:13
+    |
+557 |         let notification = last_notif_guard
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_notification`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-bench v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-bench)
+warning: `butler` (lib) generated 1 warning (run `cargo fix --lib -p butler` to apply 1 suggestion)
+   Compiling maos-cli v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-cli)
+   Compiling maos-shell v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-shell)
+   Compiling maos-bin v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-bin)
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+warning: struct `EnvVar` is never constructed
+ --> crates/maos-bin/src/env_contract.rs:1:12
+  |
+1 | pub struct EnvVar {
+  |            ^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: enum `EnvStability` is never used
+ --> crates/maos-bin/src/env_contract.rs:8:10
+  |
+8 | pub enum EnvStability {
+  |          ^^^^^^^^^^^^
+
+warning: constant `MAOS_ENV_REGISTRY` is never used
+  --> crates/maos-bin/src/env_contract.rs:13:11
+   |
+13 | pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+   |           ^^^^^^^^^^^^^^^^^
+
+warning: function `lookup` is never used
+   --> crates/maos-bin/src/env_contract.rs:511:8
+    |
+511 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+    |        ^^^^^^
+
+warning: `maos-bin` (bin "maos") generated 4 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.38s
+     Running tests/spawned_scope_17_3c.rs (/tmp/r17-3c-tgt-int/debug/deps/spawned_scope_17_3c-96f48f41dc4cc06c)
+
+running 15 tests
+maos: root supervision armed
+test a_new_turn_after_idle_restarts_the_progress_window ... ok
+HOSTILE-FIXTURE aliases=true canonical_stride=248 count=1 guest_pages=96
+HOSTILE-FIXTURE aliases=false canonical_stride=248 count=65536 guest_pages=249
+HOSTILE-FIXTURE aliases=true canonical_stride=248 count=4 guest_pages=96
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":2,"child_pid":2700360,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":4,"child_pid":2700366,"ready":true}
+{"event":"spirit_loaded","spirit_id":"worker","pid":6,"child_pid":2700367,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":7,"child_pid":2700378,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":3,"child_pid":2700379,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 768 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":9,"child_pid":2700384,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"hostile-lifting","pid":8,"child_pid":2700389,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":12,"child_pid":2700407,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 768 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"hostile-lifting","pid":11,"child_pid":2700412,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 768 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":13,"child_pid":2700413,"ready":true}
+{"event":"spirit_loaded","spirit_id":"hostile-lifting","pid":14,"child_pid":2700421,"ready":true}
+GOVERNED-ATOMIC form=subprocess case=enterprise_denied trusted_pid=3 decisions=0 minted=0 guest_effects=0
+HOSTILE-ONCE turns=0 result=error
+test a_once_session_that_never_completes_its_turn_is_not_success ... ok
+HOSTILE-PROVENANCE trusted_pid=7 restamped=lineage,consent,clock fr4_view=ok
+test forged_guest_provenance_is_restamped_by_the_kernel ... ok
+HOSTILE-LIFTING-CONTROL aliases=true count=1 canonical_call=passed
+test one_aliased_string_under_the_hostcall_budget_clears_the_canonical_call ... ok
+HOSTILE-LIFTING aliases=false count=65536 trusted_pid=11 cause=hostcall-fuel
+test hostile_metadata_fails_before_serialization_under_real_t2 ... ok
+maos: root supervision armed
+HOSTILE-LIFTING aliases=true count=4 trusted_pid=14 cause=hostcall-fuel
+test hostile_aliased_strings_fail_before_serialization_under_real_t2 ... ok
+SCOPED-VERDICT form=subprocess grant=false forged=false trusted_pid=13 child_pid=2700413 allowed=false
+HOSTILE-REFUSALS trusted_pid=4 refused=["cross_host_destination", "kernel_reserved_kind", "retract_authority_violation", "scope_limit"]
+test kernel_only_cross_host_oversized_and_foreign_retract_frames_are_refused ... ok
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 768 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos: root supervision armed
+maos: root supervision armed
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":17,"child_pid":2700457,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":18,"child_pid":2700462,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos: root supervision armed
+GOVERNED-ATOMIC form=subprocess case=policy_mixed trusted_pid=17 decisions=2 minted=1 guest_effects=0
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":21,"child_pid":2700474,"ready":true}
+HOSTILE-IAC-SEND ungranted=deny broadcast_only=iac_peer_class_not_granted
+test a_delivery_needs_its_iac_send_grant ... ok
+SCOPED-VERDICT form=subprocess grant=false forged=true trusted_pid=21 child_pid=2700474 allowed=false
+maos: root supervision armed
+maos: root supervision armed
+{"event":"spirit_loaded","spirit_id":"routed-relay","pid":10,"child_pid":2700400,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":23,"child_pid":2700487,"ready":true}
+GOVERNED-ATOMIC form=subprocess case=unmediated trusted_pid=23 decisions=1 minted=0 guest_effects=0
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":25,"child_pid":2700495,"ready":true}
+maos: root supervision armed
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+SCOPED-VERDICT form=subprocess grant=true forged=false trusted_pid=25 child_pid=2700495 allowed=true
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"runner-sigsys","pid":16,"child_pid":2700448,"ready":true}
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":29,"child_pid":2700517,"ready":true}
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":30,"child_pid":2700523,"ready":true}
+HOSTILE-EXITS typed_before_ready=2,3,5 crash_after_ready=3
+test runner_refusal_exits_before_ready_are_typed_and_not_crashes ... ok
+SCOPED-VERDICT form=subprocess grant=true forged=true trusted_pid=29 child_pid=2700517 allowed=true
+escape-anomaly: spirit_pid=16 tier=2/declared=2 syscall=seccomp-kill-process (SIGSYS; syscall number unavailable) frame=01a110f047b6e8f70df8c4d9d1e01ef9 rationale="sandbox kill at tier=2 (syscall=seccomp-kill-process (SIGSYS; syscall number unavailable)) not anticipated by manifest (declared tier=2); the OS enforcement layer observed a structural violation the Spirit did not declare"
+RUNNER-SIGSYS forbidden=true admitted_pid=16 actual_blocks=1 consumer_anomalies=1 audit_view=ok
+maos: root supervision armed
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":27,"child_pid":2700509,"ready":true}
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+GOVERNED-ATOMIC form=wasm-component case=enterprise_denied trusted_pid=27 decisions=0 minted=0 guest_effects=0
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 768 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+RUNNER-SIGSYS forbidden=false admitted_pid=33 actual_blocks=0 consumer_anomalies=0 audit_view=ok
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+test actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not ... ok
+HOSTILE-DIAGNOSTICS journaled=256 dropped=44
+test guest_diagnostics_are_bounded_per_session ... ok
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"worker","pid":35,"child_pid":2700563,"ready":true}
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":32,"child_pid":2700531,"ready":true}
+SCOPED-VERDICT form=wasm-component grant=false forged=false trusted_pid=32 child_pid=2700531 allowed=false
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":34,"child_pid":2700551,"ready":true}
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+GOVERNED-ATOMIC form=wasm-component case=policy_mixed trusted_pid=34 decisions=2 minted=1 guest_effects=0
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":37,"child_pid":2700570,"ready":true}
+SCOPED-VERDICT form=wasm-component grant=false forged=true trusted_pid=37 child_pid=2700570 allowed=false
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":38,"child_pid":2700578,"ready":true}
+GOVERNED-ATOMIC form=wasm-component case=unmediated trusted_pid=38 decisions=1 minted=0 guest_effects=0
+test configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_forms ... ok
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":40,"child_pid":2700585,"ready":true}
+SCOPED-VERDICT form=wasm-component grant=true forged=false trusted_pid=40 child_pid=2700585 allowed=true
+maos: root supervision armed
+maos-sandbox: WARNING: cgroup unavailable (no writable delegated cgroup); memory cap 64 MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)
+HOSTILE-FLOODS frame_budget=64 self_flood=deadline
+test guest_floods_end_in_typed_failures_not_a_wedged_session ... ok
+{"event":"spirit_loaded","spirit_id":"scope-wasm","pid":42,"child_pid":2700593,"ready":true}
+SCOPED-VERDICT form=wasm-component grant=true forged=true trusted_pid=42 child_pid=2700593 allowed=true
+test eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims ... ok
+REPEATED-MAILBOX admitted_pid=10 exports=2 idle_seconds=11 turn_budget_seconds=10 planned_stop=true
+test repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.12s
+

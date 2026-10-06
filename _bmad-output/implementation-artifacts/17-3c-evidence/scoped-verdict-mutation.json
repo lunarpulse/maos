@@ -1,0 +1,18 @@
+{
+  "test": "crates/maos-bin/tests/spawned_scope_17_3c.rs",
+  "scope": {"McpCall": {"server": "scope-tools", "tool": "search"}},
+  "authority": "Real load/admit/start PID and shared manifest-derived PolicyTable. Forged claimed peer is independently admitted with the opposite MCP grant. Child republishes seed claims; kernel derives output sender, Standard intent and SpiritAuto origin from binding.",
+  "runtime": {"tier": "T2", "memory_max_mb": 64, "declared_cpu_max_pct": null, "wasm_instruction_fuel": 10000000},
+  "restored_outcomes": [
+    {"form":"subprocess","grant":false,"forged":false,"pid":2,"child_pid":1558007,"allowed":false},
+    {"form":"subprocess","grant":false,"forged":true,"pid":4,"child_pid":1558014,"allowed":false},
+    {"form":"subprocess","grant":true,"forged":false,"pid":6,"child_pid":1558022,"allowed":true},
+    {"form":"subprocess","grant":true,"forged":true,"pid":8,"child_pid":1558028,"allowed":true},
+    {"form":"wasm-component","grant":false,"forged":false,"pid":10,"child_pid":1558034,"allowed":false},
+    {"form":"wasm-component","grant":false,"forged":true,"pid":12,"child_pid":1558041,"allowed":false},
+    {"form":"wasm-component","grant":true,"forged":false,"pid":14,"child_pid":1558049,"allowed":true},
+    {"form":"wasm-component","grant":true,"forged":true,"pid":16,"child_pid":1558057,"allowed":true}
+  ],
+  "assertions": ["one completed export", "denied output has no guest receiver delivery", "allowed output has trusted sender/Standard/SpiritAuto and no claimed role", "session SCB removed on clean exit"],
+  "mutation": {"source":"crates/maos-kernel-core/src/capability/mod.rs:196-198", "change":"Remove the actual issue_with_mediation PolicyDecision::Deny return, rebuild kernel and live test", "red":"delivered_frames observed 1; expected 0", "red_artifact":"artifact://630", "restored":"Original denial restored and rebuilt; all eight actual processes GREEN", "green_artifact":"artifact://632"}
+}

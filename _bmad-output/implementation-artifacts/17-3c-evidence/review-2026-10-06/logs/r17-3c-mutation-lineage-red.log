@@ -1,0 +1,3 @@
+thread 'forged_guest_provenance_is_restamped_by_the_kernel' (2265532) panicked at crates/maos-bin/tests/spawned_scope_17_3c.rs:667:5:
+assertion `left == right` failed: lineage comes from the turn's inbound frame, never from the guest
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.20s

@@ -1,0 +1,143 @@
+{
+  "loaded": {
+    "event": "spirit_loaded",
+    "spirit_id": "example-spirit-ts",
+    "pid": 1,
+    "child_pid": 43439,
+    "ready": true
+  },
+  "enforced_resources": {
+    "child_pid": 43439,
+    "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/maos-17-3c-proof.service/maos.slice/spirit-example-spirit-ts-43419-1",
+    "cpu_max": "10000 100000",
+    "memory_max": "805306368",
+    "argv": [
+      "/home/cosmo/maos-17-3c-proof.review-1791285131/target/release/maos-wasm-runner",
+      "--component",
+      "/home/cosmo/maos-17-3c-proof.review-1791285131/examples/example-spirit-ts/dist/spirit.wasm",
+      "--fuel",
+      "10000000"
+    ],
+    "vm_peak_virtual_kib": 554028,
+    "vm_hwm_rss_kib": 482020,
+    "cgroup_memory_peak_bytes": 482308096,
+    "seccomp_modes": [
+      "2"
+    ],
+    "no_new_privs": [
+      "1"
+    ],
+    "seccomp_filters": [
+      "2"
+    ]
+  },
+  "attributed_intents": [
+    "cap.issue.Discriminant(6)",
+    "cap.revoke",
+    "cli.subprocess.exit",
+    "lifecycle.admit",
+    "lifecycle.load",
+    "lifecycle.start",
+    "lifecycle.unload",
+    "planned_unload",
+    "spirit.frame.authorization",
+    "standard"
+  ],
+  "authorization": {
+    "event": "spawned_frame_authorization",
+    "spirit_pid": 1,
+    "trusted_sender": "example-spirit-ts",
+    "trusted_intent": "standard",
+    "trusted_origin": "SpiritAuto",
+    "allowed": true,
+    "refusal": null,
+    "send": {
+      "scope": {
+        "IacSend": {
+          "peer_class": "spirit:peer"
+        }
+      },
+      "kernel_verdict": "allow",
+      "refusal": null
+    },
+    "decisions": [],
+    "claims": {
+      "frame_id": [
+        1,
+        161,
+        16,
+        234,
+        33,
+        255,
+        144,
+        105,
+        61,
+        160,
+        168,
+        203,
+        253,
+        5,
+        88,
+        46
+      ],
+      "timestamp_ns": 1791285142020677420,
+      "logical_clock": 0,
+      "from": {
+        "spirit_id": "operator",
+        "host_id": null,
+        "role": null
+      },
+      "to": [
+        {
+          "spirit_id": "example-spirit-ts",
+          "host_id": null,
+          "role": null
+        }
+      ],
+      "kind": "TaskAssign",
+      "intent": "Standard",
+      "payload": {
+        "TaskAssign": {
+          "goal": "maos run /home/cosmo/maos-17-3c-proof.review-1791285131/examples/example-spirit-ts/manifest.toml --once",
+          "scope": [],
+          "success_criteria": "Complete one mailbox export",
+          "posture_preferences": {
+            "preferred_posture": null,
+            "halt_policy_overrides": []
+          },
+          "prior_distillate_ref": null
+        }
+      },
+      "auto_marker": "HumanAuthored",
+      "consent_envelope": null,
+      "intent_lineage": [
+        "standard"
+      ]
+    }
+  },
+  "terminal": {
+    "event": "cli_subprocess_exit",
+    "cli_child_pid": 43439,
+    "exit_cause": "exited(code=0)",
+    "is_crash": false
+  },
+  "database": "/home/cosmo/maos-17-3c-proof.review-1791285131/proof/home/maos/audit/transparency.sqlite",
+  "audit_query_rows": [
+    [
+      "governance.event",
+      "spirit.frame.authorization"
+    ],
+    [
+      "task.assign",
+      "standard"
+    ],
+    [
+      "capability.invocation",
+      "cli.subprocess.exit"
+    ],
+    [
+      "capability.invocation",
+      "lifecycle.unload"
+    ]
+  ]
+}

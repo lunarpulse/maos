@@ -1,7 +1,7 @@
 # 17-3c early-start and FLAG-Winston decision record
 
 **Date:** 2026-10-01  
-**Status:** `review` — detached candidate implementation/amended acceptance complete; independent review pending. Initial 2026-10-01 preparation/backlog disposition is historical and superseded below.
+**Status:** `done` (2026-10-06): the §A6 review is complete and the candidate is integrated into the original checkout. Initial 2026-10-01 preparation/backlog disposition is historical and superseded below.
 **Scope:** architecture and executable preparation only. This record changes no runtime, kernel, baseline, or KLOC ledger.
 
 ## Decision
@@ -162,3 +162,9 @@ Historical preflight disposition (2026-10-01): complete isolated AC2/AC3 impleme
 - User accepts completed Ubuntu25.10 x86_64 testing as sufficient. Ubuntu24/26, ARM and extra platform-specific syscall controls are not remaining acceptance gates; unexecuted checks are not labeled passed. Historical 17-6 CI evidence is unchanged.
 - Next: independent candidate review, including security and non-author verification. No original closure, runtime cutover, commit, push/publication or deployment; 17-3d stays backlog and outside scope.
 
+## Closure (2026-10-06)
+
+- **Status:** 17-3b and 17-3c are `done`. The 2026-10-05 handoff above is historical.
+- **Review:** the §A6 bmad-code-review resolved every 17-3c finding. The kernel deny-bypass mutation was re-run independently: RED, then GREEN on restore. It verifies 17-3b's final finding.
+- **Integration:** the candidate is integrated into the original checkout and lands kernel 25293, KLOC kernel 19529 / bin 24600 / IAC 7100 / frame-codec 249, and the approved surface rows.
+- **Commits:** two local commits, 17-3b then 17-3c. No push. 17-3d stays backlog.

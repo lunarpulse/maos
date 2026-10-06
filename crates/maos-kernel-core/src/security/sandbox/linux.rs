@@ -13,6 +13,7 @@
 #![allow(unsafe_code)]
 
 use std::io;
+use std::os::fd::AsRawFd;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -65,13 +66,28 @@ pub fn spawn_sandboxed(
     let rlimit_mem = mem_limit.map(|mb| mb as u64 * 1024 * 1024);
     let rlimit_fd = fd_limit.map(|n| n as u64);
 
-    // Pre-compute cgroup path using Spirit ID (not parent PID).
-    let cgroup_path = if let Some(root) = find_writable_cgroup_root() {
-        create_cgroup_dir(&root, &spec.spirit_id)
-    } else {
-        None
+    // Without a CPU cap the cgroup only adds memory containment on top of the
+    // rlimits, so any setup failure degrades loudly to the rlimit fallback; a CPU
+    // cap has no rlimit equivalent and refuses the spawn.
+    let (cleanup, cgroup_procs) = match setup_cgroup(spec) {
+        Ok((cleanup, procs)) => (cleanup, Some(procs)),
+        Err(error) if spec.resolved_caps.cpu_max_pct.is_none() => {
+            let reason = match error {
+                SpawnError::CgroupUnavailable => "no writable delegated cgroup".to_owned(),
+                other => other.to_string(),
+            };
+            match mem_limit {
+                Some(mb) => eprintln!(
+                    "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {mb} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)"
+                ),
+                None => eprintln!(
+                    "maos-sandbox: cgroup unavailable ({reason}); using setrlimit fallback"
+                ),
+            }
+            (Cleanup::None, None)
+        }
+        Err(error) => return Err(error),
     };
-    let cgroup_path_for_post = cgroup_path.clone();
 
     // SAFETY: `pre_exec` runs in the forked child before exec.
     // We only move `Copy` data and pre-allocated/prepared objects.
@@ -79,6 +95,13 @@ pub fn spawn_sandboxed(
     // If any sandbox step fails, we return `Err` which aborts the exec.
     unsafe {
         command.pre_exec(move || {
+            // Writing zero joins this process before guest code can execute.
+            if let Some(procs) = cgroup_procs.as_ref() {
+                let rc = libc::write(procs.as_raw_fd(), b"0".as_ptr().cast(), 1);
+                if rc != 1 {
+                    return Err(io::Error::last_os_error());
+                }
+            }
             // --- Landlock (filesystem restriction) ---
             if let Some(ruleset) = landlock_ruleset.take() {
                 // SAFETY: restrict_self issues a single landlock_restrict_self
@@ -141,24 +164,7 @@ pub fn spawn_sandboxed(
 
     let child = command.spawn().map_err(SpawnError::Io)?;
 
-    // --- cgroups v2 (parent side, post-spawn) ---
-    if let Some(path) = cgroup_path_for_post {
-        if let Err(e) = apply_cgroup_limits(&path, &spec.resolved_caps, child.id()) {
-            eprintln!(
-                "maos-sandbox: cgroup limit apply failed: {e}; relying on setrlimit fallback"
-            );
-        }
-        return Ok(SandboxedChild {
-            child,
-            cleanup: Cleanup::Cgroup { path },
-        });
-    }
-
-    eprintln!("maos-sandbox: no writable cgroup subtree; using setrlimit fallback");
-    Ok(SandboxedChild {
-        child,
-        cleanup: Cleanup::None,
-    })
+    Ok(SandboxedChild { child, cleanup })
 }
 
 // ------------------------------------------------------------------
@@ -318,6 +324,8 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
         // (SIGPIPE handler) and std::thread (glibc >= 2.34 pthread_create).
         libc::SYS_rt_sigaction,
         libc::SYS_clone3,
+        // Wasmtime's executable-memory backing, proven by the 17-3c omission probe.
+        libc::SYS_memfd_create,
     ];
 
     for &syscall in basic_syscalls.iter().chain(ARCH_SYSCALLS) {
@@ -402,40 +410,100 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
     Ok(vec![kill_bpf, bpf])
 }
 
-fn apply_seccomp(bpf: &[seccompiler::sock_filter]) -> Result<(), String> {
-    seccompiler::apply_filter(bpf).map_err(|e| format!("seccomp apply_filter failed: {e}"))
+fn apply_seccomp(bpf: &[seccompiler::sock_filter]) -> Result<(), seccompiler::Error> {
+    seccompiler::apply_filter(bpf)
 }
 
 // ------------------------------------------------------------------
 // cgroups v2
 // ------------------------------------------------------------------
 
-fn find_writable_cgroup_root() -> Option<PathBuf> {
-    if let Ok(own_cgroup) = std::fs::read_to_string("/proc/self/cgroup") {
-        for line in own_cgroup.lines() {
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() >= 3 {
-                let p = PathBuf::from("/sys/fs/cgroup").join(parts[2].trim_start_matches('/'));
-                if p.join("cgroup.procs").exists() {
-                    return Some(p);
-                }
-            }
+/// Create the child's cgroup, apply its limits, and open its `cgroup.procs` for the
+/// `pre_exec` placement write. Everything the placement needs is checked here, in
+/// the parent, so a refusal can fall back before any fork; dropping the returned
+/// guard on a later error removes the cgroup again.
+fn setup_cgroup(spec: &SandboxSpec) -> Result<(Cleanup, std::fs::File), SpawnError> {
+    let caps = &spec.resolved_caps;
+    let root = find_writable_cgroup_root(caps).ok_or(SpawnError::CgroupUnavailable)?;
+    let open_procs = |dir: &std::path::Path| {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(dir.join("cgroup.procs"))
+            .map_err(|error| SpawnError::SandboxSetup(format!("cgroup placement: {error}")))
+    };
+    // Migration needs write access to the common ancestor's `cgroup.procs`; the
+    // child's source cgroup is at or below `root`, its destination below `root`.
+    open_procs(&root)?;
+    let path =
+        create_cgroup_dir(&root, &spec.spirit_id, caps).ok_or(SpawnError::CgroupUnavailable)?;
+    let cleanup = Cleanup::Cgroup { path: path.clone() };
+    apply_cgroup_limits(&path, caps)
+        .map_err(|error| SpawnError::SandboxSetup(format!("cgroup limits: {error}")))?;
+    Ok((cleanup, open_procs(&path)?))
+}
+
+fn find_writable_cgroup_root(caps: &super::ResolvedCaps) -> Option<PathBuf> {
+    let own_cgroup = std::fs::read_to_string("/proc/self/cgroup").ok()?;
+    let path = own_cgroup
+        .lines()
+        .find_map(|line| line.strip_prefix("0::"))?;
+    let mount = std::path::Path::new("/sys/fs/cgroup");
+    let own = mount.join(path.trim_start_matches('/'));
+    // A populated process leaf cannot enable domain controllers for children.
+    // Use the nearest ancestor whose controllers are already delegated; never
+    // change an ancestor's controller policy or move the daemon itself.
+    for candidate in own.ancestors().take_while(|path| path.starts_with(mount)) {
+        let Ok(controllers) = std::fs::read_to_string(candidate.join("cgroup.subtree_control"))
+        else {
+            continue;
+        };
+        let enabled = |name| {
+            controllers
+                .split_ascii_whitespace()
+                .any(|controller| controller == name)
+        };
+        if caps.cpu_max_pct.is_some() && !enabled("cpu") {
+            continue;
         }
+        if caps.memory_max_mb.is_some() && !enabled("memory") {
+            continue;
+        }
+        // Creation below this boundary performs the actual permission check.
+        return Some(candidate.to_owned());
     }
     None
 }
 
-fn create_cgroup_dir(root: &std::path::Path, spirit_id: &str) -> Option<PathBuf> {
+fn create_cgroup_dir(
+    root: &std::path::Path,
+    spirit_id: &str,
+    caps: &super::ResolvedCaps,
+) -> Option<PathBuf> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let safe_id = spirit_id.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
-    let path = root.join(format!("maos.slice/spirit-{safe_id}"));
-    std::fs::create_dir_all(&path).ok()?;
+    let parent = root.join("maos.slice");
+    std::fs::create_dir_all(&parent).ok()?;
+    let controllers = match (caps.cpu_max_pct.is_some(), caps.memory_max_mb.is_some()) {
+        (true, true) => "+cpu +memory",
+        (true, false) => "+cpu",
+        (false, true) => "+memory",
+        (false, false) => "",
+    };
+    if !controllers.is_empty() {
+        std::fs::write(parent.join("cgroup.subtree_control"), controllers).ok()?;
+    }
+    let path = parent.join(format!(
+        "spirit-{safe_id}-{}-{sequence}",
+        std::process::id()
+    ));
+    std::fs::create_dir(&path).ok()?;
     Some(path)
 }
 
 fn apply_cgroup_limits(
     path: &std::path::Path,
     caps: &super::ResolvedCaps,
-    child_pid: u32,
 ) -> Result<(), std::io::Error> {
     if let Some(pct) = caps.cpu_max_pct {
         let period = 100_000u64;
@@ -447,6 +515,5 @@ fn apply_cgroup_limits(
         let bytes = mb as u64 * 1024 * 1024;
         std::fs::write(path.join("memory.max"), bytes.to_string())?;
     }
-    std::fs::write(path.join("cgroup.procs"), child_pid.to_string())?;
     Ok(())
 }

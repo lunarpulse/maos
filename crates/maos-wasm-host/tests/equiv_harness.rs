@@ -743,7 +743,7 @@ fn drive_subprocess(binary: &Path, args: &[&str], input_frames: &[IacFrame]) -> 
         let mut writer = BufWriter::new(stdin);
         for frame in &to_send {
             let bytes = codec::encode_cbor(frame).expect("encode input frame");
-            codec::write_frame(&mut writer, &bytes).expect("write input frame");
+            maos_frame_codec::write_frame(&mut writer, &bytes).expect("write input frame");
         }
         // Drop `writer` (and the stdin it owns) → EOF.
         drop(writer);
@@ -760,11 +760,30 @@ fn drive_subprocess(binary: &Path, args: &[&str], input_frames: &[IacFrame]) -> 
 
     // Reader: drain stdout frame-by-frame until clean EOF.
     let mut reader = BufReader::new(stdout);
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "Ready"
+    );
+    let mut completed_turns = 0;
     let mut emitted = Vec::new();
-    while let Some(bytes) = codec::read_frame(&mut reader).expect("read output frame") {
+    while let Some(bytes) = maos_frame_codec::read_frame(&mut reader).expect("read output frame") {
+        if bytes.is_empty() {
+            completed_turns += 1;
+            assert!(
+                completed_turns <= input_frames.len(),
+                "unexpected TurnComplete"
+            );
+            continue;
+        }
+        assert!(
+            completed_turns < input_frames.len(),
+            "frame outside an active turn"
+        );
         let frame: IacFrame = codec::decode_cbor(&bytes).expect("decode output frame");
         emitted.push(frame);
     }
+    assert_eq!(completed_turns, input_frames.len(), "missing TurnComplete");
 
     writer.join().expect("writer thread must not panic");
     let stderr_output = stderr_handle

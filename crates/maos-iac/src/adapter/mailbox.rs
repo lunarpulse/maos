@@ -283,6 +283,13 @@ impl Mailbox {
         })
     }
 
+    /// Remove a recipient so the same Spirit id can be registered again.
+    /// Deliveries that reach it afterwards fail with `IacBusError::UnknownSpirit`.
+    pub fn unregister_spirit(&self, spirit_id: &str) {
+        self.mpsc_senders
+            .retain(|(id, _), _| id.as_str() != spirit_id);
+    }
+
     /// Deliver a frame through the per-Spirit MPSC or broadcast sender.
     ///
     /// The I2 log-before-deliver guarantee is satisfied by the caller
@@ -480,10 +487,10 @@ impl Mailbox {
                     continue;
                 }
                 let spirit_id = addr.spirit_id.as_str().to_string();
-                let sender = self
-                    .mpsc_senders
-                    .get(&(spirit_id.clone(), kind))
-                    .expect("validated in phase 1");
+                let sender = match self.mpsc_senders.get(&(spirit_id.clone(), kind)) {
+                    Some(entry) => entry.value().clone(),
+                    None => return Err(IacBusError::UnknownSpirit(spirit_id)),
+                };
 
                 // Update last_inbound_frame_ns for the recipient via the activity
                 // tracker trait. Mutex guard is scoped to this block so the future
@@ -678,7 +685,7 @@ impl IacBusPort for super::IacBusAdapter {
         // that depended on the halt as its duplicate signal must move to
         // `deliver_typed`. Kernel-minted-id writers keep their halt via
         // `halt_on_duplicate` inside the TL adapter.
-        self.deliver_typed(frame).await.map(|logged| {
+        self.deliver_typed(frame, 0, None).await.map(|logged| {
             let _ = logged.into_inner();
             LogBeforeDeliver::new(())
         })
@@ -694,7 +701,7 @@ impl IacBusPort for super::IacBusAdapter {
         reason: String,
         retracting_spirit: &SpiritId,
     ) -> Result<maos_domain::iac_bus_types::RetractOutcome, IacBusError> {
-        self.retract(original_frame_id, reason, retracting_spirit)
+        self.retract(original_frame_id, reason, retracting_spirit, None)
             .await
     }
 }

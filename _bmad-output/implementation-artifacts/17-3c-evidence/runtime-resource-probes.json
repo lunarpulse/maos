@@ -1,0 +1,25 @@
+{
+  "measurement_only": true,
+  "approval": {"bounded_higher_limit_probes": true, "remote_proof_execution_only": true, "production_ceiling_changes": false, "cutover": false},
+  "probes": [
+    {"memory_mib": 512, "compile_guard_seconds": 180, "instruction_fuel": 10000000, "exit_code": 3, "elapsed_seconds": 12.673244582023472, "max_rss_kib": 443400, "peak_virtual_kib": 514568, "stdout_hex": "", "failure": "Cannot allocate buffer"},
+    {"memory_mib": 1024, "compile_guard_seconds": 180, "instruction_fuel": 10000000, "exit_code": 0, "elapsed_seconds": 12.67761248210445, "max_rss_kib": 516880, "peak_virtual_kib": 586508, "stdout_hex": "436f6e74656e742d4c656e6774683a20300d0a0d0a"}
+  ],
+  "successful_probe_scope": "Actual runner compilation, instantiation, on_start Ready and EOF shutdown; not admitted, not T2, no active turn",
+  "production_compile_guard_restored_seconds": 10,
+  "environment": {"configured_ssh_hosts": 0, "podman_failure": "cannot clone: Operation not permitted", "systemd_user_scope_failure": "user bus unavailable"},
+  "subsequent_candidate_grant": {
+    "explicit_user_approval": true,
+    "process_memory_mib": 768,
+    "manifest_time_seconds": 180,
+    "compile_guard_seconds": 180,
+    "retained_cpu_percent": 10,
+    "retained_guest_memory_mib": 64,
+    "retained_instruction_fuel": 10000000,
+    "remote_execution_endpoint": "cosmo@192.168.100.135",
+    "remote_execution_only": true,
+    "git_push_publication_cutover": false,
+    "historical_fields_above": "Describe the earlier measurement-only phase and its then-restored ten-second guard, not the later explicitly approved candidate configuration.",
+    "acceptance": "Actual TS admission with delegated CPU 10% and the four-image matrix remain unproven; remote default identities and rsa_nopwd were rejected."
+  }
+}

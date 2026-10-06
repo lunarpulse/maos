@@ -31,7 +31,8 @@ use std::time::Duration;
 
 use equiv_fixture_logic::{should_delay, transform_logical_clock, FixtureMode};
 use maos_domain::frame::IacFrame;
-use maos_wasm_host::codec::{decode_cbor, encode_cbor, read_frame, write_frame};
+use maos_frame_codec::{read_frame, write_frame};
+use maos_wasm_host::codec::{decode_cbor, encode_cbor};
 
 /// Cosmetic (non-invariant) wall-clock delay applied under `--mode cosmetic`.
 /// Large enough to be observable above scheduling jitter, small enough to keep
@@ -52,6 +53,11 @@ fn main() -> ExitCode {
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = BufWriter::new(stdout.lock());
+
+    if let Err(error) = write_frame(&mut writer, &[]) {
+        eprintln!("equiv-native-twin: Ready write: {error}");
+        return ExitCode::from(1);
+    }
 
     loop {
         let frame_bytes = match read_frame(&mut reader) {
@@ -103,10 +109,8 @@ fn main() -> ExitCode {
             eprintln!("equiv-native-twin: stdout write error: {e}");
             return ExitCode::from(1);
         }
-        // Flush per frame so the harness can read the response promptly; the
-        // ADR-032 peer is block-oriented, so an unflushed buffer would stall.
-        if let Err(e) = writer.flush() {
-            eprintln!("equiv-native-twin: stdout flush error: {e}");
+        if let Err(e) = write_frame(&mut writer, &[]) {
+            eprintln!("equiv-native-twin: TurnComplete write error: {e}");
             return ExitCode::from(1);
         }
     }

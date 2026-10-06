@@ -1,0 +1,45 @@
+# 17-3c AC1 audit-query evidence (2026-10-06) — run on a copy of _bmad-output/implementation-artifacts/17-3c-evidence/remote-100-20-final-isolated-runtime.tar.gz
+# maosctl: /tmp/r17-3c-tgt-int/debug/maosctl sha256=cad370e62f65f9781e0a9334ec2c199d1e81b09f7c58fdc6a4df007fa95502dc (candidate-built; archive ships no binaries)
+# transparency.sqlite sha256=272967117b4a97f9409575033d08013ff83b137686bf7d8a9f553473adc97d72 (wal=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)
+# env: env -i PATH=/usr/bin:/bin HOME=<extract>/scratch MAOS_HOME=<extract>/home-copy/maos NO_COLOR=1
+
+## --spirit ndjson
+$ maosctl audit query --spirit example-spirit-ts --format ndjson
+exit=2
+--- stdout
+
+--- stderr
+maosctl: audit query — FR4 schema violation at line 5: missing field 'capability_token'
+
+## --spirit plain
+$ maosctl audit query --spirit example-spirit-ts --format plain
+exit=2
+--- stdout
+call_id                           boot_nonce        spirit_pid  call_type               timestamp_ns          intent
+01a10995d17bd182d40f9bde7211dc9f  5e6dc0a2e64ce335  1           capability.invocation   1791162175867466301   lifecycle.admit
+01a10995d17dc9e0139ab84381cf411f  5e6dc0a2e64ce335  1           capability.invocation   1791162175869141246   lifecycle.load
+01a10995d1804084805f33f4f2e1109f  5e6dc0a2e64ce335  1           capability.invocation   1791162175872128369   lifecycle.start
+01a1099ac154a294640a458ca32a7334  5e6dc0a2e64ce335  1           governance.event        1791162499412439617   spirit.frame.authorization
+--- stderr
+maosctl: audit query — FR4 schema violation at line 5: missing field 'capability_token'
+
+## unfiltered ndjson
+$ maosctl audit query --format ndjson
+exit=0
+--- stdout
+{"frame_id":"01a10995d17bd182d40f9bde7211dc9f","timestamp_ns":1791162175867466301,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"capability.invocation","intent":"lifecycle.admit","payload":"{\"spirit_id\":\"example-spirit-ts\"}"}
+{"frame_id":"01a10995d17dc9e0139ab84381cf411f","timestamp_ns":1791162175869141246,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"capability.invocation","intent":"lifecycle.load","payload":"{\"lifecycle_event\":\"Load\",\"spirit_id\":\"example-spirit-ts\",\"spirit_pid\":1}"}
+{"frame_id":"01a10995d17ea9064c03fde85c3e8dbf","timestamp_ns":1791162175870790876,"spirit_pid":0,"boot_nonce":6804306417907721013,"kind":"governance.event","intent":"governance:vetter-key-admission","payload":"{\"recorded_at_ns\":1791162175870767981,\"effective_at_ns\":1791162175870767981,\"event\":{\"governance_type\":\"VetterKey\",\"spirit_id\":\"example-spirit-ts\",\"version\":\"0.1.0\",\"admitted\":true,\"effective_tier\":\"SandboxTier(2)\",\"journal_note\":\"admission granted\"}}"}
+{"frame_id":"01a10995d1804084805f33f4f2e1109f","timestamp_ns":1791162175872128369,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"capability.invocation","intent":"lifecycle.start","payload":"{\"lifecycle_event\":\"Start\",\"spirit_pid\":1}"}
+{"frame_id":"01a10995d17b4c82e356e983b437015e","timestamp_ns":1791162499407041492,"spirit_pid":0,"boot_nonce":6804306417907721013,"kind":"task.assign","intent":"standard","payload":"{\"TaskAssign\":{\"goal\":\"maos run /home/cosmo/maos-17-3c-proof.a99GPA/examples/example-spirit-ts/manifest.toml --once\",\"scope\":[],\"success_criteria\":\"Complete one mailbox export\",\"posture_preferences\":{\"preferred_posture\":null,\"halt_policy_overrides\":[]},\"prior_distillate_ref\":null}}"}
+{"frame_id":"01a1099ac154a294640a458ca32a7334","timestamp_ns":1791162499412439617,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"governance.event","intent":"spirit.frame.authorization","payload":"{\"event\":\"spawned_frame_authorization\",\"spirit_pid\":1,\"trusted_sender\":\"example-spirit-ts\",\"trusted_intent\":\"standard\",\"trusted_origin\":\"SpiritAuto\",\"allowed\":true,\"decisions\":[],\"claims\":{\"frame_id\":[1,161,9,149,209,123,76,130,227,86,233,131,180,55,1,94],\"timestamp_ns\":1791162175872195429,\"logical_clock\":0,\"from\":{\"spirit_id\":\"operator\",\"host_id\":null,\"role\":null},\"to\":[{\"spirit_id\":\"example-spirit-ts\",\"host_id\":null,\"role\":null}],\"kind\":\"TaskAssign\",\"intent\":\"Standard\",\"payload\":{\"TaskAssign\":{\"goal\":\"maos run /home/cosmo/maos-17-3c-proof.a99GPA/examples/example-spirit-ts/manifest.toml --once\",\"scope\":[],\"success_criteria\":\"Complete one mailbox export\",\"posture_preferences\":{\"preferred_posture\":null,\"halt_policy_overrides\":[]},\"prior_distillate_ref\":null}},\"auto_marker\":\"HumanAuthored\",\"consent_envelope\":null,\"intent_lineage\":[\"standard\"]}}"}
+{"frame_id":"01a1099ac15565b861e525c13801fb11","timestamp_ns":1791162499413763871,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"task.assign","intent":"standard","payload":"{\"TaskAssign\":{\"goal\":\"maos run /home/cosmo/maos-17-3c-proof.a99GPA/examples/example-spirit-ts/manifest.toml --once\",\"scope\":[],\"success_criteria\":\"Complete one mailbox export\",\"posture_preferences\":{\"preferred_posture\":null,\"halt_policy_overrides\":[]},\"prior_distillate_ref\":null}}"}
+{"frame_id":"01a1099ac27b6207fb65cce98b702500","timestamp_ns":1791162499707355340,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"capability.invocation","intent":"cli.subprocess.exit","payload":"{\"event\":\"cli_subprocess_exit\",\"cli_child_pid\":5709,\"exit_cause\":\"exited(code=0)\",\"is_crash\":false}"}
+{"frame_id":"01a1099ac27d901193b861886f5c7ded","timestamp_ns":1791162499709257597,"spirit_pid":1,"boot_nonce":6804306417907721013,"capability_token":"0000000000000000000000000000000000000000000000000000000000000000","kind":"capability.invocation","intent":"cap.revoke"}
+{"frame_id":"01a1099ac27e445472467f925f8f8a19","timestamp_ns":1791162499710557159,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"capability.invocation","intent":"lifecycle.unload","payload":"{\"lifecycle_event\":\"Unload\",\"spirit_pid\":1}"}
+{"frame_id":"01a1099ac280c342e2196eb358a1ac7e","timestamp_ns":1791162499712050598,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"epistemic.halt","intent":"planned_unload"}
+{"frame_id":"01a1099ac2817e2ba5e8dff2deea6431","timestamp_ns":1791162499713542625,"spirit_pid":1,"boot_nonce":6804306417907721013,"kind":"epistemic.halt","intent":"planned_unload","payload":"{\"halt_id\":\"term-example-spirit-ts-1-1791162499712046137\",\"timestamp_ns\":1791162499712046137,\"spirit_pid\":1,\"boot_nonce\":6804306417907721013,\"frame_id\":[1,161,9,154,194,128,195,66,226,25,110,179,88,161,172,126],\"terminal_state\":\"Terminated\",\"resolution_kind\":\"planned_unload\",\"resolution_timestamp_ns\":1791162499712046137}"}
+{"frame_id":"01a1099ac28271370fd478ace84baf05","timestamp_ns":1791162499714962500,"spirit_pid":1,"boot_nonce":6804306417907721013,"capability_token":"0000000000000000000000000000000000000000000000000000000000000000","kind":"capability.invocation","intent":"cap.revoke"}
+--- stderr
+
+

@@ -31,7 +31,7 @@ tier = "T2"
 
 A schema v5 kernel continues to load v4 manifests. To roll a component declaration back to an in-process Spirit, remove `artifact`, set `forms = ["rust-inproc"]`, set the sandbox tier to `T0`, and then set the schema version to `4` when targeting a v4 kernel.
 
-The default MAOS binary validates a WASM-component Spirit but reports `wasm_engine_off` while its `wasm-host` engine remains disabled for Export Hold 2. A `wasm-host` build reports `wasm_launch_not_built` until 17-3c implements launch.
+The default MAOS binary validates a WASM-component Spirit but reports `wasm_engine_off` while its `wasm-host` engine remains disabled for Export Hold 2. A `wasm-host` build launches it via `maos run` in the contained T2 runner and refuses unsupported in-process surfaces (operator door, topology, hot-swap successor) as `spawned_surface_unsupported`.
 
 ## Ratification
 

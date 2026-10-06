@@ -47,7 +47,7 @@
 //! drop/shutdown order: on `Drop` it closes stdin, kills+reaps the child (no
 //! `<defunct>` zombie), then joins the readers (no orphaned threads).
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::thread::JoinHandle;
@@ -57,6 +57,7 @@ use sha2::Digest;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::invariants::i9::SandboxTier;
 
+use crate::capability::cap_audit;
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
 use crate::security::sandbox::SandboxSpec;
@@ -315,6 +316,9 @@ pub struct SpawnedBridge {
     control_channel: CliWrapperControlChannel,
     shutdown_signal: Option<String>,
     dropped: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    sandbox_tier: SandboxTier,
+    /// Stdout reached EOF: the stream is closed to `poll_frame` callers.
+    stdout_eof: bool,
 }
 
 /// Outcome of draining the child's streams to the journal.
@@ -327,6 +331,27 @@ pub struct PumpOutcome {
     /// Journal write failures — `insert_frame_event_with_sender` returned `Err`.
     /// Non-zero means audit trail gaps; the pump still continues draining.
     pub journal_failures: u64,
+}
+
+/// Owned duplex input; move to a writer thread so output is drained concurrently.
+#[maos_attrs::i9_exempt(
+    reason = "exclusive live child stdin resource, transferred to the duplex writer"
+)]
+pub struct FrameWriter {
+    stdin: ChildStdin,
+}
+
+impl FrameWriter {
+    pub fn write_frame(&mut self, body: &[u8]) -> std::io::Result<()> {
+        maos_frame_codec::write_frame(&mut self.stdin, body)
+    }
+}
+
+/// Transport facts only; the composition root owns deadlines and protocol state.
+pub enum BridgePoll {
+    Data(SubStream, Vec<u8>),
+    Idle,
+    Closed,
 }
 /// Result of waiting for and finalizing a subprocess (ADR-022).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -350,39 +375,6 @@ fn read_newline_delimited<R: BufRead>(reader: &mut R) -> std::io::Result<Option<
     Ok(Some(buf))
 }
 
-/// Read one `Content-Length:`-framed record (`JsonRpcOverStdio`). Mirrors the
-/// J1 bench framing (`j1.rs:63-76`) so the bench and production agree on the
-/// wire shape. Returns `Ok(None)` on a clean EOF at a frame boundary.
-fn read_content_length<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Vec<u8>>> {
-    let mut header = String::new();
-    let n = reader.read_line(&mut header)?;
-    if n == 0 {
-        return Ok(None);
-    }
-    let len: usize = header
-        .trim()
-        .strip_prefix("Content-Length:")
-        .map(|s| s.trim())
-        .and_then(|s| s.parse().ok())
-        .ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("bad Content-Length header: {header:?}"),
-            )
-        })?;
-    // Consume the blank separator line and validate it.
-    let mut blank = String::new();
-    reader.read_line(&mut blank)?;
-    if !blank.trim().is_empty() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("expected blank separator after Content-Length, got {blank:?}"),
-        ));
-    }
-    let mut body = vec![0u8; len];
-    reader.read_exact(&mut body)?;
-    Ok(Some(body))
-}
 /// Reader-thread body: frame `reader` per `shape`, hand frames to `tx` per the
 /// backpressure policy. Sends a terminal `Eof` then returns (closing the thread).
 fn run_reader<R: BufRead>(
@@ -395,11 +387,14 @@ fn run_reader<R: BufRead>(
 ) {
     let mut line_no: u64 = 0;
     loop {
-        let frame = match shape {
-            CliWrapperStdioShape::NdjsonOverStdio | CliWrapperStdioShape::Raw => {
+        let frame = match (stream, shape) {
+            (SubStream::Stderr, _) => maos_frame_codec::read_diagnostic(&mut reader),
+            (_, CliWrapperStdioShape::NdjsonOverStdio | CliWrapperStdioShape::Raw) => {
                 read_newline_delimited(&mut reader)
             }
-            CliWrapperStdioShape::JsonRpcOverStdio => read_content_length(&mut reader),
+            (_, CliWrapperStdioShape::JsonRpcOverStdio) => {
+                maos_frame_codec::read_frame(&mut reader)
+            }
             _ => {
                 // Unknown framing variant — fail loud (no silent downgrade).
                 let _ = tx.send(ReaderMsg::FramingError {
@@ -410,7 +405,12 @@ fn run_reader<R: BufRead>(
             }
         };
         match frame {
-            Ok(Some(bytes)) => {
+            Ok(Some(mut bytes)) => {
+                if stream == SubStream::Stderr {
+                    while matches!(bytes.last(), Some(b'\n') | Some(b'\r')) {
+                        bytes.pop();
+                    }
+                }
                 line_no += 1;
                 let msg = ReaderMsg::Line {
                     stream,
@@ -472,6 +472,40 @@ impl BridgeChild {
             Self::Sandboxed(guard) => guard.child_mut(),
         }
     }
+
+    /// The child's cgroup directory while its guard is alive.
+    #[cfg(target_os = "linux")]
+    fn cgroup_path(&self) -> Option<&std::path::Path> {
+        match self {
+            Self::Plain(_) => None,
+            Self::Sandboxed(guard) => guard.cgroup_path(),
+        }
+    }
+}
+
+/// `oom_kill` from a cgroup's `memory.events` (0 when absent: no memory controller).
+#[cfg(target_os = "linux")]
+fn cgroup_oom_kills(cgroup: &std::path::Path) -> u64 {
+    std::fs::read_to_string(cgroup.join("memory.events"))
+        .map_or(0, |events| parse_oom_kills(&events))
+}
+
+#[cfg(target_os = "linux")]
+fn parse_oom_kills(events: &str) -> u64 {
+    events
+        .lines()
+        .find_map(|line| line.strip_prefix("oom_kill "))
+        .and_then(|count| count.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+impl Drop for BridgeChild {
+    fn drop(&mut self) {
+        if let Self::Plain(child) = self {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
 }
 
 /// Spawn under the admitted spec: T2 through `spawn_sandboxed` on Linux only (never
@@ -523,16 +557,13 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
 
     let mut child = spawn_child(&spec.sandbox, &mut cmd, &spec.program)?;
     let child_pid = child.get().id();
-    // Close the child's stdin unless stdin IS the control channel. A worker
-    // driven by `Signals` (or the fixture) is not fed via stdin, and a real CLI
-    // that reads stdin-until-EOF (e.g. `codex exec`) would otherwise DEADLOCK on
-    // the bridge's held-open pipe: it blocks reading stdin while the bridge blocks
-    // reading its output. Dropping the `ChildStdin` sends EOF so the child
-    // proceeds on its argv prompt. `StdinCommands` (and the J1 bench's
-    // `write_stdin_line`) keep stdin open — that path drives the worker through it.
-    let stdin = match spec.control_channel {
-        CliWrapperControlChannel::Signals => {
-            let _ = child.get().stdin.take(); // drop the ChildStdin → EOF to the child
+    // Framed sessions need duplex stdin even when lifecycle control uses signals.
+    // Argv-driven CLIs still receive EOF immediately.
+    let stdin = match (spec.control_channel, spec.stdio_shape) {
+        (CliWrapperControlChannel::Signals, shape)
+            if shape != CliWrapperStdioShape::JsonRpcOverStdio =>
+        {
+            drop(child.get().stdin.take());
             None
         }
         _ => child.get().stdin.take(),
@@ -571,7 +602,7 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
         .map_err(|e| BridgeError::Io(format!("spawn stdout reader: {e}")))?;
 
     let drop_err = std::sync::Arc::clone(&dropped);
-    let err_handle = std::thread::Builder::new()
+    let err_handle = match std::thread::Builder::new()
         .name(format!("cli-bridge-stderr-{child_pid}"))
         .spawn(move || {
             run_reader(
@@ -582,8 +613,16 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
                 bp,
                 drop_err,
             );
-        })
-        .map_err(|e| BridgeError::Io(format!("spawn stderr reader: {e}")))?;
+        }) {
+        Ok(handle) => handle,
+        Err(error) => {
+            drop(rx);
+            let _ = child.get().kill();
+            let _ = child.get().wait();
+            let _ = out_handle.join();
+            return Err(BridgeError::Io(format!("spawn stderr reader: {error}")));
+        }
+    };
 
     Ok(SpawnedBridge {
         child: Some(child),
@@ -595,6 +634,8 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
         control_channel: spec.control_channel,
         shutdown_signal: spec.shutdown_signal,
         dropped,
+        sandbox_tier: spec.sandbox.tier,
+        stdout_eof: false,
     })
 }
 
@@ -608,6 +649,113 @@ impl SpawnedBridge {
     /// The sender identity captured at spawn.
     pub fn from_spirit_id(&self) -> &str {
         &self.from_spirit_id
+    }
+
+    /// Observe a terminal child without turning its already-occurred fault into
+    /// a planned kill. `Child` retains a reaped status for finalization.
+    pub fn try_exit_cause(&mut self) -> Result<Option<ExitCause>, BridgeError> {
+        let child = self
+            .child
+            .as_mut()
+            .ok_or_else(|| BridgeError::Io("child already finalized".into()))?;
+        child
+            .get()
+            .try_wait()
+            .map(|status| status.map(ExitCause::classify))
+            .map_err(|error| BridgeError::Io(error.to_string()))
+    }
+
+    /// SIGKILL a not-yet-reaped child. `Ok` when it already exited or was
+    /// finalized. Does not reap: [`Self::wait_and_finalize`] still does.
+    pub fn kill(&mut self) -> Result<(), BridgeError> {
+        match self.child.as_mut().map(|child| child.get().kill()) {
+            None | Some(Ok(())) => Ok(()),
+            // Older std reports an already-reaped child as InvalidInput.
+            Some(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
+            Some(Err(error)) => Err(BridgeError::Io(format!("kill: {error}"))),
+        }
+    }
+
+    /// Report a kernel-observed sandbox enforcement on the audit channel; when it
+    /// cannot be delivered (no channel, full, closed) the bridge journals the
+    /// row the audit writer would have written (kind 8 `SandboxBlock`), so it is
+    /// never silently lost and the escape consumer reads either path alike.
+    #[cfg(unix)]
+    fn report_sandbox_block(
+        &self,
+        journal: &TransparencyLogAdapter,
+        spirit_pid: u32,
+        audit: Option<&cap_audit::Sender>,
+        attempted_syscall: String,
+    ) {
+        let event = cap_audit::CapAuditEvent::SandboxBlock {
+            spirit_pid,
+            attempted_syscall: attempted_syscall.clone(),
+            sandbox_tier: self.sandbox_tier,
+        };
+        if let Some(audit) = audit {
+            match audit.try_send(event) {
+                Ok(()) => return,
+                Err(error) => {
+                    cap_audit::record_send_error(cap_audit::AuditDropSite::SandboxBlock, &error);
+                }
+            }
+        }
+        let _ = journal.insert_frame_event_with_sender(
+            FrameKind::SandboxBlock,
+            spirit_pid,
+            &self.from_spirit_id,
+            "",
+            None,
+            &format!("sandbox.block.{attempted_syscall}"),
+            format!("tier={}", self.sandbox_tier.0).as_bytes(),
+            FrameOrigin::Kernel,
+        );
+    }
+
+    /// Transfer exclusive stdin ownership to a concurrent framed writer.
+    pub fn take_frame_writer(&mut self) -> Result<FrameWriter, BridgeError> {
+        self.stdin
+            .take()
+            .map(|stdin| FrameWriter { stdin })
+            .ok_or_else(|| BridgeError::Io("bridge framed stdin already closed or taken".into()))
+    }
+
+    /// Poll opaque bodies/diagnostics while the owner also services its mailbox.
+    /// Framing failures are terminal errors, not clean EOF or idle timeout. Once
+    /// stdout reaches EOF the stream is closed to the owner: diagnostics still
+    /// arriving are returned, and the first quiet `timeout` (or stderr EOF)
+    /// yields [`BridgePoll::Closed`], even if a descendant holds stderr open.
+    /// `timeout` is one deadline per call.
+    pub fn poll_frame(&mut self, timeout: std::time::Duration) -> Result<BridgePoll, BridgeError> {
+        let rx = self
+            .rx
+            .as_ref()
+            .ok_or_else(|| BridgeError::Io("bridge receiver closed".into()))?;
+        let mut deadline = std::time::Instant::now() + timeout;
+        loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            let message = rx.recv_timeout(left).map_err(|error| match error {
+                std::sync::mpsc::RecvTimeoutError::Timeout if !self.stdout_eof => BridgePoll::Idle,
+                _ => BridgePoll::Closed,
+            });
+            match message {
+                Ok(ReaderMsg::Line { stream, bytes, .. }) => {
+                    return Ok(BridgePoll::Data(stream, bytes))
+                }
+                Ok(ReaderMsg::Eof { stream }) => {
+                    if stream == SubStream::Stdout && !self.stdout_eof {
+                        // Trailing diagnostics get one full quiet window.
+                        self.stdout_eof = true;
+                        deadline = std::time::Instant::now() + timeout;
+                    }
+                }
+                Ok(ReaderMsg::FramingError { stream, error }) => {
+                    return Err(BridgeError::Io(format!("{stream:?} framing: {error}")))
+                }
+                Err(outcome) => return Ok(outcome),
+            }
+        }
     }
 
     /// Drain both child streams to the Transparency Log until EOF on both,
@@ -691,6 +839,7 @@ impl SpawnedBridge {
         &mut self,
         journal: &TransparencyLogAdapter,
         spirit_pid: u32,
+        audit: Option<&cap_audit::Sender>,
         revoke_on_exit: F,
     ) -> BridgeExit
     where
@@ -703,9 +852,40 @@ impl SpawnedBridge {
             },
             None => ExitCause::Unknown,
         };
+        // Read the cgroup's OOM count while the guard still owns the directory.
+        #[cfg(target_os = "linux")]
+        let oom_kills = self
+            .child
+            .as_ref()
+            .and_then(BridgeChild::cgroup_path)
+            .map_or(0, cgroup_oom_kills);
         // The child is now reaped (wait consumed it). Mark consumed so Drop does
         // not double-wait.
         self.child = None;
+
+        #[cfg(unix)]
+        if self.sandbox_tier == SandboxTier::T2
+            && cause
+                == (ExitCause::Signaled {
+                    signal: libc::SIGSYS,
+                })
+        {
+            self.report_sandbox_block(
+                journal,
+                spirit_pid,
+                audit,
+                "seccomp-kill-process (SIGSYS; syscall number unavailable)".into(),
+            );
+        }
+        #[cfg(target_os = "linux")]
+        if self.sandbox_tier == SandboxTier::T2 && oom_kills > 0 {
+            self.report_sandbox_block(
+                journal,
+                spirit_pid,
+                audit,
+                format!("resource-cap: cgroup memory.max oom_kill x{oom_kills}"),
+            );
+        }
 
         let payload = serde_json::json!({
             "event": "cli_subprocess_exit",
@@ -1100,15 +1280,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn content_length_framing_roundtrips() {
-        let body = r#"{"k":"v"}"#;
-        let input = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
-        let mut r = std::io::BufReader::new(input.as_bytes());
-        let got = read_content_length(&mut r).unwrap().unwrap();
-        assert_eq!(String::from_utf8(got).unwrap(), body);
-    }
-
     /// P-6: Drop-without-pump must NOT deadlock when the child has filled the
     /// bounded channel. The fix (self.rx.take() before join) prevents the reader
     /// thread from blocking on a full channel whose receiver is still alive.
@@ -1169,6 +1340,8 @@ mod tests {
             control_channel: CliWrapperControlChannel::Signals,
             shutdown_signal: None,
             dropped,
+            sandbox_tier: SandboxTier::T0,
+            stdout_eof: false,
         };
 
         // Drop without ever calling pump_to_journal. The channel may be full.

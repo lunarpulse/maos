@@ -9,6 +9,7 @@ description = "MAOS §13.1 rust-inproc measurement gate — J1 founder-loop IPC 
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+maos-frame-codec = { path = "../maos-frame-codec" }
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

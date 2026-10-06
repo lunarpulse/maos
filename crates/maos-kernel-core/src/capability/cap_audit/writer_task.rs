@@ -7,14 +7,8 @@ use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 
 use super::{CapAuditEvent, VerifyOutcome};
-use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+use crate::iac::transparency_log::{capability_token_column, FrameKind, TransparencyLogAdapter};
 use maos_domain::invariants::i3::FrameOrigin;
-
-fn token_id_to_capability_token(token_id: &maos_domain::invariants::i1::TokenId) -> [u8; 32] {
-    let mut buf = [0u8; 32];
-    buf[0..16].copy_from_slice(&token_id.0);
-    buf
-}
 
 /// The audit writer task state.
 pub struct CapAuditWriter;
@@ -46,7 +40,7 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
             log.insert_frame_event(
                 FrameKind::CapabilityInvocation,
                 *spirit_pid,
-                Some(&token_id_to_capability_token(token_id)),
+                Some(&capability_token_column(token_id)),
                 &intent,
                 &payload,
                 FrameOrigin::Kernel,
@@ -64,7 +58,7 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
             log.insert_frame_event(
                 FrameKind::CapabilityInvocation,
                 *spirit_pid,
-                Some(&token_id_to_capability_token(token_id)),
+                Some(&capability_token_column(token_id)),
                 intent,
                 &[],
                 FrameOrigin::Kernel,
@@ -80,7 +74,7 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
             log.insert_frame_event(
                 FrameKind::CapabilityInvocation,
                 spirit_pid,
-                Some(&token_id_to_capability_token(token_id)),
+                Some(&capability_token_column(token_id)),
                 "cap.revoke",
                 &[],
                 FrameOrigin::Kernel,
@@ -98,7 +92,7 @@ fn write_to_transparency_log(event: &CapAuditEvent, log: &TransparencyLogAdapter
             log.insert_frame_event(
                 FrameKind::CapabilityInvocation,
                 *spirit_pid,
-                Some(&token_id_to_capability_token(token_id)),
+                Some(&capability_token_column(token_id)),
                 intent,
                 &combined,
                 FrameOrigin::Kernel,

@@ -29,10 +29,6 @@
 //! to run the reference Spirit once and print JSON to stdout.
 
 mod env_contract;
-// Story 11.4b — out-of-kernel sandbox-escape detector consumer (ADR-024).
-// Declared at the composition root, NOT in `api.rs` (it is not a kernel-core
-// adapter) so `check-composition-root-completeness` stays GREEN.
-mod escape_detector_consumer;
 #[cfg(feature = "network")]
 mod migration_plan;
 /// Story 15-3 (AC4, F6, F13) — the single verb table. Included by the
@@ -2333,10 +2329,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         runner_path,
                         10_000_000,
                     ));
-                    let adapter = Arc::new(maos_wasm_host::WasmHostAdapter::new(
-                        cfg,
-                        std::time::Duration::from_secs(5),
-                    ));
+                    let adapter = Arc::new(maos_wasm_host::WasmHostAdapter::new(cfg));
                     eprintln!("maos: Spirit host (WASM component form, ADR-031) initialized");
                     Some(adapter as Arc<dyn maos_host::SpiritHostPort>)
                 } else {
@@ -3079,12 +3072,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     reason: "successor manifest lacks [class]".into(),
                 }
             })?;
-            // A successor must not relabel a compiled-in Rust object as a T2
-            // component. This path does not pass through gate_manifest.
-            if class.forms.iter().any(|form| form == "wasm-component") {
+            // This factory cannot adopt a live spawned-session binding.
+            if !class.forms.iter().any(|form| form == "rust-inproc") {
                 return Err(
                     maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
-                        reason: "wasm-component successor cannot use in-process hot-swap".into(),
+                        reason: maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                            surface: "hot-swap successor",
+                        }
+                        .to_string(),
                     },
                 );
             }
@@ -4461,6 +4456,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         child_path.display()
                     )
                 })?;
+                gated.require_in_process("topology")?;
                 let kind = classify_spirit(&gated.class_section.name)
                     .expect("gate_manifest refused every class classify_spirit does not know");
                 let epistemic_policy = gated.epistemic_policy.clone();
@@ -4887,8 +4883,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 classify_spirit(name).is_some()
             })
             .map_err(|refusal| format!("maos run: {refusal}"))?;
-            let kind = classify_spirit(&gated.class_section.name)
-                .expect("gate_manifest refused every class classify_spirit does not know");
+            let wasm = gated.class_section.forms == ["wasm-component"];
+            if !wasm {
+                gated.require_in_process("standalone native manifest without a launch binding")?;
+            }
+            let kind = (!wasm).then(|| {
+                classify_spirit(&gated.class_section.name)
+                    .expect("gate_manifest refused every unknown in-process class")
+            });
+            #[cfg(feature = "wasm-host")]
+            let mut spawned_launch = if wasm {
+                Some(maos_bin::spirit_session::manifest_launch(
+                    spirit_host.as_deref().ok_or("WASM host is unavailable")?,
+                    &gated,
+                    std::path::Path::new(&run.manifest_path),
+                    run.once,
+                )?)
+            } else {
+                None
+            };
             let posture_section = gated.posture_section.clone();
             let epistemic_policy = gated.epistemic_policy.clone();
 
@@ -4931,9 +4944,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // inference bindings, and mira's scalar port are all run-specific
             // wiring — but the ADMISSION is, and that is what AC1 claims.
             let mut pid_fixups: Vec<Box<dyn FnMut(u32) + Send>> = Vec::new();
+            #[cfg(feature = "wasm-host")]
+            let mut spawned_core = None;
             let spirit_obj: Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> =
                 match kind {
-                    LoadedSpiritKind::Butler => {
+                    Some(LoadedSpiritKind::Butler) => {
                         // Story 16-1 (D-16-1-W) — ONE butler constructor, shared
                         // with the upgrade successor factory's butler arm, so a
                         // hot-swapped successor is FAITHFUL: same seeded
@@ -5133,7 +5148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         maos_kernel_core::scheduler::make_spirit_obj(butler)
                     }
-                    LoadedSpiritKind::Researcher => {
+                    Some(LoadedSpiritKind::Researcher) => {
                         if needs_port {
                             // Defensive: a Researcher-shaped manifest in the halt-set is
                             // a misconfiguration — fail loud rather than boot a deterministic
@@ -5430,18 +5445,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         maos_kernel_core::scheduler::make_spirit_obj(researcher)
                     }
-                    LoadedSpiritKind::Orchestrator => maos_kernel_core::scheduler::make_spirit_obj(
-                        orchestrator::Orchestrator::new(&spirit_id),
-                    ),
-                    LoadedSpiritKind::Architect => maos_kernel_core::scheduler::make_spirit_obj(
-                        architect::Architect::new(&spirit_id)
-                            .with_pending_spec("founder-loop topology manifest load"),
-                    ),
-                    LoadedSpiritKind::Reviewer => maos_kernel_core::scheduler::make_spirit_obj(
-                        reviewer::Reviewer::new(&spirit_id)
-                            .with_pending_design(reviewer::DesignUnderReview::default()),
-                    ),
-                    LoadedSpiritKind::Mira => {
+                    Some(LoadedSpiritKind::Orchestrator) => {
+                        maos_kernel_core::scheduler::make_spirit_obj(
+                            orchestrator::Orchestrator::new(&spirit_id),
+                        )
+                    }
+                    Some(LoadedSpiritKind::Architect) => {
+                        maos_kernel_core::scheduler::make_spirit_obj(
+                            architect::Architect::new(&spirit_id)
+                                .with_pending_spec("founder-loop topology manifest load"),
+                        )
+                    }
+                    Some(LoadedSpiritKind::Reviewer) => {
+                        maos_kernel_core::scheduler::make_spirit_obj(
+                            reviewer::Reviewer::new(&spirit_id)
+                                .with_pending_design(reviewer::DesignUnderReview::default()),
+                        )
+                    }
+                    Some(LoadedSpiritKind::Mira) => {
                         // Story 9.6 — Mira declares a synchronous diagnostic scalar halt
                         // transport. Wire the production EpistemicScalarPort adapter.
                         if needs_port && strip_port {
@@ -5477,12 +5498,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 .with_scalar_port(adapter),
                         )
                     }
-                    LoadedSpiritKind::Nash => maos_kernel_core::scheduler::make_spirit_obj(
+                    Some(LoadedSpiritKind::Nash) => maos_kernel_core::scheduler::make_spirit_obj(
                         nash::Nash::default().with_id(&spirit_id),
                     ),
-                    LoadedSpiritKind::Digest => maos_kernel_core::scheduler::make_spirit_obj(
+                    Some(LoadedSpiritKind::Digest) => maos_kernel_core::scheduler::make_spirit_obj(
                         maos_digest::DigestSpirit::default(),
                     ),
+                    None => {
+                        #[cfg(not(feature = "wasm-host"))]
+                        return Err(maos_bin::admission::AdmissionRefusal::WasmEngineOff.into());
+                        #[cfg(feature = "wasm-host")]
+                        {
+                            let (core, obj) = root_worker_supervision
+                                .prepare_spawned(&spirit_id, &gated.bundle())?;
+                            let pid_core = Arc::clone(&core);
+                            pid_fixups.push(Box::new(move |pid| pid_core.bind_scheduler_pid(pid)));
+                            spawned_core = Some(core);
+                            obj
+                        }
+                    }
                 };
             // Story 16-6 (AC1) — the ONE admission triple. Model-provenance
             // runs inside it, BEFORE the load (the standalone order,
@@ -5510,6 +5544,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .await
             .map_err(|refusal| format!("maos run: {refusal}"))?;
+            drop(pid_fixups);
             let pid = admitted.pid;
             if let (Some(binding), Some(provider)) = (
                 researcher_inference_binding.as_ref(),
@@ -5530,18 +5565,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("maos run: token issue failed: {e}"))?;
                 *binding.lock().unwrap_or_else(|error| error.into_inner()) = Some((token, pid));
             }
-            println!(
-                "{}",
-                serde_json::json!({
-                    "event": "spirit_loaded",
-                    "spirit_id": spirit_id,
-                    "pid": pid,
-                    "live": run.live,
-                    "boot_loud_port": needs_port && !strip_port,
-                })
-            );
+            #[cfg(feature = "wasm-host")]
+            let spawned_result: Option<Result<(), Box<dyn std::error::Error>>> =
+                if let Some(core) = spawned_core {
+                    Some(
+                        maos_bin::spirit_session::run_admitted_session(
+                            maos_bin::spirit_session::SessionDeps {
+                                supervisor: Arc::clone(&root_worker_supervision),
+                                capability: Arc::clone(&capability),
+                                security: Arc::clone(&security),
+                                iac: Arc::clone(&iac),
+                                journal: Arc::clone(&transparency_log),
+                                pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
+                                enterprise: enterprise_runtime.clone(),
+                                pdp: enterprise_pdp_runtime.clone(),
+                            },
+                            admitted,
+                            core,
+                            spawned_launch
+                                .take()
+                                .expect("spawned SCB has a resolved launch"),
+                        )
+                        .await
+                        .map(|report| {
+                            println!(
+                                "{}",
+                                serde_json::json!({
+                                    "event": "spirit_session_complete", "report": report,
+                                })
+                            );
+                        })
+                        .map_err(|error| Box::new(error) as Box<dyn std::error::Error>),
+                    )
+                } else {
+                    None
+                };
+            #[cfg(not(feature = "wasm-host"))]
+            let spawned_result: Option<Result<(), Box<dyn std::error::Error>>> = None;
+            if !wasm {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "event": "spirit_loaded",
+                        "spirit_id": spirit_id,
+                        "pid": pid,
+                        "live": run.live,
+                        "boot_loud_port": needs_port && !strip_port,
+                    })
+                );
+            }
 
-            if run.once {
+            if run.once || spawned_result.is_some() {
                 // Story 16-3 (D-16-3-M) — the `--once` tail moved into ONE async
                 // block whose result the teardown below takes. Five post-`start`
                 // early returns live inside it (the researcher round-trip, the
@@ -5550,6 +5624,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // skip the drain entirely.
                 let mut once_interrupted = false;
                 let once_result: Result<(), Box<dyn std::error::Error>> = async {
+                    if let Some(result) = spawned_result {
+                        return result;
+                    }
                     // A signal that arrived BEFORE the pass means the pass never
                     // ran: the root must not print a completion line or exit 0.
                     // A signal DURING the pass is different and is deliberately
@@ -5579,7 +5656,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             format!("maos run: record-mode flush failed after on_idle: {error}")
                         })?;
                     }
-                    if kind == LoadedSpiritKind::Researcher
+                    if kind == Some(LoadedSpiritKind::Researcher)
                         && researcher_collective_failure
                             .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire))
                     {
@@ -5587,7 +5664,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "maos run: researcher collective readiness round-trip failed".into(),
                         );
                     }
-                    if kind == LoadedSpiritKind::Digest {
+                    if kind == Some(LoadedSpiritKind::Digest) {
                         let home = std::env::var_os("MAOS_HOME")
                             .map(std::path::PathBuf::from)
                             .ok_or("maos run digest: MAOS_HOME is required")?;
@@ -5739,7 +5816,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "maos run: interrupted by signal before the --once pass completed".into(),
                     );
                 }
-                eprintln!("maos run: --once complete — exiting cleanly");
+                eprintln!("maos run: session complete — exiting cleanly");
                 return Ok(());
             }
 
@@ -6776,6 +6853,7 @@ description = "smoke test spirit successor"
                     servers: Vec::new(),
                 },
                 loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
+                iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
             };
             let smoke_class = maos_kernel_core::security::manifest::ClassSection {
                 name: "smoke-spirit".into(),
@@ -8617,6 +8695,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         let gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
             classify_spirit(name).is_some()
         })?;
+        gated.require_in_process("operator door")?;
         let kind = classify_spirit(&gated.class_section.name)
             .expect("gate_manifest accepted a class that classify_spirit rejects");
         if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
@@ -9343,7 +9422,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 
     // 1. First dispatch (no predecessor — accepted).
     adapter
-        .deliver_typed(make_frame(1, None, "worker-a"))
+        .deliver_typed(make_frame(1, None, "worker-a"), 0, None)
         .await?;
     eprintln!("smoke-orchestrator-fanout-6-2: dispatch #1 → worker-a accepted");
 
@@ -9372,7 +9451,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
         intent_lineage: originating_lineage.clone(),
     };
     tc_a.frame_id[0..8].copy_from_slice(&100u64.to_le_bytes());
-    adapter.deliver_typed(tc_a).await?;
+    adapter.deliver_typed(tc_a, 0, None).await?;
 
     // 3. Distillate row (substrate for next dispatch's prior_distillate_ref).
     // Story 8.10 AC2: Distillate rows may ONLY be written via the
@@ -9412,21 +9491,25 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
 
     // 4. Dispatch #2 with distillate ref (accepted).
     adapter
-        .deliver_typed(make_frame(
-            3,
-            Some(PriorDistillateRef {
-                digest_frame_id: distillate_id,
-                distillation_depth: 1,
-                intent_lineage: originating_lineage.clone(),
-            }),
-            "worker-b",
-        ))
+        .deliver_typed(
+            make_frame(
+                3,
+                Some(PriorDistillateRef {
+                    digest_frame_id: distillate_id,
+                    distillation_depth: 1,
+                    intent_lineage: originating_lineage.clone(),
+                }),
+                "worker-b",
+            ),
+            0,
+            None,
+        )
         .await?;
     eprintln!("smoke-orchestrator-fanout-6-2: dispatch #2 → worker-b accepted (with distillate)");
 
     // 5. Demonstrate ONE rejected dispatch — FR21 closing the loophole.
     let rejected = adapter
-        .deliver_typed(make_frame(4, None, "worker-cli-stub"))
+        .deliver_typed(make_frame(4, None, "worker-cli-stub"), 0, None)
         .await;
     match rejected {
         Err(IacBusError::EOrchestratorDispatchRawOutput { .. }) => {
@@ -9450,15 +9533,19 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
             "worker-a"
         };
         adapter
-            .deliver_typed(make_frame(
-                seq,
-                Some(PriorDistillateRef {
-                    digest_frame_id: distillate_id,
-                    distillation_depth: 1,
-                    intent_lineage: originating_lineage.clone(),
-                }),
-                target,
-            ))
+            .deliver_typed(
+                make_frame(
+                    seq,
+                    Some(PriorDistillateRef {
+                        digest_frame_id: distillate_id,
+                        distillation_depth: 1,
+                        intent_lineage: originating_lineage.clone(),
+                    }),
+                    target,
+                ),
+                0,
+                None,
+            )
             .await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
@@ -13015,6 +13102,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         provider: ProviderCapabilities { complete: vec![] },
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
         loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
+        iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
     };
     let posture =
         PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")?;

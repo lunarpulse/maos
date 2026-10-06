@@ -1,0 +1,8 @@
+[package]
+name = "maos-frame-codec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Bounded ADR-032 byte framing and subprocess diagnostics"

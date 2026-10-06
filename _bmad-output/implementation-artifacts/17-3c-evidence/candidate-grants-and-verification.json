@@ -1,0 +1,130 @@
+{
+  "candidate_only": true,
+  "operator_grants": {
+    "kernel_physical_lines": 25149,
+    "kernel_files": 98,
+    "kernel_set_hash": "76dec9f7563007168134157c728ea2611855beea144012ebca9857c9e5014eeb",
+    "zero_headroom_kloc": {
+      "maos-kernel-core": 19412,
+      "maos-bin": 24213,
+      "maos-iac": 7088,
+      "maos-frame-codec": 218
+    },
+    "unchanged_aggregate_hardfail": 170884,
+    "aggregate_actual": 169654,
+    "aggregate_alarm_still_fires": true,
+    "separate_explicit_kernel_surface_approval": true
+  },
+  "verification": {
+    "process_gates": "artifact://711: 6 passed",
+    "kernel_unit": "artifact://721: 262 passed",
+    "numerical_gates": "artifact://717: approved pin and KLOC pass",
+    "surface_inventory_stability_dependency_templates": "artifact://726: all commands exit 0",
+    "empty_kernel_i9": "check-empty-kernel --json: passed true, no violations",
+    "feature_on_release": "artifact://733: restored as current /mnt/build/cargo/release/maos",
+    "final_process_gates": "artifact://771: 6 passed under approved 360-second compilation guard",
+    "host_surface": "PASSED: 0 additions, 2 allowed Timeout removal entries; no host re-pin",
+    "review_handoff_tracking": {
+      "date": "2026-10-05",
+      "gate_evidence": "artifact://820",
+      "check_exit_commands": {
+        "passed": true,
+        "findings": [],
+        "notes": "Existing absent maos-registry-server/maos-spirit binary warnings remain; named backlog ownership retained"
+      },
+      "check_dev_record_completeness": {
+        "passed": true,
+        "violation_count": 0,
+        "done_stories_checked": 162
+      },
+      "tracker_story_spec_consistency": "passed in both checkouts; only 17-3b and 17-3c status values changed; unrelated statuses/action items unchanged",
+      "canonical_story_discovery": "Initial active-story missing-file refusal resolved with complete canonical 17-3c record",
+      "original_runtime_configuration_preserved": true,
+      "current_staged_entries_preserved": 5214,
+      "approved_frozen_intent_preserved": true,
+      "final_isolated_binary_hashes_match_accepted_runtime_evidence": true,
+      "code_review_started": false
+    }
+  },
+  "original_preserved": {
+    "head": "5075443c8a87523581cfcf6cb0b6af815f7ebd4f",
+    "index_tree": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+    "kernel_physical_lines": 25032,
+    "kernel_files": 98,
+    "kernel_set_hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
+  },
+  "status": "candidate implementation and amended acceptance complete; completed Ubuntu25.10 x86_64 testing explicitly accepted; ready for candidate review/integration preparation; no original cutover, publication or story closure",
+  "earlier_status": "in-progress; no cutover, publication or closure; final acceptance blocked on authorized SSH identity and delegated runtime",
+  "latest_runtime_grant": {
+    "process_memory_mib": 768,
+    "time_and_compile_guard_seconds": 360,
+    "cpu_percent": 10,
+    "guest_memory_mib": 64,
+    "instruction_fuel": 10000000,
+    "explicit_user_approval": true
+  },
+  "latest_runtime_evidence": "remote-100-20-final-isolated.json",
+  "latest_matched_revision_evidence": "matched-refusal-launch-360.json",
+  "final_artifact_target": "/mnt/build/maos-17-3c-final.oitpeZ",
+  "progress": {
+    "done": 21,
+    "total": 21,
+    "blocked": 0,
+    "blocker": null
+  },
+  "platform_acceptance_amendment": {
+    "explicit_user_approval": true,
+    "user_statement": "I mean ubuntu 25.10 x86_64 is sufficient testing that. record and move on.",
+    "accepted_platform": "Ubuntu25.10 x86_64",
+    "accepted_completed_evidence": "remote-100-20-final-isolated.json",
+    "additional_platform_testing_required": false,
+    "other_platforms_not_claimed_verified": [
+      "Ubuntu24.04",
+      "Ubuntu26.04",
+      "aarch64"
+    ],
+    "additional_image_specific_syscall_controls": "Not required for amended acceptance; unexecuted repetitions/omission controls are not claimed passed",
+    "existing_sigsys_regression_evidence": "Preserved unchanged; applies to the exercised environment",
+    "next_phase": "candidate review/integration preparation",
+    "no_cutover_or_publication": true
+  },
+  "superseded_platform_interpretation": {
+    "status": "in-progress: actual TS and matched provenance complete; Ubuntu24.04 x86_64 launch/containment pending authorized worker; Ubuntu26/aarch64 not required or claimed verified",
+    "amendment": {
+      "explicit_user_approval": true,
+      "required": "Ubuntu24.04 x86_64",
+      "waived_for_story_acceptance": [
+        "Ubuntu26.04",
+        "aarch64"
+      ],
+      "retained_controls": [
+        "actual launch with approved resource caps",
+        "necessary-syscall omission",
+        "SIGSYS primitive audit and escape consumer"
+      ],
+      "existing_success_platform": "Ubuntu25.10 x86_64",
+      "existing_success_not_relabeled": true
+    },
+    "superseded_by_explicit_user_correction": true
+  },
+  "workflow_status": "review",
+  "review_handoff": {
+    "updated": "2026-10-05",
+    "review_root": "/tmp/maos-17-3c-candidate-wecx8ef7",
+    "original_checkout": "/home/lunarpulse/dev_ws",
+    "original_contains_candidate_runtime": false,
+    "stories": {
+      "17-3b-wasm-form-admission-and-contract": "review",
+      "17-3c-wasm-spirit-on-the-bus-under-t2": "review",
+      "17-3d-wasm-log-recall": "backlog"
+    },
+    "non_author_review_completed": false,
+    "remaining_17_3b_finding": "Implementation and compiled mutation evidence supplied; independent verification pending; not waived or closed",
+    "platform_acceptance": "Completed Ubuntu25.10 x86_64 testing explicitly accepted; no additional platform execution required",
+    "cutover_or_publication_authorized": false,
+    "canonical_story_record": "_bmad-output/implementation-artifacts/17-3c-wasm-spirit-on-the-bus-under-t2.md",
+    "current_original_staged_tree_observed": "1e5459d8a5e8573ce2b8179d319daf2cfe628b27",
+    "historical_original_preserved_is_snapshot_evidence": true,
+    "no_staging_reset_or_restoration_performed": true
+  }
+}

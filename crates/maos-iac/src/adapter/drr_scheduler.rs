@@ -54,6 +54,8 @@ struct Submission {
     intent_str: String,
     auto_marker: FrameOrigin,
     intent_lineage: Vec<u8>,
+    /// Story 17-3c — `capability_token` column bytes (`None` ⇒ NULL).
+    capability_token: Option<[u8; 32]>,
     /// j1-crosshost-2b AC3.2 — carries the typed row-write outcome so the
     /// duplicate-`frame_id` verdict survives the scheduler hop instead of being
     /// flattened back into `()` (which would re-hide the peer replay this repair
@@ -83,6 +85,7 @@ impl DrrScheduler {
         intent_str: String,
         auto_marker: FrameOrigin,
         intent_lineage: Vec<u8>,
+        capability_token: Option<[u8; 32]>,
     ) -> Result<LogBeforeDeliver<FrameRowWrite>, IacBusError> {
         let (done_tx, done_rx) = oneshot::channel();
         let sub = Submission {
@@ -93,6 +96,7 @@ impl DrrScheduler {
             intent_str,
             auto_marker,
             intent_lineage,
+            capability_token,
             done: done_tx,
         };
         self.tx
@@ -295,7 +299,7 @@ async fn flush_batch(tl: &Arc<TransparencyLogAdapter>, batch: &mut Vec<Submissio
                 sub.spirit_pid,
                 sub.frame.from.spirit_id.as_str(),
                 to_spirit_id,
-                None,
+                sub.capability_token.as_ref(),
                 std::str::from_utf8(&sub.intent_lineage).unwrap_or(""),
                 &sub.payload_bytes,
                 sub.auto_marker,

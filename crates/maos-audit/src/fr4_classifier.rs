@@ -59,14 +59,15 @@ pub enum Fr4RowDisposition {
 pub const NON_CALL_KINDS: &[&str] = &[
     "epistemic.halt",         // 3
     "telemetry.event",        // 4
-    "budget.warning",         // 12
-    "budget.exceeded",        // 13
-    "task.stalled",           // 15
+    "sandbox.block", // 8 — the kernel's own seccomp/resource-cap enforcement record at the confined Spirit's pid (17-3c; epic AC4: it shows in `maos audit query`)
+    "budget.warning", // 12
+    "budget.exceeded", // 13
+    "task.stalled",  // 15
     "silent.failure.suspect", // 16
-    "spirit.admitted",        // 19
-    "cli.subprocess.output",  // 21 — a Worker's own subprocess output rows land at its pid (16-3)
-    "governance.event",       // 28
-    "cost.attribution",       // 29
+    "spirit.admitted", // 19
+    "cli.subprocess.output", // 21 — a Worker's own subprocess output rows land at its pid (16-3)
+    "governance.event", // 28
+    "cost.attribution", // 29
     "identity.asserted", // 30 — tokenless, minted at the Worker's real pid under enterprise posture (16-3)
 ];
 
@@ -494,8 +495,9 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         ]),
     },
     // ── maos-iac — Call (deliberately NOT exempt) ──────────────────────────
-    WriterShapeEntry::call("adapter.rs", "deliver_typed", 0), // `_with_id`, variable `tl_kind`
-    WriterShapeEntry::call("drr_scheduler.rs", "flush_batch", 0), // `_with_id`, variable `sub.tl_kind`
+    // 17-3c: `deliver_typed` / DRR `flush_batch` now write the caller's
+    // `iac.send` token, so they are token-bearing sites; a row a caller left
+    // tokenless still classifies `Call` (the default) and reds the view.
     WriterShapeEntry::call("log_recall.rs", "journal_cross_wall_recall", 0),
     WriterShapeEntry::call("log_recall.rs", "recall", 0),
     WriterShapeEntry::call("log_recall.rs", "fetch", 0),

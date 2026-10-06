@@ -1,0 +1,30 @@
+{
+  "candidate_only": true,
+  "endpoint": "cosmo@192.168.100.20",
+  "ssh_authentication": "Actual BatchMode=yes, IdentitiesOnly=yes SSH using ~/.ssh/maos-test succeeded; no password, private key disclosure, or agent forwarding",
+  "platform": {"os": "Ubuntu", "version": "25.10", "arch": "x86_64", "kernel": "6.17.0-41-generic", "glibc": "2.42"},
+  "delegation": {
+    "user_manager": "user@1000.service",
+    "delegate": true,
+    "controllers": ["cpu", "memory", "pids"],
+    "proof": "Actual transient user service maos-17-3c-inspect ran successfully; cpu/memory/pids visible and service cgroup.subtree_control writable",
+    "sudo_used": false,
+    "sudo_noninteractive": "Unavailable: interactive authentication required"
+  },
+  "capacity": {"cpu_threads": 8, "memory_total_gib": 7.8, "memory_available_gib": 6.1, "home_filesystem_free_gib": 6.3},
+  "image_prerequisites": {
+    "qemu_system_x86_64": false,
+    "qemu_system_aarch64": false,
+    "container_or_vm_cli_found": false,
+    "kvm_device_readable": true,
+    "required_ubuntu_matrix": "24.04/26.04 x x86_64/aarch64 still not supplied. Ubuntu 25.10 supplemental run does not satisfy any of those image-specific rows."
+  },
+  "remote_workspace": "/home/cosmo/maos-17-3c-proof.a99GPA",
+  "transferred_sha256": {
+    "maos": "782d08fdb071058f9eef08265962eafca957207f95d146f3b5318c37900b1c82",
+    "maos-wasm-runner": "f2f8e0b2fb99a583c139aa20acf66005deeef001ab60c250f9edebd0a30d9467",
+    "manifest": "2ee93955e0e9c69cb64e75f2503cbe105ae597a8dbdfcd1c3db846bcb1473bd7",
+    "ts_component": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d"
+  },
+  "scope": "Only isolated candidate runtime proof; no system packages installed, original checkout mutation, git publication, or cutover."
+}

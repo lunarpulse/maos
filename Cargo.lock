@@ -2700,6 +2700,7 @@ dependencies = [
  "maos-audit",
  "maos-domain",
  "maos-eval",
+ "maos-frame-codec",
  "maos-kernel-core",
  "maos-loom-lite",
  "maos-spirit-abi",
@@ -2743,6 +2744,7 @@ dependencies = [
  "maos-director-surface",
  "maos-domain",
  "maos-escape-detector",
+ "maos-frame-codec",
  "maos-host",
  "maos-iac",
  "maos-kernel-core",
@@ -2790,6 +2792,7 @@ dependencies = [
  "tokio-util",
  "toml 0.8.23",
  "ulid",
+ "wit-parser 0.251.0",
  "worker",
 ]
 
@@ -3002,6 +3005,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-frame-codec"
+version = "0.1.0-alpha.1"
+
+[[package]]
 name = "maos-host"
 version = "0.1.0-alpha.1"
 dependencies = [
@@ -3070,6 +3077,7 @@ dependencies = [
  "maos-domain",
  "maos-eval",
  "maos-exec-deps",
+ "maos-frame-codec",
  "maos-iac",
  "maos-manifest",
  "maos-mcp",
@@ -3316,6 +3324,7 @@ name = "maos-spirit-hello"
 version = "0.1.0-alpha.1"
 dependencies = [
  "maos-domain",
+ "maos-frame-codec",
  "maos-kernel-core",
  "maos-spirit-abi",
  "maos-spirit-sdk",
@@ -3372,6 +3381,7 @@ dependencies = [
  "ciborium-io",
  "libc",
  "maos-domain",
+ "maos-frame-codec",
  "maos-host",
  "maos-kernel-core",
  "maos-spirit-abi",

@@ -156,7 +156,7 @@ fn run_fanout(rt: &Runtime) -> (JourneyResult, u64) {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos() as u64)
                 .unwrap_or(0);
-            match adapter.deliver_typed(frame).await {
+            match adapter.deliver_typed(frame, 0, None).await {
                 Ok(_) => {}
                 Err(_e) => {
                     dropped.fetch_add(1, Ordering::Relaxed);

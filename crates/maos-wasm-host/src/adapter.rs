@@ -2,13 +2,8 @@
 
 //! `SpiritHostPort` adapter for the WASM component form.
 //!
-//! Topology (identical to the Loom-lite adapter): daemon composition root
-//! (sync) -> this adapter (sync trait) -> a dedicated `std::thread` for the
-//! CPU-blocking wasmtime parse/instantiate conformance probe
-//! (`crate::conformance::probe_component`), bounded by `timeout` so a
-//! pathological `.wasm` cannot hang `resolve_launch` (no async runtime
-//! handle is needed for this — the probe is sync wasmtime work off the
-//! caller's thread, joined via a channel with a `recv_timeout`).
+//! Resolution performs only bounded metadata checks. Component parsing,
+//! compilation and lifecycle validation execute in the admitted runner process.
 
 use std::sync::Arc;
 
@@ -18,16 +13,15 @@ use maos_host::{
 
 use crate::config::WasmHostConfig;
 
-/// Adapter bridging the sync `SpiritHostPort` to the wasmtime conformance probe.
+/// Adapter resolving component launch plans without executing untrusted artifacts.
 pub struct WasmHostAdapter {
     config: Arc<WasmHostConfig>,
-    timeout: std::time::Duration,
 }
 
 impl WasmHostAdapter {
-    /// Create a new adapter with the given config and probe timeout.
-    pub fn new(config: Arc<WasmHostConfig>, timeout: std::time::Duration) -> Self {
-        Self { config, timeout }
+    /// Create an adapter with the daemon's runner configuration.
+    pub fn new(config: Arc<WasmHostConfig>) -> Self {
+        Self { config }
     }
 }
 
@@ -74,19 +68,6 @@ impl SpiritHostPort for WasmHostAdapter {
                     });
                 }
 
-                // Real WIT-conformance probe: parse as a component and check
-                // it exports the maos:spirit@2.0.0 world's three functions. The
-                // heavyweight wasmtime compile + the actual call path live in
-                // the runner subprocess (this check is the admission gate,
-                // not the execution); both share the same conformance bar so
-                // a present-but-non-conformant component is rejected HERE,
-                // before a process is even spawned.
-                crate::conformance::probe_component(&request.artifact, self.timeout).map_err(
-                    |e| SpiritHostError::InvalidComponent {
-                        reason: format!("component does not conform to maos:spirit@2.0.0: {e}"),
-                    },
-                )?;
-
                 // Extract fuel from form_config, defaulting to config's default.
                 let fuel = resolve_fuel(&request.form_config, self.config.default_fuel);
 
@@ -122,12 +103,6 @@ fn resolve_fuel(form_config: &[(String, String)], default_fuel: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn resolve_fuel_uses_default_when_missing() {
-        let config: Vec<(String, String)> = vec![];
-        assert_eq!(resolve_fuel(&config, 1_000_000), 1_000_000);
-    }
 
     #[test]
     fn resolve_fuel_parses_config_value() {

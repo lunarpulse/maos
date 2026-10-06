@@ -330,6 +330,7 @@ impl SpiritSchedulerAdapter {
                 provider: ProviderCapabilities { complete: vec![] },
                 mcp: McpCapabilities { servers: vec![] },
                 loom: crate::security::manifest::LoomCapabilities::default(),
+                iac: crate::security::manifest::IacCapabilities::default(),
             };
             let posture = PostureSection {
                 default: Posture::Cautious,

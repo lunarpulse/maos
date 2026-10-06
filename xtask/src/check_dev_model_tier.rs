@@ -42,9 +42,14 @@ const ENFORCE_FROM_EPIC: u32 = 12;
 /// A1 maintenance, not a waiver. The §A6 full-layer net remains NON-DEGRADABLE:
 /// the row that triggered this extension still requires a non-author review
 /// re-run, and a token extension is not a substitute for the net.
+///
+/// `gpt-6.1` added 2026-10-06 (Story 17-3c §A6 review, operator ratification):
+/// the operator rules `openai-codex/gpt-6.1-sol` a frontier model of the
+/// `opus-5` class and the successor of the allowlisted `gpt-5.6` family — the
+/// same documented A1 maintenance, not a waiver. The §A6 net stays mandatory.
 const FRONTIER_FAMILIES: &[&str] = &[
-    "opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "gpt-5.5", "gpt-5.6", "glm-5.1", "glm-5.2",
-    "glm-5.3",
+    "opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "gpt-5.5", "gpt-5.6", "gpt-6.1", "glm-5.1",
+    "glm-5.2", "glm-5.3",
 ];
 /// §A6 review-net markers — a story that ran the multi-layer adversarial review
 /// names at least one of these somewhere in its record.

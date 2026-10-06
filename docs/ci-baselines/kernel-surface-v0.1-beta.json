@@ -114,6 +114,11 @@
     },
     {
       "kind": "enum",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgePoll",
+      "signature_hash": "8ccb34956bec32e5dc7f8984e13e02fe37b5af0b3445e74d81f9244aacaf9b6f"
+    },
+    {
+      "kind": "enum",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::ExitCause",
       "signature_hash": "cda5be285a87c5c050af26edf426dcac44a62bf2e4edfe0495dbb3d7245174fb"
     },
@@ -195,7 +200,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::security::sandbox::SpawnError",
-      "signature_hash": "beb8412ac42947057bc065146c941444adfcbd609a2241fcd0824f3ec7a65328"
+      "signature_hash": "ea6af057156ef7f16f11d049a7ed8c9760bfa8c58a32095d5767d1cd0f859c28"
     },
     {
       "kind": "enum",
@@ -211,6 +216,11 @@
       "kind": "fn",
       "path": "maos_kernel_core::capability::cap_policy::strictest_of",
       "signature_hash": "fb7ed8785ba4f276c0ea48d5f2d442e8e0989bdfc97ceb81cb6077aaa9f53d65"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::capability::is_mediated_scope",
+      "signature_hash": "3ec21e0adb28c5eae08486db48ea66b7fda68e90adcba73bdb7541fcb0ca4bb1"
     },
     {
       "kind": "fn",
@@ -669,13 +679,18 @@
     },
     {
       "kind": "struct",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::FrameWriter",
+      "signature_hash": "a01851a0d3a00bf1f92c998fdb511bb297676e883962933dd6c7e047762a4a99"
+    },
+    {
+      "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::PumpOutcome",
       "signature_hash": "cc3c6205af9b3e4f95e0b80ee26bab40197f52a5f4cbf44653419a67cd1fbc40"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
-      "signature_hash": "57c22dc9243bfdff0b4e7ba184b94405e842ce96ce0a8264c27e02eebd56bbae"
+      "signature_hash": "080da93e2cd4245c3021d61b5eb939d3466bc548f3b9c4a25508da43b6da8008"
     },
     {
       "kind": "struct",

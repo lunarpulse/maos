@@ -641,7 +641,7 @@ impl DoorInner {
                 .scb_state(&admitted.spirit_id)
                 .map(|state| format!("{state:?}"))
                 .unwrap_or_else(|| "Unloaded".into()),
-            "effective_sandbox_tier": format!("{:?}", admitted.effective_sandbox_tier),
+            "effective_sandbox_tier": format!("{:?}", admitted.sandbox.tier),
             "requested_posture_ceiling": format!("{:?}", admitted.requested_posture_ceiling),
             "effective_posture_ceiling": format!("{:?}", admitted.effective_posture_ceiling),
         });

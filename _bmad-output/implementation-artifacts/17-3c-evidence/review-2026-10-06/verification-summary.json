@@ -1,0 +1,132 @@
+{
+ "generated": "2026-10-06",
+ "purpose": "Durable record of the bmad-code-review verification of the patched 17-3c candidate (chunk A + B/C patches + operator ruling option 1: iac.send mediation); supersedes non-durable artifact:// references.",
+ "candidate_root": "/tmp/maos-17-3c-candidate-wecx8ef7",
+ "head": "72077a4e991561efd189779598adc1cbd34814c8",
+ "working_tree_content_sha256": "a89ec31547499e0a58ee3a18ddd33eba393aac421295c391e90abec9e69ae87f",
+ "working_tree_files": 5253,
+ "working_tree_hash_method": "sha256 over sorted per-file `sha256sum` lines of `git ls-files -co --exclude-standard`, excluding this evidence directory",
+ "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+ "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+ "local_host": "Linux 7.2.6-1-cachyos x86_64",
+ "local_results": {
+  "cargo check --workspace --all-targets": "ok (default and --features maos-bin/wasm-host)",
+  "spawned_scope_17_3c": "15 passed; markers SCOPED-VERDICT 8, GOVERNED-ATOMIC 6, HOSTILE-LIFTING 2, HOSTILE-LIFTING-CONTROL 1, RUNNER-SIGSYS 2, REPEATED-MAILBOX 1, HOSTILE-PROVENANCE 1, HOSTILE-REFUSALS 1, HOSTILE-FLOODS 1, HOSTILE-DIAGNOSTICS 1, HOSTILE-EXITS 1, HOSTILE-ONCE 1, HOSTILE-IAC-SEND 1; FR4 `maosctl audit query --spirit` green for mediated sessions and shows SandboxBlock",
+  "maos-bin lib + 17-3b admission suites": "ok in default and wasm-host builds",
+  "maos-kernel-core (all targets)": "ok",
+  "maos-frame-codec, maos-wasm-host, maos-host, maos-iac, maos-bench, maos-manifest, maos-audit, orchestrator, architect": "ok",
+  "maos-cli": "8/10; two_host_reconcile_2c Python-twin cases fail for a missing host Python Ed25519 library, identically at the unpatched baseline (environmental)",
+  "native-twin fixture crate": "ok",
+  "mutations": {
+   "lineage restamp removed": "RED/GREEN",
+   "per-frame write loop restored (partial turn)": "RED/GREEN",
+   "delivery without iac.send token": "RED (forged_guest_provenance_is_restamped_by_the_kernel: delivery row carries its token) / GREEN"
+  }
+ },
+ "remote_ac1_proof": {
+  "endpoint": "cosmo@192.168.100.20",
+  "platform": "Ubuntu 25.10 x86_64 (operator-accepted platform)",
+  "unit": "systemd-run --user maos-17-3c-proof.service Delegate=yes",
+  "result": "TS-ADMITTED-PROOF pid=1 cpu=10 memory_mib=768 audit=attributed terminal=clean; maosctl audit query --spirit example-spirit-ts exit 0",
+  "child_pid": 43439,
+  "seccomp_modes": [
+   "2"
+  ],
+  "no_new_privs": [
+   "1"
+  ],
+  "vm_hwm_rss_kib": 482020,
+  "cgroup_memory_peak_bytes": 482308096,
+  "provenance": {
+   "platform": {
+    "os_release": {
+     "PRETTY_NAME": "\"Ubuntu 25.10\"",
+     "NAME": "\"Ubuntu\"",
+     "VERSION_ID": "\"25.10\"",
+     "VERSION": "\"25.10 (Questing Quokka)\"",
+     "VERSION_CODENAME": "questing",
+     "ID": "ubuntu",
+     "ID_LIKE": "debian",
+     "HOME_URL": "\"https://www.ubuntu.com/\"",
+     "SUPPORT_URL": "\"https://help.ubuntu.com/\"",
+     "BUG_REPORT_URL": "\"https://bugs.launchpad.net/ubuntu/\"",
+     "PRIVACY_POLICY_URL": "\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"",
+     "UBUNTU_CODENAME": "questing",
+     "LOGO": "ubuntu-logo"
+    },
+    "arch": "x86_64",
+    "kernel": "6.17.0-41-generic"
+   },
+   "exit_code": 0,
+   "elapsed_seconds": 323.40387549500156,
+   "manifest_sha256": "89a4563a55aa66aa4c72fe7cda253dbeb4ee71bdc0a874d07d06f38af9dd7e26",
+   "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+   "daemon_sha256": "9889d0276dae443411cd3f571c56272a4ee229c3893622d16e15dd386e059b5a",
+   "runner_sha256": "6ccb9fc554d0a61babc95e70d19602acbfc65e977dbade3d1705b397abe90b68",
+   "maosctl_sha256": "a4be0df18fb1871c333bdd02a33491e0ac2c8132c46142fd231a67ea07c9b5fd",
+   "declared_resources": {
+    "cpu_max_pct": 10,
+    "memory_max_mb": 768
+   },
+   "declared_time_cap_seconds": 360,
+   "declared_instruction_fuel": 10000000,
+   "declared_guest_memory_bytes": 67108864
+  },
+  "archive": "remote-ac1-proof/remote-ac1-proof.tar.gz",
+  "post_build_source_delta": "After the release binaries were built, maos-audit's WRITER_SHAPES dropped two `Call` entries (deliver_typed, DRR flush_batch) that became token-bearing sites; `Call` is the classifier default, so binary behaviour is unchanged."
+ },
+ "governance": {
+  "passing": [
+   "kloc-check",
+   "check-kernel-baseline",
+   "check-service-boundary",
+   "check-empty-kernel",
+   "check-host-surface",
+   "check-dependency-closure",
+   "check-workspace-count",
+   "check-abi-ratification",
+   "stability-matrix --check",
+   "templates-regen --check",
+   "check-dev-model-tier",
+   "check-dev-model-used-populated",
+   "check-dev-record-completeness",
+   "check-bare-review-findings"
+  ],
+  "pending_operator_approval": {},
+  "re_pinned_2026_10_06": {
+   "kloc": "maos-kernel-core 19529, maos-bin 24600, maos-frame-codec 249, maos-iac 7100 (operator KLOC sign-off + KLOC-delta approval)",
+   "kernel_surface": "SpawnedBridge rehash 080da93e\u2026; is_mediated_scope added, class universal-arithmetic (operator approval)",
+   "kernel_baseline": "src_lines 25149 -> 25293, 98 files, set hash 509d311362def7ddeb028afed49e6d59e67b9d20f74f209fc66ae9a45e8ee612 (operator approval)"
+  }
+ },
+ "logs": [
+  "check-default.log",
+  "check-wasm.log",
+  "crates.log",
+  "gate-check-abi-ratification.json",
+  "gate-check-bare-review-findings.json",
+  "gate-check-dependency-closure.json",
+  "gate-check-dev-model-tier.json",
+  "gate-check-dev-model-used-populated.json",
+  "gate-check-dev-record-completeness.json",
+  "gate-check-empty-kernel.json",
+  "gate-check-host-surface.json",
+  "gate-check-kernel-baseline.json",
+  "gate-check-service-boundary.json",
+  "gate-check-workspace-count.json",
+  "gate-kloc-check.json",
+  "gate-stability-matrix.json",
+  "gate-templates-regen.json",
+  "kernel-core.log",
+  "maos-bin-default.log",
+  "maos-bin-wasm.log",
+  "mutation-iac-send-token-green.log",
+  "mutation-iac-send-token-red.log",
+  "mutation-partial-turn-green.log",
+  "mutation-partial-turn-red.log",
+  "native-twin.log",
+  "r17-3c-mutation-lineage-green.log",
+  "r17-3c-mutation-lineage-red.log",
+  "spawned_scope_17_3c.log"
+ ]
+}

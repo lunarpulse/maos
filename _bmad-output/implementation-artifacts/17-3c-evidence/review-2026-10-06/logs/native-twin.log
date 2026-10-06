@@ -1,0 +1,58 @@
+   Compiling maos-frame-codec v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-frame-codec)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> /tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-wasm-host v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-wasm-host)
+   Compiling equiv-native-twin v0.1.0 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-wasm-host/guests/equiv-fixture/native-twin)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.55s
+     Running unittests src/main.rs (/tmp/r17-3c-tgt-int/debug/deps/equiv_native_twin-41d5c9959e7895ba)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/hostile_twin.rs (/tmp/r17-3c-tgt-int/debug/deps/hostile_twin-2ad487048c2bc3e3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/modes.rs (/tmp/r17-3c-tgt-int/debug/deps/modes-ed9c547c5c295752)
+
+running 5 tests
+test unknown_mode_exits_nonzero ... ok
+test divergent_mode_bumps_logical_clock_by_exactly_one ... ok
+test identity_mode_is_a_byte_equal_echo ... ok
+test default_mode_is_identity ... ok
+test cosmetic_mode_preserves_invariants_but_adds_latency ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

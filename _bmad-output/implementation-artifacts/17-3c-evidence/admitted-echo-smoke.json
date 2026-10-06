@@ -1,0 +1,17 @@
+{
+  "fixture": "real echo-spirit wasm32-wasip2 component",
+  "manifest": {"name": "candidate-echo-smoke", "sandbox_tier": "T2", "memory_max_mb": 64, "cpu_max_pct": null, "time_cap_seconds": 30},
+  "scope_limit": "Synthetic echo manifest declares no CPU percentage. This is not first-party TS acceptance or a scoped-MCP verdict gate.",
+  "command": "maos run /mnt/build/cargo/wasm32-wasip2/release/17-3c-echo-smoke.toml --once",
+  "exit_code": 0,
+  "spirit_pid": 1,
+  "child_pid": 1551846,
+  "actual_ready": true,
+  "turns": 1,
+  "delivered_frames": 1,
+  "denied_frames": 0,
+  "database": "/tmp/maos-17-3c-admitted-echo-k3jqlx8n/maos-home/audit/transparency.sqlite",
+  "observed_receipts": ["lifecycle.admit", "lifecycle.load", "lifecycle.start", "spirit.frame.authorization", "cli.subprocess.exit exited(code=0)", "lifecycle.unload", "planned_unload", "cap.revoke"],
+  "attribution": {"operator_input_pid": 0, "guest_output_pid": 1, "guest_output_sender": "candidate-echo-smoke", "guest_output_intent": "standard", "guest_output_origin": "SpiritAuto", "original_claimed_sender": "operator"},
+  "sandbox_block_receipts": 0
+}

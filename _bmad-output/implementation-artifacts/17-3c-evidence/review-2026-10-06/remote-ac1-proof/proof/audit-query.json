@@ -1,0 +1,55 @@
+{
+  "maosctl": "/home/cosmo/maos-17-3c-proof.review-1791285131/target/release/maosctl",
+  "maosctl_sha256": "a4be0df18fb1871c333bdd02a33491e0ac2c8132c46142fd231a67ea07c9b5fd",
+  "spirit": "example-spirit-ts",
+  "spirit_pid": 1,
+  "queries": {
+    "ndjson": {
+      "command": [
+        "/home/cosmo/maos-17-3c-proof.review-1791285131/target/release/maosctl",
+        "audit",
+        "query",
+        "--spirit",
+        "example-spirit-ts",
+        "--format",
+        "ndjson"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"call_id\":\"01a110ef0feebb22fdaf6149181a974a\",\"capability_token\":\"60c09ac6acdd3363000000000000000000000000000000000000000000000000\",\"spirit_pid\":1,\"boot_nonce\":6971742401263907683,\"call_type\":\"capability.invocation\",\"timestamp_ns\":1791285465070262882}\n{\"call_id\":\"01a110ef0ff00d73d3b00cf4afb80748\",\"capability_token\":\"60c09ac6acdd3363000000000000000000000000000000000000000000000000\",\"spirit_pid\":1,\"boot_nonce\":6971742401263907683,\"call_type\":\"task.assign\",\"timestamp_ns\":1791285465073017400}\n{\"call_id\":\"01a110ef1111f5627da63667404fc133\",\"capability_token\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"spirit_pid\":1,\"boot_nonce\":6971742401263907683,\"call_type\":\"capability.invocation\",\"timestamp_ns\":1791285465361854275}\n{\"call_id\":\"01a110ef1117bc1a3c332633d45aa38b\",\"capability_token\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"spirit_pid\":1,\"boot_nonce\":6971742401263907683,\"call_type\":\"capability.invocation\",\"timestamp_ns\":1791285465367555614}\n",
+      "stderr": "maos: FR4 feed omitted 8 non-call kernel row(s): capability.invocation\u00d75, epistemic.halt\u00d72, governance.event\u00d71\n"
+    },
+    "plain": {
+      "command": [
+        "/home/cosmo/maos-17-3c-proof.review-1791285131/target/release/maosctl",
+        "audit",
+        "query",
+        "--spirit",
+        "example-spirit-ts",
+        "--format",
+        "plain"
+      ],
+      "exit_code": 0,
+      "stdout": "call_id                           boot_nonce        spirit_pid  call_type               timestamp_ns          intent\n01a110ea21ff1fc39fd49d7cc1e8ec8d  60c09ac6acdd3363  1           capability.invocation   1791285142015964309   lifecycle.admit\n01a110ea2201036ab6246717e22f5bfd  60c09ac6acdd3363  1           capability.invocation   1791285142017606351   lifecycle.load\n01a110ea2204583f93f801d5ea95fe28  60c09ac6acdd3363  1           capability.invocation   1791285142020661780   lifecycle.start\n01a110ef0feebb22fdaf6149181a974a  60c09ac6acdd3363  1           capability.invocation   1791285465070262882   cap.issue.Discriminant(6)\n01a110ef0feff2127d7643ebb930302f  60c09ac6acdd3363  1           governance.event        1791285465071664991   spirit.frame.authorization\n01a110ef0ff00d73d3b00cf4afb80748  60c09ac6acdd3363  1           task.assign             1791285465073017400   standard\n01a110ef110fc5eeba56dc57c16feda9  60c09ac6acdd3363  1           capability.invocation   1791285465359885422   cli.subprocess.exit\n01a110ef1111f5627da63667404fc133  60c09ac6acdd3363  1           capability.invocation   1791285465361854275   cap.revoke\n01a110ef11132404a2a9a461c3f19139  60c09ac6acdd3363  1           capability.invocation   1791285465363262292   lifecycle.unload\n01a110ef11147cf2360ec0c66132d767  60c09ac6acdd3363  1           epistemic.halt          1791285465364604987   planned_unload\n01a110ef11161816379ac3449d3c338f  60c09ac6acdd3363  1           epistemic.halt          1791285465366138549   planned_unload\n01a110ef1117bc1a3c332633d45aa38b  60c09ac6acdd3363  1           capability.invocation   1791285465367555614   cap.revoke\n",
+      "stderr": ""
+    }
+  },
+  "present": [
+    [
+      "governance.event",
+      "spirit.frame.authorization"
+    ],
+    [
+      "task.assign",
+      "standard"
+    ],
+    [
+      "capability.invocation",
+      "cli.subprocess.exit"
+    ],
+    [
+      "capability.invocation",
+      "lifecycle.unload"
+    ]
+  ],
+  "missing": []
+}

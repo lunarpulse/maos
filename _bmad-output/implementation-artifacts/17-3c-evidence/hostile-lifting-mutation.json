@@ -1,0 +1,12 @@
+{
+  "tests": ["hostile_metadata_fails_before_serialization_under_real_t2", "hostile_aliased_strings_fail_before_serialization_under_real_t2"],
+  "contract_source": "Production wit/spirit.wit, parsed for canonical ABI offsets and embedded by wasm-tools; no copied WIT definition",
+  "admission": "Real load/admit/start, scheduler PID, T2 SandboxSpec and actual contained runner",
+  "caps": {"process_memory_mib":64,"guest_memory_mib":64,"instruction_fuel":10000000,"hostcall_lifting_bytes":16777216,"declared_cpu_percentage":null},
+  "shapes": [
+    {"shape":"oversized frame metadata list","canonical_frame_stride":248,"elements":65536,"guest_pages":249,"restored_pid":2,"restored_child_pid":1562610},
+    {"shape":"repeated string aliases","canonical_frame_stride":248,"elements":4,"shared_string_bytes":4194304,"guest_pages":96,"restored_pid":1,"restored_child_pid":1562604}
+  ],
+  "restored_result": "Both reach actual Ready, then controlled exit 1 with machine-readable guest_export_failed / handle-frame / canonical-call stage, no domain authorization or serialized output, and SCB unload",
+  "mutation": {"source":"crates/maos-wasm-host/src/runner.rs:199","change":"Remove Store::set_hostcall_fuel, rebuild actual release runner","metadata_red":"actual child SIGSEGV 11 instead of controlled exit 1","aliases_red":"exit 1 remained, but the required canonical-call failure-stage diagnostic was absent","red_artifact":"artifact://644","restored_green_artifact":"artifact://648","restored":true}
+}

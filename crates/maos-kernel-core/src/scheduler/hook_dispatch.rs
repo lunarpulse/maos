@@ -247,7 +247,7 @@ impl HookDispatcher {
                 consent_envelope: None,
                 intent_lineage: Default::default(),
             };
-            if iac.deliver_typed(frame).await.is_ok() {
+            if iac.deliver_typed(frame, 0, None).await.is_ok() {
                 return;
             }
         }

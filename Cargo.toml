@@ -54,6 +54,7 @@ members = [
     "crates/maos-wasm-host",
     "crates/maos-escape-detector",
     "crates/maos-exec-deps",
+    "crates/maos-frame-codec",
     "crates/maos-fkcs",
     "crates/maos-cohort",
     "spirits/digest",

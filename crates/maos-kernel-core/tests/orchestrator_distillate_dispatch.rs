@@ -134,7 +134,7 @@ async fn ac2_scenario_2_1_first_dispatch_no_predecessor_accepted() {
         .expect("register worker");
 
     let frame = orchestrator_task_assign(None, 1);
-    let result = adapter.deliver_typed(frame).await;
+    let result = adapter.deliver_typed(frame, 0, None).await;
     assert!(
         result.is_ok(),
         "first dispatch with no predecessor must be accepted: {:?}",
@@ -155,11 +155,17 @@ async fn ac2_scenario_2_2_follow_up_with_distillate_ref_accepted() {
 
     // 1. First dispatch (accepted) — establishes the fan-out.
     let f1 = orchestrator_task_assign(None, 1);
-    adapter.deliver_typed(f1).await.expect("first dispatch ok");
+    adapter
+        .deliver_typed(f1, 0, None)
+        .await
+        .expect("first dispatch ok");
 
     // 2. Worker completes the task.
     let tc = worker_task_complete(2);
-    adapter.deliver_typed(tc).await.expect("task complete ok");
+    adapter
+        .deliver_typed(tc, 0, None)
+        .await
+        .expect("task complete ok");
 
     // 3. Kernel-side distillate row exists for the prior worker output.
     let distillate_id = write_distillate_row(&tl);
@@ -173,7 +179,7 @@ async fn ac2_scenario_2_2_follow_up_with_distillate_ref_accepted() {
         }),
         3,
     );
-    let result = adapter.deliver_typed(f2).await;
+    let result = adapter.deliver_typed(f2, 0, None).await;
     assert!(
         result.is_ok(),
         "follow-up dispatch with distillate_ref must be accepted: {:?}",
@@ -194,19 +200,22 @@ async fn ac2_scenario_2_3_follow_up_none_after_complete_rejected() {
 
     // First dispatch establishes fan-out.
     adapter
-        .deliver_typed(orchestrator_task_assign(None, 1))
+        .deliver_typed(orchestrator_task_assign(None, 1), 0, None)
         .await
         .expect("first ok");
 
     // Worker completes.
     adapter
-        .deliver_typed(worker_task_complete(2))
+        .deliver_typed(worker_task_complete(2), 0, None)
         .await
         .expect("complete ok");
 
     // Follow-up dispatch with no prior_distillate_ref → REJECTED.
     let f2 = orchestrator_task_assign(None, 3);
-    let err = adapter.deliver_typed(f2).await.expect_err("must reject");
+    let err = adapter
+        .deliver_typed(f2, 0, None)
+        .await
+        .expect_err("must reject");
     match err {
         IacBusError::EOrchestratorDispatchRawOutput {
             orchestrator,
@@ -231,13 +240,13 @@ async fn ac2_scenario_2_4_follow_up_pointing_at_raw_task_complete_rejected() {
         .expect("register orchestrator");
 
     adapter
-        .deliver_typed(orchestrator_task_assign(None, 1))
+        .deliver_typed(orchestrator_task_assign(None, 1), 0, None)
         .await
         .expect("first ok");
 
     // Worker completes — captures the raw TaskComplete frame_id.
     adapter
-        .deliver_typed(worker_task_complete(2))
+        .deliver_typed(worker_task_complete(2), 0, None)
         .await
         .expect("complete ok");
     let raw_tc_id = tl.last_frame_id();
@@ -251,7 +260,10 @@ async fn ac2_scenario_2_4_follow_up_pointing_at_raw_task_complete_rejected() {
         }),
         3,
     );
-    let err = adapter.deliver_typed(f2).await.expect_err("must reject");
+    let err = adapter
+        .deliver_typed(f2, 0, None)
+        .await
+        .expect_err("must reject");
     assert!(
         matches!(err, IacBusError::EOrchestratorDispatchRawOutput { .. }),
         "expected EOrchestratorDispatchRawOutput, got {err:?}"

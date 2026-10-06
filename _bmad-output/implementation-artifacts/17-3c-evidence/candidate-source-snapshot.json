@@ -1,0 +1,30 @@
+{
+  "original_head": "5075443c8a87523581cfcf6cb0b6af815f7ebd4f",
+  "original_index_tree": "4fd937d15144c0a01a934d072b90a1d27215cbe2",
+  "patch_sha256": "0665a38e7e7756ae920cf17ea9ce7dfc3c1b45654b90f4980b282fae38d4b588",
+  "snapshot_commit": "72077a4e991561efd189779598adc1cbd34814c8",
+  "snapshot_tree": "de23b01fa11674f29caa056e5de0c155e4e75635",
+  "worktree": "/tmp/maos-17-3c-candidate-wecx8ef7",
+  "untracked_snapshot_files": [
+    "_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-annotations.log",
+    "_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-api.json",
+    "_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-snapshot.json",
+    "_bmad-output/implementation-artifacts/17-3b-evidence/post-review-ci-workflow.yml.txt",
+    "_bmad-output/implementation-artifacts/17-3b-evidence/post-review-source-preservation.json",
+    "_bmad-output/implementation-artifacts/17-3c-early-start-flag-winston-decision.md",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/candidate-planning-governance.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/candidate-planning.json",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/dependency-closure.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/governance.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/integrated-green-before.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/integrated-kernel-bypass-red.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/integrated-restored-green.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/isolated-prototype.patch",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/measurements-and-preservation.json",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/t2-memfd-allow-green.log",
+    "_bmad-output/implementation-artifacts/17-3c-evidence/t2-memfd-omission-red.log",
+    "_bmad-output/implementation-artifacts/epic-17-context.md",
+    "_bmad-output/implementation-artifacts/spec-17-3c-isolated-runtime-candidate.md"
+  ],
+  "scope": "Local detached source snapshot only; no push, grant, baseline or original-runtime mutation."
+}

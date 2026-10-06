@@ -21,7 +21,6 @@
 //! `consent_envelope.valid_until > now_ns()` runtime check and the v0.3
 //! scaffold-comment converts to runtime enforcement without API change.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 #[cfg(feature = "spirit_test")]

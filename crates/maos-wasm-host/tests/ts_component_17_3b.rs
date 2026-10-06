@@ -160,7 +160,7 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
         .arg("--component")
         .arg(&component)
         .arg("--fuel")
-        .arg("1000000000")
+        .arg("10000000")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -171,13 +171,18 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
     let input_bytes = codec::encode_cbor(&input).expect("input frame must canonically encode");
     let stdin = child.stdin.take().expect("runner stdin");
     let mut writer = BufWriter::new(stdin);
-    codec::write_frame(&mut writer, &input_bytes).expect("write one ADR-032 frame");
+    maos_frame_codec::write_frame(&mut writer, &input_bytes).expect("write one ADR-032 frame");
     drop(writer);
 
     let stdout = child.stdout.take().expect("runner stdout");
     let stderr = child.stderr.take().expect("runner stderr");
     let mut reader = BufReader::new(stdout);
-    let output_bytes = match codec::read_frame(&mut reader) {
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "Ready"
+    );
+    let output_bytes = match maos_frame_codec::read_frame(&mut reader) {
         Ok(Some(frame)) => frame,
         Ok(None) => {
             drop(reader);
@@ -202,8 +207,13 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
             );
         }
     };
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "TurnComplete"
+    );
     assert!(
-        codec::read_frame(&mut reader)
+        maos_frame_codec::read_frame(&mut reader)
             .expect("read end of TypeScript guest stream")
             .is_none(),
         "TypeScript guest must emit exactly one frame"

@@ -3,11 +3,14 @@ name = "{{project-name}}"
 version = "0.1.0"
 abi = "1.0"
 manifest_schema_version = 5
-min_substrate_version = "0.1.0"
+min_substrate_version = "0.1.0-alpha.1"
 forms = ["wasm-component"]
 artifact = "dist/spirit.wasm"
 trust_tier = "local"
 description = "A MAOS WebAssembly-component Spirit scaffolded from templates/spirit-ts."
+
+[capabilities.required.iac]
+send = ["spirit:peer"]
 
 [posture]
 default = "assistive"
@@ -18,11 +21,11 @@ required_fields = ["introduction"]
 
 [budget]
 context_window_size = 4096
-time_cap_seconds = 30
+time_cap_seconds = 360
 
 [resources]
 cpu_max_pct = 10
-memory_max_mb = 64
+memory_max_mb = 768
 
 [sandbox]
 tier = "T2"

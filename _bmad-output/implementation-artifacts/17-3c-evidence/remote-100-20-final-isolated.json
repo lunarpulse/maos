@@ -1,0 +1,148 @@
+{
+  "candidate_only": true,
+  "accepted_launch": true,
+  "isolated_target": "/mnt/build/maos-17-3c-final.oitpeZ",
+  "build": "cargo build --locked --offline --release -p maos-bin -p maos-wasm-host --features maos-bin/wasm-host --bin maos --bin maos-wasm-runner",
+  "endpoint": "cosmo@192.168.100.20",
+  "provenance": {
+    "platform": {
+      "os_release": {
+        "PRETTY_NAME": "\"Ubuntu 25.10\"",
+        "NAME": "\"Ubuntu\"",
+        "VERSION_ID": "\"25.10\"",
+        "VERSION": "\"25.10 (Questing Quokka)\"",
+        "VERSION_CODENAME": "questing",
+        "ID": "ubuntu",
+        "ID_LIKE": "debian",
+        "HOME_URL": "\"https://www.ubuntu.com/\"",
+        "SUPPORT_URL": "\"https://help.ubuntu.com/\"",
+        "BUG_REPORT_URL": "\"https://bugs.launchpad.net/ubuntu/\"",
+        "PRIVACY_POLICY_URL": "\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"",
+        "UBUNTU_CODENAME": "questing",
+        "LOGO": "ubuntu-logo"
+      },
+      "arch": "x86_64",
+      "kernel": "6.17.0-41-generic"
+    },
+    "exit_code": 0,
+    "elapsed_seconds": 323.9005578369997,
+    "manifest_sha256": "ad5b19e71b9acebff3f1405e4075d243fdfc2b66f1236bce48b48fb1fcbb8f89",
+    "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+    "daemon_sha256": "71297d7d08eee1ef42a276b2be6193fda0c63e8adc3a8e5f7ffd2f6d7d1ddd88",
+    "runner_sha256": "521869ef96d1bf983f50cdf3c1d383a0db0a5983db6666ec30bd200647d25629",
+    "declared_resources": {
+      "cpu_max_pct": 10,
+      "memory_max_mb": 768
+    },
+    "time_cap_seconds": 360,
+    "instruction_fuel": 10000000,
+    "guest_memory_bytes": 67108864
+  },
+  "actual_proof": {
+    "loaded": {
+      "event": "spirit_loaded",
+      "spirit_id": "example-spirit-ts",
+      "pid": 1,
+      "child_pid": 5709,
+      "ready": true
+    },
+    "enforced_resources": {
+      "child_pid": 5709,
+      "cgroup": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/maos-17-3c-proof.service/maos.slice/spirit-example-spirit-ts-5689-1",
+      "cpu_max": "10000 100000",
+      "memory_max": "805306368",
+      "argv": [
+        "/home/cosmo/maos-17-3c-proof.a99GPA/maos-wasm-runner",
+        "--component",
+        "/home/cosmo/maos-17-3c-proof.a99GPA/examples/example-spirit-ts/dist/spirit.wasm",
+        "--fuel",
+        "10000000"
+      ],
+      "peak_vm_kib": 605380,
+      "peak_rss_kib": 509420
+    },
+    "attributed_intents": [
+      "cap.revoke",
+      "cli.subprocess.exit",
+      "lifecycle.admit",
+      "lifecycle.load",
+      "lifecycle.start",
+      "lifecycle.unload",
+      "planned_unload",
+      "spirit.frame.authorization",
+      "standard"
+    ],
+    "authorization": {
+      "event": "spawned_frame_authorization",
+      "spirit_pid": 1,
+      "trusted_sender": "example-spirit-ts",
+      "trusted_intent": "standard",
+      "trusted_origin": "SpiritAuto",
+      "allowed": true,
+      "decisions": [],
+      "claims": {
+        "frame_id": [
+          1,
+          161,
+          9,
+          149,
+          209,
+          123,
+          76,
+          130,
+          227,
+          86,
+          233,
+          131,
+          180,
+          55,
+          1,
+          94
+        ],
+        "timestamp_ns": 1791162175872195429,
+        "logical_clock": 0,
+        "from": {
+          "spirit_id": "operator",
+          "host_id": null,
+          "role": null
+        },
+        "to": [
+          {
+            "spirit_id": "example-spirit-ts",
+            "host_id": null,
+            "role": null
+          }
+        ],
+        "kind": "TaskAssign",
+        "intent": "Standard",
+        "payload": {
+          "TaskAssign": {
+            "goal": "maos run /home/cosmo/maos-17-3c-proof.a99GPA/examples/example-spirit-ts/manifest.toml --once",
+            "scope": [],
+            "success_criteria": "Complete one mailbox export",
+            "posture_preferences": {
+              "preferred_posture": null,
+              "halt_policy_overrides": []
+            },
+            "prior_distillate_ref": null
+          }
+        },
+        "auto_marker": "HumanAuthored",
+        "consent_envelope": null,
+        "intent_lineage": [
+          "standard"
+        ]
+      }
+    },
+    "terminal": {
+      "event": "cli_subprocess_exit",
+      "cli_child_pid": 5709,
+      "exit_cause": "exited(code=0)",
+      "is_crash": false
+    },
+    "database": "/home/cosmo/maos-17-3c-proof.a99GPA/proof-final-isolated/home/maos/audit/transparency.sqlite"
+  },
+  "stdout": "{\"event\":\"spirit_loaded\",\"spirit_id\":\"example-spirit-ts\",\"pid\":1,\"child_pid\":5709,\"ready\":true}\n{\"event\":\"spirit_session_complete\",\"report\":{\"spirit_pid\":1,\"child_pid\":5709,\"turns\":1,\"delivered_frames\":1,\"denied_frames\":0}}\n",
+  "four_required_images_proven": false,
+  "publication_cutover_story_closure": false
+}

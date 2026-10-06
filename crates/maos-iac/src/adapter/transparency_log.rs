@@ -280,6 +280,13 @@ pub enum FrameRowWrite {
     Duplicate,
 }
 
+/// The single layout of a capability token in the `capability_token` column:
+/// the token's 16 bytes followed by 16 zero bytes (Story 17-3c; shared by the
+/// capability audit writer and IAC bus deliveries).
+pub fn capability_token_column(token: &maos_domain::invariants::i1::TokenId) -> [u8; 32] {
+    std::array::from_fn(|i| token.0.get(i).copied().unwrap_or(0))
+}
+
 /// SQL schema for both tables.
 const SCHEMA_SQL: &str = "\
 CREATE TABLE IF NOT EXISTS transparency_log (

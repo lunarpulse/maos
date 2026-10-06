@@ -270,7 +270,7 @@ impl DelegationLeg {
         frame: IacFrame,
     ) -> Result<DelegationOutcome, String> {
         let frame_id = frame.frame_id;
-        iac.deliver_typed(frame).await.map_err(|e| {
+        iac.deliver_typed(frame, 0, None).await.map_err(|e| {
             // FOUND BY j1-crosshost-1a, owned elsewhere: FR21's gate
             // (`maos-iac/src/adapter/orchestrator_dispatch.rs`) treats ANY
             // `TaskComplete` row inside a 60s WALL-CLOCK window as a predecessor of
@@ -381,7 +381,7 @@ impl DelegationLeg {
         frame_id[0..8].copy_from_slice(&seq.to_le_bytes());
         frame_id[8..16].copy_from_slice(&run_nonce.to_le_bytes());
         let frame = completion_frame(frame_id, seq, "completed".to_string());
-        iac.deliver_typed(frame)
+        iac.deliver_typed(frame, 0, None)
             .await
             .map_err(|e| format!("completion journal failed: {e}"))?;
         let mut drained = 0usize;
@@ -481,7 +481,7 @@ impl DelegationLeg {
             addr.host_id = None;
         }
         match iac
-            .deliver_typed(frame)
+            .deliver_typed(frame, 0, None)
             .await
             .map_err(|e| format!("host B intake journal/delivery failed: {e}"))?
             .into_inner()
@@ -550,7 +550,7 @@ impl DelegationLeg {
         // are "the evidence you are about to claim does not exist": returning
         // the id as if persisted would repeat G1's lie one layer up.
         match iac
-            .deliver_typed(frame)
+            .deliver_typed(frame, 0, None)
             .await
             .map_err(|e| format!("host B outcome journal failed: {e}"))?
             .into_inner()

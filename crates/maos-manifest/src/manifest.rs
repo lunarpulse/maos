@@ -333,7 +333,7 @@ const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 /// gate reports the constant as missing. Keep the declaration on one physical
 /// line and out of doc comments above it.
 #[rustfmt::skip]
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -603,7 +603,19 @@ pub struct CapabilitiesRequired {
     pub provider: ProviderCapabilities,
     pub mcp: McpCapabilities,
     pub loom: LoomCapabilities,
+    pub iac: IacCapabilities,
 }
+
+/// Story 17-3c — `[capabilities.required.iac].send`: peer classes from the
+/// closed set [`IAC_SEND_PEER_CLASSES`] the Spirit may emit bus frames to.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct IacCapabilities {
+    pub send: Vec<String>,
+}
+
+/// `"broadcast"` = frame with empty `to`; `"spirit:peer"` = frame addressed to
+/// at least one Spirit.
+pub const IAC_SEND_PEER_CLASSES: &[&str] = &["broadcast", "spirit:peer"];
 
 #[maos_attrs::i9_exempt(
     reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
@@ -647,12 +659,15 @@ impl CapabilitiesRequired {
     }
     /// Drops capability declarations introduced after the manifest's schema.
     ///
-    /// Schema v4 introduced `[capabilities.required.loom]`; older manifests
-    /// degrade it rather than gaining a capability their declared schema cannot
-    /// express.
+    /// Schema v4 introduced `[capabilities.required.loom]` and v5
+    /// `[capabilities.required.iac]`; older manifests degrade them rather than
+    /// gaining a capability their declared schema cannot express.
     pub fn degrade_for_schema_version(mut self, declared_schema: u32) -> Self {
         if declared_schema < 4 {
             self.loom = LoomCapabilities::default();
+        }
+        if declared_schema < 5 {
+            self.iac = IacCapabilities::default();
         }
         self
     }
@@ -661,20 +676,29 @@ impl CapabilitiesRequired {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawCapabilitiesRequired {
+    #[serde(default)]
     provider: RawProviderCapabilities,
     #[serde(default)]
     mcp: RawMcpCapabilities,
     #[serde(default)]
     loom: RawLoomCapabilities,
+    #[serde(default)]
+    iac: RawIacCapabilities,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawIacCapabilities {
+    send: Option<Vec<String>>,
 }
 
 #[maos_attrs::i9_exempt(
     reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
 )]
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 struct RawProviderCapabilities {
-    complete: Vec<String>,
+    complete: Option<Vec<String>>,
 }
 
 /// Story 5.5c — raw MCP capability section from TOML.
@@ -705,13 +729,16 @@ struct RawMcpCapabilityServerEntry {
 
 impl RawCapabilitiesRequired {
     fn validate(self) -> Result<CapabilitiesRequired, ManifestError> {
-        if self.provider.complete.is_empty() {
-            return Err(ManifestError::Toml(validation_msg(
-                "capabilities.required.provider.complete",
-                "must be non-empty",
-            )));
-        }
-        for v in &self.provider.complete {
+        let complete = match self.provider.complete {
+            Some(c) if c.is_empty() => {
+                return Err(ManifestError::Toml(validation_msg(
+                    "capabilities.required.provider.complete",
+                    "must be non-empty",
+                )))
+            }
+            c => c.unwrap_or_default(),
+        };
+        for v in &complete {
             if v.len() > 128 {
                 return Err(ManifestError::Toml(validation_msg(
                     "capabilities.required.provider.complete",
@@ -719,10 +746,27 @@ impl RawCapabilitiesRequired {
                 )));
             }
         }
+        let send_declared = self.iac.send.is_some();
+        let send = self.iac.send.unwrap_or_default();
+        let iac_err = |reason: &str| {
+            Err(ManifestError::Toml(validation_msg(
+                "capabilities.required.iac.send",
+                reason,
+            )))
+        };
+        if send_declared && send.is_empty() {
+            return iac_err("must be non-empty");
+        }
+        for (i, v) in send.iter().enumerate() {
+            if !IAC_SEND_PEER_CLASSES.contains(&v.as_str()) {
+                return iac_err(&format!("unknown peer class: {v}"));
+            }
+            if send[..i].contains(v) {
+                return iac_err(&format!("duplicate peer class: {v}"));
+            }
+        }
         Ok(CapabilitiesRequired {
-            provider: ProviderCapabilities {
-                complete: self.provider.complete,
-            },
+            provider: ProviderCapabilities { complete },
             mcp: McpCapabilities {
                 servers: self
                     .mcp
@@ -739,6 +783,7 @@ impl RawCapabilitiesRequired {
                 write: self.loom.write,
                 scan: self.loom.scan,
             },
+            iac: IacCapabilities { send },
         })
     }
 }
@@ -782,6 +827,11 @@ pub fn capabilities_required_to_scopes(
     }
     if caps.loom.scan {
         scopes.push(maos_domain::invariants::i1::Scope::LoomScan);
+    }
+    for peer_class in &caps.iac.send {
+        scopes.push(maos_domain::invariants::i1::Scope::IacSend {
+            peer_class: peer_class.clone(),
+        });
     }
     scopes
 }

@@ -287,7 +287,9 @@ pub enum GovernedMintError {
     SsoAssertionMissing(String),
     /// The enterprise PDP returned `PolicyVerdict::Deny`.
     PdpDenied(String),
-    /// Kernel capability mediation failed (e.g. `proc.exec` not granted).
+    /// The kernel policy evaluated the requested scope and denied issuance.
+    KernelPolicyDenied,
+    /// Other mediation or identity-persistence failure.
     Mediation(String),
 }
 
@@ -295,6 +297,7 @@ pub enum GovernedMintError {
 impl std::fmt::Display for GovernedMintError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::KernelPolicyDenied => write!(f, "kernel policy denied capability issuance"),
             Self::SsoAssertionMissing(m) | Self::PdpDenied(m) | Self::Mediation(m) => {
                 write!(f, "{m}")
             }
@@ -355,14 +358,28 @@ pub fn issue_enterprise_governed_capability(
 
     let token = capability
         .issue_with_mediation(spirit_pid, scope, ttl_secs, posture_hash, intent_class)
-        .map_err(|e| {
-            GovernedMintError::Mediation(format!("kernel capability mediation failed: {e}"))
+        .map_err(|e| match e {
+            maos_domain::ports::capability::CapError::PolicyDenied => {
+                GovernedMintError::KernelPolicyDenied
+            }
+            _ => GovernedMintError::Mediation(format!("kernel capability mediation failed: {e}")),
         })?;
 
     if let (Some(runtime), Some(principal)) = (enterprise_runtime, principal.as_ref()) {
-        runtime
-            .persist_identity_asserted(spirit_pid, principal, &capability_key)
-            .map_err(|e| GovernedMintError::Mediation(e.to_string()))?;
+        if let Err(error) =
+            runtime.persist_identity_asserted(spirit_pid, principal, &capability_key)
+        {
+            maos_domain::ports::capability::CapabilityRegistryPort::revoke(
+                capability,
+                token.token_id,
+            )
+            .map_err(|revoke_error| {
+                GovernedMintError::Mediation(format!(
+                    "identity assertion persistence failed: {error}; token rollback failed: {revoke_error}"
+                ))
+            })?;
+            return Err(GovernedMintError::Mediation(error.to_string()));
+        }
     }
 
     Ok(token)
@@ -743,7 +760,7 @@ pub fn run_cli_wrapper_manifest(
                         )
                         .into());
                     }
-                    GovernedMintError::Mediation(_) => {}
+                    GovernedMintError::KernelPolicyDenied | GovernedMintError::Mediation(_) => {}
                 }
             }
             eprintln!(
@@ -848,13 +865,16 @@ pub fn run_cli_wrapper_manifest(
     // D-16-1-V — the revoke closure stays UNCONDITIONAL, at the Worker's real
     // pid: its `CliSubprocessExit` row is kept even when an unload already
     // revoked. The closure is `FnOnce` and is called exactly once.
-    let exit = live
-        .bridge
-        .wait_and_finalize(&transparency_log, spirit_pid, move |exit_code| {
+    let exit = live.bridge.wait_and_finalize(
+        &transparency_log,
+        spirit_pid,
+        Some(capability.audit_sender()),
+        move |exit_code| {
             if let Some(tid) = token_id {
                 let _ = cap_for_revoke.revoke_cli_subprocess_exit(tid, spirit_pid, exit_code);
             }
-        });
+        },
+    );
 
     // 8c. FINISH — the guard's terminal act, immediately after the exit cause
     //     is known. On Linux the observer usually got there first and this

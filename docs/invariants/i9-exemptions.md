@@ -572,3 +572,12 @@ visible before a concurrent load can commit; the `RwLock<BTreeMap<CrlId, Vec<Rev
 holds operator-supplied revocation rules, bounded by CRL input, never learned state.
 Parallel to the capability-token ledger shape: keyed, bounded, no persistence across
 restarts — structural-state per I9.
+
+### `FrameWriter` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+
+**Reason:** exclusive live child stdin resource transferred from `CliSubprocessBridge`
+to the spawned session's duplex writer thread. Contains only `ChildStdin`, no
+cross-Spirit cache, learned state, queue, or persisted policy. Writes use the shared
+bounded frame codec; dropping the writer closes this child's input and ends its
+resource lifetime. Landed with Story 17-3c (2026-10-06). The ≥2 maintainer
+sign-offs are still owed (deferred-work, 17-3c chunks B+C).

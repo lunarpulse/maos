@@ -73,7 +73,7 @@ fn antitheater_real_spawn_nonce_pid_and_reaped() {
     assert_eq!(out.dropped, 0);
 
     let revoked: Cell<Option<Option<i32>>> = Cell::new(None);
-    let exit = bridge.wait_and_finalize(&journal, 7, |code| revoked.set(Some(code)));
+    let exit = bridge.wait_and_finalize(&journal, 7, None, |code| revoked.set(Some(code)));
     assert_eq!(exit.cause, ExitCause::Exited { code: 0 });
     assert!(!exit.cause.is_crash(), "clean exit-0 is NOT a crash");
     assert_eq!(
@@ -121,21 +121,21 @@ fn crash_matrix_exit_codes_and_signals() {
     let journal = TransparencyLogAdapter::open_in_memory(0);
     let mut b = spawn_and_bridge(sh_spec("exit 0")).unwrap();
     let _ = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
-    let e = b.wait_and_finalize(&journal, 1, |_| {});
+    let e = b.wait_and_finalize(&journal, 1, None, |_| {});
     assert_eq!(e.cause, ExitCause::Exited { code: 0 });
     assert!(!e.cause.is_crash());
 
     // EOF + non-zero exit → crash with the code preserved.
     let mut b = spawn_and_bridge(sh_spec("exit 3")).unwrap();
     let _ = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
-    let e = b.wait_and_finalize(&journal, 1, |_| {});
+    let e = b.wait_and_finalize(&journal, 1, None, |_| {});
     assert_eq!(e.cause, ExitCause::Exited { code: 3 });
     assert!(e.cause.is_crash());
 
     // Signal death (SIGKILL) → crash, cause disambiguated from exit-code death.
     let mut b = spawn_and_bridge(sh_spec("kill -9 $$")).unwrap();
     let _ = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
-    let e = b.wait_and_finalize(&journal, 1, |_| {});
+    let e = b.wait_and_finalize(&journal, 1, None, |_| {});
     assert_eq!(e.cause, ExitCause::Signaled { signal: 9 });
     assert!(e.cause.is_crash());
     assert_eq!(e.cause.exit_code(), None, "signal death has no exit code");
@@ -151,7 +151,7 @@ fn stdout_drains_before_death_no_truncation() {
         out.stdout_lines, 3,
         "all 3 pre-death lines captured (no truncation)"
     );
-    let e = b.wait_and_finalize(&journal, 1, |_| {});
+    let e = b.wait_and_finalize(&journal, 1, None, |_| {});
     assert!(
         e.cause.is_crash(),
         "non-zero exit after draining is a crash"
@@ -174,7 +174,7 @@ fn redaction_trap_hex_token_never_lands_in_log() {
     let journal = TransparencyLogAdapter::open_in_memory(0);
     let mut b = spawn_and_bridge(sh_spec(&format!("printf '%s\\n' '{secret}'"))).unwrap();
     let _ = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
-    let _ = b.wait_and_finalize(&journal, 1, |_| {});
+    let _ = b.wait_and_finalize(&journal, 1, None, |_| {});
     let rows = journal
         .query_frames(FrameFilter {
             kind: Some(FrameKind::CliSubprocessOutput),
@@ -213,7 +213,7 @@ fn crash_detection_latency_under_2s_with_margin() {
     let t0 = std::time::Instant::now();
     let mut b = spawn_and_bridge(sh_spec("kill -9 $$")).unwrap();
     let _ = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
-    let e = b.wait_and_finalize(&journal, 1, |_| {});
+    let e = b.wait_and_finalize(&journal, 1, None, |_| {});
     let elapsed = t0.elapsed();
     assert!(e.cause.is_crash());
     assert!(
@@ -308,7 +308,7 @@ fn stderr_lines_are_captured_with_stream_provenance() {
     let mut b = spawn_and_bridge(sh_spec("printf 'oops\\n' 1>&2; exit 0")).unwrap();
     let out = b.pump_to_journal(&journal, 1, "x", "cli", &[]);
     assert_eq!(out.stderr_lines, 1);
-    let _ = b.wait_and_finalize(&journal, 1, |_| {});
+    let _ = b.wait_and_finalize(&journal, 1, None, |_| {});
     let rows = journal
         .query_frames(FrameFilter {
             kind: Some(FrameKind::CliSubprocessOutput),

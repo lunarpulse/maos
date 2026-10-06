@@ -9,6 +9,7 @@ description = "MAOS kernel core — capability mediation, IAC bus, journal"
 
 [dependencies]
 maos-domain = { path = "../maos-domain" }
+maos-frame-codec = { path = "../maos-frame-codec" }
 # Story 6.5 — Phase 1 maos-iac extraction
 maos-iac = { path = "../maos-iac" }
 # Story 6.5 — Phase 1 maos-manifest extraction

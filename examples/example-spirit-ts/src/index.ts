@@ -9,8 +9,8 @@ let started = false;
  *
  * `jco guest-types` exposes this as `IacFrame[]` and omits WIT's
  * `result<..., halt>` wrapper. Throwing `{ tag: "fault", val: reason }` maps
- * to `Halt::Fault` (R17-39c). `console.log` is discarded by the host until
- * 17-3c provides the guest diagnostics channel (R17-39b).
+ * to `Halt::Fault` (R17-39c). `console.log` output is journaled by the host as
+ * bounded, untrusted `spirit.diagnostic` rows (R17-39b).
  */
 export function handleFrame(frame: IacFrame): IacFrame[] {
   if (!started) {

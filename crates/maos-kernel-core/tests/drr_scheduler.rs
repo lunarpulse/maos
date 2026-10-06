@@ -74,11 +74,11 @@ async fn drr_basic_two_spirits_fair() {
 
     // Spirit "a" sends a large frame (5 KiB > 4 KiB quantum)
     let big = make_frame("a", "b", 5 * 1024);
-    adapter.deliver_typed(big).await.unwrap();
+    adapter.deliver_typed(big, 0, None).await.unwrap();
 
     // Spirit "b" sends a small frame (1 KiB < 4 KiB quantum)
     let small = make_frame("b", "a", 1 * 1024);
-    adapter.deliver_typed(small).await.unwrap();
+    adapter.deliver_typed(small, 0, None).await.unwrap();
 
     // Both should be logged
     let entries = tl.query_frames(Default::default()).unwrap();
@@ -138,6 +138,7 @@ async fn drr_backpressure_emitted_when_backlog_exceeds_threshold() {
                             "standard".into(),
                             FrameOrigin::HumanAuthored,
                             vec![],
+                            None,
                         )
                         .await;
                 }) as Pin<Box<dyn Future<Output = ()> + Send>>
@@ -202,7 +203,7 @@ async fn drr_batch_flush_on_interval() {
     // Submit a single small frame — because the batch is not full,
     // deliver_typed blocks until the interval flushes it.
     let f = make_frame("a", "a", 100);
-    adapter.deliver_typed(f).await.unwrap();
+    adapter.deliver_typed(f, 0, None).await.unwrap();
 
     // Frame should now be in the TL
     let entries = tl.query_frames(Default::default()).unwrap();

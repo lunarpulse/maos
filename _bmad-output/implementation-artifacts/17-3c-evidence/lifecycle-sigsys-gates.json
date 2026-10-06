@@ -1,0 +1,41 @@
+{
+  "candidate_only": true,
+  "command": "CARGO_TARGET_DIR=/mnt/build/cargo cargo test --offline -p maos-bin --features wasm-host --test spawned_scope_17_3c -- --nocapture",
+  "output_artifact": "artifact://676",
+  "result": {"passed": 5, "failed": 0, "elapsed_test_seconds": 33.86},
+  "actual_sigsys": {
+    "admitted_pid": 6,
+    "child_pid": 1648137,
+    "mechanism": "debug-only contained runner invokes ptrace after actual Ready; installed seccomp kills with SIGSYS",
+    "sandbox_blocks": 1,
+    "production_escape_consumer_anomalies": 1,
+    "syscall_number_available": false,
+    "release_proof_flag_refused": true
+  },
+  "planned_stop_negative": {
+    "admitted_pid": 15,
+    "supervisor_owned_stop": true,
+    "binding_phase": "PlannedStop",
+    "sandbox_blocks": 0,
+    "production_escape_consumer_anomalies": 0
+  },
+  "actual_mailbox_idle": {
+    "admitted_pid": 1,
+    "child_pid": 1648108,
+    "component": "routed_relay.wasm",
+    "exports": 2,
+    "idle_seconds": 32,
+    "active_turn_budget_seconds": 3,
+    "root_progress_watchdog_threshold_seconds": 30,
+    "idle_task_ledger_empty": true,
+    "stalled_or_crash_receipts": 0,
+    "terminal_phase": "PlannedStop"
+  },
+  "regression_history": {
+    "missing_offline_fixture_dependency": "New island now reuses existing locked fixture dependencies rather than resolving unavailable latest versions.",
+    "runner_prerequisite": "Each independent test forces the shared real fixture/runner build before contained launch.",
+    "idle_transition_failure": "artifact://672: live idle test observed an unexpected task.stalled or lifecycle.crash receipt after the second export; exact diagnostic run artifact://674 passed before the fix, so the failure was intermittent.",
+    "fix": "When an empty real SCB ledger gains its first active assignment, initialize that turn's no-progress window under the same ledger lock. Existing active assignments do not have their watchdog window reset."
+  },
+  "acceptance_limit": "Rust fixture regression proof, not the requested TS CLI launch at CPU 10%, and not a four-image containment result."
+}

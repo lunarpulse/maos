@@ -533,5 +533,7 @@ fn four_mib_guest_intent_lineage_lifts_without_panicking_or_truncation() {
     assert_eq!(returned.intent_lineage, guest_lineage);
     let encoded = codec::encode_cbor(&domain).expect("4 MiB frame fits ADR-032 cap");
     assert!(encoded.len() > 4 * 1024 * 1024);
-    assert!(encoded.len() <= codec::MAX_FRAME_BYTES);
+    assert!(encoded.len() <= maos_frame_codec::MAX_FRAME_BYTES);
+    let decoded: IacFrame = codec::decode_cbor(&encoded).expect("encoded frame must decode");
+    assert_eq!(decoded, domain);
 }

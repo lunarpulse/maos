@@ -626,3 +626,11 @@
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeSpawnSpec" = "supervision"  # carries the sandbox admission granted the child
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError"     = "supervision"  # typed spawn/sandbox refusal of the launch primitive
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge"   = "supervision"  # owns the (possibly sandboxed) child + reader threads; RAII kill+reap
+
+# Detached 17-3c: explicit operator-approved candidate surface metadata grant.
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgePoll"      = "data-movement" # raw frame/idle/closed transport facts; no domain verdict or deadline policy
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::FrameWriter"     = "data-movement" # exclusively owned child stdin, bounded binary-frame transfer
+
+# 17-3c §A6 review, operator-approved kernel-surface change 2026-10-06: the pure
+# mediation predicate (does scope_to_intent map this Scope?) beside the issuance path.
+"maos_kernel_core::capability::is_mediated_scope"                    = "universal-arithmetic" # pure Scope -> bool predicate; no I/O, no state

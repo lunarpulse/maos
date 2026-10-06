@@ -1,0 +1,2056 @@
+warning: unused variable: `reason`
+  --> crates/maos-attrs/src/lib.rs:18:9
+   |
+18 |     let reason: Option<String> = None;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_reason`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling rustls v0.23.40
+warning: `maos-attrs` (lib) generated 1 warning (run `cargo fix --lib -p maos-attrs` to apply 1 suggestion)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+   Compiling maos-capability v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-capability)
+   Compiling maos-manifest v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-manifest)
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Child`
+ --> crates/maos-mcp/src/transport/stdio.rs:8:20
+  |
+8 | use std::process::{Child, Command, Stdio};
+  |                    ^^^^^
+
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-spirit-hello v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-spirit-hello)
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-acp v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-acp)
+   Compiling maos-iac v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-iac)
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-director-surface v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-director-surface)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/maos-iac/src/adapter/transparency_log.rs:946:13
+    |
+946 |         let mut inner = self
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling ureq v2.12.1
+warning: field `intent_str` is never read
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:54:5
+   |
+49 | struct Submission {
+   |        ---------- field in this struct
+...
+54 |     intent_str: String,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1287:21
+     |
+1287 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling maos-kernel-core v0.1.0-alpha.1 (/tmp/maos-17-3c-candidate-wecx8ef7/crates/maos-kernel-core)
+warning: `maos-iac` (lib) generated 5 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:392:21
+    |
+392 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+   |
+22 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::halt::TerminationKind`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+   |
+12 | use maos_domain::halt::TerminationKind;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::halt::terminate_spirit`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+   |
+16 | use crate::halt::terminate_spirit;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ClassSection` and `GatewaysSection`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+   |
+22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+   |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+  --> crates/maos-kernel-core/src/scheduler/resource_ceiling.rs:14:5
+   |
+14 | use maos_domain::invariants::i9::SandboxTier;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `EpistemicAction`, `EpistemicPolicySection`, and `Posture`
+   --> crates/maos-kernel-core/src/capability/cap_policy/mod.rs:625:41
+    |
+625 |         use crate::security::manifest::{EpistemicAction, EpistemicPolicySection, Posture};
+    |                                         ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^
+
+warning: unused import: `crate::security::posture::PostureState`
+   --> crates/maos-kernel-core/src/capability/cap_policy/mod.rs:626:13
+    |
+626 |         use crate::security::posture::PostureState;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `EvidenceKind`, `ProviderEndpointPin`, `SandboxTier`, and `TrustTier`
+   --> crates/maos-kernel-core/src/compliance/mod.rs:126:41
+    |
+126 |         Claim, ComplianceClaimEnvelope, EvidenceKind, PrincipleRef, ProviderEndpointPin,
+    |                                         ^^^^^^^^^^^^                ^^^^^^^^^^^^^^^^^^^
+127 |         SandboxTier, SigningAlg, TrustTier, Uuid, Verdict,
+    |         ^^^^^^^^^^^              ^^^^^^^^^
+
+warning: unused import: `std::io::Write`
+    --> crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:1288:13
+     |
+1288 |         use std::io::Write;
+     |             ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_spirit_abi::lifecycle::SpiritVtable`
+   --> crates/maos-kernel-core/src/scheduler/control_block.rs:506:9
+    |
+506 |     use maos_spirit_abi::lifecycle::SpiritVtable;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+   |
+28 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+    |
+157 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+    |
+229 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:195:13
+    |
+195 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:84:5
+   |
+79 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+84 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:710:8
+    |
+117 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+710 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: associated function `now_ns` is never used
+  --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+   |
+37 | impl PrincipalNamespaceIndex {
+   | ---------------------------- associated function in this implementation
+...
+51 |     fn now_ns() -> u64 {
+   |        ^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:44:5
+   |
+42 | struct DiskCandidate {
+   |        ------------- field in this struct
+43 |     name: String,
+44 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:146:8
+    |
+ 69 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+146 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused `Result` that must be used
+   --> crates/maos-kernel-core/src/halt/mod.rs:692:9
+    |
+692 |         registry.insert_pending(hid.clone(), HaltState::PendingResolution);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+692 |         let _ = registry.insert_pending(hid.clone(), HaltState::PendingResolution);
+    |         +++++++
+
+warning: unused `Result` that must be used
+   --> crates/maos-kernel-core/src/halt/mod.rs:710:9
+    |
+710 |         registry.insert_pending(hid.clone(), HaltState::PendingResolution);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+710 |         let _ = registry.insert_pending(hid.clone(), HaltState::PendingResolution);
+    |         +++++++
+
+warning: unused `Result` that must be used
+   --> crates/maos-kernel-core/src/hot_swap/precheck.rs:126:9
+    |
+126 |         registry.insert_pending(hid, HaltState::PendingResolution);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+126 |         let _ = registry.insert_pending(hid, HaltState::PendingResolution);
+    |         +++++++
+
+warning: `maos-kernel-core` (lib) generated 42 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+warning: unused import: `SCHEDULER_QUANTUM`
+  --> crates/maos-kernel-core/tests/drr_priority_weighted_dispatch.rs:13:34
+   |
+13 |     pick_next_spirit_from_slice, SCHEDULER_QUANTUM,
+   |                                  ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+ --> crates/maos-kernel-core/tests/cap_audit_backpressure.rs:7:5
+  |
+7 | use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (lib test) generated 46 warnings (38 duplicates) (run `cargo fix --lib -p maos-kernel-core --tests` to apply 5 suggestions)
+warning: function `skip_if_no_container_runtime` is never used
+ --> crates/maos-kernel-core/tests/common/mod.rs:9:8
+  |
+9 | pub fn skip_if_no_container_runtime() -> bool {
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `journal` and `transparency_log` are never read
+  --> crates/maos-kernel-core/tests/common/upgrade.rs:43:9
+   |
+40 | pub struct UpgradeHarness {
+   |            -------------- fields in this struct
+...
+43 |     pub journal: Arc<JournalAdapter>,
+   |         ^^^^^^^
+44 |     pub transparency_log: Arc<TransparencyLogAdapter>,
+   |         ^^^^^^^^^^^^^^^^
+
+warning: unused import: `HaltId`
+ --> crates/maos-kernel-core/tests/halt_resolution_writes_memory.rs:6:25
+  |
+6 | use maos_domain::halt::{HaltId, HaltResolver, Resolution};
+  |                         ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `count` and `last_payload` are never used
+  --> crates/maos-kernel-core/tests/schedule_watchdog_fr26.rs:37:8
+   |
+36 | impl CountingSpirit {
+   | ------------------- methods in this implementation
+37 |     fn count(&self) -> u32 {
+   |        ^^^^^
+...
+41 |     fn last_payload(&self) -> Vec<u8> {
+   |        ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+  --> crates/maos-kernel-core/tests/scalar_predicate_truth_table.rs:24:5
+   |
+24 | use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `LifecycleSection`, `OnCrashSection`, `OnRevocationSection`, `OutputShape`, `SchedulingSection`, and `SupervisionSection`
+ --> crates/maos-kernel-core/tests/provider_switched_journal.rs:4:41
+  |
+4 |     CapabilitiesRequired, ClassSection, LifecycleSection, OnCrashSection, OnRevocationSection,
+  |                                         ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+5 |     OutputShape, PostureSection, ProviderCapabilities, ProvidersSection, ResourceCaps,
+  |     ^^^^^^^^^^^
+6 |     SandboxConfig, SchedulingSection, SupervisionSection,
+  |                    ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `CorpusSpirit` is never constructed
+  --> crates/maos-kernel-core/tests/common/upgrade.rs:24:12
+   |
+24 | pub struct CorpusSpirit;
+   |            ^^^^^^^^^^^^
+
+warning: struct `UpgradeHarness` is never constructed
+  --> crates/maos-kernel-core/tests/common/upgrade.rs:40:12
+   |
+40 | pub struct UpgradeHarness {
+   |            ^^^^^^^^^^^^^^
+
+warning: associated items `new` and `write_manifest` are never used
+   --> crates/maos-kernel-core/tests/common/upgrade.rs:49:12
+    |
+ 48 | impl UpgradeHarness {
+    | ------------------- associated items in this implementation
+ 49 |     pub fn new(successor_factory: Arc<dyn SuccessorSpiritFactory>) -> Self {
+    |            ^^^
+...
+131 |     pub fn write_manifest(&self, name: &str, contents: &str) -> std::path::PathBuf {
+    |            ^^^^^^^^^^^^^^
+
+warning: function `parse_manifest_bundle` is never used
+   --> crates/maos-kernel-core/tests/common/upgrade.rs:138:8
+    |
+138 | pub fn parse_manifest_bundle(manifest: &str) -> Result<SpiritManifestBundle, String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+ --> crates/maos-kernel-core/tests/fr4_1000_call_fixture.rs:7:5
+  |
+7 | use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "halt_resolution_writes_memory") generated 1 warning (run `cargo fix --test "halt_resolution_writes_memory" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "drr_priority_weighted_dispatch") generated 1 warning (run `cargo fix --test "drr_priority_weighted_dispatch" -p maos-kernel-core` to apply 1 suggestion)
+warning: unused import: `maos_domain::halt::HaltState`
+  --> crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs:13:5
+   |
+13 | use maos_domain::halt::HaltState;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `JournalEntry`
+  --> crates/maos-kernel-core/tests/scalar_predicate_to_halt_integration.rs:14:36
+   |
+14 | use maos_domain::invariants::i10::{JournalEntry, LifecycleEvent};
+   |                                    ^^^^^^^^^^^^
+
+warning: unused import: `HaltState`
+  --> crates/maos-kernel-core/tests/halt_invoke_test.rs:14:47
+   |
+14 | use maos_domain::halt::{HaltId, HaltResolver, HaltState, OutputMarkerKind, Resolution};
+   |                                               ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "fr4_1000_call_fixture") generated 1 warning (run `cargo fix --test "fr4_1000_call_fixture" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "provider_switched_journal") generated 6 warnings (1 duplicate) (run `cargo fix --test "provider_switched_journal" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "schedule_watchdog_fr26") generated 1 warning
+warning: `maos-kernel-core` (test "cap_audit_backpressure") generated 1 warning (run `cargo fix --test "cap_audit_backpressure" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "scalar_predicate_truth_table") generated 1 warning (run `cargo fix --test "scalar_predicate_truth_table" -p maos-kernel-core` to apply 1 suggestion)
+warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+  --> crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:11:5
+   |
+11 | use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `CapabilityToken`, `IntentClass`, `Scope`, and `TokenId`
+  --> crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:14:35
+   |
+14 | use maos_domain::invariants::i1::{CapabilityToken, IntentClass, Scope, TokenId};
+   |                                   ^^^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^  ^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+  --> crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:15:5
+   |
+15 | use maos_domain::invariants::i9::SandboxTier;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::ports::capability::CapError`
+  --> crates/maos-kernel-core/tests/scalar_policy_runtime_test.rs:16:5
+   |
+16 | use maos_domain::ports::capability::CapError;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-kernel-core` (test "upgrade_migrator_cross_major") generated 2 warnings
+warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+ --> crates/maos-kernel-core/tests/cap_registry_integration.rs:5:5
+  |
+5 | use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::path::PathBuf`
+ --> crates/maos-kernel-core/tests/cold_restart_recover_in_flight.rs:7:5
+  |
+7 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_domain::invariants::i1::Scope`
+  --> crates/maos-kernel-core/tests/spirit_boundary_invariants.rs:12:5
+   |
+12 | use maos_domain::invariants::i1::Scope;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/tests/nfr_rel_9_revoke_latency.rs:14:55
+   |
+14 | use maos_domain::invariants::i1::{IntentClass, Scope, TokenId};
+   |                                                       ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `RetractPayload`
+  --> crates/maos-kernel-core/tests/retract_corpus_v0.rs:11:64
+   |
+11 | use maos_domain::frame::{FrameAddress, FramePayload, IacFrame, RetractPayload};
+   |                                                                ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `hello_spirit_output_shape` is never used
+  --> crates/maos-kernel-core/tests/sandbox_admission.rs:67:4
+   |
+67 | fn hello_spirit_output_shape() -> OutputShape {
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_domain::ports::IacBusPort`
+  --> crates/maos-kernel-core/tests/retract_corpus_v0.rs:16:5
+   |
+16 | use maos_domain::ports::IacBusPort;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notes` is never read
+  --> crates/maos-kernel-core/tests/spirit_boundary_invariants.rs:27:5
+   |
+21 | struct CaseLine {
+   |        -------- field in this struct
+...
+27 |     notes: String,
+   |     ^^^^^
+   |
+   = note: `CaseLine` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_domain::self_telemetry::SelfTelemetryError`
+  --> crates/maos-kernel-core/tests/self_telemetry_scope.rs:10:5
+   |
+10 | use maos_domain::self_telemetry::SelfTelemetryError;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "scalar_predicate_to_halt_integration") generated 2 warnings (run `cargo fix --test "scalar_predicate_to_halt_integration" -p maos-kernel-core` to apply 2 suggestions)
+warning: unused import: `ValueKind`
+ --> crates/maos-kernel-core/tests/memory_md_opaque_write.rs:6:69
+  |
+6 | use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue, ValueKind};
+  |                                                                     ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `tmp`
+  --> crates/maos-kernel-core/tests/memory_md_opaque_write.rs:29:19
+   |
+29 |     let (adapter, tmp) = make_adapter();
+   |                   ^^^ help: if this is intentional, prefix it with an underscore: `_tmp`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "halt_invoke_test") generated 1 warning (run `cargo fix --test "halt_invoke_test" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "cold_restart_recover_in_flight") generated 1 warning (run `cargo fix --test "cold_restart_recover_in_flight" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "scalar_policy_runtime_test") generated 4 warnings (run `cargo fix --test "scalar_policy_runtime_test" -p maos-kernel-core` to apply 4 suggestions)
+warning: `maos-kernel-core` (test "cap_registry_integration") generated 1 warning (run `cargo fix --test "cap_registry_integration" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "spirit_boundary_invariants") generated 2 warnings (run `cargo fix --test "spirit_boundary_invariants" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "sandbox_admission") generated 1 warning
+warning: unused import: `maos_kernel_core::telemetry::TelemetryStreamAdapter`
+ --> crates/maos-kernel-core/tests/scalar_slot_set_and_tap.rs:9:5
+  |
+9 | use maos_kernel_core::telemetry::TelemetryStreamAdapter;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "retract_corpus_v0") generated 2 warnings (run `cargo fix --test "retract_corpus_v0" -p maos-kernel-core` to apply 1 suggestion)
+warning: `maos-kernel-core` (test "nfr_rel_9_revoke_latency") generated 1 warning (run `cargo fix --test "nfr_rel_9_revoke_latency" -p maos-kernel-core` to apply 1 suggestion)
+warning: function `default_test_class` is never used
+  --> crates/maos-kernel-core/tests/abi_stability_admit.rs:84:4
+   |
+84 | fn default_test_class() -> ClassSection {
+   |    ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "self_telemetry_scope") generated 1 warning (run `cargo fix --test "self_telemetry_scope" -p maos-kernel-core` to apply 1 suggestion)
+warning: unused variable: `topic`
+  --> crates/maos-kernel-core/tests/scalar_slot_set_and_tap.rs:53:9
+   |
+53 |     let topic = maos_domain::invariants::i7::TelemetryTopic::new("scalar.tap.uncertainty");
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_topic`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-kernel-core` (test "upgrade_cold_swap_with_inflight_tasks") generated 2 warnings (2 duplicates)
+warning: `maos-kernel-core` (test "memory_md_opaque_write") generated 2 warnings (run `cargo fix --test "memory_md_opaque_write" -p maos-kernel-core` to apply 2 suggestions)
+warning: `maos-kernel-core` (test "scalar_slot_set_and_tap") generated 2 warnings (run `cargo fix --test "scalar_slot_set_and_tap" -p maos-kernel-core` to apply 2 suggestions)
+warning: `maos-kernel-core` (test "abi_stability_admit") generated 1 warning
+warning: `maos-kernel-core` (test "upgrade_orchestrator_three_policies") generated 2 warnings (2 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 20.68s
+     Running unittests src/lib.rs (/tmp/r17-3c-tgt-int/debug/deps/maos_kernel_core-b63b32bb313b6972)
+
+running 262 tests
+test capability::cap_policy::tests::strictest_of_three ... ok
+test capability::cap_policy::tests::evaluate_with_posture_returns_deny_for_unknown_spirit ... ok
+test capability::cap_policy::tests::policy_table_update_is_atomic ... ok
+test capability::cap_policy::tests::operator_floor_can_force_above_manifest_and_trust_tier ... ok
+test capability::cap_policy::tests::strictest_of_floor_forces_t0_to_t2_for_public_untrusted ... ok
+test capability::cap_policy::tests::skill_author_self_requires_manifest_declaration_not_always_allow ... ok
+test capability::cap_policy::tests::evaluate_with_posture_operator_override_takes_precedence ... ok
+test capability::working_memory::policy_runtime::tests::above_flag_returns_flag_outcome ... ok
+test capability::working_memory::policy_runtime::tests::above_halt_fires ... ok
+test capability::working_memory::policy_runtime::tests::above_no_fire_when_below ... ok
+test capability::working_memory::policy_runtime::tests::above_verbalize_only_returns_verbalize_outcome ... ok
+test capability::tests::adapter_on_value_predicates ... ok
+test capability::working_memory::policy_runtime::tests::below_no_fire_when_above ... ok
+test capability::tests::adapter_issue_and_verify ... ok
+test capability::working_memory::policy_runtime::tests::below_halt_fires ... ok
+test capability::working_memory::policy_runtime::tests::first_matching_rule_fires ... ok
+test capability::working_memory::policy_runtime::tests::non_matching_tag_returns_none ... ok
+test capability::working_memory::policy_runtime::tests::outside_no_fire_when_inside ... ok
+test capability::working_memory::policy_runtime::tests::outside_halt_fires ... ok
+test capability::working_memory::policy_runtime::tests::rule_with_no_predicate_is_skipped ... ok
+test capability::working_memory::policy_runtime::tests::within_no_fire_when_outside ... ok
+test capability::working_memory::policy_runtime::tests::within_halt_fires ... ok
+test compliance::tests::all_zero_signature_err ... ok
+test compliance::tests::empty_claim_bytes_err ... ok
+test compliance::tests::malformed_cbor_err ... ok
+test compliance::tests::expiry_before_issue_err ... ok
+test compliance::tests::non_canonical_encoding_err ... ok
+test compliance::tests::every_malformation_has_distinct_error_variant ... ok
+test compliance::tests::unknown_principle_err ... ok
+test compliance::tests::unknown_verdict_err ... ok
+test compliance::tests::well_formed_claim_ok ... ok
+test halt::resolver::tests::failing_resolver_returns_unknown_halt ... ok
+test compliance::tests::zero_issue_timestamp_err ... ok
+test halt::resolver::tests::mock_call_count_reflects_multiple_calls ... ok
+test halt::resolver::tests::mock_is_send_and_sync ... ok
+test halt::resolver::tests::mock_records_resolve_calls ... ok
+test halt::swap_continuity_tests::drain_completes_returns_safe_drained ... ok
+test halt::swap_continuity_tests::drain_fails_migrate_rejects ... ok
+test halt::swap_continuity_tests::drain_fails_migrate_succeeds ... ok
+test halt::swap_continuity_tests::drain_fails_then_migrate_rejects_via_validate_halt_set ... ok
+test halt::swap_continuity_tests::drain_for_spirit_dry_run_does_not_mutate ... ok
+test halt::swap_continuity_tests::drain_for_spirit_empty_returns_empty ... ok
+test halt::swap_continuity_tests::drain_for_spirit_finds_only_owned_halts ... ok
+test halt::swap_continuity_tests::drain_for_spirit_idempotent_second_call_empty ... ok
+test halt::swap_continuity_tests::drain_for_spirit_leaves_legacy_no_meta_untouched ... ok
+test halt::swap_continuity_tests::drain_for_spirit_multi_spirit_filtering_correct ... ok
+test halt::swap_continuity_tests::empty_predecessor_returns_safe_drained_zero ... ok
+test halt::swap_continuity_tests::empty_successor_accepted_versions_returns_violation_via_validate_halt_set ... ok
+test hot_swap::archive::tests::archive_dir_path_construction ... ok
+test halt::swap_continuity_tests::missing_halt_protocol_compatibility_via_validate_halt_set ... ok
+test hot_swap::migrator::tests::different_length_fails ... ok
+test hot_swap::migrator::tests::midas_version_pattern_exact_match ... ok
+test hot_swap::migrator::tests::wildcard_major_mismatch_fails ... ok
+test hot_swap::migrator::tests::wildcard_matches_any_patch ... ok
+test hot_swap::migrator::tests::exact_mismatch_fails ... ok
+test hot_swap::migrator::tests::wildcard_minor_mismatch_fails ... ok
+test hot_swap::post_swap_monitor::tests::a_pre_drain_snapshot_would_falsely_flag_the_drained_halt ... ok
+test hot_swap::archive::tests::archive_read_nonexistent_returns_none ... ok
+test hot_swap::post_swap_monitor::tests::a_genuinely_lost_survivor_is_still_flagged ... ok
+test hot_swap::post_swap_monitor::tests::invariant_snapshot_construction ... ok
+test hot_swap::post_swap_monitor::tests::a_surviving_halt_still_pending_is_clean ... ok
+test hot_swap::post_swap_monitor::tests::monitor_window_resolves_from_env_var ... ok
+test hot_swap::post_swap_monitor::tests::survivor_snapshot_without_the_drained_halt_is_not_a_loss ... ok
+test hot_swap::precheck::tests::precheck_cross_major_detected ... ok
+test hot_swap::precheck::tests::precheck_empty_halt_set_returns_safe_drained ... ok
+test hot_swap::precheck::tests::precheck_halt_continuity_violation ... ok
+test hot_swap::saga::tests::saga_advances_through_phases ... ok
+test hot_swap::archive::tests::archive_read_returns_snapshot ... ok
+test hot_swap::archive::tests::archive_write_and_exists ... ok
+test hot_swap::saga::tests::saga_captures_pre_swap_runtime ... ok
+test hot_swap::state_codec::tests::cross_major_detected ... ok
+test hot_swap::state_codec::tests::decode_accepts_adjacent_downward_major ... ok
+test hot_swap::state_codec::tests::decode_accepts_adjacent_upward_major ... ok
+test hot_swap::state_codec::tests::decode_rejects_empty_blob ... ok
+test hot_swap::state_codec::tests::decode_rejects_downward_gap_of_two_majors ... ok
+test hot_swap::state_codec::tests::decode_rejects_invalid_expected_schema_version_distinctly ... ok
+test hot_swap::state_codec::tests::decode_rejects_truncated_cbor ... ok
+test hot_swap::state_codec::tests::decode_rejects_upward_gap_of_two_majors ... ok
+test hot_swap::state_codec::tests::decode_rejects_zero_envelope_schema_version ... ok
+test hot_swap::state_codec::tests::encode_validates_schema_version_gt_zero ... ok
+test capability::cap_policy::tests::concurrent_readers_never_block_writer ... ok
+test hot_swap::state_codec::tests::logical_envelope_preserves_the_spirit_payload_without_a_codec_roundtrip ... ok
+test hot_swap::state_codec::tests::same_major_detected ... ok
+test hot_swap::state_codec::tests::roundtrip_encode_decode ... ok
+test inference::router::tests::dispatch_returns_default_when_none_provided ... ok
+test inference::router::tests::dispatch_returns_no_default_when_no_provider_id ... ok
+test inference::router::tests::dispatch_returns_primary_when_registered ... ok
+test inference::router::tests::dispatch_returns_unknown_provider_when_missing ... ok
+test inference::router::tests::dispatch_with_fallback_400_does_not_walk ... ok
+test inference::router::tests::dispatch_with_fallback_503_walks_to_secondary ... ok
+test inference::router::tests::dispatch_with_fallback_all_fail_returns_last_error ... ok
+test inference::router::tests::dispatch_with_fallback_first_provider_succeeds_no_walk ... ok
+test inference::router::tests::dispatch_with_fallback_transport_walks ... ok
+test inference::router::tests::is_retriable_serde_false ... ok
+test inference::router::tests::registered_ids_returns_all_keys ... ok
+test isolation::runner::tests::validate_kernel_response_known_variants ... ok
+test isolation::runner::tests::empty_corpus_run_all_success ... ok
+test lifecycle::cli_wrapper::runtime::tests::argv_prefix_hash_empty_is_stable ... ok
+test lifecycle::cli_wrapper::runtime::tests::ci_default_guard_passes_for_fixture ... ok
+test lifecycle::cli_wrapper::runtime::tests::ci_default_guard_trips_on_network ... ok
+test lifecycle::cli_wrapper::runtime::tests::ci_default_guard_trips_on_real_cli ... ok
+test lifecycle::cli_wrapper::lifecycle::tests::respawn_with_context_returns_transfer_true ... ok
+test lifecycle::cli_wrapper::lifecycle::tests::respawn_fresh_returns_transfer_false ... ok
+test lifecycle::cli_wrapper::lifecycle::tests::escalate_returns_escalate ... ok
+test lifecycle::cli_wrapper::runtime::tests::argv_prefix_hash_deterministic ... ok
+test lifecycle::cli_wrapper::admission::tests::admission_rejects_non_t3_sandbox ... ok
+test lifecycle::cli_wrapper::runtime::tests::argv_prefix_hash_differs_with_args ... ok
+test inference::tests::capability_denied_without_token ... ok
+test lifecycle::cli_wrapper::runtime::tests::escalate_policy_does_not_respawn ... ok
+test lifecycle::cli_wrapper::runtime::tests::exit_nonzero_is_a_crash ... ok
+test lifecycle::cli_wrapper::runtime::tests::exit_zero_is_not_a_crash ... ok
+test lifecycle::cli_wrapper::runtime::tests::newline_framing_strips_crlf ... ok
+test lifecycle::cli_wrapper::admission::tests::admission_reports_binary_not_found ... ok
+test lifecycle::cli_wrapper::runtime::tests::respawn_bound_routes_to_escalate ... ok
+test lifecycle::cli_wrapper::runtime::tests::respawn_fresh_carries_no_context ... ok
+test lifecycle::cli_wrapper::runtime::tests::respawn_with_context_fails_loud ... ok
+test lifecycle::cli_wrapper::runtime::tests::signal_death_is_a_crash_and_has_no_exit_code ... ok
+test memory::read_entry_point::tests::raw_store_read_methods_callable_from_memory_module ... ok
+test memory::read_entry_point::tests::read_enforcement_disabled_when_no_home ... ok
+test memory::read_entry_point::tests::read_entry_point_enum_is_exhaustive ... ok
+test inference::tests::mock_provider_round_trip_logs_inference_call ... ok
+test inference::tests::fallback_503_routes_to_secondary ... ok
+test lifecycle::cli_wrapper::runtime::tests::drop_without_pump_does_not_deadlock ... ok
+test memory::write_entry_point::tests::disabled_pinning_allows_foreign ... ok
+test memory::write_entry_point::tests::r_rg1_same_input_opposite_verdict ... ok
+test memory::write_entry_point::tests::r_rg2_anti_stub_all_entry_points_fail_closed ... ok
+test memory::write_entry_point::tests::r_rg3_exhaustive_defined_verdict_per_variant ... ok
+test memory::write_entry_point::tests::r_rg_cross_region_readmit_enforced ... ok
+test orchestrator::buffer::tests::buffer_is_send_and_sync ... ok
+test orchestrator::buffer::tests::dequeue_at_safe_point_on_empty_returns_none ... ok
+test orchestrator::buffer::tests::enqueue_32_succeeds_33rd_returns_queue_full ... ok
+test orchestrator::buffer::tests::enqueue_then_dequeue_returns_same_instruction_fifo ... ok
+test orchestrator::buffer::tests::new_returns_buffer_with_capacity_32 ... ok
+test orchestrator::buffer::tests::pending_count_after_enqueue_dequeue_is_correct ... ok
+test orchestrator::buffer::tests::recall_all_pending_empties_the_queue ... ok
+test orchestrator::buffer::tests::recall_all_pending_returns_fifo_order ... ok
+test orchestrator::buffer::tests::recall_and_re_enqueue_preserves_instructions ... ok
+test memory::self_telemetry::tests::invalid_window_returns_error ... ok
+test orchestrator::registry::tests::get_or_create_is_idempotent ... ok
+test orchestrator::registry::tests::get_or_create_returns_new_buffer_for_fresh_spirit ... ok
+test orchestrator::registry::tests::get_returns_none_for_unknown_spirit ... ok
+test orchestrator::registry::tests::get_returns_some_for_known_spirit ... ok
+test orchestrator::registry::tests::registry_is_send_and_sync ... ok
+test memory::self_telemetry::tests::empty_window_returns_zeros ... ok
+test memory::self_telemetry::tests::different_pids_produce_different_reports ... ok
+test revocation::parser::tests::parse_rejects_noncanonical_wire_class_before_matching ... ok
+test revocation::parser::tests::parse_accepts_real_ed25519_signature_over_canonical_entries ... ok
+test revocation::parser::tests::parse_rejects_mutated_real_signature ... ok
+test revocation::poller::tests::cadence_precedence_is_revocation_then_supervision_then_default ... ok
+test scheduler::control_block::tests::cas_race_tolerance ... ok
+test scheduler::control_block::tests::loaded_to_paused_rejected ... ok
+test scheduler::control_block::tests::loaded_to_running_allowed ... ok
+test scheduler::control_block::tests::loaded_to_unloaded_allowed ... ok
+test revocation::parser::tests::parse_rejects_wrong_schema_version ... ok
+test revocation::parser::tests::parse_rejects_trust_anchor_mismatch ... ok
+test scheduler::control_block::tests::paused_to_running_allowed ... ok
+test scheduler::control_block::tests::paused_to_unloaded_allowed ... ok
+test scheduler::control_block::tests::running_to_paused_allowed ... ok
+test scheduler::control_block::tests::running_to_unloaded_allowed ... ok
+test scheduler::control_block::tests::runtime_replacement_preserves_stable_identity_and_rolls_back_for_stale_clones ... ok
+test scheduler::control_block::tests::scb_default_supervision_fields ... ok
+test scheduler::control_block::tests::scb_last_stall_emit_cas ... ok
+test scheduler::control_block::tests::scb_on_crash_action_from_manifest ... ok
+test scheduler::control_block::tests::scb_on_revocation_action_default ... ok
+test scheduler::control_block::tests::scb_on_revocation_action_from_manifest ... ok
+test scheduler::control_block::tests::scb_task_assignments_push_and_drain ... ok
+test scheduler::control_block::tests::unload_idempotent ... ok
+test scheduler::idle_watchdog::tests::poll_interval_bounds ... ok
+test scheduler::resource_ceiling::tests::compute_cpu_quota_us_values ... ok
+test scheduler::schedule_watchdog::tests::cadence_window_normal_and_fast ... ok
+test scheduler::schedule_watchdog::tests::schedule_bucket_consume_and_refill ... ok
+test scheduler::schedule_watchdog::tests::schedule_bucket_starts_full ... ok
+test lifecycle::cli_wrapper::runtime::tests::signals_control_closes_worker_stdin_so_a_stdin_reader_proceeds ... ok
+test security::approval::tests::prompt_with_posture_prompts_for_matrix_true ... ok
+test security::crypto::tests::mock_provider_satisfies_trait_for_swap_pattern ... ok
+test security::approval::tests::approval_prompt_auto_allows_and_logs ... ok
+test security::approval::tests::approval_decision_id_increments ... ok
+test security::crypto::tests::ring_seal_produces_gcm_tag_appended_ciphertext ... ok
+test security::crypto::tests::ring_seal_rejects_wrong_key_length ... ok
+test security::approval::tests::prompt_with_posture_silent_allows_for_matrix_false ... ok
+test security::crypto::tests::ring_verify_rejects_malformed_public_key ... ok
+test security::drift::tests::drift_channel_sends_and_receives ... ok
+test security::operator_config::tests::defaults_are_local_tier ... ok
+test security::operator_config::tests::env_allows_negating_bools ... ok
+test security::drift::tests::drift_channel_try_send_does_not_block_on_full ... ok
+test security::operator_config::tests::env_overrides_disk_config ... ok
+test security::operator_config::tests::parse_tier_maps_correctly ... ok
+test security::operator_config::tests::posture_ceiling_env_accepts_the_runtime_posture_spellings ... ok
+test security::operator_config::tests::region_defaults_to_disabled ... ok
+test security::operator_config::tests::posture_ceiling_env_rejects_non_runtime_and_invalid_values ... ok
+test security::crypto::tests::ring_sign_verify_round_trip ... ok
+test security::operator_config::tests::region_env_empty_disables ... ok
+test security::operator_config::tests::region_env_invalid_tag_disables_with_warning ... ok
+test security::crypto::tests::ring_verify_rejects_tampered_message ... ok
+test security::operator_config::tests::region_env_sets_and_canonicalizes ... ok
+test security::operator_config::tests::resolve_from_defaults_when_no_env ... ok
+test security::posture::tests::apply_director_preferences_clamps_tilt ... ok
+test security::posture::tests::apply_director_preferences_idempotent ... ok
+test security::posture::tests::apply_director_preferences_rejects_duplicate_override_tag ... ok
+test security::posture::tests::apply_director_preferences_negative_tilt_lowers_threshold ... ok
+test security::posture::tests::apply_director_preferences_rejects_nan ... ok
+test security::posture::tests::apply_director_preferences_rejects_override_for_rule_without_threshold ... ok
+test security::posture::tests::apply_director_preferences_rejects_unknown_tag ... ok
+test security::posture::tests::posture_hash_changes_when_default_action_changes ... ok
+test security::posture::tests::posture_hash_changes_when_posture_variant_changes ... ok
+test security::posture::tests::posture_hash_changes_when_threshold_changes ... ok
+test security::posture::tests::posture_hash_is_deterministic ... ok
+test security::posture::tests::posture_hash_stable_under_rule_reordering ... ok
+test security::posture::tests::posture_matrix_covers_all_combinations ... ok
+test security::posture::tests::posture_matrix_matches_epic_3_acs ... ok
+test security::posture::tests::posture_requires_approval_returns_true_for_unknown_pairs ... ok
+test security::provider_history_tests::provider_history_reinsertion_keeps_order_synced ... ok
+test security::sandbox::t3::argv::tests::build_argv_produces_expected_shape ... ok
+test security::sandbox::t3::image_lock::tests::shipped_default_lock_is_rejected_before_signature_use ... ok
+test security::sandbox::t3::image_lock::tests::shipped_placeholder_shape_is_never_verifiable ... ok
+test security::sandbox::t3::image_verify::tests::normalizer_removes_one_tag_or_digest_without_losing_registry_port ... ok
+test security::sandbox::t3::image_verify::tests::repo_digest_parser_preserves_malformed_and_missing_diagnostics ... ok
+test security::sandbox::t3::image_verify::tests::repo_digest_parser_selects_the_matching_repository ... ok
+test security::sandbox::t3::image_verify::tests::signed_lock_parser_rejects_an_invalid_signature_after_anchor_match ... ok
+test security::sandbox::t3::runtime_detect::tests::auto_mode_retains_both_runtime_probe_diagnostics ... ok
+test security::provider_history_tests::provider_history_tracks_switch_and_keeps_newest ... ok
+test security::sandbox::tests::sandbox_spec_construction ... ok
+test security::sandbox::tests::spawn_error_display ... ok
+test telemetry::tests::adapter_default_constructs_with_2048 ... ok
+test telemetry::tests::adapter_new_has_no_topics ... ok
+test security::provider_history_tests::provider_history_evict_then_reinsert_no_ghost ... ok
+test telemetry::tests::publish_with_subscriber_receives_event ... ok
+test telemetry::tests::publish_without_subscriber_silently_dropped ... ok
+test telemetry::tests::subscribe_returns_initialized_receiver ... ok
+test telemetry::tests::subscribe_topic_first_returns_true ... ok
+test telemetry::tests::subscribe_topic_different_spirit_returns_true ... ok
+test telemetry::tests::subscribe_topic_second_returns_false ... ok
+test security::approval::tests::prompt_with_posture_all_cells_match_matrix ... ok
+test security::provider_history_tests::provider_history_is_bounded_under_churn ... ok
+test security::sandbox::t3::runtime_detect::tests::detect_container_runtime_caches_result ... ok
+test journal::tests::append_in_flight_roundtrip ... ok
+test lifecycle::cli_wrapper::admission::tests::admission_bare_name_resolved_via_path ... ok
+test journal::tests::recover_in_flight_returns_last_per_spirit ... ok
+test journal::tests::open_temp_succeeds ... ok
+test hot_swap::state_codec::tests::large_payload_roundtrip ... ok
+test journal::tests::spirit_scheduler_port_impl ... ok
+test journal::tests::recover_in_flight_with_tasks_mixed_entries ... ok
+test journal::tests::append_and_read_last_event ... ok
+test journal::tests::in_flight_entry_survives_cold_restart ... ok
+test journal::tests::journal_survives_cold_restart ... ok
+test memory::shared::tests::read_missing_returns_none ... ok
+test memory::shared::tests::write_and_read_same_writer ... ok
+test memory::principal::tests::lookup_nonexistent_returns_empty ... ok
+test memory::shared::tests::cross_writer_read ... ok
+test memory::shared::tests::json_roundtrip_via_kind_column ... ok
+test memory::tests::collective_returns_typed_error ... ok
+test memory::tests::scan_private ... ok
+test memory::principal::tests::write_and_lookup ... ok
+test memory::shared::tests::insert_or_replace_semantics ... ok
+test memory::tests::write_read_private ... ok
+test memory::tests::spirit_view_fuses_pid ... ok
+test memory::tests::write_read_shared ... ok
+test memory::principal::tests::second_forget_returns_zero ... ok
+test memory::principal::tests::forget_then_lookup_empty ... ok
+test memory::tests::i5_isolation_different_pids_dont_overlap ... ok
+test memory::shared::tests::scan_returns_deterministic_order ... ok
+test memory::tests::legal_hold_cannot_commit_inside_an_in_progress_forget ... ok
+
+test result: ok. 262 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running unittests src/bin/assert-revocation-p99-floor.rs (/tmp/r17-3c-tgt-int/debug/deps/assert_revocation_p99_floor-abed729087c3876e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/abi_stability_admit.rs (/tmp/r17-3c-tgt-int/debug/deps/abi_stability_admit-e37d16e4fb27b03b)
+
+running 9 tests
+test combined_substrate_too_old_and_schema_n2_checks_substrate_first ... ok
+test kernel_below_declared_min_substrate_rejected ... ok
+test no_class_section_rejected_e_class_required ... ok
+test unparseable_min_substrate_fails_loud_never_admits ... ok
+test kernel_at_declared_min_admits ... ok
+test kernel_above_declared_min_admits ... ok
+test schema_above_max_rejected_eabitoonew_fail_closed ... ok
+test schema_below_min_rejected_eabitooold ... ok
+test schema_n_minus_1_admits ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/air_gap_ollama_test.rs (/tmp/r17-3c-tgt-int/debug/deps/air_gap_ollama_test-29cb80da89399cd3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/approval_prompt_e2e.rs (/tmp/r17-3c-tgt-int/debug/deps/approval_prompt_e2e-0abe748e16fe822c)
+
+running 2 tests
+test approval_prompt_e2e_dispatches_and_logs ... ok
+test approval_prompt_is_distinct_from_transparency_log ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/audit_sink_truth_16_5.rs (/tmp/r17-3c-tgt-int/debug/deps/audit_sink_truth_16_5-90b5a6d2e875b307)
+
+running 2 tests
+test every_audit_drop_site_counts_into_its_own_counter ... ok
+test audit_sink_truth_lifecycle_healthy_then_closed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/audit_spine_integration.rs (/tmp/r17-3c-tgt-int/debug/deps/audit_spine_integration-ac9a28997e9c4e89)
+
+running 3 tests
+test concurrent_transparency_log_writes ... ok
+test journal_cold_restart_rehydration ... ok
+test audit_spine_end_to_end ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/bridge_t2_route_17_6.rs (/tmp/r17-3c-tgt-int/debug/deps/bridge_t2_route_17_6-dce583b0e227c202)
+
+running 5 tests
+test t1_and_t4_are_refused_typed_before_any_spawn ... ok
+test t3_probe_runs_bare_until_17_1 ... ok
+test t0_probe_runs_bare_and_ptrace_returns ... ok
+test t2_probe_dies_of_sigsys_at_the_launch_primitive ... ok
+test t2_sigsys_block_is_audited_or_journaled_never_dropped ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/budget_seam_8_11.rs (/tmp/r17-3c-tgt-int/debug/deps/budget_seam_8_11-717b22829e335f9b)
+
+running 3 tests
+test manifest_time_cap_overrides_default ... ok
+test absent_budget_falls_back_to_default ... ok
+test slow_hook_emits_budget_warning_then_exceeded_at_manifest_cap ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s
+
+     Running tests/cap_audit_backpressure.rs (/tmp/r17-3c-tgt-int/debug/deps/cap_audit_backpressure-e80c6ea7ed69283b)
+
+running 1 test
+test hot_path_never_blocks_under_audit_saturation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running tests/cap_policy_decision.rs (/tmp/r17-3c-tgt-int/debug/deps/cap_policy_decision-972cb73f86f84285)
+
+running 3 tests
+test log_fetch_policy_decision_is_allow ... ok
+test log_recall_policy_decision_is_allow ... ok
+test distillate_write_policy_decision_is_require_approval ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cap_registry_integration.rs (/tmp/r17-3c-tgt-int/debug/deps/cap_registry_integration-b0633b54372738d9)
+
+running 4 tests
+test integration_issue_verify_revoke ... ok
+test integration_high_privilege_ttl_capped ... ok
+test integration_cross_spirit_replay_rejected ... ok
+test integration_toctu_rejects_stale_posture ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cap_token_verify_assertion.rs (/tmp/r17-3c-tgt-int/debug/deps/cap_token_verify_assertion-17f0bf4e428a9a88)
+
+running 2 tests
+test cap_token_verify_p99_under_100us_overall ... ok
+test cap_token_verify_p99_under_5us_hot_path ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/capability_invocation_audit.rs (/tmp/r17-3c-tgt-int/debug/deps/capability_invocation_audit-33b53f1b59573b3b)
+
+running 3 tests
+test recall_emits_capability_invocation ... ok
+test fetch_emits_capability_invocation ... ok
+test write_distillate_emits_capability_invocation ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/cgroup_ceiling_smoke.rs (/tmp/r17-3c-tgt-int/debug/deps/cgroup_ceiling_smoke-be7374cb9b58fa5e)
+
+running 2 tests
+test cgroup_ceiling_writes_cpu_and_memory_files ... ignored, self-skips unless MAOS_CGROUP_TEST is set (real-cgroup smoke; manual on a cgroup-capable host — Story 15-1 R-4)
+test compute_cpu_quota_us_values ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_subprocess_invocation_fr52.rs (/tmp/r17-3c-tgt-int/debug/deps/cli_subprocess_invocation_fr52-9a5bd79f97d58a0a)
+
+running 5 tests
+test ac6_scenario_6_2_cap_token_expired_propagation ... ok
+test ac6_scenario_6_1_cli_subprocess_output_surface_typed_variants_present ... ok
+test ac6_scenario_6_3_subprocess_exit_127_audit_row_shape ... ok
+test ac6_scenario_6_4_t1_sandbox_refused_with_ecli_wrapper_requires_t3 ... ok
+test ac6_scenario_6_5_firehose_drr_fairness_floor_signal_present ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_wrapper_admission.rs (/tmp/r17-3c-tgt-int/debug/deps/cli_wrapper_admission-de6443cb20ceeee1)
+
+running 7 tests
+test ac5_scenario_5_4_class_and_cli_wrapper_mutually_exclusive_via_error_variant ... ok
+test ac5_scenario_5_6_adapter_not_registered_typed_error ... ok
+test ac5_scenario_5_5_cli_binary_not_on_path_fires_ecli_binary_not_found ... ok
+test ac5_scenario_5_2_minor_bump_mismatch_fires_eoutput_shape_adapter_mismatch ... ok
+test ac5_scenario_5_1_declared_matches_observed_admission_succeeds ... ok
+test ac5_scenario_5_7_mock_claude_code_admits_and_runtime_forwards_frames ... ok
+test ac5_scenario_5_3_major_bump_mismatch_fires_eoutput_shape_adapter_mismatch ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/cli_wrapper_bridge_8_12.rs (/tmp/r17-3c-tgt-int/debug/deps/cli_wrapper_bridge_8_12-a5be12e8ca4bfe36)
+
+running 9 tests
+test admission_rejects_respawn_with_context_fail_loud ... ok
+test admission_tier_grant_gate ... ok
+test cap_binding_mismatch_refuses_to_spawn ... ok
+test crash_detection_latency_under_2s_with_margin ... ok
+test antitheater_real_spawn_nonce_pid_and_reaped ... ok
+test redaction_trap_hex_token_never_lands_in_log ... ok
+test stderr_lines_are_captured_with_stream_provenance ... ok
+test stdout_drains_before_death_no_truncation ... ok
+test crash_matrix_exit_codes_and_signals ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cli_wrapper_shape_mismatch_journal_7_4.rs (/tmp/r17-3c-tgt-int/debug/deps/cli_wrapper_shape_mismatch_journal_7_4-0f5571af86d88d0c)
+
+running 4 tests
+test non_shape_errors_are_not_journaled_as_shape_mismatch ... ok
+test clean_admission_writes_no_mismatch_frame ... ok
+test mismatch_is_journaled_with_version_diff ... ok
+test resumption_gate_no_silent_restart_then_corrected_config_admits ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/cold_restart_recover_in_flight.rs (/tmp/r17-3c-tgt-int/debug/deps/cold_restart_recover_in_flight-3fe637d03f38819a)
+
+running 1 test
+test in_flight_entry_survives_journal_reopen ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/consent_rupture_adr_034.rs (/tmp/r17-3c-tgt-int/debug/deps/consent_rupture_adr_034-0d51dcdaf2b5cbfa)
+
+running 11 tests
+test rupture_payload_serde_round_trip ... ok
+test rupture_3_7_recipient_unloaded ... ok
+test rupture_3_8_recursion_bound_at_depth_2 ... ok
+test rupture_3_2_two_accept_no_rupture ... ok
+test rupture_3_9_lineage_preserved ... ok
+test rupture_3_6_token_revoked ... ok
+test rupture_3_1_single_accept_no_rupture ... ok
+test rupture_3_4_full_quarantine ... ok
+test rupture_3_3_partial_intent_mismatch ... ok
+test rupture_3_5_posture_shift_during_transmission ... ok
+test rupture_3_10_cross_host_rejection ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/crash_detector_in_process_panic.rs (/tmp/r17-3c-tgt-int/debug/deps/crash_detector_in_process_panic-4fb5106eadd1e289)
+
+running 1 test
+test panic_hook_triggers_crash_detector ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/distillation_i11_audit_chain.rs (/tmp/r17-3c-tgt-int/debug/deps/distillation_i11_audit_chain-4bce9fe92587aef0)
+
+running 8 tests
+test rejects_depth_zero ... ok
+test rejects_empty_source ... ok
+test rejects_missing_source_frame ... ok
+test admit_denies_non_matching_lineage ... ok
+test admit_allows_matching_lineage ... ok
+test two_hop_flattening ... ok
+test write_single_hop ... ok
+test cycle_detection ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/drr_priority_weighted_dispatch.rs (/tmp/r17-3c-tgt-int/debug/deps/drr_priority_weighted_dispatch-dc16f0e68943c38e)
+
+running 4 tests
+test drr_empty_slice_returns_none ... ok
+test drr_skips_non_running_spirits ... ok
+test drr_highest_weight_dominates ... ok
+test drr_equal_weights_rotate ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/drr_scheduler.rs (/tmp/r17-3c-tgt-int/debug/deps/drr_scheduler-043115b23ce6dde8)
+
+running 3 tests
+test drr_batch_flush_on_interval ... ok
+test drr_backpressure_emitted_when_backlog_exceeds_threshold ... ok
+test drr_basic_two_spirits_fair ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/fr4_1000_call_fixture.rs (/tmp/r17-3c-tgt-int/debug/deps/fr4_1000_call_fixture-4922fd0fa17b192e)
+
+running 1 test
+test fr4_1000_call_mediation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/frame_bridge_poll_17_3c.rs (/tmp/r17-3c-tgt-int/debug/deps/frame_bridge_poll_17_3c-2c8d390afc2d6553)
+
+running 4 tests
+test malformed_frame_header_is_a_terminal_error_not_eof ... ok
+test kill_after_exit_is_a_no_op ... ok
+test overlong_stderr_never_journals_a_token_split_across_records ... ok
+test stdout_eof_closes_the_bridge_even_while_stderr_stays_open ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s
+
+     Running tests/gateway_dispatcher_fr54.rs (/tmp/r17-3c-tgt-int/debug/deps/gateway_dispatcher_fr54-5e268905c8fb89a5)
+
+running 10 tests
+test gateway_dispatcher_duplicate_gateway_id_rejected ... ok
+test gateway_dispatcher_empty_gateways_section ... ok
+test gateway_dispatcher_admit_single_spirit ... ok
+test gateway_dispatcher_admit_multiple_gateways ... ok
+test gateway_dispatcher_admit_two_spirits_isolated ... ok
+test gateway_dispatcher_gateway_type_in_uninstall_record ... ok
+test gateway_dispatcher_no_factory_fails_admission ... ok
+test gateway_dispatcher_unload_nonexistent_spirit ... ok
+test gateway_dispatcher_unload_returns_record ... ok
+test gateway_dispatcher_unregistered_type_fails_admission ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gateway_uninstall_fr65_v05.rs (/tmp/r17-3c-tgt-int/debug/deps/gateway_uninstall_fr65_v05-eae2deecc7e01c68)
+
+running 6 tests
+test gateway_uninstall_empty_when_no_gateways ... ok
+test gateway_uninstall_serde_round_trip ... ok
+test gateway_uninstall_record_disconnect_outcome_clean ... ok
+test gateway_uninstall_record_has_gateways ... ok
+test gateway_uninstall_record_entry_has_gateway_id ... ok
+test gateway_uninstall_record_has_spirit_pid ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/halt_continuity_test.rs (/tmp/r17-3c-tgt-int/debug/deps/halt_continuity_test-5db3e81c83fa2c1e)
+
+running 5 tests
+test validate_halt_set_empty_accepted_versions_returns_violation_not_compatibility_missing ... ok
+test validate_halt_set_empty_predecessor_succeeds_regardless_of_successor ... ok
+test validate_halt_set_matching_version_succeeds ... ok
+test validate_halt_set_mismatched_version_returns_typed_error ... ok
+test validate_halt_set_missing_compatibility_returns_typed_error ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/halt_durability_16_5.rs (/tmp/r17-3c-tgt-int/debug/deps/halt_durability_16_5-1beb0131fe2ea03b)
+
+running 2 tests
+test failed_context_write_leaves_halt_retryable ... ok
+test journal_failure_rolls_back_and_retry_succeeds ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/halt_invoke_test.rs (/tmp/r17-3c-tgt-int/debug/deps/halt_invoke_test-729a1a5889397bd3)
+
+running 12 tests
+test invoke_halt_rejects_duplicate_halt_id_with_typed_error ... ok
+test invoke_halt_empty_halt_id_returns_registry_insert_failed ... ok
+test invoke_halt_then_resolve_via_mock_records_call ... ok
+test invoke_halt_writes_tl_row_journal_entry_and_inserts_registry ... ok
+test kernel_resolver_provided_context_marks_resumed_and_clears_registry ... ok
+test kernel_resolver_is_send_and_sync ... ok
+test kernel_resolver_unknown_halt_returns_error ... ok
+test kernel_resolver_accepted_halt_emits_task_orphaned_and_marks_terminated ... ok
+test kernel_resolver_transitions_registry_state_for_all_three_resolution_kinds ... ok
+test kernel_resolver_authorized_override_enqueues_output_marker_and_marks_overridden ... ok
+test kernel_resolver_double_resolve_returns_already_resolved ... ok
+test kernel_resolver_rejects_empty_payload_without_transitioning_halt_state ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/halt_receipt_production_rate.rs (/tmp/r17-3c-tgt-int/debug/deps/halt_receipt_production_rate-e44631f6bc662cd9)
+
+running 1 test
+test test_halt_receipt_production_rate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running tests/halt_resolution_journaled.rs (/tmp/r17-3c-tgt-int/debug/deps/halt_resolution_journaled-70ac4ce626a0acd6)
+
+running 2 tests
+test failing_resolver_prevents_journal_write ... ok
+test halt_resolution_three_variants_journaled ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/halt_resolution_writes_memory.rs (/tmp/r17-3c-tgt-int/debug/deps/halt_resolution_writes_memory-ca258c4d24488588)
+
+running 1 test
+test provided_context_writes_memory_and_scalar_marker ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/hook_dispatch_budget_envelope.rs (/tmp/r17-3c-tgt-int/debug/deps/hook_dispatch_budget_envelope-a03ddad12c907d7c)
+
+running 5 tests
+test manifest_gate_skips_disabled_hook ... ok
+test hook_fires_within_budget ... ok
+test panicking_hook_returns_payload_preview ... ok
+test hook_crosses_eighty_percent_before_timeout ... ok
+test hook_exceeds_budget_and_returns_budget_exceeded ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s
+
+     Running tests/hook_dispatch_swap_hooks.rs (/tmp/r17-3c-tgt-int/debug/deps/hook_dispatch_swap_hooks-7996ecccaf3a0cf2)
+
+running 3 tests
+test default_migrate_returns_not_implemented ... ok
+test default_on_swap_out_fires_noop ... ok
+test default_snapshot_returns_empty_vec ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hot_swap_cross_major_migration.rs (/tmp/r17-3c-tgt-int/debug/deps/hot_swap_cross_major_migration-f8c308a9a30585f0)
+
+running 10 tests
+test version_pattern_exact_match ... ok
+test version_pattern_rejects_different_major ... ok
+test version_pattern_rejects_different_minor ... ok
+test version_pattern_rejects_exact_mismatch ... ok
+test version_pattern_wildcard_matches_same_major_minor ... ok
+test run_migrator_names_the_specific_absent_hop_at_run_time ... ok
+test declared_default_migrator_returns_migrator_not_implemented ... ok
+test zero_successor_schema_returns_distinct_expected_version_error ... ok
+test adjacent_upward_major_reaches_migrator_and_delivers_migrated_state ... ok
+test snapshot_panic_returns_snapshot_specific_error ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/hot_swap_halt_continuity_corpus_integration.rs (/tmp/r17-3c-tgt-int/debug/deps/hot_swap_halt_continuity_corpus_integration-80b94a0651b65f0b)
+
+running 3 tests
+test chain_walk_drains_a_real_pending_halt_at_every_hop_with_zero_dropped ... ok
+test swap_continuity_with_seeded_halts_returns_safe_drained_nonzero ... ok
+test halt_signal_observation_corpus_exercises_swap_continuity_wrapper ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/hot_swap_halt_continuity_test.rs (/tmp/r17-3c-tgt-int/debug/deps/hot_swap_halt_continuity_test-e05bb21571260dc3)
+
+running 1 test
+test halt_continuity_corpus_loads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hot_swap_saga_compensation.rs (/tmp/r17-3c-tgt-int/debug/deps/hot_swap_saga_compensation-a796483730237f46)
+
+running 1 test
+test swap_in_failure_restores_the_predecessor_runtime_on_the_same_control_block ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hot_swap_same_major_lifecycle.rs (/tmp/r17-3c-tgt-int/debug/deps/hot_swap_same_major_lifecycle-4b6c782962e3934e)
+
+running 1 test
+test same_major_swap_happy_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/i12_real_digest_provider_8_10.rs (/tmp/r17-3c-tgt-int/debug/deps/i12_real_digest_provider_8_10-7d7aa0a84bbc945e)
+
+running 2 tests
+test real_provider_yields_nonempty_refs_for_decision_frame ... ok
+test real_provider_empty_when_spirit_has_no_digests ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/intent_lineage_corpus_v0.rs (/tmp/r17-3c-tgt-int/debug/deps/intent_lineage_corpus_v0-97b6fc011ba45169)
+
+running 1 test
+test nfr_aud_14_intent_lineage_corpus_100_percent_coverage ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/isolation_hookpoint_wiring.rs (/tmp/r17-3c-tgt-int/debug/deps/isolation_hookpoint_wiring-030dda547888fceb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/journal_append_16_5.rs (/tmp/r17-3c-tgt-int/debug/deps/journal_append_16_5-e35423ae64f61fad)
+
+running 1 test
+test independent_adapters_append_complete_non_overlapping_records ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/journal_fsync_assertion.rs (/tmp/r17-3c-tgt-int/debug/deps/journal_fsync_assertion-8f0bf29770706357)
+
+running 1 test
+test journal_append_p99_measurement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+     Running tests/kernel_ctx_round_trip.rs (/tmp/r17-3c-tgt-int/debug/deps/kernel_ctx_round_trip-a5d11b6437caa650)
+
+running 3 tests
+test kernel_ctx_default_builder_has_none ... ok
+test kernel_ctx_heartbeat_err_when_not_wired ... ok
+test kernel_ctx_builder_wires_all_adapters ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/loaded_spirit_exit_16_6.rs (/tmp/r17-3c-tgt-int/debug/deps/loaded_spirit_exit_16_6-a6eb8d13320f5c7f)
+
+running 3 tests
+test loaded_but_never_started_spirit_unloads_with_a_receipt ... ok
+test panicking_unload_orphans_in_flight_tasks_with_the_audit_payload_shape ... ok
+test unload_cleanup_runs_even_when_the_on_unload_hook_panics ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/log_recall_isolation_hookpoint.rs (/tmp/r17-3c-tgt-int/debug/deps/log_recall_isolation_hookpoint-75f401ed248e25e9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/log_recall_scope.rs (/tmp/r17-3c-tgt-int/debug/deps/log_recall_scope-2977852783602f50)
+
+running 5 tests
+test fetch_scope_violation ... ok
+test fetch_happy_path ... ok
+test fetch_emits_capability_invocation_audit_row ... ok
+test recall_emitter_scope_only_returns_own_frames ... ok
+test recall_cursor_pagination ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/manifest_field_coverage.rs (/tmp/r17-3c-tgt-int/debug/deps/manifest_field_coverage-5eea14d9e1cc95eb)
+
+running 3 tests
+test production_capability_parsers_are_all_schema_degraded ... ok
+test capabilities_fixtures_deserialize_to_their_declared_outcomes ... ok
+test test_nfr_test_13_three_cases_per_field ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/memory_i5_isolation.rs (/tmp/r17-3c-tgt-int/debug/deps/memory_i5_isolation-0047221aced1a010)
+
+running 2 tests
+test spirit_b_cannot_write_as_spirit_a ... ok
+test spirit_a_private_not_readable_by_spirit_b ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/memory_md_opaque_write.rs (/tmp/r17-3c-tgt-int/debug/deps/memory_md_opaque_write-84ea5ceb9b8de7c7)
+
+running 3 tests
+test markdown_spills_to_disk_and_reads_back_byte_identical ... ok
+test operator_hand_edit_survives_on_next_read ... ok
+test no_markdown_parser_in_kernel_core_deps ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/memory_three_tier_smoke.rs (/tmp/r17-3c-tgt-int/debug/deps/memory_three_tier_smoke-174e91449135306d)
+
+running 4 tests
+test write_read_private ... ok
+test scan_private_returns_entries ... ok
+test collective_returns_typed_error ... ok
+test write_read_shared ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/multi_provider_routing.rs (/tmp/r17-3c-tgt-int/debug/deps/multi_provider_routing-cd265b789ab6cd5c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/nfr_perf_4_pause_resume_latency.rs (/tmp/r17-3c-tgt-int/debug/deps/nfr_perf_4_pause_resume_latency-ee6c9ccf3e3c1b2c)
+
+running 1 test
+test nfr_perf_4_1000_pause_resume_corpus ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/nfr_perf_4_posture_shift_propagation.rs (/tmp/r17-3c-tgt-int/debug/deps/nfr_perf_4_posture_shift_propagation-ad4bc1a70702e322)
+
+running 1 test
+test nfr_perf_4_1000_shift_propagation_corpus ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/nfr_rel_9_revoke_latency.rs (/tmp/r17-3c-tgt-int/debug/deps/nfr_rel_9_revoke_latency-69e67d465d15c144)
+
+running 1 test
+test nfr_rel_9_1000_token_revoke_latency_v03_scaffold ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/nfr_sec_14_cross_spirit_isolation.rs (/tmp/r17-3c-tgt-int/debug/deps/nfr_sec_14_cross_spirit_isolation-bf6323f76a3f2d25)
+
+running 1 test
+test nfr_sec_14_200_scenarios_zero_leaks ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/on_idle_substrate.rs (/tmp/r17-3c-tgt-int/debug/deps/on_idle_substrate-17b97eb19a91ca9d)
+
+running 4 tests
+test pick_poll_interval_bounds ... ok
+test idle_watchdog_fires_on_idle_after_quiescence ... ok
+test idle_watchdog_skips_manifest_disabled_hook ... ok
+test idle_watchdog_skips_paused_spirit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running tests/on_revocation_three_actions.rs (/tmp/r17-3c-tgt-int/debug/deps/on_revocation_three_actions-c260669786d152b9)
+
+running 1 test
+test applier_executes_terminate_drain_and_quarantine_actions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/operator_posture_ceiling_16_6.rs (/tmp/r17-3c-tgt-int/debug/deps/operator_posture_ceiling_16_6-778d56ca8e92ae63)
+
+running 6 tests
+test a_default_above_the_ceiling_is_clamped_too_never_left_inverted ... ok
+test an_operator_ceiling_clamps_the_manifest_and_refuses_the_shift ... ok
+test a_manifest_declared_sandbox_tier_is_ignored_on_first_admission ... ok
+test updating_the_operator_ceiling_reclamps_existing_spirit_postures ... ok
+test without_an_operator_ceiling_a_manifest_picks_its_own ... ok
+test a_ceiling_looser_than_the_manifest_changes_nothing ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/orchestrator_distillate_dispatch.rs (/tmp/r17-3c-tgt-int/debug/deps/orchestrator_distillate_dispatch-550f0ae7a21c86df)
+
+running 4 tests
+test ac2_scenario_2_1_first_dispatch_no_predecessor_accepted ... ok
+test ac2_scenario_2_4_follow_up_pointing_at_raw_task_complete_rejected ... ok
+test ac2_scenario_2_3_follow_up_none_after_complete_rejected ... ok
+test ac2_scenario_2_2_follow_up_with_distillate_ref_accepted ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/policy_per_capability_deny.rs (/tmp/r17-3c-tgt-int/debug/deps/policy_per_capability_deny-d1c4b5c4aee9b73d)
+
+running 7 tests
+test baseline_manifest_grants_fsread ... ok
+test per_capability_deny_absent_is_noop_allow ... ok
+test per_capability_deny_beats_manifest_grant_via_intent_key ... ok
+test per_capability_deny_beats_manifest_grant_via_scope_key ... ok
+test per_capability_deny_cannot_grant_beyond_manifest ... ok
+test per_capability_deny_does_not_override_self_telemetry ... ok
+test per_spirit_capability_deny_only_targets_one_spirit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/posture_shift_journaled.rs (/tmp/r17-3c-tgt-int/debug/deps/posture_shift_journaled-29eabd3e5c1ef1e3)
+
+running 6 tests
+test shift_posture_rejects_ceiling_violation ... ok
+test shift_posture_rejects_autonomous ... ok
+test shift_posture_rejects_unknown_spirit ... ok
+test shift_posture_succeeds_and_returns_new_hash ... ok
+test shift_posture_ceiling_rejection_writes_no_approval_row ... ok
+test posture_shift_e2e_journaled ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/principal_namespace_lifecycle.rs (/tmp/r17-3c-tgt-int/debug/deps/principal_namespace_lifecycle-aa4b9229c46b64f0)
+
+running 1 test
+test principal_namespace_full_lifecycle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/private_forget_restart_13_5i.rs (/tmp/r17-3c-tgt-int/debug/deps/private_forget_restart_13_5i-021352beb573d004)
+
+running 10 tests
+test forget_does_not_follow_namespace_directory_symlink ... ok
+test forget_does_not_follow_pid_directory_symlink ... ok
+test forget_fails_closed_when_pid_directory_is_unreadable ... ok
+test forget_counts_cached_and_spilled_value_exactly_once ... ok
+test forget_counts_logical_keys_not_filesystem_nodes ... ok
+test restart_forget_erases_non_markdown_spill_content ... ok
+test restart_forget_erases_markdown_content ... ok
+test forget_counts_inline_only_entries_that_never_spill ... ok
+test restart_forget_reports_distinct_persisted_entry_count ... ok
+test forget_preserves_bystander_and_default_namespace_content ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running tests/private_spill_supersession_13_5j.rs (/tmp/r17-3c-tgt-int/debug/deps/private_spill_supersession_13_5j-96c039b6a4005d63)
+
+running 18 tests
+test read_and_scan_reject_a_spill_swapped_for_a_symlink_before_open ... ok
+test durability_failure_at_temp_fsync_rolls_back ... ok
+test equal_mtime_conflicting_spills_fail_without_deleting_either ... ok
+test public_write_contract_rejects_path_syntax_only ... ok
+test a_read_does_not_change_scan_cardinality ... ok
+test scan_skips_a_directory_that_looks_like_a_spill ... ok
+test read_does_not_follow_a_spill_symlink ... ok
+test scan_returns_one_entry_for_a_key_held_in_cache_and_on_disk ... ok
+test digest_refs_are_not_duplicated_by_a_spilled_working_memory_entry ... ok
+test scan_ignores_malformed_spills_outside_the_requested_prefix ... ok
+test scan_does_not_follow_a_namespace_directory_symlink ... ok
+test scan_recovers_the_empty_key_from_its_spill_name ... ok
+test forget_counts_a_pre_existing_superseded_spill_once ... ok
+test write_unlinks_the_spill_when_the_value_shrinks_below_the_threshold ... ok
+test rejected_spill_update_preserves_cache_and_disk_without_temp_residue ... ok
+test write_unlinks_the_superseded_spill_when_the_kind_changes ... ok
+test io_lock_serializes_concurrent_same_key_spills ... ok
+test concurrent_same_key_spills_leave_one_complete_durable_value ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running tests/progress_watchdog_smoke.rs (/tmp/r17-3c-tgt-int/debug/deps/progress_watchdog_smoke-426517616d71a82c)
+
+running 1 test
+test progress_watchdog_emits_task_stalled ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/provider_switched_journal.rs (/tmp/r17-3c-tgt-int/debug/deps/provider_switched_journal-8a8cbff5fc1c9b7a)
+
+running 4 tests
+test second_admit_same_provider_emits_no_switch_event ... ok
+test first_admit_emits_no_switch_event ... ok
+test admit_with_changed_provider_emits_switch_event ... ok
+test multiple_switches_each_emit_event ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/redaction_canary.rs (/tmp/r17-3c-tgt-int/debug/deps/redaction_canary-ba623b0877545cfa)
+
+running 2 tests
+test redaction_filter_detects_every_known_pattern_class ... ok
+test redaction_filter_zero_leak_against_10k_canary ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/resource_caps_linux.rs (/tmp/r17-3c-tgt-int/debug/deps/resource_caps_linux-60224bb3428a196c)
+
+running 2 tests
+test memory_cap_smoke ... ok
+done
+test setrlimit_nofile_enforced ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/retract_corpus_v0.rs (/tmp/r17-3c-tgt-int/debug/deps/retract_corpus_v0-3b37fba8739d5884)
+
+running 1 test
+test retract_corpus_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/revocation_applier_pipeline.rs (/tmp/r17-3c-tgt-int/debug/deps/revocation_applier_pipeline-560b2232e9698642)
+
+running 2 tests
+test concurrent_apply_reserves_exactly_one_crl_commit ... ok
+test signed_crl_propagates_to_token_denial_and_lifecycle_evidence ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/revocation_verify_denial.rs (/tmp/r17-3c-tgt-int/debug/deps/revocation_verify_denial-3eebba30e6132892)
+
+running 1 test
+test issued_token_is_denied_by_the_real_post_revocation_verify_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sandbox_admission.rs (/tmp/r17-3c-tgt-int/debug/deps/sandbox_admission-070d06b260488243)
+
+running 5 tests
+test t1_effective_tier_rejected ... ok
+test strictest_of_manifest_trust_operator ... ok
+test t3_effective_tier_admitted ... ok
+test t4_effective_tier_rejected ... ok
+test effective_tier_is_journaled ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/sandbox_enforcement_linux.rs (/tmp/r17-3c-tgt-int/debug/deps/sandbox_enforcement_linux-8ed97cd7db12425d)
+
+running 4 tests
+test classify_exit_normal_returns_none ... ok
+test t0_passthrough_exits_cleanly ... ok
+sh: 0: getcwd() failed: Operation not permitted
+test t2_child_exit_code_preserved ... ok
+sh: 0: getcwd() failed: Operation not permitted
+ok
+test t2_benign_process_not_killed_by_seccomp ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sandbox_enforcement_windows.rs (/tmp/r17-3c-tgt-int/debug/deps/sandbox_enforcement_windows-1e3297bd93c422bc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sandbox_t3_image_verify.rs (/tmp/r17-3c-tgt-int/debug/deps/sandbox_t3_image_verify-29f321e23ade69e5)
+
+running 7 tests
+test verify_empty_entries_returns_signature_invalid ... ok
+test parse_signed_attestation_rejects_unsupported_schema_from_bytes ... ok
+test parse_signed_attestation_round_trips_from_bytes ... ok
+test verify_signature_mismatch_returns_signature_invalid ... ok
+test verify_unsupported_schema_version_returns_unsupported ... ok
+test verify_trust_anchor_mismatch_returns_trust_anchor_mismatch ... ok
+test verify_well_formed_attestation_succeeds ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scalar_policy_runtime_test.rs (/tmp/r17-3c-tgt-int/debug/deps/scalar_policy_runtime_test-27958adf117be094)
+
+running 14 tests
+test on_value_below_flag_returns_flag ... ok
+test on_value_above_verbalize_only_returns_verbalize ... ok
+test on_value_below_verbalize_only_returns_verbalize ... ok
+test on_value_below_halt_fires ... ok
+test on_confidence_below_desugar_halt_fires ... ok
+test on_value_above_flag_returns_flag ... ok
+test on_value_outside_flag_returns_flag ... ok
+test on_value_above_halt_fires ... ok
+test on_value_outside_verbalize_only_returns_verbalize ... ok
+test on_value_outside_halt_fires ... ok
+test on_value_within_flag_returns_flag ... ok
+test on_value_within_halt_fires ... ok
+test on_value_within_verbalize_only_returns_verbalize ... ok
+test rule_not_matching_tag_returns_none ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scalar_predicate_to_halt_integration.rs (/tmp/r17-3c-tgt-int/debug/deps/scalar_predicate_to_halt_integration-c483229956f768fd)
+
+running 5 tests
+test set_scalar_non_matching_tag_no_halt ... ok
+test set_scalar_no_halt_when_predicate_does_not_fire ... ok
+test set_scalar_verbalize_only_action_does_not_halt ... ok
+test set_scalar_flag_action_does_not_halt ... ok
+test set_scalar_to_halt_end_to_end ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/scalar_predicate_truth_table.rs (/tmp/r17-3c-tgt-int/debug/deps/scalar_predicate_truth_table-59c488501fa21ae4)
+
+running 4 tests
+test truth_table_on_value_below ... ok
+test truth_table_on_value_above ... ok
+test truth_table_on_value_within ... ok
+test truth_table_on_value_outside ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scalar_slot_set_and_tap.rs (/tmp/r17-3c-tgt-int/debug/deps/scalar_slot_set_and_tap-4799b86ea02214c4)
+
+running 7 tests
+test set_scalar_happy_path_returns_tap_event ... ok
+test set_scalar_rejects_empty_derived_from ... ok
+test set_scalar_publishes_to_telemetry_stream ... ok
+test set_scalar_rejects_empty_tag ... ok
+test set_scalar_rejects_nan_value ... ok
+test set_scalar_same_tag_overwrites ... ok
+test set_scalar_spirit_scoped ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scalar_tap_subscriber.rs (/tmp/r17-3c-tgt-int/debug/deps/scalar_tap_subscriber-5701ca8d0577e297)
+
+running 4 tests
+test subscribe_twice_same_spirit_returns_false ... ok
+test subscriber_receives_scalar_tap_event ... ok
+test subscribe_different_spirit_same_topic_returns_true ... ok
+test subscriber_readonly_cannot_mutate ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/schedule_watchdog_fr26.rs (/tmp/r17-3c-tgt-int/debug/deps/schedule_watchdog_fr26-e9ea96224d2f9605)
+
+running 8 tests
+test schedule_empty_section_no_fire ... ok
+test schedule_2_5_lifecycle_gate_skips_firing ... ok
+test schedule_cadence_respected_between_fires ... ok
+test schedule_2_7_paused_spirit_no_fire ... ok
+test schedule_2_1_single_entry_fires ... ok
+test schedule_2_8_compliance_claim_stamp_in_tl_row ... ok
+test schedule_2_3_rate_limit_caps_firing ... ok
+test schedule_2_2_two_entries_independent_cadence ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+     Running tests/scheduler_five_verb_lifecycle.rs (/tmp/r17-3c-tgt-int/debug/deps/scheduler_five_verb_lifecycle-6fca128b7827c76b)
+
+running 6 tests
+test lifecycle_resolver_inside_current_thread_runtime_does_not_unwind ... ok
+test invalid_state_transition_rejected ... ok
+test unload_is_idempotent ... ok
+test five_verb_lifecycle_routes_through_scheduler ... ok
+test lifecycle_resolver_rejects_blank_director_identity ... ok
+test lifecycle_resolver_without_tokio_runtime_returns_typed_error ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/self_telemetry_scope.rs (/tmp/r17-3c-tgt-int/debug/deps/self_telemetry_scope-848410a95465daa9)
+
+running 5 tests
+test audit_row_written_per_call ... ok
+test empty_window_returns_zeros ... ok
+test mixed_pid_frames_filtered_by_spirit_pid ... ok
+test since_ns_zero_includes_all_frames ... ok
+test self_telemetry_counts_distillate_frames_precisely ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/silent_failure_detector_smoke.rs (/tmp/r17-3c-tgt-int/debug/deps/silent_failure_detector_smoke-72254b81b941700e)
+
+running 1 test
+test silent_failure_detector_emits_suspect ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/spirit_boundary_invariants.rs (/tmp/r17-3c-tgt-int/debug/deps/spirit_boundary_invariants-6230fa41d0b0a1dd)
+
+running 1 test
+test spirit_boundary_invariants ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/upgrade_cold_swap_with_inflight_tasks.rs (/tmp/r17-3c-tgt-int/debug/deps/upgrade_cold_swap_with_inflight_tasks-eb1045770e170a8f)
+
+running 1 test
+test cold_upgrade_factory_failure_preserves_scb_runtime_and_inflight_tasks ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/upgrade_migrator_cross_major.rs (/tmp/r17-3c-tgt-int/debug/deps/upgrade_migrator_cross_major-80260e8c3e77e3ff)
+
+running 1 test
+test migrator_policy_executes_successor_migration_and_commits_on_stable_scb ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/upgrade_orchestrator_three_policies.rs (/tmp/r17-3c-tgt-int/debug/deps/upgrade_orchestrator_three_policies-657a1c4cce30262a)
+
+running 1 test
+test orchestrator_executes_hot_cold_and_migrator_with_fresh_successors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+   Doc-tests maos_kernel_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

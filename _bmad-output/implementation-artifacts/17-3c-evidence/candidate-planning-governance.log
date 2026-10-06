@@ -1,0 +1,38 @@
+{
+  "passed": true,
+  "actual-lines": 25032,
+  "pinned-lines": 25032,
+  "baseline-file": "/home/lunarpulse/dev_ws/xtask/kernel-core-baseline.toml",
+  "file-set-entries": 98,
+  "set-hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776",
+  "pinned-set-hash": "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776",
+  "changed": [],
+  "added": [],
+  "removed": []
+}
+{
+  "passed": true,
+  "epics-checked": 21,
+  "authoritative-src-lines": 25032,
+  "violations": []
+}
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:6: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:7: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:8: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:15: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:179: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:482: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:494: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:556: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:624: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:639: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:828: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:829: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:831: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:908: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:909: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:910: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:922: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:923: ownerless and open, with a recorded disposition
+dev-record-completeness: OWNERLESS-AND-OPEN (dispositioned) deferred-work.md:924: ownerless and open, with a recorded disposition
+{"passed":true,"violation_count":0,"violations":[],"done_stories_checked":162,"deferred_owner_assertions":79,"owned_but_deferred":[],"not_a_vehicle":[],"ownerless_undispositioned":[],"ownerless_dispositioned":["deferred-work.md:6: ownerless and open, with a recorded disposition","deferred-work.md:7: ownerless and open, with a recorded disposition","deferred-work.md:8: ownerless and open, with a recorded disposition","deferred-work.md:15: ownerless and open, with a recorded disposition","deferred-work.md:179: ownerless and open, with a recorded disposition","deferred-work.md:482: ownerless and open, with a recorded disposition","deferred-work.md:494: ownerless and open, with a recorded disposition","deferred-work.md:556: ownerless and open, with a recorded disposition","deferred-work.md:624: ownerless and open, with a recorded disposition","deferred-work.md:639: ownerless and open, with a recorded disposition","deferred-work.md:828: ownerless and open, with a recorded disposition","deferred-work.md:829: ownerless and open, with a recorded disposition","deferred-work.md:831: ownerless and open, with a recorded disposition","deferred-work.md:908: ownerless and open, with a recorded disposition","deferred-work.md:909: ownerless and open, with a recorded disposition","deferred-work.md:910: ownerless and open, with a recorded disposition","deferred-work.md:922: ownerless and open, with a recorded disposition","deferred-work.md:923: ownerless and open, with a recorded disposition","deferred-work.md:924: ownerless and open, with a recorded disposition"],"total_stories_scanned":163}

@@ -23,7 +23,8 @@ use maos_domain::invariants::i13::IntentLineage;
 use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::SmallVec;
 
-use maos_wasm_host::codec::{decode_cbor, encode_cbor, read_frame, write_frame};
+use maos_frame_codec::{read_frame, write_frame};
+use maos_wasm_host::codec::{decode_cbor, encode_cbor};
 
 const FRAME_ID: [u8; 16] = [0xAB; 16];
 
@@ -85,10 +86,13 @@ fn run_twin(mode: &str, input: &IacFrame) -> (IacFrame, std::time::Duration) {
     );
 
     let mut reader = Cursor::new(output.stdout);
+    assert_eq!(read_frame(&mut reader).unwrap(), Some(Vec::new()), "Ready");
     let frame_bytes = read_frame(&mut reader)
         .expect("read twin output")
         .expect("expected exactly one emitted frame");
     let frame: IacFrame = decode_cbor(&frame_bytes).expect("decode twin output");
+    assert_eq!(read_frame(&mut reader).unwrap(), Some(Vec::new()), "TurnComplete");
+    assert_eq!(read_frame(&mut reader).unwrap(), None);
     (frame, elapsed)
 }
 
@@ -156,8 +160,11 @@ fn default_mode_is_identity() {
     let output = child.wait_with_output().expect("wait");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     let mut reader = Cursor::new(output.stdout);
-    let bytes = read_frame(&mut reader).unwrap().unwrap();
+    assert_eq!(read_frame(&mut reader).unwrap(), Some(Vec::new()), "Ready");
+    let bytes = read_frame(&mut reader).unwrap().expect("one emitted frame");
     let out: IacFrame = decode_cbor(&bytes).unwrap();
+    assert_eq!(read_frame(&mut reader).unwrap(), Some(Vec::new()), "TurnComplete");
+    assert_eq!(read_frame(&mut reader).unwrap(), None);
     assert_eq!(out, input, "default mode must be identity");
 }
 

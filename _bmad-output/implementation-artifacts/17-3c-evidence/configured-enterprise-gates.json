@@ -1,0 +1,31 @@
+{
+  "candidate_only": true,
+  "passing_artifact": "artifact://711",
+  "result": {"passed": 6, "failed": 0, "test_elapsed_seconds": 33.65},
+  "eight_verdict_matrix": {
+    "forms": ["subprocess", "wasm-component"],
+    "kernel_manifest_grant": [false, true],
+    "claimed_sender_forged": [false, true],
+    "enterprise_policy": "Real CedarPolicyAdapter loaded with permit(principal, action, resource);",
+    "kernel_policy_state": "Shared actual PolicyTable installed by real scheduler admission; no manually seeded PID or FsRead grant"
+  },
+  "four_atomic_refusals": {
+    "forms": ["subprocess", "wasm-component"],
+    "enterprise_forbid": "Real Cedar permit plus forbid blocks an otherwise MCP-entitled sender before kernel mint; structured kernel_verdict is null, no guest mailbox effect.",
+    "mixed_scope": "Real Cedar permit; MCP scope permits but undeclared SkillAuthorSelf cannot be mediated and returns typed kernel PolicyDenied. Entire assignment is refused, not partially delivered.",
+    "guest_effects_each": 0,
+    "terminal_each": "clean"
+  },
+  "unsupported_scope_regression": {
+    "before": "artifact://705: actual admitted native assignment reached scope_to_intent(SkillAuthorSelf), panicked in the session worker, and returned Supervision error.",
+    "fix": "Intent projection is fallible; an action with no mediated intent returns existing typed PolicyDenied before capability/token construction. No coercion to another action and no exception masking.",
+    "after": "artifact://707 and artifact://711: real native and WASM mixed-scope assignments refused atomically without a session panic."
+  },
+  "fresh_compiled_mutation": {
+    "change": "Bypass the actual CapabilityRegistryAdapter.issue_with_mediation PolicyDecision::Deny return; Cargo recompiles kernel and the live eight-case gate.",
+    "red": "artifact://709: denied case delivered_frames=1 instead of 0.",
+    "restoration": "Actual return restored; artifact://711 recompiles and passes all six process gates.",
+    "source_and_test_binary_restored": true
+  },
+  "scope_granularity_limit": "Existing PolicyTable.evaluate matches Scope enum discriminants, not MCP server/tool selectors (cap_policy/mod.rs:159-166). This candidate proves actual current kernel issuance policy and does not claim finer selector entitlement or change that policy."
+}

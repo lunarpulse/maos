@@ -35,7 +35,8 @@
 //! # Zero-kernel-delta guarantee
 //!
 //! This crate has no dependency on `maos-kernel-core` or `maos-domain`.
-//! Adding or modifying it cannot change `check-kernel-baseline` (22964).
+//! Its source is outside the kernel baseline. Kernel bridge or admission
+//! changes in a caller still require their own measured baseline grant.
 
 /// The Spirit authoring forms hosted at v2.0.
 ///
@@ -105,15 +106,13 @@ pub enum SpiritHostError {
     #[error("spirit host unreachable: {reason}")]
     Unreachable { reason: String },
 
-    /// Component validation/instantiation failed (bad `.wasm`, WIT mismatch,
-    /// unsupported imports). The composition root maps this to a typed
-    /// admission rejection.
+    /// The launch request names an unusable artifact (empty path, not a regular
+    /// file, over the size cap). Component validation (parse, WIT world,
+    /// instantiation) happens in the contained runner, not here: the daemon
+    /// maps runner exits 2/3/5 before Ready to the typed refusals
+    /// `incompatible_world`/`invalid_component`/`unrepresentable_frame`.
     #[error("spirit component invalid: {reason}")]
     InvalidComponent { reason: String },
-
-    /// Resolution timed out (e.g. a slow AOT compile step).
-    #[error("spirit host timeout after {timeout_ms}ms")]
-    Timeout { timeout_ms: u64 },
 }
 
 /// Sync port trait for resolving a Spirit form into a launchable plan.
@@ -130,9 +129,9 @@ pub trait SpiritHostPort: Send + Sync {
     /// Resolve a launch request into a concrete subprocess launch plan.
     ///
     /// For `NativeSubprocess`, this is identity (`program = artifact`).
-    /// For `WasmComponent`, the adapter validates the component against the
-    /// `maos:spirit@2.0.0` WIT world (real wasmtime parse + instantiate probe,
-    /// bounded by a timeout), then returns `program = <runner>`,
+    /// For `WasmComponent`, the adapter checks bounded artifact metadata and
+    /// returns `program = <runner>`. The admitted T2 child validates and compiles
+    /// the `maos:spirit@2.0.0` component before acknowledging Ready.
     /// `argv = [--component, <artifact>, --fuel, <n>, ...]`.
     fn resolve_launch(
         &self,

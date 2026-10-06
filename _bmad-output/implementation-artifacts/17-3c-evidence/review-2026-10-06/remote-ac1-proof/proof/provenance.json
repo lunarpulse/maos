@@ -1,0 +1,35 @@
+{
+  "platform": {
+    "os_release": {
+      "PRETTY_NAME": "\"Ubuntu 25.10\"",
+      "NAME": "\"Ubuntu\"",
+      "VERSION_ID": "\"25.10\"",
+      "VERSION": "\"25.10 (Questing Quokka)\"",
+      "VERSION_CODENAME": "questing",
+      "ID": "ubuntu",
+      "ID_LIKE": "debian",
+      "HOME_URL": "\"https://www.ubuntu.com/\"",
+      "SUPPORT_URL": "\"https://help.ubuntu.com/\"",
+      "BUG_REPORT_URL": "\"https://bugs.launchpad.net/ubuntu/\"",
+      "PRIVACY_POLICY_URL": "\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"",
+      "UBUNTU_CODENAME": "questing",
+      "LOGO": "ubuntu-logo"
+    },
+    "arch": "x86_64",
+    "kernel": "6.17.0-41-generic"
+  },
+  "exit_code": 0,
+  "elapsed_seconds": 323.40387549500156,
+  "manifest_sha256": "89a4563a55aa66aa4c72fe7cda253dbeb4ee71bdc0a874d07d06f38af9dd7e26",
+  "component_sha256": "ca8909781b945cf3714e6bf5a2b364be9ecf8f0a565bf95a2fe6f7bf51a4be4d",
+  "daemon_sha256": "9889d0276dae443411cd3f571c56272a4ee229c3893622d16e15dd386e059b5a",
+  "runner_sha256": "6ccb9fc554d0a61babc95e70d19602acbfc65e977dbade3d1705b397abe90b68",
+  "maosctl_sha256": "a4be0df18fb1871c333bdd02a33491e0ac2c8132c46142fd231a67ea07c9b5fd",
+  "declared_resources": {
+    "cpu_max_pct": 10,
+    "memory_max_mb": 768
+  },
+  "declared_time_cap_seconds": 360,
+  "declared_instruction_fuel": 10000000,
+  "declared_guest_memory_bytes": 67108864
+}

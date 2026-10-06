@@ -502,7 +502,7 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 25032
+src_lines = 25293
 # HISTORY: Story 17-6 review security repair (2026-09-28), operator-ratified
 #          FLAG-Winston: 25015 -> 25032 (+17 physical; tokei 19292 -> 19309,
 #          +17). `security/sandbox/linux.rs` compares each Landlock rule fd's
@@ -649,18 +649,40 @@ src_lines = 25032
 #          receipt comment (subprocess Worker has a child), replica resolver
 #          plumbing to the inline FR50 disposition. (4) `security/mod.rs` —
 #          clamp helper extraction. No kernel file was added or removed.
+# HISTORY: Detached 17-3c candidate, explicit operator numerical grant:
+#          25032 -> 25149 (+117 physical), formatted exact measurement;
+#          kernel KLOC 19309 -> 19412 (+103), zero headroom. Six files changed:
+#          capability/mod.rs (fallible governed mint), inference/mod.rs (trusted
+#          sender PID), lifecycle/cli_wrapper/runtime.rs (bounded duplex bridge),
+#          scheduler/hook_dispatch.rs (trusted sender PID),
+#          security/sandbox/linux.rs (contained runner/cgroup ownership), and
+#          security/sandbox/mod.rs (duplex launch and typed terminal audit).
+#          All 98 paths retained; no original pin, publication, or cutover.
+# HISTORY: 17-3c §A6 code review (bmad-code-review, 2026-10-06), operator-
+#          approved kernel-baseline re-pin: 25149 -> 25293 (+144 physical);
+#          kernel KLOC 19412 -> 19529 (operator KLOC sign-off), zero headroom.
+#          Eight files changed: capability/mod.rs (is_mediated_scope),
+#          capability/cap_audit/writer_task.rs (one-source token column),
+#          inference/mod.rs + scheduler/hook_dispatch.rs (token-less
+#          deliver_typed callers), scheduler/scheduler_loop.rs (iac capability
+#          field), lifecycle/cli_wrapper/runtime.rs (stdout-EOF close, bridge
+#          kill, lossless kind-8 SandboxBlock fallback, cgroup oom_kill audit),
+#          security/sandbox/linux.rs + mod.rs (parent-validated cgroup placement,
+#          loud rlimit degrade, bounded rmdir retry). All 98 paths retained;
+#          surface pin moved in the same change (SpawnedBridge rehash,
+#          is_mediated_scope = universal-arithmetic). Landed 2026-10-06.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
+set_hash = "509d311362def7ddeb028afed49e6d59e67b9d20f74f209fc66ae9a45e8ee612"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
 "bin/assert-revocation-p99-floor.rs" = "dab2d5ac79c9c5f9b67eedc33350c640d4909715d5eb78aaa0187c2bf7e48432"
 "capability/cap_audit/mod.rs" = "9f253336da1d618808984fef11941929a6af927ef66120d84b43e122ff70decc"
-"capability/cap_audit/writer_task.rs" = "7c90023579458fdb4a3357990a46cb0520d018196b1ffa0f2ed65fa5e7e84ef2"
+"capability/cap_audit/writer_task.rs" = "34f3e914dcf5fe05fe7d531a0e1eb2653417196f0fc6cb249ed0467974c2700b"
 "capability/cap_policy/decision.rs" = "be8b2e5a0b08821f55f019ab85b0a91b953dd60f3a8d3f994bd59e087b409e41"
 "capability/cap_policy/mod.rs" = "6deb125b813c2f291cfa4519f299244889090f47ee5f08e352acd82222790acb"
-"capability/mod.rs" = "ea09b10768bc9cc99821ed0ba6bcb109fa0618cab08526930167c4e24edc067b"
+"capability/mod.rs" = "3e021cf0d3c6e635adf938fb7ff5e5c18be0fa6cc41b0d3bb16f0d2a9eb48cc3"
 "capability/working_memory/mod.rs" = "151f1ea71b3b05e575b4771736a65aaaba0503e3a33a20d949d8e5382829892a"
 "capability/working_memory/orchestrator.rs" = "c6e102b0965fac7e813fe303be4ea989001fd646dd97cf22a9ab08c1dc0fdc7f"
 "capability/working_memory/policy_runtime.rs" = "199858803e69787c8f981c18f4fa22201c8ad0f47d18638623606462e2e374b5"
@@ -678,7 +700,7 @@ set_hash = "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
 "hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
-"inference/mod.rs" = "35e7a2d5f0f65827c4a25a9837cd41b77e689c62dbb4a0ae9567ba022d04fe7d"
+"inference/mod.rs" = "43bcd71c59c47d1cdc7c6058fd168a21a22235e038258bfd9afe45d985284065"
 "inference/router.rs" = "4cd2744273861514bf0989eb43f723380a5caf0801454078bd10a1953a94e8b1"
 "io/mod.rs" = "1c4c5202c33d39de7dd61d36607015dd07dac01922bd82ac6fd40300a8e72bf6"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
@@ -688,7 +710,7 @@ set_hash = "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
 "lifecycle/cli_wrapper/admission.rs" = "006b245592fde622bca53dca3e61efd448c106a318d3e4df1d81449bb5fb48d7"
 "lifecycle/cli_wrapper/lifecycle.rs" = "4a3d2e2f631c47195321fc48410efcbc218d69a979195fbc8f741a09ace09599"
 "lifecycle/cli_wrapper/mod.rs" = "c78a43ba26d796315af0ee07f2ce76991c7b0f1785298d49c08ffbdf17c0addc"
-"lifecycle/cli_wrapper/runtime.rs" = "a7ca87178d2faf5440f24634f3a31d015246d3bbf9245559aeb194dd4aaaab5a"
+"lifecycle/cli_wrapper/runtime.rs" = "456a1aab38b8d5f42d7192cc9795ebcc1d3909a544206b62bb61c308616dae97"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
@@ -713,13 +735,13 @@ set_hash = "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
 "revocation/rules.rs" = "726b27e55d5fff3e1cbd9ca2c1cf38494dfd272fbe586c1a0ed869c760366f44"
 "revocation/version_match.rs" = "b225bac84b6e2529cab18b4dadbc271f0c0ff487eaca4f11e23a49ea0ccf5046"
 "scheduler/control_block.rs" = "f7e6e26447ecf9822244956dbd341e96472f7d81edc0c644732d414c3d4c6ed5"
-"scheduler/hook_dispatch.rs" = "6f26d6b147425f8001e1c5d377cf88676329f7cd6402e1e5940e51580ac4d985"
+"scheduler/hook_dispatch.rs" = "74f481ceacaabf0cba1f10088e4bd6cfe3e17ec69c0a748f22b65972b425bfc1"
 "scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
 "scheduler/kernel_ctx.rs" = "7baf6a7e15a5ffb62312a02aa19d58b24c8500f277bcc724b2065f4c732963ef"
 "scheduler/mod.rs" = "fa89437053eedadef4662a1f538ad275caa62df69a9ddbbd4dc0a9976a377cf5"
 "scheduler/resource_ceiling.rs" = "becc322aa3700d8f08c10ac443aff2ea80995926a2cc647ddbad49aecfa6b06d"
 "scheduler/schedule_watchdog.rs" = "b50009c32df76c8f99095584a68c1de65d6a4831f84a97061672303dccca70fc"
-"scheduler/scheduler_loop.rs" = "48cc3e524a15aad9eda382b985b90cb6170b2e4667dce56831d60c87d351ea5b"
+"scheduler/scheduler_loop.rs" = "32c65c38316d68f7672147b070f47a4586066a9c774e0e4888c55ddef1591095"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
@@ -728,9 +750,9 @@ set_hash = "bdcb3b2ef64bc63cd68ec1f32415c197d2fc02601422933f2b084885ce773776"
 "security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
-"security/sandbox/linux.rs" = "881eb436b17cc959da56c77e20fe16d99d62c92c23626e150d09f95f1dd3abf1"
+"security/sandbox/linux.rs" = "a99dfbe86b91b029c0f1b65da5cb032bfdc79e14d7a993704297d22a29e7bf32"
 "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
-"security/sandbox/mod.rs" = "19d5d0cb09d7dd05f9c329f3d5bc6df55e10f97451748aa67c605e6ac4ef149c"
+"security/sandbox/mod.rs" = "092b1d0ab2eccb764934568b6263fa950a60f596284c97e0e10981e7847ac1f9"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
 "security/sandbox/t3/argv.rs" = "18badaa3d8141e86fb87b852577d1720319a16b765e2dbdc177facad913c5ae0"
 "security/sandbox/t3/cap_audit_bridge.rs" = "c4f77a015d1b21541f82ce35a6a49c66e8e3a0228191de1a68eac330d2093035"

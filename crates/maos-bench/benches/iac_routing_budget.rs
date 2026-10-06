@@ -96,7 +96,7 @@ fn run_routing_journey(rt: &Runtime) -> JourneyResult {
     for i in 0..BUDGET_INVOCATIONS {
         let frame = make_frame(i as u64);
         let start = Instant::now();
-        rt.block_on(adapter.deliver_typed(frame))
+        rt.block_on(adapter.deliver_typed(frame, 0, None))
             .expect("deliver should succeed");
         samples.push(start.elapsed().as_micros() as u64);
     }

@@ -1,7 +1,6 @@
 //! Configuration for the WASM host adapter.
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 /// Configuration resolved at the daemon composition root.
 ///
@@ -14,8 +13,6 @@ pub struct WasmHostConfig {
     pub runner_program: PathBuf,
     /// Default fuel budget for WASM components (overridable per-manifest).
     pub default_fuel: u64,
-    /// Timeout for component validation/compilation.
-    pub validation_timeout: Duration,
 }
 
 impl WasmHostConfig {
@@ -24,7 +21,6 @@ impl WasmHostConfig {
         Self {
             runner_program,
             default_fuel,
-            validation_timeout: Duration::from_secs(5),
         }
     }
 }

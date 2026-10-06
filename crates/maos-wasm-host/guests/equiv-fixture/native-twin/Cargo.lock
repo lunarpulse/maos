@@ -615,6 +615,7 @@ dependencies = [
  "ciborium",
  "equiv-fixture-logic",
  "maos-domain",
+ "maos-frame-codec",
  "maos-spirit-abi",
  "maos-wasm-host",
  "serde",
@@ -1166,6 +1167,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "maos-frame-codec"
+version = "0.1.0-alpha.1"
+
+[[package]]
 name = "maos-host"
 version = "0.1.0-alpha.1"
 dependencies = [
@@ -1186,6 +1191,7 @@ dependencies = [
  "ciborium",
  "ciborium-io",
  "maos-domain",
+ "maos-frame-codec",
  "maos-host",
  "maos-spirit-abi",
  "serde",

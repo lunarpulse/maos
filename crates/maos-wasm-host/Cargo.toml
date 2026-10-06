@@ -18,10 +18,15 @@ path = "src/runner.rs"
 # responds to its inputs rather than rubber-stamping a canned GREEN.
 # Off by default (dev-only; never shipped).
 equiv-fault-inject = []
+# Story 17.3c — dev/CI-only `maos-wasm-runner --test-forbidden-syscall-after-ready`
+# probe (a real ptrace after Ready, killed by T2 seccomp). Debug + Linux only;
+# `src/runner.rs` hard-fails any release build with this feature on.
+runner-fault-inject = []
 
 [dependencies]
 # Host port trait + plan types (daemon-side, Story 11.1a D1)
 maos-host = { path = "../maos-host" }
+maos-frame-codec = { path = "../maos-frame-codec" }
 
 # Domain frame types — the real `IacFrame`/`FramePayload` this host bridges
 # between the ADR-032 wire and the `maos:spirit@2.0.0` WIT world (AC2/AC3).

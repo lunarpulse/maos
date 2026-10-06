@@ -1,9 +1,5 @@
-//! ADR-032 wire protocol codec: Content-Length + CBOR.
-//!
-//! Implements the framing both Spirit forms speak. The WASM runner subprocess
-//! reads inbound frames from stdin and writes outbound frames to stdout using
-//! this exact codec — the kernel's `read_content_length` (runtime.rs:345) on
-//! the other side of the pipe speaks the same protocol.
+//! Bounded CBOR encoding and decoding for the ADR-032 frame body.
+//! Byte framing is owned by the std-only `maos-frame-codec` leaf.
 //!
 //! # Canonical CBOR (RFC 8949 §4.2.1) — caller responsibility, NOT a codec guarantee
 //!
@@ -17,174 +13,102 @@
 //! `Vec<(K, V)>`. Preferred-length integer encoding and definite-length
 //! items ARE genuine ciborium defaults; sorted map-key order is NOT.
 
-use std::io::{self, BufRead, Write};
-
-/// Hard cap on a single ADR-032 frame body, in either direction. Enforce it
-/// while serializing guest output, before growing an unbounded host buffer.
-pub const MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
-
-/// Hard cap on the length of a single header line before the blank
-/// separator. Guards against an unbounded `read_line` buffer growth on a
-/// hostile or broken stream with no newline.
-const MAX_HEADER_LINE_BYTES: usize = 4096;
-
-/// Read one ADR-032 frame from a reader.
-///
-/// Format: `Content-Length: <decimal>\r\n\r\n` followed by N bytes of CBOR.
-/// Returns `None` on clean EOF (no partial header). Skips a bounded number
-/// of leading blank lines before the header (never silently drops a real
-/// frame — a run of blank lines followed by a header is still read).
-pub fn read_frame(reader: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
-    const MAX_BLANK_SKIPS: u32 = 16;
-    let mut skipped = 0u32;
-    loop {
-        let mut header = String::new();
-        let n = read_bounded_line(reader, &mut header)?;
-        if n == 0 {
-            return Ok(None); // Clean EOF.
-        }
-        let trimmed = header.trim();
-        if !trimmed.is_empty() {
-            return parse_and_read(trimmed, reader);
-        }
-        skipped += 1;
-        if skipped > MAX_BLANK_SKIPS {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("too many consecutive blank lines (> {MAX_BLANK_SKIPS}) before a header"),
-            ));
-        }
-    }
-}
-
-/// `read_line` bounded by `MAX_HEADER_LINE_BYTES` so a newline-less hostile
-/// stream cannot grow the buffer without limit.
-fn read_bounded_line(reader: &mut impl BufRead, out: &mut String) -> io::Result<usize> {
-    let mut limited = std::io::Read::take(reader, MAX_HEADER_LINE_BYTES as u64);
-    let n = limited.read_line(out)?;
-    if n > 0 && !out.ends_with('\n') && (n as u64) >= MAX_HEADER_LINE_BYTES as u64 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("header line exceeds {MAX_HEADER_LINE_BYTES}-byte cap with no newline"),
-        ));
-    }
-    Ok(n)
-}
-
-fn parse_and_read(header_line: &str, reader: &mut impl BufRead) -> io::Result<Option<Vec<u8>>> {
-    // Parse "Content-Length: <n>"
-    let len_str = header_line
-        .strip_prefix("Content-Length:")
-        .or_else(|| header_line.strip_prefix("content-length:"))
-        .ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("expected Content-Length header, got: {header_line}"),
-            )
-        })?
-        .trim();
-
-    let content_len: usize = len_str.parse().map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("invalid Content-Length value '{len_str}': {e}"),
-        )
-    })?;
-    if content_len > MAX_FRAME_BYTES {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("Content-Length {content_len} exceeds the {MAX_FRAME_BYTES}-byte frame cap"),
-        ));
-    }
-
-    // Consume and VALIDATE the blank line separator (\r\n or \n). A
-    // non-blank line here means the sender's framing disagrees with ours —
-    // reading content_len bytes starting mid-body would silently misframe
-    // every subsequent frame, so this fails closed instead.
-    let mut blank = String::new();
-    read_bounded_line(reader, &mut blank)?;
-    if !blank.trim().is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("expected a blank separator line after Content-Length, got: {blank:?}"),
-        ));
-    }
-
-    // Read exactly content_len bytes
-    let mut buf = vec![0u8; content_len];
-    reader.read_exact(&mut buf)?;
-
-    Ok(Some(buf))
-}
-
-/// Write one ADR-032 frame to a writer.
-///
-/// Format: `Content-Length: <decimal>\r\n\r\n` followed by N bytes of CBOR.
-pub fn write_frame(writer: &mut impl Write, cbor_data: &[u8]) -> io::Result<()> {
-    if cbor_data.len() > MAX_FRAME_BYTES {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("outbound frame exceeds the {MAX_FRAME_BYTES}-byte frame cap"),
-        ));
-    }
-    write!(writer, "Content-Length: {}\r\n\r\n", cbor_data.len())?;
-    writer.write_all(cbor_data)?;
-    writer.flush()
-}
+use maos_frame_codec::MAX_FRAME_BYTES;
 
 /// Encode a serde-serializable value to CBOR, without allocating beyond the
-/// ADR-032 frame limit. This is also used on guest-controlled output.
+/// ADR-032 frame limit. This is also used on guest-controlled output. Output
+/// that [`decode_cbor`] would refuse (expansion budget, nesting) is refused here.
 pub fn encode_cbor<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, String> {
-    struct BoundedBuffer(Vec<u8>);
-
-    impl Write for BoundedBuffer {
-        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-            if bytes.len() > MAX_FRAME_BYTES - self.0.len() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "CBOR output exceeds the ADR-032 frame cap",
-                ));
-            }
-            self.0.extend_from_slice(bytes);
-            Ok(bytes.len())
-        }
-
-        fn flush(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-    }
-
-    let mut buf = BoundedBuffer(Vec::new());
+    let mut buf = maos_frame_codec::BodyBuffer::default();
     ciborium::into_writer(value, &mut buf).map_err(|e| format!("CBOR encode error: {e}"))?;
-    Ok(buf.0)
+    let bytes = buf.into_bytes();
+    validate_decode_budget(&bytes).map_err(|error| format!("CBOR encode bound: {error}"))?;
+    Ok(bytes)
 }
 
-/// Decode canonical CBOR bytes to a serde-deserializable value.
+/// Decode a definite-length CBOR body after allocation-free expansion validation.
+/// Each encoded node consumes 1 KiB of the 16 MiB expansion budget; string/byte
+/// payloads consume their length as well. Container hints are checked before
+/// serde can reserve memory, and nesting is limited to 64 levels.
 pub fn decode_cbor<T: serde::de::DeserializeOwned>(data: &[u8]) -> Result<T, String> {
+    validate_decode_budget(data).map_err(|error| format!("CBOR decode bound: {error}"))?;
     ciborium::from_reader(data).map_err(|e| format!("CBOR decode error: {e}"))
+}
+
+fn validate_decode_budget(data: &[u8]) -> Result<(), &'static str> {
+    fn item(
+        data: &[u8],
+        pos: &mut usize,
+        budget: &mut usize,
+        depth: u8,
+    ) -> Result<(), &'static str> {
+        if depth > 64 {
+            return Err("nesting limit exceeded");
+        }
+        *budget = budget
+            .checked_sub(1024)
+            .ok_or("expanded item budget exceeded")?;
+        let head = *data.get(*pos).ok_or("truncated item")?;
+        *pos += 1;
+        let additional = head & 31;
+        let value = match additional {
+            0..=23 => u64::from(additional),
+            24..=27 => {
+                let width = 1usize << (additional - 24);
+                let end = pos.checked_add(width).ok_or("length overflow")?;
+                let bytes = data.get(*pos..end).ok_or("truncated argument")?;
+                *pos = end;
+                bytes
+                    .iter()
+                    .fold(0u64, |value, byte| (value << 8) | u64::from(*byte))
+            }
+            _ => return Err("reserved or indefinite-length item"),
+        };
+        match head >> 5 {
+            0 | 1 | 7 => {}
+            2 | 3 => {
+                let length = usize::try_from(value).map_err(|_| "length overflow")?;
+                *budget = budget
+                    .checked_sub(length)
+                    .ok_or("expanded string budget exceeded")?;
+                *pos = pos.checked_add(length).ok_or("length overflow")?;
+                if *pos > data.len() {
+                    return Err("truncated string");
+                }
+            }
+            4 | 5 => {
+                let count = if head >> 5 == 5 {
+                    value.checked_mul(2).ok_or("map length overflow")?
+                } else {
+                    value
+                };
+                if count > (*budget / 1024) as u64 {
+                    return Err("container expansion budget exceeded");
+                }
+                for _ in 0..count {
+                    item(data, pos, budget, depth + 1)?;
+                }
+            }
+            6 => item(data, pos, budget, depth + 1)?,
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+    if data.len() > MAX_FRAME_BYTES {
+        return Err("frame byte limit exceeded");
+    }
+    let mut pos = 0;
+    let mut budget = MAX_FRAME_BYTES;
+    item(data, &mut pos, &mut budget, 0)?;
+    if pos != data.len() {
+        return Err("trailing CBOR item");
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{BufReader, Cursor};
-
-    #[test]
-    fn roundtrip_frame() {
-        let payload = b"hello world";
-        let mut buf = Vec::new();
-        write_frame(&mut buf, payload).unwrap();
-
-        let mut reader = BufReader::new(Cursor::new(buf));
-        let frame = read_frame(&mut reader).unwrap().unwrap();
-        assert_eq!(frame, payload);
-    }
-
-    #[test]
-    fn clean_eof_returns_none() {
-        let mut reader = BufReader::new(Cursor::new(Vec::<u8>::new()));
-        assert!(read_frame(&mut reader).unwrap().is_none());
-    }
 
     #[test]
     fn cbor_roundtrip_string() {

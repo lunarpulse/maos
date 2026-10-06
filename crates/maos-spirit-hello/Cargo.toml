@@ -11,6 +11,7 @@ description = "MAOS hello-spirit — reference Spirit acknowledgement (FR58)"
 maos-spirit-abi = { path = "../maos-spirit-abi" }
 maos-spirit-sdk = { path = "../maos-spirit-sdk" }
 maos-domain = { path = "../maos-domain" }
+maos-frame-codec = { path = "../maos-frame-codec" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 

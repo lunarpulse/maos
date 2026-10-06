@@ -10,12 +10,13 @@
 //! constraint). It **decides nothing** about capability grants (it is not
 //! authorization — L10); it only reports structural anomalies.
 //!
-//! Production posture (the honesty clause): `spawn_and_bridge` routes a T2
-//! spec through `spawn_sandboxed` since Story 17-6 AC5, but no production
-//! Spirit launches at T2 until 17-3c's WASM runner (Workers stay T3, bare
-//! until 17-1). So in production today this consumer finds no `SandboxBlock`
-//! rows — wired and dormant, ready to surface anomalies the moment a real T2
-//! kill flows through the edge-wired producer seam (tested on a synthetic TL).
+//! T2 process finalization sends actual SIGSYS events through the supervised
+//! capability audit writer, which persists them as SandboxBlock rows. When
+//! invoked, this consumer reads those persisted rows; planned termination is
+//! not a sandbox violation. It currently has NO daemon caller: running it over
+//! a live session's Transparency Log is production wiring deferred to a later
+//! story (see deferred-work), so a SandboxBlock is not yet surfaced
+//! automatically at runtime.
 
 use std::path::Path;
 
@@ -24,7 +25,6 @@ use maos_escape_detector::{format_anomaly_line, ManifestDeclaration};
 /// emit each anomaly as an operator-observable line. Returns the anomaly count
 /// (derive-and-reconcile: the count comes from the real detector output, never a
 /// committed literal).
-#[allow(dead_code)] // wired + dormant until production T2 sandboxing lands (CATCH-0, out of scope)
 pub fn report_escape_anomalies(
     tl_path: &Path,
     manifests: &[ManifestDeclaration],

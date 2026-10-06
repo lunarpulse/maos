@@ -1,0 +1,125 @@
+{
+  "story": "17-3c",
+  "finding": "AC1 `maos audit query` shows the attributed rows",
+  "generated": "2026-10-06",
+  "source_archive": {
+    "path": "_bmad-output/implementation-artifacts/17-3c-evidence/remote-100-20-final-isolated-runtime.tar.gz",
+    "sha256": "f4e2ce658a97e74e5888d9e6ef71c8b74c0fb40a11ea0532abf5b07efa9d3ba6",
+    "contains_maos_or_maosctl_binaries": false,
+    "members_outside_home": [
+      "accepted-proof.json",
+      "provenance.json",
+      "process-observations.json",
+      "launch.stdout",
+      "launch.stderr",
+      "init.stdout",
+      "init.stderr"
+    ]
+  },
+  "database": {
+    "archived_path": "home/maos/audit/transparency.sqlite",
+    "queried": "a copy of home/ (MAOS_HOME=<copy>/maos); archived files unchanged after the query",
+    "sha256": {
+      "transparency.sqlite": "272967117b4a97f9409575033d08013ff83b137686bf7d8a9f553473adc97d72",
+      "transparency.sqlite-shm": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "transparency.sqlite-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "maosctl": {
+    "path": "/tmp/r17-3c-tgt-int/debug/maosctl",
+    "sha256": "cad370e62f65f9781e0a9334ec2c199d1e81b09f7c58fdc6a4df007fa95502dc",
+    "size_bytes": 147338656,
+    "mtime_utc": "2026-10-05T21:12:52.458430+00:00",
+    "provenance": "candidate-built debug maosctl (CARGO_TARGET_DIR=/tmp/r17-3c-tgt-int) from /tmp/maos-17-3c-candidate-wecx8ef7; the archive ships no maos/maosctl binaries"
+  },
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "<extract>/scratch",
+    "MAOS_HOME": "<extract>/home-copy/maos",
+    "NO_COLOR": "1"
+  },
+  "spirit": "example-spirit-ts",
+  "spirit_pid": 1,
+  "expected_rows": [
+    [
+      "governance.event",
+      "spirit.frame.authorization"
+    ],
+    [
+      "task.assign",
+      "standard"
+    ],
+    [
+      "capability.invocation",
+      "cli.subprocess.exit"
+    ],
+    [
+      "capability.invocation",
+      "lifecycle.unload"
+    ]
+  ],
+  "spirit_filtered_query": {
+    "ndjson": {
+      "command": "maosctl audit query --spirit example-spirit-ts --format ndjson",
+      "exit_code": 2,
+      "stderr": "maosctl: audit query \u2014 FR4 schema violation at line 5: missing field 'capability_token'",
+      "stdout_lines": 0
+    },
+    "plain": {
+      "command": "maosctl audit query --spirit example-spirit-ts --format plain",
+      "exit_code": 2,
+      "stderr": "maosctl: audit query \u2014 FR4 schema violation at line 5: missing field 'capability_token'",
+      "stdout_lines": 5
+    }
+  },
+  "spirit_filtered_rows_present": [
+    [
+      "governance.event",
+      "spirit.frame.authorization"
+    ]
+  ],
+  "spirit_filtered_rows_missing": [
+    [
+      "task.assign",
+      "standard"
+    ],
+    [
+      "capability.invocation",
+      "cli.subprocess.exit"
+    ],
+    [
+      "capability.invocation",
+      "lifecycle.unload"
+    ]
+  ],
+  "unfiltered_query": {
+    "command": "maosctl audit query --format ndjson",
+    "exit_code": 0,
+    "stderr": "",
+    "rows": 13,
+    "attributed_rows_present": [
+      [
+        "governance.event",
+        "spirit.frame.authorization"
+      ],
+      [
+        "task.assign",
+        "standard"
+      ],
+      [
+        "capability.invocation",
+        "cli.subprocess.exit"
+      ],
+      [
+        "capability.invocation",
+        "lifecycle.unload"
+      ]
+    ],
+    "attributed_rows_missing": []
+  },
+  "verdict": {
+    "spirit_filtered_query_passes": false,
+    "unfiltered_query_shows_expected_rows": true
+  },
+  "assessment": "FAIL for the AC1 surface `maosctl audit query --spirit example-spirit-ts`: both formats exit 2 with an FR4 schema violation at filtered row 5, the guest's own spirit_pid-attributed TaskAssign (task.assign/standard, origin SpiritAuto) which carries no capability_token; FR4 classifies token-less task.assign rows as calls. The plain table prints the four rows before it (lifecycle admit/load/start and the authorization) and then aborts, so the TaskAssign, cli.subprocess.exit and lifecycle.unload rows are not shown. The unfiltered `maosctl audit query` exits 0 and lists every expected row attributed to spirit_pid 1. FR4 classification of the guest TaskAssign is an operator decision; no Rust was changed."
+}

@@ -152,13 +152,14 @@ async fn retract_corpus_fixtures() {
             scenario.original_frame.payload_size_bytes,
         );
 
-        let _ = adapter.deliver_typed(frame).await.unwrap();
+        let _ = adapter.deliver_typed(frame, 0, None).await.unwrap();
 
         let result = adapter
             .retract(
                 frame_id,
                 scenario.retract_request.reason.clone(),
                 &SpiritId::from(scenario.retract_request.retracting_spirit.as_str()),
+                None,
             )
             .await;
 
@@ -172,6 +173,7 @@ async fn retract_corpus_fixtures() {
                         frame_id,
                         "first".into(),
                         &SpiritId::from(scenario.retract_request.retracting_spirit.as_str()),
+                        None,
                     )
                     .await;
                 let second = adapter
@@ -179,6 +181,7 @@ async fn retract_corpus_fixtures() {
                         frame_id,
                         scenario.retract_request.reason.clone(),
                         &SpiritId::from(scenario.retract_request.retracting_spirit.as_str()),
+                        None,
                     )
                     .await;
                 matches!(second, Ok(RetractOutcome::Already { .. }))

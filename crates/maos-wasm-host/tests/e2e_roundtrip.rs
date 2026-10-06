@@ -5,8 +5,9 @@
 //! (not a host-side echo). Uses a real `maos:spirit@2.0.0` component.
 //!
 //! This test validates the complete path without test doubles:
-//! 1. `SpiritHostPort::resolve_launch` resolves a WasmComponent request and
-//!    rejects a non-conformant one.
+//! 1. `SpiritHostPort::resolve_launch` resolves a WasmComponent request to the
+//!    runner plan after bounded metadata checks; component validation happens
+//!    in the contained runner (exit 2/3 before Ready, asserted below).
 //! 2. The resolved plan points at the real `maos-wasm-runner` binary.
 //! 3. The runner subprocess communicates over real pipes.
 //! 4. A domain `IacFrame` round-trips through component instantiation and a
@@ -96,7 +97,7 @@ fn resolve_launch_wasm_component_produces_runner_plan() {
     let runner_path = require_runner_binary();
 
     let config = Arc::new(WasmHostConfig::new(runner_path.clone(), 1_000_000));
-    let adapter = WasmHostAdapter::new(config, std::time::Duration::from_secs(5));
+    let adapter = WasmHostAdapter::new(config);
 
     let request = SpiritLaunchRequest {
         form: SpiritForm::WasmComponent,
@@ -113,13 +114,15 @@ fn resolve_launch_wasm_component_produces_runner_plan() {
         runner_path.to_string_lossy(),
         "program must be the runner binary"
     );
-    assert!(
-        plan.argv.contains(&"--component".to_string()),
-        "argv must contain --component"
-    );
-    assert!(
-        plan.argv.contains(&component_fixture_path()),
-        "argv must contain the component path"
+    assert_eq!(
+        plan.argv,
+        [
+            "--component".to_string(),
+            component_fixture_path(),
+            "--fuel".to_string(),
+            "1000000".to_string(),
+        ],
+        "an empty form_config must use the configured default fuel"
     );
     assert_eq!(plan.wire, WireShape::ContentLengthCbor);
 }
@@ -128,7 +131,7 @@ fn resolve_launch_wasm_component_produces_runner_plan() {
 fn resolve_launch_native_subprocess_is_identity() {
     let runner_path = runner_binary_path();
     let config = Arc::new(WasmHostConfig::new(runner_path, 1_000_000));
-    let adapter = WasmHostAdapter::new(config, std::time::Duration::from_secs(5));
+    let adapter = WasmHostAdapter::new(config);
 
     let request = SpiritLaunchRequest {
         form: SpiritForm::NativeSubprocess,
@@ -140,35 +143,6 @@ fn resolve_launch_native_subprocess_is_identity() {
 
     assert_eq!(plan.program, "/usr/bin/my-spirit");
     assert!(plan.argv.is_empty());
-}
-
-/// AC3: a present-but-bad `.wasm` is rejected at `resolve_launch` time
-/// (admission gate), not just at runner-spawn time. This exercises the
-/// adapter's real wasmtime conformance probe, not a `std::fs::metadata`
-/// existence check.
-#[test]
-fn resolve_launch_rejects_non_conformant_component() {
-    let runner_path = runner_binary_path();
-    let config = Arc::new(WasmHostConfig::new(runner_path, 1_000_000));
-    let adapter = WasmHostAdapter::new(config, std::time::Duration::from_secs(5));
-
-    let dir = tempfile::tempdir().unwrap();
-    let bad_wasm = dir.path().join("bad.wasm");
-    std::fs::write(&bad_wasm, b"not a valid wasm").unwrap();
-
-    let request = SpiritLaunchRequest {
-        form: SpiritForm::WasmComponent,
-        artifact: bad_wasm.to_str().unwrap().to_string(),
-        form_config: vec![],
-    };
-
-    let err = adapter
-        .resolve_launch(&request)
-        .expect_err("a non-wasm file must be rejected at admission time");
-    assert!(
-        matches!(err, maos_host::SpiritHostError::InvalidComponent { .. }),
-        "must be the typed InvalidComponent variant, got {err:?}"
-    );
 }
 
 // ── AC3: Real subprocess ADR-032 round-trip THROUGH the guest ─────────
@@ -195,12 +169,17 @@ fn real_runner_subprocess_adr032_roundtrip_through_guest() {
     let sent_bytes = codec::encode_cbor(&sent_frame).unwrap();
 
     let mut writer = BufWriter::new(stdin);
-    codec::write_frame(&mut writer, &sent_bytes).unwrap();
+    maos_frame_codec::write_frame(&mut writer, &sent_bytes).unwrap();
     // Close stdin to signal EOF (Halt::Voluntary) after the one frame.
     drop(writer);
 
     let mut reader = BufReader::new(stdout);
-    let emitted_bytes = codec::read_frame(&mut reader)
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "Ready"
+    );
+    let emitted_bytes = maos_frame_codec::read_frame(&mut reader)
         .unwrap()
         .expect("the echo-spirit guest must emit exactly one frame back");
 
@@ -213,10 +192,15 @@ fn real_runner_subprocess_adr032_roundtrip_through_guest() {
     );
     let emitted_frame: IacFrame = codec::decode_cbor(&emitted_bytes).unwrap();
     assert_eq!(emitted_frame, sent_frame);
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "TurnComplete"
+    );
 
     // No more frames after the single emission.
     assert!(
-        codec::read_frame(&mut reader).unwrap().is_none(),
+        maos_frame_codec::read_frame(&mut reader).unwrap().is_none(),
         "guest must not emit extra frames for a single inbound frame"
     );
 
@@ -254,16 +238,28 @@ fn peer_identity_rupture_round_trips_through_the_real_runner() {
         .stderr(std::process::Stdio::piped())
         .spawn()
         .unwrap();
-    codec::write_frame(&mut child.stdin.take().unwrap(), &sent).unwrap();
+    maos_frame_codec::write_frame(&mut child.stdin.take().unwrap(), &sent).unwrap();
     let output = child.wait_with_output().unwrap();
     assert!(
         output.status.success(),
         "the current rupture reason must not terminate the runner: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let emitted = codec::read_frame(&mut BufReader::new(output.stdout.as_slice()))
+    let mut reader = BufReader::new(output.stdout.as_slice());
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "Ready"
+    );
+    let emitted = maos_frame_codec::read_frame(&mut reader)
         .unwrap()
         .expect("guest must emit the rupture");
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "TurnComplete"
+    );
+    assert_eq!(maos_frame_codec::read_frame(&mut reader).unwrap(), None);
     assert_eq!(
         emitted, sent,
         "runner must preserve the current rupture reason"
@@ -310,7 +306,7 @@ fn invalid_component_fails_closed_with_distinct_exit_code() {
     // The runner must never write a truncated/partial frame to stdout before
     // failing closed (AC3: "never a truncated frame").
     let mut reader = BufReader::new(child.stdout.take().unwrap());
-    let leaked = codec::read_frame(&mut reader).unwrap();
+    let leaked = maos_frame_codec::read_frame(&mut reader).unwrap();
     assert!(
         leaked.is_none(),
         "an InvalidComponent failure must not leak a partial frame to stdout"
@@ -335,10 +331,11 @@ fn v1_frames_world_is_refused_with_incompatible_world_exit() {
         .expect("runner must execute the committed WAT-text component fixture");
 
     assert_eq!(output.status.code(), Some(2));
-    assert_eq!(
-        String::from_utf8(output.stderr).expect("runner stderr must be UTF-8"),
-        "maos-wasm-runner: IncompatibleWorld: component imports \
-maos:spirit/frames@1.0.0; this runner implements maos:spirit@2.0.0\n"
+    assert!(
+        String::from_utf8(output.stderr)
+            .expect("runner stderr must be UTF-8")
+            .starts_with("maos-wasm-runner: IncompatibleWorld:"),
+        "an incompatible frames import must be refused as IncompatibleWorld"
     );
     assert!(
         output.stdout.is_empty(),
@@ -367,5 +364,51 @@ fn component_without_spirit_import_reaches_invalid_component_not_world_refusal()
             .expect("runner stderr must be UTF-8")
             .starts_with("maos-wasm-runner: InvalidComponent:"),
         "a component with no maos:spirit import must continue to instantiate and fail as InvalidComponent"
+    );
+    assert!(
+        output.stdout.is_empty(),
+        "an InvalidComponent refusal must not emit an ADR-032 frame"
+    );
+}
+
+/// Turn atomicity: the guest returns `[valid, invalid]`. The valid frame must
+/// not escape on its own — the runner writes no data frame and no
+/// TurnComplete for the failed turn, only the initial Ready, and exits non-zero.
+#[test]
+fn a_turn_with_one_unliftable_frame_emits_nothing() {
+    let fixture = format!(
+        "{}/test-fixtures/partial-turn/partial_turn_component.wat",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let mut child = std::process::Command::new(require_runner_binary())
+        .arg("--component")
+        .arg(&fixture)
+        .arg("--fuel")
+        .arg("1000000000")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let sent = codec::encode_cbor(&make_test_frame()).unwrap();
+    maos_frame_codec::write_frame(&mut child.stdin.take().unwrap(), &sent).unwrap();
+    let output = child.wait_with_output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(output.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("outbound frame lift error: frame_id is not 16 bytes (was 15)"),
+        "the second frame must be the one refused: {stderr}"
+    );
+    let mut reader = BufReader::new(output.stdout.as_slice());
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        Some(Vec::new()),
+        "Ready"
+    );
+    assert_eq!(
+        maos_frame_codec::read_frame(&mut reader).unwrap(),
+        None,
+        "no data frame and no TurnComplete may follow Ready for a failed turn"
     );
 }

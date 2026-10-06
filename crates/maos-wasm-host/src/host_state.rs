@@ -1,4 +1,4 @@
-//! Wasmtime `Store<T>` state shared by the conformance probe and the runner.
+//! Wasmtime `Store<T>` state for the contained runner.
 //!
 //! `wasip2`-targeted components (built via `cargo component`/`wit-bindgen`
 //! with the `wasm32-wasip2` target, as `guests/echo-spirit` is) import
@@ -15,6 +15,7 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 pub struct HostState {
     ctx: WasiCtx,
     table: ResourceTable,
+    pub limits: wasmtime::StoreLimits,
 }
 
 impl HostState {
@@ -23,8 +24,20 @@ impl HostState {
     /// `handle-frame`/`on-start`/`on-shutdown` exports need — nothing.
     pub fn new() -> Self {
         Self {
-            ctx: WasiCtxBuilder::new().build(),
+            ctx: WasiCtxBuilder::new()
+                .stdout(std::io::stderr())
+                .stderr(std::io::stderr())
+                .build(),
             table: ResourceTable::new(),
+            // `memory_size` caps each linear memory; one memory makes 64 MiB
+            // the aggregate guest cap (Spirit components define one memory).
+            limits: wasmtime::StoreLimitsBuilder::new()
+                .memory_size(64 * 1024 * 1024)
+                .instances(16)
+                .memories(1)
+                .tables(16)
+                .table_elements(65_536)
+                .build(),
         }
     }
 }

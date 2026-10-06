@@ -104,10 +104,13 @@ fn cookbook_whole_manifests_pass_structural_gates_before_class_admission() {
         "{page}: whole manifest must pass structural gates with a permissive class predicate and reach wasm_engine_off, got {outcome:?}"
     );
     #[cfg(feature = "wasm-host")]
-    assert!(
-        matches!(outcome, Err(AdmissionRefusal::WasmLaunchNotBuilt)),
-        "{page}: whole manifest must pass structural gates with a permissive class predicate and reach wasm_launch_not_built, got {outcome:?}"
-    );
+    {
+        let gated = outcome.expect("component cookbook must pass structural admission");
+        assert!(matches!(
+            gated.require_in_process("operator door"),
+            Err(AdmissionRefusal::SpawnedSurfaceUnsupported { .. })
+        ));
+    }
 }
 
 #[test]

@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-02",
+  "status": "draft awaiting checkpoint approval; no runtime implementation",
+  "spec": "_bmad-output/implementation-artifacts/spec-17-3c-isolated-runtime-candidate.md",
+  "tokens": {
+    "encoding": "o200k_base",
+    "count": 1535
+  },
+  "resource_probe": {
+    "command": "prlimit --as=67108864:67108864 /mnt/build/cargo/release/maos-wasm-runner --component tests/fixtures/wasm/echo_spirit_component.wasm",
+    "observed_exit": 3,
+    "observed_duration_seconds": 0.09,
+    "stderr_excerpts": [
+      "The global thread pool has not been initialized.: ThreadPoolBuildError { kind: IOError(Os { code: 11, kind: WouldBlock, message: \"Resource temporarily unavailable\" }) }",
+      "maos-wasm-runner: InvalidComponent: component compile exceeded 10s \u2014 treating as a compile-bomb"
+    ],
+    "scope": "Existing release runner, actual 64 MiB address-space ceiling. Not T2 or a hostile-output proof; current timeout diagnostic also covers this thread-pool failure."
+  },
+  "source_verified": {
+    "lifting_charge": "Wasmtime 46.0.3 typed.rs:1764-1776 checks guest bounds and charges len * size_of::<T>() before Vec::with_capacity at :719; strings are charged separately. Store::set_hostcall_fuel supplies a per-lift budget; StoreLimits is separate. Transcoding overhead means this is not an exact total-RSS limit.",
+    "bus_attribution": "crates/maos-iac/src/adapter.rs:494 uses hardcoded pid zero; trusted-pid API migration must precede production session proof.",
+    "workspace_inventory": "Std-only maos-frame-codec adds member 57. Update authoritative architecture sentinel and generated STABILITY.md, dependency edges, lock and measured leaf ledger request; do not weaken count gates."
+  },
+  "proposed_policy": "Sender is entitled to every TaskAssign scope before delegation; approval required at checkpoint. Guest intent/consent remain claims, endpoint owns sender/origin. All-or-nothing authorization and kind/payload validation.",
+  "exercised_governance": {
+    "command": "/mnt/build/cargo/debug/xtask check-exit-commands --json",
+    "passed": true,
+    "epics_in_roster": 5,
+    "blocks_read": 5,
+    "tokens_resolved": 16,
+    "findings": []
+  },
+  "original_changes": "Planning/context/evidence documents only; source/index/baseline/ledger not mutated. No grant or story completion claimed.",
+  "final_governance": {
+    "kernel_baseline_and_content_hashes": {
+      "passed": true,
+      "actual_lines": 25032,
+      "changed": [],
+      "added": [],
+      "removed": []
+    },
+    "epic_close_coherence": {
+      "passed": true,
+      "epics_checked": 21,
+      "violations": []
+    },
+    "dev_record_completeness": {
+      "passed": true,
+      "violation_count": 0,
+      "done_stories_checked": 162,
+      "existing_dispositioned_ownerless_rows_retained": true
+    },
+    "log": "candidate-planning-governance.log"
+  }
+}
