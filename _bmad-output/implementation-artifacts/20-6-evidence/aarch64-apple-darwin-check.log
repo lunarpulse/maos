@@ -1,0 +1,32 @@
+# 20-6 local darwin check evidence (2026-10-06, base 0d73cac3, rustc 1.98.1, host linux x86_64)
+# Method: cargo check never links, but build scripts run. ring and libsqlite3-sys compile C for the darwin target, and this host has no macOS SDK, so CC_aarch64_apple_darwin points at a throwaway shim (outside the repo) that forwards -E to the real clang and emits an EMPTY arm64 Mach-O object for every -c. Every RUST type-check below is real; the C compilation of those two -sys crates is NOT exercised here.
+
+$ cargo check --offline --locked -p maos-bin -p maos-cli --target aarch64-apple-darwin
+exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.97s
+
+$ cargo check --offline --locked --workspace --exclude maos-exec-deps --target aarch64-apple-darwin
+exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.65s
+
+$ cargo check --offline --locked --workspace --exclude maos-exec-deps --all-targets --target aarch64-apple-darwin
+exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.38s
+
+$ cargo check --offline --locked --workspace --target aarch64-apple-darwin
+exit=101
+error[E0425]: cannot find value `O_PATH` in crate `libc`
+   --> crates/maos-exec-deps/src/lib.rs:218:29
+    |
+218 |         .custom_flags(libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+    |                             ^^^^^^ not found in `libc`
+--
+error: could not compile `maos-exec-deps` (lib) due to 1 previous error
+
+$ cargo tree --offline --locked -p maos-bin --target aarch64-apple-darwin -i maos-exec-deps
+warning: nothing to print.
+
+$ cargo check --offline --locked --workspace --exclude maos-exec-deps --all-targets --all-features --target aarch64-apple-darwin
+error: failed to download `axum v0.8.9`
+
+Caused by:

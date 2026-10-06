@@ -71,6 +71,20 @@ Run these checks against the exact commit that will be tagged:
    route (`packaging/homebrew/maos.rb:24`), so it must compile once before a tag
    depends on it. There are two paths; **prefer the first.**
 
+   **The discipline `macos-check` job does not replace this step (Story
+   20-6).** Since 2026-10 a pull request or push that touches a
+   platform-sensitive path also runs `cargo check --target aarch64-apple-darwin`
+   on a macOS runner (`discipline.yml` `macos-scope` → `macos-check`). When the
+   path filter judges a diff irrelevant, `aggregate` reports the guard as
+   **NOT APPLICABLE — not a pass**, and the filter cannot see a change that
+   alters what `release.yml` builds without touching a filtered path (a
+   transitive dependency's own platform code, a `stable` toolchain release, or
+   a portable edit — a rename, a changed signature — that breaks unchanged
+   macOS-only code in another file). So the
+   rehearsal below stays mandatory before every tag, regardless of the guard's
+   result, and a green `macos-check` is evidence about the diff it ran on,
+   never about the tagged SHA.
+
    **6a — before the merge (preferred).** Label the pull request
    `release-rehearsal`. `release.yml` triggers on `pull_request` into `main` and
    its `build` job runs only when that label is present

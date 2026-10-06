@@ -640,7 +640,7 @@ maos-escape-detector = 376
 # ⚠ 15-2 EPIC-15 MEASURED RE-BASE 2026-09-06 (operator-authorized; measured at 03ee0ad8 with tokei 14.0.0, the CI pin): 3696 -> 4831 (+1135). Grant = 1170 over measured 3661. Σupper = 900.
 # Ledger: Epic 18 halt-eval driver and judge harness +450–900. | prior: prior ceiling had no inline history.
 maos-eval = 4831
-maos-exec-deps = 357   # 17-6 review patches, exact formatted tokei 14.0.0: 233 -> 357; bounded hostile ELF parsing and transitive RPATH resolution, O_PATH-held regular-file opens, and inode identities checked at Landlock rule attachment. ZERO headroom.
+maos-exec-deps = 358   # ⚠ 20-6 OPERATOR GRANT 2026-10-06 (exact measured, `kloc-check`, after `cargo fmt --all`): 357 -> 358 (+1) — the crate-level `#![cfg(target_os = "linux")]` that lets `cargo check --workspace` compile for macOS (the 20-6 guard drops its `--exclude`). ZERO headroom. | PRIOR: 17-6 review patches, exact formatted tokei 14.0.0: 233 -> 357; bounded hostile ELF parsing and transitive RPATH resolution, O_PATH-held regular-file opens, and inode identities checked at Landlock rule attachment. ZERO headroom.
 maos-frame-codec = 249   # Detached 17-3c operator-approved exact formatted candidate-only grant 218; §A6 review patches, operator sign-off 2026-10-06, exact formatted 218 -> 249 (+31): truncate-not-split diagnostics (UTF-8 and token-tail safe, unbuffered discard). ZERO HEADROOM.
 maos-fkcs = 591
 maos-host = 139

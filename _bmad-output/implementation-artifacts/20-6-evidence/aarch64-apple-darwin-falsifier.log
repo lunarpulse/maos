@@ -1,0 +1,86 @@
+## PLANT 1 — macos.rs E0425 (re-add the Linux leftover)
+--- a/crates/maos-kernel-core/src/security/sandbox/macos.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/macos.rs
++    let _use_cgroup = cgroup_path.is_some();
+exit=101
+error[E0425]: cannot find value `cgroup_path` in this scope
+  --> crates/maos-kernel-core/src/security/sandbox/macos.rs:22:23
+   |
+22 |     let _use_cgroup = cgroup_path.is_some();
+--
+error: could not compile `maos-kernel-core` (lib) due to 1 previous error; 38 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `maos-kernel-core` (lib test) generated 41 warnings (35 duplicates)
+error: could not compile `maos-kernel-core` (lib test) due to 1 previous error; 41 warnings emitted
+
+## PLANT 2 — purge.rs: root_device hard-coded u64
+--- a/crates/maos-bin/src/purge.rs
++++ b/crates/maos-bin/src/purge.rs
+-    root_device: rustix::fs::Dev,
++    root_device: u64,
+exit=101
+error[E0308]: mismatched types
+    --> crates/maos-bin/src/purge.rs:1347:49
+     |
+1347 |     remove_directory_contents(&directory, path, opened.st_dev, protected, left_files)?;
+--
+error[E0308]: mismatched types
+    --> crates/maos-bin/src/purge.rs:1436:31
+     |
+1436 |             if stat.st_dev != root_device {
+--
+error[E0277]: can't compare `i32` with `u64`
+    --> crates/maos-bin/src/purge.rs:1436:28
+     |
+1436 |             if stat.st_dev != root_device {
+--
+error: could not compile `maos-bin` (lib test) due to 3 previous errors; 3 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: unused import: `std::path::Path`
+  --> crates/maos-audit/tests/fr4_worker_rows_16_3.rs:15:5
+--
+error: could not compile `maos-bin` (lib) due to 3 previous errors; 1 warning emitted
+warning: `maos-kernel-core` (test "spirit_boundary_invariants") generated 2 warnings (run `cargo fix --test "spirit_boundary_invariants" -p maos-kernel-core` to apply 1 suggestion)
+warning: unused imports: `LifecycleSection`, `OnCrashSection`, `OnRevocationSection`, `OutputShape`, `SchedulingSection`, and `SupervisionSection`
+ --> crates/maos-kernel-core/tests/provider_switched_journal.rs:4:41
+
+## PLANT 3 — operator_door.rs: st_dev key hard-coded u64
+--- a/crates/maos-bin/src/operator_door.rs
++++ b/crates/maos-bin/src/operator_door.rs
+-            let mut opened: Vec<(PathBuf, std::fs::File, rustix::fs::Dev, u64)> = Vec::new();
+-            let mut identity: std::collections::BTreeSet<(rustix::fs::Dev, u64)> =
++            let mut opened: Vec<(PathBuf, std::fs::File, u64, u64)> = Vec::new();
++            let mut identity: std::collections::BTreeSet<(u64, u64)> =
+exit=101
+error[E0308]: mismatched types
+    --> crates/maos-bin/src/operator_door.rs:1995:36
+     |
+1995 |                 if identity.insert(key) {
+--
+error[E0308]: mismatched types
+    --> crates/maos-bin/src/operator_door.rs:1996:54
+     |
+1996 |                     opened.push((path.clone(), file, stat.st_dev, stat.st_ino));
+--
+error[E0308]: mismatched types
+    --> crates/maos-bin/src/operator_door.rs:2017:56
+     |
+2017 | ...                   Ok(stat) if stat.st_dev == dev && stat.st_ino == ino => {
+--
+error[E0277]: can't compare `i32` with `u64`
+    --> crates/maos-bin/src/operator_door.rs:2017:53
+     |
+2017 | ...                   Ok(stat) if stat.st_dev == dev && stat.st_ino == ino => {
+--
+error: could not compile `maos-bin` (lib) due to 4 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `maos-kernel-core` (test "memory_md_opaque_write") generated 2 warnings (run `cargo fix --test "memory_md_opaque_write" -p maos-kernel-core` to apply 2 suggestions)
+warning: `maos-bin` (lib test) generated 3 warnings
+error: could not compile `maos-bin` (lib test) due to 4 previous errors; 3 warnings emitted
+warning: unused import: `std::io::Write`
+   --> crates/maos-eval/src/distillate_corpus.rs:134:9
+    |
+
+## RESTORED — unplanted tree
+exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.39s

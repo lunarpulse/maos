@@ -11,6 +11,11 @@
 //! ELF64 little-endian executable), `$ORIGIN`/`$LIB` substitution and relative
 //! (or empty) `DT_RUNPATH`/`DT_RPATH` entries — ld.so resolves those against
 //! the child's working directory, which the parent cannot pin.
+//!
+//! Linux-only by construction (ELF, `O_PATH`, procfs reopen): on any other OS
+//! the crate compiles empty, so `cargo check --workspace` works there (Story
+//! 20-6); its one dependent takes it only under `cfg(target_os = "linux")`.
+#![cfg(target_os = "linux")]
 #![forbid(unsafe_code)]
 
 use std::collections::{BTreeSet, VecDeque};

@@ -4064,6 +4064,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
           # - aarch64-apple-darwin # excluded by D-15-4-F: macOS bills ~10x with zero precedent in 177 Linux jobs, and `aggregate` is the branch-protection check — linux first. Kept in place, never deleted: release.yml still ships this artifact on a native macOS runner (packaging/homebrew/maos.rb:24 downloads it), and tag-procedure.md carries the pre-tag rehearsal that gives the target its first build. ⚠ AMENDED 2026-09-12 (Epic-15 retrospective, operator-ratified): that rehearsal is now a LABEL-GATED `pull_request` run of release.yml (`release-rehearsal`), not only a post-merge `workflow_dispatch` — `workflow_dispatch` is unusable until the workflow reaches the default branch, which is the very merge the rehearsal exists to de-risk. The COST RULING IS UNCHANGED: macOS stays out of this matrix and off unlabelled PRs.
+          # Story 20-6 (operator ruling 2026-09-25): macOS COMPILE coverage is the path-filtered `macos-check` job below, not this matrix — D-15-4-F stands for this release-dry-run matrix.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -4113,6 +4114,186 @@ jobs:
           name: release-dry-run-${{ matrix.target }}
           path: dist/
           retention-days: 7
+
+  # ── Story 20-6 — path-filtered macOS compile guard ──────────────────────────
+  # WHY (measured 2026-09-25): no push ever compiled for macOS, so the first
+  # macOS build in project history (release.yml run 36084557101, the
+  # v0.1.0-alpha.1 rehearsal) found three breaks dormant since 2026-05-14
+  # (`macos.rs` E0425; `st_dev` u64 vs `dev_t` i32 in `purge.rs` and
+  # `operator_door.rs`), each visible only after the previous crate compiled.
+  #
+  # COST (D-15-4-F, which otherwise STANDS): macOS bills ~10x and `aggregate` is
+  # the branch-protection check, so macOS stays out of every matrix and off an
+  # ordinary pull request. The operator ruled this ONE exception (2026-09-25):
+  # `macos-scope` (ubuntu, seconds) reads the diff and starts a macOS runner
+  # only when the diff touches a platform-sensitive path. Its rule, in full, is
+  # the script below; `xtask/tests/macos_compile_guard_20_6.rs` EXECUTES that
+  # script against planted diffs, so the filter cannot rot unseen.
+  #
+  # NOT-APPLICABLE IS NOT A PASS (AC3): when the filter skips `macos-check`,
+  # `aggregate` says "NOT APPLICABLE" in its log, its step summary and the PR
+  # comment — never a bare green. This job does NOT replace the pre-tag
+  # rehearsal (docs/release/tag-procedure.md step 6): that stays mandatory
+  # regardless, because a diff the filter judged irrelevant can still change
+  # what `release.yml` builds.
+  macos-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      applicable: ${{ steps.scope.outputs.applicable }}
+      reason: ${{ steps.scope.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: the diff base (PR base tip, or the push's `before`)
+          # must be reachable from the checked-out commit.
+          fetch-depth: 0
+      - name: Decide whether the diff is platform-sensitive
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          # Push: the whole pushed range (`before`..`sha`), not just the last
+          # commit. (Pull request: derived below from the merge commit.)
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          emit() {
+            local reason="${2//[$'\n\r']/ }"   # a path can carry a newline; never let it forge an output
+            echo "applicable=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$reason" >> "$GITHUB_OUTPUT"
+            echo "macos-scope: applicable=$1 — $reason"
+            echo "- macos-check applicable=$1 — $reason" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
+          # Pull request: `github.sha` is the MERGE commit checkout builds, and
+          # its first parent is the base tip it lands on. `pull_request.base.sha`
+          # is NOT used: it is not refreshed when `main` moves, so diffing
+          # against it would charge the PR for every commit merged since it opened.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE_SHA="$(git rev-parse --verify --quiet "${HEAD_SHA}^1" || true)"
+          fi
+          # FAIL OPEN: with no usable base (new branch, force-push, unreachable
+          # commit) the diff is unknown, and an unknown diff runs the guard.
+          if [ -z "${BASE_SHA:-}" ] || [[ "$BASE_SHA" =~ ^0+$ ]] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            emit true "no usable diff base — guard runs (fail open)"
+            exit 0
+          fi
+          # NUL-separated, so no path is ever C-quoted or split (a non-ASCII
+          # `macos.rs` directory must still match). Deleted paths are listed
+          # too (a deleted `macos.rs` is a macOS change).
+          list="$(mktemp)"
+          trap 'rm -f "$list"' EXIT
+          git diff -z --name-only --no-renames "$BASE_SHA" "$HEAD_SHA" > "$list"
+          mapfile -d '' -t listed < "$list"
+          # Trees that are NOT workspace members (their own fuzz/guest/fixture/
+          # spike workspaces; `templates/` is `exclude`d): no change there can
+          # alter what `cargo check --workspace` compiles, so they never start a
+          # macOS runner (D-15-4-F). The contract test pins that no workspace
+          # member falls under this pattern. Rules (1) and (3) read `files`.
+          OUTSIDE_RE='^(spikes|templates|tests/fixtures|xtask/tests/fixtures)/|/(fuzz|guests|test-fixtures)/'
+          files=()
+          for f in ${listed[@]+"${listed[@]}"}; do
+            [[ "$f" =~ $OUTSIDE_RE ]] || files+=("$f")
+          done
+
+          # (1) Named platform-sensitive paths — epic-20 §20-6 AC1, plus the
+          #     inputs that change what compiles: build scripts, cargo config and
+          #     the pinned toolchain.
+          PATH_RE='(^|/)macos\.rs$|^crates/maos-kernel-core/src/security/sandbox/|^crates/maos-bin/src/(purge|operator_door)\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)build\.rs$|(^|/)\.cargo/|^rust-toolchain\.toml$|^\.github/workflows/release\.yml$'
+          for f in ${files[@]+"${files[@]}"}; do
+            if [[ "$f" =~ $PATH_RE ]]; then
+              emit true "platform-sensitive path changed: $f"
+              exit 0
+            fi
+          done
+
+          # (2) This job's own definition, so a change to the guard is exercised
+          #     by the PR that makes it: (a) the macos-scope/macos-check job
+          #     blocks differ between base and head (any edit, not just one that
+          #     spells "macos"), or (b) any other discipline.yml line that
+          #     mentions macos/darwin changed. The many unrelated edits to this
+          #     file do not start a macOS runner.
+          macos_jobs() {
+            git show "$1:.github/workflows/discipline.yml" 2>/dev/null \
+              | awk '/^  macos-(scope|check):/ {p=1; print; next} /^  (#|[A-Za-z0-9_-]+:)/ {p=0} p'
+          }
+          if [ "$(macos_jobs "$BASE_SHA")" != "$(macos_jobs "$HEAD_SHA")" ]; then
+            emit true "the macos-scope/macos-check job definitions changed"
+            exit 0
+          fi
+          if [ "$(git diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- .github/workflows/discipline.yml | grep -Eic '^[+-].*(macos|darwin)' || true)" -gt 0 ]; then
+            emit true "discipline.yml changed a macos/darwin line"
+            exit 0
+          fi
+
+          # (3) Rust source that is platform-conditional, or that calls OS-typed
+          #     APIs (`st_dev` is `dev_t`: u64 on Linux, i32 on macOS — the
+          #     purge.rs break had no cfg at the failing sites). Judged on the
+          #     file as it will be (HEAD) AND on its removed/added lines, so
+          #     deleting the last `cfg` from a file still counts (the `+`/`-`
+          #     prefix is cut first, so the anchored alternative below sees the
+          #     line as written). CFG_RE is line-oriented, so it also matches the
+          #     bare predicate lines rustfmt leaves when it wraps `#[cfg(any(…))]`
+          #     over several lines. API_RE matches `os::{unix,linux,fd,macos,…}`
+          #     wherever it sits in a path (`use std::{io, os::linux::…}`), and
+          #     names every crate a workspace manifest takes only under
+          #     `cfg(target_os = "linux")` (absent, or empty, on macOS); the
+          #     contract test derives that list from the manifests.
+          # BLIND SPOT, stated: a portable edit (a rename in a file with no
+          # platform marker) that breaks UNCHANGED macOS-only code elsewhere is
+          # not seen — that is what the pre-tag rehearsal is for.
+          CFG_RE='cfg(_attr)?!?\(.*(unix|windows)|\btarget_(os|family|vendor|env|arch|pointer_width|endian)[[:space:]]*=|^[[:space:]]*(not\()?(unix|windows)\)*,?[[:space:]]*$'
+          API_RE='(^|[^A-Za-z0-9_])os::(unix|linux|fd|macos|darwin|windows)\b|std::os::\{|libc::|rustix::|nix::|MetadataExt|/proc/|landlock::|seccompiler::|maos_exec_deps::'
+          SRC_RE="$CFG_RE|$API_RE"
+          for f in ${files[@]+"${files[@]}"}; do
+            case "$f" in *.rs) ;; *) continue ;; esac
+            git cat-file -e "$HEAD_SHA:$f" 2>/dev/null || continue
+            if [ "$(git show "$HEAD_SHA:$f" | grep -Ec "$SRC_RE" || true)" -gt 0 ]; then
+              emit true "platform-sensitive Rust source changed: $f"
+              exit 0
+            fi
+          done
+          for f in ${files[@]+"${files[@]}"}; do
+            case "$f" in *.rs) ;; *) continue ;; esac
+            if [ "$(git --literal-pathspecs diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- "$f" | grep -E '^[-+]' | grep -Ev '^(\+\+\+|---)' | cut -c2- | grep -Ec "$SRC_RE" || true)" -gt 0 ]; then
+              emit true "a changed Rust line adds or removes platform-conditional code: $f"
+              exit 0
+            fi
+          done
+          emit false "no platform-sensitive path in this diff — NOT a pass; the pre-tag rehearsal stays mandatory"
+
+  macos-check:
+    needs: macos-scope
+    if: needs.macos-scope.outputs.applicable == 'true'
+    # The SAME runner label as release.yml's `aarch64-apple-darwin` leg, so the
+    # guard cannot compile under a different SDK than the artifact it protects;
+    # `xtask/tests/macos_compile_guard_20_6.rs` pins the equality. Kept
+    # `macos-latest` by operator ruling (2026-10-06): moving the image moves the
+    # guard and the release together.
+    runs-on: macos-latest
+    # release.yml's darwin leg carries 45 (a full release-profile BUILD); this
+    # leg only checks. A hang is a fast red, not six hours (E16-A2).
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-check-${{ hashFiles('**/Cargo.lock') }}
+      # Every workspace member and every target (lib, bin, test, bench) — a
+      # superset of release.yml's `-p maos-bin -p maos-cli`, so it also sees
+      # platform breaks in test code and in crates the release does not ship.
+      # No exclusion (operator ruling 2026-10-06): `maos-exec-deps` parses ELF
+      # and re-opens files through procfs, so it is Linux-only by construction
+      # (`libc::O_PATH` does not exist on macOS); it carries a crate-level
+      # `#![cfg(target_os = "linux")]` and compiles EMPTY here. Deleting that
+      # line reds this job (E0425 `O_PATH`), as would any other Linux-only
+      # symbol that reaches a crate compiled for macOS.
+      - name: cargo check (aarch64-apple-darwin)
+        run: cargo check --locked --workspace --all-targets --target aarch64-apple-darwin
 
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
@@ -4592,6 +4773,8 @@ jobs:
       - check-migration-merkle
       - workspace-test-suite
       - release-dry-run
+      - macos-scope
+      - macos-check
     if: always()
     permissions:
       pull-requests: write
@@ -4649,6 +4832,38 @@ jobs:
           echo "ecc=${{ needs.check-epic-close-coherence.result }}" >> $GITHUB_OUTPUT
           echo "jht1=${{ needs.journey-hermetic-tier-1.result }}" >> $GITHUB_OUTPUT
           echo "rdr=${{ needs.release-dry-run.result }}" >> $GITHUB_OUTPUT
+      # Story 20-6 AC3 — a skipped macOS guard is NOT-APPLICABLE, said out loud.
+      # `needs.*.result == 'skipped'` is not a failure, so without this step a
+      # filtered-out guard would read as an unremarkable green and the
+      # rehearsal could then be assumed to have covered it.
+      - name: macOS guard disposition (Story 20-6 AC3)
+        id: macos_guard
+        env:
+          SCOPE_RESULT: ${{ needs.macos-scope.result }}
+          SCOPE_APPLICABLE: ${{ needs.macos-scope.outputs.applicable }}
+          SCOPE_REASON: ${{ needs.macos-scope.outputs.reason }}
+          CHECK_RESULT: ${{ needs.macos-check.result }}
+        run: |
+          case "$CHECK_RESULT" in
+            success)
+              line="macos-check: RAN and PASSED — $SCOPE_REASON" ;;
+            skipped)
+              if [ "$SCOPE_APPLICABLE" = "false" ]; then
+                line="macos-check: NOT APPLICABLE (not a pass) — $SCOPE_REASON. The pre-tag rehearsal (docs/release/tag-procedure.md step 6) stays mandatory."
+              elif [ "$SCOPE_RESULT" != "success" ]; then
+                line="macos-check: NOT RUN because macos-scope was $SCOPE_RESULT — that failure already reds this aggregate."
+              else
+                # Applicable, yet skipped: the guard did not run. Recorded as an
+                # output and failed by the LAST step, so the PR comment (which
+                # sits between) is still refreshed instead of left stale.
+                line="macos-check: SKIPPED although macos-scope judged it applicable ($SCOPE_REASON) — the guard did not run; this reds the aggregate."
+                echo "unran=true" >> "$GITHUB_OUTPUT"
+              fi ;;
+            *)
+              line="macos-check: $CHECK_RESULT — $SCOPE_REASON" ;;
+          esac
+          echo "$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
       - name: Check for failures
         id: status
         run: |
@@ -4712,6 +4927,9 @@ jobs:
             const ecc = '${{ needs.check-epic-close-coherence.result }}';
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
             const rdr = '${{ needs.release-dry-run.result }}';
+            const mcs = '${{ needs.macos-check.result }}';
+            const mcsScope = '${{ needs.macos-scope.result }}';
+            const mcsApplicable = '${{ needs.macos-scope.outputs.applicable }}';
             // Pre-existing latent bug fixed by Story 8.16 (surfaced on the FIRST PR, run 27397275823):
             // `dt` is used in the advisory determinism-tests table row but was never declared, so the
             // github-script threw ReferenceError on every `pull_request` event (this step is PR-only,
@@ -4719,6 +4937,14 @@ jobs:
             const dt = '${{ needs.determinism-tests.result }}';
             const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
             const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
+            // A skip is "not applicable" ONLY when the filter ran and said so; a skip behind a failed
+            // filter, or behind `applicable=true`, is a guard that did not run — never a green-looking cell.
+            // Declared AFTER `icon`: reading a `const` above its declaration throws (TDZ) and reds aggregate.
+            const mcsCell = mcs === 'skipped'
+              ? ((mcsScope === 'success' && mcsApplicable === 'false')
+                  ? '➖ NOT APPLICABLE (not a pass) — no platform-sensitive path in this diff; the pre-tag rehearsal stays mandatory'
+                  : '❌ NOT RUN — macos-scope ' + mcsScope + ', applicable=' + (mcsApplicable || 'unset'))
+              : icon(mcs) + ' ' + mcs;
 
             const body = `## MAOS Discipline Gate Results
 
@@ -4774,6 +5000,7 @@ jobs:
             | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | release-dry-run | ${icon(rdr)} ${rdr} |
+            | macos-check (path-filtered, Story 20-6) | ${mcsCell} |
             | determinism-tests (advisory)¹ | ${advisoryIcon(dt)} ${dt} |
 
             ¹ Advisory at v0.1-α per DF6 — does not block merge. Promotes to blocking when NFR-Sec-4 ships (v0.5).
@@ -4806,6 +5033,13 @@ jobs:
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo "One or more discipline gates failed."
+          exit 1
+      # Story 20-6 AC3 — LAST on purpose (after the PR comment): an applicable
+      # guard that was skipped is a red aggregate, and the comment still says why.
+      - name: Fail if the macOS guard was applicable but did not run
+        if: ${{ steps.macos_guard.outputs.unran == 'true' }}
+        run: |
+          echo "macos-check was judged applicable by macos-scope but did not run — the guard is unverified."
           exit 1
 
   # Story 10.2 D3/F3→B — v1.5 Ship-Gate Aggregate: the phase-graduation mechanism.

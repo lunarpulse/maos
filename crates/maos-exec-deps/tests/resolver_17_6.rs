@@ -1,3 +1,6 @@
+// Story 20-6: the crate under test is `#![cfg(target_os = "linux")]`.
+#![cfg(target_os = "linux")]
+
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{Cursor, Write};

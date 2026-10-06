@@ -1,0 +1,126 @@
+# 20-6 FRONTIER RE-RUN — contract-test mutation proofs and the PR-comment execution (2026-10-06, anthropic/claude-opus-5-5, base 32420928)
+# Each plant edits one file, runs `cargo test -p xtask --test macos_compile_guard_20_6` (rustc 1.99.0), restores the file byte-for-byte.
+# M1–M17 are the draft's (scope-filter-mutation-proofs.log, against the draft's 22 tests). M18–M22: the operator-ruling Q1 pins (run when the suite had 23 tests, before the review patches). M23–M29: the frontier review patches (F1–F4, F8, F9).
+
+## M18 guard re-gains --exclude maos-exec-deps
+-        run: cargo check --locked --workspace --all-targets --target aarch64-apple-darwin
++        run: cargo check --locked --workspace --exclude maos-exec-deps --all-targets --target aarch64-apple-darwin
+exit=101
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+failed: macos_check_runs_on_release_yamls_darwin_runner_and_checks_the_whole_workspace
+
+## M19 guard narrowed with -p maos-bin
+-        run: cargo check --locked --workspace --all-targets ...
++        run: cargo check --locked --workspace -pmaos-bin --all-targets ...
+exit=101
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+failed: macos_check_runs_on_release_yamls_darwin_runner_and_checks_the_whole_workspace
+
+## M20 lib.rs loses the crate cfg
+crates/maos-exec-deps/src/lib.rs
+-#![cfg(target_os = "linux")]
+exit=101
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+failed: the_linux_only_exec_deps_crate_is_cfg_gated_in_source_not_excluded
+
+## M21 the crate cfg moved below the first item
+crates/maos-exec-deps/src/lib.rs
+-#![cfg(target_os = "linux")]   (re-planted as `// #![cfg(target_os = "linux")]` below the first `use` item — no longer crate level; the header scan must not accept it)
+exit=101
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+failed: the_linux_only_exec_deps_crate_is_cfg_gated_in_source_not_excluded
+
+## M22 integration test loses its cfg
+crates/maos-exec-deps/tests/resolver_17_6.rs
+-#![cfg(target_os = "linux")]
+exit=101
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+failed: the_linux_only_exec_deps_crate_is_cfg_gated_in_source_not_excluded
+
+## M23 (F1) `icon` declared after `mcsCell` again (TDZ)
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -4912,2 +4911,0 @@
+-            const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
+-            const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
+@@ -4921,0 +4920,2 @@
++            const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
++            const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
+exit=101
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+failed: the_pr_comment_script_reads_no_const_before_its_declaration
+
+## M24 (F2) diff pass no longer cuts the +/- prefix
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -4235 +4235 @@
+-            if [ "$(git --literal-pathspecs diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- "$f" | grep -E '^[-+]' | grep -Ev '^(\+\+\+|---)' | cut -c2- | grep -Ec "$SRC_RE" || true)" -gt 0 ]; then
++            if [ "$(git --literal-pathspecs diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- "$f" | grep -E '^[-+]' | grep -Ev '^(\+\+\+|---)' | grep -Ec "$SRC_RE" || true)" -gt 0 ]; then
+exit=101
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+failed: removing_a_wrapped_bare_unix_cfg_starts_the_guard
+
+## M25 (F3) API_RE loses landlock::
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -4223 +4223 @@
+-          API_RE='(^|[^A-Za-z0-9_])os::(unix|linux|fd|macos|darwin|windows)\b|std::os::\{|libc::|rustix::|nix::|MetadataExt|/proc/|landlock::|seccompiler::|maos_exec_deps::'
++          API_RE='(^|[^A-Za-z0-9_])os::(unix|linux|fd|macos|darwin|windows)\b|std::os::\{|libc::|rustix::|nix::|MetadataExt|/proc/|seccompiler::|maos_exec_deps::'
+exit=101
+test result: FAILED. 25 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+failed: every_linux_only_dependency_is_an_os_typed_api_for_the_filter, rust_source_with_platform_conditional_code_starts_the_guard
+
+## M26 (F4) API_RE back to the contiguous std::os::(unix|linux|fd)
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -4223 +4223 @@
+-          API_RE='(^|[^A-Za-z0-9_])os::(unix|linux|fd|macos|darwin|windows)\b|std::os::\{|libc::|rustix::|nix::|MetadataExt|/proc/|landlock::|seccompiler::|maos_exec_deps::'
++          API_RE='std::os::(unix|linux|fd)|libc::|rustix::|nix::|MetadataExt|/proc/|landlock::|seccompiler::|maos_exec_deps::'
+exit=101
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+failed: rust_source_with_platform_conditional_code_starts_the_guard
+
+## M27 (F8) a matrix-driven job gains a macos-latest image
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -3022 +3022 @@
+-        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
++        image: [macos-latest, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+exit=101
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+failed: macos_check_is_the_only_macos_job_and_the_release_dry_run_matrix_is_unchanged
+
+## M28 (F9) OUTSIDE_RE swallows a member tree (spirits/)
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -4170 +4170 @@
+-          OUTSIDE_RE='^(spikes|templates|tests/fixtures|xtask/tests/fixtures)/|/(fuzz|guests|test-fixtures)/'
++          OUTSIDE_RE='^(spirits|spikes|templates|tests/fixtures|xtask/tests/fixtures)/|/(fuzz|guests|test-fixtures)/'
+exit=101
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+failed: no_workspace_member_is_treated_as_outside_the_workspace
+
+## M29 (F9) the OUTSIDE filter is dropped
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -4173 +4173 @@
+-            [[ "$f" =~ $OUTSIDE_RE ]] || files+=("$f")
++            files+=("$f")
+exit=101
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+failed: changes_touching_none_of_the_filtered_paths_start_no_macos_runner
+
+## UNPLANTED (all restored)
+exit=0
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+
+## PR-comment github-script EXECUTED under node v20.19.2 (script extracted from the YAML, `${{ }}` substituted, `github`/`context` stubbed)
+macos-check=success macos-scope=success applicable='true' -> rc=0 ROW | macos-check (path-filtered, Story 20-6) | ✅ success |
+macos-check=failure macos-scope=success applicable='true' -> rc=0 ROW | macos-check (path-filtered, Story 20-6) | ❌ failure |
+macos-check=cancelled macos-scope=success applicable='true' -> rc=0 ROW | macos-check (path-filtered, Story 20-6) | ❌ cancelled |
+macos-check=skipped macos-scope=success applicable='false' -> rc=0 ROW | macos-check (path-filtered, Story 20-6) | ➖ NOT APPLICABLE (not a pass) — no platform-sensitive path in this diff; the pre-tag rehearsal stays mandatory |
+macos-check=skipped macos-scope=failure applicable='' -> rc=0 ROW | macos-check (path-filtered, Story 20-6) | ❌ NOT RUN — macos-scope failure, applicable=unset |
+macos-check=skipped macos-scope=success applicable='true' -> rc=0 ROW | macos-check (path-filtered, Story 20-6) | ❌ NOT RUN — macos-scope success, applicable=true |
+DRAFT ORDER macos-check=success -> rc=1 THREW ReferenceError: Cannot access 'icon' before initialization
+DRAFT ORDER macos-check=skipped -> rc=0 POSTED
+(the DRAFT ORDER lines replay M23 = the draft's declaration order: the comment step threw on every PR where macos-check ran — review finding F1)

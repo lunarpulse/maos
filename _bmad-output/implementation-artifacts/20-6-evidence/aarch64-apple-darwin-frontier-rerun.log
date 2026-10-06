@@ -1,0 +1,41 @@
+# 20-6 FRONTIER RE-RUN darwin evidence (2026-10-06, anthropic/claude-opus-5-5, base 32420928 = wasmtime 48, rustc 1.99.0 b940084d7 = CI stable, host linux x86_64)
+# Method unchanged from the draft: RUSTC_WRAPPER= ; CC_aarch64_apple_darwin=20-6-evidence/darwin-check-cc-shim.sh (C halves of ring/libsqlite3-sys stubbed; every Rust type-check real); target dir = the worktree's own `target` symlink.
+# Operator ruling 2026-10-06 applied: `maos-exec-deps` carries a crate-level `#![cfg(target_os = "linux")]` (and its integration test the same); the guard checks the WHOLE workspace, no `--exclude`.
+
+$ rm -rf target/aarch64-apple-darwin && cargo check --offline --locked --workspace --all-targets --target aarch64-apple-darwin   # the guard's command, cold
+exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.74s
+
+$ cargo tree --offline --locked --workspace --target aarch64-apple-darwin -i maos-exec-deps
+maos-exec-deps v0.1.0-alpha.1 (/tmp/maos-20-6-wt/crates/maos-exec-deps)   # a workspace ROOT only: no dependent pulls it in for darwin
+
+## PLANT 4 — the O_PATH break: delete the crate-level cfg (the only way to reach O_PATH on darwin now)
+--- a/crates/maos-exec-deps/src/lib.rs (restored copy)	2026-10-06 20:25:29.451463705 +0000
++++ crates/maos-exec-deps/src/lib.rs	2026-10-06 20:25:31.421450726 +0000
+@@ -15,7 +15,6 @@
+ //! Linux-only by construction (ELF, `O_PATH`, procfs reopen): on any other OS
+ //! the crate compiles empty, so `cargo check --workspace` works there (Story
+ //! 20-6); its one dependent takes it only under `cfg(target_os = "linux")`.
+-#![cfg(target_os = "linux")]
+ #![forbid(unsafe_code)]
+ 
+ use std::collections::{BTreeSet, VecDeque};
+exit=101
+error[E0425]: cannot find value `O_PATH` in crate `libc`
+   --> crates/maos-exec-deps/src/lib.rs:222:29
+    |
+222 |         .custom_flags(libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+    |                             ^^^^^^ not found in `libc`
+error: could not compile `maos-exec-deps` (lib) due to 1 previous error
+error: could not compile `maos-exec-deps` (lib test) due to 1 previous error
+
+## RESTORED (byte-identical, sha256 cd10fdbb…4846b before and after)
+exit=0
+
+## PLANTS 1-3 re-run on THIS base (wasmtime 48 graph), guard command, each restored and `git status -- <file>` empty after
+PLANT 1 macos.rs `let _use_cgroup = cgroup_path.is_some();` -> exit=101  error[E0425]: cannot find value `cgroup_path` in this scope
+PLANT 2 purge.rs `root_device: rustix::fs::Dev` -> `u64` -> exit=101  E0308 x2 + E0277 `can't compare i32 with u64` (3 errors)
+PLANT 3 operator_door.rs:1980-1981 `rustix::fs::Dev` -> `u64` -> exit=101  E0308 x3 + E0277 (4 errors)   => 3 + 4 = the epic's 7
+RESTORED -> exit=0
+
+## Note (honesty): the very first warm run of the guard command in this session exited 101; its error text was cut by my own `| head` filter and is lost. Five later runs (one cold, from an empty target/aarch64-apple-darwin; one on rustc 1.98.1 then 1.99.0 back-to-back) all exit 0 with the identical tree. Not reproduced; recorded rather than dropped.

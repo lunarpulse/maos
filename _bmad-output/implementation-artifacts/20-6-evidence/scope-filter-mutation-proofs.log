@@ -1,0 +1,131 @@
+# 20-6 mutation proofs (after review patches): each plant edits discipline.yml, runs the 22-test contract, restores the file byte-for-byte.
+
+## M1 PATH_RE drops build.rs
+(plant changed 2 diff line(s); shown clipped)
+-          PATH_RE='(^|/)macos\.rs$|^crates/maos-kernel-core/src/security/sandbox/|^crates/maos-bin/src/(purge|operator_door)\.rs$
++          PATH_RE='(^|/)macos\.rs$|^crates/maos-kernel-core/src/security/sandbox/|^crates/maos-bin/src/(purge|operator_door)\.rs$
+test named_platform_sensitive_paths_start_the_guard ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+## M2 macos-check runner label macos-latest -> macos-14
+(plant changed 2 diff line(s); shown clipped)
+-    runs-on: macos-latest
++    runs-on: macos-14
+test macos_check_runs_on_release_yamls_darwin_runner_and_checks_the_whole_workspace ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M3 aggregate.needs loses macos-check
+(plant changed 1 diff line(s); shown clipped)
+-      - macos-check
+test aggregate_depends_on_both_jobs_and_reports_not_applicable_loudly ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M4 API_RE loses libc::
+(plant changed 2 diff line(s); shown clipped)
+-          API_RE='std::os::(unix|linux|fd)|libc::|rustix::|nix::|MetadataExt|/proc/'
++          API_RE='std::os::(unix|linux|fd)|rustix::|nix::|MetadataExt|/proc/'
+test a_path_with_a_newline_cannot_forge_the_step_outputs ... FAILED
+test non_ascii_paths_are_matched_not_c_quoted_past_the_filter ... FAILED
+test rust_source_with_platform_conditional_code_starts_the_guard ... FAILED
+test result: FAILED. 19 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+## M5 PATH_RE drops the sandbox/ prefix
+(plant changed 2 diff line(s); shown clipped)
+-          PATH_RE='(^|/)macos\.rs$|^crates/maos-kernel-core/src/security/sandbox/|^crates/maos-bin/src/(purge|operator_door)\.rs$
++          PATH_RE='(^|/)macos\.rs$|^crates/maos-bin/src/(purge|operator_door)\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)build\.rs$|(^|/)
+test named_platform_sensitive_paths_start_the_guard ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+## M6 unknown diff base no longer fails open
+(plant changed 2 diff line(s); shown clipped)
+-            emit true "no usable diff base — guard runs (fail open)"
++            emit false "no usable diff base — fail open"
+test an_unknown_diff_fails_open_and_runs_the_guard ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+## M7 rule 2a (job-block comparison) neutered
+(plant changed 2 diff line(s); shown clipped)
+-          if [ "$(macos_jobs "$BASE_SHA")" != "$(macos_jobs "$HEAD_SHA")" ]; then
++          if [ "$(macos_jobs "$BASE_SHA")" != "$(macos_jobs "$BASE_SHA")" ]; then
+test any_edit_to_the_macos_job_definitions_starts_the_guard_even_without_the_word_macos ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M8 rule 2b (macos/darwin line mention) neutered
+(plant changed 2 diff line(s); shown clipped)
+-          if [ "$(git diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- .github/workflows/discipline.yml | grep -Eic '^[+-].*(maco
++          if [ "$(git diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- .github/workflows/discipline.yml | grep -Eic '^[+-].*(NEVE
+test discipline_yml_edits_start_the_guard_only_when_they_mention_macos ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+## M9 rule 3b (added/removed-line scan) neutered
+(plant changed 2 diff line(s); shown clipped)
+-          if [ "$(git diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- '*.rs' | grep -E '^[-+]' | grep -Ev '^(\+\+\+|---)' | grep
++          if [ "$(git diff -U0 --no-renames "$BASE_SHA" "$HEAD_SHA" -- '*.rs' | grep -E '^[-+]NEVER' | grep -Ev '^(\+\+\+|---)' |
+test removing_the_last_cfg_from_a_file_starts_the_guard ... FAILED
+test wrapped_cfg_attributes_and_other_target_predicates_start_the_guard ... FAILED
+test result: FAILED. 20 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M10 pull_request base no longer taken from the merge commit
+(plant changed 2 diff line(s); shown clipped)
+-          if [ "$EVENT_NAME" = "pull_request" ]; then
++          if [ "$EVENT_NAME" = "never" ]; then
+test a_pull_request_is_diffed_against_its_merge_commits_first_parent_not_a_stale_base ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M11 file list no longer NUL-separated
+(plant changed 2 diff line(s); shown clipped)
+-          git diff -z --name-only --no-renames "$BASE_SHA" "$HEAD_SHA" > "$list"
++          git diff --name-only --no-renames "$BASE_SHA" "$HEAD_SHA" > "$list"
+test non_ascii_paths_are_matched_not_c_quoted_past_the_filter ... FAILED
+test rust_source_with_platform_conditional_code_starts_the_guard ... FAILED
+test editing_a_file_that_already_contains_a_cfg_starts_the_guard ... FAILED
+test a_pull_request_is_diffed_against_its_merge_commits_first_parent_not_a_stale_base ... FAILED
+test named_platform_sensitive_paths_start_the_guard ... FAILED
+test wrapped_cfg_attributes_and_other_target_predicates_start_the_guard ... FAILED
+test result: FAILED. 16 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+## M12 CFG_RE drops target_arch
+(plant changed 2 diff line(s); shown clipped)
+-          CFG_RE='cfg(_attr)?!?\(.*(unix|windows)|\btarget_(os|family|vendor|env|arch|pointer_width|endian)[[:space:]]*=|^[[:spac
++          CFG_RE='cfg(_attr)?!?\(.*(unix|windows)|\btarget_(os|family|vendor|env|pointer_width|endian)[[:space:]]*=|^[[:space:]]*
+test wrapped_cfg_attributes_and_other_target_predicates_start_the_guard ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+## M13 emit() stops sanitising newlines
+(plant changed 2 diff line(s); shown clipped)
+-            local reason="${2//[$'\n\r']/ }"   # a path can carry a newline; never let it forge an output
++            local reason="$2"   # a path can carry a newline; never let it forge an output
+test a_path_with_a_newline_cannot_forge_the_step_outputs ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M14 final aggregate step watches the wrong output
+(plant changed 2 diff line(s); shown clipped)
+-        if: ${{ steps.macos_guard.outputs.unran == 'true' }}
++        if: ${{ steps.macos_guard.outputs.unrun == 'true' }}
+test aggregate_depends_on_both_jobs_and_reports_not_applicable_loudly ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+## M15 PR comment ignores a failed macos-scope
+(plant changed 2 diff line(s); shown clipped)
+-              ? ((mcsScope === 'success' && mcsApplicable === 'false')
++              ? ((mcsApplicable === 'false')
+test the_pr_comment_never_calls_a_failed_filter_not_applicable ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M16 disposition no longer records applicable-but-skipped
+(plant changed 2 diff line(s); shown clipped)
+-                echo "unran=true" >> "$GITHUB_OUTPUT"
++                true
+test an_applicable_guard_that_did_not_run_is_flagged_for_the_failing_step ... FAILED
+test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+## M17 macos-scope moves to a macOS runner
+(plant changed 2 diff line(s); shown clipped)
+-    runs-on: ubuntu-latest
++    runs-on: macos-latest
+test macos_check_is_the_only_macos_job_and_the_release_dry_run_matrix_is_unchanged ... FAILED
+test macos_scope_is_a_cheap_linux_job_with_full_history ... FAILED
+test result: FAILED. 20 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+## UNPLANTED
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
