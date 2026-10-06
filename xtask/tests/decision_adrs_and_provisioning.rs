@@ -412,6 +412,13 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
             }
         }
         "061" => {
+            // Story 17-1 (operator-ratified 2026-10-06): the M3 transport
+            // amendment lies outside `## Context`; anchor the ADR's own body so
+            // an unamended ADR-061 reds here.
+            let adr_rel = "docs/adr/ADR-061-worker-egress-and-scoped-credential.md";
+            require_body_contains(number, body, adr_rel, "## Amendment — Story 17-1", findings);
+            require_body_contains(number, body, adr_rel, "/proxy/egress.sock", findings);
+            require_body_contains(number, body, adr_rel, "daemon-minted", findings);
             if let Some(posture) = anchor_source(
                 root,
                 number,
@@ -1023,14 +1030,14 @@ impl Fixture {
             let filler = (0..35)
                 .map(|line| format!("Fixture rationale line {line}.\n"))
                 .collect::<String>();
-            // ADR-062's fixture mirrors the amended contract: the amendment
-            // heading and its two body literals are gate clauses, so the
-            // fixture corpus must satisfy them to stay green before any red
-            // is credited.
-            let amendment = if number == 62 {
-                "\n## Amendment — Story 16-1\n\n`control.json` keeps one writer and `cohort-a2a-daemon` is a door root.\n"
-            } else {
-                ""
+            // ADR-061's and ADR-062's fixtures mirror the amended contracts:
+            // each amendment heading and its body literals are gate clauses,
+            // so the fixture corpus must satisfy them to stay green before any
+            // red is credited.
+            let amendment = match number {
+                61 => "\n## Amendment — Story 17-1\n\nThe bearer is daemon-minted; the Worker reaches `/proxy/egress.sock` only.\n",
+                62 => "\n## Amendment — Story 16-1\n\n`control.json` keeps one writer and `cohort-a2a-daemon` is a door root.\n",
+                _ => "",
             };
             let adr = format!(
                 "---\nStatus: ACCEPTED — fixture\nGate: fixture\nDecided: 2026-09-08\nAccepted-in-PR: pending\nRevisits: fixture\nSupersedes: nothing\n---\n\n# ADR-{number:03}\n\n## Context\n\n{context}\n\n{filler}{amendment}\n## Decision\n\nThe fixture decision is binding.\n\n## Consumers\n\n- `{consumer}`\n"

@@ -1,0 +1,85 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-06",
+  "base_head": "0d73cac3",
+  "method": "Throwaway prototype in the detached worktree /tmp/maos-17-1-wt (E16-A7, 17-3c early-start precedent). Kernel-side changes written to compile (cargo check -p maos-kernel-core --lib, then maos-bin / maos-bench / xtask), `cargo fmt --all`, then measured with `cargo run -q --offline --locked -p xtask -- check-kernel-baseline` (physical src lines of crates/maos-kernel-core/src, the number the baseline pins) and `cargo run -q --offline --locked -p xtask -- kloc-check --json` (tokei 14.0.0 code lines per crate, the number kloc.toml budgets). All prototype code was then reverted; only the two diffs in this directory remain. New tests are NOT in the figures (tests under crates/*/tests do not count; tests inside src/ do and are listed under not_in_the_figures).",
+  "base": {
+    "kernel_src_lines": 25293,
+    "kernel_files": 98,
+    "kernel_tokei": 19519,
+    "kernel_kloc_ceiling": 19529,
+    "aggregate_tokei": 170434,
+    "aggregate_hardfail": 170884,
+    "maos_domain": 9270,
+    "maos_manifest": 4445,
+    "maos_bin": 24600
+  },
+  "variant_A_keep_ci_default_guard": {
+    "diff": "prototype.diff",
+    "kernel_src_lines": 25425,
+    "delta_src_lines": 132,
+    "kernel_tokei": 19621,
+    "delta_tokei_vs_measured_base": 102,
+    "delta_tokei_vs_ceiling_19529": 92,
+    "per_file_src_lines_net": {
+      "lifecycle/cli_wrapper/runtime.rs": 67,
+      "lifecycle/cli_wrapper/admission.rs": 27,
+      "security/sandbox/t3/spawn.rs": 23,
+      "security/sandbox/t3/argv.rs": 14,
+      "lifecycle/cli_wrapper/lifecycle.rs": 1
+    },
+    "other_crates_tokei": {"maos-domain": 9274, "maos-manifest": 4447, "maos-bin_scaffold_only": 24605, "maos-bench_scaffold_only": 1512, "xtask_scaffold_only": 44041},
+    "aggregate_tokei": 170549
+  },
+  "variant_B_delete_dead_ci_default_guard": {
+    "diff": "prototype-with-dead-guard-deleted.diff",
+    "note": "the diff is variant A plus the deletion of ci_default_guard (runtime.rs fn, its 3 unit tests) and its cli_wrapper/mod.rs re-export; it contains the whole prototype, not only the deletion",
+    "kernel_src_lines": 25353,
+    "delta_src_lines": 60,
+    "kernel_tokei": 19564,
+    "delta_tokei_vs_measured_base": 45,
+    "delta_tokei_vs_ceiling_19529": 35,
+    "per_file_src_lines_net": {
+      "lifecycle/cli_wrapper/runtime.rs": -4,
+      "lifecycle/cli_wrapper/admission.rs": 27,
+      "security/sandbox/t3/spawn.rs": 23,
+      "security/sandbox/t3/argv.rs": 14,
+      "lifecycle/cli_wrapper/lifecycle.rs": 1,
+      "lifecycle/cli_wrapper/mod.rs": -1
+    },
+    "aggregate_tokei": 170492
+  },
+  "what_the_prototype_contains": [
+    "t3/argv.rs: build_runtime_argv gains egress_socket + env names -> --volume=<sock>:/proxy/egress.sock:rw, --http-proxy=false, --env=NAME (names only)",
+    "t3/spawn.rs: T3SpawnContext gains egress_socket + env; piped stdin/stdout/stderr; env_clear + 4-name client allowlist; guard built before inspect_container_host_pid (no leak on failed inspect)",
+    "runtime.rs: BridgeChild::Container(SandboxedContainerChild); BridgeChild::kill (+ <runtime> kill); T3Launch + BridgeSpawnSpec.t3; spawn_child T3 arm via spawn_t3 (typed refusal, never bare); env_clear() at the Command build; read_newline_delimited bounded by MAX_FRAME_BYTES; stderr marker -> kind-8 row (T3, stderr only) in pump_to_journal",
+    "admission.rs: check_egress (proxy configured + manifest subset of host grant), admit_cli_wrapper_journaled gains 2 params, probe env_clear",
+    "out of kernel (scaffolding so the workspace compiles for the gates): CliWrapperConfig.egress (maos-manifest), two CliWrapperAdmissionError variants (maos-domain), t3: None / egress: vec![] at the dependent call sites"
+  ],
+  "not_in_the_figures": [
+    "#[cfg(unix)] on the pump's kind-8 branch (+1: report_sandbox_block is unix-only)",
+    "doc-comment re-ordering of admit_cli_wrapper_journaled (the prototype inserted check_egress between the doc and the fn)",
+    "wiring commit_spawn_report (maos-bin side, zero kernel lines)",
+    "any unit test added under crates/maos-kernel-core/src (every such line counts; put new tests under tests/)",
+    "a bounded post-exit drain if the R17-22 measurement under spawn_t3 shows the defect does not dissolve",
+    "the in-image / entry-shim forwarder (out of kernel: maos-egress)",
+    "surface-pin rows: kernel-surface-v0.1-beta.json + kernel-api-classes.toml re-hash for the new pub items (T3Launch, check_egress, BridgeSpawnSpec.t3, T3SpawnContext fields)"
+  ],
+  "gates_on_prototype_variant_B": {
+    "fail_only_because_of_the_pending_grant_or_surface": [
+      "check-kernel-baseline: maos-kernel-core/src is 25353 lines but kernel-core-baseline.toml pins 25293 (5 files changed, 6 in variant B)",
+      "kloc-check --json: maos-kernel-core 19564 > 19529 (variant A: 19621), maos-domain 9274 > 9270, maos-bin 24605 > 24600 (scaffold lines only)",
+      "check-fkcs --json: frozen-tag-consistency/diff-oracle/fault-inject/kernel-abi-diff all report the same kernel line-count drift",
+      "check-service-boundary: new public kernel symbols unclassified in kernel-api-classes.toml (check_egress, runtime items) and P3 on T3SpawnContext.env: Vec<(String,String)> (needs i9_exempt or a borrowed parameter)"
+    ],
+    "pass": ["check-dev-record-completeness", "check-dev-model-tier", "check-dev-model-used-populated", "templates-regen --check", "check-manifest-schema-version", "stability-matrix --check", "check-equiv-fixture-provenance", "check-wasm-form-equiv --json"],
+    "environmental_on_the_prototype_run": [
+      "check-exit-commands and gen-abi-docs failed on the prototype run because the measuring shell exported CARGO_TARGET_DIR=/mnt/build/cargo: target/debug/{maos,maosctl} and target/doc/maos_spirit_abi.json (what those gates read) were not in the worktree's target/. An environment fault, not a prototype fault. On the final docs-only tree (variable unset, own target) all 14 gates + `cargo fmt --all --check` pass and `cargo test --offline --locked -p xtask` = 941 passed."
+    ],
+    "scratch_regrant_proof_variant_B": {
+      "check-kernel-baseline": "PASSED (maos-kernel-core/src = 25353 lines, 98 files, pinned 25353) with src_lines = 25353 and the --emit-pin [kernel_src] block spliced into a scratch copy of kernel-core-baseline.toml",
+      "kloc-check --json": "passed: true, over_budget: [], aggregate 170492 with scratch kloc.toml maos-kernel-core 19564, maos-domain 9274, maos-bin 24605",
+      "reverted": true
+    }
+  }
+}

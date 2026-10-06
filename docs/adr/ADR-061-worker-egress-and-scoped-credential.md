@@ -1,5 +1,5 @@
 ---
-Status: ACCEPTED — ratified 2026-09-08 under Story 15-5, decisions F6 and F7
+Status: ACCEPTED — ratified 2026-09-08 under Story 15-5, decisions F6 and F7; transport AMENDED 2026-10-06 (operator-ratified under Story 17-1 — see Amendment)
 Gate: `cargo test -p xtask --test decision_adrs_and_provisioning`
 Decided: 2026-09-08
 Accepted-in-PR: pending — Story 15-5
@@ -124,3 +124,46 @@ independent of vendor CLI behavior and keeps refusal evidence out of the child.
 - Manifest schema/version and admission coverage change in Story 17-1.
 - Existing T3 `--network=none` semantics remain the model and become real for
   the Worker rather than remaining confined to a diagnostic smoke.
+
+## Amendment — Story 17-1 (transport; ratified 2026-10-06)
+
+Ratified by the operator (Lunarpulse) on 2026-10-06, on Story 17-1's creation
+record (`_bmad-output/implementation-artifacts/17-1-flag-winston-decision.md`,
+D-17-1-FW-04) and Story 17-3a's measured Q6 verdict. Each point below
+supersedes the sentence it names; everything else in the Decision stands,
+including the order (proxy and bearer, then the T3 route, then `env_clear` and
+the guard inversion in the same commit).
+
+- **The transport is a daemon-owned Unix socket, not host loopback.**
+  SUPERSEDES *"the Worker's only reachable endpoint is a daemon-side proxy on
+  host loopback."* A `--network=none` container cannot reach host loopback by
+  construction, and the two mechanisms that can — `slirp4netns`
+  `allow_host_loopback=true` (M1) and `pasta` (M2) — were measured to reach the
+  internet on ubuntu-24.04 (podman 4.9.3) and ubuntu-26.04 (podman 5.7.0)
+  (17-3a Q6, CI runs `36207588609`, `36206431636`). The Worker's only
+  reachable endpoint is a daemon-owned Unix socket bind-mounted into the
+  container at `/proxy/egress.sock`, served inside the container by a
+  forwarder on `127.0.0.1:18080`; `--network=none` is retained (M3).
+- **Socket custody.** The socket is mode 0666 inside a daemon-owned 0700
+  directory: a 0600 socket is refused to the remapped container uid under the
+  rootless user namespace (measured, 17-3a Q6). The directory keeps other uids
+  out; it is not a boundary against a same-uid process, so the bearer is the
+  authentication, and Story 17-1 proves that a same-uid process without the
+  bearer is refused by the proxy.
+- **The bearer is daemon-minted.** The Decision never required a kernel mint:
+  the per-spawn proxy bearer is minted by the daemon's composition root,
+  stored by the proxy only as a hash, and verified at the proxy boundary.
+- **Refusals are journaled by a confirmed write.** The proxy journals every
+  refusal through `TransparencyLogAdapter::insert_frame_event`
+  (`crates/maos-kernel-core/src/iac/transparency_log.rs`) before it returns the
+  refusal.
+- **The kernel figure is measured, not projected.** SUPERSEDES the Decision's
+  *"projected `+65–130` kernel lines … zero local headroom at 18935/18935"*
+  paragraph. The ratified ceiling is variant B of the 17-1 measurement (the
+  dead `ci_default_guard` is deleted): `maos-kernel-core/src` 25293 → at most
+  25353 lines, kloc 19529 → at most 19564, `maos-domain` 9270 → 9274. The
+  landing commit re-measures and re-pins the exact figure, which may not
+  exceed these. `_aggregate_hardfail` and the `maos-bin`, `maos-egress` and
+  `xtask` rows are raised to their exact measured figures in the landing
+  commit; the `_aggregate_hardfail` raise is capped at +1182 lines, the top of
+  17-1's measured envelope.

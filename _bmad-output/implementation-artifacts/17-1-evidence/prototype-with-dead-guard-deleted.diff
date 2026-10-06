@@ -1,0 +1,633 @@
+diff --git a/crates/maos-bench/src/harness/j1.rs b/crates/maos-bench/src/harness/j1.rs
+index e749e303..da8f5f87 100644
+--- a/crates/maos-bench/src/harness/j1.rs
++++ b/crates/maos-bench/src/harness/j1.rs
+@@ -196,6 +196,7 @@ pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResul
+     // POSIX `sh`, zero work per iteration.
+     let argv_prefix = vec!["-c".to_string()];
+     let spec = BridgeSpawnSpec {
++        t3: None,
+         program: "sh".to_string(),
+         sandbox: maos_kernel_core::security::sandbox::SandboxSpec::new_for_test(
+             maos_domain::invariants::i9::SandboxTier::T0,
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index cf4b5c8c..a08039c1 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -7064,6 +7064,8 @@ description = "smoke test spirit successor"
+                     };
+                     let spec = SandboxSpec::new_for_test(SandboxTier::T3);
+                     let ctx = T3SpawnContext {
++                        egress_socket: None,
++                        env: vec![],
+                         spirit_binary_path: busybox_path.to_path_buf(),
+                         boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+                         container_name: format!(
+@@ -12979,8 +12981,9 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
+             control_channel: CliWrapperControlChannel::Signals,
+             shutdown_signal: None,
+         },
++        egress: vec![],
+     };
+-    let err = admit_cli_wrapper_journaled(&cfg, SandboxTier::T3, 1, &log)
++    let err = admit_cli_wrapper_journaled(&cfg, SandboxTier::T3, 1, &log, false, &[])
+         .expect_err("step5: stale declared shape must refuse");
+     let (declared, observed) = match err {
+         maos_domain::cli_wrapper::CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
+diff --git a/crates/maos-bin/src/spirit_session.rs b/crates/maos-bin/src/spirit_session.rs
+index ce029bbc..da66a8d4 100644
+--- a/crates/maos-bin/src/spirit_session.rs
++++ b/crates/maos-bin/src/spirit_session.rs
+@@ -261,6 +261,7 @@ pub async fn run_admitted_session(
+         };
+         let prefix_hash = argv_prefix_hash(&launch.plan.argv);
+         let bridge = spawn_and_bridge(BridgeSpawnSpec {
++        t3: None,
+             program: launch.plan.program,
+             sandbox,
+             argv_prefix: launch.plan.argv,
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index 0165f503..2337b7ba 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -643,7 +643,7 @@ pub fn run_cli_wrapper_manifest(
+     //    so admission runs a liveness probe and re-asserts the T3 floor here.
+     match worker_cli.probe_strategy() {
+         worker_cli::ProbeStrategy::BridgeHandshake => {
+-            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
++            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log, false, &[])
+                 .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+         }
+         worker_cli::ProbeStrategy::Liveness { argv } => {
+@@ -797,6 +797,7 @@ pub fn run_cli_wrapper_manifest(
+     // 8. Spawn the REAL bridge. The typed task is routed as the trailing argv
+     //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
+     let spec = BridgeSpawnSpec {
++        t3: None,
+         program: resolved,
+         sandbox: maos_kernel_core::security::sandbox::SandboxSpec {
+             tier: granted_tier,
+diff --git a/crates/maos-domain/src/cli_wrapper.rs b/crates/maos-domain/src/cli_wrapper.rs
+index 1eb4778e..702125da 100644
+--- a/crates/maos-domain/src/cli_wrapper.rs
++++ b/crates/maos-domain/src/cli_wrapper.rs
+@@ -79,4 +79,12 @@ pub enum CliWrapperAdmissionError {
+          (deferred to Epic 10 / NFR-Rel-3 HSIS); admission fails closed — no silent downgrade"
+     )]
+     ERespawnWithContextUnsupported,
++
++    /// Story 17-1 AC2 — the manifest asks for egress but no proxy is configured.
++    #[error("manifest declares egress but no egress proxy is configured (fail-closed)")]
++    EEgressProxyUnavailable,
++
++    /// Story 17-1 AC2 — a declared destination is not in the host grant.
++    #[error("egress destination {destination} is not granted by the host (fail-closed)")]
++    EEgressNotGranted { destination: String },
+ }
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+index 0bfb469d..1e39dc88 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+@@ -73,6 +73,7 @@ pub fn probe_and_verify_shape(
+ 
+     let mut child = std::process::Command::new(&resolved)
+         .args(&argv)
++        .env_clear()
+         .stdin(std::process::Stdio::null())
+         .stdout(std::process::Stdio::piped())
+         .stderr(std::process::Stdio::piped())
+@@ -185,12 +186,37 @@ pub fn probe_and_verify_shape(
+ /// version matches the observed shape — there is no code path that silently
+ /// retries into a started state. (Tested in
+ /// `tests/cli_wrapper_shape_mismatch_journal_7_4.rs`.)
++/// Story 17-1 AC2 — a manifest that asks for egress is admitted only when a
++/// proxy exists to enforce it and the host grant covers every destination
++/// (the manifest requests; the host grants — never the reverse).
++pub fn check_egress(
++    config: &CliWrapperConfig,
++    proxy_configured: bool,
++    granted: &[String],
++) -> Result<(), CliWrapperAdmissionError> {
++    if config.egress.is_empty() {
++        return Ok(());
++    }
++    if !proxy_configured {
++        return Err(CliWrapperAdmissionError::EEgressProxyUnavailable);
++    }
++    match config.egress.iter().find(|d| !granted.contains(d)) {
++        Some(destination) => Err(CliWrapperAdmissionError::EEgressNotGranted {
++            destination: destination.clone(),
++        }),
++        None => Ok(()),
++    }
++}
++
+ pub fn admit_cli_wrapper_journaled(
+     config: &CliWrapperConfig,
+     sandbox_tier: SandboxTier,
+     spirit_pid: u32,
+     journal: &TransparencyLogAdapter,
++    proxy_configured: bool,
++    granted_egress: &[String],
+ ) -> Result<(), CliWrapperAdmissionError> {
++    check_egress(config, proxy_configured, granted_egress)?;
+     match probe_and_verify_shape(config, sandbox_tier) {
+         Ok(()) => Ok(()),
+         Err(CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
+@@ -334,6 +360,7 @@ mod tests {
+                 control_channel: CliWrapperControlChannel::Signals,
+                 shutdown_signal: None,
+             },
++            egress: vec![],
+         }
+     }
+ 
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs
+index 0eb301d8..2de1a2f7 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/lifecycle.rs
+@@ -74,6 +74,7 @@ mod tests {
+                 control_channel: CliWrapperControlChannel::Signals,
+                 shutdown_signal: None,
+             },
++            egress: vec![],
+         }
+     }
+ 
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs
+index fbce7497..49d00722 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs
+@@ -38,7 +38,6 @@ pub use admission::{
+ };
+ pub use lifecycle::{handle_subprocess_death, RecoveryAction};
+ pub use runtime::{
+-    argv_prefix_hash, ci_default_guard, execute_recovery, spawn_and_bridge, Backpressure,
+-    BridgeError, BridgeExit, BridgeSpawnSpec, ExitCause, PumpOutcome, RecoveryOutcome,
+-    SpawnedBridge, SubStream,
++    argv_prefix_hash, execute_recovery, spawn_and_bridge, Backpressure, BridgeError, BridgeExit,
++    BridgeSpawnSpec, ExitCause, PumpOutcome, RecoveryOutcome, SpawnedBridge, SubStream,
+ };
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index f6d99ae0..4d79aae9 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -60,6 +60,11 @@ use maos_domain::invariants::i9::SandboxTier;
+ use crate::capability::cap_audit;
+ use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+ use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
++use crate::security::sandbox::t3::{
++    child::SandboxedContainerChild,
++    image_lock::VerifiedImageAttestation,
++    spawn::{spawn_t3, T3SpawnContext},
++};
+ use crate::security::sandbox::SandboxSpec;
+ #[cfg(target_os = "linux")]
+ use crate::security::sandbox::{spawn_sandboxed, SandboxedChild};
+@@ -206,40 +211,6 @@ pub enum BridgeError {
+     SandboxRefused(String),
+ }
+ 
+-/// Story 8.12 AC6 — the `ci_default` hermetic guard.
+-///
+-/// On the hermetic Tier-1 path the bridge must spawn ONLY the deterministic
+-/// fixture-CLI: **zero network**, **no real agent CLI**. This guard trips
+-/// (returns `Err`) if pointed at a known real agent CLI (`claude`/`opencode`/
+-/// `gemini`/`kimi`) or if a network egress is requested. A guard with no
+-/// failure-mode test is decoration — its trip behavior is proven in
+-/// `tests::ci_default_guard_trips_on_real_cli`.
+-pub fn ci_default_guard(program: &str, network_requested: bool) -> Result<(), BridgeError> {
+-    const REAL_AGENT_CLIS: &[&str] = &[
+-        "claude",
+-        "opencode",
+-        "gemini",
+-        "gemini-cli",
+-        "kimi",
+-        "kimi-cli",
+-    ];
+-    if network_requested {
+-        return Err(BridgeError::CiGuardTripped(
+-            "network egress requested on the hermetic ci_default path (Tier-2 needs --live)".into(),
+-        ));
+-    }
+-    let base = std::path::Path::new(program)
+-        .file_name()
+-        .and_then(|s| s.to_str())
+-        .unwrap_or(program);
+-    if REAL_AGENT_CLIS.iter().any(|c| base == *c) {
+-        return Err(BridgeError::CiGuardTripped(format!(
+-            "real agent CLI '{base}' invoked on the hermetic ci_default path (Tier-2 needs --live)"
+-        )));
+-    }
+-    Ok(())
+-}
+-
+ /// Spec for a single subprocess spawn through the bridge (AC1).
+ #[maos_attrs::i9_exempt(
+     reason = "live CLI subprocess spawn spec; carries host-injected process \
+@@ -278,6 +249,17 @@ pub struct BridgeSpawnSpec {
+     /// Host-injected environment (credentials). NEVER journaled; passed only to
+     /// the child's process environment.
+     pub env: Vec<(String, String)>,
++    /// Story 17-1 AC4 — T3 only: the verified image and container context the
++    /// admission resolved. A T3 spec without it is refused, never spawned bare.
++    pub t3: Option<T3Launch>,
++}
++
++/// What the bridge needs beyond a [`SandboxSpec`] to start a T3 container.
++#[maos_attrs::i9_exempt(reason = "transient launch value; verified image and container \
++              context for one spawn, not cached kernel domain state")]
++pub struct T3Launch {
++    pub image: VerifiedImageAttestation,
++    pub context: T3SpawnContext,
+ }
+ 
+ /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
+@@ -365,10 +347,19 @@ pub struct BridgeExit {
+ /// byte: read-to-newline, buffered. Returns `Ok(None)` on EOF.
+ fn read_newline_delimited<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Vec<u8>>> {
+     let mut buf = Vec::new();
+-    let n = reader.read_until(b'\n', &mut buf)?;
++    // One line is bounded by the frame cap; a longer one is a framing error, not
++    // an unbounded allocation (17-3c deferred row, stdout reader).
++    let cap = maos_frame_codec::MAX_FRAME_BYTES as u64;
++    let n = std::io::Read::take(&mut *reader, cap + 1).read_until(b'\n', &mut buf)?;
+     if n == 0 {
+         return Ok(None);
+     }
++    if buf.len() as u64 > cap && buf.last() != Some(&b'\n') {
++        return Err(std::io::Error::new(
++            std::io::ErrorKind::InvalidData,
++            "stdout line exceeds the frame cap",
++        ));
++    }
+     while matches!(buf.last(), Some(b'\n') | Some(b'\r')) {
+         buf.pop();
+     }
+@@ -462,6 +453,9 @@ enum BridgeChild {
+     Plain(Child),
+     #[cfg(target_os = "linux")]
+     Sandboxed(SandboxedChild),
++    /// Story 17-1 AC4 — a T3 container: the guard owns the runtime client (the
++    /// piped `Child`) and stops and removes the container when dropped.
++    Container(SandboxedContainerChild),
+ }
+ 
+ impl BridgeChild {
+@@ -470,14 +464,31 @@ impl BridgeChild {
+             Self::Plain(child) => child,
+             #[cfg(target_os = "linux")]
+             Self::Sandboxed(guard) => guard.child_mut(),
++            Self::Container(guard) => guard
++                .child
++                .as_mut()
++                .expect("container client is held until finalized"),
++        }
++    }
++
++    /// SIGKILL the child. A container is also killed through its runtime:
++    /// killing only the attached client would leave the Worker running.
++    fn kill(&mut self) -> std::io::Result<()> {
++        if let Self::Container(guard) = self {
++            let _ = Command::new(&guard.runtime.path)
++                .args(["kill", &guard.container_name])
++                .stdout(Stdio::null())
++                .stderr(Stdio::null())
++                .status();
+         }
++        self.get().kill()
+     }
+ 
+     /// The child's cgroup directory while its guard is alive.
+     #[cfg(target_os = "linux")]
+     fn cgroup_path(&self) -> Option<&std::path::Path> {
+         match self {
+-            Self::Plain(_) => None,
++            Self::Plain(_) | Self::Container(_) => None,
+             Self::Sandboxed(guard) => guard.cgroup_path(),
+         }
+     }
+@@ -508,19 +519,30 @@ impl Drop for BridgeChild {
+     }
+ }
+ 
+-/// Spawn under the admitted spec: T2 through `spawn_sandboxed` on Linux only (never
+-/// a bare fallback); T0 and T3 bare (T3 is applied by 17-1 AC4); all else refused.
++/// Spawn under the admitted spec: T2 through `spawn_sandboxed` on Linux only,
++/// T3 through `spawn_t3` (Story 17-1 AC4), T0 bare; all else refused. Never a
++/// bare fallback for a tier that asks for containment.
+ fn spawn_child(
+-    spec: &SandboxSpec,
++    spec: &mut BridgeSpawnSpec,
+     cmd: &mut Command,
+-    program: &str,
++    argv: &[String],
+ ) -> Result<BridgeChild, BridgeError> {
+-    match spec.tier {
++    let program = spec.program.as_str();
++    match spec.sandbox.tier {
+         #[cfg(target_os = "linux")]
+-        SandboxTier::T2 => spawn_sandboxed(spec, cmd)
++        SandboxTier::T2 => spawn_sandboxed(&spec.sandbox, cmd)
+             .map(BridgeChild::Sandboxed)
+             .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}"))),
+-        SandboxTier::T0 | SandboxTier::T3 => cmd
++        SandboxTier::T3 => {
++            let mut launch = spec.t3.take().ok_or_else(|| {
++                BridgeError::SandboxRefused(format!("{program}: T3 needs a verified image"))
++            })?;
++            launch.context.env = std::mem::take(&mut spec.env);
++            spawn_t3(&spec.sandbox, &launch.image, argv, launch.context)
++                .map(BridgeChild::Container)
++                .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}")))
++        }
++        SandboxTier::T0 => cmd
+             .spawn()
+             .map(BridgeChild::Plain)
+             .map_err(|e| BridgeError::Spawn(format!("{program}: {e}"))),
+@@ -533,7 +555,7 @@ fn spawn_child(
+ /// Spawn a subprocess under its admitted sandbox and start its reader threads
+ /// (AC1; Story 17-6 AC5). The cap-token binding is asserted BEFORE the child
+ /// can produce a single byte.
+-pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeError> {
++pub fn spawn_and_bridge(mut spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeError> {
+     // ADR-023 TOCTOU — re-derive the argv_prefix_hash and assert the binding
+     // BEFORE spawning. A divergent prefix is exactly the substitution the
+     // cap-token binding exists to prevent; fail loud, never run.
+@@ -547,6 +569,7 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+ 
+     let mut cmd = Command::new(&spec.program);
+     cmd.args(&argv)
++        .env_clear()
+         .stdin(Stdio::piped())
+         .stdout(Stdio::piped())
+         .stderr(Stdio::piped());
+@@ -555,7 +578,7 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
+         cmd.env(k, v);
+     }
+ 
+-    let mut child = spawn_child(&spec.sandbox, &mut cmd, &spec.program)?;
++    let mut child = spawn_child(&mut spec, &mut cmd, &argv)?;
+     let child_pid = child.get().id();
+     // Framed sessions need duplex stdin even when lifecycle control uses signals.
+     // Argv-driven CLIs still receive EOF immediately.
+@@ -668,7 +691,7 @@ impl SpawnedBridge {
+     /// SIGKILL a not-yet-reaped child. `Ok` when it already exited or was
+     /// finalized. Does not reap: [`Self::wait_and_finalize`] still does.
+     pub fn kill(&mut self) -> Result<(), BridgeError> {
+-        match self.child.as_mut().map(|child| child.get().kill()) {
++        match self.child.as_mut().map(|child| child.kill()) {
+             None | Some(Ok(())) => Ok(()),
+             // Older std reports an already-reaped child as InvalidInput.
+             Some(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
+@@ -789,6 +812,15 @@ impl SpawnedBridge {
+                         SubStream::Stdout => out.stdout_lines += 1,
+                         SubStream::Stderr => out.stderr_lines += 1,
+                     }
++                    // A T3 fixture self-reports a refused open on stderr; the
++                    // bridge journals it as a kind-8 row (a mount-set proof from
++                    // inside the sandbox, not a kernel control). Never from stdout.
++                    if stream == SubStream::Stderr && self.sandbox_tier == SandboxTier::T3 {
++                        if let Some(what) = bytes.strip_prefix(b"maos-sandbox-block: ") {
++                            let what = String::from_utf8_lossy(what).into_owned();
++                            self.report_sandbox_block(journal, spirit_pid, None, what);
++                        }
++                    }
+                     // The line bytes may be non-UTF8 or carry a secret; the TL
+                     // redaction scrubber runs on the full payload at insert.
+                     let line_str = String::from_utf8_lossy(&bytes);
+@@ -1013,7 +1045,7 @@ impl SpawnedBridge {
+         let _ = self.shutdown_signal; // advisory; see doc above
+         self.stdin = None;
+         if let Some(child) = self.child.as_mut() {
+-            let _ = child.get().kill();
++            let _ = child.kill();
+             let _ = child.get().wait();
+         }
+         self.child = None;
+@@ -1027,7 +1059,7 @@ impl Drop for SpawnedBridge {
+         // any `Block`ed reader), then join the readers (no orphaned threads).
+         self.stdin = None;
+         if let Some(mut child) = self.child.take() {
+-            let _ = child.get().kill();
++            let _ = child.kill();
+             let _ = child.get().wait();
+         }
+         // Drop the receiver first so any `Block`ed reader send returns Err and
+@@ -1243,43 +1275,6 @@ mod tests {
+         assert_eq!(read_newline_delimited(&mut r).unwrap(), None);
+     }
+ 
+-    // ── ci_default hermetic guard (AC6) ──
+-
+-    #[test]
+-    fn ci_default_guard_passes_for_fixture() {
+-        assert!(ci_default_guard("worker-cli-fixture", false).is_ok());
+-        assert!(ci_default_guard("/abs/path/to/worker-cli-fixture", false).is_ok());
+-        assert!(ci_default_guard("sh", false).is_ok());
+-    }
+-
+-    #[test]
+-    fn ci_default_guard_trips_on_real_cli() {
+-        // The guard must TRIP on a real agent CLI (decoration otherwise).
+-        for cli in [
+-            "claude",
+-            "opencode",
+-            "gemini",
+-            "kimi",
+-            "/usr/local/bin/claude",
+-        ] {
+-            assert!(
+-                matches!(
+-                    ci_default_guard(cli, false),
+-                    Err(BridgeError::CiGuardTripped(_))
+-                ),
+-                "guard must trip on real CLI {cli}"
+-            );
+-        }
+-    }
+-
+-    #[test]
+-    fn ci_default_guard_trips_on_network() {
+-        assert!(matches!(
+-            ci_default_guard("worker-cli-fixture", true),
+-            Err(BridgeError::CiGuardTripped(_))
+-        ));
+-    }
+-
+     /// P-6: Drop-without-pump must NOT deadlock when the child has filled the
+     /// bounded channel. The fix (self.rx.take() before join) prevents the reader
+     /// thread from blocking on a full channel whose receiver is still alive.
+@@ -1368,6 +1363,7 @@ mod tests {
+     fn signals_control_closes_worker_stdin_so_a_stdin_reader_proceeds() {
+         let argv_prefix = vec!["-c".to_string(), "cat >/dev/null; echo done".to_string()];
+         let spec = BridgeSpawnSpec {
++            t3: None,
+             program: "/bin/sh".to_string(),
+             sandbox: SandboxSpec::new_for_test(SandboxTier::T0),
+             expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+index b586c501..80a6584e 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+@@ -33,6 +33,8 @@ pub fn build_runtime_argv(
+     spirit_id: &str,
+     boot_nonce: u64,
+     container_name: &str,
++    egress_socket: Option<&Path>,
++    env: &[(String, String)],
+ ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+     let cpu_str = spec
+         .resolved_caps
+@@ -80,10 +82,20 @@ pub fn build_runtime_argv(
+         format!("--memory={mem_str}"),
+         format!("--pids-limit={pid_str}"),
+         format!("--name={container_name}"),
+-        image_ref,
+-        "/maos/spirit".to_string(),
+-        "--".to_string(),
+     ];
++    // M3 (17-3a Q6): the only reachable endpoint is the daemon-owned socket,
++    // bind-mounted where the in-image forwarder expects it.
++    if let Some(socket) = egress_socket {
++        argv.push(format!(
++            "--volume={}:/proxy/egress.sock:rw",
++            socket.display()
++        ));
++    }
++    // Names only: values travel in the client's environment, never on argv.
++    // `--http-proxy=false` stops podman copying the client's proxy variables in.
++    argv.push("--http-proxy=false".to_string());
++    argv.extend(env.iter().map(|(name, _)| format!("--env={name}")));
++    argv.extend([image_ref, "/maos/spirit".to_string(), "--".to_string()]);
+     argv.extend(command.iter().cloned());
+     Ok(argv)
+ }
+@@ -142,6 +154,8 @@ mod tests {
+             "test-spirit",
+             12345,
+             "maos-test-spirit-00003039-3039",
++            None,
++            &[],
+         )
+         .expect("valid attestation produces argv");
+ 
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+index 054e902b..0bde49ad 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+@@ -17,7 +17,7 @@
+ //! layering activates with Epic 6 subprocess form landing.
+ 
+ use std::path::PathBuf;
+-use std::process::Command;
++use std::process::{Command, Stdio};
+ 
+ use maos_domain::sandbox::T3Error;
+ 
+@@ -37,8 +37,20 @@ pub struct T3SpawnContext {
+     pub boot_nonce: u64,
+     /// Container name for identification.
+     pub container_name: String,
++    /// Daemon-owned egress socket, bind-mounted at `/proxy/egress.sock` (M3).
++    pub egress_socket: Option<PathBuf>,
++    /// Container environment. Names reach argv; values never do.
++    pub env: Vec<(String, String)>,
+ }
+ 
++/// What the podman client itself needs to run; nothing else is inherited.
++const CLIENT_ENV: [&str; 4] = [
++    "PATH",
++    "HOME",
++    "XDG_RUNTIME_DIR",
++    "DBUS_SESSION_BUS_ADDRESS",
++];
++
+ /// Spawn a command inside a T3 container.
+ ///
+ /// # Platform
+@@ -106,31 +118,42 @@ pub fn spawn_t3(
+             &spec.spirit_id,
+             parent.boot_nonce,
+             &parent.container_name,
++            parent.egress_socket.as_deref(),
++            &parent.env,
+         )
+         .map_err(|error| SpawnError::T3ImageInspect {
+             reason: error.to_string(),
+         })?;
+-        // 4. Spawn via std::process::Command.
+-        // T3 has no pre_exec closure — the container itself is the boundary.
++        // 4. Spawn via std::process::Command, stdio piped for the bridge. The
++        // container's environment is exactly the `--env NAME` entries; their
++        // values ride the client's environment, which keeps only what rootless
++        // podman needs to run at all.
+         let mut cmd = Command::new(&argv[0]);
+-        cmd.args(&argv[1..]);
++        cmd.args(&argv[1..])
++            .stdin(Stdio::piped())
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped())
++            .env_clear();
++        for key in CLIENT_ENV {
++            if let Some(value) = std::env::var_os(key) {
++                cmd.env(key, value);
++            }
++        }
++        cmd.envs(parent.env.iter().map(|(k, v)| (k, v)));
+         let child = cmd.spawn().map_err(SpawnError::Io)?;
+ 
+-        // 5. Capture host-namespace PID (this is the kernel's ADR-023 identity).
+-        let host_pid =
+-            inspect_container_host_pid(&runtime, &parent.container_name).map_err(|e| {
+-                SpawnError::Io(std::io::Error::new(
+-                    std::io::ErrorKind::Other,
+-                    e.to_string(),
+-                ))
+-            })?;
+-
+-        Ok(SandboxedContainerChild {
++        // The guard exists before the identity inspect, so a failed inspect
++        // stops and removes the container instead of leaking it.
++        let mut guard = SandboxedContainerChild {
+             child: Some(child),
+-            host_pid,
++            host_pid: 0,
+             container_name: parent.container_name,
+             runtime,
+-        })
++        };
++        // 5. Capture host-namespace PID (this is the kernel's ADR-023 identity).
++        guard.host_pid = inspect_container_host_pid(&guard.runtime, &guard.container_name)
++            .map_err(|e| SpawnError::Io(std::io::Error::other(e.to_string())))?;
++        Ok(guard)
+     }
+ }
+ 
+diff --git a/crates/maos-manifest/src/manifest.rs b/crates/maos-manifest/src/manifest.rs
+index 244c8399..859108fb 100644
+--- a/crates/maos-manifest/src/manifest.rs
++++ b/crates/maos-manifest/src/manifest.rs
+@@ -4276,6 +4276,10 @@ pub struct CliWrapperConfig {
+     /// Posture for the subprocess: stdio shape, control-channel mechanism,
+     /// shutdown signal.
+     pub posture: CliWrapperPosture,
++    /// Story 17-1 AC2 — `host:port` destinations the Worker may reach through
++    /// the egress proxy; empty means none (the default).
++    #[serde(default)]
++    pub egress: Vec<String>,
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+diff --git a/xtask/src/check_skill_conformance.rs b/xtask/src/check_skill_conformance.rs
+index f4ed1111..496b6302 100755
+--- a/xtask/src/check_skill_conformance.rs
++++ b/xtask/src/check_skill_conformance.rs
+@@ -67,6 +67,7 @@ fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
+     let (program, argv_prefix, task_args) = bridge_program_and_prefix(skill_name);
+     let expected_argv_prefix_hash = argv_prefix_hash(&argv_prefix);
+     let mut bridge = spawn_and_bridge(BridgeSpawnSpec {
++        t3: None,
+         program,
+         sandbox: maos_kernel_core::security::sandbox::SandboxSpec::new_for_test(
+             maos_domain::invariants::i9::SandboxTier::T0,
