@@ -256,7 +256,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 118,
+  "expected_distinct_pages": 124,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",
