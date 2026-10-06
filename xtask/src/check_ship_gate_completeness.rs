@@ -114,6 +114,9 @@ const EXPECTED_GATES: &[&str] = &[
     // landed first, so this const's expansion can only make the gate red on
     // a real absence, never on an ordering artifact.
     "workspace-test-suite",
+    // Story 17-5 — model-pin currency. Enrolled LAST, after the discipline job
+    // and both registry rows landed, for the 15-3 reason above.
+    "check-model-currency",
 ];
 
 /// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.

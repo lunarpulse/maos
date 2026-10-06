@@ -44,7 +44,7 @@ description = "MAOS Researcher v0.5 reference Spirit — survey-mode distillatio
 # Inference Port — the Spirit-side compressor. App F.4: ≥Sonnet-tier (70B+),
 # temp ≤0.3. At v0.5 the compressor is seeded/mocked in CI (no live LLM); the
 # declared provider class is the production target.
-provider.complete = ["anthropic.claude-3-5-sonnet-20241022"]
+provider.complete = ["anthropic.claude-sonnet-5-5"]
 
 [capabilities.required.loom]
 read = true

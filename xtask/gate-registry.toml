@@ -171,6 +171,10 @@ gates = [
     # was `-p`/`--test`-scoped, so the exit line's final clause was performed
     # by hand on a developer's box and nowhere else (a gap, not a demotion).
     "workspace-test-suite",
+    # Story 17-5 — model-pin currency: every vendor model id pinned in a
+    # manifest, the price book or a `main.rs` provider constructor is checked
+    # against `xtask/model-currency.toml`. Offline; names `file:line`.
+    "check-model-currency",
 ]
 
 # D3/F3→B — per-gate phase disposition (v1.5-ship-gate graduation mechanism).
@@ -326,6 +330,14 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 # foundation gates — there is no phase at which a red suite should pass.
 [[ship_gate]]
 name = "workspace-test-suite"
+disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+
+# Story 17-5 — the model-pin currency gate. Blocking at every phase, hermetic,
+# no private `CURRENT_PHASE`: the lane it closes slipped three times (E14-A3 →
+# E15-A2 → E16-A4) precisely because nothing ever turned a stale pin red, so
+# there is no phase at which a retired vendor id should pass.
+[[ship_gate]]
+name = "check-model-currency"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
 
 # Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel

@@ -13,6 +13,9 @@ pub mod check_fkcs;
 pub mod check_host_surface;
 pub mod check_kernel_baseline;
 pub mod check_mock_not_in_release;
+// Story 17-5 — the model-pin currency gate's audit, exposed so `xtask/tests/` drive
+// the REAL `audit()` over planted trees (a parallel copy would prove nothing).
+pub mod check_model_currency;
 pub mod check_trial_attestation;
 pub mod release_dry_run;
 // corpus_types + gate_common exposed so the lib-compiled gate modules

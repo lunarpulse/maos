@@ -499,6 +499,29 @@ jobs:
           cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1 &&
           cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1
 
+  # Story 17-5 — model-pin currency (E14-A3 → E15-A2 → E16-A4). A pin on a
+  # vendor model that the vendor already retired reds here, naming file:line,
+  # instead of surviving three retros. Offline: the gate reads only repo-local
+  # files (`xtask/model-currency.toml`, the manifests, the price book, `main.rs`),
+  # so no secret and no network leg exists to flake. The proven-red vectors run
+  # in the same job because a gate whose reds are never executed is the failure
+  # mode this lane exists to close.
+  check-model-currency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run check-model-currency
+        run: cargo run -p xtask -- check-model-currency --json
+      - name: Run the 17-5 proven-red vectors
+        run: cargo test -p xtask --test model_currency_gate
+
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
@@ -4349,6 +4372,7 @@ jobs:
       - check-decision-register
       - check-cert-rotation-trigger
       - check-exit-commands
+      - check-model-currency
       - workspace-test-suite
       - one-daemon-one-door
       - j0-scene
@@ -4393,6 +4417,7 @@ jobs:
           echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
           echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
+          echo "| check-model-currency | ${{ needs.check-model-currency.result }} | cargo run -p xtask -- check-model-currency |"
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo test --workspace --locked --no-fail-fast |"
           echo "| one-daemon-one-door | ${{ needs.one-daemon-one-door.result }} | cargo test -p maos-bin --test one_daemon_one_door_16_1 |"
           echo "| j0-scene | ${{ needs.j0-scene.result }} | cargo test -p maos-journey-test --test journey_j0 |"
@@ -4432,6 +4457,7 @@ jobs:
           echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
           echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
+          echo "  check-model-currency: ${{ needs.check-model-currency.result }}"
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
           echo "  one-daemon-one-door: ${{ needs.one-daemon-one-door.result }}"
           echo "  j0-scene: ${{ needs.j0-scene.result }}"

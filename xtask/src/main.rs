@@ -85,6 +85,7 @@ mod check_loom;
 mod check_manifest_schema_version;
 mod check_migration_merkle;
 pub mod check_mock_not_in_release;
+mod check_model_currency;
 mod check_multi_provider_drift;
 mod check_pentest_gate;
 mod check_pub_field_constructors;
@@ -425,6 +426,14 @@ enum Commands {
     /// actually claims it.
     #[command(name = "check-exit-commands")]
     CheckExitCommands {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Story 17-5 — model-pin currency: every model id pinned in a manifest, the
+    /// price book or a `main.rs` provider constructor must be current per
+    /// `xtask/model-currency.toml`. Offline; names `file:line` for each violation.
+    #[command(name = "check-model-currency")]
+    CheckModelCurrency {
         #[arg(long)]
         json: bool,
     },
@@ -1341,6 +1350,7 @@ fn main() {
         Commands::CheckEpicCloseGreen { json } => check_epic_close_green::run(json),
         Commands::CheckEpicCloseCoherence { json } => check_epic_close_coherence::run(json),
         Commands::CheckExitCommands { json } => check_exit_commands::run(json),
+        Commands::CheckModelCurrency { json } => check_model_currency::run(json),
         Commands::StabilityMatrix { check, json } => {
             let workspace_root = std::env::current_dir().expect("failed to get current dir");
             stability_matrix::run(&workspace_root, check, json)

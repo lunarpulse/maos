@@ -1,0 +1,137 @@
+# Model-pin currency data for `xtask check-model-currency` (Story 17-5).
+#
+# This file is the gate's ONLY source of vendor facts: the gate reads repo-local
+# files only and opens no socket, so it cannot learn that a vendor retired a
+# model — a human updates this file when a vendor page changes (re-verified
+# 2026-10-06 against the pages below), and the gate then reds every pin that
+# fell behind. Policy owner:
+# Winston (wave + pin policy); gate owner: Murat. Adding an id to `allowed` or
+# moving one to `retired` is a policy edit, never a drive-by.
+#
+# Shape, per provider (the segment before the first `.` of a manifest
+# `provider.complete` entry, e.g. `anthropic` in `anthropic.claude-sonnet-5-5`;
+# the bare provider name is what `xtask/provider-pricing.toml` carries):
+#   allowed  — ids a pin may name today.
+#   retired  — ids a pin must NOT name: vendor-retired OR vendor-deprecated
+#              (a deprecated pin is a countdown, not a currency). Every entry
+#              carries a `replacement`, which MUST be in `allowed`.
+#
+# `replacement` is DISPLAY-ONLY guidance printed in the violation message (OD1,
+# ratified): the gate never rewrites a manifest. Where the vendor names a
+# different replacement it is cited in a comment; the value here is the
+# tier-equivalent current id from `allowed` (haiku → haiku, sonnet → sonnet).
+#
+# An id in neither list is UNKNOWN and reds too — add it to `allowed` (policy)
+# or fix the typo. A provider absent from this file is unknown the same way.
+#
+# Sources, fetched 2026-10-06 (this is the only network this story used):
+#   Anthropic: platform.claude.com/docs/en/models/overview
+#              platform.claude.com/docs/en/about-claude/model-deprecations
+#   OpenAI:    developers.openai.com/api/docs/models
+#              developers.openai.com/api/docs/deprecations
+#
+# ⚠ WATCH (operator ruling 2026-10-06: keep, re-sweep later) —
+# `claude-haiku-4-5-20251001` is Active, but the vendor's earliest retirement
+# date for it is 2026-10-15. It stays `allowed` until the vendor deprecates it.
+# TRIGGER: the Anthropic deprecation notice for Claude Haiku 4.5 (model-
+# deprecations page / developer email). That day it moves to `retired`
+# (replacement: the vendor's named successor) and this gate reds every pin of
+# it — hello-spirit, the 17-5 sweep targets, the price book and the `main.rs`
+# default — which is the re-sweep. Not a pin the gate can pre-empt offline.
+
+[providers.anthropic]
+allowed = [
+    "claude-fable-5-1",
+    "claude-fable-5",
+    "claude-opus-5-5",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-opus-4-5-20251101",
+    "claude-sonnet-5-5",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-haiku-4-5",
+]
+
+[[providers.anthropic.retired]]
+id = "claude-3-haiku-20240307"            # retired 2026-04-20
+replacement = "claude-haiku-4-5-20251001"
+
+[[providers.anthropic.retired]]
+id = "claude-3-5-haiku-20241022"          # retired 2026-02-19
+replacement = "claude-haiku-4-5-20251001"
+
+[[providers.anthropic.retired]]
+id = "claude-3-5-sonnet-20241022"         # retired 2025-10-28; vendor: claude-sonnet-4-6
+replacement = "claude-sonnet-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-3-5-sonnet-20240620"         # retired 2025-10-28; vendor: claude-sonnet-4-6
+replacement = "claude-sonnet-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-3-7-sonnet-20250219"         # retired 2026-02-19; vendor: claude-sonnet-4-6
+replacement = "claude-sonnet-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-3-sonnet-20240229"           # retired 2025-07-21; vendor: claude-sonnet-4-6
+replacement = "claude-sonnet-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-3-opus-20240229"             # retired 2026-01-05; vendor: claude-opus-4-8
+replacement = "claude-opus-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-sonnet-4-20250514"           # retired 2026-06-15; vendor: claude-sonnet-4-6
+replacement = "claude-sonnet-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-sonnet-4-5-20250929"         # DEPRECATED 2026-09-30, retires 2026-11-30
+replacement = "claude-sonnet-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-opus-4-20250514"             # retired 2026-06-15; vendor: claude-opus-4-8
+replacement = "claude-opus-5-5"
+
+[[providers.anthropic.retired]]
+id = "claude-opus-4-1-20250805"           # retired 2026-08-05; vendor: claude-opus-4-8
+replacement = "claude-opus-5-5"
+
+[providers.openai]
+allowed = [
+    "gpt-6-astra",
+    "gpt-6.1-sol",
+    "gpt-6-sol",
+    "gpt-6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-4o-mini",
+]
+
+# Shutdown 2026-10-23 (vendor deprecations page, 2026-04-22 announcement); the
+# vendor's own substitutes are gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna.
+[[providers.openai.retired]]
+id = "gpt-4"
+replacement = "gpt-5.6-sol"
+
+[[providers.openai.retired]]
+id = "gpt-4-turbo"
+replacement = "gpt-5.6-sol"
+
+[[providers.openai.retired]]
+id = "gpt-3.5-turbo"
+replacement = "gpt-5.6-terra"
+
+[[providers.openai.retired]]
+id = "gpt-4.1-nano"
+replacement = "gpt-5.6-luna"
+
+# Local runtime: the model is whatever the operator pulled, so there is no
+# vendor retirement feed to mirror. The list exists so a pin cannot rot
+# unlisted — `main.rs` constructs `OllamaProvider` with `llama3.1:8b`.
+[providers.ollama]
+allowed = ["llama3.1:8b"]
