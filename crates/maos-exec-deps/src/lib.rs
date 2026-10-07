@@ -15,7 +15,6 @@
 //! Linux-only by construction (ELF, `O_PATH`, procfs reopen): on any other OS
 //! the crate compiles empty, so `cargo check --workspace` works there (Story
 //! 20-6); its one dependent takes it only under `cfg(target_os = "linux")`.
-#![cfg(target_os = "linux")]
 #![forbid(unsafe_code)]
 
 use std::collections::{BTreeSet, VecDeque};
