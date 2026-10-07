@@ -1,7 +1,7 @@
 ---
 story_key: 20-6-macos-compile-guard
-status: review
-updated: 2026-10-06
+status: done
+updated: 2026-10-07
 dev_model_used: anthropic/claude-opus-5-5
 initial_draft_model: "anthropic/claude-sonnet-5-5 — the first dev pass and its review (2026-10-06). Operator ruling 2026-10-06: dev re-run under a frontier model; this record's dev of record is `anthropic/claude-opus-5-5` (see §Dev Agent Record)."
 baseline_commit: 0d73cac32bb6155e46bdc4374f77ff2672f3f060
@@ -16,7 +16,7 @@ review: "bmad-code-review §A6, FRESH frontier pass 2026-10-06 (Blind Hunter + E
 
 # 20-6 — A path-filtered macOS compile guard
 
-Status: review
+Status: done
 
 > **The capability:** *A change that can break `aarch64-apple-darwin` — a `cfg`, an OS-typed API call, a dependency,
 > a build script — compiles for macOS before it merges, and a change that cannot does not pay for a macOS runner.
@@ -92,14 +92,18 @@ so that **a macOS break is found on the PR that caused it, not three rehearsal r
 - [x] **T9 — Operator rulings 2026-10-06** (frontier re-run). Q1: crate-level `#![cfg(target_os = "linux")]` on
   `maos-exec-deps` (lib + its integration test), `--exclude` dropped, kloc 357 → 358. Q2: declined (no `sonnet-5-5`
   token; frontier re-run instead). Q3: keep `macos-latest`.
-- [ ] **T8 — CI proof (parent's push).** First real `macos-check` run on a macOS runner: green on this story's PR
-  (it changes `discipline.yml` macOS lines, so the filter starts it), and RED on a pushed re-plant of one break. **Not
-  provable locally — this is the only open item and is why the story stays `review`** (AC1's runtime half, AC2's
-  pushed half).
-  - **Green half OBSERVED 2026-10-07:** push of `86d5f8f0` to `main`, discipline run `37532509983`: `macos-scope`
-    success (job `112505181482`) started the guard; `macos-check` success on `macos-latest` (job `112516208814`), its
-    `cargo check (aarch64-apple-darwin)` step ran 188 s from a cold cache (2 s restore). **Red half OPEN:** discipline
-    runs only on `push: main` and `pull_request: main`, so a pushed re-plant needs a PR from a throwaway branch.
+- [x] **T8 — CI proof (parent's push).** First real `macos-check` run on a macOS runner: green on this story's PR
+  (it changes `discipline.yml` macOS lines, so the filter starts it), and RED on a pushed re-plant of one break
+  (AC1's runtime half, AC2's pushed half). **Both halves observed in CI 2026-10-07.**
+  - **Green half:** push of `86d5f8f0` to `main`, discipline run `37532509983`: `macos-scope` success (job
+    `112505181482`) started the guard; `macos-check` success on `macos-latest` (job `112516208814`), its
+    `cargo check (aarch64-apple-darwin)` step ran 188 s from a cold cache (2 s restore).
+  - **Red half:** PR #8 from throwaway branch `ci/20-6-t8-replant` (`57748f8f` = `main` minus the crate-level
+    `#![cfg(target_os = "linux")]` in `crates/maos-exec-deps/src/lib.rs`, operator-approved, never merged), discipline
+    run `37654943930` (`pull_request`): `macos-scope` success (job `112907591624`) judged it applicable; `macos-check`
+    FAILED on `macos-latest` (job `112913629046`) at `cargo check (aarch64-apple-darwin)` after 173 s, exit 101 — the
+    same command that exits 101 locally with E0425 `libc::O_PATH` on this re-plant (the error text is in the job log,
+    which needs a token; the annotation carries the exit code). The branch was deleted afterwards.
 
 ## Dev Notes
 
@@ -374,10 +378,10 @@ skipped, matrix-aware only-macOS pin, blind-spot docs, runner comment, docs drif
 
 ### Completion Notes List
 
-- **Result:** story `review`, not `done`. **T8 is the only open item:** the first real `macos-check` run on a GitHub
-  macOS runner (AC1's runtime half — green on this story's PR, which the filter starts because it edits the macOS job
-  blocks — and AC2's pushed half, a red on a pushed re-plant), including the C halves of `ring`/`libsqlite3-sys`.
-  Everything else is green locally (below).
+- **Result (frontier re-run, 2026-10-06):** story `review`, not `done`, pending T8 — the first real `macos-check` run on
+  a GitHub macOS runner (AC1's runtime half and AC2's pushed half), including the C halves of `ring`/`libsqlite3-sys`.
+  Everything else was green locally (below). **Superseded 2026-10-07: T8 observed in CI, both halves (§Tasks T8);
+  story `done`.**
 - **AC1 (frontier re-verified):** the job runs exactly `cargo check --locked --workspace --all-targets --target
   aarch64-apple-darwin` on `macos-latest` behind `needs.macos-scope.outputs.applicable == 'true'` (pinned by
   `macos_check_runs_on_release_yamls_darwin_runner_and_checks_the_whole_workspace`, no `--exclude`/`-p`). Local darwin
@@ -435,3 +439,6 @@ skipped, matrix-aware only-macOS pin, blind-spot docs, runner comment, docs drif
   review (9 patched, 1 dismissed), 14/14 gates green, 968 xtask tests; status stays `review` — T8 (CI) is the only open item.
 - 2026-10-07 — T8 green half observed in CI (run `37532509983`, `macos-check` 188 s on `macos-latest`); red half (PR
   with a re-plant) still open; status stays `review`.
+- 2026-10-07 — T8 red half observed: PR #8 (`ci/20-6-t8-replant`, the `maos-exec-deps` cfg re-plant), run
+  `37654943930`, `macos-scope` applicable, `macos-check` failed at the darwin `cargo check` (exit 101, 173 s). All ACs
+  proven; `review` → `done`. Throwaway branch deleted.
