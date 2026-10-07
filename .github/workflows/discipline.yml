@@ -3166,13 +3166,27 @@ jobs:
           version=${version%-arm}
           arch=x86_64
           if [[ '${{ matrix.image }}' == *-arm ]]; then arch=aarch64; fi
+          # The verdict is also a public annotation: job logs need a token the
+          # agent host does not have (17-3a T6 convention).
+          set +e
           sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
             --uid="$(id -u)" --gid="$(id -g)" \
             --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
             --property="WorkingDirectory=$PWD" \
             "$PWD/scripts/run_17_3c_delegated.sh" /usr/bin/python3 -I \
             "$PWD/scripts/prove_17_3c.py" --binary "$PWD/target/release/maos" \
-            --output "$PWD/17-3c-proof" --expected-os "$version" --expected-arch "$arch"
+            --output "$PWD/17-3c-proof" --expected-os "$version" --expected-arch "$arch" \
+            2>&1 | tee 17-3c-proof.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=17-3c proof (${{ matrix.image }})::$(grep -m1 '^TS-ADMITTED-PROOF ' 17-3c-proof.log)"
+          else
+            msg=$(grep -m1 -A3 '17-3c proof FAILED' 17-3c-proof.log || tail -n 8 17-3c-proof.log)
+            msg=${msg:0:1500}; msg=${msg//'%'/'%25'}; msg=${msg//$'\r'/}; msg=${msg//$'\n'/'%0A'}
+            echo "::error title=17-3c proof (${{ matrix.image }}) rc=${rc}::${msg}"
+          fi
+          exit "$rc"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -3180,6 +3194,7 @@ jobs:
           path: |
             spawned-17-3c.log
             17-3c-proof/
+            17-3c-proof.log
           if-no-files-found: error
 
   # RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
