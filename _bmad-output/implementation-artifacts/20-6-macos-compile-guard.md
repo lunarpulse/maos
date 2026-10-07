@@ -96,6 +96,10 @@ so that **a macOS break is found on the PR that caused it, not three rehearsal r
   (it changes `discipline.yml` macOS lines, so the filter starts it), and RED on a pushed re-plant of one break. **Not
   provable locally — this is the only open item and is why the story stays `review`** (AC1's runtime half, AC2's
   pushed half).
+  - **Green half OBSERVED 2026-10-07:** push of `86d5f8f0` to `main`, discipline run `37532509983`: `macos-scope`
+    success (job `112505181482`) started the guard; `macos-check` success on `macos-latest` (job `112516208814`), its
+    `cargo check (aarch64-apple-darwin)` step ran 188 s from a cold cache (2 s restore). **Red half OPEN:** discipline
+    runs only on `push: main` and `pull_request: main`, so a pushed re-plant needs a PR from a throwaway branch.
 
 ## Dev Notes
 
@@ -429,3 +433,5 @@ skipped, matrix-aware only-macOS pin, blind-spot docs, runner comment, docs drif
 - 2026-10-06 — operator rulings: Q1 cfg the crate (kloc +1), Q2 declined (frontier re-run), Q3 keep `macos-latest`.
 - 2026-10-06 — frontier re-run by anthropic/claude-opus-5-5 on `32420928`: every AC re-verified, rulings applied, fresh §A6
   review (9 patched, 1 dismissed), 14/14 gates green, 968 xtask tests; status stays `review` — T8 (CI) is the only open item.
+- 2026-10-07 — T8 green half observed in CI (run `37532509983`, `macos-check` 188 s on `macos-latest`); red half (PR
+  with a re-plant) still open; status stays `review`.
