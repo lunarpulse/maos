@@ -342,6 +342,13 @@ Candidate `_bmad-output/implementation-artifacts/17-3c-evidence/`:
   - `cargo deny`: wasmtime 46.0.3 has no fix for RUSTSEC-2026-0314/0316/0321-0324/0327, so it moved to the Wasmtime 48 LTS
     line (48.0.5, wit-parser 0.254) and rustls to 0.23.45. RUSTSEC-2026-0316 is the hostcall-fuel lifting bound that
     `candidate-planning.json` cites for 46.0.3. Re-verified on 48.0.5: `spawned_scope_17_3c` 15/15 with every marker count.
+- CI repair 2026-10-07 (discipline run 37532509983, the first run to reach the 17-3c real-gates step on every image): both
+  aarch64 images failed every WASM-form leg of `spawned_scope_17_3c` (`HOSTILE-ONCE turns=0 result=error`), while x86_64 and
+  the subprocess form passed. Wasmtime issues `membarrier(PRIVATE_EXPEDITED_SYNC_CORE)` on aarch64 Linux only
+  (`wasmtime-internal-jit-icache-coherence`) before it runs loaded code, and T2 answered EPERM. The aarch64 `ARCH_SYSCALLS`
+  row in `security/sandbox/linux.rs` now admits `membarrier` (line-neutral; operator-approved content re-pin of the
+  kernel digest and `set_hash`, `src_lines` 25293 unchanged). The 2026-10-05 platform amendment (Ubuntu 25.10 x86_64)
+  had left aarch64 unverified.
 
 ### File List
 
@@ -479,3 +486,4 @@ Cargo.lock files are not source changes.
 - 2026-10-05 — Canonical story, sprint rows, approved specification status, 17-3b finding, early-start record, parent epic and context reconciled to review. No original runtime cutover, staging, commit or publication.
 - 2026-10-06 — §A6 bmad-code-review complete (43 patches; decisions D1, D2 and FR4 `iac.send` built; D3 dismissed; `gpt-6.1` ratified). Approved kernel/KLOC/surface re-pins, fresh AC1 remote proof and four mutation pairs, all RED then GREEN. 17-3b verified and closed. Candidate integrated into the original checkout; `review` → `done`. Local commit only, no push.
 - 2026-10-06 — CI repair: enrolled `spirit_session.rs` in the 13.5d manifest-scope negative (the peer-class check now reads the admitted SCB, not the policy table); restored the 16-3 `--once` completion line; moved wasmtime to 48.0.5 (LTS) and rustls to 0.23.45 for new RustSec advisories. See Completion Notes.
+- 2026-10-07 — CI repair: aarch64 T2 admits `membarrier` (wasmtime icache coherence); line-neutral, operator-approved kernel content re-pin. See Completion Notes.

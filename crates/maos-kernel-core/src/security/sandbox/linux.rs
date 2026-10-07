@@ -22,14 +22,14 @@ use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i9::SandboxTier;
 
 use super::{Cleanup, SandboxSpec, SandboxedChild, SpawnError};
-/// Per-arch allow-list row: x86_64 legacy calls + `poll`; aarch64 `ppoll` (Story 17-6).
+/// Per-arch allow-list row: x86_64 legacy calls + `poll`; aarch64 `ppoll` (17-6) + `membarrier` (wasmtime icache sync, 17-3c CI repair).
 #[cfg(target_arch = "x86_64")]
 #[rustfmt::skip]
 const ARCH_SYSCALLS: &[i64] = &[
     libc::SYS_pipe, libc::SYS_dup2, libc::SYS_arch_prctl, libc::SYS_stat, libc::SYS_lstat, libc::SYS_readlink, libc::SYS_access, libc::SYS_poll
 ];
 #[cfg(target_arch = "aarch64")]
-const ARCH_SYSCALLS: &[i64] = &[libc::SYS_ppoll];
+const ARCH_SYSCALLS: &[i64] = &[libc::SYS_ppoll, libc::SYS_membarrier];
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
 const ARCH_SYSCALLS: &[i64] = &[];
 

@@ -671,9 +671,17 @@ src_lines = 25293
 #          loud rlimit degrade, bounded rmdir retry). All 98 paths retained;
 #          surface pin moved in the same change (SpawnedBridge rehash,
 #          is_mediated_scope = universal-arithmetic). Landed 2026-10-06.
+# HISTORY: 17-3c CI repair (2026-10-07), operator-approved content re-pin:
+#          src_lines 25293 unchanged (line-neutral); kernel KLOC unchanged.
+#          One file changed: security/sandbox/linux.rs — the aarch64
+#          ARCH_SYSCALLS row admits `membarrier`, which wasmtime issues on
+#          aarch64 Linux only (jit-icache-coherence, PRIVATE_EXPEDITED_SYNC_CORE)
+#          before running loaded code; T2's EPERM default failed every WASM-form
+#          leg of spawned_scope_17_3c on ubuntu-24.04-arm/26.04-arm (discipline
+#          run 37532509983) while x86_64 passed. Surface pin unaffected.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "509d311362def7ddeb028afed49e6d59e67b9d20f74f209fc66ae9a45e8ee612"
+set_hash = "9878cb9cbe056397bb5c2bf8be43333d03c5a5163730ca87dcd2088b0fbf3c54"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -750,7 +758,7 @@ set_hash = "509d311362def7ddeb028afed49e6d59e67b9d20f74f209fc66ae9a45e8ee612"
 "security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
-"security/sandbox/linux.rs" = "a99dfbe86b91b029c0f1b65da5cb032bfdc79e14d7a993704297d22a29e7bf32"
+"security/sandbox/linux.rs" = "f0b634ac12e9284e7d011f3902a28ca01ec0938e915318e565515364a0689646"
 "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
 "security/sandbox/mod.rs" = "092b1d0ab2eccb764934568b6263fa950a60f596284c97e0e10981e7847ac1f9"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
