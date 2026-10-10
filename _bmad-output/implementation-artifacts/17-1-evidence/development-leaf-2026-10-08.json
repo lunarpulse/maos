@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-08",
+  "phase": "Task 2, before daemon wiring and T3 cutover",
+  "implementation_model": "openai-codex/gpt-6.1-sol:xhigh",
+  "story_complete": false,
+  "verification": {
+    "cargo_test_maos_egress": {"passed": 35, "failed": 0, "baseline_domain_warnings": 2},
+    "no_default_features_lib_check": "passed",
+    "no_default_features_normal_dependencies": [],
+    "live_forwarder_proxy_smoke": {
+      "authenticated_loopback_status": 200,
+      "outside_allowlist_status": 403,
+      "refusal_file_synced_before_response": true,
+      "active_connection_closed": true,
+      "bearer_revoked": true,
+      "socket_removed": true,
+      "tasks_joined": true
+    },
+    "live_https_smoke": {
+      "destination": "example.com:443",
+      "status": 200,
+      "body_assertion": "Example Domain",
+      "certificate_and_hostname_verification": "rustls with webpki roots; no override"
+    },
+    "development_dependency_mutation": {"violation": "maos-egress", "planted_passed": false, "restored_passed": true, "warning_free": false},
+    "workspace_count": 58,
+    "stability_matrix_check": "passed"
+  },
+  "formatted_measurements": {
+    "maos_domain": 9333,
+    "maos_manifest": 4456,
+    "maos_bin": 24620,
+    "maos_egress": 1724,
+    "maos_kernel_core": 19553,
+    "xtask": 44362,
+    "aggregate": 172609,
+    "current_aggregate_hardfail": 170884,
+    "authorized_maximum_landing_aggregate_hardfail": 172066,
+    "candidate_over_authorized_maximum": 543,
+    "landing_governance_pins_applied": false
+  },
+  "limits": [
+    "This is standalone transport proof, not T3 Worker containment or a real transparency-log kind-8 proof.",
+    "Task 10 warning-free mutation proofs and the final regression suite remain pending.",
+    "The aggregate candidate exceeds the unchanged landing grant; final implementation must fit or obtain a measured operator revision before landing."
+  ]
+}

@@ -1,0 +1,79 @@
+name: docs-site
+
+# Isolated CI job for the documentation site (D2 isolation contract).
+# Does NOT touch the Rust workspace, air-gap test, or any kernel gate.
+
+on:
+  push:
+    paths:
+      - 'docs-site/**'
+      - 'docs/errors/error-catalog.json'
+      - 'LOCALES.md'
+      - 'BREAKING.md'
+      - 'GOVERNANCE.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'RFC_TEMPLATE.md'
+      - 'TRADEMARK.md'
+      - '.github/workflows/docs-site.yml'
+  pull_request:
+    paths:
+      - 'docs-site/**'
+      - 'docs/errors/error-catalog.json'
+      - 'LOCALES.md'
+      - 'BREAKING.md'
+      - 'GOVERNANCE.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'RFC_TEMPLATE.md'
+      - 'TRADEMARK.md'
+      - '.github/workflows/docs-site.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('docs-site/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install dependencies
+        working-directory: docs-site
+        run: npm ci
+
+      - name: Install Chromium for behavioral gates
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: docs-site
+        run: npx playwright install --with-deps chromium
+
+      - name: gate:build
+        working-directory: docs-site
+        run: npm run build
+
+      - name: gate:static
+        working-directory: docs-site
+        run: npm run gate:static
+
+      - name: gate:behavioral
+        timeout-minutes: 10
+        working-directory: docs-site
+        run: npm run gate:behavioral
+
+      - name: gate:proven-red
+        working-directory: docs-site
+        run: npm run gate:proven-red

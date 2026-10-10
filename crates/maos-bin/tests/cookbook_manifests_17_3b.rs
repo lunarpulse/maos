@@ -3,13 +3,14 @@
 use std::path::{Path, PathBuf};
 
 use maos_bin::admission::{gate_manifest, AdmissionRefusal};
-use maos_manifest::{ClassSection, ModelProvenanceSection};
+use maos_manifest::{ClassSection, CliWrapperConfig, ModelProvenanceSection, OnCrashSection};
 
 const COOKBOOK_PAGES: &[&str] = &[
     "hello-world-spirit.md",
     "manifest-fields.md",
     "compliance-claim.md",
     "wasm-component-spirit.md",
+    "cli-wrapper-spirit.md",
 ];
 
 fn repository_root() -> PathBuf {
@@ -135,4 +136,54 @@ fn compliance_claim_fragment_tables_parse() {
         provenance.is_some(),
         "{page}: [model_provenance] section is present"
     );
+}
+
+#[test]
+fn cli_wrapper_manifest_passes_worker_load_gates() {
+    let page = "cli-wrapper-spirit.md";
+    let manifest = one_manifest(page);
+    let outcome = gate_manifest(&manifest, &|_| true);
+    assert!(
+        matches!(outcome, Err(AdmissionRefusal::CliWrapperUnsupported)),
+        "{page}: operator-door gate 3b refuses Worker manifests, got {outcome:?}"
+    );
+
+    let document = toml::from_str::<toml::Value>(&manifest)
+        .unwrap_or_else(|error| panic!("{page}: whole manifest parses: {error}"));
+    let cli_wrapper = document
+        .get("cli_wrapper")
+        .unwrap_or_else(|| panic!("{page}: [cli_wrapper] table exists"));
+    let cli_wrapper_toml = toml::to_string(cli_wrapper)
+        .unwrap_or_else(|error| panic!("{page}: serialize [cli_wrapper]: {error}"));
+    let config = CliWrapperConfig::from_toml_str(&cli_wrapper_toml)
+        .unwrap_or_else(|error| panic!("{page}: [cli_wrapper] parses and validates: {error}"));
+
+    maos_kernel_core::lifecycle::cli_wrapper::reject_respawn_with_context(&config)
+        .unwrap_or_else(|error| panic!("{page}: recovery policy passes Worker load gate: {error}"));
+    maos_kernel_core::lifecycle::cli_wrapper::admission::reject_t3_stdin_posture(&config)
+        .unwrap_or_else(|error| panic!("{page}: T3 posture passes Worker load gate: {error}"));
+
+    #[cfg(feature = "network")]
+    {
+        let tier = document
+            .get("sandbox")
+            .and_then(|sandbox| sandbox.get("tier"))
+            .and_then(toml::Value::as_str)
+            .unwrap_or_else(|| panic!("{page}: [sandbox] tier is a string"));
+        let parsed = maos_bin::worker_spawn::parse_sandbox_tier(tier)
+            .unwrap_or_else(|error| panic!("{page}: sandbox tier parses: {error}"));
+        assert_eq!(
+            parsed,
+            maos_domain::invariants::i9::SandboxTier::T3,
+            "{page}: Worker requests T3"
+        );
+    }
+
+    let on_crash = document
+        .get("on_crash")
+        .unwrap_or_else(|| panic!("{page}: [on_crash] table exists"));
+    let on_crash_toml = toml::to_string(on_crash)
+        .unwrap_or_else(|error| panic!("{page}: serialize [on_crash]: {error}"));
+    OnCrashSection::from_toml_str(&on_crash_toml)
+        .unwrap_or_else(|error| panic!("{page}: [on_crash] parses: {error}"));
 }

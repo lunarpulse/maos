@@ -1,0 +1,22 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-08T23:46:32+00:00",
+  "phase": "Task 4 prerequisite; no kernel cutover applied",
+  "command": "env CODEX_API_KEY=egress-custody-public-sentinel cargo run --offline --locked -p maos-kernel-core --example t3_environment_17_1_smoke",
+  "observed": "T3-ENVIRONMENT-CUSTODY-SMOKE: image-inspection child inherited CODEX_API_KEY; synthetic sentinel only, not a container-isolation proof",
+  "scope": "The real inspect_image_sha API launched a controlled temporary runtime executable. Its valid registry digest response was parsed; its receipt independently recorded the public sentinel's presence in the child environment. No real key was used or disclosed.",
+  "source_evidence": [
+    "security/sandbox/t3/runtime_detect.rs:72-77: runtime --version probe uses Command::new without env_clear",
+    "security/sandbox/t3/image_verify.rs:108-118: image inspection uses Command::new without env_clear",
+    "security/sandbox/t3/child.rs:86-97: stop and rm cleanup commands use Command::new without env_clear"
+  ],
+  "required_location_extension": [
+    "crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs",
+    "crates/maos-kernel-core/src/security/sandbox/t3/image_verify.rs",
+    "crates/maos-kernel-core/src/security/sandbox/t3/child.rs"
+  ],
+  "proposed_change": "Use the same env_clear plus PATH/HOME/XDG_RUNTIME_DIR/DBUS_SESSION_BUS_ADDRESS runtime-client allowlist for detection, image inspection, run, container inspection, kill, stop and rm. Shared helper belongs to an already granted location; no unrelated behavior changes.",
+  "ceilings": { "kernel_src_lines": 25353, "kernel_kloc": 19564, "aggregate_raise_max": 1182, "unchanged": true },
+  "temporary_source_removed": true,
+  "task_complete": false
+}

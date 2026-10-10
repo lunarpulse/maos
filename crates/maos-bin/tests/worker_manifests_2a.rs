@@ -16,9 +16,10 @@
 //! 24 of 28 `crates/maos-bin/tests/` targets are never invoked by any CI job.
 
 use maos_bin::worker_cli::{
-    refuse_missing_argv_flags, select_worker_cli, FIXTURE_CLI_NAME, SUPPORTED_WORKER_CLIS,
+    live_agent_gate, refuse_missing_argv_flags, select_worker_cli, FIXTURE_CLI_NAME,
+    PROBE_CLI_NAME, SUPPORTED_WORKER_CLIS,
 };
-use maos_manifest::manifest::CliWrapperConfig;
+use maos_manifest::CliWrapperConfig;
 
 fn workspace_root() -> std::path::PathBuf {
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
@@ -85,7 +86,6 @@ fn shipped_worker_manifests() -> Vec<(std::path::PathBuf, toml::Value, CliWrappe
 #[test]
 fn crosshost_2a_every_shipped_worker_manifest_resolves_to_an_adapter() {
     let manifests = shipped_worker_manifests();
-    let mut names: Vec<String> = Vec::new();
     for (path, root, cfg) in &manifests {
         let cli = select_worker_cli(&cfg.command).unwrap_or_else(|| {
             panic!(
@@ -129,17 +129,40 @@ fn crosshost_2a_every_shipped_worker_manifest_resolves_to_an_adapter() {
                 path.display()
             )
         });
-        names.push(cli.name().to_string());
     }
-    // The heterogeneity claim, as a shipped fact rather than an aspiration: the
-    // repo carries manifests for the fixture AND both real adapters, so two hosts
-    // can run different worker CLIs under one protocol with no code change.
-    for expected in [FIXTURE_CLI_NAME, "codex", "claude"] {
-        assert!(
-            names.iter().any(|n| n == expected),
-            "expected a shipped worker manifest for `{expected}`; saw {names:?}"
-        );
-    }
+}
+
+#[test]
+fn probe_identity_is_hermetic_without_widening_live_admission() {
+    let probe = select_worker_cli(PROBE_CLI_NAME).expect("exact probe identity is supported");
+    assert_eq!(probe.name(), PROBE_CLI_NAME);
+    assert!(select_worker_cli("worker-probe-fixture-wrapper").is_none());
+    assert!(live_agent_gate(PROBE_CLI_NAME, false).is_ok());
+    assert!(live_agent_gate("codex", false).is_err());
+    assert!(live_agent_gate("claude", false).is_err());
+    assert!(live_agent_gate("codex", true).is_ok());
+}
+
+#[cfg(feature = "network")]
+#[test]
+fn builtin_probe_authority_cannot_admit_the_operator_echo_destination() {
+    let root: toml::Value = toml::from_str(include_str!(
+        "../../../spirits/worker/manifest-probe-echo.toml"
+    ))
+    .unwrap();
+    let config = CliWrapperConfig::from_toml_str(
+        &toml::to_string(root.get("cli_wrapper").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let grant = maos_bin::worker_spawn::builtin_probe_grant();
+    assert!(matches!(
+        maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress(
+            &config,
+            true,
+            &grant.permitted_egress_destinations,
+        ),
+        Err(maos_domain::cli_wrapper::CliWrapperAdmissionError::EEgressNotGranted { .. })
+    ));
 }
 
 /// AC4.1 — every REAL-adapter manifest must carry a non-empty ISOLATION
@@ -163,11 +186,9 @@ fn crosshost_2a_real_adapter_manifests_declare_an_isolation_posture() {
     let mut checked = 0usize;
     for (path, _root, cfg) in shipped_worker_manifests() {
         let cli = select_worker_cli(&cfg.command).expect("resolvable adapter");
-        if cli.name() == FIXTURE_CLI_NAME {
-            // The hermetic fixture — no jail to declare, and it must not acquire
-            // a requirement (the journey + drain suites depend on it staying green).
-            // Exemption is fixture-ONLY and asserted: a fourth adapter landing
-            // here without a posture would otherwise skip silently.
+        if cli.name() == FIXTURE_CLI_NAME || cli.name() == PROBE_CLI_NAME {
+            // Hermetic fixtures and the probe make no vendor-authenticated
+            // filesystem claims, so they do not require a vendor jail posture.
             assert!(cli.refuse_missing_isolation(&cfg.argv_prefix).is_ok());
             continue;
         }

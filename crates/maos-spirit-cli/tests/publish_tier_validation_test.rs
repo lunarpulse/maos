@@ -1,6 +1,7 @@
 //! Story 7.2 AC2 §2.7–§2.9 — tier flag validation.
 
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 use maos_spirit_cli::publish::{build_signed_package, parse_tier_arg, PublishArgs};
@@ -19,7 +20,8 @@ fn write_temp(contents: &[u8], suffix: &str) -> std::path::PathBuf {
     let mut f = std::fs::File::create(&path).unwrap();
     f.write_all(contents).unwrap();
 
-    // Key files must have restrictive permissions (0600 or tighter).
+    // Unix key permissions mirror the production Unix-only check.
+    #[cfg(unix)]
     if suffix.ends_with(".key") {
         let perms = std::fs::Permissions::from_mode(0o600);
         std::fs::set_permissions(&path, perms).unwrap();

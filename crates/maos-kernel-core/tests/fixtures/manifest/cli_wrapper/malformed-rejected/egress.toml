@@ -1,0 +1,9 @@
+command = "worker-cli-fixture"
+output_shape_version = "1.0.0"
+egress = ["api.openai.com:443"]
+unknown_egress = []
+
+[posture]
+stdio_shape = "raw"
+control_channel = "signals"
+unknown_control_channel = "signals"

@@ -2699,6 +2699,7 @@ dependencies = [
  "maos-digest",
  "maos-director-surface",
  "maos-domain",
+ "maos-egress",
  "maos-escape-detector",
  "maos-frame-codec",
  "maos-host",
@@ -2904,6 +2905,22 @@ dependencies = [
  "smallvec",
  "tempfile",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "maos-egress"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "getrandom 0.3.4",
+ "hex",
+ "log",
+ "maos-domain",
+ "parking_lot",
+ "rustls",
+ "sha2 0.10.9",
+ "subtle",
+ "tempfile",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -6993,6 +7010,7 @@ name = "worker"
 version = "0.1.0"
 dependencies = [
  "maos-domain",
+ "maos-egress",
  "maos-kernel-core",
  "maos-manifest",
  "maos-spirit-abi",

@@ -105,7 +105,7 @@ pub fn verify_image_attestation(
 /// `RepoDigests` metadata.  Local `.Id` is a config/image identifier and must
 /// never be compared with an attested registry manifest digest.
 pub fn inspect_image_sha(runtime: &ContainerRuntime, image_uri: &str) -> Result<[u8; 32], T3Error> {
-    let output = std::process::Command::new(&runtime.path)
+    let output = super::spawn::runtime_command(&runtime.path)
         .args([
             "image",
             "inspect",

@@ -82,7 +82,7 @@
   "ECliWrapperRequiresT3": {
     "cause_chain_semantics": "admission or runtime policy",
     "code": "ECliWrapperRequiresT3",
-    "description": "CliWrapperSpirit MUST declare sandbox tier = t3; lower tiers cannot contain subprocess CLI invocation",
+    "description": "Worker ([cli_wrapper]) manifest requested a sandbox tier other than T3; T3 is the only Worker path (below it no scoped egress exists, T4 has no spawn path)",
     "docs_url": "https://docs.maos.dev/errors/ECliWrapperRequiresT3",
     "kernel_or_spirit": "kernel",
     "owner": "maos-domain",
@@ -92,8 +92,8 @@
     "severity": "policy",
     "since_version": "0.5.0",
     "version_stability": "stable within LTS cycle — no breaking error-code changes",
-    "cause": "The CLI wrapper spirit manifest declares a sandbox tier lower than t3. Because CLI wrappers spawn external subprocesses, they require t3 (the highest sandbox tier) to contain the subprocess securely.",
-    "remediation": "Set `sandbox_tier = \"t3\"` in the spirit manifest's `[cli_wrapper]` section. Lower tiers (t1, t2) do not permit subprocess invocation by design."
+    "cause": "The Worker manifest's `[sandbox]` `tier` resolves to a tier other than `T3` (`T0`, `T1`, `T2` or `T4`). A `[cli_wrapper]` Worker runs only inside a verified T3 rootless container (`--network=none`, `--read-only`, `--cap-drop=ALL`, `--user=65534:65534`), whose only egress is the daemon's proxy socket at `/proxy/egress.sock`. Below `T3` no scoped egress or credential custody exists for a Worker; `T4` has no spawn path. `maos run` refuses the manifest at load, before any probe or spawn. `T3` is not the highest tier, and there is no `hardened` tier: the parser accepts only `T0`–`T4`.",
+    "remediation": "Set `tier = \"T3\"` in the manifest's `[sandbox]` table, or omit `[sandbox]` (a Worker requests `T3` by default). The operator must also grant `T3` for the manifest's `command` and `[author]` `name` in the `MAOS_HOST_GRANTS` file; otherwise admission fails with `ECliWrapperTierNotGranted`."
   },
   "ECliWrapperTierNotGranted": {
     "cause_chain_semantics": "security policy enforcement",
@@ -174,6 +174,38 @@
     "version_stability": "stable within LTS cycle — no breaking error-code changes",
     "cause": "The Ed25519 signature on the ComplianceClaim failed cryptographic verification. This can occur if the claim was tampered with in transit, signed with a wrong or rotated key, or uses an unsupported signing algorithm.",
     "remediation": "Verify that the signing key used to produce the ComplianceClaim matches the public key the kernel trusts. Check the key fingerprint with the compliance authority. If keys were rotated, update the kernel's trusted-key store and re-sign the claim."
+  },
+  "EEgressNotGranted": {
+    "cause_chain_semantics": "security policy enforcement",
+    "code": "EEgressNotGranted",
+    "description": "The Worker requests a host:port destination outside its host grant",
+    "docs_url": "https://docs.maos.dev/errors/EEgressNotGranted",
+    "kernel_or_spirit": "kernel",
+    "owner": "maos-domain",
+    "recovery_class": "reject",
+    "retryable": false,
+    "rust_path": "CliWrapperAdmissionError::EEgressNotGranted",
+    "severity": "security",
+    "since_version": "0.1.0-alpha.1",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The Worker manifest's `[cli_wrapper]` `egress` lists a `host:port` destination that the operator's host grant for this `command` and `[author]` `name` does not permit. Manifest egress must be a subset of the grant's `permitted_egress_destinations`, where a bare host grants only `host:443`. `maos run` refuses the Worker at admission, before any probe or spawn; no destination is ever added from the manifest.",
+    "remediation": "Remove the destination from the manifest's `egress`, or have the operator add it to the matching `[[grant]]` entry's `permitted_egress_destinations` in the `MAOS_HOST_GRANTS` file (write `host:port` for any port other than 443), then rerun `maos run`."
+  },
+  "EEgressProxyUnavailable": {
+    "cause_chain_semantics": "security policy enforcement",
+    "code": "EEgressProxyUnavailable",
+    "description": "A non-empty Worker egress policy requires an available daemon-owned proxy",
+    "docs_url": "https://docs.maos.dev/errors/EEgressProxyUnavailable",
+    "kernel_or_spirit": "kernel",
+    "owner": "maos-domain",
+    "recovery_class": "fix_config",
+    "retryable": false,
+    "rust_path": "CliWrapperAdmissionError::EEgressProxyUnavailable",
+    "severity": "security",
+    "since_version": "0.1.0-alpha.1",
+    "version_stability": "stable within LTS cycle — no breaking error-code changes",
+    "cause": "The Worker manifest declares a non-empty `[cli_wrapper]` `egress`, but this `maos` root has no egress proxy: the platform is not Unix, no MAOS home could be resolved (`MAOS_HOME` and `HOME` unset), the proxy failed to start (`maos: egress proxy unavailable: …` on stderr at boot), or the root is shutting down. A Worker's only route to the network is that proxy, so admission refuses rather than spawn a Worker whose declared egress cannot be enforced.",
+    "remediation": "Run the Worker on Linux from a root that can resolve its MAOS home and create its private `egress` directory under it; check boot stderr for the `egress proxy unavailable` line and fix the reported cause. A Worker that needs no network can drop `egress` from its manifest instead."
   },
   "EHaltContinuityViolation": {
     "cause_chain_semantics": "admission or runtime policy",

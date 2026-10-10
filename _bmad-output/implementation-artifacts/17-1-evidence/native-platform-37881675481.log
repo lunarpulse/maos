@@ -1,0 +1,20 @@
+Story: 17-1-worker-egress-allowlist-and-scoped-credential
+Run: https://github.com/lunarpulse/maos/actions/runs/37881675481
+Snapshot: 4a6398111117b3cc485b709c4fe15bc557b94463
+Branch: ci/17-1-platform-20261009t0211
+Runners: macos-15 (macOS/ARM64), windows-2025 (Windows/X64)
+
+Darwin job 113662532112 (1m50s):
+17-1 native compile PASS platform=darwin rc=0 command=cargo check --locked --workspace --all-targets --target aarch64-apple-darwin --keep-going --message-format=json
+
+Windows job 113662531968 (8m9s):
+17-1 native compile PASS platform=windows rc=0 command=cargo build --locked -p maos-kernel-core -p maos-cli --message-format=json
+17-1 native compile PASS platform=windows rc=0 command=cargo check --locked --workspace --all-targets --target x86_64-pc-windows-msvc --keep-going --message-format=json
+
+All compiler receipts above were read from public check-run annotations. Each job has four public annotations; compiler errors were neither filtered out of the exit status nor suppressed. The complete workspace/target check was retained through all four native iterations. Production resource handles did not gain Debug; file-symlink refusal assertions and Unix key permission behavior remain. The POSIX signal-15 test remains explicitly Unix-only, with its actual Linux behavior separately exercised.
+
+Warnings remain, including compiler warnings in uploaded raw logs and upload-artifact@v4's Node-20 deprecation annotation. This is compilation proof, not native test execution, T3 container isolation, a live vendor CLI run, a warning-free Task-10 build or complete story acceptance.
+
+Workflow capture: native-platform-workflow-37874751474.yml.txt.
+Runner capture: native-platform-runner-37878298905.py.txt (unchanged for Run 4).
+Annotations: https://api.github.com/repos/lunarpulse/maos/check-runs/113662532112/annotations and https://api.github.com/repos/lunarpulse/maos/check-runs/113662531968/annotations

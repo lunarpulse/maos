@@ -1,0 +1,41 @@
+Story: 17-1-worker-egress-allowlist-and-scoped-credential
+Run: https://github.com/lunarpulse/maos/actions/runs/37878298905
+Snapshot: da124f7cbe52151a826e74440d527199ec9fc622
+Branch: ci/17-1-platform-20261009t0211
+Runners: macos-15 (macOS/ARM64), windows-2025 (Windows/X64)
+
+Darwin job 113651835360:
+17-1 native compile PASS platform=darwin rc=0 command=cargo check --locked --workspace --all-targets --target aarch64-apple-darwin --keep-going --message-format=json
+
+Windows job 113651835543:
+17-1 native compile PASS platform=windows rc=0 command=cargo build --locked -p maos-kernel-core -p maos-cli --message-format=json
+17-1 native compile FAIL platform=windows rc=101 command=cargo check --locked --workspace --all-targets --target x86_64-pc-windows-msvc --keep-going --message-format=json
+
+error[E0433]: cannot find `unix` in `os`
+    --> crates\maos-audit\src\lib.rs:2559:18
+     |
+2559 |         std::os::unix::fs::symlink(&real, &link).unwrap();
+     |                  ^^^^ could not find `unix` in `os`
+
+error[E0599]: no associated function or constant named `from_mode` found for struct `Permissions` in the current scope
+  --> crates\maos-spirit-cli\tests\publish_tier_validation_test.rs:24:43
+   |
+24 |         let perms = std::fs::Permissions::from_mode(0o600);
+   |                                           ^^^^^^^^^ associated function or constant not found in `Permissions`
+
+error[E0433]: cannot find `unix` in `os`
+ --> crates\maos-spirit-cli\tests\publish_tier_validation_test.rs:4:14
+  |
+4 | use std::os::unix::fs::PermissionsExt;
+  |              ^^^^ could not find `unix` in `os`
+
+error[E0277]: `ResourceCeilingHandle` doesn't implement `Debug`
+  --> crates\maos-kernel-core\tests\cgroup_ceiling_smoke.rs:82:52
+   |
+82 |         let err = apply_resource_ceiling(1, &caps).unwrap_err();
+   |                                                    ^^^^^^^^^^ the trait `Debug` is not implemented for `ResourceCeilingHandle`
+
+The third consecutive native check fails on four diagnostics in three existing test locations. No new implementation edits followed the result: the workflow Step-5 HALT condition requires operator guidance. Task 4 remains unchecked and the story remains in-progress. No full-Windows-workspace, native-runtime, final regression, warning-free or source-measurement claim.
+Windows annotations observed: 9, including one action deprecation warning, beginning/pass/failure summaries, the four compiler diagnostics and the runner exit status. No warning suppressed. All-target check retains --keep-going and its original exit code.
+Annotations: https://api.github.com/repos/lunarpulse/maos/check-runs/113651835360/annotations and https://api.github.com/repos/lunarpulse/maos/check-runs/113651835543/annotations
+Captured runner: native-platform-runner-37878298905.py.txt. Run 2 used the unchanged Run-1 runner; its capture is native-platform-runner-37877217531.py.txt.

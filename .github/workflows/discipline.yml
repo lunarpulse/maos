@@ -1534,6 +1534,8 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run halt receipt production rate test
         run: cargo test -p maos-kernel-core --test halt_receipt_production_rate --release
+      # Story 17-1 — the root-shutdown Workers run under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
       # Story 16-3 (AC4) — NFR-Rel-11's PLANNED half, at every `maos run` root.
       # The kernel test above drives `terminate_spirit` directly; this second
       # step drives the real roots, where the receipt was actually missing.
@@ -1694,23 +1696,58 @@ jobs:
             echo "result=success" >> $GITHUB_OUTPUT
           fi
 
-  # Story 5.5a — T3 escape corpus (Linux + Podman required)
+  # Story 5.5a, unmasked by Story 17-1 AC4(c)/D-12 — the T3 escape corpus.
+  # Shape checks for all 25 fixtures, plus a real execution of the five
+  # `--network=none` scenarios inside the verified container (each must leave
+  # one confirmed kind-8 row) and the M3 socket custody pair (0600 refused,
+  # 0666 connects). The twenty unexecuted scenarios are listed by id with their
+  # owner (`20-3a-gate-honesty`). No continue-on-error, no `|| echo`, no skip:
+  # this runner is declared capable (rule 11(b)).
   t3-escape-corpus:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
-      - name: Install Podman
-        run: sudo apt-get update && sudo apt-get install -y podman
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run T3 escape corpus
-        continue-on-error: true
-        run: cargo test -p maos-eval --test t3_escape_corpus --release -- --nocapture || echo "T3 escape corpus skipped (no container runtime or fixtures pending)"
+          key: t3-escape-corpus-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build the static network-escape probe
+        run: >-
+          RUSTFLAGS='-C target-feature=+crt-static'
+          cargo build --locked --release --target x86_64-unknown-linux-gnu
+          --manifest-path crates/maos-eval/test-fixtures/t3-network-escape-probe/Cargo.toml
+      - name: Run the T3 escape corpus and the network executor
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-eval --test t3_escape_corpus --test t3_network_escape_executor --release -- --nocapture 2>&1 | tee t3-escape.log
+          rc=${PIPESTATUS[0]}
+          executed=$(grep -c '^T3-ESCAPE-EXECUTED ' t3-escape.log)
+          labelled=$(grep -c '^T3-ESCAPE-UNEXECUTED .* owner=20-3a-gate-honesty$' t3-escape.log)
+          grep '^T3-ESCAPE-EXECUTED ' t3-escape.log | while IFS= read -r line; do
+            echo "::notice title=T3 escape corpus (${{ matrix.image }})::${line#T3-ESCAPE-EXECUTED }"
+          done
+          grep '^T3-NETWORK-MATRIX ' t3-escape.log | while IFS= read -r line; do
+            echo "::notice title=T3 escape corpus (${{ matrix.image }})::${line}"
+          done
+          grep -E 'panicked at' t3-escape.log | head -3 | while IFS= read -r line; do
+            echo "::error title=T3 escape corpus (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' t3-escape.log; then rc=1; echo "::error title=T3 escape corpus (${{ matrix.image }})::a SKIP line was printed"; fi
+          if [ "$executed" -ne 5 ] || [ "$labelled" -ne 20 ]; then
+            rc=1
+            echo "::error title=T3 escape corpus (${{ matrix.image }})::executed=$executed (want 5) labelled=$labelled (want 20)"
+          fi
+          echo "::notice title=T3 escape corpus (${{ matrix.image }})::rc=${rc} executed=${executed}/25 unexecuted=${labelled} owner=20-3a-gate-honesty"
+          exit "$rc"
 
   # Story 5.5a — T3 image signature verification corpus
   nfr-sec-1-t3-image-signature:
@@ -1727,25 +1764,140 @@ jobs:
       - name: Run T3 image-verify tests
         run: cargo test -p maos-kernel-core --test sandbox_t3_image_verify --release
 
-  # Story 5.5a — T3 busybox smoke test (Linux + Podman required)
+  # Story 5.5a, unmasked by Story 17-1 AC4(c) — the live T3 boundary
+  # (`sandbox_t3_spawn_linux`: nonroot uid/gid, separate network namespace,
+  # names-only runtime argv, guard cleanup) on both x64 T3 images. The job id
+  # is historical; the payload is a script on the signed digest-pinned image.
   t3-smoke-busybox:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
-      - name: Install Podman and busybox
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman busybox-static
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run T3 spawn tests
-        continue-on-error: true
-        run: cargo test -p maos-kernel-core --test sandbox_t3_spawn_linux --release || echo "T3 spawn tests skipped (no container runtime available)"
+          key: t3-smoke-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Run the live T3 boundary test
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-kernel-core --test sandbox_t3_spawn_linux --release -- --nocapture 2>&1 | tee t3-smoke.log
+          rc=${PIPESTATUS[0]}
+          grep -E 'panicked at' t3-smoke.log | head -3 | while IFS= read -r line; do
+            echo "::error title=T3 smoke (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' t3-smoke.log; then rc=1; echo "::error title=T3 smoke (${{ matrix.image }})::a SKIP line was printed"; fi
+          echo "::notice title=T3 smoke (${{ matrix.image }})::rc=${rc} $(grep '^test result' t3-smoke.log)"
+          exit "$rc"
+
+  # Story 17-1 AC1 / D-11 — the Epic-17 exit lines on both x64 T3 images.
+  # Lines 1 and 1b run the real T3 Worker topology and its audit query, then an
+  # independent Transparency Log read (`scripts/epic_17_exit_line1.py`). Line 3
+  # (17-6) and line 2 (17-3c) are carried verbatim. A red line is fixed at its
+  # origin, never masked; line 2b (17-3d) is still owed. No macOS image: the
+  # `macos-check` job is the only macOS job.
+  epic-17-exit:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: epic-17-exit-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      # ubuntu-26.04's /tmp is a quota-limited tmpfs (actions/runner-images#14777).
+      - name: Keep build and image temporaries off /tmp
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/provision-t3-test-substrate
+      - name: Build the Worker root and the static probe fixture
+        run: |
+          cargo build --locked -p maos-bin --bin maos
+          cargo build --locked -p maos-cli --bin maosctl
+          RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked -p worker --bin worker-probe-fixture --target x86_64-unknown-linux-gnu
+      # The runner refuses SKIP lines from its children; this step also refuses
+      # one from the runner itself, and requires its positive kind-8 verdict, so
+      # a runner that skips or returns early cannot pass (AC4 proof).
+      - name: Epic-17 exit lines 1 and 1b — Worker sandbox, egress refusal, audit query
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/epic_17_exit_line1.py --maos target/debug/maos \
+            --probe target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture \
+            --output epic-17-exit-line1 --image ${{ matrix.image }} 2>&1 | tee line1.out
+          rc=${PIPESTATUS[0]}
+          if grep -q '^SKIP ' line1.out; then rc=1; echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if [ "$rc" -eq 0 ] && ! grep -q '^::notice title=Epic-17 exit lines 1/1b .*3 Kernel-origin kind-8 rows' line1.out; then
+            rc=1
+            echo "::error title=Epic-17 exit line 1 (${{ matrix.image }})::the runner exited 0 without its verified kind-8 verdict"
+          fi
+          exit "$rc"
+      - name: Build the forbidden-syscall probes (line 3 prerequisite)
+        run: |
+          cargo build --locked --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+          cargo build --locked --release --manifest-path crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/Cargo.toml
+      - name: Epic-17 exit line 3 — T2 kill (Story 17-6)
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p maos-wasm-host --test t2_sandbox_kill -- --nocapture 2>&1 | tee t2.log
+          rc=${PIPESTATUS[0]}
+          grep -E 'panicked at|rule 11' t2.log | head -3 | while IFS= read -r line; do
+            echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::${line}"
+          done
+          if grep -q '^SKIP ' t2.log; then rc=1; echo "::error title=Epic-17 exit line 3 (${{ matrix.image }})::a SKIP line was printed"; fi
+          echo "::notice title=Epic-17 exit line 3 (${{ matrix.image }})::rc=${rc} $(grep '^test result' t2.log)"
+          exit "$rc"
+      - name: Componentize the TypeScript Spirit (line 2 prerequisite)
+        working-directory: examples/example-spirit-ts
+        run: npm ci && npm run build && npm run componentize
+      # The T2 WASM runner places itself in a delegated cgroup v2 subtree and
+      # refuses without one (17-3c; never a production fallback). Like podman
+      # for T3, this job originates that precondition: the verbatim launch runs
+      # inside the same dedicated Delegate=yes unit the 17-3c proof uses.
+      - name: Epic-17 exit line 2 — the TypeScript Spirit launch (Story 17-3c)
+        shell: bash
+        run: |
+          set +e
+          cargo build --release -p maos-bin -p maos-wasm-host --features maos-bin/wasm-host --bin maos --bin maos-wasm-runner &&
+            sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect \
+              --uid="$(id -u)" --gid="$(id -g)" \
+              --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes \
+              --property="WorkingDirectory=$PWD" \
+              "$PWD/scripts/run_17_3c_delegated.sh" target/release/maos run examples/example-spirit-ts/manifest.toml --once 2>&1 | tee line2.log
+          rc=${PIPESTATUS[0]}
+          if grep -q '^SKIP ' line2.log; then rc=1; echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::a SKIP line was printed"; fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Epic-17 exit line 2 (${{ matrix.image }})::rc=${rc} $(tail -n 3 line2.log | paste -sd' ' -)"
+          else
+            echo "::notice title=Epic-17 exit line 2 (${{ matrix.image }})::rc=0"
+          fi
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-17-exit-${{ matrix.image }}
+          path: |
+            epic-17-exit-line1/
+            line1.out
+            t2.log
+            line2.log
+          if-no-files-found: warn
 
   # Story 5.5b — multi-provider drift-check tool tests
   multi-provider-drift-tests:
@@ -2313,6 +2465,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      # Story 17-1 — Host-B delegation and completion Workers run under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
       - name: Run check-j1-loopback-delegation
         run: cargo run -p xtask -- check-j1-loopback-delegation --json
       - name: Run j1-crosshost-1a proven-red vectors (AC4.3)
@@ -2535,6 +2689,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      # Story 17-1 — journey_j1's delegated Worker runs under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
       # The PTY journey tests spawn the real `maos` binary, resolved via
       # `target/debug/maos` (CARGO_BIN_EXE_maos is unset — the binary lives in a
       # SEPARATE package, maos-bin, so Cargo does not inject it for this crate's
@@ -3772,6 +3928,8 @@ jobs:
           extra-databases: |-
             maos_team_b
             maos_team_c
+      # Story 17-1 — the whole-package maos-bin leg runs every T3 Worker suite.
+      - uses: ./.github/actions/provision-t3-test-substrate
       # The `maos-bin-whole-package-parallel-isolation` leg runs a debug
       # `cargo test -p maos-bin`, whose tests resolve `worker-cli-fixture` and
       # `maosctl` as siblings of the running debug `maos` — and `cargo test -p
@@ -4323,7 +4481,7 @@ jobs:
   # tests spawn that binary and it is a `[[bin]]` of the separate `worker`
   # package (the j1-crosshost-2a P1 shape; the systemic fix is 20-3's).
   workspace-test-suite:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # ⚠ 45 -> 90 (Epic-16 retrospective, 2026-09-21). MEASURED, not guessed: on
     # PR #7 at `ddb7441b` this job ran 10:09:20 -> 10:54:35 = exactly 45m15s and
     # was KILLED by the old ceiling, reported as `cancelled` — a timeout wearing
@@ -4355,6 +4513,7 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/provision-t3-test-substrate
       - name: Install nightly toolchain for cargo-public-api integration tests
         run: rustup toolchain install nightly --profile minimal
       - name: Install cargo-public-api for workspace integration tests
@@ -4379,7 +4538,7 @@ jobs:
       # same reason.
       - name: Build the fixture binaries every workspace suite resolves by path
         run: |
-          cargo build --locked -p worker --bin worker-cli-fixture
+          cargo build --locked -p worker --bin worker-cli-fixture --bin worker-probe-fixture
           cargo build --locked -p maos-cli --bin maosctl
           cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
           cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
@@ -4733,6 +4892,7 @@ jobs:
       - t3-escape-corpus
       - nfr-sec-1-t3-image-signature
       - t3-smoke-busybox
+      - epic-17-exit
       - multi-provider-drift-tests
       - retract-corpus-tests
       - check-serde-error-handling

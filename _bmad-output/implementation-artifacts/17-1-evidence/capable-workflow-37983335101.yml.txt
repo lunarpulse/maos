@@ -1,0 +1,77 @@
+name: 17-1 capable sweep and native compile
+on:
+  push:
+    branches: [ci/17-1-sweep-20261009t1134]
+permissions:
+  contents: read
+jobs:
+  capable-linux-sweep:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: 17-1-sweep-${{ matrix.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Provision immutable signed T3 test substrate
+        run: |
+          command -v podman || { sudo apt-get update && sudo apt-get install -y podman; }
+          python3 scripts/provision_t3_tests.py "$RUNNER_TEMP/maos-t3-tests"
+      - name: Run actual probe and migrated substrate sweep
+        run: python3 tools/ci/17_1_sweep.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 17-1-sweep-${{ matrix.os }}
+          path: sweep-linux.log
+  platform-macos:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: 17-1-native-macos-${{ hashFiles('**/Cargo.lock') }}
+      - name: Compile complete Darwin workspace
+        run: python3 tools/ci/17_1_platform_compile.py darwin
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 17-1-darwin-compile
+          path: platform-*.log
+  platform-windows:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: 17-1-native-windows-${{ hashFiles('**/Cargo.lock') }}
+      - name: Compile Windows kernel and complete workspace
+        shell: bash
+        run: python3 tools/ci/17_1_platform_compile.py windows
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 17-1-windows-compile
+          path: platform-*.log

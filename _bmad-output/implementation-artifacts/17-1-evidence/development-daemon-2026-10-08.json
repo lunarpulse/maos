@@ -1,0 +1,45 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "phase": "Task 3 development; not final containment acceptance",
+  "date": "2026-10-08",
+  "model": "openai-codex/gpt-6.1-sol:xhigh",
+  "red": [
+    "The daemon integration test could not import the absent maos_bin::egress module before implementation.",
+    "Host-B delegation failed with Worker egress: No such file or directory when its daemon home was absent.",
+    "The focused uninitialized-home regression failed with NotFound before fallible startup created the missing directory."
+  ],
+  "focused_tests": {
+    "command": "cargo test --offline --locked -p maos-bin --test egress_daemon_17_1 --test two_host_delegation_2b --test worker_supervision_16_3 --test worker_hang_corpus_16_3 --test worker_crash_corpus_16_3 --test cohort_daemon_smoke_13_5c",
+    "passed": 32,
+    "failed": 0,
+    "ignored": 3,
+    "ignored_subjects": ["live Postgres tenant substrate", "100-worker crash corpus", "60-worker hang corpus"]
+  },
+  "actual_runtime_smoke": {
+    "command": "cargo run --offline --locked -p maos-bin --example egress_17_1_daemon_smoke",
+    "observed": "DAEMON-EGRESS-SMOKE: 403; independently reopened SQLite kind=8 pid=47 origin=Kernel; scoped bearer absent from reply/row; socket removed; root joined",
+    "temporary_source_removed": true,
+    "t3_exercised": false
+  },
+  "feature_check": {
+    "command": "cargo check --offline --locked -p maos-bin --no-default-features --lib --bins",
+    "passed": true,
+    "exploratory_all_targets": "Failed in existing shell_host_16_2 and bounded_postures_2b tests referencing disabled network APIs; not represented as green."
+  },
+  "release": {
+    "command": "cargo build --offline --locked -p maos-bin --release",
+    "passed": true,
+    "stripped_bytes": 31131632,
+    "threshold_bytes": 33554432,
+    "baseline_stripped_bytes": 30816112,
+    "delta_bytes": 315520,
+    "remaining_bytes": 2422800
+  },
+  "codex_ruling": "Operator approved non-secret -c openai_base_url override; scoped bearer remains only CODEX_API_KEY. Obsolete OPENAI_BASE_URL emission removed.",
+  "limits": [
+    "Existing compiler warnings remain; these are not Task 10 warning-free mutation proofs.",
+    "Three existing ignored tests were compiled but not executed in this command.",
+    "No Codex executable is installed locally; primary-source CLI config support was read, not a live vendor run.",
+    "Landing governance pins and aggregate ceiling remain unresolved Task 9 obligations."
+  ]
+}

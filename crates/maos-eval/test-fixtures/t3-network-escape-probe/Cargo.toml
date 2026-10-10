@@ -1,0 +1,11 @@
+[workspace]
+
+[package]
+name = "t3-network-escape-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test-only probe: attempts the five --network=none escapes of t3-escape-corpus-v0 from inside a verified T3 container and reports each errno (Story 17-1 D-12). NOT part of any shipped artifact."
+
+[dependencies]
+libc = "0.2"

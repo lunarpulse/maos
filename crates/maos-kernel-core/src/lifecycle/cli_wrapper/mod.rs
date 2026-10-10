@@ -38,7 +38,6 @@ pub use admission::{
 };
 pub use lifecycle::{handle_subprocess_death, RecoveryAction};
 pub use runtime::{
-    argv_prefix_hash, ci_default_guard, execute_recovery, spawn_and_bridge, Backpressure,
-    BridgeError, BridgeExit, BridgeSpawnSpec, ExitCause, PumpOutcome, RecoveryOutcome,
-    SpawnedBridge, SubStream,
+    argv_prefix_hash, execute_recovery, spawn_and_bridge, Backpressure, BridgeError, BridgeExit,
+    BridgeSpawnSpec, ExitCause, PumpOutcome, RecoveryOutcome, SpawnedBridge, SubStream, T3Launch,
 };

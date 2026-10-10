@@ -1,7 +1,7 @@
 ---
 title: Deployment Topology
 sidebar_position: 1
-description: Deployment topologies for MAOS — single-host, multi-host A2A, air-gapped, and container-isolated.
+description: Deployment topologies for MAOS — single-host, multi-host A2A, air-gapped, and contained Workers (T3).
 ---
 
 # Deployment Topology
@@ -107,49 +107,62 @@ A hardened topology where the MAOS binary is built with **all network surface co
 
 See the full [Air-Gap Deployment](./air-gap-deployment) guide for build instructions and verification.
 
-## Container-isolated
+## Contained Workers (T3)
 
-Each Spirit runs in its own container with the kernel orchestrating via a container runtime. Provides process-level and filesystem-level isolation beyond the kernel's capability-token enforcement.
+One host runs the MAOS daemon, which runs the kernel and first-party `rust-inproc` Spirits in-process (`T0`, capability tokens only). On Linux, WASM-component Spirits run in the `T2` runner process. Each `[cli_wrapper]` Worker runs in its own `T3` rootless container; with `--network=none`, it reaches the network only through the daemon's egress proxy at `/proxy/egress.sock`. The daemon writes to one local SQLite Transparency Log.
 
 ```
-┌──────────────────────────────────────┐
-│          Host                        │
-│  ┌────────────────────────────────┐  │
-│  │       MAOS Kernel              │  │
-│  └────────────────────────────────┘  │
-│  ┌──────────┐  ┌──────────┐         │
-│  │Container │  │Container │         │
-│  │ Spirit A │  │ Spirit B │         │
-│  └──────────┘  └──────────┘         │
-│  ┌────────────────────────────────┐  │
-│  │  Shared Transparency Log      │  │
-│  └────────────────────────────────┘  │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│ Host                                                │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ MAOS daemon                                   │  │
+│  │ kernel + rust-inproc Spirits (T0)             │  │
+│  │ egress proxy · Transparency Log (SQLite)      │  │
+│  └──────┬────────────────────────────────────────┘  │
+│         │ /proxy/egress.sock (one per Worker)       │
+│  ┌──────▼─────────────────┐  ┌───────────────────┐  │
+│  │ T3 rootless container  │  │ T2 runner process │  │
+│  │ [cli_wrapper] Worker   │  │ WASM component    │  │
+│  │ --network=none         │  │ Spirit (Linux)    │  │
+│  └────────────────────────┘  └───────────────────┘  │
+└─────────────────────────────────────────────────────┘
 ```
 
-**When to use:** multi-tenant production, untrusted Spirit workloads, compliance environments requiring process isolation.
+**When to use:** running third-party agent CLIs you do not trust with your credentials, home directory, or network.
 
 **Isolation layers:**
 
-1. **Capability tokens** — kernel-level scope enforcement (always active)
-2. **Container namespaces** — PID, network, mount, and user namespace isolation
-3. **Seccomp/AppArmor** — system-call filtering
+- `rust-inproc` Spirits run in the daemon process (`T0`), mediated by capability tokens; there is no process isolation.
+- On Linux, WASM-component Spirits run in the `T2` runner process with seccomp allow-list, Landlock, and a delegated cgroup v2 subtree.
+- Each Worker runs in a Linux-only `T3` rootless container with `--network=none`, read-only filesystem, no host home mount, and egress only through its daemon proxy socket at `/proxy/egress.sock`.
 
-**Setup with network namespace isolation:**
+**What stays unisolated by design:**
+
+- `rust-inproc` Spirits run in the daemon process.
+- The admission probe runs on the host.
+- Worker resource limits use runtime defaults; manifest resource limits are not applied yet.
+- T3 has no MAOS-specific seccomp or AppArmor profile.
+- T3 is Linux-only; elsewhere the launch is refused.
+
+**Setup:** configure the operator-owned host grant and signed image lock, pull the locked image by digest with rootless podman, then run a Worker. The manifest and grant example are in the [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit). CI proof uses rootless podman on Ubuntu 24.04 and 26.04.
 
 ```bash
-# Run each Spirit subprocess in its own network namespace
-# (the kernel handles this when configured for container mode)
-unshare --net -- ./target/release/maos run --spirit hello-spirit
+export MAOS_T3_IMAGE_LOCK_PATH="/path/to/operator-signed-image-lock.toml"
+export MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX="ED25519_PUBLIC_KEY_HEX"
+export MAOS_HOST_GRANTS="/path/to/host-grants.toml"
+
+# Replace with the image reference and digest from the signed image lock.
+podman pull "IMAGE@sha256:DIGEST"
+./target/release/maos run worker-manifest.toml --once
 ```
 
 ## Topology comparison
 
-| Feature | Single-host | Multi-host (A2A) | Air-gapped | Container-isolated |
-|---------|-------------|------------------|------------|--------------------|
-| Network required | Optional | Yes (mTLS) | No | Optional |
-| Spirit communication | In-process | A2A over mTLS | In-process only | In-process |
-| Remote inference | Yes | Yes | No | Yes |
-| Transparency Log | Local SQLite | Per-host SQLite | Local SQLite | Shared SQLite |
-| Isolation level | Capability tokens | Capability tokens + network | Capability tokens + no network | Capability tokens + containers |
+| Feature | Single-host | Multi-host (A2A) | Air-gapped | Contained Workers (T3) |
+|---------|-------------|------------------|------------|------------------------|
+| Network required | Optional | Yes (mTLS) | No | Optional; Worker egress only through the proxy allowlist |
+| Spirit communication | In-process | A2A over mTLS | In-process only | In-process for Spirits; stdio bridge for Workers |
+| Remote inference | Yes | Yes | No | Workers reach vendor APIs only through the proxy allowlist |
+| Transparency Log | Local SQLite | Per-host SQLite | Local SQLite | Local SQLite, written by the daemon |
+| Isolation level | Capability tokens | Capability tokens + network | Capability tokens + no network | Capability tokens; T3 containers for Workers (no network, proxy-only egress); T2 runner for WASM Spirits |
 | Complexity | Low | Medium | Medium | High |

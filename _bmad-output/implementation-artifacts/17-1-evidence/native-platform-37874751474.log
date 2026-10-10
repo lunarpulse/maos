@@ -1,0 +1,23 @@
+Story: 17-1-worker-egress-allowlist-and-scoped-credential
+Run: https://github.com/lunarpulse/maos/actions/runs/37874751474
+Snapshot: 27df53a5f0b6ba6d48a64194470f956be8ce1c53
+Throwaway branch: ci/17-1-platform-20261009t0211
+Runners: macos-15 (observed macOS/ARM64), windows-2025 (observed Windows/X64)
+Permissions: contents: read; no repository secrets; no main-branch workflow changes.
+
+Public Darwin annotations: https://api.github.com/repos/lunarpulse/maos/check-runs/113640656856/annotations
+17-1 native compile BEGIN platform=darwin commit=27df53a5f0b6ba6d48a64194470f956be8ce1c53 runner=macOS/ARM64
+17-1 native compile PASS platform=darwin rc=0 command=cargo check --locked --workspace --all-targets --target aarch64-apple-darwin --message-format=json
+
+Public Windows annotations: https://api.github.com/repos/lunarpulse/maos/check-runs/113640657078/annotations
+17-1 native compile BEGIN platform=windows commit=27df53a5f0b6ba6d48a64194470f956be8ce1c53 runner=Windows/X64
+17-1 native compile PASS platform=windows rc=0 command=cargo build --locked -p maos-kernel-core -p maos-cli --message-format=json
+17-1 native compile FAIL platform=windows rc=101 command=cargo check --locked --workspace --all-targets --target x86_64-pc-windows-msvc --message-format=json
+error[E0433]: cannot find `unix` in `os`
+   --> xtask\tests\model_currency_gate.rs:488:14
+    |
+488 |     std::os::unix::fs::symlink(
+    |              ^^^^ could not find `unix` in `os`
+
+Overall run failed; no all-workspace Windows success claim. The pre-existing dangling-manifest-link test uses a Unix-only API. The originating test is being made portable with Windows symlink_file, without ignoring or disabling the refusal assertion. This is development compilation evidence, not Task 10's warning-free mutation proof.
+The existing docs-site workflow also ran because its all-branch push filter includes docs/errors/error-catalog.json. It has build/static/behavioral/proven-red steps only, no deployment step. Its verdict is not a platform-compilation proof.

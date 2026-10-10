@@ -19,7 +19,9 @@
 //! can be overridden via `MAOS_FIXTURE_SHAPE_VERSION` so tests can drive a
 //! shape MISMATCH against a stable binary (no write-then-exec race).
 //!
-//! Hermetic by construction: no network, no filesystem, deterministic stdout.
+//! Hermetic by construction: no network, no filesystem writes, deterministic
+//! stdout. Launched as T3's mounted payload, every self-terminating scene first
+//! stays alive through bounded PID inspection; native execution is unchanged.
 
 use std::io::Write as _;
 use std::time::Duration;
@@ -36,6 +38,12 @@ const HANG_POLL: Duration = Duration::from_secs(3600);
 /// Exit code for an unrecognized `--maos-fixture-mode=<v>` value (D-16-3-L).
 const UNKNOWN_MODE_EXIT: i32 = 2;
 
+/// Longer than the kernel's bounded post-launch PID inspection (about 2.25 s).
+const OCI_INSPECTION_HOLD: Duration = Duration::from_secs(3);
+
+/// The kernel's read-only T3 payload mount, executed as argv[0].
+const T3_PAYLOAD_PATH: &str = "/maos/spirit";
+
 /// Exit code when the `kill` binary cannot be run at all in `sigkill-self` —
 /// distinct from every other exit so AC1's `signaled(sig=9)` expectation reds
 /// loudly instead of passing on a non-signal exit.
@@ -47,6 +55,7 @@ const GRANDCHILD_SPAWN_FAILURE_EXIT: i32 = 98;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    let t3_payload = args.first().is_some_and(|arg| arg == T3_PAYLOAD_PATH);
     let version = std::env::var("MAOS_FIXTURE_SHAPE_VERSION")
         .unwrap_or_else(|_| worker::OUTPUT_SHAPE_VERSION.to_string());
 
@@ -76,7 +85,10 @@ fn main() {
             "sigkill-self" => sigkill_self(),
             // The sanctioned non-crash failure: a clean `fault.non-zero-exit`
             // with `exit_code: 3`.
-            "exit-nonzero" => std::process::exit(3),
+            "exit-nonzero" => {
+                hold_for_oci_inspection(t3_payload);
+                std::process::exit(3)
+            }
             unknown => {
                 eprintln!(
                     "worker-fixture: unknown fixture mode `{unknown}` (expected hang, \
@@ -102,12 +114,20 @@ fn main() {
     }
     println!("{}", worker::CANNED_OUTPUT_LINES[1]);
     println!("{}", worker::CANNED_OUTPUT_LINES[2]);
+    flush_stdout();
+    hold_for_oci_inspection(t3_payload);
 }
 
 /// Flushes stdout so a mode's line is in the pipe before the mode sleeps or
 /// dies (the mode contract demands the flush explicitly).
 fn flush_stdout() {
     let _ = std::io::stdout().flush();
+}
+
+fn hold_for_oci_inspection(t3_payload: bool) {
+    if t3_payload {
+        std::thread::sleep(OCI_INSPECTION_HOLD);
+    }
 }
 
 /// Sleeps effectively forever, in a loop — the harness SIGKILLs the process.
@@ -150,7 +170,8 @@ fn hang_with_grandchild() -> ! {
 
 /// `sigkill-self`: print one line, flush, then SIGKILL this process through
 /// the `kill` binary (`unsafe_code = "forbid"` rules out a raw `kill(2)` and
-/// `std::process::abort()` dies by signal 6, not 9).
+/// `std::process::abort()` dies by signal 6, not 9). Native only: a T3 payload
+/// is its PID namespace's init, which cannot receive its own SIGKILL.
 fn sigkill_self() -> ! {
     println!("{}", worker::CANNED_OUTPUT_LINES[0]);
     flush_stdout();

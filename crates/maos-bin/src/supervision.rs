@@ -172,6 +172,8 @@ pub async fn unload_all_loaded(
 
 #[cfg(feature = "network")]
 mod worker {
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -272,6 +274,9 @@ mod worker {
         /// receipt.
         #[error("maos run: worker scb start failed: {0}")]
         Start(String),
+        /// The kernel could not commit the confirmed T3 spawn report.
+        #[error("maos run: worker T3 spawn report commit failed: {0}")]
+        SpawnReport(String),
     }
 
     // ── The state machine (D-16-3-Q (4)) ────────────────────────────────
@@ -310,7 +315,7 @@ mod worker {
     pub enum BindingAction {
         /// Nothing to do.
         Nothing,
-        /// Signal the child through the strategy (`pidfd_send_signal` on Linux).
+        /// Signal the runtime-client pidfd and stop any attached container name.
         Signal,
         /// In-lock exception: `Handle::spawn(handle_crash)`, storing the handle
         /// so no reader ever sees `CrashHandled` without one.
@@ -325,10 +330,9 @@ mod worker {
         JoinHandlerThenMaybeDispositionThenUnload,
         /// Disposition from the kept record, then `unload`.
         DispositionAndUnload,
-        /// Signal through the strategy WHILE THE BRIDGE IS STILL ALIVE, then
-        /// disposition and unload. `abandon(Running)` uses this: the bridge's
-        /// own `Drop` kills and reaps the child, so a guard that only
-        /// dispositioned would prove nothing about the stop.
+        /// Signal the runtime-client pidfd and named container WHILE THE BRIDGE
+        /// IS STILL ALIVE, then disposition and unload. `abandon(Running)` uses
+        /// this so bridge cleanup is not the only evidence of the stop.
         SignalThenDispositionAndUnload,
         /// Take the record out of the ledger WITHOUT disposition (the verdict
         /// row is the record), then `unload`.
@@ -360,14 +364,14 @@ mod worker {
             }
         }
 
-        /// A stop was requested. `has_child` is whether a child handle is
-        /// stored — without one (no pidfd) there is nothing to signal, which is
-        /// the stated fallback cost.
-        pub fn begin_stop(self, has_child: bool) -> (Self, BindingAction) {
+        /// A stop was requested. `has_stop_target` is a pidfd handle or an
+        /// attached container identity, either of which requires the signal
+        /// action.
+        pub fn begin_stop(self, has_stop_target: bool) -> (Self, BindingAction) {
             match self {
                 BindingPhase::Running => (
                     BindingPhase::PlannedStop,
-                    if has_child {
+                    if has_stop_target {
                         BindingAction::Signal
                     } else {
                         BindingAction::Nothing
@@ -594,10 +598,16 @@ mod worker {
 
     // ── The binding's shared core (Observer's subscriber) ───────────────
 
+    struct ContainerStopIdentity {
+        runtime_path: PathBuf,
+        container_name: String,
+    }
+
     struct BindingState {
         phase: BindingPhase,
         child: Option<ObservedChild>,
         child_pid: Option<u32>,
+        container_stop: Option<ContainerStopIdentity>,
         handler: Option<CrashHandlerHandle>,
         record: TaskAssignmentRecord,
         on_crash_action: OnCrashAction,
@@ -646,6 +656,29 @@ mod worker {
             self.spirit_pid
                 .compare_exchange(0, pid, Ordering::AcqRel, Ordering::Acquire)
                 .expect("scheduler PID is already bound");
+        }
+
+        /// Attach the actual runtime and name that own this Worker's T3
+        /// container. If shutdown already won the race, stop it immediately.
+        pub fn attach_container_stop(&self, runtime_path: PathBuf, container_name: String) {
+            let identity = ContainerStopIdentity {
+                runtime_path,
+                container_name,
+            };
+            let (late, replaced) = {
+                let mut state = self.lock();
+                if state.phase == BindingPhase::Running {
+                    (None, state.container_stop.replace(identity))
+                } else {
+                    (Some(identity), state.container_stop.take())
+                }
+            };
+            if let Some(replaced) = replaced {
+                self.stop_named_container(replaced);
+            }
+            if let Some(late) = late {
+                self.stop_named_container(late);
+            }
         }
 
         /// A session timeout/error marks the kill as planned before signalling.
@@ -744,8 +777,8 @@ mod worker {
 
         fn begin_stop(&self) -> BindingAction {
             let mut state = self.lock();
-            let has_child = state.child.is_some();
-            let (next, action) = state.phase.begin_stop(has_child);
+            let has_stop_target = state.child.is_some() || state.container_stop.is_some();
+            let (next, action) = state.phase.begin_stop(has_stop_target);
             state.phase = next;
             action
         }
@@ -767,6 +800,7 @@ mod worker {
         fn retire_view(&self) -> WorkerBindingView {
             let mut state = self.lock();
             state.child = None;
+            state.container_stop = None;
             WorkerBindingView {
                 spirit_id: self.spirit_id.clone(),
                 spirit_pid: self.spirit_pid(),
@@ -847,13 +881,71 @@ mod worker {
             }
         }
 
-        fn signal(&self) {
-            match self.strategy.signal_kill(self) {
-                SignalOutcome::Signalled => {
+        pub(super) fn signal(&self) {
+            let container = self.lock().container_stop.take();
+            let pidfd_outcome = self.strategy.signal_kill(self);
+            let container_stopped =
+                container.is_none_or(|container| self.stop_named_container(container));
+            match pidfd_outcome {
+                SignalOutcome::Signalled if container_stopped => {
                     self.counters.signals_sent.fetch_add(1, Ordering::Relaxed);
+                }
+                SignalOutcome::Signalled => {
+                    eprintln!(
+                        "maos: worker {} container kill failed; stop is incomplete",
+                        self.spirit_id
+                    );
                 }
                 SignalOutcome::AlreadyReaped | SignalOutcome::NotSignalled => {}
             }
+        }
+
+        fn stop_named_container(&self, identity: ContainerStopIdentity) -> bool {
+            let mut command = Command::new(identity.runtime_path);
+            command.env_clear();
+            for key in [
+                "PATH",
+                "HOME",
+                "XDG_RUNTIME_DIR",
+                "DBUS_SESSION_BUS_ADDRESS",
+            ] {
+                if let Some(value) = std::env::var_os(key) {
+                    command.env(key, value);
+                }
+            }
+            let result = command
+                .args(["kill", &identity.container_name])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            match result {
+                Ok(status) if status.success() => true,
+                Ok(status) => {
+                    eprintln!(
+                        "maos: worker {} runtime refused container kill (status {status})",
+                        self.spirit_id
+                    );
+                    false
+                }
+                Err(error) => {
+                    eprintln!(
+                        "maos: worker {} could not run container kill: {error}",
+                        self.spirit_id
+                    );
+                    false
+                }
+            }
+        }
+
+        fn stop_attached_container(&self) {
+            let container = { self.lock().container_stop.take() };
+            if let Some(container) = container {
+                self.stop_named_container(container);
+            }
+        }
+
+        fn discard_attached_container(&self) {
+            self.lock().container_stop = None;
         }
 
         /// Join the stored handler. Returns `true` when the record still needs
@@ -978,6 +1070,8 @@ mod worker {
     #[must_use = "a WorkerBinding that is dropped without `finish` is abandoned: \
                   the Worker is signalled, its task dispositioned and its SCB unloaded"]
     pub struct WorkerBinding {
+        #[cfg(unix)]
+        egress: Option<crate::egress::WorkerEgress>,
         core: Arc<BindingCore>,
         armed: bool,
         active_paths: Arc<ActivePathCount>,
@@ -985,6 +1079,16 @@ mod worker {
     }
 
     impl WorkerBinding {
+        #[cfg(unix)]
+        pub fn attach_egress(&mut self, egress: crate::egress::WorkerEgress) {
+            self.egress = Some(egress);
+        }
+
+        #[cfg(unix)]
+        pub fn egress(&self) -> Option<&crate::egress::WorkerEgress> {
+            self.egress.as_ref()
+        }
+
         /// The shared core — the handle `watch` and the pre-spawn phase check
         /// need.
         pub fn core(&self) -> &Arc<BindingCore> {
@@ -1005,6 +1109,12 @@ mod worker {
         /// executing, so `Drop` never runs `abandon` after `finish`.
         pub fn finish(mut self, bridge_exit: &ExitCause) {
             self.armed = false;
+            #[cfg(unix)]
+            if let Some(mut egress) = self.egress.take() {
+                if let Err(error) = egress.finish() {
+                    eprintln!("maos: Worker egress cleanup failed: {error}");
+                }
+            }
             let cause = crash_cause_from_exit(&self.core, bridge_exit);
             let action = {
                 let mut state = self.core.lock();
@@ -1109,6 +1219,14 @@ mod worker {
         /// after `spawn_and_bridge` returns — BEFORE the pump starts.
         fn watch(&self, core: &Arc<BindingCore>, child_pid: u32);
 
+        /// Commit the confirmed T3 spawn identity to its owning SCB and journal.
+        fn commit_container_spawn(
+            &self,
+            core: &Arc<BindingCore>,
+            child: &maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild,
+            image: &maos_kernel_core::security::sandbox::t3::image_lock::VerifiedImageAttestation,
+        ) -> Result<(), WorkerSupervisionError>;
+
         /// Patch the minted capability token and its expiry into the kept
         /// record and the SCB ledger entry.
         fn bind_token(&self, core: &Arc<BindingCore>, token_id: TokenId, ttl_deadline_ns: u64);
@@ -1209,6 +1327,7 @@ mod worker {
                     phase: BindingPhase::Running,
                     child: None,
                     child_pid: None,
+                    container_stop: None,
                     handler: None,
                     record: TaskAssignmentRecord {
                         task_id,
@@ -1264,6 +1383,8 @@ mod worker {
                 core.stop_session();
             }
             WorkerBinding {
+                #[cfg(unix)]
+                egress: None,
                 core,
                 armed: true,
                 active_paths: Arc::clone(&self.active_paths),
@@ -1543,6 +1664,22 @@ mod worker {
                     );
                 }
             }
+        }
+
+        fn commit_container_spawn(
+            &self,
+            core: &Arc<BindingCore>,
+            child: &maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild,
+            image: &maos_kernel_core::security::sandbox::t3::image_lock::VerifiedImageAttestation,
+        ) -> Result<(), WorkerSupervisionError> {
+            maos_kernel_core::security::sandbox::t3::spawn::commit_spawn_report(
+                &self.exec.scheduler,
+                self.exec.scheduler.as_ref(),
+                child,
+                core.spirit_id().to_owned(),
+                image,
+            )
+            .map_err(|error| WorkerSupervisionError::SpawnReport(error.to_string()))
         }
 
         fn bind_token(&self, core: &Arc<BindingCore>, token_id: TokenId, ttl_deadline_ns: u64) {
@@ -1835,13 +1972,18 @@ mod worker {
     }
 
     impl Spirit for WorkerSpirit {
-        /// Signal the child. `on_unload` runs INSIDE `scheduler.unload`, in
-        /// `spawn_blocking` under a hook budget, so it must never reach back
-        /// into `unload`: `begin_stop` decides under the binding lock, releases
-        /// it, and the only act is the strategy's signal.
+        /// Stop the runtime-client pidfd and attached container name. `on_unload`
+        /// runs inside `scheduler.unload` under a hook budget, so it must not
+        /// recurse into `unload`; the core decides under lock and executes after
+        /// releasing it.
         fn on_unload(&self, _ctx: &mut Ctx) {
             let action = self.core.begin_stop();
             self.core.execute(action);
+            if self.core.phase() == BindingPhase::ExitedClean {
+                self.core.discard_attached_container();
+            } else {
+                self.core.stop_attached_container();
+            }
         }
     }
 
@@ -1885,6 +2027,11 @@ mod worker {
         root_cancel: tokio_util::sync::CancellationToken,
         root_shutdown: tokio_util::sync::CancellationToken,
         supervisor: Arc<WorkerSupervisor>,
+        #[cfg(unix)]
+        egress: Option<(
+            crate::egress::EgressHandle,
+            tokio::task::JoinHandle<std::io::Result<()>>,
+        )>,
         watchdog: tokio::task::JoinHandle<()>,
         stamper: tokio::task::JoinHandle<()>,
         listener: tokio::task::JoinHandle<()>,
@@ -1911,6 +2058,25 @@ mod worker {
         ) -> Self {
             let root_cancel = tokio_util::sync::CancellationToken::new();
             let root_shutdown = tokio_util::sync::CancellationToken::new();
+            #[cfg(unix)]
+            let egress = match maos_domain::operator_door::maos_home() {
+                Ok(Some(run_dir)) => match crate::egress::EgressHandle::start(
+                    run_dir,
+                    Arc::clone(&transparency_log),
+                    root_cancel.clone(),
+                ) {
+                    Ok(egress) => Some(egress),
+                    Err(error) => {
+                        eprintln!("maos: egress proxy unavailable: {error}");
+                        None
+                    }
+                },
+                Ok(None) => None,
+                Err(error) => {
+                    eprintln!("maos: egress proxy unavailable: {error}");
+                    None
+                }
+            };
             let supervisor = Arc::new(WorkerSupervisor::new(
                 Arc::clone(&scheduler),
                 crash_detector,
@@ -1952,6 +2118,8 @@ mod worker {
                 root_cancel,
                 root_shutdown,
                 supervisor,
+                #[cfg(unix)]
+                egress,
                 watchdog,
                 stamper,
                 listener,
@@ -1961,6 +2129,11 @@ mod worker {
         /// The root's Worker supervisor.
         pub fn supervisor(&self) -> &Arc<WorkerSupervisor> {
             &self.supervisor
+        }
+
+        #[cfg(unix)]
+        pub fn egress_handle(&self) -> Option<&crate::egress::EgressHandle> {
+            self.egress.as_ref().map(|(handle, _)| handle)
         }
 
         /// Cancelled by the signal listener on the first SIGTERM/SIGINT. Every
@@ -1989,6 +2162,14 @@ mod worker {
             ] {
                 if let Err(error) = handle.await {
                     eprintln!("maos: {name} join failed: {error}");
+                }
+            }
+            #[cfg(unix)]
+            if let Some((_, task)) = self.egress {
+                match task.await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => eprintln!("maos: egress proxy cleanup failed: {error}"),
+                    Err(error) => eprintln!("maos: egress proxy task join failed: {error}"),
                 }
             }
             self.supervisor.join_outstanding(ROOT_GRACE).await;
@@ -2322,7 +2503,7 @@ pub mod exit_observation {
                 match core.store_child(child_pid, child) {
                     Ok(action) => {
                         if matches!(action, super::super::worker::BindingAction::Signal) {
-                            self.signal_kill(&core);
+                            core.signal();
                         }
                     }
                     Err(refusal) => {

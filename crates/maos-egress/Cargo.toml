@@ -1,0 +1,26 @@
+[package]
+name = "maos-egress"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Daemon-owned Worker egress proxy and scoped credentials"
+
+[features]
+default = ["daemon"]
+daemon = ["dep:maos-domain", "dep:getrandom", "dep:sha2", "dep:subtle", "dep:hex", "dep:rustls", "dep:webpki-roots", "dep:parking_lot"]
+
+[dependencies]
+maos-domain = { path = "../maos-domain", optional = true }
+getrandom = { version = "0.3", optional = true }
+sha2 = { version = "0.10", optional = true }
+subtle = { version = "2.6", optional = true }
+hex = { version = "0.4", optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+webpki-roots = { version = "0.26", optional = true }
+parking_lot = { version = "0.12", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+log = "0.4"

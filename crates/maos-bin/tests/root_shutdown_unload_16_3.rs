@@ -34,13 +34,11 @@
 //!
 //! # The "child gone" oracle (story Trap 22)
 //!
-//! The Worker subprocess is a child of `maos`, not of the test, so the
-//! pidfd's `waitid` is not available here and `kill(pid, 0)` succeeds on a
-//! zombie — neither is evidence. These vectors use `/proc/<pid>` cmdline +
-//! `stat` (state and ppid) as the oracle instead of adding a `rustix` `event`
-//! feature just for `poll`: after the direct child is SIGKILLed and reaped by
-//! the supervisor's own observer, `/proc/<pid>` is gone; a reparented orphan
-//! or a still-running grandchild is present with a non-`Z` state.
+//! The Worker payload is inside a T3 container. Tests identify its OCI runtime
+//! client by the root's pid and `--name`, then use runtime inspect to resolve
+//! the host-namespace payload pid. Both client and payload must disappear, and
+//! the container name must no longer report a live PID. No payload environment
+//! or payload-parent relationship is used as an ownership oracle.
 //!
 //! # Vector 6
 //!
@@ -60,6 +58,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[path = "../../../tests/harness/doorless_home.rs"]
 mod doorless_home;
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
 
 /// The stderr handshake (D-16-3-M): the listener's SIGTERM/SIGINT streams are
 /// created synchronously at the site BEFORE this line is printed, so a signal
@@ -241,147 +241,184 @@ fn proc_stat(pid: u32) -> Option<(char, u32)> {
     Some((state, ppid))
 }
 
-/// Every live process whose argv carries BOTH the worker prefix and the named
-/// fixture mode AND whose parent is `parent` — i.e. the DIRECT worker child a
-/// root spawned (the `hang-with-grandchild` grandchild re-spawns itself
-/// WITHOUT `--maos-worker`, so it never matches).
-///
-/// ⚠ The admission PROBE runs `argv_prefix + --maos-bridge-probe`
-/// (`admission.rs:70-71`), so its argv carries the very same two flags and
-/// its parent is the root too — it must be EXCLUDED, or the first poll grabs
-/// the probe's short-lived pid and every later /proc read is about a reused
-/// pid that belongs to someone else entirely.
-fn fixture_children_of(parent: u32, mode: &str) -> Vec<u32> {
-    let mut found = Vec::new();
-    let Ok(entries) = std::fs::read_dir("/proc") else {
-        return found;
-    };
-    for entry in entries.flatten() {
-        let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
-            continue;
-        };
-        let Some(args) = proc_cmdline_args(pid) else {
-            continue;
-        };
-        let mode_flag = format!("--maos-fixture-mode={mode}");
-        if args.iter().any(|arg| arg == "--maos-worker")
-            && args.iter().any(|arg| arg == &mode_flag)
-            && !args.iter().any(|arg| arg == "--maos-bridge-probe")
-            && proc_stat(pid).map(|(_, ppid)| ppid) == Some(parent)
+/// T3 has two host processes: the runtime client started by the root and the
+/// payload host pid reported by OCI inspect. Keep both process identities.
+#[derive(Clone, Debug)]
+struct FixtureContainer {
+    runtime_client_pid: u32,
+    payload_host_pid: u32,
+    container_name: String,
+    runtime_client_start_time: String,
+    payload_start_time: String,
+}
+
+fn inspect_payload_pid(container_name: &str) -> Result<Option<u32>, String> {
+    let runtime = std::env::var("MAOS_T3_RUNTIME")
+        .map_err(|error| format!("MAOS_T3_RUNTIME unavailable during inspect: {error}"))?;
+    let output = Command::new(runtime)
+        .args(["inspect", "--format", "{{.State.Pid}}", container_name])
+        .output()
+        .map_err(|error| format!("run OCI inspect for {container_name}: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let lower = stderr.to_ascii_lowercase();
+        if lower.contains("no such")
+            || lower.contains("not found")
+            || lower.contains("no container")
         {
-            found.push(pid);
+            return Ok(None);
         }
+        return Err(format!("OCI inspect {container_name} failed: {stderr}"));
     }
-    found
+    let pid = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .map_err(|error| format!("OCI inspect {container_name} returned invalid PID: {error}"))?;
+    Ok(Some(pid))
 }
 
-/// One entry of `/proc/<pid>/environ`, when readable.
-fn proc_environ_value(pid: u32, key: &str) -> Option<String> {
-    let bytes = std::fs::read(format!("/proc/{pid}/environ")).ok()?;
-    bytes
-        .split(|byte| *byte == 0)
-        .filter_map(|entry| {
-            let entry = String::from_utf8_lossy(entry).into_owned();
-            entry.strip_prefix(&format!("{key}=")).map(str::to_owned)
-        })
-        .next()
-}
-
-/// Every live `worker-cli-fixture` process that BELONGS TO THIS TEST, keyed
-/// by an env var this test set to a unique value (`MAOS_HOME` for `maos run`
-/// roots, `MAOS_AUDIT_DB` for cohort daemons — the child inherits both).
-///
-/// Machine-wide scans are worthless here: sibling corpora on the same runner
-/// spawn `hang` workers of their own, and an "orphan" assertion that counts
-/// another test's worker is noise. The env var scopes the scan to processes
-/// that inherited THIS test's stores.
-fn my_fixture_processes(env_key: &str, env_value: &str) -> Vec<u32> {
+/// Find the OCI client launched by this root, then resolve its named
+/// container's host payload pid through the configured runtime.
+fn fixture_children_of(parent: u32, mode: &str) -> Vec<FixtureContainer> {
     let mut found = Vec::new();
     let Ok(entries) = std::fs::read_dir("/proc") else {
         return found;
     };
+    let mode_flag = format!("--maos-fixture-mode={mode}");
     for entry in entries.flatten() {
-        let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
+        let Ok(runtime_client_pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
             continue;
         };
-        let belongs = proc_cmdline_args(pid)
-            .map(|args| {
-                args.iter().any(|arg| arg.contains("worker-cli-fixture"))
-                    && !args.iter().any(|arg| arg == "--maos-bridge-probe")
-            })
-            .unwrap_or(false)
-            && proc_environ_value(pid, env_key).as_deref() == Some(env_value);
-        if belongs {
-            found.push(pid);
+        if proc_stat(runtime_client_pid).map(|(_, ppid)| ppid) != Some(parent) {
+            continue;
+        }
+        let Some(args) = proc_cmdline_args(runtime_client_pid) else {
+            continue;
+        };
+        if args.iter().any(|arg| arg == "--maos-bridge-probe")
+            || !args.iter().any(|arg| arg == &mode_flag)
+        {
+            continue;
+        }
+        let Some(container_name) = args
+            .iter()
+            .find_map(|arg| arg.strip_prefix("--name="))
+            .map(str::to_owned)
+        else {
+            continue;
+        };
+        if let Ok(Some(payload_host_pid)) = inspect_payload_pid(&container_name) {
+            let (Some(runtime_client_start_time), Some(payload_start_time)) = (
+                proc_start_time(runtime_client_pid),
+                proc_start_time(payload_host_pid),
+            ) else {
+                continue;
+            };
+            found.push(FixtureContainer {
+                runtime_client_pid,
+                payload_host_pid,
+                container_name,
+                runtime_client_start_time,
+                payload_start_time,
+            });
         }
     }
     found
 }
 
-fn wait_for_fixture_child(parent: u32, mode: &str, timeout: Duration) -> u32 {
+fn wait_for_fixture_child(parent: u32, mode: &str, timeout: Duration) -> FixtureContainer {
+    wait_for_fixture_child_with(parent, mode, timeout, String::new)
+}
+
+/// Like [`wait_for_fixture_child`], with the owning root's captured output in
+/// the timeout diagnostic.
+fn wait_for_fixture_child_with(
+    parent: u32,
+    mode: &str,
+    timeout: Duration,
+    context: impl Fn() -> String,
+) -> FixtureContainer {
     let deadline = Instant::now() + timeout;
     loop {
         let mut children = fixture_children_of(parent, mode);
-        if let Some(pid) = children.pop() {
-            return pid;
+        if let Some(child) = children.pop() {
+            return child;
         }
         assert!(
             Instant::now() < deadline,
-            "no {mode} fixture child of pid {parent} appeared within {timeout:?}"
+            "no {mode} OCI Worker of root pid {parent} appeared within {timeout:?}; root output:\n{}",
+            context()
         );
         std::thread::sleep(Duration::from_millis(50));
     }
 }
 
-/// Wait until `pid` no longer names one of THIS test's fixture processes:
-/// gone from /proc, its argv lost the mode flag, or its inherited env var no
-/// longer carries this test's unique value — a reused pid belongs to someone
-/// else and is not the process we are waiting on.
-fn wait_pid_gone(
-    pid: u32,
-    timeout: Duration,
-    what: &str,
-    mode_flag: &str,
-    env_key: &str,
-    env_value: &str,
-) {
+fn wait_pid_gone(pid: u32, start_time: &str, timeout: Duration, what: &str) {
     let deadline = Instant::now() + timeout;
     loop {
-        let still_ours = proc_cmdline_args(pid)
-            .map(|args| args.iter().any(|arg| arg.contains(mode_flag)))
-            .unwrap_or(false)
-            && proc_environ_value(pid, env_key).as_deref() == Some(env_value);
-        if !still_ours {
+        if proc_start_time(pid).as_deref() != Some(start_time) {
             return;
         }
         assert!(
             Instant::now() < deadline,
-            "{what} (pid {pid}, mode {mode_flag}) is still in /proc after \
-             {timeout:?}"
+            "{what} (pid {pid}) is still in /proc after {timeout:?}"
         );
         std::thread::sleep(Duration::from_millis(25));
     }
 }
 
-/// A grandchild this vector promised to kill: dropped even when an assertion
-/// unwinds first, so a residual process never leaks into another test.
-///
-/// The kill is scoped by the owning root's unique env var — a pid is only
-/// killed while it still names one of THIS test's fixture processes.
+fn wait_container_stopped(container_name: &str, timeout: Duration) {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match inspect_payload_pid(container_name) {
+            Ok(None) | Ok(Some(0)) => return,
+            Ok(Some(_)) => {}
+            Err(error) => panic!("cannot confirm T3 container {container_name} stopped: {error}"),
+        }
+        assert!(
+            Instant::now() < deadline,
+            "OCI container {container_name} still reports a live payload after {timeout:?}"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn wait_worker_stopped(worker: &FixtureContainer, timeout: Duration, what: &str) {
+    wait_pid_gone(
+        worker.payload_host_pid,
+        &worker.payload_start_time,
+        timeout,
+        what,
+    );
+    wait_pid_gone(
+        worker.runtime_client_pid,
+        &worker.runtime_client_start_time,
+        timeout,
+        "the OCI runtime client for the Worker",
+    );
+    wait_container_stopped(&worker.container_name, timeout);
+}
+
+/// Linux `/proc/<pid>/stat` start time, used with argv to reject a reused pid.
+fn proc_start_time(pid: u32) -> Option<String> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let close = stat.rfind(')')?;
+    stat[close + 1..]
+        .split_whitespace()
+        .nth(19)
+        .map(str::to_owned)
+}
+
 struct GrandchildGuard {
     pid: u32,
-    env_key: &'static str,
-    env_value: String,
+    args: Vec<String>,
+    start_time: String,
 }
 
 impl GrandchildGuard {
     fn still_ours(&self) -> bool {
-        let fixture_argv = proc_cmdline_args(self.pid)
-            .map(|args| args.iter().any(|arg| arg.contains("worker-cli-fixture")))
-            .unwrap_or(false);
-        fixture_argv
-            && proc_environ_value(self.pid, self.env_key).as_deref()
-                == Some(self.env_value.as_str())
+        proc_cmdline_args(self.pid).as_deref() == Some(self.args.as_slice())
+            && proc_start_time(self.pid).as_deref() == Some(self.start_time.as_str())
     }
 
     fn kill_now(&self) {
@@ -395,13 +432,48 @@ impl GrandchildGuard {
 
 impl Drop for GrandchildGuard {
     fn drop(&mut self) {
-        // Best-effort only: a panic HERE would panic-in-destructor during
-        // unwind and abort the whole test binary, burying the real failure.
         self.kill_now();
         let deadline = Instant::now() + Duration::from_secs(5);
         while self.still_ours() && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(25));
         }
+    }
+}
+
+/// The fixture grandchild is `<payload> --maos-fixture-mode=hang`. Its argv[0]
+/// is the binary path natively and the T3 mount `/maos/spirit` in OCI, so the
+/// stable identity is its exact mode argument under the inspected payload.
+fn wait_for_host_grandchild(parent_host_pid: u32, timeout: Duration) -> u32 {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let found = std::fs::read_dir("/proc")
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| entry.file_name().to_string_lossy().parse::<u32>().ok())
+            .find(|pid| {
+                proc_stat(*pid).map(|(_, ppid)| ppid) == Some(parent_host_pid)
+                    && proc_cmdline_args(*pid).is_some_and(|args| {
+                        args.len() == 2 && args[1] == "--maos-fixture-mode=hang"
+                    })
+            });
+        if let Some(pid) = found {
+            return pid;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "no host-namespace fixture grandchild of payload pid {parent_host_pid} appeared"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn grandchild_guard(pid: u32) -> GrandchildGuard {
+    GrandchildGuard {
+        pid,
+        args: proc_cmdline_args(pid).unwrap_or_else(|| panic!("grandchild {pid} has no argv")),
+        start_time: proc_start_time(pid)
+            .unwrap_or_else(|| panic!("grandchild {pid} has no /proc start time")),
     }
 }
 
@@ -478,12 +550,12 @@ impl RunRoot {
         );
 
         let mut command = Command::new(maos());
-        command.arg("run").arg(manifest);
+        command.env_clear().arg("run").arg(manifest);
         if once {
             command.arg("--once");
         }
         command
-            .env("HOME", &scratch)
+            .env("HOME", t3_substrate::isolated_runtime_home(&scratch))
             .env("MAOS_HOME", &home)
             .env("XDG_DATA_HOME", scratch.join("xdg"))
             .env("MAOS_NOTIFY_DISABLE", "1")
@@ -491,6 +563,17 @@ impl RunRoot {
             .current_dir(workspace_root())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        for key in [
+            "MAOS_T3_RUNTIME",
+            "MAOS_T3_IMAGE_LOCK_PATH",
+            "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+            "XDG_RUNTIME_DIR",
+            "DBUS_SESSION_BUS_ADDRESS",
+        ] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
         for (key, value) in extra_env {
             command.env(key, value);
         }
@@ -718,6 +801,9 @@ fn class_manifest(class: &str) -> PathBuf {
 /// synthetic `term-…` receipt standing in for the halt's own id.
 #[test]
 fn ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm() {
+    if !t3_substrate::require_t3("root shutdown serving Worker") {
+        return;
+    }
     let mut root = RunRoot::butler_serving("v1", &[("MAOS_IDLE_FAST", "1")]);
 
     // The handshake first: arming installs the listener's streams; everything
@@ -873,6 +959,9 @@ fn ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm() {
 #[test]
 fn ac4_v2_butler_once_receipts_the_raised_halt_and_drains() {
     let started = Instant::now();
+    if !t3_substrate::require_t3("root shutdown one-shot Worker") {
+        return;
+    }
     let mut root = RunRoot::butler_once("v2", &[("MAOS_IDLE_FAST", "1")]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
@@ -971,6 +1060,9 @@ fn ac4_v2_butler_once_receipts_the_raised_halt_and_drains() {
 /// loaded has its own `lifecycle.unload` row.
 #[test]
 fn ac4_v3_topology_once_unloads_every_loaded_spirit() {
+    if !t3_substrate::require_t3("root shutdown topology Worker") {
+        return;
+    }
     let scratch = scratch_dir("v3");
     let topology = write_topology_manifest(
         &scratch,
@@ -1023,6 +1115,9 @@ fn ac4_v3_topology_once_unloads_every_loaded_spirit() {
 /// being admitted.
 #[test]
 fn ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker() {
+    if !t3_substrate::require_t3("root shutdown interrupted topology Worker") {
+        return;
+    }
     let scratch = scratch_dir("v3b");
     let worker = write_worker_manifest(&scratch, "hang");
     let topology = write_topology_manifest(
@@ -1037,10 +1132,9 @@ fn ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker() {
     let mut root = RunRoot::spawn("v3b", &topology, true, &[("MAOS_OLLAMA_URL", "skip")]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    // Wait until the hang Worker is the entry being run: its process exists
-    // as a direct child of THIS root.
-    let root_pid = root.pid();
-    let worker_child = wait_for_fixture_child(root_pid, "hang", STARTUP_TIMEOUT);
+    // The runtime client is the root's direct child; its --name identifies the
+    // payload through OCI inspect rather than relying on payload ppid/environment.
+    let worker = wait_for_fixture_child(root.pid(), "hang", STARTUP_TIMEOUT);
 
     root.sigterm();
     let (status, elapsed) = root.wait_exit(Duration::from_secs(45));
@@ -1061,13 +1155,10 @@ fn ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker() {
         !stderr.contains("drain timed out"),
         "the teardown still drains: {stderr}"
     );
-    wait_pid_gone(
-        worker_child,
+    wait_worker_stopped(
+        &worker,
         Duration::from_secs(5),
-        "the hung worker child",
-        "--maos-fixture-mode=hang",
-        "MAOS_HOME",
-        &root.scratch.display().to_string(),
+        "the interrupted topology Worker",
     );
 
     let rows = root.tl();
@@ -1125,13 +1216,15 @@ fn ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker() {
 /// past its own teardown, the missing unload/receipt, and a drain timeout.
 #[test]
 fn ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan() {
+    if !t3_substrate::require_t3("root shutdown standalone Worker") {
+        return;
+    }
     let scratch = scratch_dir("v4");
     let worker = write_worker_manifest(&scratch, "hang");
     let mut root = RunRoot::spawn("v4", &worker, true, &[]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    let root_pid = root.pid();
-    let worker_child = wait_for_fixture_child(root_pid, "hang", STARTUP_TIMEOUT);
+    let worker = wait_for_fixture_child(root.pid(), "hang", STARTUP_TIMEOUT);
 
     root.sigterm();
     let (status, elapsed) = root.wait_exit(Duration::from_secs(25));
@@ -1147,22 +1240,7 @@ fn ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan() {
     );
     // The child was SIGKILLed by the supervisor and reaped by its observer —
     // the /proc oracle (see module docs): gone means gone.
-    wait_pid_gone(
-        worker_child,
-        Duration::from_secs(5),
-        "the standalone worker child",
-        "--maos-fixture-mode=hang",
-        "MAOS_HOME",
-        &root.scratch.display().to_string(),
-    );
-    // No process from THIS root's tree may outlive it. The scan is scoped by
-    // the root's unique MAOS_HOME (see `my_fixture_processes`): a machine-wide
-    // scan would count sibling corpora's workers as orphans.
-    let orphans = my_fixture_processes("MAOS_HOME", &root.scratch.display().to_string());
-    assert!(
-        orphans.is_empty(),
-        "no worker-cli-fixture process of this root may outlive it; found {orphans:?}"
-    );
+    wait_worker_stopped(&worker, Duration::from_secs(5), "the standalone Worker");
 
     let rows = root.tl();
     let worker_pid = expect_load_pid(&rows, "worker");
@@ -1186,13 +1264,15 @@ fn ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan() {
 /// child, dispose its task once, unload its SCB, and receipt the unload.
 #[test]
 fn ac3_operator_door_unload_stops_a_live_worker_once() {
+    if !t3_substrate::require_t3("root unload live Worker") {
+        return;
+    }
     let scratch = scratch_dir("ac3-door-unload");
     let worker = write_worker_manifest(&scratch, "hang");
     let mut root = RunRoot::spawn("ac3-door-unload", &worker, true, &[]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    let root_pid = root.pid();
-    let worker_child = wait_for_fixture_child(root_pid, "hang", STARTUP_TIMEOUT);
+    let worker = wait_for_fixture_child(root.pid(), "hang", STARTUP_TIMEOUT);
     let deadline = Instant::now() + STARTUP_TIMEOUT;
     let worker_pid = loop {
         if let Some(pid) = load_pid(&root.tl(), "worker") {
@@ -1213,13 +1293,10 @@ fn ac3_operator_door_unload_stops_a_live_worker_once() {
     );
 
     let (_status, elapsed) = root.wait_exit(Duration::from_secs(25));
-    wait_pid_gone(
-        worker_child,
+    wait_worker_stopped(
+        &worker,
         Duration::from_secs(5),
-        "the operator-unloaded worker child",
-        "--maos-fixture-mode=hang",
-        "MAOS_HOME",
-        &root.scratch.display().to_string(),
+        "the operator-unloaded Worker",
     );
 
     let rows = root.tl();
@@ -1242,100 +1319,52 @@ fn ac3_operator_door_unload_stops_a_live_worker_once() {
     println!("AC3 door unload: live Worker stopped and receipted in {elapsed:?}");
 }
 
-/// AC4 (4b) — the stated 17-1 residual, OBSERVED, not fixed.
-///
-/// When a descendant holds the stopped Worker's pipe, the root waits out the
-/// 5 s grace, prints the descendant line and exits 1 WITHOUT the door
-/// shutdown and the audit-channel drain — and the grandchild SURVIVES. This
-/// vector pins the survival as observed behaviour for 17-1 to close; "fixing"
-/// it here would be lying about what the process tree does.
+/// AC4 (4b) — root shutdown stops the complete T3 Worker container, including
+/// its descendant, instead of leaving a payload process behind.
 #[test]
-fn ac4_v4b_grandchild_residual_is_observed_not_fixed() {
+fn ac4_v4b_grandchild_is_stopped_with_its_worker_container() {
+    if !t3_substrate::require_t3("root shutdown descendant Worker") {
+        return;
+    }
     let scratch = scratch_dir("v4b");
-    let worker = write_worker_manifest(&scratch, "hang-with-grandchild");
-    let mut root = RunRoot::spawn("v4b", &worker, true, &[]);
+    let worker_manifest = write_worker_manifest(&scratch, "hang-with-grandchild");
+    let mut root = RunRoot::spawn("v4b", &worker_manifest, true, &[]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    let root_pid = root.pid();
-    let direct_child = wait_for_fixture_child(root_pid, "hang-with-grandchild", STARTUP_TIMEOUT);
-    // The grandchild pid arrives through the bridge as the fixture's first
-    // stdout line, journaled to the TL.
-    let grandchild = wait_for_grandchild_pid(&root.db, OUTPUT_ROW_TIMEOUT);
-    let guard = GrandchildGuard {
-        pid: grandchild,
-        env_key: "MAOS_HOME",
-        env_value: root.scratch.display().to_string(),
-    };
-    // Cross-check the tree shape while the parent is still alive: the
-    // grandchild's REAL parent is the direct child we found.
-    let (_, grandchild_ppid) = proc_stat(grandchild)
-        .unwrap_or_else(|| panic!("grandchild {grandchild} vanished before the check"));
-    assert_eq!(
-        grandchild_ppid, direct_child,
-        "the fixture's grandchild must be a child of the worker this root spawned"
-    );
+    let worker = wait_for_fixture_child(root.pid(), "hang-with-grandchild", STARTUP_TIMEOUT);
+    let _announced_guest_pid = wait_for_grandchild_pid(&root.db, OUTPUT_ROW_TIMEOUT);
+    let grandchild = wait_for_host_grandchild(worker.payload_host_pid, OUTPUT_ROW_TIMEOUT);
+    let guard = grandchild_guard(grandchild);
 
-    // GNU `timeout` would signal the whole GROUP and kill the grandchild too,
-    // destroying the residual under test — signal the root's pid directly.
     root.sigterm();
-    let (status, elapsed) = root.wait_exit(Duration::from_secs(8));
-    let stderr = root.stderr();
-    assert_eq!(
-        status.code(),
-        Some(1),
-        "the grace path exits 1 without the door shutdown and the drain: {stderr}"
-    );
+    let (status, elapsed) = root.wait_exit(Duration::from_secs(25));
     assert!(
-        elapsed < Duration::from_secs(8),
-        "the grace is 5 s + 2 s of slack; the root took {elapsed:?}"
+        !status.success(),
+        "the interrupted --once pass must not report success: {}",
+        root.stderr()
     );
-    assert!(
-        stderr.contains("still held open by a descendant"),
-        "the descendant line must be printed on the grace path: {stderr}"
-    );
-
-    // The DIRECT child is gone; the grandchild is not.
-    wait_pid_gone(
-        direct_child,
+    wait_worker_stopped(
+        &worker,
         Duration::from_secs(5),
-        "the direct worker child",
-        "--maos-fixture-mode=hang-with-grandchild",
-        "MAOS_HOME",
-        &root.scratch.display().to_string(),
+        "the descendant-holding Worker",
+    );
+    assert!(
+        !guard.still_ours(),
+        "stopping the Worker's named T3 container must remove its grandchild"
     );
     let rows = root.tl();
     let worker_pid = expect_load_pid(&rows, "worker");
     assert!(
         rows.iter()
             .any(|row| row.intent == "lifecycle.unload" && row.spirit_pid == worker_pid),
-        "the descendant grace path must still unload the direct Worker's SCB"
+        "root shutdown must unload the Worker SCB"
     );
     assert_eq!(
         receipt_ids(&rows, "planned_unload", worker_pid).len(),
         1,
-        "the descendant grace path must persist one PlannedUnload receipt"
+        "root shutdown must persist one PlannedUnload receipt"
     );
-    let (state, ppid) =
-        proc_stat(grandchild).unwrap_or_else(|| panic!("the grandchild {grandchild} must STILL be alive — that survival IS the observed 17-1 residual"));
-    assert_ne!(
-        state, 'Z',
-        "the grandchild must be running, not an unreaped zombie: state {state}"
-    );
-    let args = proc_cmdline_args(grandchild)
-        .unwrap_or_else(|| panic!("grandchild {grandchild} lost its cmdline"));
-    assert!(
-        args.iter().any(|arg| arg.contains("worker-cli-fixture")),
-        "the surviving pid must still be the fixture grandchild: {args:?}"
-    );
-    assert_ne!(
-        ppid, root_pid,
-        "the root exited — the grandchild cannot still name it as parent"
-    );
-    println!(
-        "v4b: root exited 1 in {elapsed:?} with the descendant line; grandchild \
-         {grandchild} is STILL alive (17-1 residual, observed); killing it now"
-    );
-    guard.kill_now();
+    println!("v4b: stopped Worker container and descendant during root teardown in {elapsed:?}");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1353,6 +1382,7 @@ fn ac4_v4b_grandchild_residual_is_observed_not_fixed() {
 /// Refuses: a leaked `RootSupervision` arming inside the one-shot — tokio
 /// never restores the default disposition, so a leaked listener would turn
 /// signal-death into a swallowed signal and a root that will not die.
+#[cfg(unix)]
 #[test]
 fn ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15() {
     use std::io::Write as _;
@@ -1744,7 +1774,10 @@ mod cohort {
             .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
             // Both roots share one log (MAOS_AUDIT_DB) by design, so only
             // "HOME" moves — no developer control.json endpoint for either.
-            .env("HOME", doorless_home::doorless_home())
+            .env(
+                "HOME",
+                t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+            )
             .env("PATH", child_process_path())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -1763,7 +1796,10 @@ mod cohort {
             .env("MAOS_AUDIT_DB", audit_db)
             .env("MAOS_OLLAMA_URL", "skip")
             .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
-            .env("HOME", doorless_home::doorless_home())
+            .env(
+                "HOME",
+                t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+            )
             // Required on every cross-host arm: the goal is operator-supplied
             // and the fixture asserts the MECHANISM, not the goal's content.
             .env(
@@ -1874,6 +1910,9 @@ mod cohort {
     /// `drain timed out` or a missing `SpiritUnload` revoke row.
     #[test]
     fn ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains() {
+        if !super::t3_substrate::require_t3("cohort root shutdown Worker") {
+            return;
+        }
         let fixture = fixture("v5", "hang");
         let b_config = host_b_config(&fixture);
         let (mut daemon, _port_b, _b_stdout, b_stderr) =
@@ -1897,9 +1936,10 @@ mod cohort {
             "the hang Worker must be host B's, not a local spawn: {host_a_stdout}"
         );
 
-        // "Live host-B Worker": the fixture process exists as a direct child
-        // of the daemon.
-        let worker_child = wait_for_fixture_child(daemon_pid, "hang", LISTEN_TIMEOUT);
+        // Resolve the OCI client's name and inspect the host payload pid.
+        let worker_child = wait_for_fixture_child_with(daemon_pid, "hang", LISTEN_TIMEOUT, || {
+            b_stderr.lock().expect("stderr lock").clone()
+        });
 
         daemon_sigterm(daemon_pid);
         let (status, elapsed) = daemon_exit(&mut daemon, Duration::from_secs(30), &b_stderr);
@@ -1908,13 +1948,10 @@ mod cohort {
             status.code().is_some(),
             "the daemon must exit THROUGH ITS TEARDOWN, not by signal: {stderr}"
         );
-        wait_pid_gone(
-            worker_child,
+        wait_worker_stopped(
+            &worker_child,
             Duration::from_secs(5),
-            "host B's hang worker child",
-            "--maos-fixture-mode=hang",
-            "MAOS_AUDIT_DB",
-            &fixture.host_b_log.display().to_string(),
+            "host B's hang Worker",
         );
 
         let rows = tl_rows(&fixture.host_b_log);
@@ -1968,6 +2005,9 @@ mod cohort {
     #[test]
     fn ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown() {
         const MAX_ATTEMPTS: usize = 5;
+        if !super::t3_substrate::require_t3("cohort root startup shutdown Worker") {
+            return;
+        }
         let mut counted = 0usize;
         for attempt in 1..=MAX_ATTEMPTS {
             let fixture = fixture("v5b", "hang");
@@ -2069,13 +2109,13 @@ mod cohort {
         );
     }
 
-    /// AC4 (5c) — the cohort grandchild residual, observed.
-    ///
-    /// The 5 s grace applies to the daemon too: exit 1 within the grace + 2 s
-    /// printing the descendant line, direct child gone, grandchild STILL
-    /// alive — the stated 17-1 residual on the cohort path.
+    /// AC4 (5c) — the cohort daemon stops the complete named T3 Worker
+    /// container, including a descendant that held its stdio pipe open.
     #[test]
-    fn ac4_v5c_cohort_grandchild_residual_exits_within_the_grace() {
+    fn ac4_v5c_cohort_shutdown_stops_worker_container_descendants() {
+        if !super::t3_substrate::require_t3("cohort root descendant Worker") {
+            return;
+        }
         let fixture = fixture("v5c", "hang-with-grandchild");
         let b_config = host_b_config(&fixture);
         let (mut daemon, _port_b, _b_stdout, b_stderr) =
@@ -2089,47 +2129,48 @@ mod cohort {
             String::from_utf8_lossy(&output.stderr)
         );
 
-        let direct_child =
-            wait_for_fixture_child(daemon_pid, "hang-with-grandchild", LISTEN_TIMEOUT);
-        let grandchild = wait_for_grandchild_pid(&fixture.host_b_log, OUTPUT_ROW_TIMEOUT);
-        let guard = GrandchildGuard {
-            pid: grandchild,
-            env_key: "MAOS_AUDIT_DB",
-            env_value: fixture.host_b_log.display().to_string(),
-        };
+        let worker =
+            wait_for_fixture_child_with(daemon_pid, "hang-with-grandchild", LISTEN_TIMEOUT, || {
+                b_stderr.lock().expect("stderr lock").clone()
+            });
+        let _announced_guest_pid = wait_for_grandchild_pid(&fixture.host_b_log, OUTPUT_ROW_TIMEOUT);
+        let grandchild = wait_for_host_grandchild(worker.payload_host_pid, OUTPUT_ROW_TIMEOUT);
+        let guard = grandchild_guard(grandchild);
 
         daemon_sigterm(daemon_pid);
         let (status, elapsed) = daemon_exit(&mut daemon, Duration::from_secs(12), &b_stderr);
         let stderr = b_stderr.lock().expect("stderr lock").clone();
-        assert_eq!(
-            status.code(),
-            Some(1),
-            "the daemon's grace path exits 1: status {status:?}; stderr:\n{stderr}"
+        // T0's exit-1 grace path was the descendant residual: the grandchild
+        // held the stdio pipe past the grace. Stopping the named container now
+        // removes it, so the daemon takes the same teardown as v5.
+        assert!(
+            status.code().is_some(),
+            "the daemon must exit THROUGH ITS TEARDOWN, not by signal: {stderr}"
         );
         assert!(
             elapsed < Duration::from_secs(12),
-            "exit 1 within the 5 s grace + 2 s of slack; took {elapsed:?}"
+            "the root teardown budget is 5 s grace + 2 s slack; took {elapsed:?}"
+        );
+        wait_worker_stopped(
+            &worker,
+            Duration::from_secs(5),
+            "host B's descendant-holding Worker",
         );
         assert!(
-            stderr.contains("still held open by a descendant"),
-            "the descendant line must be printed on the daemon's grace path: {stderr}"
+            !guard.still_ours(),
+            "stopping the named host-B Worker container must remove its grandchild"
         );
-        wait_pid_gone(
-            direct_child,
-            Duration::from_secs(5),
-            "host B's direct worker child",
-            "--maos-fixture-mode=hang-with-grandchild",
-            "MAOS_AUDIT_DB",
-            &fixture.host_b_log.display().to_string(),
+        let rows = tl_rows(&fixture.host_b_log);
+        let worker_pid = expect_load_pid(&rows, "worker");
+        assert!(
+            rows.iter()
+                .any(|row| row.intent == "lifecycle.unload" && row.spirit_pid == worker_pid),
+            "host B must unload the Worker SCB"
         );
-        let (state, _) = proc_stat(grandchild).unwrap_or_else(|| {
-            panic!("the grandchild {grandchild} must STILL be alive — the observed residual")
-        });
-        assert_ne!(state, 'Z', "the grandchild must be running, not a zombie");
-        println!(
-            "v5c: cohort daemon exited 1 in {elapsed:?} with the descendant line; \
-             grandchild {grandchild} STILL alive (observed); killing it now"
+        assert_eq!(
+            receipt_ids(&rows, "planned_unload", worker_pid).len(),
+            1,
+            "host B must persist one PlannedUnload receipt"
         );
-        guard.kill_now();
     }
 }

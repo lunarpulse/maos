@@ -110,7 +110,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError",
-      "signature_hash": "a9317d2c92579f6ae66214aee934e4290d9ddd04172ca1558b04de5d3e47e611"
+      "signature_hash": "238ad704c794d5c07570e544e72c48be124abd153fa0dfea6a70a55b031d5f71"
     },
     {
       "kind": "enum",
@@ -204,11 +204,6 @@
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::security::sandbox::t3::quarantine::QuarantineOutcome",
-      "signature_hash": "8104cf95397ae4b090a5dbb5bc56d9438ed415b00db4f547939caa4ee7f7272e"
-    },
-    {
-      "kind": "enum",
       "path": "maos_kernel_core::supervision::cold_restart::DrainError",
       "signature_hash": "d03369ad04896d0b208dbd56a123bcf1bdf025c3b67bb192c12c859bf6041737"
     },
@@ -290,7 +285,12 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::admit_cli_wrapper_journaled",
-      "signature_hash": "9f435630e6da1baf83ca1d6d2a4dcdabc9a4dca18a4661e07cfde60bcb81eb62"
+      "signature_hash": "4972254b3bd2d574a269312984453ee218da91d049266810dc75aad4e164dff7"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress",
+      "signature_hash": "b2208b5fc03354ee66edd5cca207912fb5e91941b9ac62e9b4a730cfe5d07917"
     },
     {
       "kind": "fn",
@@ -301,6 +301,11 @@
       "kind": "fn",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::reject_respawn_with_context",
       "signature_hash": "d3d9760801376121ce1eca5b6a3324b1872a351823367b24edbf0269caa56033"
+    },
+    {
+      "kind": "fn",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::admission::reject_t3_stdin_posture",
+      "signature_hash": "0331d3d5a0fdf50eb0f9b30855483852ac94bbca0bc7d9adc0b1f2cabc7993d4"
     },
     {
       "kind": "fn",
@@ -319,18 +324,13 @@
     },
     {
       "kind": "fn",
-      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::ci_default_guard",
-      "signature_hash": "8ae69af4d1feddde6101ccbaaf42db143e8c0cdbbe91b3962e87661cb2d9237e"
-    },
-    {
-      "kind": "fn",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::execute_recovery",
       "signature_hash": "4946eda1a90adc3bd8c8f47cced1cf4a0f6a0810a27890d7a1d0de7a5cde7c98"
     },
     {
       "kind": "fn",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_and_bridge",
-      "signature_hash": "bce5212305fc8d5d955de4ec89409b00c47212cbd6306a37e52317ed6cf0ccce"
+      "signature_hash": "477a60b6905f2c55f8154d9322e8462aae5edfb0c6363251b619e1200e41ccf9"
     },
     {
       "kind": "fn",
@@ -420,17 +420,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::t3::argv::build_runtime_argv",
-      "signature_hash": "d7a9aa33f8f398d9f869d1ba46ba0b654330d98bfabf248118bfb6e91f0f7a28"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::security::sandbox::t3::cap_audit_bridge::emit_t3_escape_block",
-      "signature_hash": "9437fcf55682328ffede6fb99b10b84eb910d57501ae788c87cd231a6be85503"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::security::sandbox::t3::cap_audit_bridge::emit_t3_escape_block_probe",
-      "signature_hash": "c766b1997f4d328e2472cfc57ed7f9d36ed4c8a49a30f4cffae1a02d2087dd04"
+      "signature_hash": "a914007d63228fe2f8ed46938155210698ce36387f627aff4fc6145e8fb7cd57"
     },
     {
       "kind": "fn",
@@ -469,11 +459,6 @@
     },
     {
       "kind": "fn",
-      "path": "maos_kernel_core::security::sandbox::t3::quarantine::quarantine_spirit",
-      "signature_hash": "b736fbd68c530478829b56ce516f2ca20087e16e55a68962028e108b1f2205d4"
-    },
-    {
-      "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::t3::runtime_detect::detect_container_runtime",
       "signature_hash": "5bfb00e3a73ebf284e863291e2faf335972a2ce3fd5a4912b5f545462a64e617"
     },
@@ -485,7 +470,7 @@
     {
       "kind": "fn",
       "path": "maos_kernel_core::security::sandbox::t3::spawn::spawn_t3",
-      "signature_hash": "d2c4dd2103bcc1eb00563b05156050600c08c7716ad3160cb8045bbd22ec8608"
+      "signature_hash": "9c09a267fd8dcaab2c09b1fb4fbd46bdfffa7aa3ee11b1f5f9ecd9fd3caeb990"
     },
     {
       "kind": "fn",
@@ -675,7 +660,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeSpawnSpec",
-      "signature_hash": "f7abd467f81fa56f2dfcbecaa17ecc2d15ca2d90cfe8c3b9445ace4acbf4e0df"
+      "signature_hash": "65e0bfd57cd9264cc0dbb186f80222efe6abac35e2520350a5cd0df6b0416aee"
     },
     {
       "kind": "struct",
@@ -691,6 +676,11 @@
       "kind": "struct",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
       "signature_hash": "080da93e2cd4245c3021d61b5eb939d3466bc548f3b9c4a25508da43b6da8008"
+    },
+    {
+      "kind": "struct",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::T3Launch",
+      "signature_hash": "953d992471aac1f453a7c12345e9559d92adebdc588759186bbc4072cc77e254"
     },
     {
       "kind": "struct",
@@ -914,18 +904,13 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::security::sandbox::t3::quarantine::QuarantineReport",
-      "signature_hash": "bcd395e8b2512fb70217485e3e53ff38f7d6c046dd5abfeed0bfcbd7f48cf01a"
-    },
-    {
-      "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::t3::runtime_detect::ContainerRuntime",
       "signature_hash": "87529e502dd2be9ddd8a2b48d263b3dd859dcedf8b27f53744634640f2b563d0"
     },
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext",
-      "signature_hash": "04ee165f0b37b94834da6dab079a820e8eefad9aeb6d80a9c3bc416638c3f206"
+      "signature_hash": "1966a9558b61b15dfe8be8b2b602dc521ec132d7b6913b1e49d28b2d794d7625"
     },
     {
       "kind": "struct",
@@ -1365,67 +1350,67 @@
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::Backpressure",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeSpawnSpec",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::ExitCause",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::PumpOutcome",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::RecoveryOutcome",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::SubStream",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
+    },
+    {
+      "kind": "use",
+      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::T3Launch",
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::argv_prefix_hash",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
-    },
-    {
-      "kind": "use",
-      "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::ci_default_guard",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::execute_recovery",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",
       "path": "maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_and_bridge",
-      "signature_hash": "0e8859f21d5b40e0b03b3a1240d2c06b892b9a4a5419d696f3cdfe2ca696e4c2"
+      "signature_hash": "a1b58c20358924c7ef1b285ec6acbc1ae371ecaa750ea95bd35ebb72428f11a3"
     },
     {
       "kind": "use",

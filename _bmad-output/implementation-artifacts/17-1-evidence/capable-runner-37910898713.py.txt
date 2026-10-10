@@ -1,0 +1,122 @@
+import http.server
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import sqlite3
+import struct
+import subprocess
+import tempfile
+import threading
+
+ROOT = Path.cwd()
+LOG = ROOT / 'sweep-linux.log'
+BODY = b'EPIC17_HERMETIC_ECHO'
+
+
+def run(command, env=None, timeout=1200):
+    with LOG.open('a', encoding='utf-8') as log:
+        log.write('\nCOMMAND ' + shlex.join(map(str, command)) + '\n')
+        log.flush()
+        result = subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT,
+                                timeout=timeout, text=True)
+    print(f'17-1 command rc={result.returncode}: {shlex.join(map(str, command))}', flush=True)
+    if result.returncode:
+        raise RuntimeError(f'command exited {result.returncode}; complete output in {LOG.name}')
+
+
+class Echo(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        request = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+        if self.path != '/echo' or request != BODY:
+            self.send_error(400)
+            return
+        self.send_response(200)
+        self.send_header('Content-Length', str(len(BODY)))
+        self.send_header('Connection', 'close')
+        self.end_headers()
+        self.wfile.write(BODY)
+
+    def log_message(self, *_):
+        pass
+
+
+def static_probe():
+    environment = dict(os.environ, RUSTFLAGS='-C target-feature=+crt-static')
+    run(['cargo', 'build', '--locked', '-p', 'worker', '--bin', 'worker-probe-fixture',
+         '--target', 'x86_64-unknown-linux-gnu'], environment)
+    binary = ROOT / 'target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture'
+    data = binary.read_bytes()
+    assert data[:6] == b'\x7fELF\x02\x01', 'probe must be ELF64 little-endian'
+    assert struct.unpack_from('<H', data, 18)[0] == 62, 'probe must be x86_64'
+    offset = struct.unpack_from('<Q', data, 32)[0]
+    size, count = struct.unpack_from('<HH', data, 54)
+    assert all(struct.unpack_from('<I', data, offset + size * i)[0] != 3
+               for i in range(count)), 'probe has a PT_INTERP dynamic loader'
+    shutil.copy2(binary, ROOT / 'target/debug/worker-probe-fixture')
+    print(f'17-1 STATIC PASS ELF64/x86_64 no PT_INTERP bytes={len(data)}', flush=True)
+
+
+def probe_root(positive):
+    with tempfile.TemporaryDirectory(prefix='maos-17-1-probe-', dir=os.environ['RUNNER_TEMP']) as scratch:
+        home = Path(scratch)
+        env = dict(os.environ, MAOS_HOME=str(home), MAOS_AUDIT_DB=str(home / 'audit.db'),
+                   MAOS_OPERATOR_CUSTODY_SENTINEL='PUBLIC_OPERATOR_SENTINEL',
+                   CODEX_API_KEY='PUBLIC_CODEX_SENTINEL', ANTHROPIC_API_KEY='PUBLIC_CLAUDE_SENTINEL')
+        manifest = 'spirits/worker/manifest-probe.toml'
+        if positive:
+            grant = home / 'grant.toml'
+            grant.write_text('[[grant]]\nattested_image = "worker-probe-fixture"\n'
+                             'signing_key_id = "MAOS 17-1 Echo"\npermitted_tier = "T3"\n'
+                             'permitted_egress_destinations = ["127.0.0.1:18081"]\n')
+            env['MAOS_HOST_GRANTS'] = str(grant)
+            manifest = 'spirits/worker/manifest-probe-echo.toml'
+        else:
+            env.pop('MAOS_HOST_GRANTS', None)
+        run([str(ROOT / 'target/debug/maos'), 'run', manifest, '--once'], env, 60)
+        run([str(ROOT / 'target/debug/maos'), 'audit', 'query', '--spirit', 'worker', '--format', 'plain'], env, 30)
+        with sqlite3.connect(f'file:{home / "audit" / "transparency.sqlite"}?mode=ro', uri=True) as db:
+            rows = db.execute('SELECT kind, intent, origin, payload_redacted FROM transparency_log WHERE kind=8 ORDER BY intent').fetchall()
+        expected = [] if positive else ['sandbox.block.container.escape.fs.control-json',
+                                       'sandbox.block.container.escape.fs.host-home-ssh',
+                                       'sandbox.block.egress.example.invalid:443']
+        assert [row[1] for row in rows] == expected, f'wrong actual kind-8 rows: {[row[1] for row in rows]}'
+        for _, _, _, payload in rows:
+            payload = payload if isinstance(payload, bytes) else payload.encode()
+            assert b'PUBLIC_CODEX_SENTINEL' not in payload and b'PUBLIC_CLAUDE_SENTINEL' not in payload
+        print(f'17-1 ACTUAL ROOT PROBE PASS positive={positive} kind8={len(rows)}', flush=True)
+
+
+try:
+    LOG.write_text(f'17-1 capable Linux sweep commit={os.environ["GITHUB_SHA"]} runner={os.environ["RUNNER_OS"]}/{os.environ["RUNNER_ARCH"]}\n')
+    run(['cargo', 'build', '--locked', '-p', 'maos-bin', '-p', 'maos-cli', '-p', 'worker', '--bins'])
+    static_probe()
+    probe_root(False)
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 18081), Echo)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    try:
+        probe_root(True)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+    run(['cargo', 'test', '--locked', '-p', 'maos-kernel-core', '--test', 'sandbox_t3_spawn_linux',
+         '--test', 'bridge_t2_route_17_6', '--', '--nocapture'])
+    suites = ['worker_manifests_2a', 'worker_supervision_16_3', 'root_shutdown_unload_16_3',
+              'smoke_cli_wrapper_8_12', 'drain_once_audit_writer', 'f4_pairing',
+              'two_host_delegation_2b', 'worker_completion_2a']
+    command = ['cargo', 'test', '--locked', '-p', 'maos-bin']
+    for suite in suites:
+        command += ['--test', suite]
+    run(command + ['--no-fail-fast', '--', '--nocapture'])
+    run(['cargo', 'test', '--locked', '-p', 'maos-journey-test', '--test', 'journey_j1', '--', '--nocapture'])
+    run(['cargo', 'test', '--locked', '-p', 'maos-bin', '--test', 'worker_crash_corpus_16_3',
+         '--test', 'worker_hang_corpus_16_3', '--no-fail-fast', '--', '--ignored', '--nocapture'])
+    assert not any(line.startswith('SKIP T3 ') for line in LOG.read_text().splitlines()), 'capable runner skipped T3'
+    print('::notice::17-1 capable Linux probe and sweep PASS', flush=True)
+except Exception as error:
+    text = str(error).replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
+    print(f'::error::17-1 capable Linux sweep FAIL: {text}', flush=True)
+    raise SystemExit(1)

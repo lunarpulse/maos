@@ -41,30 +41,6 @@ fn cgroup_ceiling_writes_cpu_and_memory_files() {
 }
 
 #[test]
-#[cfg(target_os = "linux")]
-fn compute_cpu_quota_us_values() {
-    // The pure-function part of the cgroups path is tested inline in
-    // resource_ceiling.rs; this test re-asserts the contract at the
-    // integration boundary.
-    use maos_kernel_core::scheduler::resource_ceiling::apply_resource_ceiling;
-
-    // We can't test compute_cpu_quota_us directly (it's private), but
-    // we can verify the RAII handle reports applied=true when cgroup
-    // creation succeeds (or false when it falls back).
-    let caps = ResourceCaps {
-        cpu_max_pct: Some(50),
-        memory_max_mb: Some(128),
-        fd_max: Some(64),
-    };
-    let handle = apply_resource_ceiling(99998, &caps);
-    // Either succeeds (if we have cgroup perms) or falls back to noop.
-    match handle {
-        Ok(h) => assert!(h.was_applied() || !h.was_applied()), // both acceptable
-        Err(_) => {}
-    }
-}
-
-#[test]
 #[cfg(not(target_os = "linux"))]
 fn apply_resource_ceiling_falls_back_on_non_linux() {
     let caps = ResourceCaps {
@@ -79,7 +55,10 @@ fn apply_resource_ceiling_falls_back_on_non_linux() {
     }
     #[cfg(windows)]
     {
-        let err = apply_resource_ceiling(1, &caps).unwrap_err();
+        let err = match apply_resource_ceiling(1, &caps) {
+            Err(err) => err,
+            Ok(_) => panic!("Windows ceiling must refuse unimplemented Job Objects"),
+        };
         assert!(
             matches!(err, IoError::Unimplemented(ref s) if s.contains("Job Objects")),
             "expected Unimplemented on windows, got {err:?}"

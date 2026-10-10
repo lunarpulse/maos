@@ -477,6 +477,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_EGRESS_BEARER",
+        purpose: "Guest-only daemon-minted scoped bearer for worker-probe-fixture; never a raw vendor credential, ambient daemon input, argv value or journal value (Story 17-1)",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_EGRESS_BASE_URL",
+        purpose: "Guest-only loopback endpoint for the probe fixture's in-container forwarder (Story 17-1)",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
+        name: "MAOS_PROBE_HOST_CONTROL_PATH",
+        purpose: "Guest-only non-secret actual daemon control.json path derived at launch, used to measure filesystem refusal without inheriting MAOS_HOME (Story 17-1)",
+        stability: EnvStability::HarnessOnly,
+    },
+    EnvVar {
         name: "MAOS_OPERATOR_BEARER_TOKEN",
         purpose: "Bearer token for the loopback operator HTTP surface; with MAOS_OPERATOR_HTTP_BIND it OVERRIDES <MAOS_HOME|HOME/.maos>/control.json for one boot — both-or-neither, half-set is a typed refusal (Story 16-1 AC2)",
         stability: EnvStability::UserFacing,

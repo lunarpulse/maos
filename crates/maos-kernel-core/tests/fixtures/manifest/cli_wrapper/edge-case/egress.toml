@@ -1,0 +1,6 @@
+command = "worker-cli-fixture"
+output_shape_version = "1.0.0"
+
+[posture]
+stdio_shape = "raw"
+control_channel = "signals"

@@ -21,6 +21,8 @@ This page lists every MAOS error code with links to detailed cause and remediati
 | `EComplianceRejection::ExpiredClaim` | security | reject | maos-compliance | [EComplianceRejection-ExpiredClaim](/errors/EComplianceRejection::ExpiredClaim) |
 | `EComplianceRejection::MalformedClaim` | security | reject | maos-compliance | [EComplianceRejection-MalformedClaim](/errors/EComplianceRejection::MalformedClaim) |
 | `EComplianceRejection::SignatureInvalid` | security | reject | maos-compliance | [EComplianceRejection-SignatureInvalid](/errors/EComplianceRejection::SignatureInvalid) |
+| `EEgressNotGranted` | security | reject | maos-domain | [EEgressNotGranted](/errors/EEgressNotGranted) |
+| `EEgressProxyUnavailable` | security | fix_config | maos-domain | [EEgressProxyUnavailable](/errors/EEgressProxyUnavailable) |
 | `EHaltContinuityViolation` | policy | reject | maos-domain | [EHaltContinuityViolation](/errors/EHaltContinuityViolation) |
 | `EIntentLineageBroken` | security | reject | maos-domain | [EIntentLineageBroken](/errors/EIntentLineageBroken) |
 | `EManifestSchemaConflict` | policy | reject | maos-domain | [EManifestSchemaConflict](/errors/EManifestSchemaConflict) |

@@ -6,8 +6,40 @@
 //! The topology path drives Orchestrator/Architect/Reviewer under one scheduler;
 //! the standalone check pins the removed 8.12 FounderLoopClass short-circuit.
 
-use std::collections::BTreeSet;
-use std::process::Command;
+use std::{collections::BTreeSet, process::Command};
+
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
+
+fn add_t3_environment(command: &mut Command) {
+    for key in [
+        "MAOS_T3_RUNTIME",
+        "MAOS_T3_IMAGE_LOCK_PATH",
+        "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ] {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+}
+
+fn production_command() -> Command {
+    let binary = maos_bin();
+    let profile = std::path::Path::new(&binary)
+        .parent()
+        .expect("maos binary profile directory");
+    let mut paths = vec![profile.to_path_buf()];
+    if let Some(existing) = std::env::var_os("PATH") {
+        paths.extend(std::env::split_paths(&existing));
+    }
+    let mut command = Command::new(binary);
+    command.env_clear();
+    add_t3_environment(&mut command);
+    command.env("PATH", std::env::join_paths(paths).expect("valid PATH"));
+    command
+}
 
 fn workspace_root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -19,7 +51,15 @@ fn maos_bin() -> String {
     if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
         return bin.to_string();
     }
-    let debug_bin = workspace_root().join("target/debug/maos");
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| workspace_root().join("target"));
+    let target_dir = if target_dir.is_absolute() {
+        target_dir
+    } else {
+        workspace_root().join(target_dir)
+    };
+    let debug_bin = target_dir.join("debug/maos");
     if debug_bin.exists() {
         return debug_bin.to_string_lossy().into_owned();
     }
@@ -36,9 +76,14 @@ fn parse_json_lines(stdout: &str) -> Vec<serde_json::Value> {
 
 #[test]
 fn j1_founder_loop_topology_run_once() {
+    if !t3_substrate::require_t3("J1 founder-loop journey delegated Worker") {
+        return;
+    }
     let home = tempfile::TempDir::new().unwrap();
-    let output = Command::new(maos_bin())
+    let mut command = production_command();
+    let output = command
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(home.path()))
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
         // 15-6 §A6 review P1: cassette-free child; never inherit a
@@ -187,8 +232,10 @@ fn j1_founder_loop_topology_run_once() {
 #[test]
 fn j1_founder_class_standalone_load_succeeds() {
     let home = tempfile::TempDir::new().unwrap();
-    let output = Command::new(maos_bin())
+    let mut command = production_command();
+    let output = command
         .args(["run", "spirits/orchestrator/manifest.toml", "--once"])
+        .env("HOME", home.path())
         .env("XDG_DATA_HOME", home.path())
         .env("MAOS_HOME", home.path())
         .env_remove("MAOS_INFERENCE_MODE")
@@ -228,9 +275,14 @@ fn j1_founder_class_standalone_load_succeeds() {
 #[test]
 fn j1_resume_continuity_ref_identity_oracle() {
     // Run 1: first topology run in a fresh temp home.
+    if !t3_substrate::require_t3("J1 resume-continuity topology Workers") {
+        return;
+    }
     let home1 = tempfile::TempDir::new().unwrap();
-    let output1 = Command::new(maos_bin())
+    let mut command1 = production_command();
+    let output1 = command1
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(home1.path()))
         .env("XDG_DATA_HOME", home1.path())
         .env("MAOS_HOME", home1.path())
         .env_remove("MAOS_INFERENCE_MODE")
@@ -253,8 +305,10 @@ fn j1_resume_continuity_ref_identity_oracle() {
 
     // Run 2: second topology run in a DIFFERENT temp home (cold-start negative control).
     let home2 = tempfile::TempDir::new().unwrap();
-    let output2 = Command::new(maos_bin())
+    let mut command2 = production_command();
+    let output2 = command2
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(home2.path()))
         .env("XDG_DATA_HOME", home2.path())
         .env("MAOS_HOME", home2.path())
         .env_remove("MAOS_INFERENCE_MODE")

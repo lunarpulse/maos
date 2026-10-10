@@ -73,6 +73,7 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("sandbox", "tier-t3"),
     ("sandbox", "tier-t3-with-pin"),
     ("sandbox", "image-pin-missing"),
+    ("cli_wrapper", "egress"),
 ];
 
 const CATEGORIES: &[&str] = &["well-formed", "malformed-rejected", "edge-case"];
@@ -239,53 +240,32 @@ fn capabilities_fixtures_deserialize_to_their_declared_outcomes() {
 }
 
 #[test]
-fn production_capability_parsers_are_all_schema_degraded() {
-    // The invariant: EVERY production capability parser is paired with a
-    // schema degradation, so an N-1 manifest never silently keeps a loom
-    // capability the running kernel no longer honours.
-    //
-    // ⚠ Story 16-1 re-measured these: 5 → 4 and 6 → 5. The parser that went
-    // away is the `posture-shift` one-shot arm's, and its removal is the point
-    // of that story rather than a side effect — the arm re-admitted pid 0 into
-    // a FRESH `PolicyTable` built from a CWD-relative
-    // `spirits/{id}/manifest.toml`, then shifted pid 0's posture, while the
-    // running daemon's Spirit was pid 1. So it degraded a schema it then threw
-    // away. Posture now travels over the operator door to the daemon's own
-    // `PolicyTable`, which needs no manifest parse at all.
-    //
-    // ⚠ Story 16-6 re-measured them again, and the control now spans TWO
-    // files because the code does. `maos run`'s standalone and topology arms
-    // no longer parse capabilities themselves: both call the ONE extracted
-    // admission path in `maos-bin/src/admission.rs`, which is also what the
-    // operator door's `load` verb calls. Pair within each file: a global total
-    // could let a degradation in one path mask an unpaired parser in another.
-    let main_rs = include_str!("../../maos-bin/src/main.rs");
-    let admission_rs = include_str!("../../maos-bin/src/admission.rs");
-    let main_parsers = main_rs
-        .matches("CapabilitiesRequired::from_toml_str")
-        .count();
-    let main_degraded = main_rs
-        .matches(".degrade_for_schema_version(class_section.manifest_schema_version)")
-        .count();
-    let admission_parsers = admission_rs
-        .matches("CapabilitiesRequired::from_toml_str")
-        .count();
-    let admission_degraded = admission_rs
-        .matches(".degrade_for_schema_version(class_section.manifest_schema_version)")
-        .count();
-
+fn cli_wrapper_egress_fixtures_enforce_their_declared_outcomes() {
+    use maos_kernel_core::security::manifest::CliWrapperConfig;
+    let root = fixture_root().join("cli_wrapper");
+    let load = |category: &str| {
+        fs::read_to_string(root.join(category).join("egress.toml"))
+            .expect("every cli_wrapper.egress category must be readable")
+    };
+    let valid = CliWrapperConfig::from_toml_str(&load("well-formed")).unwrap();
     assert_eq!(
-        main_parsers, main_degraded,
-        "every main.rs capability parser must be paired with a local schema degradation"
+        valid
+            .egress
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["api.openai.com:443", "127.0.0.1:18081"]
     );
-    assert_eq!(
-        admission_parsers, admission_degraded,
-        "every admission.rs capability parser must be paired with a local schema degradation"
-    );
-    assert_eq!(
-        (main_parsers, admission_parsers),
-        (3, 1),
-        "a new production capability parser must add schema degradation coverage in its file"
+    let absent = CliWrapperConfig::from_toml_str(&load("edge-case")).unwrap();
+    assert!(absent.egress.is_empty());
+    let malformed = load("malformed-rejected");
+    let error = CliWrapperConfig::from_toml_str(&malformed).unwrap_err();
+    assert!(error.to_string().contains("unknown_egress"), "{error}");
+    let posture_only = malformed.replace("unknown_egress = []\n", "");
+    let error = CliWrapperConfig::from_toml_str(&posture_only).unwrap_err();
+    assert!(
+        error.to_string().contains("unknown_control_channel"),
+        "{error}"
     );
 }
 

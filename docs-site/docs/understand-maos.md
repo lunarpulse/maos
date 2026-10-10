@@ -32,7 +32,7 @@ MAOS is a **kernel that hosts LLM-backed Spirits** the way an OS hosts processes
 ## Trust model
 
 - Capability mediation: every Spirit operation requires a scoped, time-bounded token
-- Sandbox tiers: T0 (no isolation) → T3 (container-isolated)
+- Sandbox tiers: `T0` (in the daemon, no process isolation); `T2` (WASM runner process, Linux); `T3` (rootless container with no network, required for every Worker). `T1` and `T4` have no spawn path and are refused.
 - The transparency log records before delivery — if it's not in the log, it didn't happen
 - ComplianceClaim envelopes are verified at admission
 

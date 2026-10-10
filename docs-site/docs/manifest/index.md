@@ -15,7 +15,7 @@ Every Spirit ships a `manifest.toml` describing its identity, resource budget, c
 | [v5](./v5) | **Current** | Adds `wasm-component` and `[class].artifact` (Story 17-3b). |
 | [v4](./v4) | Supported (N-1) | Adds `[capabilities.required.loom]` (Story 13.5d). |
 | [v3](./v3) | Supported | Adds `[model_provenance]` (Story 9.4b). |
-| [v2](./v2) | Supported | Adds `[[cli_wrapper]]`, `[[schedule]]`, `[[gateway]]` (Epic 6). |
+| [v2](./v2) | Supported | Adds `[cli_wrapper]`, `[[schedule]]`, `[[gateway]]` (Epic 6). |
 | [v1](./v1) | Supported | Baseline schema (Epic 1b). |
 
 ## Version policy

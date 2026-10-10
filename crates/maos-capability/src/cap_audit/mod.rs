@@ -27,13 +27,11 @@ pub enum AuditDropSite {
     Verification,
     Invocation,
     SandboxBlock,
-    T3EscapeBlock,
-    Quarantine,
     AcpNotification,
 }
 
 impl AuditDropSite {
-    const COUNT: usize = 9;
+    const COUNT: usize = 7;
 }
 
 /// Why an audit event did not reach the writer.

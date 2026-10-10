@@ -1,0 +1,49 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-09",
+  "authority": "Operator replied continue to the targeted test-infrastructure repair request; recorded in 17-1-flag-winston-decision.md",
+  "origin_evidence": {
+    "run": 37915868047,
+    "image_store": "Root subprocesses with isolated HOME refused 'image not known' for the provisioned immutable image",
+    "lifetime": "In-process Host-B fixture refused 'PID not available after 10 attempts'; kernel inspection retries for about 2.25 s",
+    "image_kill_tool": "Ubuntu provides kill through procps, which the minimal Ubuntu image does not install; T3 sigkill-self therefore needs the image's /bin/sh builtin"
+  },
+  "red": {
+    "command": "python3 /tmp/maos17-fixture-lifetime-smoke.py <unchanged release worker-cli-fixture>",
+    "observed": {"scoped_execution_seconds": 0.0005069329999969341, "verdict": "FAIL: exits before the T3 inspection window"}
+  },
+  "repairs": [
+    "scripts/provision_t3_tests.py records the actual Podman Store driver, graph root, run root and driver options as public storage.conf beside the signed lock",
+    "tests/harness/t3_substrate.rs links only that storage.conf into each isolated HOME; credentials, control.json, Transparency Log and data homes stay isolated",
+    "Root test commands pass XDG_RUNTIME_DIR and DBUS_SESSION_BUS_ADDRESS, which the kernel runtime client already allows",
+    "worker-cli-fixture holds self-terminating scenes for 3 s only when argv[0] is the kernel's /maos/spirit payload mount; T3 sigkill-self uses /bin/sh's kill builtin",
+    "planted codex/claude test scripts hold only when $0 is /maos/spirit; host liveness probes remain immediate"
+  ],
+  "green_local": {
+    "formatter": "cargo fmt --all --check exit 0",
+    "storage_configuration": "TOML round-trip PASS for driver, graphroot, runroot and nested overlay options",
+    "fixture_lifetime": {
+      "native_default_seconds": 0.0006447719997595414,
+      "native_exit_nonzero_seconds": 0.0005178129999876546,
+      "native_sigkill_seconds": 0.0009222429998771986,
+      "payload_probe_seconds": 0.000513324999701581,
+      "payload_default_seconds": 3.0006230020003386,
+      "payload_exit_nonzero_seconds": 3.0007861799999773,
+      "payload_sigkill_seconds": 3.0062629279996145,
+      "planted_host_liveness_seconds": 0.0005870840000170574,
+      "planted_payload_seconds": 3.001230032999956,
+      "verdict": "PASS"
+    },
+    "worker_contract_tests": "8 passed across fixture_modes_16_3, fixtures_pin and spirit_smoke",
+    "affected_targets_release": "drain 1, f4 6, root shutdown 11, smoke 4, completion 45, manifests 6, supervision 23, kernel T3 boundary 1 passed; T3 legs skip only because CI and MAOS_T3_RUNTIME are unset",
+    "debug_only_targets": "two_host_delegation_2b 3 passed and journey_j1 3 passed in debug profile; release attempts failed only because MAOS_TEST_BOOT_NONCE is debug-only and journey resolves target/debug/maos",
+    "new_warnings": "none observed in changed test targets; f4_pairing sql_i64 dead-code warning exists unchanged at HEAD"
+  },
+  "capable_verification": {
+    "status": "not run",
+    "snapshot_branch": "ci/17-1-sweep-20261009t1134",
+    "snapshot_commit": "041d237f1e05e01b27fd64a443c3a967fb5ab646",
+    "blocker": "Push to the authorized SSH remote failed: forwarded agent has no identities and ~/.ssh/id_rsa requires a passphrase. No alternate credential used."
+  },
+  "not_claimed": ["actual OCI success after repair", "Task 6 completion", "Task 7 completion", "full regression", "final acceptance"]
+}

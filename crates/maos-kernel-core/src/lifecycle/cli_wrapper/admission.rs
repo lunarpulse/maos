@@ -72,6 +72,17 @@ pub fn probe_and_verify_shape(
     argv.push("--maos-bridge-probe".to_string());
 
     let mut child = std::process::Command::new(&resolved)
+        .env_clear()
+        .envs(
+            [
+                "PATH",
+                "HOME",
+                "XDG_RUNTIME_DIR",
+                "DBUS_SESSION_BUS_ADDRESS",
+            ]
+            .into_iter()
+            .filter_map(|name| std::env::var_os(name).map(|value| (name, value))),
+        )
         .args(&argv)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -158,6 +169,27 @@ pub fn probe_and_verify_shape(
     Ok(())
 }
 
+/// Admission policy only: the daemon must provide the enforceable proxy route.
+pub fn check_egress(
+    config: &CliWrapperConfig,
+    proxy_configured: bool,
+    granted: &[maos_domain::host_grant::EgressDestination],
+) -> Result<(), CliWrapperAdmissionError> {
+    if !config.egress.is_empty() && !proxy_configured {
+        return Err(CliWrapperAdmissionError::EEgressProxyUnavailable);
+    }
+    if let Some(destination) = config
+        .egress
+        .iter()
+        .find(|request| !granted.contains(request))
+    {
+        return Err(CliWrapperAdmissionError::EEgressNotGranted {
+            destination: destination.clone(),
+        });
+    }
+    Ok(())
+}
+
 /// Story 7.4 AC4 — FR40 "full": the JOURNALED admission path.
 ///
 /// Calls the EXISTING Story 6.2 [`probe_and_verify_shape`] (the probe logic —
@@ -190,7 +222,10 @@ pub fn admit_cli_wrapper_journaled(
     sandbox_tier: SandboxTier,
     spirit_pid: u32,
     journal: &TransparencyLogAdapter,
+    proxy_configured: bool,
+    granted: &[maos_domain::host_grant::EgressDestination],
 ) -> Result<(), CliWrapperAdmissionError> {
+    check_egress(config, proxy_configured, granted)?;
     match probe_and_verify_shape(config, sandbox_tier) {
         Ok(()) => Ok(()),
         Err(CliWrapperAdmissionError::EOutputShapeAdapterMismatch {
@@ -246,6 +281,28 @@ pub fn reject_respawn_with_context(
     Ok(())
 }
 
+/// Reject T3 postures that would retain stdin as a control channel.
+pub fn reject_t3_stdin_posture(
+    config: &CliWrapperConfig,
+) -> Result<(), super::runtime::BridgeError> {
+    use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
+    if matches!(
+        (config.posture.stdio_shape, config.posture.control_channel),
+        (CliWrapperStdioShape::Raw, CliWrapperControlChannel::Signals)
+            | (
+                CliWrapperStdioShape::NdjsonOverStdio,
+                CliWrapperControlChannel::Signals
+            )
+    ) {
+        Ok(())
+    } else {
+        Err(super::runtime::BridgeError::ControlUnsupported(
+            config.posture.control_channel,
+            "T3 does not support stdin-keeping postures".into(),
+        ))
+    }
+}
+
 /// Story 8.12 AC5 (FORK A — Winston host-grant model) — resolve the manifest's
 /// **requested** sandbox tier against the host-side grant allowlist.
 ///
@@ -283,10 +340,20 @@ pub fn resolve_cli_wrapper_tier(
             requested,
             permitted,
             attested_image,
-            ..
+            reason,
         } => Err(CliWrapperAdmissionError::ECliWrapperTierNotGranted {
             requested: format!("{requested:?}"),
-            permitted: format!("{permitted:?}"),
+            permitted: match reason {
+                maos_domain::host_grant::TierDenialReason::NoMatchingGrant => {
+                    "none (no matching host grant)".into()
+                }
+                maos_domain::host_grant::TierDenialReason::PlatformCannotEnforce => {
+                    "none (platform cannot enforce)".into()
+                }
+                maos_domain::host_grant::TierDenialReason::ExceedsPermittedTier => {
+                    format!("{permitted:?}")
+                }
+            },
             attested_image,
         }),
     }
@@ -324,6 +391,7 @@ mod tests {
 
     fn cfg(command: &str, declared: &str) -> CliWrapperConfig {
         CliWrapperConfig {
+            egress: Vec::new(),
             command: command.into(),
             argv_prefix: vec![],
             output_shape_version: declared.into(),
@@ -337,6 +405,30 @@ mod tests {
         }
     }
 
+    #[test]
+    fn t3_stdin_postures_admit_only_raw_and_ndjson_with_signals() {
+        use CliWrapperControlChannel::{NamedPipe, Signals, StdinCommands};
+        use CliWrapperStdioShape::{JsonRpcOverStdio, NdjsonOverStdio, Raw};
+        for shape in [Raw, NdjsonOverStdio, JsonRpcOverStdio] {
+            for channel in [Signals, NamedPipe, StdinCommands] {
+                let mut config = cfg("echo", "1.0.0");
+                config.posture.stdio_shape = shape;
+                config.posture.control_channel = channel;
+                let result = reject_t3_stdin_posture(&config);
+                let admitted = matches!(
+                    (shape, channel),
+                    (Raw, Signals) | (NdjsonOverStdio, Signals)
+                );
+                assert_eq!(result.is_ok(), admitted, "{shape:?} + {channel:?}");
+                if !admitted {
+                    assert!(matches!(
+                        result,
+                        Err(super::super::runtime::BridgeError::ControlUnsupported(_, _))
+                    ));
+                }
+            }
+        }
+    }
     #[test]
     fn admission_rejects_non_t3_sandbox() {
         let c = cfg("echo", "1.0.0");

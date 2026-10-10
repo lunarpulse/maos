@@ -74,3 +74,34 @@ fn payload_identity_overrides_legacy_intent_and_incarnations_are_deduplicated() 
         vec![(8, 43)]
     );
 }
+
+#[test]
+fn scheduler_journal_echo_rows_are_not_spirit_identities() {
+    let temp = tempfile::TempDir::new().expect("tempdir");
+    let path = temp.path().join("audit.sqlite");
+    let connection = create_log(&path);
+    insert_lifecycle_load(&connection, 1, 10, 9, 42, "lifecycle.load", "worker");
+    // SpiritSchedulerAdapter::journal_lifecycle echoes a T3 SandboxApplied
+    // transition at pid 0 with the Spirit's id in its kind-7 payload.
+    let echo = serde_json::to_vec(&serde_json::json!({
+        "lifecycle_event": "SandboxApplied",
+        "spirit_id": "worker",
+    }))
+    .expect("serialize echo payload");
+    connection
+        .execute(
+            "INSERT INTO transparency_log
+             (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token,
+              kind, intent, payload_redacted, origin)
+             VALUES (?1, 20, 0, 9, NULL, 7, 'lifecycle.journal', ?2, 0)",
+            rusqlite::params![&[2u8; 16] as &[u8], &echo as &[u8]],
+        )
+        .expect("insert scheduler journal echo");
+    drop(connection);
+
+    assert_eq!(
+        resolve_spirit_name(&path, "worker", false).expect("resolve the loaded Worker"),
+        vec![(9, 42)],
+        "a pid-0 journal echo must not displace the Worker's real pid"
+    );
+}

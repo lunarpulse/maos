@@ -59,17 +59,9 @@ const DELEGATION_GATE: &str = "check-j1-loopback-delegation";
 /// Where gate ledgers are published, when they are.
 const REPORTS_DIR: &str = "tests/reports";
 
-/// Egress posture the run declares — declared, NOT enforced, with its follow-up.
-const EGRESS_POSTURE: &str = "declared-not-enforced";
-const EGRESS_FOLLOWUP: &str = "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT";
-
-/// FS-jail posture the run declares (j1-crosshost-2a AC4.1/4.2), mirroring the
-/// egress precedent: a stated posture a capture cannot overclaim, plus a named
-/// follow-up so the residual has an owner. The claim, in three checkable clauses:
-/// the FS jail is the ADAPTER's, DECLARED by MAOS in a hashed manifest, ENFORCED
-/// by the adapter, not by MAOS. `CaptureDoc::validate` refuses any other value.
-const FS_JAIL_POSTURE: &str = "adapter-enforced-maos-declared";
-const FS_JAIL_FOLLOWUP: &str = "FOLLOWUP-EPIC14-MAOS-ENFORCED-WORKER-ISOLATION";
+/// Current Worker controls; emitted only for the verified T3 route.
+const EGRESS_POSTURE: &str = "enforced";
+const FS_JAIL_POSTURE: &str = "maos-enforced";
 
 /// One narrated beat of the journey.
 ///
@@ -307,12 +299,11 @@ pub fn run(
     println!("                   kernel `proc.exec` mediation is an Epic-9 operator-policy");
     println!("                   surface, and a Cedar permit alone cannot green it. The");
     println!("                   CapabilityInvocation exit row IS journaled either way.");
-    println!("  egress           {EGRESS_POSTURE} ({EGRESS_FOLLOWUP}).");
-    println!("  fs jail          {FS_JAIL_POSTURE} — the jail is the ADAPTER's, DECLARED by");
-    println!("                   MAOS in a hashed argv_prefix and ENFORCED by the adapter, not");
-    println!("                   by MAOS: the spawn has no namespace, no rlimit, no process");
-    println!("                   group, and the adapter is chosen by BASENAME with no realpath,");
-    println!("                   hash or signature check ({FS_JAIL_FOLLOWUP}).");
+    println!("  egress           {EGRESS_POSTURE} — exact manifest/host-grant intersection");
+    println!("                   through the scoped proxy; direct container networking disabled.");
+    println!("  fs jail          {FS_JAIL_POSTURE} — verified T3 container, read-only root,");
+    println!("                   non-root payload and bounded tmpfs; adapter restrictions are");
+    println!("                   additional controls, not the MAOS boundary.");
     println!("  halt/resume      safe shutdown with no in-flight delegation is proven; the");
     println!("                   post-resume digest citing the exact pre-halt ref is NOT —");
     println!("                   FOLLOWUP-J1-RESUME-SEAM.");
@@ -401,6 +392,17 @@ struct Bins {
 
 fn preflight(skip_build: bool) -> Result<Bins, String> {
     section("Preflight");
+    for name in [
+        "MAOS_T3_RUNTIME",
+        "MAOS_T3_IMAGE_LOCK_PATH",
+        "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+    ] {
+        if std::env::var_os(name).is_none() {
+            return Err(format!(
+                "demo-j1: T3 Worker substrate missing {name}; run scripts/provision_t3_tests.py and source its t3.env"
+            ));
+        }
+    }
     let dir = PathBuf::from("target/debug");
     let maos = dir.join("maos");
     let fixture = dir.join("worker-cli-fixture");
@@ -1175,9 +1177,8 @@ fn resolve_topology_worker(topology: &Path) -> Result<TopologyWorker, String> {
     })
 }
 
-/// AC3.5 — `command_metadata` is DERIVED (never a hardcoded literal) from the
-/// adapter and manifest actually used, and says INHERITED, never "injected
-/// host-side": MAOS holds no credential and injects nothing (F22).
+/// Capture metadata names the actual adapter, manifest and daemon credential
+/// channel without serializing either the raw key or the scoped bearer.
 fn derive_command_metadata(
     manifest: &Path,
     topology: &Path,
@@ -1187,8 +1188,8 @@ fn derive_command_metadata(
 ) -> String {
     format!(
         "maos run {} --live --once (topology {}); worker adapter `{identity}` with \
-         argv_prefix {argv_prefix:?}; {secret_var} inherited from the operator's environment — \
-         MAOS neither injects nor holds it (value redacted, scanned)",
+         argv_prefix {argv_prefix:?}; raw {secret_var} held by the daemon — \
+         Worker receives a scoped bearer and proxy route (values redacted, scanned)",
         manifest.display(),
         topology.display()
     )
@@ -1265,10 +1266,8 @@ fn live_codex_take(
     // already announced it is about to spend money; refuse here too.
     maos_bin::worker_cli::refuse_missing_argv_flags(worker.cli.as_ref(), &worker.argv_prefix)
         .map_err(|e| format!("{} is not signable: {e}", worker.manifest.display()))?;
-    // Review 2a-P2/P3 — same two argv gates the composition root enforces, run
-    // here too so a bypassing or isolation-less topology is refused BEFORE the
-    // money is spent, and so the `fs_jail: adapter-enforced-maos-declared`
-    // claim below is never sealed over an argv that did not declare the jail.
+    // Adapter restrictions supplement the verified T3 boundary; reject an argv
+    // bypass before announcing a paid run.
     maos_bin::worker_cli::refuse_unsafe_argv(worker.cli.as_ref(), &worker.argv_prefix)
         .map_err(|e| format!("{} is not signable: {e}", worker.manifest.display()))?;
     worker
@@ -1435,8 +1434,8 @@ fn live_codex_take(
 
     // The capture carries NON-SECRET fields only, spelled exactly as
     // `record-capture` validates them: it refuses a credential-shaped value and
-    // refuses an overclaimed control (egress "enforced", redaction not
-    // "verified"), so the gate stays open rather than signing a lie.
+    // refuses stale control claims or unverified redaction, so the gate stays open
+    // rather than signing a lie.
     //
     // AC3.5 — `command_metadata` is DERIVED from the adapter and manifest actually
     // used. It used to be the literal `"maos run <codex topology> --live;
@@ -1444,10 +1443,8 @@ fn live_codex_take(
     // bundle: the moment the identity allowlist widened, a claude run would have
     // signed a bundle asserting it was codex.
     //
-    // AC2.2/F22 — "injected host-side" is also GONE, because MAOS does not inject
-    // it. There is no setter for any provider credential anywhere in
-    // `crates/maos-bin/src` and the spawn has no `env_clear`, so the child
-    // INHERITS the operator's variable. The capture now says what actually happens.
+    // The daemon holds the raw provider credential. The Worker receives only
+    // its scoped bearer and proxy route under a cleared inherited environment.
     let command_metadata = derive_command_metadata(
         &worker.manifest,
         &topology,
@@ -1463,9 +1460,7 @@ fn live_codex_take(
             "host-managed grant admitted; a mismatch would have refused",
         "audit_refs": [tl_ref],
         "egress": EGRESS_POSTURE,
-        "egress_followup": EGRESS_FOLLOWUP,
         "fs_jail": FS_JAIL_POSTURE,
-        "fs_jail_followup": FS_JAIL_FOLLOWUP,
         "redaction_result": "verified",
         "outcome":
             "worker completed via adapter oracle; no secret persisted; demo-j1 scene take",

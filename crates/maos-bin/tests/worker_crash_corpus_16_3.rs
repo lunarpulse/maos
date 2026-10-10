@@ -57,6 +57,8 @@
 //! `#[ignore]`d by design: the NFR job runs it with `-- --ignored` and fails
 //! unless libtest reports exactly `1 passed` (a zero-test run is red).
 
+#[path = "support/t0_worker.rs"]
+mod t0_worker;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -65,7 +67,6 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use maos_bin::supervision::{WorkerSupervisor, WorkerTask};
-use maos_bin::worker_spawn::{run_cli_wrapper_manifest, RunArgs};
 use maos_kernel_core::iac::transparency_log::{
     FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
 };
@@ -135,6 +136,7 @@ static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
 struct KernelWorld {
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     supervisor: Arc<WorkerSupervisor>,
 }
 
@@ -144,12 +146,13 @@ impl KernelWorld {
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(NONCE));
         let telemetry = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
         let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+        let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
         let capability = Arc::new(
             maos_kernel_core::capability::CapabilityRegistryAdapter::new(
                 Arc::new(maos_kernel_core::api::RingCryptoProvider),
                 maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x16; 32]),
                 NONCE,
-                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+                Arc::clone(&policy),
                 audit_tx,
                 maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
                 Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
@@ -223,6 +226,7 @@ impl KernelWorld {
         Self {
             tl,
             capability,
+            policy,
             supervisor,
         }
     }
@@ -252,20 +256,12 @@ fn write_worker_manifest(dir: &Path, mode: &str) -> PathBuf {
              output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
              recovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\n\
              stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
-             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n\
+             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T0\"\n\n\
              [author]\nname = \"MAOS Project\"\n"
         ),
     )
     .expect("write worker manifest");
     path
-}
-
-fn run_args(manifest: &Path) -> RunArgs {
-    RunArgs {
-        manifest_path: manifest.display().to_string(),
-        live: false,
-        once: true,
-    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -544,7 +540,7 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
 
     let hang = write_worker_manifest(&dir, "hang");
     let grandchild = write_worker_manifest(&dir, "hang-with-grandchild");
-    let manifests: HashMap<String, (toml::Value, RunArgs)> = [hang, grandchild]
+    let manifests: HashMap<String, toml::Value> = [hang, grandchild]
         .into_iter()
         .map(|path| {
             let root: toml::Value =
@@ -555,7 +551,7 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                     .expect("named manifest")
                     .to_string_lossy()
                     .into_owned(),
-                (root, run_args(&path)),
+                root,
             )
         })
         .collect();
@@ -717,27 +713,21 @@ async fn hundred_sigkilled_workers_meet_both_floors_half_holding_a_grandchild() 
                 manifests.get("worker-hang")
             }
             .expect("both manifests exist");
-            let (manifest_root, run) = (manifest.0.clone(), manifest.1.clone());
+            let manifest_root = manifest.clone();
             let tl = Arc::clone(&world.tl);
             let capability = Arc::clone(&world.capability);
+            let policy = Arc::clone(&world.policy);
             let supervisor = Arc::clone(&supervisor);
             joins.push(tokio::task::spawn_blocking(move || {
-                run_cli_wrapper_manifest(
+                t0_worker::run_t0_worker(
                     &manifest_root,
-                    &run,
                     tl,
                     capability,
-                    None,
-                    None,
-                    None,
-                    None,
-                    false,
+                    policy,
                     supervisor.as_ref(),
                     WorkerTask::Standalone,
                 )
                 .map(|completion| completion.label().to_string())
-                // `Box<dyn Error>` is not `Send`; flatten inside the closure.
-                .map_err(|error| error.to_string())
             }));
         }
         for join in joins {

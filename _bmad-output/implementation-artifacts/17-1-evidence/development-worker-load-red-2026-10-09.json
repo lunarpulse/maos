@@ -1,0 +1,29 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "task": 5,
+  "phase": "red-before-worker-cutover",
+  "command": "env MAOS_HOME=/tmp/maos-17-1-load-red-home MAOS_LIVE_AGENT= cargo run --offline --locked -p maos-bin --bin maos -- run /tmp/maos-17-1-load-posture-red.toml --once",
+  "posture": {"tier": "T3", "stdio_shape": "json_rpc_over_stdio", "control_channel": "signals"},
+  "exit_code": 1,
+  "session_output": "artifact://193",
+  "observed": "Kernel rejects the unsupported posture only at bridge spawn after probe, Worker bind and cap-token mediation",
+  "database_query": "SELECT spirit_pid,kind,intent FROM transparency_log ORDER BY rowid",
+  "durable_rows": [
+    {"spirit_pid": 1, "kind": 7, "intent": "lifecycle.admit"},
+    {"spirit_pid": 1, "kind": 7, "intent": "lifecycle.load"},
+    {"spirit_pid": 1, "kind": 7, "intent": "lifecycle.start"},
+    {"spirit_pid": 0, "kind": 1, "intent": "task.nacked"},
+    {"spirit_pid": 1, "kind": 7, "intent": "lifecycle.unload"},
+    {"spirit_pid": 1, "kind": 3, "intent": "planned_unload"},
+    {"spirit_pid": 1, "kind": 3, "intent": "planned_unload"},
+    {"spirit_pid": 1, "kind": 7, "intent": "cap.revoke"}
+  ],
+  "throwaway_assertion": {
+    "command": "python3 /tmp/maos-17-1-load-red-check.py",
+    "expected_load_rows": 0,
+    "actual_load_rows": 1,
+    "exit_code": 1,
+    "failure": "T3 stdin-keeping posture must refuse before binding; lifecycle.load rows=1"
+  },
+  "limits": ["Real daemon CLI and independently read durable state; not a container-isolation or live vendor run", "Task 5 and final story acceptance remain incomplete"]
+}

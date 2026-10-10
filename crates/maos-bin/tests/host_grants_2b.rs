@@ -82,8 +82,12 @@ permitted_egress_destinations = ["api.openai.com"]
     assert_eq!(grants.len(), 1);
     assert_eq!(grants[0].attested_image, "codex");
     assert_eq!(
-        grants[0].permitted_egress_destinations,
-        vec!["api.openai.com".to_string()]
+        grants[0]
+            .permitted_egress_destinations
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["api.openai.com:443".to_string()]
     );
     assert_eq!(grants[0].permitted_tier, SandboxTier::T3);
 }
@@ -94,4 +98,31 @@ fn malformed_grants_file_errors_never_silently_admits() {
         parse_host_grants_toml("[[grant]]\nsigning_key_id = \"x\"\n").is_err(),
         "a grant missing attested_image must error, never silently admit"
     );
+}
+
+#[test]
+fn invalid_or_non_string_egress_grants_are_refused_by_entry_name() {
+    for destinations in [
+        "[\"API.openai.com:443\"]",
+        "[\"api.openai.com:0\"]",
+        "[\"https://api.openai.com:443\"]",
+        "[\"api.openai.com\", 42]",
+        "\"api.openai.com\"",
+    ] {
+        let text = format!(
+            "[[grant]]\nattested_image = \"codex\"\nsigning_key_id = \"OpenAI\"\n\
+             permitted_egress_destinations = {destinations}\n"
+        );
+        let error = parse_host_grants_toml(&text).unwrap_err();
+        let field = if destinations.starts_with('[') {
+            if destinations.contains("42") {
+                "grant[0].permitted_egress_destinations[1]"
+            } else {
+                "grant[0].permitted_egress_destinations[0]"
+            }
+        } else {
+            "grant[0].permitted_egress_destinations"
+        };
+        assert!(error.contains(field), "{error}");
+    }
 }

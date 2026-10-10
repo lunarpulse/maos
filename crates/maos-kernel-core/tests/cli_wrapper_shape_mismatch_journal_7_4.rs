@@ -25,6 +25,7 @@ use maos_kernel_core::security::manifest::{
 /// trailing arg lands as `$1` to the script (ignored), so the echo still fires.
 fn sh_probe_cfg(observed: &str, declared: &str) -> CliWrapperConfig {
     CliWrapperConfig {
+        egress: Vec::new(),
         command: "/bin/sh".into(),
         argv_prefix: vec![
             "-c".into(),
@@ -57,7 +58,7 @@ fn mismatch_is_journaled_with_version_diff() {
     let log = TransparencyLogAdapter::open_in_memory(0x7_4_0_4);
     let c = sh_probe_cfg("1.1.0", "1.0.0");
 
-    let err = admit_cli_wrapper_journaled(&c, SandboxTier::T3, 77, &log).unwrap_err();
+    let err = admit_cli_wrapper_journaled(&c, SandboxTier::T3, 77, &log, false, &[]).unwrap_err();
     assert!(
         matches!(
             err,
@@ -83,7 +84,8 @@ fn clean_admission_writes_no_mismatch_frame() {
     let log = TransparencyLogAdapter::open_in_memory(0x7_4_0_5);
     let c = sh_probe_cfg("1.0.0", "1.0.0");
 
-    admit_cli_wrapper_journaled(&c, SandboxTier::T3, 77, &log).expect("clean admission");
+    admit_cli_wrapper_journaled(&c, SandboxTier::T3, 77, &log, false, &[])
+        .expect("clean admission");
     assert_eq!(
         mismatch_frames(&log).len(),
         0,
@@ -98,12 +100,13 @@ fn resumption_gate_no_silent_restart_then_corrected_config_admits() {
     let stale = sh_probe_cfg("2.0.0", "1.0.0");
 
     // First admission attempt → refuse + journal.
-    assert!(admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 77, &log).is_err());
+    assert!(admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 77, &log, false, &[]).is_err());
     assert_eq!(mismatch_frames(&log).len(), 1);
 
     // RESTART with the SAME stale config → re-fails identically + re-journals.
     // There is NO silent retry into a started state.
-    let err2 = admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 77, &log).unwrap_err();
+    let err2 =
+        admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 77, &log, false, &[]).unwrap_err();
     assert!(matches!(
         err2,
         CliWrapperAdmissionError::EOutputShapeAdapterMismatch { .. }
@@ -116,7 +119,7 @@ fn resumption_gate_no_silent_restart_then_corrected_config_admits() {
 
     // Operator publishes a CORRECTED configuration (declared == observed).
     let corrected = sh_probe_cfg("2.0.0", "2.0.0");
-    admit_cli_wrapper_journaled(&corrected, SandboxTier::T3, 77, &log)
+    admit_cli_wrapper_journaled(&corrected, SandboxTier::T3, 77, &log, false, &[])
         .expect("corrected config admits");
     // No NEW mismatch frame on the successful admission.
     assert_eq!(
@@ -131,7 +134,7 @@ fn non_shape_errors_are_not_journaled_as_shape_mismatch() {
     let log = TransparencyLogAdapter::open_in_memory(0x7_4_0_7);
     // Wrong sandbox tier → ECliWrapperRequiresT3, NOT a shape mismatch.
     let c = sh_probe_cfg("1.0.0", "1.0.0");
-    let err = admit_cli_wrapper_journaled(&c, SandboxTier::T1, 77, &log).unwrap_err();
+    let err = admit_cli_wrapper_journaled(&c, SandboxTier::T1, 77, &log, false, &[]).unwrap_err();
     assert!(matches!(
         err,
         CliWrapperAdmissionError::ECliWrapperRequiresT3 { .. }

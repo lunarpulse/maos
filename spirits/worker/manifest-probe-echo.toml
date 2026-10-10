@@ -1,0 +1,21 @@
+# Hermetic T3 positive control. No built-in grant: the operator must grant this
+# exact author/image/destination. The test runner owns the loopback echo service.
+[cli_wrapper]
+command = "worker-probe-fixture"
+argv_prefix = ["--maos-worker", "--maos-probe-positive-control"]
+output_shape_version = "1.0.0"
+skill_bundle = ["maos-bridge"]
+recovery_policy = "respawn_fresh"
+egress = ["127.0.0.1:18081"]
+
+[cli_wrapper.posture]
+stdio_shape = "raw"
+control_channel = "signals"
+shutdown_signal = "SIGTERM"
+
+[sandbox]
+tier = "T3"
+
+[author]
+name = "MAOS 17-1 Echo"
+homepage = "https://github.com/lunarpulse/maos"

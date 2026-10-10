@@ -64,6 +64,7 @@ mod tests {
 
     fn cfg(policy: CliWrapperRecoveryPolicy) -> CliWrapperConfig {
         CliWrapperConfig {
+            egress: Vec::new(),
             command: "echo".into(),
             argv_prefix: vec![],
             output_shape_version: "1.0.0".into(),

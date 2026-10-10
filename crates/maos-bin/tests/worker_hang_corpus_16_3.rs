@@ -42,6 +42,8 @@
 //! thread holding ONE keyset cursor over all new rows — never per-pid queries,
 //! because the log has one mutex shared with the writes being measured.
 
+#[path = "support/t0_worker.rs"]
+mod t0_worker;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -50,7 +52,6 @@ use std::time::{Duration, Instant};
 
 use maos_bin::supervision::exit_observation::ObservedChild;
 use maos_bin::supervision::{RootSupervision, WorkerTask};
-use maos_bin::worker_spawn::{run_cli_wrapper_manifest, RunArgs};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 
 /// Distinct from every other 16-3 world's nonce so an in-memory log can never
@@ -124,6 +125,7 @@ static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
 struct World {
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
     crash_detector: Arc<maos_kernel_core::supervision::CrashDetector>,
@@ -137,12 +139,13 @@ impl World {
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(NONCE));
         let telemetry = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+        let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
         let capability = Arc::new(
             maos_kernel_core::capability::CapabilityRegistryAdapter::new(
                 Arc::new(maos_kernel_core::api::RingCryptoProvider),
                 maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x16; 32]),
                 NONCE,
-                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+                Arc::clone(&policy),
                 maos_kernel_core::capability::cap_audit::channel().0,
                 maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
                 Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
@@ -206,6 +209,7 @@ impl World {
         Self {
             tl,
             capability,
+            policy,
             scheduler,
             halt_registry,
             crash_detector,
@@ -243,7 +247,7 @@ fn write_manifest(dir: &Path, mode: &str) -> PathBuf {
              output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
              recovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\n\
              stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
-             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n\
+             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T0\"\n\n\
              [author]\nname = \"MAOS Project\"\n"
         ),
     )
@@ -251,21 +255,10 @@ fn write_manifest(dir: &Path, mode: &str) -> PathBuf {
     path
 }
 
-fn run_args(manifest: &Path) -> RunArgs {
-    RunArgs {
-        manifest_path: manifest.display().to_string(),
-        live: false,
-        once: true,
-    }
-}
-
-/// Drive one Worker to its verdict on a blocking thread — the exact shape the
-/// daemon's Worker-bearing roots use, so the corpus measures the production
-/// path and nothing else.
-#[allow(clippy::too_many_arguments)]
 async fn run_worker_owned(
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     supervisor: Arc<maos_bin::supervision::WorkerSupervisor>,
     manifest: PathBuf,
     task: WorkerTask,
@@ -273,26 +266,19 @@ async fn run_worker_owned(
     let manifest_root: toml::Value =
         toml::from_str(&std::fs::read_to_string(&manifest).expect("read manifest"))
             .expect("parse manifest");
-    let run = run_args(&manifest);
     tokio::task::spawn_blocking(move || {
-        run_cli_wrapper_manifest(
+        t0_worker::run_t0_worker(
             &manifest_root,
-            &run,
             tl,
             capability,
-            None,
-            None,
-            None,
-            None,
-            false,
+            policy,
             supervisor.as_ref(),
             task,
         )
         .map(|completion| completion.label().to_string())
-        .map_err(|error| error.to_string())
     })
     .await
-    .expect("worker blocking thread joined")
+    .expect("Worker blocking thread joined")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -485,6 +471,7 @@ async fn sixty_workers_stall_by_silence_and_crash_by_signal() {
         runs.push(tokio::spawn(run_worker_owned(
             Arc::clone(&world.tl),
             Arc::clone(&world.capability),
+            Arc::clone(&world.policy),
             Arc::clone(&supervisor),
             manifest_for(index),
             WorkerTask::TopologyEntry { index },

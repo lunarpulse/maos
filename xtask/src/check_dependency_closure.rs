@@ -59,6 +59,8 @@ const FORBIDDEN_CRATES: &[&str] = &[
     "cedar-policy-core",
     "cedar-policy-validator",
     "cedar-policy-formatter",
+    // Daemon-owned credential/proxy transport never enters the frozen closure.
+    "maos-egress",
 ];
 
 /// Trees whose transitive closure must exclude every FORBIDDEN_CRATES entry.

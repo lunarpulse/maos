@@ -168,7 +168,7 @@ since_version = "0.5.0"
 code = "ECliWrapperRequiresT3"
 rust_path = "CliWrapperAdmissionError::ECliWrapperRequiresT3"
 source_file = "crates/maos-domain/src/cli_wrapper.rs"
-description = "CliWrapperSpirit MUST declare sandbox tier = t3; lower tiers cannot contain subprocess CLI invocation"
+description = "Worker ([cli_wrapper]) manifest requested a sandbox tier other than T3; T3 is the only Worker path (below it no scoped egress exists, T4 has no spawn path)"
 severity = "policy"
 recovery_class = "reject"
 owner = "maos-domain"
@@ -207,6 +207,28 @@ recovery_class = "reject"
 owner = "maos-domain"
 kernel_or_spirit = "kernel"
 since_version = "0.9.0"
+
+[[error]]
+code = "EEgressProxyUnavailable"
+rust_path = "CliWrapperAdmissionError::EEgressProxyUnavailable"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "A non-empty Worker egress policy requires an available daemon-owned proxy"
+severity = "security"
+recovery_class = "fix_config"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.1.0-alpha.1"
+
+[[error]]
+code = "EEgressNotGranted"
+rust_path = "CliWrapperAdmissionError::EEgressNotGranted"
+source_file = "crates/maos-domain/src/cli_wrapper.rs"
+description = "The Worker requests a host:port destination outside its host grant"
+severity = "security"
+recovery_class = "reject"
+owner = "maos-domain"
+kernel_or_spirit = "kernel"
+since_version = "0.1.0-alpha.1"
 
 # ---------------------------------------------------------------------------
 # SecurityError — crates/maos-kernel-core/src/security/mod.rs

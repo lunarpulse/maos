@@ -16,8 +16,9 @@
 //! uses busybox which does NOT call `t2_apply()` — full T2-inside-T3
 //! layering activates with Epic 6 subprocess form landing.
 
-use std::path::PathBuf;
-use std::process::Command;
+use std::ffi::OsStr;
+use std::path::Path;
+use std::process::{Command, Stdio};
 
 use maos_domain::sandbox::T3Error;
 
@@ -29,14 +30,82 @@ use super::image_verify;
 use super::runtime_detect::{self};
 
 /// Context for a T3 container spawn.
-#[derive(Debug, Clone)]
-pub struct T3SpawnContext {
+pub struct T3SpawnContext<'a> {
     /// Path to the Spirit binary inside the container.
-    pub spirit_binary_path: PathBuf,
+    pub spirit_binary_path: &'a Path,
     /// Boot nonce from the SCB.
     pub boot_nonce: u64,
-    /// Container name for identification.
+    /// Container name for identification; consumed by the child guard.
     pub container_name: String,
+    /// Optional daemon-owned proxy socket.
+    pub egress_socket: Option<&'a Path>,
+    /// Explicit environment passed to the container (never as argument values).
+    pub env: &'a [(String, String)],
+}
+
+/// Construct a runtime client command with ambient credentials removed.
+pub(crate) fn runtime_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    command.env_clear();
+    for key in [
+        "PATH",
+        "HOME",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ] {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+    command
+}
+
+/// Run one runtime-client invocation under an absolute deadline. A runtime
+/// client that never exits is killed at the deadline so no spawn, teardown
+/// or inspect path can hang the daemon on a stuck runtime. `None` means the
+/// call did not complete within the deadline (or failed to start).
+pub(crate) fn runtime_call_bounded(
+    runtime: &Path,
+    arguments: &[&str],
+) -> Option<std::process::Output> {
+    const CLIENT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+    let mut child = runtime_command(runtime)
+        .args(arguments)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let deadline = std::time::Instant::now() + CLIENT_DEADLINE;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+}
+
+/// The runtime must self-report rootless operation before it may carry a T3
+/// spawn. `podman info` is the attestation surface; docker and rootful podman
+/// do not report rootless and are refused.
+fn ensure_rootless(runtime: &runtime_detect::ContainerRuntime) -> Result<(), T3Error> {
+    let output = runtime_call_bounded(
+        &runtime.path,
+        &["info", "--format", "{{.Host.Security.Rootless}}"],
+    )
+    .ok_or(T3Error::RuntimeUnavailable)?;
+    let rootless = String::from_utf8_lossy(&output.stdout).trim() == "true";
+    if output.status.success() && rootless {
+        Ok(())
+    } else {
+        Err(T3Error::RuntimeUnavailable)
+    }
 }
 
 /// Spawn a command inside a T3 container.
@@ -55,10 +124,11 @@ pub fn spawn_t3(
     spec: &SandboxSpec,
     image: &VerifiedImageAttestation,
     command: &[String],
-    parent: T3SpawnContext,
+    parent: T3SpawnContext<'_>,
 ) -> Result<SandboxedContainerChild, SpawnError> {
     #[cfg(not(target_os = "linux"))]
     {
+        let _ = (spec, image, command, parent);
         return Err(SpawnError::SandboxUnavailable {
             reason: "T3 container isolation not yet implemented on this platform; \
                      pending macOS/Windows CI runners and container-runtime equivalents \
@@ -69,16 +139,18 @@ pub fn spawn_t3(
 
     #[cfg(target_os = "linux")]
     {
-        // 1. Detect runtime (cached after first call via OnceLock).
         let runtime = runtime_detect::detect_container_runtime().map_err(|e| {
             SpawnError::T3RuntimeUnavailable {
                 reason: e.to_string(),
             }
         })?;
-
-        // 2. Compare the verified image's attested registry manifest digest
-        // against the runtime's RepoDigests entry for the same normalized
-        // repository.  Local image `.Id` is deliberately never consulted.
+        // ADR-061 M3: the T3 boundary is a ROOTLESS container. A rootful
+        // runtime (or the docker fallback) is a silently weaker boundary
+        // than every published isolation claim, so it is refused here —
+        // applies-or-refuses, never a weaker spawn.
+        ensure_rootless(&runtime).map_err(|reason| SpawnError::T3RuntimeUnavailable {
+            reason: reason.to_string(),
+        })?;
         let entry = image.entry();
         let local_sha =
             image_verify::inspect_image_sha(&runtime, &entry.image_uri).map_err(|error| {
@@ -93,44 +165,43 @@ pub fn spawn_t3(
             });
         }
 
-        // 3. Build argv via the pure-function argv builder.
-        //    `parent.container_name` is the canonical identity used both
-        //    for `--name` and for inspect/cleanup — argv and spawn MUST
-        //    agree (Story 5.5a review finding §argv-divergence).
         let argv = super::argv::build_runtime_argv(
             &runtime,
             image,
             spec,
-            &parent.spirit_binary_path,
+            parent.spirit_binary_path,
             command,
             &spec.spirit_id,
             parent.boot_nonce,
             &parent.container_name,
+            parent.egress_socket,
+            parent.env,
         )
         .map_err(|error| SpawnError::T3ImageInspect {
             reason: error.to_string(),
         })?;
-        // 4. Spawn via std::process::Command.
-        // T3 has no pre_exec closure — the container itself is the boundary.
-        let mut cmd = Command::new(&argv[0]);
-        cmd.args(&argv[1..]);
-        let child = cmd.spawn().map_err(SpawnError::Io)?;
 
-        // 5. Capture host-namespace PID (this is the kernel's ADR-023 identity).
-        let host_pid =
-            inspect_container_host_pid(&runtime, &parent.container_name).map_err(|e| {
+        let mut cmd = runtime_command(&argv[0]);
+        cmd.args(&argv[1..])
+            .envs(parent.env.iter().map(|(name, value)| (name, value)))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let child = cmd.spawn().map_err(SpawnError::Io)?;
+        let mut guard = SandboxedContainerChild {
+            child: Some(child),
+            host_pid: 0,
+            container_name: parent.container_name,
+            runtime,
+        };
+        guard.host_pid = inspect_container_host_pid(&guard.runtime, &guard.container_name)
+            .map_err(|e| {
                 SpawnError::Io(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     e.to_string(),
                 ))
             })?;
-
-        Ok(SandboxedContainerChild {
-            child: Some(child),
-            host_pid,
-            container_name: parent.container_name,
-            runtime,
-        })
+        Ok(guard)
     }
 }
 
@@ -161,12 +232,11 @@ fn inspect_container_host_pid(
 ) -> Result<u32, T3Error> {
     let max_attempts = 10u32;
     for attempt in 1..=max_attempts {
-        let output = std::process::Command::new(&runtime.path)
-            .args(["inspect", "--format", "{{.State.Pid}}", container_name])
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output()
-            .map_err(|e| T3Error::Inspect(format!("inspect container pid: {e}")))?;
+        let output = runtime_call_bounded(
+            &runtime.path,
+            &["inspect", "--format", "{{.State.Pid}}", container_name],
+        )
+        .ok_or_else(|| T3Error::Inspect("inspect container pid failed".into()))?;
 
         if output.status.success() {
             let pid_str = String::from_utf8_lossy(&output.stdout).trim().to_string();

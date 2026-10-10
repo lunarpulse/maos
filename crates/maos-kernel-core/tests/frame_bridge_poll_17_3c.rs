@@ -31,6 +31,7 @@ fn bridge(script: &str, stdio_shape: CliWrapperStdioShape) -> SpawnedBridge {
         channel_capacity: 8,
         backpressure: Backpressure::Block,
         env: vec![],
+        t3: None,
     })
     .expect("spawn sh")
 }

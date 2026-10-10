@@ -38,6 +38,22 @@ use ed25519_dalek::SigningKey;
 use maos_a2a_core::PeerCertFingerprint;
 use maos_bin::delegation;
 
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
+
+fn add_t3_environment(command: &mut Command) {
+    for key in [
+        "MAOS_T3_RUNTIME",
+        "MAOS_T3_IMAGE_LOCK_PATH",
+        "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ] {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+}
 #[path = "../../../tests/harness/doorless_home.rs"]
 mod doorless_home;
 
@@ -265,8 +281,13 @@ fn write_daemon_config(
 }
 
 fn target_debug_path() -> std::ffi::OsString {
-    let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
+    let profile = std::env::current_exe()
+        .expect("test executable path")
+        .parent()
+        .and_then(Path::parent)
+        .expect("test profile directory")
+        .to_path_buf();
+    let mut paths = vec![profile.clone(), profile.join("deps")];
     if let Some(existing) = std::env::var_os("PATH") {
         paths.extend(std::env::split_paths(&existing));
     }
@@ -275,8 +296,33 @@ fn target_debug_path() -> std::ffi::OsString {
 
 /// Cargo does not build sibling workspace binaries for a package-scoped test.
 fn build_fixture_binary(label: &str) {
-    let output = Command::new("cargo")
-        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
+    let mut command = Command::new("cargo");
+    if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
+        command.env("CARGO_TARGET_DIR", target_dir);
+    }
+    let executable = std::env::current_exe().expect("test executable path");
+    let profile = executable
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::file_name)
+        .and_then(|name| name.to_str())
+        .expect("Cargo profile name");
+    let profile = match profile {
+        "debug" => "dev",
+        name => name,
+    };
+    let output = command
+        .args([
+            "build",
+            "-q",
+            "-p",
+            "worker",
+            "--bin",
+            "worker-cli-fixture",
+            "--profile",
+            profile,
+        ])
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
         .output()
         .unwrap_or_else(|e| panic!("{label}: cargo build: {e}"));
     assert!(
@@ -319,13 +365,11 @@ fn host_b_config(fixture: &Fixture, pinned_nonce_for_a: u64, listen_addr: &str) 
 fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
-        // Story 16-1 / D-16-1-Q — an EMPTY scratch HOME, so this root finds no
-        // `<home>/control.json`, configures no operator door, and cannot
-        // collide with the second root below (or with the developer's own) on
-        // one endpoint. `HOME` and NOT `MAOS_HOME`: `MAOS_HOME` would redirect
-        // host A's whole Transparency Log away from `MAOS_AUDIT_DB`, which is
-        // the sink every assertion in this file reads.
-        .env("HOME", doorless_home::doorless_home())
+        .env_clear()
+        .env(
+            "HOME",
+            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+        )
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
         .env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
         .env("MAOS_COHORT_DAEMON_CONFIG", config)
@@ -335,6 +379,7 @@ fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    add_t3_environment(&mut command);
     command
 }
 
@@ -451,7 +496,11 @@ fn run_host_a_once(
 ) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
-        .env("HOME", doorless_home::doorless_home())
+        .env_clear()
+        .env(
+            "HOME",
+            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+        )
         .args([
             "run",
             "spirits/topologies/j1-founder-loop-crosshost.toml",
@@ -463,6 +512,7 @@ fn run_host_a_once(
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_DELEGATED_GOAL", goal)
         .env("PATH", target_debug_path());
+    add_t3_environment(&mut command);
     if let Some(nonce) = boot_nonce {
         command.env("MAOS_TEST_BOOT_NONCE", nonce.to_string());
     }
@@ -489,7 +539,11 @@ fn spawn_host_a_streaming(
 ) -> (RunningChild, CapturedPipes) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
-        .env("HOME", doorless_home::doorless_home())
+        .env_clear()
+        .env(
+            "HOME",
+            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+        )
         .args([
             "run",
             "spirits/topologies/j1-founder-loop-crosshost.toml",
@@ -508,6 +562,7 @@ fn spawn_host_a_streaming(
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    add_t3_environment(&mut command);
     let mut child = command.spawn().expect("spawn streaming host A");
     let stderr = child.stderr.take().expect("A stderr piped");
     let stdout = child.stdout.take().expect("A stdout piped");
@@ -615,6 +670,9 @@ fn published_nonce(text: &str) -> u64 {
 
 #[test]
 fn crosshost_sender_publishes_before_the_delegation_frame() {
+    if !t3_substrate::require_t3("F4 pairing V1 delegated Worker") {
+        return;
+    }
     build_fixture_binary("V1");
     let fixture = fixture("v1-row");
     let (host_b, port_b) = boot_until_listening(daemon_command(
@@ -679,6 +737,9 @@ fn crosshost_sender_publishes_before_the_delegation_frame() {
 
 #[test]
 fn pairing_hold_blocks_until_host_b_is_pinned_then_releases() {
+    if !t3_substrate::require_t3("F4 pairing V2 delegated Worker") {
+        return;
+    }
     build_fixture_binary("V2");
     let fixture = fixture("v2-hold");
     let port_b = reserve_port();
@@ -855,6 +916,9 @@ fn preexisting_ready_file_is_refused_before_publication() {
 // ── Vector 3 — NFR-Rel-6 survives the pairing path ──────────────────────────
 #[test]
 fn wrong_nonce_is_refused_and_recovery_requires_a_b_restart() {
+    if !t3_substrate::require_t3("F4 pairing V3 recovered delegated Worker") {
+        return;
+    }
     build_fixture_binary("V3");
     let fixture = fixture("v3-restart");
 

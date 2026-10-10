@@ -121,3 +121,13 @@ covered_changes = [
   "IAC_SEND_PEER_CLASSES",
 ]
 ratified_at = "2026-10-06"
+
+# Story 17-1 — field-level forward strictness; no schema version exists on cli_wrapper.
+# Operator ruling 2026-10-09 (Lunarpulse): ratified at the 17-1 close, text per D-5.
+[[ratification]]
+proposal_id = "17-1-AC2-cli-wrapper-egress"
+summary = "[cli_wrapper].egress typed host:port destinations; absent means empty allowlist; pre-17-1 readers ignore egress and never enforce it; from 17-1 unknown wrapper/posture keys are refused; schema 5 unchanged"
+adr_ref = "ADR-061"
+status = "ratified"
+covered_changes = ["CliWrapperConfig", "CliWrapperPosture", "EgressDestination"]
+ratified_at = "2026-10-09"

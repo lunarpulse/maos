@@ -2,32 +2,61 @@
 
 //! Story 8.12 · AC2/AC3/AC6 — live CliWrapper subprocess bridge under the daemon.
 //!
-//! Two Tier-1 (CI, hermetic) gates:
+//! Worker-subject scenarios use the signed T3 substrate on capable CI and emit
+//! a named local skip when OCI is not provisioned. The separate admission/denial
+//! control remains runnable without starting a Worker.
 //!  1. `maos run spirits/worker/manifest.toml --once` admits the `[cli_wrapper]`
 //!     Worker through the AC5 tier-grant + AC1 respawn gate + Story-7.4 journaled
-//!     shape probe, spawns the REAL `worker-cli-fixture` subprocess through the
-//!     live bridge, and journals its stdout as `CliSubprocessOutput=21` rows
-//!     ("the machine is real"). The emitted events carry the real child PID.
-//!  2. The founder-loop topology manifest (`spirits/topologies/j1-founder-loop.toml`)
-//!     runs the Orchestrator/Architect/Reviewer group under `maos run --once`,
-//!     exits 0, and drains through the production topology seam.
+//!     shape probe, spawns the REAL `worker-cli-fixture`, reports its real child
+//!     PID, and durably journals the fixture's completion marker.
+//!  2. The founder-loop topology runs through the production topology seam and
+//!     drains cleanly; the real Worker launch still requires provisioned T3.
 //!
-//! Every subprocess isolates `XDG_DATA_HOME` (8.11 journal-corruption lesson).
-
+//! Every production subprocess uses an isolated environment and data home.
+//!
 use std::process::Command;
+
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
+
+fn add_t3_environment(command: &mut Command) {
+    for key in [
+        "MAOS_T3_RUNTIME",
+        "MAOS_T3_IMAGE_LOCK_PATH",
+        "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ] {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+}
+
+fn production_command() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command.env_clear();
+    add_t3_environment(&mut command);
+    command.env("PATH", path_with_target_debug());
+    command
+}
 
 fn workspace_root() -> &'static str {
     concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
 }
 
 fn path_with_target_debug() -> std::ffi::OsString {
-    let mut paths = Vec::new();
-    paths.push(std::path::PathBuf::from(workspace_root()).join("target/debug"));
-    paths.push(std::path::PathBuf::from(workspace_root()).join("target/debug/deps"));
+    let profile = std::env::current_exe()
+        .expect("test executable path")
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("test profile directory")
+        .to_path_buf();
+    let mut paths = vec![profile.clone(), profile.join("deps")];
     if let Some(existing) = std::env::var_os("PATH") {
         paths.extend(std::env::split_paths(&existing));
     }
-    std::env::join_paths(paths).expect("target/debug PATH entries are valid")
+    std::env::join_paths(paths).expect("test PATH entries are valid")
 }
 
 struct IsolatedDataHome {
@@ -52,20 +81,20 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 
 #[test]
 fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
+    if !t3_substrate::require_t3("maos run cli-wrapper Worker") {
+        return;
+    }
     let home = isolated_data_home("cw-run");
-    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut command = production_command();
+    let output = command
         .args(["run", "spirits/worker/manifest.toml", "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(&home.path))
         .env("XDG_DATA_HOME", home.path.clone())
-        // MAOS_HOME isolated like `ci_local_split_refuses_a_granted_real_agent_without_the_live_flag`
-        // (the one test here that stayed green): without it `maos run` reads the
-        // runner's real `~/.maos/control.json` and the CI decoy (D-16-1-Q)
-        // correctly reds it with EndpointInUse — measured on cd4422ef.
+        // MAOS_HOME isolation avoids a host control.json endpoint collision.
         .env("MAOS_HOME", home.path.clone())
-        .env("PATH", path_with_target_debug())
         .current_dir(workspace_root())
         .output()
         .expect("failed to execute maos-bin");
-
     assert!(
         output.status.success(),
         "maos run worker --once must exit 0; stderr:\n{}",
@@ -104,21 +133,36 @@ fn maos_run_cli_wrapper_worker_spawns_real_subprocess() {
         .find(|e| e.get("event").and_then(|v| v.as_str()) == Some("cli_wrapper_exit"))
         .expect("a cli_wrapper_exit event");
     assert_eq!(exit.get("is_crash").and_then(|v| v.as_bool()), Some(false));
-    let lines = exit
-        .get("stdout_lines")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
+    let audit_db = home.path.join("audit").join("transparency.sqlite");
+    let connection = rusqlite::Connection::open_with_flags(
+        audit_db,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .expect("open Worker transparency log");
+    let marker_rows: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM transparency_log \
+             WHERE payload_redacted LIKE '%worker: task complete%'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count fixture completion output rows");
     assert!(
-        lines >= 3,
-        "the fixture emits 3 canned stdout lines, all journaled as CliSubprocessOutput rows; got {lines}"
+        marker_rows >= 1,
+        "the fixture's real completion output must be durably journaled"
     );
 }
 
 #[test]
 fn founder_loop_journey_runs_with_real_worker_subprocess() {
+    if !t3_substrate::require_t3("founder-loop delegated Worker") {
+        return;
+    }
     let home = isolated_data_home("founder");
-    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut command = production_command();
+    let output = command
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(&home.path))
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_HOME", home.path.clone())
         .current_dir(workspace_root())
@@ -185,16 +229,19 @@ fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag() {
     )
     .unwrap();
 
-    let mut path = std::ffi::OsString::from(&bindir);
-    path.push(":");
-    path.push(std::env::var_os("PATH").unwrap_or_default());
-
-    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut command = production_command();
+    let output = command
         .args(["run", manifest.to_str().unwrap(), "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(&home.path))
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_HOME", home.path.clone())
         .env("MAOS_HOST_GRANTS", &grants)
-        .env("PATH", path)
+        .env("PATH", {
+            let mut path = std::ffi::OsString::from(&bindir);
+            path.push(":");
+            path.push(path_with_target_debug());
+            path
+        })
         .env_remove("MAOS_LIVE_AGENT")
         .current_dir(workspace_root())
         .output()
@@ -220,10 +267,15 @@ fn ci_local_split_refuses_a_granted_real_agent_without_the_live_flag() {
 /// constant must NOT appear, proving override rather than append.
 #[test]
 fn delegated_goal_reaches_the_frame_verbatim_with_non_ascii() {
+    if !t3_substrate::require_t3("founder-loop delegated goal Worker") {
+        return;
+    }
     let home = isolated_data_home("goal");
     let sentinel = "write a haiku to ./h.txt about a café — sentinel ✓ 2e-F7 §A6-P10";
-    let output = Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut command = production_command();
+    let output = command
         .args(["run", "spirits/topologies/j1-founder-loop.toml", "--once"])
+        .env("HOME", t3_substrate::isolated_runtime_home(&home.path))
         .env("XDG_DATA_HOME", home.path.clone())
         .env("MAOS_HOME", home.path.clone())
         .env("MAOS_DELEGATED_GOAL", sentinel)

@@ -52,11 +52,7 @@ pub enum CliWrapperAdmissionError {
     #[error("CLI probe failed for {cli}: {reason}")]
     ECliProbeFailed { cli: String, reason: String },
 
-    /// Story 8.12 AC5 (FORK A — host-grant tier model). A CliWrapperSpirit
-    /// manifest **requested** a sandbox tier that the host-side grant allowlist
-    /// (operator config, NOT in the artifact) does not grant for this Spirit's
-    /// attested-image + signing-key. Fail-closed — NO silent downgrade. The
-    /// artifact under least trust never decides its own sandbox.
+    /// The host refuses the artifact's requested tier; no silent downgrade.
     #[error(
         "CliWrapperSpirit tier not granted: manifest requested tier {requested} but the host \
          grant allowlist permits {permitted} for image '{attested_image}' (fail-closed, no downgrade)"
@@ -79,4 +75,12 @@ pub enum CliWrapperAdmissionError {
          (deferred to Epic 10 / NFR-Rel-3 HSIS); admission fails closed — no silent downgrade"
     )]
     ERespawnWithContextUnsupported,
+
+    /// Egress requests require a configured daemon proxy and host permission.
+    #[error("CliWrapperSpirit egress proxy unavailable")]
+    EEgressProxyUnavailable,
+    #[error("CliWrapperSpirit egress destination not granted: {destination}")]
+    EEgressNotGranted {
+        destination: crate::host_grant::EgressDestination,
+    },
 }

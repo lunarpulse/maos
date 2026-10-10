@@ -9,12 +9,12 @@
 
 | ID | Decision | Status |
 |---|---|---|
-| **D-17-1-FW-01** | The kernel **locations** for 17-1 are `lifecycle/cli_wrapper/runtime.rs`, `security/sandbox/t3/spawn.rs`, `t3/argv.rs`, `lifecycle/cli_wrapper/admission.rs` and — by the measurement — `lifecycle/cli_wrapper/lifecycle.rs` (a test struct literal, +1). `security/manifest.rs`, named by the epic, is a 9-line `pub use maos_manifest::*` shim and carries **0**. | **Ratified 2026-10-06** — a charter, not a number |
+| **D-17-1-FW-01** | The kernel **locations** for 17-1 are `lifecycle/cli_wrapper/runtime.rs`, `security/sandbox/t3/spawn.rs`, `t3/argv.rs`, `lifecycle/cli_wrapper/admission.rs` and — by the measurement — `lifecycle/cli_wrapper/lifecycle.rs` (a test struct literal, +1). `security/manifest.rs`, named by the epic, is a 9-line `pub use maos_manifest::*` shim and carries **0**. **Extended 2026-10-07 (story Q10, deletion-only):** `security/sandbox/t3/cap_audit_bridge.rs` and `t3/quarantine.rs` are deleted, with their two `pub mod` lines in `t3/mod.rs` — no line may be *added* to these three locations. | **Ratified 2026-10-06** — a charter, not a number; deletion-only extension ruled 2026-10-07 |
 | **D-17-1-FW-02** | The **numerical ceiling**: variant **B** (delete the dead `ci_default_guard`) — `src_lines` 25293 → **25353** (+60), kloc 19529 → **19564**; or variant **A** (keep it) — 25425 (+132), 19621. The landing commit re-measures after `cargo fmt --all` and re-pins the exact figure; it may not exceed the ratified one without a new request. | **Ratified 2026-10-06: variant B** (≤ 25353 / ≤ 19564) |
 | **D-17-1-FW-03** | Out-of-kernel ceilings: `maos-domain` 9270 → **9274** (measured); `maos-manifest` **no raise** (4445 measured, +29 free); `maos-bin`, `maos-egress` (phantom row 780 → exact), `xtask` — exact measured raises **at landing**; **`_aggregate_hardfail` 170884** — the aggregate has **+450** free against an envelope of **+585…+1182**, so an exact raise at landing is part of the request. | **Ratified 2026-10-06:** exact at landing; `_aggregate_hardfail` raise ≤ +1182 |
 | **D-17-1-FW-04** | **ADR-061 M3 amendment** (text below): transport by a daemon-owned Unix socket bind-mounted into a `--network=none` container; *on host loopback* superseded; bearer daemon-minted; stale cites corrected. | **Ratified 2026-10-06** — written as `## Amendment — Story 17-1 (transport; ratified 2026-10-06)`, body-anchored in `xtask/tests/decision_adrs_and_provisioning.rs` |
 | **D-17-1-FW-05** | Story status: **`backlog`** until FW-02…FW-04 are ruled and Q1–Q7 of the story are answered. The parent moves it to `ready-for-dev` (17-6 precedent, `f86b5d4f`). | **Done 2026-10-06** — `ready-for-dev` |
-| **D-17-1-FW-06** | Optional further kernel offset, **unmeasured**: `t3/cap_audit_bridge.rs` (35 lines) and `t3/quarantine.rs` (73 lines) have zero callers (R17-83). Not taken: they are not this story's code. | Named only |
+| **D-17-1-FW-06** | Kernel offset: `t3/cap_audit_bridge.rs` (35 lines, fire-and-forget `emit_t3_escape_block`, superseded by D-10's confirmed write) and `t3/quarantine.rs` (73 lines, `quarantine_spirit`, a stub that always returns `Err` and whose doc falsely claims the revocation applier calls it) have zero callers (R17-83/R17-89). Measured at landing (≈ −110 `src_lines`; tokei unmeasured); file set 98 → 96. It lowers the landing figure and absorbs the lines the prototype omitted (story F-9, D-15); it is **never** spent as a raise elsewhere. | **Taken 2026-10-07** (story Q10 / D-16) |
 
 ## Evidence and boundary
 
@@ -68,3 +68,214 @@ The operator decides FW-02/03/04. If approved, the **landing commit** re-pins in
 - **Story:** created, validated against the create-story checklist, **`backlog`** — *story created 2026-10-06; awaiting operator kernel grant*. 17-1 does **not** start development until the operator rules FW-02…FW-04 and Q1–Q7.
 - **Operator questions:** Q1 (variant A/B + aggregate), Q2 (ADR amendment), Q3 (one story or two), Q4 (exit lines 2/3 on 24/26), Q5 (admission executes the manifest binary on the host; `deny_unknown_fields` owner), Q6 (hermetic-suite sweep), Q7 (escape-corpus scope) — in the story.
 - **Ruling (2026-10-06, Lunarpulse):** FW-02 variant B; FW-03 exact at landing, aggregate ≤ +1182; FW-04 ratified; Q3 one story / two commits; Q4 fix at origin; Q5 probe → `19-3`, `deny_unknown_fields` → `20-3c`; Q6 D-8 triage; Q7 five `--network=none` scenarios. Story moved `backlog` → `ready-for-dev`; rulings table in the story §Operator questions.
+- **Ruling (2026-10-07, consensus under the operator's decision rule — long-term correctness, PRD strictly, correct drift, honour contracts, fill gaps along the roadmap):** story Q8–Q11 (D-5, D-14…D-17). For this record: FW-01 extended deletion-only and FW-06 taken (Q10); FW-02's ceiling unchanged (25353 / 19564) and now expected to be undershot; FW-03's `maos-domain` 9274 is **exceeded by D-14** (Q9: `EgressDestination` beside `HostGrant`), so the landing returns its exact figure to the operator as a new request (ledger envelope *17 +25–50*), with D-14's `maos-manifest` fallback if refused; FW-03 gains a `maos-capability` decrease (D-16 removes two `AuditDropSite` variants). Q5's `deny_unknown_fields` owner moves from `20-3c` to 17-1 (Q8).
+- **Operator sign-off (2026-10-07, Lunarpulse — binding):** S1 approved (`deny_unknown_fields` on `[cli_wrapper]` in 17-1; Q5's second half superseded; schema-version gap → `20-5`); **S2 approved — FW-03 `maos-domain` ceiling 9274 → ≤ 9320** (covers the two variants and D-14's `EgressDestination`; exact figure pinned at landing; D-14's `maos-manifest` fallback retired); **S3 approved — FW-01 deletion-only extension and FW-06 taken** (FR13 quarantine semantics → `20-1`). FW-02's kernel ceiling (≤ 25353 / ≤ 19564) is unchanged.
+
+## Development measurement request — 2026-10-07 (not ratified)
+
+The Task-1 candidate is formatted with `cargo fmt --all` and measured by the
+existing `xtask kloc-check --json` instrument. `maos-domain` is **9333** versus
+the signed S2 ceiling **9320**: **13 LOC over the ceiling**, **63 LOC over the
+9270 baseline**. The candidate contains `EgressDestination` (strict DNS/IPv4
+authority parsing, canonical serialization, legacy bare grants meaning port
+443), typed grant carriers, the two admission errors, and the required migration
+of the existing in-source grant fixture. The parser reuses its input allocation
+and serialization uses `collect_str`; grammar and length checks are retained.
+
+The first parser measurement was 9326. Simplifying port parsing and replacing
+the obsolete egress-grant commentary reduced the parser-only candidate to
+9321. The complete typed candidate above is the request, not a ratification.
+No KLOC ledger, kernel baseline, surface pin, or model allowlist was changed.
+Development is halted at Task 1 pending a revised domain ceiling; the kernel
+and aggregate grants remain unchanged. The manifest measures **4456**, within
+its unchanged **4474** ceiling; aggregate candidate **170839** is below the
+existing hard-fail **170884**. `maos-bin` measures **24607**, whose exact landing
+row is already authorized by FW-03.
+
+### Operator ruling — 2026-10-08
+
+Lunarpulse selected **Authorize ceiling 9,333** for the measured Task-1 domain
+candidate: S2 / FW-03 is revised from ≤ 9320 to **≤ 9333**, exact at landing.
+Kernel and aggregate ceilings are unchanged; no ledger or pin moves before
+the landing re-measurement. This clears the domain-grant halt above.
+
+### Operator sequencing and interim-validation ruling — 2026-10-08
+
+Lunarpulse selected **Move 1.5 after Task 5**: complete the published
+`enforced` disposition only after the real T3 proxy route is exercised.
+Subtasks 1.1–1.4 retain their original order; Task 1 remains incomplete until
+1.5 is verified. This avoids publishing containment before the control exists.
+
+Lunarpulse selected **Allow interim advancement**: Tasks 1–8 may advance on
+green focused behavioral tests while landing-dependent governance pins await
+Task 9. Final full-regression and code-quality gates remain mandatory before
+the story can enter `review`. Neither ruling relaxes any acceptance criterion
+or increases a kernel, aggregate, or package ceiling.
+
+### Operator Codex routing ruling — 2026-10-08
+
+Lunarpulse selected **Use explicit CLI config override** after primary-source
+research found that current Codex no longer reads `OPENAI_BASE_URL`. The
+adapter supplies `-c openai_base_url="http://127.0.0.1:18080/api.openai.com:443/v1"`.
+This is an explicit exception for the **non-secret base URL**, not credentials:
+the scoped bearer stays only in `CODEX_API_KEY`; the raw key stays in the
+daemon proxy; every podman `--env` argument still contains a name only.
+The obsolete environment-only Codex route is removed, not retained as a shim.
+Claude continues to use `ANTHROPIC_BASE_URL` and scoped `ANTHROPIC_API_KEY`.
+
+Evidence: Codex `rust-v0.155.1` `core/src/config/mod.rs` consumes the
+`openai_base_url` config field at lines 3744–3750
+([source](https://github.com/openai/codex/blob/rust-v0.155.1/codex-rs/core/src/config/mod.rs#L3744-L3750));
+the CLI documents `--config, -c key=value`
+([reference](https://developers.openai.com/codex/cli/reference)).
+
+### Task-4 credential-custody location request — 2026-10-08 (not ratified)
+
+FW-01 omits three subprocess-owning T3 files:
+`runtime_detect.rs` (runtime version probe), `image_verify.rs` (image
+inspection), and `child.rs` (container stop/removal). Their commands inherit
+the daemon environment. Clearing only the `run` command would leave these
+children holding the vendor key, contrary to AC3 and the security mandate.
+
+An actual invocation of `inspect_image_sha` against a controlled temporary
+runtime parsed its registry digest and independently observed the public
+`CODEX_API_KEY` sentinel in that child. No real key was used. The throwaway
+source was removed; evidence is
+`17-1-evidence/development-custody-charter-2026-10-08.json`.
+
+Request: extend FW-01 to those three locations **only for using the common
+scrubbed runtime-command path** (`env_clear`, then PATH/HOME/XDG_RUNTIME_DIR/
+DBUS_SESSION_BUS_ADDRESS). Detection, image/container inspection, run, kill,
+stop and removal use the same custody boundary. No unrelated changes and no
+ceiling raise: kernel remains ≤ 25353 / ≤ 19564; aggregate raise remains
+≤ 1182. The kernel behavior cutover has not started pending this ruling.
+
+### Operator custody-location ruling — 2026-10-09
+
+Lunarpulse selected **Extend custody locations**. FW-01 now also permits
+`security/sandbox/t3/{runtime_detect,image_verify,child}.rs` **only to use the
+shared scrubbed runtime-command path**. No unrelated behavior change is
+authorized in these three files. Kernel source/KLOC ceilings remain
+≤ 25353 / ≤ 19564 and aggregate raise remains ≤ 1182. The Task-4 location
+prerequisite is cleared.
+
+### Operator HALT-clearance and native-compile ruling — 2026-10-09
+
+Lunarpulse selected **Resume targeted fixes** after the three-consecutive-
+implementation-failure HALT. Correct the environment tuple iterator and
+bounded reader reborrow, then rerun focused regressions and the actual kernel
+smoke. Task 4 remains unchecked until every applicable gate passes.
+
+Lunarpulse selected **Authorize native compile CI**: the throwaway-branch
+authorization now also permits **one macOS compile job and one Windows
+compile job** for the Task-4 platform gate. Reuse the existing all-workspace/
+all-targets check commands with explicit runner labels; keep `contents: read`,
+no repository secrets, purpose-named `ci/17-1-*` branches, evidence captures
+and branch deletion. This exception does not alter the main-branch
+`macos-check` single-job contract or authorize other native-runner jobs.
+Kernel/domain/aggregate ceilings and final completion gates are unchanged.
+
+### Operator native-portability HALT clearance — 2026-10-09
+
+Lunarpulse selected **Resume targeted repairs** after three native CI
+iterations failed the exhaustive Windows all-targets check. Repair the three
+identified test locations at origin: `maos-audit`'s unit-test file symlink,
+the spirit-publish key fixture's POSIX permissions, and the kernel resource
+ceiling test's `unwrap_err` Debug requirement. Retain behavioral refusal
+assertions and the exhaustive native check. No production-handle Debug
+exposure, dependency addition, warning suppression or numerical-ceiling
+raise is authorized. Task 4 remains unchecked pending verification.
+
+### Operator Task-6 prerequisite sequencing ruling — 2026-10-09
+
+Lunarpulse selected **Move the fixture prerequisite**: implement Task 7's
+complete `worker-probe-fixture` and its four admission integrations before
+Task 6's verification/prebuild gate. The rest of Task 7 remains after Task 6.
+No acceptance criterion, test, CI proof, numerical threshold or final gate is
+removed. Task 6 remains unchecked until its complete verification passes.
+
+### Operator Task-6 HALT clearance and remaining native proof — 2026-10-09
+
+Lunarpulse selected **Resume targeted correction**: distinguish explicitly local
+non-CI checks from declared-capable CI, preserving hard refusal on CI without
+the signed substrate. Replace the obsolete empty token-list expectation with
+actual bound-token observation and revocation verification; retain crash,
+orphan, disposition and cleanup assertions. Resume the authorized real T3
+proofs. No test budget, acceptance criterion or numerical ceiling is lowered.
+
+Lunarpulse selected **Extend native compile scope**: the existing throwaway-
+branch permission also covers the remaining story snapshot with one
+macOS-15 ARM64 compile job and one Windows-2025 X64 compile job, the same
+exhaustive commands, `contents: read`, no repository secrets, captured
+receipts and purpose-branch deletion. Main platform-job contracts are unchanged.
+
+### Capable Task-6 verification HALT request — 2026-10-09 (not approved)
+
+Three consecutive capable Linux iterations failed: `37909394818`,
+`37910898713`, `37915868047`. Step-5 HALT applies before further implementation.
+The latest snapshot `df5a5a7d958da989dca48bcaf2aa03752eef6b96` passes the actual
+negative/positive static probe, live kernel T3 custody boundary, complete
+Darwin workspace check and Windows build/complete workspace check. The moved
+probe/admission prerequisite is runtime-proven; Task 6 and parent Task 7 are
+not complete.
+
+Both Ubuntu images execute the unchanged 99-test sweep: 77 pass, 22 fail
+across seven targets. Actual errors include `image not known` in isolated-home
+Root subprocesses and `PID not available after 10 attempts` in the direct
+Host-B ordinary fixture. Downstream stall and named-container assertions time
+out. [INFERENCE] isolated `HOME` selects a different rootless image store,
+and the ordinary fixture exits before PID inspection observes it.
+
+Requested guidance: **Resume targeted test-infrastructure repairs**. Preserve
+application state isolation while retaining the provisioned OCI image store,
+and make T3 fixture lifetime cover actual inspection without changing native
+supervision budgets. No production retry/bare fallback, inherited secret,
+declared-capable skip, numerical raise or reduced final gate is requested.
+Durable evidence: `17-1-evidence/development-capable-halt-2026-10-09.json`,
+the three full capable artifact archives and exact runner captures.
+No implementation patch follows the third failed verdict.
+
+### Operator capable-sweep HALT clearance — 2026-10-09
+
+Lunarpulse replied **continue** to the preceding targeted-repair proposal.
+Resume test-infrastructure image-store selection and fixture-lifetime repairs,
+then the complete capable matrix and remaining story. Preserve real T3,
+environment custody, hard refusal on declared-capable CI, native supervision
+budgets, numerical ceilings and every final acceptance gate. The existing
+bounded native compile-pair authorization remains unchanged.
+
+### Capable-sweep HALT request after clearance — 2026-10-09 (not approved)
+
+Iterations `37928459013`, `37932612178` and `37934183235` failed consecutively,
+each closer: 22 failures, then 3 failures plus a hang, then 1 failure, then 1.
+Two production defects were exposed and fixed with RED/GREEN regressions:
+FR4 Spirit resolution displaced by the T3 report's pid-0 journal echo, and
+Worker egress socket directories colliding across roots sharing one data home
+or after a crash. The latest snapshot passes 98/99 on both Ubuntu images with
+zero T3 skips; Darwin and Windows pass.
+
+The remaining failure is the migrated cohort v5c assertion `exit == 1`. That
+value was T0's grace-path exit while a descendant held the pipe. Under T3 the
+named-container stop removes the descendant, and the daemon exits through
+ordinary teardown; v5 exits 0 in 4/4 capable runs. Requested guidance:
+**Resume the single v5c test correction** to v5's teardown contract, then
+re-run the complete capable matrix. No production change, skip, retry or
+threshold change is requested.
+
+### Operator rulings — 2026-10-09
+
+Lunarpulse **approved the one-line cohort v5c test correction**, clearing the
+post-clearance capable-sweep HALT for that correction and the complete capable
+re-run. Lunarpulse also **approved the code-size budget request for
+ratification at landing**: Task 9 pins the exact `cargo fmt`-measured
+per-crate rows and `_aggregate_hardfail` (latest measured aggregate 173146)
+in the landing commit. The figure is ratified at landing, not pre-raised.
+Tasks 7–11 add production lines only with a measured driver. The T3
+exit-code 137 question is under analysis, not ruled.
+
+Later the same day Lunarpulse **ruled A on the T3 exit code**: a SIGKILLed
+Worker stays recorded as `exited(code=137)` / `fault.non-zero-exit`, and the
+cookbook documents it. Authoritative OOM/signal facts are proposed for
+`17-2-worker-cgroups-applied`. At Task 11 Lunarpulse **ratified** the ABI
+entry `17-1-AC2-cli-wrapper-egress` and assigned the §A6 review to the
+`review` phase. Landed aggregate 173289; `_aggregate_hardfail` 173290.

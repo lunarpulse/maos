@@ -11,44 +11,46 @@ Supersedes: ambient vendor-key inheritance by the production `cli_wrapper` Worke
 
 ## Context
 
-The production Worker path is the `[cli_wrapper]` subprocess launched by
-`spawn_and_bridge` at
-`crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:449-472`.
-`Command::new` inherits the parent environment, then overlays `BridgeSpawnSpec`
-environment entries. It does not call `env_clear`.
+The production `[cli_wrapper]` Worker enters
+`crates/maos-bin/src/worker_spawn.rs` and reaches `spawn_and_bridge` in
+`crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`. Story 17-1
+replaces the former ambient vendor-key inheritance at this boundary. Plain
+command and admission-probe children use `env_clear`; only explicitly selected
+non-secret environment entries are restored.
 
-That behavior is intentional at HEAD. The adapter contract in
-`crates/maos-bin/src/worker_cli.rs:121-148` says MAOS has no credential channel:
-the operator exports a vendor key into the daemon environment and the child
-inherits it. `credential_env_var` exists for scanning and redaction evidence,
-not for injection.
+The T3 arm requires a verified `T3Launch`, never a bare host process. Its image
+lock is signature-verified against the configured trust anchor and its runtime
+argv keeps `--network=none`. The Worker's lease supplies a per-spawn Unix socket,
+mounted at `/proxy/egress.sock`; the std-only forwarder exposes the vendor-compatible
+loopback endpoint inside that network namespace. Only a daemon-minted scoped
+bearer reaches the child, through the adapter's explicit environment. A Codex
+base-URL CLI-config override is non-secret and follows the hash-bound prefix,
+before task arguments; Claude uses its supported URL environment variable.
 
-The live regression guard is explicit. In
-`crates/maos-cli/tests/credential_posture_2c.rs`, the test asserts
-`!RUNTIME_SRC.contains("env_clear")` because clearing the environment before a
-replacement credential path exists breaks the paid Worker.
+The daemon owns the raw vendor credential and the hash-only bearer table.
+Authorization is the exact intersection of the typed manifest egress list and
+the host-managed grant, bound to Worker identity, destination and expiry.
+Neither the endpoint adapter nor the child receives the raw vendor key.
 
-T3 container isolation is a separate current path. Its argv builder at
-`crates/maos-kernel-core/src/security/sandbox/t3/argv.rs:66-83` emits
-`--network=none`, and its spawn path passes no `-e` environment flags. The only
-production `spawn_t3` caller is currently a diagnostic busybox smoke, not the
-production `cli_wrapper` Worker. T3 is the isolation model, not evidence that
-the Worker is already protected.
+T3 currently admits only Raw/Signals and NdjsonOverStdio/Signals. All seven
+stdin-keeping combinations refuse at load, before probing or Worker binding.
+The first production stdin writer owns interactive container support; 17-1
+does not silently approximate it.
 
-The manifest has no egress contract. `SandboxConfig` contains only tier and
-image pin. Epic 17's `[network]`/egress schema is priced against
-`maos-manifest`, not `maos-domain`.
+The obsolete inheritance/source-wording guard in
+`crates/maos-cli/tests/credential_posture_2c.rs` is retired rather than re-pinned.
+Executable child-environment and probe regressions cover custody. This ADR's
+anti-rot gate now parses the actual plain-command `env_clear` control, so prose,
+comments and an unrelated test assertion cannot satisfy the architecture anchor.
+The stored-credential escape/non-disclosure tests remain.
 
-No daemon-side egress proxy exists. The wire-stable `CapabilityToken` at
-`crates/maos-domain/src/invariants/i1.rs:175-185` carries token id, Spirit pid,
-expiry, and signature. It has no audience, proxy scope, or secret material.
-Scope is registry-side through `TokenIssuer::get_token_scope` at
-`crates/maos-domain/src/ports/capability.rs:28-29`. “Scoped credential” is
-therefore a design obligation, not a primitive already available.
+The wire-stable `CapabilityToken` remains unchanged: its authorization scope is
+registry-side, and no proxy audience or secret is added to that ABI. The dedicated
+proxy bearer provides the separate narrowed credential channel.
 
 The Transparency Log append entry point is
 `TransparencyLogAdapter::insert_frame_event` at
-`crates/maos-iac/src/adapter/transparency_log.rs:596`. Its log-before-deliver
+`crates/maos-iac/src/adapter/transparency_log.rs:612`. Its log-before-deliver
 contract is fail-closed and existing write failures panic; the proxy must not
 weaken or silently bypass that behavior. It must also respect the enforced
 `maos-a2a-tcp` to `maos-kernel-core` dependency barrier.
@@ -155,7 +157,7 @@ the guard inversion in the same commit).
   stored by the proxy only as a hash, and verified at the proxy boundary.
 - **Refusals are journaled by a confirmed write.** The proxy journals every
   refusal through `TransparencyLogAdapter::insert_frame_event`
-  (`crates/maos-kernel-core/src/iac/transparency_log.rs`) before it returns the
+  (`crates/maos-iac/src/adapter/transparency_log.rs:612`) before it returns the
   refusal.
 - **The kernel figure is measured, not projected.** SUPERSEDES the Decision's
   *"projected `+65–130` kernel lines … zero local headroom at 18935/18935"*
@@ -167,3 +169,12 @@ the guard inversion in the same commit).
   `xtask` rows are raised to their exact measured figures in the landing
   commit; the `_aggregate_hardfail` raise is capped at +1182 lines, the top of
   17-1's measured envelope.
+- **Landed figures (operator rulings 2026-10-07 to 2026-10-09).** SUPERSEDES
+  the previous bullet's `maos-domain` 9274 and its +1182 aggregate cap. The
+  operator raised the `maos-domain` ceiling to 9333 (S2 2026-10-07, revised
+  2026-10-08) and ratified the per-crate rows and `_aggregate_hardfail` at their
+  exact measured landing values (2026-10-09). The kernel ceiling did not move.
+  The landing commit pins `maos-kernel-core/src` 25212 lines in 96 files (the
+  two dead T3 emitters deleted, D-16) and kloc 19513. It also pins `maos-domain`
+  9329, `maos-bin` 25247, `maos-egress` 1716, `xtask` 44370, and
+  `_aggregate_hardfail` 173290 against a measured aggregate of 173289.

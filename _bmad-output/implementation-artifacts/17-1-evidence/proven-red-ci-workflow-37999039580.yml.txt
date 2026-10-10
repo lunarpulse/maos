@@ -1,0 +1,84 @@
+name: 17-1-proven-red
+'on':
+  push:
+    branches:
+    - ci/17-1-red-20261009
+permissions:
+  contents: read
+jobs:
+  t3-escape-corpus:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+        - ubuntu-24.04
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        persist-credentials: false
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: t3-escape-corpus-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+    - uses: ./.github/actions/provision-t3-test-substrate
+    - name: Build the static network-escape probe
+      run: RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path crates/maos-eval/test-fixtures/t3-network-escape-probe/Cargo.toml
+    - name: Run the T3 escape corpus and the network executor
+      shell: bash
+      run: "set +e\ncargo test --locked -p maos-eval --test t3_escape_corpus --test t3_network_escape_executor --release -- --nocapture 2>&1 | tee t3-escape.log\nrc=${PIPESTATUS[0]}\nexecuted=$(grep -c '^T3-ESCAPE-EXECUTED ' t3-escape.log)\nlabelled=$(grep -c '^T3-ESCAPE-UNEXECUTED .* owner=20-3a-gate-honesty$' t3-escape.log)\ngrep '^T3-ESCAPE-EXECUTED ' t3-escape.log | while IFS= read -r line; do\n  echo \"::notice title=T3 escape corpus (${{ matrix.image }})::${line#T3-ESCAPE-EXECUTED }\"\ndone\ngrep '^T3-NETWORK-MATRIX ' t3-escape.log | while IFS= read -r line; do\n  echo \"::notice title=T3 escape corpus (${{ matrix.image }})::${line}\"\ndone\ngrep -E 'panicked at' t3-escape.log | head -3 | while IFS= read -r line; do\n  echo \"::error title=T3 escape corpus (${{ matrix.image }})::${line}\"\ndone\nif grep -q '^SKIP ' t3-escape.log; then rc=1; echo \"::error title=T3 escape corpus (${{ matrix.image }})::a SKIP line was printed\"; fi\nif [ \"$executed\" -ne 5 ] || [ \"$labelled\" -ne 20\
+        \ ]; then\n  rc=1\n  echo \"::error title=T3 escape corpus (${{ matrix.image }})::executed=$executed (want 5) labelled=$labelled (want 20)\"\nfi\necho \"::notice title=T3 escape corpus (${{ matrix.image }})::rc=${rc} executed=${executed}/25 unexecuted=${labelled} owner=20-3a-gate-honesty\"\nexit \"$rc\"\n"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: red-t3-escape-corpus
+        path: t3-escape.log
+        if-no-files-found: warn
+  epic-17-exit:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+        - ubuntu-24.04
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        persist-credentials: false
+    - uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+    - uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: epic-17-exit-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+    - name: Keep build and image temporaries off /tmp
+      run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+    - uses: ./.github/actions/provision-t3-test-substrate
+    - name: Build the Worker root and the static probe fixture
+      run: 'cargo build --locked -p maos-bin --bin maos
+
+        cargo build --locked -p maos-cli --bin maosctl
+
+        RUSTFLAGS=''-C target-feature=+crt-static'' cargo build --locked -p worker --bin worker-probe-fixture --target x86_64-unknown-linux-gnu
+
+        '
+    - name: "Epic-17 exit lines 1 and 1b \u2014 Worker sandbox, egress refusal, audit query"
+      shell: bash
+      run: "set +e\npython3 scripts/epic_17_exit_line1.py --maos target/debug/maos \\\n  --probe target/x86_64-unknown-linux-gnu/debug/worker-probe-fixture \\\n  --output epic-17-exit-line1 --image ${{ matrix.image }} 2>&1 | tee line1.out\nrc=${PIPESTATUS[0]}\nif grep -q '^SKIP ' line1.out; then rc=1; echo \"::error title=Epic-17 exit line 1 (${{ matrix.image }})::a SKIP line was printed\"; fi\nif [ \"$rc\" -eq 0 ] && ! grep -q '^::notice title=Epic-17 exit lines 1/1b .*3 Kernel-origin kind-8 rows' line1.out; then\n  rc=1\n  echo \"::error title=Epic-17 exit line 1 (${{ matrix.image }})::the runner exited 0 without its verified kind-8 verdict\"\nfi\nexit \"$rc\"\n"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: red-epic-17-exit
+        path: 'line1.out
+
+          epic-17-exit-line1/
+
+          '
+        if-no-files-found: warn

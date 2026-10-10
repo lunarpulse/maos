@@ -158,11 +158,13 @@ rewritten except where a point says it supersedes them.
   unknown `version` or a non-`tcp://` scheme: the version field is what lets a
   future transport (a Unix socket dissolves half this threat model) change the
   shape without old readers guessing.
-- **Residual threat, stated plainly.** Until Story 17-1 lands, a Worker
-  inherits the daemon's environment and runs as the operator uid, so a bare,
-  prompt-injectable agent CLI can read the `0600` `control.json` and use any
-  exported `MAOS_OPERATOR_BEARER_TOKEN`. The cure is 17-1's own `env_clear`
-  plus T3 isolation; naming it here is not a fix and must not read as one.
+- **Residual threat, stated plainly — closed by Story 17-1.** Before 17-1, a
+  Worker inherited the daemon's environment and ran as the operator uid, so a
+  bare, prompt-injectable agent CLI could read the `0600` `control.json` and use
+  any exported `MAOS_OPERATOR_BEARER_TOKEN`. Since 17-1 every Worker runs in a
+  verified T3 rootless container with no host home mounted and only the named
+  `--env` entries MAOS passes, so neither is reachable; this surface itself is
+  unchanged.
 - **The `operation_id` contract.** A `503 handler_still_running` carries the
   id the PORT minted (the port, never the server — the server cannot know what
   it did not submit); the command runs to completion and writes exactly one

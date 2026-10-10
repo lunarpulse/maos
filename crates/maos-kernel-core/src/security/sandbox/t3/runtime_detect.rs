@@ -10,7 +10,6 @@
 //! Operator override: `MAOS_T3_RUNTIME=podman|docker|auto|none`.
 
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::OnceLock;
 
 use maos_domain::sandbox::{ContainerRuntimeKind, T3Error};
@@ -69,13 +68,13 @@ fn select_auto_runtime(
 
 /// Probe a single runtime binary by running `<path> --version`.
 fn probe_runtime(bin: &str, kind: ContainerRuntimeKind) -> Result<ContainerRuntime, T3Error> {
-    let output = Command::new(bin)
+    let output = super::spawn::runtime_command(bin)
         .arg("--version")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .and_then(|child| child.wait_with_output())
-        .map_err(|e| T3Error::Io(format!("probe {bin}: {e}")))?;
+        .map_err(|error| T3Error::Io(format!("probe {bin}: {error}")))?;
 
     if !output.status.success() {
         return Err(T3Error::RuntimeUnavailable);

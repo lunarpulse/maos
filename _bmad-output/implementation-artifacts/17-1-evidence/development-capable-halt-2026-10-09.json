@@ -1,0 +1,45 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-09",
+  "workflow_state": "HALTED: Step 5 three consecutive capable Linux verification iterations failed",
+  "failed_iterations": [37909394818, 37910898713, 37915868047],
+  "latest_run": {
+    "id": 37915868047,
+    "commit": "df5a5a7d958da989dca48bcaf2aa03752eef6b96",
+    "url": "https://github.com/lunarpulse/maos/actions/runs/37915868047",
+    "branch": "ci/17-1-sweep-20261009t0858",
+    "artifact_archive": "capable-snapshot-37915868047.tar.gz",
+    "terminal_metadata": "capable-snapshot-37915868047.jobs.json",
+    "linux": {
+      "ubuntu_24_04": {"job": 113771769249, "passed_sweep": 77, "failed_sweep": 22, "suites": 8},
+      "ubuntu_26_04": {"job": 113771769149, "passed_sweep": 77, "failed_sweep": 22, "suites": 8},
+      "failed_targets": ["drain_once_audit_writer", "f4_pairing", "root_shutdown_unload_16_3", "smoke_cli_wrapper_8_12", "two_host_delegation_2b", "worker_completion_2a", "worker_supervision_16_3"],
+      "observed_errors": ["Root subprocess image inspection refuses 'image not known' under isolated test homes", "Direct Host-B fixture spawn refuses 'PID not available after 10 attempts'", "Downstream stall/completion assertions and named-OCI discovery time out because their Worker did not launch"],
+      "cause_inferences": ["Isolated HOME selects a different rootless Podman image store from the provisioner's HOME", "The ordinary worker-cli-fixture exits before T3 PID inspection can observe it"],
+      "unreached_commands": ["journey_j1 runtime test", "CI native crash/hang corpora", "actual deterministic demo-j1"]
+    },
+    "verified_before_sweep_failure_on_both_linux_images": [
+      "Real immutable image pull and rootless nonroot/read-only/network-none shell",
+      "Per-run OpenSSL Ed25519 signature accepted by the production kernel image lock and real spawn path",
+      "Static ELF64/x64 probe has no PT_INTERP",
+      "Both retained probe response-framing tests passed",
+      "Actual negative Root Worker completed and emitted the exact three independently queried kind-8 intents, all Kernel-origin 3",
+      "Actual guest direct loopback/public dial errno 111/101 and forwarded forbidden request HTTP 403",
+      "Actual guest environment keys only, no operator-prefixed or vendor key",
+      "Actual positive Root Worker completed through the proxy with HTTP 200 and exact EPIC17_HERMETIC_ECHO body; independently queried zero kind-8 rows",
+      "All six manifest/admission tests passed, including the hermetic probe and empty built-in grant boundary",
+      "Five typed kernel route tests passed",
+      "Live verified_t3_applies_nonroot_namespace_and_argv_environment_custody passed, including actual 65534 uid/gid, namespace separation, names-only runtime argv and cleanup"
+    ],
+    "native": {
+      "macos_15_arm64": {"job": 113771769251, "verdict": "PASS complete workspace/all-targets"},
+      "windows_2025_x64": {"job": 113771768890, "verdict": "PASS kernel/CLI build and complete workspace/all-targets"}
+    }
+  },
+  "guidance_requested": "Clear the HALT for targeted test-only OCI-home/image-store and fixture-lifetime repairs; preserve real T3, environment custody, declared-capable hard refusal, all quantitative floors and full final gates. No production retry, bare fallback, skip or numerical raise requested.",
+  "local_build_limit": "Debug static build timed out waiting for build-directory lock. Four owned waiting jobs cancelled. Release-profile EOF parser RED/GREEN actually executed. No shared cache/lock or unrelated process deleted.",
+  "implementation_after_third_failure": "None; evidence, permitted story record and owned CI branch cleanup only",
+  "cleanup": {"remote_purpose_branch_deleted": true, "local_purpose_branch_deleted": true, "owned_worktree_removed": true, "read_only_token_wrapper_removed": true, "owned_download_and_signing_scratch_removed": true, "complete_archives_retained": true},
+  "story_status": "in-progress; not review",
+  "not_claimed": ["Task 6 completion", "Task 7 completion", "Permanent epic-17-exit success", "Grandchild containment proof", "Full-suite green", "Warning-free", "Landing gates", "Final acceptance"]
+}

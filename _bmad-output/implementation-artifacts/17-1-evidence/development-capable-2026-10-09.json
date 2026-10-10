@@ -1,0 +1,43 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-09",
+  "status": "partial; positive echo and complete sweep not green",
+  "first_run": {
+    "id": 37909394818,
+    "commit": "83d7cdccebec92754537711e6eeacc1fe795a957",
+    "url": "https://github.com/lunarpulse/maos/actions/runs/37909394818",
+    "artifacts": "capable-snapshot-37909394818.tar.gz",
+    "linux_ubuntu_24_26": "Signed immutable image provisioning, static x64 ELF assertion and actual negative Worker completion succeeded; independent SQL verifier used the wrong path and failed unable to open database file.",
+    "native": "Complete Darwin/Windows checks found the same three missing BTreeSet imports in journey_j1; Windows kernel/CLI build passed.",
+    "corrections": "Actual MAOS_HOME/audit/transparency.sqlite path used; std::collections::BTreeSet imported at origin through LSP quick-fix. No narrowed native command or test."
+  },
+  "second_run": {
+    "id": 37910898713,
+    "commit": "8a2522ef3ed0949d366e8af48a05ae323cea9a03",
+    "url": "https://github.com/lunarpulse/maos/actions/runs/37910898713",
+    "artifacts": "capable-snapshot-37910898713.tar.gz",
+    "linux_jobs": {
+      "ubuntu_24_04": 113755513264,
+      "ubuntu_26_04": 113755513335
+    },
+    "linux_negative": "Actual Worker completed, then independent SQL assertions found exactly sandbox.block.container.escape.fs.control-json, sandbox.block.container.escape.fs.host-home-ssh and sandbox.block.egress.example.invalid:443 at kind 8. Both images reached the positive-control invocation afterward.",
+    "positive_echo": "Actual granted positive Worker exited 1, not_completed:process_crash. Captured CLI output proves it was loaded under exact MAOS 17-1 Echo / 127.0.0.1:18081 grant, but does not expose its journaled guest diagnostic.",
+    "darwin": {
+      "job": 113755513304,
+      "runner": "macos-15 ARM64",
+      "command": "cargo check --locked --workspace --all-targets --target aarch64-apple-darwin --keep-going --message-format=json",
+      "verdict": "PASS"
+    },
+    "windows": {
+      "job": 113755513044,
+      "runner": "windows-2025 x64",
+      "commands": [
+        "cargo build --locked -p maos-kernel-core -p maos-cli --message-format=json",
+        "cargo check --locked --workspace --all-targets --target x86_64-pc-windows-msvc --keep-going --message-format=json"
+      ],
+      "verdict": "PASS"
+    }
+  },
+  "source_observation": "Proxy downstream response builder uses Connection: close and strips upstream body framing while streaming decoded bytes. Probe parser currently requires Content-Length. EOF-delimited regression test is queued; this is an inferred positive-control cause until the test and corrected actual echo run prove it.",
+  "not_claimed": ["Positive echo success", "Kernel live spawn test success", "Complete T3 sweep", "Task 6 completion", "Task 7 completion", "Warning-free", "Full-suite green", "Final acceptance"]
+}

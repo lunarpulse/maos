@@ -1,0 +1,65 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "status": "in-progress",
+  "task": 4,
+  "completion_claim": false,
+  "halt": "bmad-dev-story Step 5: three consecutive implementation failures; operator guidance required before further implementation",
+  "red_before_implementation": {
+    "suite": "cli_wrapper_t3_boundary_17_1",
+    "observed": "All four regressions failed against the previous implementation: bare T3 launch, unsupported T3 stdin postures, oversized Raw newline records, and inherited T0 daemon environment",
+    "session_output": "artifact://125"
+  },
+  "integration_attempts": [
+    {
+      "attempt": 1,
+      "result": "failed before tests",
+      "diagnostic": "unexpected closing delimiter in cli_wrapper/runtime.rs; missing pub fn kill opener restored"
+    },
+    {
+      "attempt": 2,
+      "result": "failed before tests",
+      "session_output": "artifact://137",
+      "diagnostic": "E0425: missing cgroup_oom_kills in cli_wrapper/runtime.rs; original cgroup_oom_kills and parse_oom_kills restored"
+    },
+    {
+      "attempt": 3,
+      "command": "cargo fmt --all && cargo test --offline --locked -p maos-kernel-core --test cli_wrapper_t3_boundary_17_1 --test cli_wrapper_bridge_8_12 --test frame_bridge_poll_17_3c --test audit_sink_truth_16_5 && cargo run --offline --locked -p xtask -- check-skill-conformance",
+      "result": "exit 101 during compilation; tests and skill-conformance command not executed",
+      "session_output": "artifact://139",
+      "diagnostics": [
+        "E0271 at runtime.rs:584: Command::envs requires tuple iterator items, not references to owned tuples",
+        "E0507 at runtime.rs:351: Read::take moves R through &mut R; an explicit mutable reborrow is required"
+      ],
+      "warnings": "31 kernel warnings observed; no warning-free claim"
+    }
+  ],
+  "native_compile_prerequisites": [
+    {
+      "target": "aarch64-apple-darwin",
+      "command": "cargo check --offline --locked -p maos-kernel-core -p maos-bin -p maos-bench -p xtask --all-targets --target aarch64-apple-darwin",
+      "session_output": "artifact://131",
+      "result": "failed C dependency builds: host compiler does not accept Darwin compiler flags"
+    },
+    {
+      "target": "x86_64-pc-windows-gnu",
+      "command": "cargo check --offline --locked -p maos-kernel-core -p maos-bin -p maos-bench -p xtask --all-targets --target x86_64-pc-windows-gnu",
+      "session_output": "artifact://132",
+      "result": "failed C dependency builds: x86_64-w64-mingw32-gcc unavailable"
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "command": "env CC_aarch64_apple_darwin=clang cargo check --offline --locked -p maos-kernel-core --lib --target aarch64-apple-darwin",
+      "session_output": "artifact://134",
+      "result": "failed C dependency builds with Clang: Darwin SDK headers unavailable"
+    }
+  ],
+  "verification_limits": [
+    "Task 4 is unchecked; current Rust source does not compile",
+    "No Task-4 green regression or post-cutover runtime smoke was observed",
+    "The unrun throwaway kernel smoke source was removed",
+    "No local positive podman or live vendor CLI proof",
+    "No platform compile success or Task-4 measurement claim",
+    "No governance pins or numerical ceilings changed",
+    "Existing CI authorization excludes macOS; native platform CI needs an operator ruling"
+  ]
+}

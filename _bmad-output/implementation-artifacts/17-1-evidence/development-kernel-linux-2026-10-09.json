@@ -1,0 +1,76 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "task": 4,
+  "status": "in-progress-after-operator-halt-clearance",
+  "commands": [
+    {
+      "command": "cargo fmt --all && cargo test --offline --locked -p maos-kernel-core --test cli_wrapper_t3_boundary_17_1 --test cli_wrapper_bridge_8_12 --test frame_bridge_poll_17_3c --test audit_sink_truth_16_5 && cargo run --offline --locked -p xtask -- check-skill-conformance",
+      "result": "19 tests passed across four suites; skill-conformance adapter/bridge and invalid-fixture refusal passed",
+      "session_output": "artifact://146"
+    },
+    {
+      "command": "cargo check --offline --locked --workspace --all-targets",
+      "result": "exit 0; compiler warnings remain",
+      "session_output": "artifact://152"
+    },
+    {
+      "command": "cargo test --offline --locked -p maos-kernel-core --test t3_argv_custody_17_1",
+      "result": "2 passed: environment values absent from runtime argv; malformed names refused without echoing values; fixture attestation verified by real Ed25519",
+      "session_output": "artifact://166"
+    },
+    {
+      "command": "cargo test --offline --locked -p xtask --test model_currency_gate a_dangling_manifest_link_is_a_refusal_not_a_skip -- --nocapture",
+      "result": "1 passed, 19 filtered; Windows file-symlink alias added without disabling the test",
+      "session_output": "artifact://164"
+    },
+    {
+      "command": "cargo test --offline --locked -p maos-bin --test root_shutdown_unload_16_3 ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 -- --nocapture",
+      "result": "1 passed, 10 filtered, 0.15 s; actual one-shot and SIGTERM contract preserved under cfg(unix)",
+      "session_output": "artifact://173"
+    },
+    {
+      "command": "cargo fmt --all && cargo test --offline --locked -p maos-audit tl_tenant_binding_refuses_symlinked_artifact -- --nocapture && cargo test --offline --locked -p maos-spirit-cli --test publish_tier_validation_test && cargo check --offline --locked -p maos-kernel-core --test cgroup_ceiling_smoke",
+      "result": "Audit symlink read/write refusal passed (1 test); publish tier validation passed (3 tests); resource integration target compiled. Warnings remain.",
+      "session_output": "artifact://180"
+    },
+    {
+      "command": "cargo run --offline --locked -p xtask -- check-service-boundary --json",
+      "result": "exit 1; every reported violation is in docs/ci-baselines/kernel-surface-v0.1-beta.json (removed/signature-changed or unclassified symbols). No I9/P3 violation; per-service P3 is enforced, scheduler is the existing supervisor exception. Overall boundary gate still requires Task-9 classification/surface pins.",
+      "session_output": "artifact://162"
+    }
+  ],
+  "runtime_smoke": {
+    "command": "env CODEX_API_KEY=public-custody-sentinel-17-1 ANTHROPIC_API_KEY=public-anthropic-sentinel-17-1 MAOS_OPERATOR_ENV_SENTINEL=public-operator-sentinel-17-1 cargo run --offline --locked -p maos-bench --example t3_cutover_17_1_smoke",
+    "session_output": "artifact://148",
+    "runtime_custody_receipt": ["image scrubbed", "stop scrubbed", "rm scrubbed"],
+    "j1": {"invocation_count": 100, "p50_us": 10, "p95_us": 11, "p99_us": 14, "max_us": 15, "budget_met": true, "not_measured": false},
+    "temporary_source_removed": true,
+    "limits": "Controlled runtime proves image/stop/removal child environment custody, not container isolation. J1 exercised a real T0 child and frame round trips. No local positive podman or live vendor CLI run."
+  },
+  "native_compilation": {
+    "first_run": 37874751474,
+    "darwin_workspace": "PASS",
+    "windows_kernel_cli_build": "PASS",
+    "windows_workspace": "FAIL: pre-existing Unix-only dangling-link test; originating test repaired",
+    "retry_run": 37877217531,
+    "retry_snapshot": "9921ee5825b2e48e1fe18d7ffabc0c15dbf41ac2",
+    "retry_verdict": "Darwin workspace and Windows kernel/CLI PASS; Windows all-targets FAIL in the existing Unix-only signal-15 test, now honestly scoped to Unix",
+    "exhaustive_run": 37878298905,
+    "exhaustive_snapshot": "da124f7cbe52151a826e74440d527199ec9fc622",
+    "exhaustive_verdict": "Darwin workspace and Windows kernel/CLI PASS; Windows all-targets with --keep-going FAIL: four diagnostics at three existing test locations",
+    "exhaustive_evidence": "native-platform-37878298905.log",
+    "halt": "Three consecutive native CI iterations failed the complete Windows check; workflow Step-5 HALT recorded",
+    "halt_clearance": "Operator selected Resume targeted repairs for the three test locations; no production-handle Debug exposure, dependency addition, warning suppression or ceiling raise",
+    "fourth_run": 37881675481,
+    "fourth_snapshot": "4a6398111117b3cc485b709c4fe15bc557b94463",
+    "fourth_verdict": "PASS: Darwin complete-workspace/all-targets check, Windows kernel/CLI build and Windows complete-workspace/all-targets check all exited 0",
+    "fourth_evidence": "native-platform-37881675481.log",
+    "native_runtime_tests": "not exercised; compilation only; warnings remain"
+  },
+  "completion_limits": [
+    "Task 4 remains unchecked until final native proof and formatted source measurements",
+    "No governance pins or ceilings changed",
+    "No Task-10 warning-free mutation claim",
+    "Full regression and final story acceptance remain unfinished"
+  ]
+}

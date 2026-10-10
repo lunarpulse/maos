@@ -22,6 +22,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: journey-${{ hashFiles('**/Cargo.lock') }}
+      # Story 17-1 — journey_j1's delegated Worker runs under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
 
       - uses: taiki-e/install-action@nextest
         with:
@@ -76,6 +78,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: journey-rerecord-${{ hashFiles('**/Cargo.lock') }}
+      - uses: ./.github/actions/provision-t3-test-substrate
       - uses: taiki-e/install-action@nextest
         with:
           tool: nextest

@@ -483,9 +483,13 @@ fn a_providers_section_model_id_is_a_pin() {
 
 #[test]
 fn a_dangling_manifest_link_is_a_refusal_not_a_skip() {
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+    #[cfg(windows)]
+    use std::os::windows::fs::symlink_file as symlink;
     let tree = Tree::real();
     fs::create_dir_all(tree.root().join("spirits/zz-dangling")).unwrap();
-    std::os::unix::fs::symlink(
+    symlink(
         tree.root().join("nowhere.toml"),
         tree.root().join("spirits/zz-dangling/manifest.toml"),
     )

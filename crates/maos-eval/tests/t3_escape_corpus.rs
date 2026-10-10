@@ -4,22 +4,6 @@ use std::path::Path;
 
 use maos_eval::T3EscapeCorpus;
 
-fn skip_if_no_container_runtime() -> bool {
-    for bin in ["/usr/bin/podman", "/usr/bin/docker"] {
-        if std::process::Command::new(bin)
-            .arg("--version")
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-        {
-            return false;
-        }
-    }
-    true
-}
-
 #[test]
 fn t3_escape_corpus_loads_all_25_scenarios() {
     let corpus = T3EscapeCorpus::load_from(Path::new("fixtures/t3-escape-corpus-v0/"))

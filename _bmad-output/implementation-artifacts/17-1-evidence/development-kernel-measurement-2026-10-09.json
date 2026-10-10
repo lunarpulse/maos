@@ -1,0 +1,43 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "task": 4,
+  "measured_after_native_compile": "37881675481",
+  "format": {"command": "cargo fmt --all --check", "exit_code": 0},
+  "kernel_physical": {
+    "command": "cargo run --offline --locked -p xtask -- check-kernel-baseline",
+    "actual": 25154,
+    "authorized_ceiling": 25353,
+    "remaining_below_ceiling": 199,
+    "unchanged_pin": 25293,
+    "exit_code": 1,
+    "reason": "Authorized source changes have not yet received Task-9 exact hash/count pins",
+    "session_output": "artifact://187"
+  },
+  "kloc": {
+    "command": "cargo run --offline --locked -p xtask -- kloc-check --json",
+    "kernel_actual": 19457,
+    "kernel_authorized_ceiling": 19564,
+    "kernel_remaining_below_ceiling": 107,
+    "domain_actual": 9329,
+    "domain_authorized_ceiling": 9333,
+    "aggregate_actual": 172874,
+    "maximum_landing_aggregate": 172066,
+    "aggregate_over_maximum_landing": 808,
+    "other_actuals": {"maos-bin": 24982, "maos-manifest": 4456, "maos-egress": 1724, "maos-audit": 7245, "xtask": 44363},
+    "exit_code": 1,
+    "session_output": "artifact://188"
+  },
+  "existing_t3_library_contracts": {
+    "command": "cargo test --offline --locked -p maos-kernel-core --lib security::sandbox::t3",
+    "passed": 8,
+    "failed": 0,
+    "session_output": "artifact://190"
+  },
+  "limits": [
+    "Both kernel ceilings pass without a raise; the deletion offset is not converted into a raise elsewhere",
+    "No baseline, classification, per-crate or aggregate numerical pin changed",
+    "Aggregate remains over the maximum landing grant; fit or a measured operator revision remains a Task-9 obligation",
+    "Task-4 advancement uses the operator's focused-green interim ruling, not a full-suite or final-story-green claim",
+    "Compiler warnings remain; no live container/vendor or native test-execution claim"
+  ]
+}

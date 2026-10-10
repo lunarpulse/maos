@@ -1,0 +1,25 @@
+Story: 17-1-worker-egress-allowlist-and-scoped-credential
+Run: https://github.com/lunarpulse/maos/actions/runs/37877217531
+Snapshot: 9921ee5825b2e48e1fe18d7ffabc0c15dbf41ac2
+Branch: ci/17-1-platform-20261009t0211
+Runners: macos-15 (macOS/ARM64), windows-2025 (Windows/X64)
+
+Darwin job 113648464463:
+17-1 native compile PASS platform=darwin rc=0 command=cargo check --locked --workspace --all-targets --target aarch64-apple-darwin --message-format=json
+
+Windows job 113648464609:
+17-1 native compile PASS platform=windows rc=0 command=cargo build --locked -p maos-kernel-core -p maos-cli --message-format=json
+17-1 native compile FAIL platform=windows rc=101 command=cargo check --locked --workspace --all-targets --target x86_64-pc-windows-msvc --message-format=json
+error[E0433]: cannot find `unix` in `os`
+    --> crates\maos-bin\tests\root_shutdown_unload_16_3.rs:1425:18
+     |
+1425 |     use std::os::unix::process::ExitStatusExt as _;
+     |                  ^^^^ could not find `unix` in `os`
+error[E0599]: no method named `signal` found for struct `ExitStatus` in the current scope
+    --> crates\maos-bin\tests\root_shutdown_unload_16_3.rs:1442:16
+     |
+1442 |         status.signal(),
+     |                ^^^^^^ method not found in `ExitStatus`
+
+The earlier dangling-manifest-link compilation defect no longer appears. This failure is in the pre-existing POSIX-only signal-15 one-shot contract. That test now has cfg(unix); its Linux real one-shot/SIGTERM behavior passed (1 test, 10 filtered, 0.15 s; session artifact://173). No Windows signal-15 behavior is claimed. Complete workspace/target compilation is retained; the next run uses --keep-going to collect all remaining independent defects. No fully green Windows workspace or Task-10 warning-free proof.
+Annotations: https://api.github.com/repos/lunarpulse/maos/check-runs/113648464463/annotations and https://api.github.com/repos/lunarpulse/maos/check-runs/113648464609/annotations

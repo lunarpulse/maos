@@ -36,6 +36,7 @@ const FIXTURE_CLI: &str = env!("CARGO_BIN_EXE_worker-cli-fixture");
 
 fn worker_cfg(declared: &str) -> CliWrapperConfig {
     CliWrapperConfig {
+        egress: Vec::new(),
         command: FIXTURE_CLI.to_string(),
         argv_prefix: vec!["--maos-worker".to_string()],
         output_shape_version: declared.into(),
@@ -76,7 +77,7 @@ fn mismatched_shape_fails_loud_and_is_journaled_with_version_diff() {
     // Fixture reports 1.0.0; we DECLARE 2.0.0 → mismatch.
     let c = worker_cfg("2.0.0");
 
-    let err = admit_cli_wrapper_journaled(&c, SandboxTier::T3, 84, &log).unwrap_err();
+    let err = admit_cli_wrapper_journaled(&c, SandboxTier::T3, 84, &log, false, &[]).unwrap_err();
     assert!(
         matches!(
             err,
@@ -110,11 +111,12 @@ fn resumption_gate_no_silent_restart_then_corrected_config_admits() {
     let stale = worker_cfg("9.9.9");
 
     // First attempt → refuse + journal.
-    assert!(admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 84, &log).is_err());
+    assert!(admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 84, &log, false, &[]).is_err());
     assert_eq!(mismatch_frames(&log).len(), 1);
 
     // RESTART with the SAME stale config → re-fails identically + re-journals.
-    let err2 = admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 84, &log).unwrap_err();
+    let err2 =
+        admit_cli_wrapper_journaled(&stale, SandboxTier::T3, 84, &log, false, &[]).unwrap_err();
     assert!(matches!(
         err2,
         CliWrapperAdmissionError::EOutputShapeAdapterMismatch { .. }
@@ -127,7 +129,7 @@ fn resumption_gate_no_silent_restart_then_corrected_config_admits() {
 
     // Operator publishes a CORRECTED config (declared == observed).
     let corrected = worker_cfg("1.0.0");
-    admit_cli_wrapper_journaled(&corrected, SandboxTier::T3, 84, &log)
+    admit_cli_wrapper_journaled(&corrected, SandboxTier::T3, 84, &log, false, &[])
         .expect("corrected config admits");
     assert_eq!(
         mismatch_frames(&log).len(),

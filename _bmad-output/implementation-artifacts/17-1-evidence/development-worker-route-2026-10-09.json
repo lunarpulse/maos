@@ -1,0 +1,36 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-09",
+  "task": 5,
+  "status": "focused_green",
+  "commands": [
+    {"command": "cargo test --offline --locked -p maos-kernel-core --lib t3_stdin_postures_admit_only_raw_and_ndjson_with_signals", "passed": 1, "cases": 9, "output": "artifact://198"},
+    {"command": "cargo test --offline --locked -p maos-bin --test worker_supervision_16_3 container", "passed": 6, "output": "artifact://203"},
+    {"command": "cargo test --offline --locked -p xtask --test decision_adrs_and_provisioning", "passed": 3, "output": "artifact://203"},
+    {"command": "cargo test --offline --locked -p maos-cli --test credential_posture_2c", "passed": 9, "output": "artifact://203"}
+  ],
+  "native_probe_smoke": {
+    "command": "env CODEX_API_KEY=public-custody-sentinel-17-1 ANTHROPIC_API_KEY=public-anthropic-sentinel-17-1 MAOS_OPERATOR_ENV_SENTINEL=public-operator-sentinel-17-1 cargo run --offline --locked -p maos-bin --example probe_custody_17_1_smoke",
+    "receipt": "PASS: native liveness and handshake probe children inherit no credential/operator sentinels",
+    "output": "artifact://203:184"
+  },
+  "real_cli_refusal_smoke": {
+    "command": "cargo run --offline --locked -p maos-bin --bin maos -- run /tmp/maos-17-1-load-posture-red.toml --once",
+    "isolated_maos_home": "/tmp/maos-17-1-load-green-home",
+    "exit": 1,
+    "error": "ControlUnsupported(Signals, \"T3 does not support stdin-keeping postures\")",
+    "independently_read_sqlite_rows": [],
+    "lifecycle_load_rows": 0,
+    "kind_8_rows": 0,
+    "red_before": "development-worker-load-red-2026-10-09.json",
+    "output": "artifact://202"
+  },
+  "stop_test_surface": "Real native processes and controlled executable runtime, not a live OCI container. Tests exercise named kill plus pidfd stop, direct unload, abandonment, both late-attachment orders, runtime nonzero exit and inherited-environment exclusion.",
+  "limits": [
+    "No live OCI containment or vendor session proof in Task 5; capable-runner provisioning and proof remain Tasks 6-7.",
+    "No full-regression-green or warning-free claim; landing governance remains Task 9.",
+    "Guest-image entrypoint/helper must start the std-only TCP-to-Unix forwarder inside the container network namespace; no host-loopback listener is substituted.",
+    "Two concurrent integrated commands observed one private-method visibility defect; it was repaired by exposing only the internal signal operation, not the action executor. Subsequent integrated verification passed."
+  ],
+  "temporary_smoke_inputs": "Removed after observed proof; no permanent smoke scaffold."
+}

@@ -22,6 +22,22 @@ use maos_kernel_core::iac::{IacBusAdapter, Mailbox, TransparencyLogAdapter};
 use maos_spirit_abi::identity::SpiritRole;
 use orchestrator::{Orchestrator, DELEGATION_CONSENT_INTENT};
 
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
+
+fn add_t3_environment(command: &mut Command) {
+    for key in [
+        "MAOS_T3_RUNTIME",
+        "MAOS_T3_IMAGE_LOCK_PATH",
+        "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ] {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
+        }
+    }
+}
 #[path = "../../../tests/harness/doorless_home.rs"]
 mod doorless_home;
 
@@ -262,8 +278,13 @@ fn write_daemon_config(
 }
 
 fn target_debug_path() -> std::ffi::OsString {
-    let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
-    let mut paths = vec![root.join("target/debug"), root.join("target/debug/deps")];
+    let profile = std::env::current_exe()
+        .expect("test executable path")
+        .parent()
+        .and_then(Path::parent)
+        .expect("test profile directory")
+        .to_path_buf();
+    let mut paths = vec![profile.clone(), profile.join("deps")];
     if let Some(existing) = std::env::var_os("PATH") {
         paths.extend(std::env::split_paths(&existing));
     }
@@ -271,11 +292,33 @@ fn target_debug_path() -> std::ffi::OsString {
 }
 
 /// Cargo does not build sibling workspace binaries for a package-scoped test.
-/// Build the fixture once so both daemon children and the in-process path use
-/// the same real executable rather than a test-owned stand-in.
 static WORKER_FIXTURE_BUILT: LazyLock<()> = LazyLock::new(|| {
-    let output = Command::new("cargo")
-        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
+    let mut command = Command::new("cargo");
+    if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
+        command.env("CARGO_TARGET_DIR", target_dir);
+    }
+    let executable = std::env::current_exe().expect("test executable path");
+    let profile = executable
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::file_name)
+        .and_then(|name| name.to_str())
+        .expect("Cargo profile name");
+    let profile = match profile {
+        "debug" => "dev",
+        name => name,
+    };
+    let output = command
+        .args([
+            "build",
+            "-q",
+            "-p",
+            "worker",
+            "--bin",
+            "worker-cli-fixture",
+            "--profile",
+            profile,
+        ])
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
         .output()
         .expect("run cargo build for worker fixture");
@@ -293,18 +336,21 @@ fn ensure_fixture_binary() {
 fn daemon_command(config: &Path, audit_db: &Path, boot_nonce: u64) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
+        .env_clear()
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
         .env("MAOS_ONE_SHOT", "cohort-a2a-daemon")
         .env("MAOS_COHORT_DAEMON_CONFIG", config)
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", boot_nonce.to_string())
-        // Story 16-1 / D-16-1-Q: both roots share one log (MAOS_AUDIT_DB) by design,
-        // so only "HOME" moves — no developer control.json endpoint for either.
-        .env("HOME", doorless_home::doorless_home())
+        .env(
+            "HOME",
+            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+        )
         .env("PATH", target_debug_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    add_t3_environment(&mut command);
     command
 }
 
@@ -460,7 +506,9 @@ fn log_payload(db: &Path, frame_id: [u8; 16]) -> Vec<u8> {
 }
 
 fn run_host_a(config: &Path, audit_db: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_maos"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+    command
+        .env_clear()
         .args([
             "run",
             "spirits/topologies/j1-founder-loop-crosshost.toml",
@@ -471,16 +519,17 @@ fn run_host_a(config: &Path, audit_db: &Path) -> std::process::Output {
         .env("MAOS_AUDIT_DB", audit_db)
         .env("MAOS_OLLAMA_URL", "skip")
         .env("MAOS_TEST_BOOT_NONCE", NONCE_A.to_string())
-        .env("HOME", doorless_home::doorless_home())
-        // §A6 review D1 — MAOS_DELEGATED_GOAL is required on every cross-host
-        // arm. This fixture asserts the delegation MECHANISM (the same frame_id
-        // bytes in both logs), never the goal's content, so a dummy goal is
-        // exactly right here.
+        .env(
+            "HOME",
+            t3_substrate::isolated_runtime_home(doorless_home::doorless_home()),
+        )
         .env(
             "MAOS_DELEGATED_GOAL",
             "hermetic mechanism probe — the delegation recording is the assertion, not this goal",
         )
-        .env("PATH", target_debug_path())
+        .env("PATH", target_debug_path());
+    add_t3_environment(&mut command);
+    command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -519,6 +568,9 @@ fn host_b_config(fixture: &Fixture, worker_manifest: bool) -> PathBuf {
 
 #[test]
 fn two_daemon_delegation_is_joined_on_the_same_sixteen_bytes() {
+    if !t3_substrate::require_t3("two-host delegation Worker") {
+        return;
+    }
     ensure_fixture_binary();
     let fixture = fixture("crossing");
     let b_config = host_b_config(&fixture, true);
@@ -740,11 +792,16 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         enterprise_runtime: None,
         enterprise_pdp_runtime: None,
         supervision,
+        #[cfg(unix)]
+        egress: None,
     }
 }
 
 #[tokio::test]
 async fn replayed_inbound_frame_returns_duplicate_without_halting_host_b() {
+    if !t3_substrate::require_t3("replayed inbound delegation Worker") {
+        return;
+    }
     ensure_fixture_binary();
     let fixture = fixture("replay");
     maos_kernel_core::capability::cap_tokens::init_monotonic_base();

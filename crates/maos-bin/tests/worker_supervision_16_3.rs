@@ -24,18 +24,18 @@
 //!
 //! Linux-gated: the pidfd exit observer is the subject.
 
+#[path = "support/t0_worker.rs"]
+mod t0_worker;
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 use maos_bin::supervision::{
-    ActivePathCount, BindingAction, BindingCore, BindingPhase, PhaseRefusal, WorkerBinding,
-    WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask,
+    BindingAction, BindingPhase, PhaseRefusal, WorkerSupervision, WorkerSupervisor, WorkerTask,
 };
-use maos_bin::worker_spawn::{run_cli_wrapper_manifest, RunArgs};
-use maos_domain::invariants::i1::TokenId;
 use maos_domain::supervision::{CrashCause, FaultCause};
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
 use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
@@ -233,127 +233,6 @@ fn worker_task_ids_survive_redaction_and_name_their_originator() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// (2) The port, driven by a test DOUBLE — Ports & Adapters, D-16-3-Q (1).
-//
-// `run_cli_wrapper_manifest` depends on `WorkerSupervision`, not on a kernel,
-// so this vector runs the whole gate stack and the bind/finish spine with no
-// scheduler, no SCB map and no crash detector at all. If the port ever grows a
-// kernel-shaped requirement, this stops compiling.
-// ────────────────────────────────────────────────────────────────────────────
-
-#[derive(Default)]
-struct DoubleLedger {
-    binds: Mutex<Vec<(String, String)>>,
-    tokens_bound: AtomicU32,
-    after_mint_calls: AtomicU32,
-}
-
-struct DoubleSupervision {
-    ledger: Arc<DoubleLedger>,
-    next_seq: AtomicU32,
-    active_paths: Arc<ActivePathCount>,
-    stopping: bool,
-}
-
-impl DoubleSupervision {
-    fn new(ledger: Arc<DoubleLedger>, stopping: bool) -> Self {
-        Self {
-            ledger,
-            next_seq: AtomicU32::new(0),
-            active_paths: Arc::new(ActivePathCount::default()),
-            stopping,
-        }
-    }
-}
-
-impl WorkerSupervision for DoubleSupervision {
-    fn bind(
-        &self,
-        task: &WorkerTask,
-        _bundle: SpiritManifestBundle,
-    ) -> Result<WorkerBinding, WorkerSupervisionError> {
-        if self.stopping {
-            return Err(WorkerSupervisionError::WorkerStopping);
-        }
-        let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-        let spirit_id = if seq == 0 {
-            "worker".to_string()
-        } else {
-            format!("worker-{}", seq + 1)
-        };
-        let ids = task.record_ids(&spirit_id);
-        self.ledger
-            .binds
-            .lock()
-            .expect("double ledger")
-            .push(ids.clone());
-        // The double refuses to fabricate a kernel: with no SCB there is no pid
-        // and nothing to unload, so it reports the bind and stops there.
-        Err(WorkerSupervisionError::Load(format!(
-            "test double: bound {spirit_id} as {}",
-            ids.0
-        )))
-    }
-
-    fn watch(&self, _core: &Arc<BindingCore>, _child_pid: u32) {}
-
-    fn bind_token(&self, _core: &Arc<BindingCore>, _token_id: TokenId, _ttl_deadline_ns: u64) {
-        self.ledger.tokens_bound.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn is_stopping(&self) -> bool {
-        self.stopping
-    }
-
-    fn after_mint(&self) {
-        self.ledger.after_mint_calls.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
-#[test]
-fn worker_spawn_drives_the_port_with_no_kernel_at_all() {
-    LazyLock::force(&WORKER_FIXTURE_BUILT);
-    let dir = scratch_dir("port-double");
-    let manifest = write_worker_manifest(&dir, Some("hang"), None);
-    let manifest_root: toml::Value =
-        toml::from_str(&std::fs::read_to_string(&manifest).expect("read manifest"))
-            .expect("parse manifest");
-    let ledger = Arc::new(DoubleLedger::default());
-    let double = DoubleSupervision::new(Arc::clone(&ledger), false);
-    let world = KernelWorld::new(&dir);
-
-    let error = run_cli_wrapper_manifest(
-        &manifest_root,
-        &run_args(&manifest),
-        Arc::clone(&world.tl),
-        Arc::clone(&world.capability),
-        None,
-        None,
-        None,
-        None,
-        false,
-        &double,
-        WorkerTask::TopologyEntry { index: 7 },
-    )
-    .expect_err("the double refuses to fabricate an SCB");
-
-    assert!(
-        error.to_string().contains("bound worker as topology:7"),
-        "the caller's WorkerTask must reach `bind` verbatim, got: {error}"
-    );
-    let binds = ledger.binds.lock().expect("double ledger");
-    assert_eq!(
-        binds.as_slice(),
-        &[("topology:7".to_string(), "topology".to_string())],
-        "exactly one bind, with the record the caller's task implies"
-    );
-    // Nothing spawned: `bind` refused before the mint, so the token seam and
-    // the stop-before-spawn seam were never reached.
-    assert_eq!(ledger.tokens_bound.load(Ordering::SeqCst), 0);
-    assert_eq!(ledger.after_mint_calls.load(Ordering::SeqCst), 0);
-}
-
-// ────────────────────────────────────────────────────────────────────────────
 // The in-process kernel world (the shape `crash_detector_in_process_panic.rs`
 // uses). Duplicated per test file by this repo's convention — integration tests
 // are separate crates and cannot share a helper without inventing one.
@@ -362,6 +241,7 @@ fn worker_spawn_drives_the_port_with_no_kernel_at_all() {
 struct KernelWorld {
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
     crash_detector: Arc<maos_kernel_core::supervision::CrashDetector>,
@@ -374,13 +254,13 @@ impl KernelWorld {
     fn new(dir: &Path) -> Self {
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let tl = Arc::new(TransparencyLogAdapter::open_in_memory(NONCE));
-        let telemetry = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
+        let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
         let capability = Arc::new(
             maos_kernel_core::capability::CapabilityRegistryAdapter::new(
                 Arc::new(maos_kernel_core::api::RingCryptoProvider),
                 maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x16; 32]),
                 NONCE,
-                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+                Arc::clone(&policy),
                 maos_kernel_core::capability::cap_audit::channel().0,
                 maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
                 Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
@@ -403,6 +283,7 @@ impl KernelWorld {
             ),
             Arc::clone(&tl),
         ));
+        let telemetry = Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new());
         let iac = Arc::new(maos_kernel_core::iac::IacBusAdapter::new(
             Arc::new(maos_kernel_core::iac::Mailbox::new(Arc::clone(&telemetry))),
             Arc::clone(&tl),
@@ -443,6 +324,7 @@ impl KernelWorld {
         Self {
             tl,
             capability,
+            policy,
             scheduler,
             halt_registry,
             crash_detector,
@@ -521,6 +403,19 @@ fn scratch_dir(tag: &str) -> PathBuf {
 /// names `worker-cli-fixture` exactly, so no machine-local `MAOS_HOST_GRANTS`
 /// file can change the outcome.
 fn write_worker_manifest(dir: &Path, mode: Option<&str>, threshold_ms: Option<u32>) -> PathBuf {
+    write_worker_manifest_tier(dir, mode, threshold_ms, "T0")
+}
+
+fn write_worker_manifest_t3(dir: &Path, mode: Option<&str>, threshold_ms: Option<u32>) -> PathBuf {
+    write_worker_manifest_tier(dir, mode, threshold_ms, "T3")
+}
+
+fn write_worker_manifest_tier(
+    dir: &Path,
+    mode: Option<&str>,
+    threshold_ms: Option<u32>,
+    tier: &str,
+) -> PathBuf {
     let name = format!(
         "worker-{}-{}.toml",
         mode.unwrap_or("default"),
@@ -542,7 +437,7 @@ fn write_worker_manifest(dir: &Path, mode: Option<&str>, threshold_ms: Option<u3
              output_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\n\
              recovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\n\
              stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
-             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n\
+             shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"{tier}\"\n\n\
              [author]\nname = \"MAOS Project\"\n{supervision}"
         ),
     )
@@ -550,16 +445,7 @@ fn write_worker_manifest(dir: &Path, mode: Option<&str>, threshold_ms: Option<u3
     path
 }
 
-fn run_args(manifest: &Path) -> RunArgs {
-    RunArgs {
-        manifest_path: manifest.display().to_string(),
-        live: false,
-        once: true,
-    }
-}
-
-/// Drive one Worker to completion on a blocking thread, exactly as paths (a),
-/// (b) and (c) do.
+/// Drive a Worker through the real T0 bridge primitive and kernel supervisor.
 async fn run_worker(
     world: &KernelWorld,
     supervisor: &Arc<WorkerSupervisor>,
@@ -569,29 +455,23 @@ async fn run_worker(
     let manifest_root: toml::Value =
         toml::from_str(&std::fs::read_to_string(&manifest).expect("read manifest"))
             .expect("parse manifest");
-    let run = run_args(&manifest);
     let tl = Arc::clone(&world.tl);
     let capability = Arc::clone(&world.capability);
+    let policy = Arc::clone(&world.policy);
     let supervisor = Arc::clone(supervisor);
     tokio::task::spawn_blocking(move || {
-        run_cli_wrapper_manifest(
+        t0_worker::run_t0_worker(
             &manifest_root,
-            &run,
             tl,
             capability,
-            None,
-            None,
-            None,
-            None,
-            false,
+            policy,
             supervisor.as_ref(),
             task,
         )
         .map(|completion| completion.label().to_string())
-        .map_err(|error| error.to_string())
     })
     .await
-    .expect("worker blocking thread joined")
+    .expect("Worker blocking thread joined")
 }
 
 /// Block until `predicate` holds or `budget` elapses. Returns whether it held.
@@ -617,7 +497,21 @@ async fn a_sigkilled_worker_reaches_handle_crash_at_its_own_pid() {
     LazyLock::force(&WORKER_FIXTURE_BUILT);
     let dir = scratch_dir("crash-scene");
     let world = KernelWorld::new(&dir);
-    let supervisor = world.supervisor(Default::default());
+    let bound_tokens = Arc::new(Mutex::new(Vec::new()));
+    let observed_tokens = Arc::clone(&bound_tokens);
+    let observed_scheduler = Arc::clone(&world.scheduler);
+    let supervisor = world.supervisor(maos_bin::supervision::SupervisorSeams {
+        after_mint: Some(Arc::new(move || {
+            let scbs = observed_scheduler.scbs();
+            let scbs = scbs.read().unwrap();
+            let mut observed = observed_tokens.lock().unwrap();
+            for scb in scbs.values() {
+                let ledger = scb.task_assignments_in_flight.lock().unwrap();
+                observed.extend(ledger.iter().filter_map(|record| record.capability_token));
+            }
+        })),
+        ..Default::default()
+    });
     let manifest = write_worker_manifest(&dir, Some("sigkill-self"), None);
 
     let outcome = run_worker(&world, &supervisor, manifest, WorkerTask::Standalone).await;
@@ -657,8 +551,8 @@ async fn a_sigkilled_worker_reaches_handle_crash_at_its_own_pid() {
         "the fixture's kind-21 output rows must be at the Worker's pid"
     );
 
-    // `task.orphaned` is kind 1 at the Worker's pid. This host-grant path has
-    // no minted capability, so both the token column and payload stay empty.
+    // The orphan event records the tokens bound while this task was in flight.
+    // Compare the real mint observation, not a fabricated id or an empty default.
     let orphaned: Vec<TlRow> = world
         .rows(FrameKind::TaskComplete, Some(pid))
         .into_iter()
@@ -672,9 +566,24 @@ async fn a_sigkilled_worker_reaches_handle_crash_at_its_own_pid() {
     assert_eq!(payload["originator_spirit_id"], "operator");
     assert!(
         !orphaned[0].has_token,
-        "host-grant authority must not fabricate a capability token"
+        "task.orphaned is an event, not an invocation charged to one token"
     );
-    assert_eq!(payload["in_flight_tokens"], serde_json::json!([]));
+    {
+        let bound_tokens = bound_tokens.lock().unwrap();
+        assert_eq!(
+            bound_tokens.len(),
+            1,
+            "the task binds its mediated CLI token"
+        );
+        assert_eq!(
+            payload["in_flight_tokens"],
+            serde_json::to_value(&*bound_tokens).unwrap()
+        );
+    }
+    assert!(
+        !world.capability.has_active_tokens_for_pid(pid),
+        "crash handling must revoke the Worker's actual bound token"
+    );
 
     // The FR50 disposition lands at pid 0, sender = originator, and is joined
     // to the Worker by payload `task_id` — never by pid.
@@ -901,6 +810,346 @@ fn child_is_alive(child_pid: u32) -> bool {
         }
         Err(_) => false,
     }
+}
+
+struct ControlledRuntime {
+    executable: PathBuf,
+    invocations: PathBuf,
+    environment: PathBuf,
+    target_pid_file: PathBuf,
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn controlled_runtime(dir: &Path, name: &str, kill_target: bool) -> ControlledRuntime {
+    let executable = dir.join("controlled-runtime");
+    let invocations = dir.join("runtime-invocations");
+    let environment = dir.join("runtime-environment");
+    let target_pid_file = dir.join(format!("{name}.pid"));
+    let script = format!(
+        "#!/bin/sh\n\
+         printf '%s %s\\n' \"$1\" \"$2\" >> {}\n\
+         unset PWD SHLVL _\n\
+         /usr/bin/env -u PWD -u SHLVL -u _ > {}\n\
+         [ \"$1\" = kill ] && [ \"$2\" = {} ] || exit 64\n\
+         {}\n",
+        shell_quote(&invocations.display().to_string()),
+        shell_quote(&environment.display().to_string()),
+        shell_quote(name),
+        if kill_target {
+            format!(
+                "read pid < {}\nkill -KILL \"$pid\"",
+                shell_quote(&target_pid_file.display().to_string())
+            )
+        } else {
+            "exit 23".to_string()
+        }
+    );
+    std::fs::write(&executable, script).expect("write controlled runtime executable");
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700))
+        .expect("make controlled runtime executable");
+    ControlledRuntime {
+        executable,
+        invocations,
+        environment,
+        target_pid_file,
+    }
+}
+
+fn spawn_sleep() -> std::process::Child {
+    std::process::Command::new("/bin/sleep")
+        .arg("60")
+        .spawn()
+        .expect("start controlled process")
+}
+
+fn wait_child_exit(child: &mut std::process::Child) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            _ => return false,
+        }
+    }
+}
+
+fn stop_child(child: &mut std::process::Child) {
+    if child.try_wait().ok().flatten().is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+fn assert_one_named_kill(runtime: &ControlledRuntime, name: &str) {
+    assert_eq!(
+        std::fs::read_to_string(&runtime.invocations).expect("read runtime invocations"),
+        format!("kill {name}\n"),
+        "a named container is killed once, with no stale-name retry during unload"
+    );
+    let allowed = [
+        "PATH",
+        "HOME",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ];
+    let environment = std::fs::read_to_string(&runtime.environment).expect("read kill environment");
+    for entry in environment.lines() {
+        let key = entry.split('=').next().unwrap_or_default();
+        assert!(
+            allowed.contains(&key),
+            "runtime kill inherited disallowed environment variable {key}"
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stopping_a_container_kills_its_name_and_runtime_client() {
+    let dir = scratch_dir("container-stop");
+    let world = KernelWorld::new(&dir);
+    let supervisor = world.supervisor(Default::default());
+    assert_eq!(supervisor.strategy_name(), "pidfd");
+    let binding = tokio::task::block_in_place(|| {
+        supervisor
+            .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+            .expect("bind worker SCB")
+    });
+    let core = Arc::clone(binding.core());
+    let name = "worker-container-stop";
+    let runtime = controlled_runtime(&dir, name, true);
+    let mut container_process = spawn_sleep();
+    std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
+        .expect("write named container process PID");
+    let mut runtime_client = spawn_sleep();
+    supervisor.watch(&core, runtime_client.id());
+    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+
+    supervisor.stop_workers();
+    let runtime_client_stopped = wait_child_exit(&mut runtime_client);
+    let container_stopped = wait_child_exit(&mut container_process);
+    stop_child(&mut runtime_client);
+    stop_child(&mut container_process);
+    tokio::task::block_in_place(|| drop(binding));
+
+    assert!(
+        runtime_client_stopped,
+        "pidfd stop reaches the runtime client"
+    );
+    assert!(
+        container_stopped,
+        "named kill reaches the container payload"
+    );
+    assert_one_named_kill(&runtime, name);
+    assert_eq!(
+        supervisor.counters().signals_sent(),
+        1,
+        "a successful named kill and pidfd signal count as one stop"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn direct_worker_unload_stops_its_named_container() {
+    let dir = scratch_dir("container-unload");
+    let world = KernelWorld::new(&dir);
+    let supervisor = world.supervisor(Default::default());
+    let binding = tokio::task::block_in_place(|| {
+        supervisor
+            .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+            .expect("bind worker SCB")
+    });
+    let core = Arc::clone(binding.core());
+    let pid = binding.spirit_pid();
+    let name = "worker-container-unload";
+    let runtime = controlled_runtime(&dir, name, true);
+    let mut container_process = spawn_sleep();
+    std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
+        .expect("write named container process PID");
+    let mut runtime_client = spawn_sleep();
+    supervisor.watch(&core, runtime_client.id());
+    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+
+    world
+        .scheduler
+        .unload(pid)
+        .await
+        .expect("unload worker SCB");
+    let runtime_client_stopped = wait_child_exit(&mut runtime_client);
+    let container_stopped = wait_child_exit(&mut container_process);
+    stop_child(&mut runtime_client);
+    stop_child(&mut container_process);
+    tokio::task::block_in_place(|| drop(binding));
+
+    assert!(
+        runtime_client_stopped,
+        "unload reaches the runtime-client pidfd"
+    );
+    assert!(container_stopped, "on_unload reaches the named container");
+    assert_one_named_kill(&runtime, name);
+    assert_eq!(supervisor.counters().signals_sent(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn abandoning_a_binding_stops_its_named_container() {
+    let dir = scratch_dir("container-abandon");
+    let world = KernelWorld::new(&dir);
+    let supervisor = world.supervisor(Default::default());
+    let binding = tokio::task::block_in_place(|| {
+        supervisor
+            .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+            .expect("bind worker SCB")
+    });
+    let core = Arc::clone(binding.core());
+    let name = "worker-container-abandon";
+    let runtime = controlled_runtime(&dir, name, true);
+    let mut container_process = spawn_sleep();
+    std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
+        .expect("write named container process PID");
+    let mut runtime_client = spawn_sleep();
+    supervisor.watch(&core, runtime_client.id());
+    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+
+    tokio::task::block_in_place(|| drop(binding));
+    let runtime_client_stopped = wait_child_exit(&mut runtime_client);
+    let container_stopped = wait_child_exit(&mut container_process);
+    stop_child(&mut runtime_client);
+    stop_child(&mut container_process);
+
+    assert!(
+        runtime_client_stopped,
+        "abandon signals the runtime-client pidfd"
+    );
+    assert!(
+        container_stopped,
+        "abandon stops the named container before bridge cleanup"
+    );
+    assert_one_named_kill(&runtime, name);
+    assert_eq!(supervisor.counters().signals_sent(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stop_before_container_attachment_still_kills_late_named_container() {
+    let dir = scratch_dir("late-container-attach");
+    let world = KernelWorld::new(&dir);
+    let supervisor = world.supervisor(Default::default());
+    let binding = tokio::task::block_in_place(|| {
+        supervisor
+            .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+            .expect("bind worker SCB")
+    });
+    let core = Arc::clone(binding.core());
+    let mut runtime_client = spawn_sleep();
+    supervisor.watch(&core, runtime_client.id());
+    let mut container_process = spawn_sleep();
+    let name = "worker-late-container";
+    let runtime = controlled_runtime(&dir, name, true);
+    std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
+        .expect("write named container process PID");
+
+    core.stop_session();
+    let runtime_client_stopped = wait_child_exit(&mut runtime_client);
+    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+    let container_stopped = wait_child_exit(&mut container_process);
+    stop_child(&mut runtime_client);
+    stop_child(&mut container_process);
+    tokio::task::block_in_place(|| drop(binding));
+
+    assert!(runtime_client_stopped, "the pre-attachment stop uses pidfd");
+    assert!(
+        container_stopped,
+        "late attachment immediately stops the named container"
+    );
+    assert_one_named_kill(&runtime, name);
+    assert_eq!(supervisor.counters().signals_sent(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn container_attachment_before_pidfd_stops_name_then_late_pidfd() {
+    let dir = scratch_dir("container-before-watch");
+    let world = KernelWorld::new(&dir);
+    let supervisor = world.supervisor(Default::default());
+    let binding = tokio::task::block_in_place(|| {
+        supervisor
+            .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+            .expect("bind worker SCB")
+    });
+    let core = Arc::clone(binding.core());
+    let name = "worker-container-before-watch";
+    let runtime = controlled_runtime(&dir, name, true);
+    let mut container_process = spawn_sleep();
+    std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
+        .expect("write named container process PID");
+    let mut runtime_client = spawn_sleep();
+    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+
+    core.stop_session();
+    let container_stopped = wait_child_exit(&mut container_process);
+    supervisor.watch(&core, runtime_client.id());
+    let runtime_client_stopped = wait_child_exit(&mut runtime_client);
+    stop_child(&mut runtime_client);
+    stop_child(&mut container_process);
+    tokio::task::block_in_place(|| drop(binding));
+
+    assert!(
+        container_stopped,
+        "stop reaches the name before a pidfd exists"
+    );
+    assert!(
+        runtime_client_stopped,
+        "late pidfd storage signals the runtime client"
+    );
+    assert_one_named_kill(&runtime, name);
+    assert_eq!(supervisor.counters().signals_sent(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn failed_named_kill_is_not_counted_as_a_successful_container_stop() {
+    let dir = scratch_dir("container-stop-refused");
+    let world = KernelWorld::new(&dir);
+    let supervisor = world.supervisor(Default::default());
+    let binding = tokio::task::block_in_place(|| {
+        supervisor
+            .bind(&WorkerTask::Standalone, SpiritManifestBundle::default())
+            .expect("bind worker SCB")
+    });
+    let core = Arc::clone(binding.core());
+    let name = "worker-container-refused";
+    let runtime = controlled_runtime(&dir, name, false);
+    let mut container_process = spawn_sleep();
+    std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
+        .expect("write named container process PID");
+    let mut runtime_client = spawn_sleep();
+    supervisor.watch(&core, runtime_client.id());
+    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+
+    core.stop_session();
+    let runtime_client_stopped = wait_child_exit(&mut runtime_client);
+    let named_container_survived = container_process
+        .try_wait()
+        .expect("poll container process")
+        .is_none();
+    let successful_stops = supervisor.counters().signals_sent();
+    stop_child(&mut runtime_client);
+    stop_child(&mut container_process);
+    tokio::task::block_in_place(|| drop(binding));
+
+    assert!(
+        runtime_client_stopped,
+        "pidfd still stops the runtime client"
+    );
+    assert!(
+        named_container_survived,
+        "a non-zero runtime status does not pretend the named container stopped"
+    );
+    assert_one_named_kill(&runtime, name);
+    assert_eq!(
+        successful_stops, 0,
+        "a failed named kill must not count as a successful container stop"
+    );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1150,6 +1399,7 @@ async fn three_workers_that_printed_once_then_hung_all_stall() {
         runs.push(tokio::spawn(run_worker_owned(
             Arc::clone(&world.tl),
             Arc::clone(&world.capability),
+            Arc::clone(&world.policy),
             Arc::clone(&supervisor),
             manifest.clone(),
             WorkerTask::TopologyEntry { index },
@@ -1219,23 +1469,35 @@ impl RootRun {
             paths.extend(std::env::split_paths(&existing));
         }
         command
+            .env_clear()
             .current_dir(&root)
             .arg("run")
             .arg(manifest)
             .arg("--once")
             // Per-command isolation: HOME decides which `control.json` the
             // root would find, and MAOS_HOME/XDG_DATA_HOME decide where it
-            // writes. A shared home makes a second root fail `EndpointInUse`
-            // on a developer machine while staying green in CI.
-            .env("HOME", self.dir.join("home"))
+            // writes.
+            .env(
+                "HOME",
+                t3_substrate::isolated_runtime_home(&self.dir.join("home")),
+            )
             .env("MAOS_HOME", self.dir.join("home"))
             .env("XDG_DATA_HOME", self.dir.join("home"))
             .env("MAOS_OLLAMA_URL", "skip")
             .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
-            .env_remove("MAOS_LIVE_AGENT")
-            .env_remove("MAOS_HOST_GRANTS")
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
+        for key in [
+            "MAOS_T3_RUNTIME",
+            "MAOS_T3_IMAGE_LOCK_PATH",
+            "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+            "XDG_RUNTIME_DIR",
+            "DBUS_SESSION_BUS_ADDRESS",
+        ] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
         command
     }
 
@@ -1265,7 +1527,7 @@ impl RootRun {
 fn maos_run_refuses_a_one_shot_mode_in_the_same_process() {
     LazyLock::force(&WORKER_FIXTURE_BUILT);
     let run = RootRun::new("one-shot-refusal");
-    let manifest = write_worker_manifest(&run.dir, None, None);
+    let manifest = write_worker_manifest_t3(&run.dir, None, None);
     // The one-shot dispatch is gated by the env var ALONE, so without this
     // refusal a non-`--once` `maos run` with it set would fall out of the run
     // block into a one-shot arm while still holding the root's SIGTERM
@@ -1290,11 +1552,14 @@ fn maos_run_refuses_a_one_shot_mode_in_the_same_process() {
 
 #[test]
 fn a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean() {
+    if !t3_substrate::require_t3("binary root stalled Worker") {
+        return;
+    }
     LazyLock::force(&WORKER_FIXTURE_BUILT);
     let run = RootRun::new("binary-hang");
     // 5 s threshold so the stall is observable inside a test budget; the
     // production default is 30 000 ms (the NFR's "> 30s").
-    let manifest = write_worker_manifest(&run.dir, Some("hang"), Some(5000));
+    let manifest = write_worker_manifest_t3(&run.dir, Some("hang"), Some(5000));
     let started = Instant::now();
     let mut child = run
         .command(&manifest)
@@ -1344,12 +1609,25 @@ fn a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean() {
 /// At `af96c907` a SIGKILLed standalone Worker's entire Transparency Log was
 /// three tokenless pid-0 rows: kind 21, kind 7 `cli.subprocess.exit
 /// signaled(sig=9)`, kind 4 verdict. No SCB, no crash, no disposition.
+///
+/// Under T3 the payload is its PID namespace's init and cannot receive its own
+/// SIGKILL, so the host kills the exact inspected payload. The bridge observes
+/// the OCI runtime client, which reports that death as exit code 137 (128+9).
 #[test]
 fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
+    use std::io::Read as _;
+
+    if !t3_substrate::require_t3("binary root crashed Worker") {
+        return;
+    }
     LazyLock::force(&WORKER_FIXTURE_BUILT);
     let run = RootRun::new("binary-crash");
-    let base = std::fs::read_to_string(write_worker_manifest(&run.dir, Some("sigkill-self"), None))
-        .expect("read base manifest");
+    let base = std::fs::read_to_string(write_worker_manifest_t3(
+        &run.dir,
+        Some("line-then-hang"),
+        None,
+    ))
+    .expect("read base manifest");
     let manifest = run.dir.join("crash-scene.toml");
     std::fs::write(
         &manifest,
@@ -1357,13 +1635,62 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
     )
     .expect("write crash-scene manifest");
 
-    let output = run
+    let mut root = run
         .command(&manifest)
-        .output()
-        .expect("spawn maos run with a self-killing Worker");
-    let stdout = String::from_utf8_lossy(&output.stdout);
+        .spawn()
+        .expect("spawn maos run with a T3 Worker to crash");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let child_pid = loop {
+        let output_child = run.audit_db.exists().then(|| {
+            TransparencyLogAdapter::open(&run.audit_db, NONCE)
+                .expect("reopen the crash-scene transparency log")
+                .query_frames(FrameFilter {
+                    kind: Some(FrameKind::CliSubprocessOutput),
+                    ..Default::default()
+                })
+                .expect("query Worker output rows")
+                .into_iter()
+                .filter(|row| row.spirit_pid != 0 && row.intent == "cli.subprocess.output")
+                .find_map(|row| {
+                    serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).ok()?
+                        ["child_pid"]
+                        .as_u64()
+                        .and_then(|pid| u32::try_from(pid).ok())
+                })
+        });
+        if let Some(child_pid) = output_child.flatten() {
+            break child_pid;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the T3 Worker never journaled its first output line"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    let payload_pid = t3_payload_host_pid(child_pid, "line-then-hang");
+    let payload_args = std::fs::read(format!("/proc/{payload_pid}/cmdline"))
+        .unwrap_or_else(|error| panic!("inspected T3 payload {payload_pid}: {error}"));
     assert!(
-        !output.status.success(),
+        payload_args
+            .split(|byte| *byte == 0)
+            .any(|arg| arg == b"--maos-fixture-mode=line-then-hang"),
+        "inspected T3 payload {payload_pid} is not the crash-scene fixture"
+    );
+    let killed = std::process::Command::new("kill")
+        .args(["-KILL", &payload_pid.to_string()])
+        .status()
+        .expect("send SIGKILL to the inspected T3 Worker payload");
+    assert!(killed.success(), "SIGKILL must reach payload {payload_pid}");
+    let status = wait_with_deadline(&mut root, Duration::from_secs(20))
+        .expect("root must finish after its T3 Worker crashes");
+    let mut stdout = String::new();
+    root.stdout
+        .take()
+        .expect("root stdout is piped")
+        .read_to_string(&mut stdout)
+        .expect("read root stdout");
+    assert!(
+        !status.success(),
         "a crashed Worker must fail the run; stdout:\n{stdout}"
     );
     assert!(
@@ -1428,9 +1755,9 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
         .expect("the bridge's exit row");
     let exit_payload = String::from_utf8_lossy(&exit_row.payload_redacted);
     assert!(
-        exit_payload.contains("signaled(sig=9)"),
-        "the exit cause must name the signal, never conflate it with an exit \
-         code (ADR-022); payload: {exit_payload}"
+        exit_payload.contains("exited(code=137)"),
+        "the exit cause must be the OCI runtime client's reported SIGKILL code; \
+         payload: {exit_payload}"
     );
     let orphaned = all
         .iter()
@@ -1438,8 +1765,8 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
         .expect("the crash report");
     let orphan_payload: serde_json::Value =
         serde_json::from_slice(&orphaned.payload_redacted).expect("task.orphaned is JSON");
-    assert_eq!(orphan_payload["cause"], "fault.signaled");
-    assert_eq!(orphan_payload["exit_signal"], 9);
+    assert_eq!(orphan_payload["cause"], "fault.non-zero-exit");
+    assert_eq!(orphan_payload["exit_code"], 137);
     assert_eq!(orphan_payload["task_id"], "run:worker");
     assert_eq!(orphan_payload["originator_spirit_id"], "operator");
     assert!(
@@ -1489,14 +1816,64 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
     );
 }
 
+fn t3_payload_host_pid(runtime_client_pid: u32, mode: &str) -> u32 {
+    let bytes =
+        std::fs::read(format!("/proc/{runtime_client_pid}/cmdline")).unwrap_or_else(|error| {
+            panic!("runtime client {runtime_client_pid} has no cmdline: {error}")
+        });
+    let args: Vec<String> = bytes
+        .split(|byte| *byte == 0)
+        .filter(|arg| !arg.is_empty())
+        .map(|arg| String::from_utf8_lossy(arg).into_owned())
+        .collect();
+    assert!(
+        args.iter().any(|arg| arg == &format!("--maos-fixture-mode={mode}")),
+        "reported T3 runtime client {runtime_client_pid} does not name fixture mode {mode}: {args:?}"
+    );
+    let name = args
+        .iter()
+        .find_map(|arg| arg.strip_prefix("--name="))
+        .unwrap_or_else(|| {
+            panic!("runtime client {runtime_client_pid} has no named container: {args:?}")
+        });
+    let runtime =
+        std::env::var("MAOS_T3_RUNTIME").expect("T3 gate ensures MAOS_T3_RUNTIME is selected");
+    let output = std::process::Command::new(runtime)
+        .args(["inspect", "--format", "{{.State.Pid}}", name])
+        .output()
+        .expect("inspect the T3 Worker container");
+    assert!(
+        output.status.success(),
+        "inspect T3 container {name} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .unwrap_or_else(|error| panic!("container {name} reported invalid host pid: {error}"))
+}
+
+fn proc_start_time(pid: u32) -> Option<String> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let close = stat.rfind(')')?;
+    stat[close + 1..]
+        .split_whitespace()
+        .nth(19)
+        .map(str::to_owned)
+}
+
 /// AC5's binary leg: one Worker prints, stalls, and is then crashed in the
 /// same root. One audit query must survive and name every omitted non-call
 /// shape from that single boot nonce.
 #[test]
+
 fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
+    if !t3_substrate::require_t3("binary root stalled then crashed Worker") {
+        return;
+    }
     LazyLock::force(&WORKER_FIXTURE_BUILT);
     let run = RootRun::new("fr4-stall-then-crash");
-    let manifest = write_worker_manifest(&run.dir, Some("line-then-hang"), Some(5000));
+    let manifest = write_worker_manifest_t3(&run.dir, Some("line-then-hang"), Some(5000));
     let mut root = run
         .command(&manifest)
         .spawn()
@@ -1535,11 +1912,36 @@ fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
         .as_u64()
         .and_then(|pid| u32::try_from(pid).ok())
         .expect("output row carries the real child pid");
+    let payload_pid = t3_payload_host_pid(child_pid, "line-then-hang");
+    assert!(
+        payload_pid > 1,
+        "the named T3 container must report a live payload PID, got {payload_pid}"
+    );
+    let payload_cmdline =
+        std::fs::read(format!("/proc/{payload_pid}/cmdline")).unwrap_or_else(|error| {
+            panic!("inspected T3 payload {payload_pid} has no cmdline: {error}")
+        });
+    assert!(
+        payload_cmdline
+            .split(|byte| *byte == 0)
+            .any(|arg| arg == b"--maos-fixture-mode=line-then-hang"),
+        "inspected T3 payload {payload_pid} is not the stalled fixture"
+    );
+    let payload_start_time = proc_start_time(payload_pid)
+        .unwrap_or_else(|| panic!("inspected T3 payload {payload_pid} has no proc identity"));
+    assert_eq!(
+        proc_start_time(payload_pid).as_deref(),
+        Some(payload_start_time.as_str()),
+        "the inspected payload PID must remain the same process before signaling"
+    );
     let killed = std::process::Command::new("kill")
-        .args(["-KILL", &child_pid.to_string()])
+        .args(["-KILL", &payload_pid.to_string()])
         .status()
-        .expect("send SIGKILL to the stalled Worker");
-    assert!(killed.success(), "SIGKILL must reach the stalled Worker");
+        .expect("send SIGKILL to the inspected T3 Worker payload");
+    assert!(
+        killed.success(),
+        "SIGKILL must reach the exact inspected payload pid {payload_pid}"
+    );
 
     let status = wait_with_deadline(&mut root, Duration::from_secs(20))
         .expect("root must finish after the stalled Worker crashes");
@@ -1619,10 +2021,10 @@ fn stalled_pids(world: &KernelWorld) -> BTreeSet<u32> {
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn run_worker_owned(
     tl: Arc<TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     supervisor: Arc<WorkerSupervisor>,
     manifest: PathBuf,
     task: WorkerTask,
@@ -1630,26 +2032,19 @@ async fn run_worker_owned(
     let manifest_root: toml::Value =
         toml::from_str(&std::fs::read_to_string(&manifest).expect("read manifest"))
             .expect("parse manifest");
-    let run = run_args(&manifest);
     tokio::task::spawn_blocking(move || {
-        run_cli_wrapper_manifest(
+        t0_worker::run_t0_worker(
             &manifest_root,
-            &run,
             tl,
             capability,
-            None,
-            None,
-            None,
-            None,
-            false,
+            policy,
             supervisor.as_ref(),
             task,
         )
         .map(|completion| completion.label().to_string())
-        .map_err(|error| error.to_string())
     })
     .await
-    .expect("worker blocking thread joined")
+    .expect("Worker blocking thread joined")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1688,6 +2083,7 @@ async fn unload_all_loaded_closes_a_live_workers_scb_and_reports_it() {
     let run = tokio::spawn(run_worker_owned(
         Arc::clone(&world.tl),
         Arc::clone(&world.capability),
+        Arc::clone(&world.policy),
         Arc::clone(&supervisor),
         manifest,
         WorkerTask::Standalone,

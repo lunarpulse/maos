@@ -262,7 +262,7 @@ fn the_full_post_1a_stream_proves_every_executed_beat() {
             serde_json::json!({
                 "event": "host_grant_disposition",
                 "granted_tier": "SandboxTier(3)",
-                "egress": "declared-not-enforced",
+                "egress": "enforced",
             }),
             serde_json::json!({
                 "event": "cli_wrapper_loaded",
@@ -545,32 +545,6 @@ fn resolve_topology_worker_refuses_an_unsupported_cli() {
     assert!(err.contains("no adapter supports"), "got: {err}");
 }
 
-#[test]
-fn command_metadata_is_derived_and_never_says_injected() {
-    // Review 2a-P11 + AC3.5/F22 — the sealed `command_metadata` must name the
-    // manifest, the topology, the adapter identity and the adapter's OWN
-    // credential variable, and must say INHERITED, never "injected host-side"
-    // (MAOS holds no credential and injects nothing).
-    let manifest = std::path::Path::new("/tmp/manifest-codex.toml");
-    let topology = std::path::Path::new("/tmp/topo.toml");
-    let argv: Vec<String> = ["exec", "--json"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    let meta = derive_command_metadata(manifest, topology, "codex", &argv, "CODEX_API_KEY");
-    assert!(meta.contains("manifest-codex.toml"), "got: {meta}");
-    assert!(meta.contains("topo.toml"), "got: {meta}");
-    assert!(meta.contains("`codex`"), "got: {meta}");
-    assert!(meta.contains("CODEX_API_KEY"), "got: {meta}");
-    assert!(
-        meta.contains("inherited from the operator's environment"),
-        "got: {meta}"
-    );
-    assert!(!meta.contains("injected host-side"), "got: {meta}");
-    // A claude run derives ANTHROPIC_API_KEY — the variable the scan targets.
-    let meta = derive_command_metadata(manifest, topology, "claude", &argv, "ANTHROPIC_API_KEY");
-    assert!(meta.contains("ANTHROPIC_API_KEY"), "got: {meta}");
-}
 
 #[test]
 fn the_signable_allowlist_admits_both_real_adapters_and_refuses_the_fixture() {

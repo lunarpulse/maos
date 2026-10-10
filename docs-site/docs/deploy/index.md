@@ -12,7 +12,7 @@ MAOS supports multiple deployment topologies from single-host development to air
 
 | Guide | Description |
 |-------|-------------|
-| [Deployment Topology](./topology) | Single-host, multi-host (A2A), air-gapped, and container-isolated modes |
+| [Deployment Topology](./topology) | Single-host, multi-host (A2A), air-gapped, and contained Workers (T3) |
 | [Air-Gap Deployment](./air-gap-deployment) | Network-isolated deployment with compile-time network removal |
 | [Backup & Restore Drill](./restore-drill) | Transparency Log backup, restore, and Merkle verification |
 | [Release Signing](./release-signing) | Ed25519 release artifact signing and verification |

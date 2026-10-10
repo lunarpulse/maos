@@ -921,8 +921,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 17-3c — 24 → 25: `spirit_session.rs` joins it (CI repair
     // 2026-10-06: 17-3c added the file without ringing this doorbell).
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 25] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 26] = [
         ("main.rs", include_str!("../src/main.rs")),
+        ("egress.rs", include_str!("../src/egress.rs")),
         // Story 16-6 — the extracted `load → admit → start` path. Enrolled
         // deliberately and NOT whitelisted below: the door's load must never
         // seed or consume `manifest_scopes` — that table is `admit_spirit`'s

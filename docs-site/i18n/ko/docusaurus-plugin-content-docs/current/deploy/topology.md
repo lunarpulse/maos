@@ -1,7 +1,7 @@
 ---
 title: 배포 토폴로지
 sidebar_position: 1
-description: MAOS 배포 토폴로지 — 단일 호스트, 멀티 호스트 A2A, 에어갭, 컨테이너 격리.
+description: MAOS 배포 토폴로지 — 단일 호스트, 멀티 호스트 A2A, 에어갭, contained Workers (T3).
 review_status: machine
 ---
 
@@ -108,51 +108,64 @@ MAOS 바이너리가 빌드 타임에 **모든 네트워크 표면을 컴파일�
 
 빌드 지침과 검증은 전체 [에어갭 배포](./air-gap-deployment) 가이드를 참조하세요.
 
-## 컨테이너 격리 (Container-isolated)
+## Contained Workers (T3)
 
-각 Spirit이 자체 컨테이너에서 실행되며 kernel이 컨테이너 런타임으로 오케스트레이션합니다. kernel의 역량 토큰 시행을 넘어 프로세스 수준 및 파일시스템 수준 격리를 제공합니다.
+한 호스트에서 MAOS 데몬이 kernel과 first-party `rust-inproc` Spirits를 프로세스 내부에서 실행합니다(`T0`, capability tokens만 사용). Linux에서는 WASM-component Spirits가 `T2` runner 프로세스에서 실행됩니다. 각 `[cli_wrapper]` Worker는 자체 `T3` rootless container에서 실행되며, `--network=none`에서 `/proxy/egress.sock`의 데몬 egress proxy를 통해서만 네트워크에 연결합니다. 데몬은 하나의 로컬 SQLite Transparency Log에 기록합니다.
 
 ```
-┌──────────────────────────────────────┐
-│          Host                        │
-│  ┌────────────────────────────────┐  │
-│  │       MAOS Kernel              │  │
-│  └────────────────────────────────┘  │
-│  ┌──────────┐  ┌──────────┐         │
-│  │Container │  │Container │         │
-│  │ Spirit A │  │ Spirit B │         │
-│  └──────────┘  └──────────┘         │
-│  ┌────────────────────────────────┐  │
-│  │  Shared Transparency Log      │  │
-│  └────────────────────────────────┘  │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│ Host                                                │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ MAOS daemon                                   │  │
+│  │ kernel + rust-inproc Spirits (T0)             │  │
+│  │ egress proxy · Transparency Log (SQLite)      │  │
+│  └──────┬────────────────────────────────────────┘  │
+│         │ /proxy/egress.sock (one per Worker)       │
+│  ┌──────▼─────────────────┐  ┌───────────────────┐  │
+│  │ T3 rootless container  │  │ T2 runner process │  │
+│  │ [cli_wrapper] Worker   │  │ WASM component    │  │
+│  │ --network=none         │  │ Spirit (Linux)    │  │
+│  └────────────────────────┘  └───────────────────┘  │
+└─────────────────────────────────────────────────────┘
 ```
 
-**사용 시점:** 멀티 테넌트 프로덕션, 신뢰할 수 없는 Spirit 워크로드, 프로세스 격리를 요구하는 컴플라이언스 환경.
+**사용 시점:** 자격 증명, 홈 디렉터리 또는 네트워크에 대한 신뢰를 주지 않는 타사 에이전트 CLI를 실행할 때.
 
 **격리 계층:**
 
-1. **역량 토큰(Capability tokens)** — kernel 수준 스코프 시행(항상 활성)
-2. **컨테이너 네임스페이스** — PID, 네트워크, 마운트, 사용자 네임스페이스 격리
-3. **Seccomp/AppArmor** — 시스템 콜 필터링
+- `rust-inproc` Spirits는 데몬 프로세스(`T0`)에서 실행되고 capability tokens로 중재되며, 프로세스 격리는 없습니다.
+- Linux에서 WASM-component Spirits는 seccomp allow-list, Landlock, 위임된 cgroup v2 subtree가 적용된 `T2` runner 프로세스에서 실행됩니다.
+- 각 Worker는 Linux 전용 `T3` rootless container에서 실행됩니다. 컨테이너는 `--network=none`, 읽기 전용 파일시스템을 사용하고 호스트 홈을 마운트하지 않으며, `/proxy/egress.sock`의 데몬 proxy socket을 통해서만 egress합니다.
 
-**네트워크 네임스페이스 격리 설정:**
+**설계상 격리되지 않는 항목:**
+
+- `rust-inproc` Spirits는 데몬 프로세스에서 실행됩니다.
+- 승인 probe는 호스트에서 실행됩니다.
+- Worker 리소스 제한은 런타임 기본값을 사용하며, manifest 리소스 제한은 아직 적용되지 않습니다.
+- T3에는 MAOS 전용 seccomp 또는 AppArmor 프로필이 없습니다.
+- T3는 Linux 전용이며, 다른 플랫폼에서는 실행이 거부됩니다.
+
+**설정:** 운영자 소유 host grant와 서명된 image lock을 구성하고, rootless podman으로 lock의 digest를 사용해 이미지를 가져온 다음 Worker를 실행합니다. manifest와 grant 예제는 [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit)에 있습니다. CI 검증은 Ubuntu 24.04 및 26.04의 rootless podman을 사용합니다.
 
 ```bash
-# Run each Spirit subprocess in its own network namespace
-# (the kernel handles this when configured for container mode)
-unshare --net -- ./target/release/maos run --spirit hello-spirit
+export MAOS_T3_IMAGE_LOCK_PATH="/path/to/operator-signed-image-lock.toml"
+export MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX="ED25519_PUBLIC_KEY_HEX"
+export MAOS_HOST_GRANTS="/path/to/host-grants.toml"
+
+# Replace with the image reference and digest from the signed image lock.
+podman pull "IMAGE@sha256:DIGEST"
+./target/release/maos run worker-manifest.toml --once
 ```
 
 ## 토폴로지 비교
 
-| 기능 | 단일 호스트 | 멀티 호스트(A2A) | 에어갭 | 컨테이너 격리 |
-|---------|-------------|------------------|------------|--------------------|
-| 네트워크 필요 | 선택 | Yes (mTLS) | No | 선택 |
-| Spirit 통신 | 인프로세스 | mTLS를 통한 A2A | 인프로세스 전용 | 인프로세스 |
-| 원격 추론 | Yes | Yes | No | Yes |
-| Transparency Log | 로컬 SQLite | 호스트별 SQLite | 로컬 SQLite | 공유 SQLite |
-| 격리 수준 | 역량 토큰 | 역량 토큰 + 네트워크 | 역량 토큰 + 네트워크 없음 | 역량 토큰 + 컨테이너 |
+| 기능 | 단일 호스트 | 멀티 호스트(A2A) | 에어갭 | Contained Workers (T3) |
+|---------|-------------|------------------|------------|------------------------|
+| 네트워크 필요 | 선택 | Yes (mTLS) | No | 선택; Worker egress는 proxy allowlist를 통해서만 가능 |
+| Spirit 통신 | 인프로세스 | mTLS를 통한 A2A | 인프로세스 전용 | Spirit은 인프로세스, Worker는 stdio bridge |
+| 원격 추론 | Yes | Yes | No | Worker는 proxy allowlist를 통해서만 vendor API에 연결 |
+| Transparency Log | 로컬 SQLite | 호스트별 SQLite | 로컬 SQLite | 데몬이 기록하는 로컬 SQLite |
+| 격리 수준 | 역량 토큰 | 역량 토큰 + 네트워크 | 역량 토큰 + 네트워크 없음 | capability tokens; Worker용 T3 container(네트워크 없음, proxy-only egress); WASM Spirit용 T2 runner |
 | 복잡도 | 낮음 | 중간 | 중간 | 높음 |
 
 ## 한국 규제 참고사항

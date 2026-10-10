@@ -286,10 +286,6 @@ pub enum T3Error {
     Spawn(String),
     #[error("container runtime inspect failed: {0}")]
     Inspect(String),
-    #[error(
-        "quarantine requested but Spirit form does not support container re-spawn; subprocess form arrives at Epic 6"
-    )]
-    QuarantineRequiresSubprocessForm,
     #[error("io error: {0}")]
     Io(String),
 }

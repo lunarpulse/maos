@@ -91,10 +91,9 @@ pub fn parse_sandbox_tier(s: &str) -> Result<maos_domain::invariants::i9::Sandbo
     }
 }
 
-/// Story 8.12 — resolve a CliWrapper `command` to a runnable path. The
-/// deterministic fixture-CLI (`worker-cli-fixture`) is built as a sibling of the
-/// daemon binary in the cargo target dir; tests run the daemon from
-/// `target/debug/deps/`, so the parent dir is also checked, then `$PATH`.
+/// Story 8.12 — resolve a CliWrapper `command` to a runnable path. The fixture
+/// binaries are built in the daemon's Cargo target directory; integration tests
+/// run from `target/debug/deps/`, so the target directory parent is checked too.
 #[cfg(feature = "network")]
 pub fn resolve_cli_binary(command: &str) -> Result<String, String> {
     let p = std::path::Path::new(command);
@@ -134,32 +133,26 @@ pub fn resolve_cli_binary(command: &str) -> Result<String, String> {
     ))
 }
 
-/// Story 8.12 AC3 — load + run a `[cli_wrapper]` manifest under the daemon.
-///
-/// Admits the wrapper through the full gate stack — `reject_respawn_with_context`
-/// (AC1 FORK C), `resolve_cli_wrapper_tier` against the host-side grant allowlist
-/// (AC5 FORK A), then the existing journaled output-shape probe (Story 7.4
-/// `admit_cli_wrapper_journaled`) — then issues a `Scope::CliSubprocessSpawn`
-/// cap-token bound to the `argv_prefix_hash`, spawns the REAL subprocess through
-/// the AC1 [`spawn_and_bridge`] bridge, journals each captured line as a
-/// `FrameKind::CliSubprocessOutput=21` row, and on exit revokes the cap-token
-/// with `RevokeReason::CliSubprocessExit`. Composition-root only — the kernel
-/// receives a constructed handle and decides no topology.
-/// Follow-up ID for the deferred packet-level egress enforcement. Run one records
-/// egress `declared-not-enforced`; enforced egress is an Epic-14 v2.0 hardening.
-#[cfg(feature = "network")]
-const EGRESS_ENFORCEMENT_FOLLOWUP: &str = "FOLLOWUP-EPIC14-V2.0-PACKET-EGRESS-ENFORCEMENT";
-
-/// The built-in HOST grant for the hermetic fixture Worker. Host-side and
-/// image-keyed — the host independently grants THIS known image; it never echoes
-/// the manifest's self-declared fields (the AC5 trust-direction inversion).
+/// The built-in HOST grant for the hermetic fixture Worker.
 #[cfg(feature = "network")]
 pub fn builtin_fixture_grant() -> maos_domain::host_grant::HostGrant {
     maos_domain::host_grant::HostGrant {
         attested_image: "worker-cli-fixture".to_string(),
         signing_key_id: "MAOS Project".to_string(),
         permitted_tier: maos_domain::invariants::i9::SandboxTier::T3,
-        permitted_egress_destinations: vec![], // hermetic: no egress
+        permitted_egress_destinations: vec![],
+    }
+}
+
+/// The probe receives the same T3 admission authority with no host-granted
+/// egress permission.
+#[cfg(feature = "network")]
+pub fn builtin_probe_grant() -> maos_domain::host_grant::HostGrant {
+    maos_domain::host_grant::HostGrant {
+        attested_image: worker_cli::PROBE_CLI_NAME.to_string(),
+        signing_key_id: "MAOS Project".to_string(),
+        permitted_tier: maos_domain::invariants::i9::SandboxTier::T3,
+        permitted_egress_destinations: vec![],
     }
 }
 
@@ -196,15 +189,22 @@ pub fn parse_host_grants_toml(
             Some(s) => parse_sandbox_tier(s)?,
             None => maos_domain::invariants::i9::SandboxTier::T3,
         };
-        let permitted_egress_destinations = g
-            .get("permitted_egress_destinations")
-            .and_then(|v| v.as_array())
-            .map(|a| {
-                a.iter()
-                    .filter_map(|x| x.as_str().map(String::from))
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let mut permitted_egress_destinations = Vec::new();
+        if let Some(value) = g.get("permitted_egress_destinations") {
+            let entries = value.as_array().ok_or_else(|| {
+                format!("grant[{i}].permitted_egress_destinations: expected an array")
+            })?;
+            for (j, entry) in entries.iter().enumerate() {
+                let field = format!("grant[{i}].permitted_egress_destinations[{j}]");
+                let value = entry
+                    .as_str()
+                    .ok_or_else(|| format!("{field}: expected a string"))?;
+                permitted_egress_destinations.push(
+                    maos_domain::host_grant::EgressDestination::parse_granted(value)
+                        .map_err(|error| format!("{field}: {error}"))?,
+                );
+            }
+        }
         out.push(maos_domain::host_grant::HostGrant {
             attested_image,
             signing_key_id,
@@ -215,28 +215,22 @@ pub fn parse_host_grants_toml(
     Ok(out)
 }
 
-/// Load the HOST-MANAGED grant allowlist (replaces the v0.9 self-grant). The
-/// built-in fixture grant keeps the hermetic path green; the operator adds real
-/// agent-CLI grants (codex/claude + egress) via a `MAOS_HOST_GRANTS` TOML file.
+/// Load the HOST-MANAGED grant allowlist (replaces the v0.9 self-grant). Built-in
+/// grants cover only the hermetic fixture and its security probe; the operator
+/// adds real agent-CLI grants (codex/claude + egress) via `MAOS_HOST_GRANTS`.
 /// A manifest whose (image, author) matches no grant fails CLOSED at
 /// `resolve_cli_wrapper_tier` — never self-granted.
 ///
 /// **Disposition of the unreadable/unparseable branch, stated rather than
 /// inherited (j1-crosshost-2a AC2.4).** A `MAOS_HOST_GRANTS` file that cannot be
-/// read or parsed does NOT abort the run: it warns and continues with the
-/// built-in grants only. That is SAFE today — the built-in set grants the
-/// hermetic fixture and nothing else, so every real agent CLI then fails closed
-/// at `resolve_cli_wrapper_tier` and no unauthorized image can spawn. It is
-/// nevertheless a SILENT DOWNGRADE OF AN OPERATOR-INTENT FILE: the operator
-/// asked for a specific grant set and got a different one, and the only signal
-/// is a line on stderr. It stays a warning because tightening it to a hard
-/// refusal changes the failure mode of every hermetic run that happens to have a
-/// stale variable exported, which is a separate decision from this story's. The
-/// safety argument above is the reason it is tolerable, not an argument that it
-/// is correct.
+/// read or parsed does NOT abort the run: it warns and continues with built-in
+/// grants only. The result is safe: real agent CLIs then fail closed at
+/// `resolve_cli_wrapper_tier`. It remains a warning because tightening it to a
+/// hard refusal changes the failure mode of every hermetic run that happens to
+/// have a stale variable exported.
 #[cfg(feature = "network")]
 pub fn load_host_grant_allowlist() -> maos_domain::host_grant::StaticHostGrantAllowlist {
-    let mut grants = vec![builtin_fixture_grant()];
+    let mut grants = vec![builtin_fixture_grant(), builtin_probe_grant()];
     if let Some(path) = std::env::var_os("MAOS_HOST_GRANTS") {
         let display = std::path::Path::new(&path).display().to_string();
         match std::fs::read_to_string(&path) {
@@ -425,6 +419,7 @@ pub fn run_cli_wrapper_manifest(
     remote_requested: bool,
     supervision: &dyn crate::supervision::WorkerSupervision,
     task: crate::supervision::WorkerTask,
+    #[cfg(unix)] egress: Option<&crate::egress::EgressHandle>,
 ) -> Result<worker_cli::WorkerCompletion, Box<dyn std::error::Error>> {
     use maos_domain::host_grant::HostGrantAllowlist;
     use maos_domain::invariants::i9::SandboxTier;
@@ -489,14 +484,17 @@ pub fn run_cli_wrapper_manifest(
 
     // 3. AC1 FORK C — fail loud at load on the deferred respawn_with_context.
     reject_respawn_with_context(&config).map_err(|e| format!("maos run: {e}"))?;
+    if requested_tier == SandboxTier::T3 {
+        maos_kernel_core::lifecycle::cli_wrapper::admission::reject_t3_stdin_posture(&config)?;
+    }
 
     // 4. AC5 FORK A — host-grant tier gate (T3: self-grant KILLED). The manifest
     //    supplies only the REQUEST (its claimed image + author); the allowlist is
-    //    HOST-MANAGED (built-in fixture grant + operator `MAOS_HOST_GRANTS` file),
-    //    never populated from the manifest's own fields. A (image, author) that
-    //    matches no host grant fails CLOSED at `resolve_cli_wrapper_tier`
-    //    (ECliWrapperTierNotGranted) — the artifact can no longer decide its own
-    //    tier. See host_grant.rs module doc + `load_host_grant_allowlist`.
+    //    HOST-MANAGED (built-in hermetic fixture/probe grants + operator
+    //    `MAOS_HOST_GRANTS` file), never populated from manifest fields.
+    //    A (image, author) that matches no host grant fails CLOSED at
+    //    `resolve_cli_wrapper_tier` (ECliWrapperTierNotGranted) — the artifact
+    //    can no longer decide its own tier.
     let attested_image = config.command.clone();
     let signing_key_id = manifest_root
         .get("author")
@@ -509,27 +507,13 @@ pub fn run_cli_wrapper_manifest(
         resolve_cli_wrapper_tier(requested_tier, &attested_image, &signing_key_id, &allowlist)
             .map_err(|e| format!("maos run: {e}"))?;
 
-    // Egress disposition (spec c3): run one records egress `declared-not-enforced`
-    // with a follow-up ID; enforced packet-level egress is an Epic-14 v2.0
-    // hardening. The permitted destinations come from the HOST grant, not the
-    // manifest.
+    // The host grant bounds admission; the proxy enforces exact destinations
+    // after the verified container launch. Emit the disposition only after its
+    // confirmed spawn report, never for a refused or failed launch.
     let permitted_egress = allowlist
         .lookup(&attested_image, &signing_key_id)
-        .map(|g| g.permitted_egress_destinations.clone())
+        .map(|g| g.permitted_egress_destinations.as_slice())
         .unwrap_or_default();
-    println!(
-        "{}",
-        serde_json::json!({
-            "event": "host_grant_disposition",
-            "attested_image": attested_image,
-            "signing_key_id": signing_key_id,
-            "granted_tier": format!("{granted_tier:?}"),
-            "egress": "declared-not-enforced",
-            "egress_enforced": false,
-            "permitted_egress": permitted_egress,
-            "egress_followup": EGRESS_ENFORCEMENT_FOLLOWUP,
-        })
-    );
 
     // 5. Resolve the CLI binary path; pin it into the config for the probe.
     let resolved = resolve_cli_binary(&config.command)?;
@@ -566,18 +550,15 @@ pub fn run_cli_wrapper_manifest(
             worker_cli::SUPPORTED_WORKER_CLIS
         )
     })?;
-    // T5 — CI/local split: a real agent CLI needs MAOS_LIVE_AGENT (local opt-in);
-    // the fixture always runs. CI never sets the flag, so CI cannot spawn a paid
-    // agent — the paid path is physically local-only. Fails closed before spawn.
+    // T5 — CI/local split: real agent CLIs need MAOS_LIVE_AGENT (local opt-in);
+    // hermetic fixtures always run. CI never sets the flag, so no paid agent
+    // spawns on the hermetic path. Fails closed before spawn.
     let live_agent = std::env::var_os("MAOS_LIVE_AGENT").is_some_and(|v| !v.is_empty());
     worker_cli::live_agent_gate(worker_cli.name(), live_agent)
         .map_err(|e| format!("maos run: {e}"))?;
-    // T5 — clean-home invariant on the live path: refuse an ambient auth file
-    // (codex's `~/.codex/auth.json`, claude's `~/.claude/.credentials.json`) that
-    // would let the child use a credential MAOS never holds. `HOME` is read here,
-    // not `MAOS_HOME` or `XDG_DATA_HOME`: the child inherits the real `HOME`
-    // because the bridge does not clear the env, so this is the variable that
-    // decides which credential file the CLI actually finds.
+    // T5 — clean-home invariant on the live path: refuse the CLI's ambient auth
+    // file. Child environments are cleared; HOME is explicitly restored from
+    // this runtime environment, so it determines the credential-file lookup.
     //
     // j1-crosshost-2a AC2.4 — an UNSET `HOME` used to skip the check entirely,
     // which is a fail-OPEN: the CLI's own home resolution does not necessarily
@@ -609,7 +590,7 @@ pub fn run_cli_wrapper_manifest(
                  live run. It lets the worker use a credential MAOS never holds, so redaction \
                  is unattestable (a failed Tier-2). Wipe it or use a clean sandbox home. Note \
                  this is a FILENAME control: renaming the file satisfies it without removing \
-                 the credential, and the inherited environment channel is not covered at all.",
+                 the credential. Provider keys are not copied into the child environment.",
                 p.display()
             )
             .into());
@@ -629,9 +610,23 @@ pub fn run_cli_wrapper_manifest(
         Some(task) => worker_cli.argv(task),
         None => Vec::new(),
     };
-    // Non-secret CLI env only (e.g. codex CODEX_NON_INTERACTIVE). Credentials are
-    // injected host-side on the live path, never in this argv/env shaping code.
-    let worker_env = worker_cli.nonsecret_env();
+    let probe_home = if worker_cli.name() == worker_cli::PROBE_CLI_NAME {
+        Some(
+            maos_domain::operator_door::maos_home()
+                .map_err(|error| format!("maos run: cannot resolve MAOS home: {error}"))?
+                .ok_or_else(|| {
+                    "maos run: the worker probe requires a resolved MAOS_HOME for its control-file check"
+                        .to_string()
+                })?,
+        )
+    } else {
+        None
+    };
+    let mut worker_env = worker_cli.nonsecret_env();
+    if let Some(home) = probe_home.as_deref() {
+        worker_env.extend(worker_cli.control_path_env(home));
+    }
+    let mut proxy_args = Vec::new();
 
     // 6. Admission — adapter-aware. The hermetic fixture speaks the kernel's
     //    Story 7.4 `--maos-bridge-probe` output-shape handshake, so it uses the
@@ -641,12 +636,29 @@ pub fn run_cli_wrapper_manifest(
     //    only worker that ever admitted. For real CLIs the WorkerCli adapter's
     //    `parse_completion` IS the output-shape contract (verified at COMPLETION),
     //    so admission runs a liveness probe and re-asserts the T3 floor here.
+    #[cfg(unix)]
+    let proxy_configured = egress.is_some_and(crate::egress::EgressHandle::is_available);
+    #[cfg(not(unix))]
+    let proxy_configured = false;
     match worker_cli.probe_strategy() {
         worker_cli::ProbeStrategy::BridgeHandshake => {
-            admit_cli_wrapper_journaled(&config, granted_tier, 0, &transparency_log)
-                .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
+            admit_cli_wrapper_journaled(
+                &config,
+                granted_tier,
+                0,
+                &transparency_log,
+                proxy_configured,
+                &permitted_egress,
+            )
+            .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
         }
         worker_cli::ProbeStrategy::Liveness { argv } => {
+            maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress(
+                &config,
+                proxy_configured,
+                &permitted_egress,
+            )
+            .map_err(|e| format!("maos run: cli_wrapper admission failed: {e}"))?;
             // AC6 floor — a CliWrapperSpirit requires T3 (the kernel probe asserts
             // this; preserve it on the real-CLI path, typed — Story 17-6 D-17-6-C).
             if !matches!(granted_tier, SandboxTier::T3) {
@@ -698,12 +710,38 @@ pub fn run_cli_wrapper_manifest(
     // still before the hash is bound and the child spawned.
     worker_cli::refuse_unsafe_argv(worker_cli.as_ref(), &config.argv_prefix)
         .map_err(|e| format!("maos run: {e}"))?;
+    // T3 launch requires a production trust anchor and verified image
+    // attestation before binding or minting; there is no development fallback.
+    let trust_anchor =
+        maos_kernel_core::security::sandbox::t3::image_verify::read_trust_anchor_pub()
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+    let crypto = maos_kernel_core::security::crypto::RingCryptoProvider;
+    let lock = maos_kernel_core::security::sandbox::t3::image_lock::load_and_verify_lock(
+        &trust_anchor,
+        &crypto,
+    )
+    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+    let image = lock
+        .default_entry()
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
     let aph = argv_prefix_hash(&config.argv_prefix);
 
     // 7a. Story 16-3 (D-16-3-D) — BIND. Every gate above ran at pid 0 and is
     //     unchanged: a refused manifest must never leave `lifecycle.load` rows
     //     behind. From here on the Worker HAS an SCB, and the guard's `Drop`
     //     owns every exit path.
+    #[cfg(unix)]
+    let egress_policy = egress.map(|handle| {
+        let ceiling_ms = supervision_section.as_ref().map_or_else(
+            || maos_manifest::SupervisionSection::default().silent_failure_threshold_ms,
+            |section| section.silent_failure_threshold_ms,
+        );
+        (
+            handle,
+            std::time::Duration::from_millis(u64::from(ceiling_ms))
+                .min(std::time::Duration::from_secs(300)),
+        )
+    });
     let bundle = maos_kernel_core::scheduler::control_block::SpiritManifestBundle {
         on_crash: on_crash_section,
         supervision: supervision_section,
@@ -712,6 +750,45 @@ pub fn run_cli_wrapper_manifest(
     let binding = supervision.bind(&task, bundle).map_err(|e| e.to_string())?;
     let spirit_pid = binding.spirit_pid();
     let worker_spirit_id = binding.spirit_id().to_string();
+    let mut egress_socket = None;
+    #[cfg(unix)]
+    let binding = {
+        let mut binding = binding;
+        if let Some((handle, ttl)) = egress_policy {
+            let credential = if config.egress.is_empty() {
+                maos_egress::Credential::None
+            } else if let Some(name) = worker_cli.credential_env_var() {
+                // Do not format VarError: its non-Unicode variant owns the key.
+                let raw = std::env::var(name)
+                    .map_err(|_| format!("maos run: egress credential {name} is unavailable"))?;
+                if worker_cli.proxy_uses_api_key() {
+                    maos_egress::Credential::ApiKey(raw)
+                } else {
+                    maos_egress::Credential::Bearer(raw)
+                }
+            } else {
+                maos_egress::Credential::None
+            };
+            let lease = handle
+                .spawn(
+                    spirit_pid,
+                    &worker_spirit_id,
+                    &config.egress,
+                    &permitted_egress,
+                    credential,
+                    ttl,
+                )
+                .map_err(|error| format!("maos run: Worker egress: {error}"))?;
+            egress_socket = Some(lease.socket_path().to_owned());
+            let proxy_root = "http://127.0.0.1:18080";
+            worker_env.extend(worker_cli.proxy_env(proxy_root, lease.bearer()));
+            proxy_args.extend(worker_cli.proxy_args(proxy_root));
+            binding.attach_egress(lease);
+        }
+        binding
+    };
+    #[cfg(not(unix))]
+    let binding = binding;
 
     // 7b. The mint moves to the REAL pid. Its revoke row, its
     //     `identity.asserted` row under an enterprise posture, and the token
@@ -794,27 +871,34 @@ pub fn run_cli_wrapper_manifest(
         );
     }
 
-    // 8. Spawn the REAL bridge. The typed task is routed as the trailing argv
-    //    (after the hashed argv_prefix); no probe flag → the worker runs its task.
+    let boot_nonce = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
+    let container_name = format!("maos-{worker_spirit_id}-{boot_nonce}");
+    proxy_args.extend(task_args);
     let spec = BridgeSpawnSpec {
         program: resolved,
         sandbox: maos_kernel_core::security::sandbox::SandboxSpec {
             tier: granted_tier,
             resolved_caps: Default::default(),
             declared_scopes: vec![],
-            spirit_id: "worker".to_string(),
+            spirit_id: worker_spirit_id.clone(),
             output_shape_predicate: None,
         },
         argv_prefix: config.argv_prefix.clone(),
-        task_args,
+        task_args: proxy_args,
         expected_argv_prefix_hash: aph,
-        from_spirit_id: "worker".to_string(),
+        from_spirit_id: worker_spirit_id.clone(),
         stdio_shape: config.posture.stdio_shape,
         control_channel: config.posture.control_channel,
         shutdown_signal: config.posture.shutdown_signal.clone(),
         channel_capacity: 256,
         backpressure: Backpressure::Block,
         env: worker_env,
+        t3: Some(maos_kernel_core::lifecycle::cli_wrapper::T3Launch {
+            image,
+            boot_nonce,
+            container_name,
+            egress_socket,
+        }),
     };
     // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
     // rows (the adapter's oracle reads the persisted evidence, not the raw exit).
@@ -822,13 +906,34 @@ pub fn run_cli_wrapper_manifest(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let bridge = spawn_and_bridge(spec).map_err(|e| format!("maos run: bridge spawn: {e}"))?;
+    let bridge = spawn_and_bridge(spec)?;
     // Story 16-3 (D-16-3-Q (6)) — guard FIRST. `SpawnedBridge::drop` kills and
     // reaps the child, and struct fields drop in declaration order, so two
     // separate locals would let the bridge kill the child before the guard
     // acted: the guard's signal would prove nothing, and the bridge's SIGKILL
     // landing in `Running` could race the observer into a spurious crash path.
     let mut live = crate::supervision::LiveWorker { binding, bridge };
+    let (child, image) = live.bridge.container().ok_or_else(|| {
+        maos_kernel_core::lifecycle::cli_wrapper::BridgeError::SandboxRefused(
+            "Worker spawn did not produce a T3 container".into(),
+        )
+    })?;
+    live.binding
+        .core()
+        .attach_container_stop(child.runtime.path.clone(), child.container_name.clone());
+    supervision.commit_container_spawn(live.binding.core(), child, image)?;
+    println!(
+        "{}",
+        serde_json::json!({
+            "event": "host_grant_disposition",
+            "attested_image": attested_image,
+            "signing_key_id": signing_key_id,
+            "granted_tier": format!("{granted_tier:?}"),
+            "egress": "enforced",
+            "egress_enforced": true,
+            "permitted_egress": permitted_egress,
+        })
+    );
     let child_pid = live.bridge.child_pid();
     println!(
         "{}",

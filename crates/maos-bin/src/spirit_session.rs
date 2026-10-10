@@ -278,6 +278,7 @@ pub async fn run_admitted_session(
             channel_capacity: 1,
             backpressure: Backpressure::Block,
             env: launch.plan.env,
+            t3: None,
         }).map_err(|error| SessionError::Bridge(error.to_string()))?;
         let mut live = LiveWorker { binding, bridge };
         deps.supervisor.watch(live.binding.core(), live.bridge.child_pid());

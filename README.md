@@ -279,9 +279,9 @@ Exit codes:
 `uninstall` keeps its terminal `0/3/4/5`, `forget` its `3`, and
 `spirit hot-swap-precheck` its `0/2`.
 
-Until Story 17-1 lands, any Worker on this host can read `control.json` and
-inherits an exported operator bearer — the cure is 17-1's `env_clear` plus
-T3 isolation, not this surface.
+A Worker cannot reach `control.json` or an exported operator bearer: every
+Worker runs in a T3 rootless container with no host home mounted, no network
+and only the environment names MAOS passes (Story 17-1).
 
 → [`docs/maos.dev/run-maos.md`](docs/maos.dev/run-maos.md)
 

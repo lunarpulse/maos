@@ -1666,6 +1666,9 @@ pub fn resolve_spirit_name(
             row.map_err(|e| format!("row error: {e}"))?;
         let name_matches = match kind {
             19 => intent == name,
+            // The scheduler's pid-0 transition echo names a Spirit but never
+            // identifies its pid; it must not displace the `lifecycle.load` row.
+            _ if intent == "lifecycle.journal" => false,
             // `lifecycle.load`: a valid payload is authoritative; use the
             // legacy intent layout only when the payload has no Spirit id.
             _ => match payload_spirit_id(&payload) {
@@ -2556,7 +2559,10 @@ mod tests {
         let real = dir.path().join("foreign.sqlite");
         make_13_5g_artifact(&real, 3, Some("support"), None, None);
         let link = dir.path().join("transparency.sqlite");
+        #[cfg(unix)]
         std::os::unix::fs::symlink(&real, &link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&real, &link).unwrap();
         let team = maos_domain::team::TeamId::new("security").unwrap();
 
         assert!(

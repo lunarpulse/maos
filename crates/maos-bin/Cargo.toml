@@ -19,6 +19,7 @@ network = [
     "dep:maos-mcp",
     "dep:maos-a2a-tcp",
     "dep:maos-cohort",
+    "dep:maos-egress",
     "dep:maos-notify-push",
     "dep:rcgen",
     "dep:maos-a2a",
@@ -117,6 +118,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 # `waitid(WaitId::PidFd, EXITED|NOWAIT)`. Feature-only: no new crate, no new
 # lockfile entry.
 [target.'cfg(unix)'.dependencies]
+maos-egress = { path = "../maos-egress", optional = true }
 rustix = { version = "1.1", features = ["fs", "process"] }
 # Story 16-4 (D2/D3) — unix builds keep today's keyring-backed composition.
 # Non-unix builds never see the keyring stack: the default backend is `env`

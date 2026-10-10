@@ -20,10 +20,9 @@
 //!    asserts equality with the hash bound into the cap-token at issue-time
 //!    (TOCTOU correctness per ADR-023). Divergence ⇒ [`BridgeError::CapBindingMismatch`].
 //! 3. Spawns the subprocess under the admitted [`BridgeSpawnSpec::sandbox`]
-//!    (Story 17-6 AC5): `T2` through `spawn_sandboxed` on Linux (refused on
-//!    every other OS, never a bare fallback); `T0`/`T3` directly via
-//!    [`std::process::Command`] (the T3 container variant is 17-1's); any other
-//!    tier is refused, typed ([`BridgeError::SandboxRefused`]).
+//!    `T2` through `spawn_sandboxed` on Linux (refused on every other OS),
+//!    `T0` directly with a cleared child environment, and `T3` through the
+//!    verified container launch path; every unsupported tier is refused.
 //! 4. Each captured stdout/stderr line is written to the Transparency Log as a
 //!    `FrameKind::CliSubprocessOutput = 21` row via the **real**
 //!    [`TransparencyLogAdapter::insert_frame_event_with_sender`], which routes
@@ -60,9 +59,16 @@ use maos_domain::invariants::i9::SandboxTier;
 use crate::capability::cap_audit;
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
+use crate::security::sandbox::t3::{
+    child::SandboxedContainerChild,
+    image_lock::VerifiedImageAttestation,
+    spawn::{runtime_command, spawn_t3, T3SpawnContext},
+};
 use crate::security::sandbox::SandboxSpec;
 #[cfg(target_os = "linux")]
 use crate::security::sandbox::{spawn_sandboxed, SandboxedChild};
+#[cfg(unix)]
+use maos_iac::adapter::{CorpusBackedRedactionPolicy, RedactionPolicy};
 
 /// Story 6.2 AC6 — recompute the manifest's `argv_prefix_hash` for cap-token
 /// binding verification. Re-derived at runtime; asserted equal to the
@@ -196,48 +202,10 @@ pub enum BridgeError {
     /// Generic I/O failure on the control channel or wait path.
     #[error("cli bridge io error: {0}")]
     Io(String),
-    /// AC6 `ci_default` hermetic guard tripped — a real agent CLI or a network
-    /// request was seen on the hermetic Tier-1 path (use `--live` for Tier-2).
-    #[error("ci_default hermetic guard tripped: {0}")]
-    CiGuardTripped(String),
     /// Story 17-6 AC5 — the admitted sandbox could not be applied (a refused T2
     /// spawn, or a tier no spawn path applies). Never a bare fallback.
     #[error("cli bridge sandbox refused: {0}")]
     SandboxRefused(String),
-}
-
-/// Story 8.12 AC6 — the `ci_default` hermetic guard.
-///
-/// On the hermetic Tier-1 path the bridge must spawn ONLY the deterministic
-/// fixture-CLI: **zero network**, **no real agent CLI**. This guard trips
-/// (returns `Err`) if pointed at a known real agent CLI (`claude`/`opencode`/
-/// `gemini`/`kimi`) or if a network egress is requested. A guard with no
-/// failure-mode test is decoration — its trip behavior is proven in
-/// `tests::ci_default_guard_trips_on_real_cli`.
-pub fn ci_default_guard(program: &str, network_requested: bool) -> Result<(), BridgeError> {
-    const REAL_AGENT_CLIS: &[&str] = &[
-        "claude",
-        "opencode",
-        "gemini",
-        "gemini-cli",
-        "kimi",
-        "kimi-cli",
-    ];
-    if network_requested {
-        return Err(BridgeError::CiGuardTripped(
-            "network egress requested on the hermetic ci_default path (Tier-2 needs --live)".into(),
-        ));
-    }
-    let base = std::path::Path::new(program)
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or(program);
-    if REAL_AGENT_CLIS.iter().any(|c| base == *c) {
-        return Err(BridgeError::CiGuardTripped(format!(
-            "real agent CLI '{base}' invoked on the hermetic ci_default path (Tier-2 needs --live)"
-        )));
-    }
-    Ok(())
 }
 
 /// Spec for a single subprocess spawn through the bridge (AC1).
@@ -278,6 +246,19 @@ pub struct BridgeSpawnSpec {
     /// Host-injected environment (credentials). NEVER journaled; passed only to
     /// the child's process environment.
     pub env: Vec<(String, String)>,
+    /// Optional one-shot launch context for the T3 container boundary.
+    pub t3: Option<T3Launch>,
+}
+
+/// T3 launch material transferred exactly once into the runtime child.
+#[maos_attrs::i9_exempt(
+    reason = "transient T3 launch attestation and container identity consumed by one spawn"
+)]
+pub struct T3Launch {
+    pub image: VerifiedImageAttestation,
+    pub boot_nonce: u64,
+    pub container_name: String,
+    pub egress_socket: Option<std::path::PathBuf>,
 }
 
 /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
@@ -362,19 +343,32 @@ pub struct BridgeExit {
 
 /// Read one newline-delimited record (`NdjsonOverStdio` / `Raw`). `Raw` has no
 /// self-delimiting boundary, so its **explicit, documented** boundary is the LF
-/// byte: read-to-newline, buffered. Returns `Ok(None)` on EOF.
+/// byte: read-to-newline, buffered. Returns `Ok(None)` on EOF. Records are
+/// bounded by the shared codec maximum; overlong records fail, never truncate.
 fn read_newline_delimited<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Vec<u8>>> {
+    let limit = maos_frame_codec::MAX_FRAME_BYTES + 2;
     let mut buf = Vec::new();
-    let n = reader.read_until(b'\n', &mut buf)?;
+    let n = std::io::Read::take(&mut *reader, limit as u64).read_until(b'\n', &mut buf)?;
     if n == 0 {
         return Ok(None);
+    }
+    if n == limit && buf.last() != Some(&b'\n') {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "newline-delimited record exceeds maximum frame size",
+        ));
     }
     while matches!(buf.last(), Some(b'\n') | Some(b'\r')) {
         buf.pop();
     }
+    if buf.len() > maos_frame_codec::MAX_FRAME_BYTES {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "newline-delimited record exceeds maximum frame size",
+        ));
+    }
     Ok(Some(buf))
 }
-
 /// Reader-thread body: frame `reader` per `shape`, hand frames to `tx` per the
 /// backpressure policy. Sends a terminal `Eof` then returns (closing the thread).
 fn run_reader<R: BufRead>(
@@ -456,12 +450,12 @@ fn run_reader<R: BufRead>(
     }
 }
 
-/// Story 17-6 AC5 — the bridge child: a bare spawn, or one confined by
-/// `spawn_sandboxed`, whose guard owns the child and its cgroup dir.
+/// Story 17-6 AC5 / 17-1 — a child under its admitted confinement boundary.
 enum BridgeChild {
     Plain(Child),
     #[cfg(target_os = "linux")]
     Sandboxed(SandboxedChild),
+    Container(SandboxedContainerChild, VerifiedImageAttestation),
 }
 
 impl BridgeChild {
@@ -470,20 +464,58 @@ impl BridgeChild {
             Self::Plain(child) => child,
             #[cfg(target_os = "linux")]
             Self::Sandboxed(guard) => guard.child_mut(),
+            Self::Container(guard, _) => guard
+                .child
+                .as_mut()
+                .expect("T3 runtime child remains owned by container guard"),
         }
     }
 
-    /// The child's cgroup directory while its guard is alive.
+    fn kill(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Container(guard, _) => {
+                let child_result = match guard.child.as_mut().map_or(Ok(()), Child::kill) {
+                    Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
+                    result => result,
+                };
+                let runtime_result = runtime_command(&guard.runtime.path)
+                    .args(["kill", &guard.container_name])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .and_then(|status| {
+                        if status.success() {
+                            Ok(())
+                        } else {
+                            Err(std::io::Error::other("container runtime refused kill"))
+                        }
+                    });
+                child_result.and(runtime_result)
+            }
+            Self::Plain(child) => child.kill(),
+            #[cfg(target_os = "linux")]
+            Self::Sandboxed(guard) => guard.child_mut().kill(),
+        }
+    }
+
     #[cfg(target_os = "linux")]
     fn cgroup_path(&self) -> Option<&std::path::Path> {
         match self {
-            Self::Plain(_) => None,
+            Self::Plain(_) | Self::Container(_, _) => None,
+            #[cfg(target_os = "linux")]
             Self::Sandboxed(guard) => guard.cgroup_path(),
+        }
+    }
+
+    fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
+        match self {
+            Self::Container(child, image) => Some((child, image)),
+            _ => None,
         }
     }
 }
 
-/// `oom_kill` from a cgroup's `memory.events` (0 when absent: no memory controller).
+/// `oom_kill` from a cgroup's `memory.events` (0 when absent).
 #[cfg(target_os = "linux")]
 fn cgroup_oom_kills(cgroup: &std::path::Path) -> u64 {
     std::fs::read_to_string(cgroup.join("memory.events"))
@@ -508,57 +540,73 @@ impl Drop for BridgeChild {
     }
 }
 
-/// Spawn under the admitted spec: T2 through `spawn_sandboxed` on Linux only (never
-/// a bare fallback); T0 and T3 bare (T3 is applied by 17-1 AC4); all else refused.
-fn spawn_child(
-    spec: &SandboxSpec,
-    cmd: &mut Command,
-    program: &str,
-) -> Result<BridgeChild, BridgeError> {
-    match spec.tier {
+fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChild, BridgeError> {
+    let program = &spec.program;
+    match spec.sandbox.tier {
+        SandboxTier::T0 => (),
         #[cfg(target_os = "linux")]
-        SandboxTier::T2 => spawn_sandboxed(spec, cmd)
-            .map(BridgeChild::Sandboxed)
-            .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}"))),
-        SandboxTier::T0 | SandboxTier::T3 => cmd
-            .spawn()
-            .map(BridgeChild::Plain)
-            .map_err(|e| BridgeError::Spawn(format!("{program}: {e}"))),
-        tier => Err(BridgeError::SandboxRefused(format!(
-            "{program}: no spawn path applies tier {tier:?}"
-        ))),
+        SandboxTier::T2 => (),
+        SandboxTier::T3 => {
+            if spec.control_channel != CliWrapperControlChannel::Signals
+                || spec.stdio_shape == CliWrapperStdioShape::JsonRpcOverStdio
+            {
+                return Err(BridgeError::ControlUnsupported(
+                    spec.control_channel,
+                    "T3 does not support stdin-keeping postures".into(),
+                ));
+            }
+            let launch = spec.t3.take().ok_or_else(|| {
+                BridgeError::SandboxRefused("T3 launch context is missing".into())
+            })?;
+            let spawn_context = T3SpawnContext {
+                spirit_binary_path: std::path::Path::new(program),
+                boot_nonce: launch.boot_nonce,
+                container_name: launch.container_name,
+                egress_socket: launch.egress_socket.as_deref(),
+                env: &spec.env,
+            };
+            return spawn_t3(&spec.sandbox, &launch.image, argv, spawn_context)
+                .map(|child| BridgeChild::Container(child, launch.image))
+                .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}")));
+        }
+        tier => {
+            return Err(BridgeError::SandboxRefused(format!(
+                "{program}: no spawn path applies tier {tier:?}"
+            )))
+        }
     }
+    let mut cmd = Command::new(program);
+    cmd.env_clear()
+        .args(argv)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .envs(spec.env.iter().map(|(name, value)| (name, value)));
+    #[cfg(target_os = "linux")]
+    if spec.sandbox.tier == SandboxTier::T2 {
+        return spawn_sandboxed(&spec.sandbox, &mut cmd)
+            .map(BridgeChild::Sandboxed)
+            .map_err(|e| BridgeError::SandboxRefused(format!("{program}: {e}")));
+    }
+    cmd.spawn()
+        .map(BridgeChild::Plain)
+        .map_err(|e| BridgeError::Spawn(format!("{program}: {e}")))
 }
 
-/// Spawn a subprocess under its admitted sandbox and start its reader threads
-/// (AC1; Story 17-6 AC5). The cap-token binding is asserted BEFORE the child
-/// can produce a single byte.
-pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeError> {
-    // ADR-023 TOCTOU — re-derive the argv_prefix_hash and assert the binding
-    // BEFORE spawning. A divergent prefix is exactly the substitution the
-    // cap-token binding exists to prevent; fail loud, never run.
+/// Spawn a subprocess under its admitted sandbox and start its reader threads.
+/// The cap-token binding is asserted BEFORE the child can produce a single byte.
+pub fn spawn_and_bridge(mut spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeError> {
     let observed = argv_prefix_hash(&spec.argv_prefix);
     if observed != spec.expected_argv_prefix_hash {
         return Err(BridgeError::CapBindingMismatch);
     }
 
-    let mut argv: Vec<String> = spec.argv_prefix.clone();
-    argv.extend(spec.task_args.iter().cloned());
-
-    let mut cmd = Command::new(&spec.program);
-    cmd.args(&argv)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    // Host-injected credentials → child env ONLY. Never journaled.
-    for (k, v) in &spec.env {
-        cmd.env(k, v);
-    }
-
-    let mut child = spawn_child(&spec.sandbox, &mut cmd, &spec.program)?;
+    // Transfer the two owned argument vectors into the single argv allocation.
+    let mut argv = std::mem::take(&mut spec.argv_prefix);
+    argv.extend(std::mem::take(&mut spec.task_args));
+    let mut child = spawn_child(&mut spec, &argv)?;
     let child_pid = child.get().id();
-    // Framed sessions need duplex stdin even when lifecycle control uses signals.
-    // Argv-driven CLIs still receive EOF immediately.
+    // Argv-driven T0/T2 CLIs receive EOF immediately; T3 only permits this posture.
     let stdin = match (spec.control_channel, spec.stdio_shape) {
         (CliWrapperControlChannel::Signals, shape)
             if shape != CliWrapperStdioShape::JsonRpcOverStdio =>
@@ -617,9 +665,8 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
         Ok(handle) => handle,
         Err(error) => {
             drop(rx);
-            let _ = child.get().kill();
+            let _ = child.kill();
             let _ = child.get().wait();
-            let _ = out_handle.join();
             return Err(BridgeError::Io(format!("spawn stderr reader: {error}")));
         }
     };
@@ -637,6 +684,13 @@ pub fn spawn_and_bridge(spec: BridgeSpawnSpec) -> Result<SpawnedBridge, BridgeEr
         sandbox_tier: spec.sandbox.tier,
         stdout_eof: false,
     })
+}
+
+impl SpawnedBridge {
+    /// Container and attested image retained for the composition-root report.
+    pub fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
+        self.child.as_ref().and_then(BridgeChild::container)
+    }
 }
 
 impl SpawnedBridge {
@@ -668,9 +722,8 @@ impl SpawnedBridge {
     /// SIGKILL a not-yet-reaped child. `Ok` when it already exited or was
     /// finalized. Does not reap: [`Self::wait_and_finalize`] still does.
     pub fn kill(&mut self) -> Result<(), BridgeError> {
-        match self.child.as_mut().map(|child| child.get().kill()) {
+        match self.child.as_mut().map(BridgeChild::kill) {
             None | Some(Ok(())) => Ok(()),
-            // Older std reports an already-reaped child as InvalidInput.
             Some(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
             Some(Err(error)) => Err(BridgeError::Io(format!("kill: {error}"))),
         }
@@ -787,7 +840,23 @@ impl SpawnedBridge {
                 }) => {
                     match stream {
                         SubStream::Stdout => out.stdout_lines += 1,
-                        SubStream::Stderr => out.stderr_lines += 1,
+                        SubStream::Stderr => {
+                            out.stderr_lines += 1;
+                            #[cfg(unix)]
+                            if self.sandbox_tier == SandboxTier::T3 {
+                                const MARKER: &[u8] = b"maos-sandbox-block: ";
+                                if let Some(what) = bytes.strip_prefix(MARKER) {
+                                    let policy = CorpusBackedRedactionPolicy::new();
+                                    let redacted = policy.redact(what);
+                                    self.report_sandbox_block(
+                                        journal,
+                                        spirit_pid,
+                                        None,
+                                        String::from_utf8_lossy(&redacted).into_owned(),
+                                    );
+                                }
+                            }
+                        }
                     }
                     // The line bytes may be non-UTF8 or carry a secret; the TL
                     // redaction scrubber runs on the full payload at insert.
@@ -1005,15 +1074,11 @@ impl SpawnedBridge {
                 let _ = stdin.flush();
             }
         }
-        // Close stdin → the child reads EOF on stdin (graceful for CLIs that
-        // treat stdin-close as shutdown). `shutdown_signal` (SIGTERM/SIGINT) is
-        // honored at the container-stop layer for live CLIs; for the directly
-        // spawned fixture path the only `forbid(unsafe_code)`-safe terminator is
-        // `Child::kill` (SIGKILL), used below if the child outlives stdin-close.
-        let _ = self.shutdown_signal; // advisory; see doc above
+        // Close stdin before routing termination through the child abstraction.
+        let _ = self.shutdown_signal;
         self.stdin = None;
         if let Some(child) = self.child.as_mut() {
-            let _ = child.get().kill();
+            let _ = child.kill();
             let _ = child.get().wait();
         }
         self.child = None;
@@ -1027,7 +1092,7 @@ impl Drop for SpawnedBridge {
         // any `Block`ed reader), then join the readers (no orphaned threads).
         self.stdin = None;
         if let Some(mut child) = self.child.take() {
-            let _ = child.get().kill();
+            let _ = child.kill();
             let _ = child.get().wait();
         }
         // Drop the receiver first so any `Block`ed reader send returns Err and
@@ -1243,43 +1308,6 @@ mod tests {
         assert_eq!(read_newline_delimited(&mut r).unwrap(), None);
     }
 
-    // ── ci_default hermetic guard (AC6) ──
-
-    #[test]
-    fn ci_default_guard_passes_for_fixture() {
-        assert!(ci_default_guard("worker-cli-fixture", false).is_ok());
-        assert!(ci_default_guard("/abs/path/to/worker-cli-fixture", false).is_ok());
-        assert!(ci_default_guard("sh", false).is_ok());
-    }
-
-    #[test]
-    fn ci_default_guard_trips_on_real_cli() {
-        // The guard must TRIP on a real agent CLI (decoration otherwise).
-        for cli in [
-            "claude",
-            "opencode",
-            "gemini",
-            "kimi",
-            "/usr/local/bin/claude",
-        ] {
-            assert!(
-                matches!(
-                    ci_default_guard(cli, false),
-                    Err(BridgeError::CiGuardTripped(_))
-                ),
-                "guard must trip on real CLI {cli}"
-            );
-        }
-    }
-
-    #[test]
-    fn ci_default_guard_trips_on_network() {
-        assert!(matches!(
-            ci_default_guard("worker-cli-fixture", true),
-            Err(BridgeError::CiGuardTripped(_))
-        ));
-    }
-
     /// P-6: Drop-without-pump must NOT deadlock when the child has filled the
     /// bounded channel. The fix (self.rx.take() before join) prevents the reader
     /// thread from blocking on a full channel whose receiver is still alive.
@@ -1380,6 +1408,7 @@ mod tests {
             channel_capacity: 8,
             backpressure: Backpressure::Block,
             env: vec![],
+            t3: None,
         };
         let mut bridge = spawn_and_bridge(spec).expect("spawn /bin/sh");
 

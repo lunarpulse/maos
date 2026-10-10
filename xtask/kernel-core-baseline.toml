@@ -502,7 +502,7 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 25293
+src_lines = 25267
 # HISTORY: Story 17-6 review security repair (2026-09-28), operator-ratified
 #          FLAG-Winston: 25015 -> 25032 (+17 physical; tokei 19292 -> 19309,
 #          +17). `security/sandbox/linux.rs` compares each Landlock rule fd's
@@ -679,9 +679,36 @@ src_lines = 25293
 #          before running loaded code; T2's EPERM default failed every WASM-form
 #          leg of spawned_scope_17_3c on ubuntu-24.04-arm/26.04-arm (discipline
 #          run 37532509983) while x86_64 passed. Surface pin unaffected.
+# HISTORY: Story 17-1 landing (2026-10-09), FLAG-Winston operator grant:
+#          variant B ceiling 25293 -> ≤ 25353 / KLOC ≤ 19564 (ruled 2026-10-06),
+#          FW-01 charter extended deletion-only to t3/{cap_audit_bridge,quarantine}.rs
+#          (D-16, sign-off S3 2026-10-07) and to runtime_detect.rs / image_verify.rs /
+#          child.rs for the shared scrubbed runtime command only (2026-10-09).
+#          Exact measured after `cargo fmt --all`: 25293 -> 25212 physical (-81);
+#          kernel KLOC row 19529 -> 19513. Files 98 -> 96 (two removed).
+#          Per file: lifecycle/cli_wrapper/admission.rs +92 (check_egress, the
+#          D-15 reject_t3_stdin_posture, env-cleared shape probe, tests),
+#          runtime.rs +29 (T3Launch, BridgeChild::Container, T3 arm never bare,
+#          env_clear, bounded T3 framing, stderr-only sandbox marker; dead
+#          ci_default_guard deleted), lifecycle.rs +1, cli_wrapper/mod.rs -1,
+#          t3/spawn.rs +16 (piped spawn_t3, scrubbed runtime_command, guard before
+#          inspect), t3/argv.rs -107 (names-only --env, --http-proxy=false, the
+#          /proxy/egress.sock mount, `--` operands; in-file tests moved out),
+#          t3/mod.rs -2, runtime_detect.rs -1, image_verify.rs 0, child.rs 0
+#          (scrubbed runtime command), cap_audit_bridge.rs -35 and quarantine.rs
+#          -73 (deleted, zero callers, R17-83/R17-89). t3-image.lock unchanged.
+#          Surface pin moved in the same change (382 -> 379 items).
+# HISTORY: Story 17-1 §A6 review patches (2026-10-10, review phase):
+#          25212 -> 25267 physical (+55); kernel KLOC row 19513 -> 19553
+#          (ceiling 19564 held). Driver: t3/spawn.rs +45 (rootless-runtime
+#          verification gate per ADR-061 M3 — a rootful or docker runtime is
+#          refused at spawn, applies-or-refuses; bounded `runtime_call_bounded`
+#          helper so a stuck runtime client cannot hang spawn, inspect or
+#          teardown), t3/child.rs -8 (teardown via the bounded helper),
+#          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "9878cb9cbe056397bb5c2bf8be43333d03c5a5163730ca87dcd2088b0fbf3c54"
+set_hash = "36219a02cd4377576d4427431bb1a8e42cc3886da44f27968f9c388f593fb408"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -715,10 +742,10 @@ set_hash = "9878cb9cbe056397bb5c2bf8be43333d03c5a5163730ca87dcd2088b0fbf3c54"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
 "journal/mod.rs" = "c0e8306b72ed4349ebfde22d4501f5467e354a840fd473e8aee1c03037a47e77"
 "lib.rs" = "a4c3708400196b1c97ac614ead31645d77cc5124bfbd30f4b13139bf4c7f9100"
-"lifecycle/cli_wrapper/admission.rs" = "006b245592fde622bca53dca3e61efd448c106a318d3e4df1d81449bb5fb48d7"
-"lifecycle/cli_wrapper/lifecycle.rs" = "4a3d2e2f631c47195321fc48410efcbc218d69a979195fbc8f741a09ace09599"
-"lifecycle/cli_wrapper/mod.rs" = "c78a43ba26d796315af0ee07f2ce76991c7b0f1785298d49c08ffbdf17c0addc"
-"lifecycle/cli_wrapper/runtime.rs" = "456a1aab38b8d5f42d7192cc9795ebcc1d3909a544206b62bb61c308616dae97"
+"lifecycle/cli_wrapper/admission.rs" = "5d1c1222faa082614f101d91cb343d4b9f636d23c340d4863bbb12008c3e41e5"
+"lifecycle/cli_wrapper/lifecycle.rs" = "87d3d77b8c646090341890990e634d71a62e72d0e032d892d23aee5e5cba950b"
+"lifecycle/cli_wrapper/mod.rs" = "c8fb7558651655cde31d3ef0044c5ee682eb00405bdacdad429fc2ef7434f6bb"
+"lifecycle/cli_wrapper/runtime.rs" = "8e02312ebb9a2e2fd1c78898b332ed7ad4364bd08e53e804519a8381fc85456d"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
@@ -762,15 +789,13 @@ set_hash = "9878cb9cbe056397bb5c2bf8be43333d03c5a5163730ca87dcd2088b0fbf3c54"
 "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
 "security/sandbox/mod.rs" = "092b1d0ab2eccb764934568b6263fa950a60f596284c97e0e10981e7847ac1f9"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
-"security/sandbox/t3/argv.rs" = "18badaa3d8141e86fb87b852577d1720319a16b765e2dbdc177facad913c5ae0"
-"security/sandbox/t3/cap_audit_bridge.rs" = "c4f77a015d1b21541f82ce35a6a49c66e8e3a0228191de1a68eac330d2093035"
-"security/sandbox/t3/child.rs" = "b020bc87c673f83e0d49831f564dadbda94d901f68299803cd41c88670d733d6"
+"security/sandbox/t3/argv.rs" = "1f6b41cb2e6515425414bc24cbb0398a9a52c282e329c46d9c0484ef7761e249"
+"security/sandbox/t3/child.rs" = "d91f8d061e6a4b3bb2340857148ec8d590e62cd8f5be8556a930a29900397de7"
 "security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
-"security/sandbox/t3/image_verify.rs" = "2418b6e509a547aecb192ff6e83a12423935599bb9ab5c978b50827d320ee523"
-"security/sandbox/t3/mod.rs" = "f8e44ec0e9bb15005c800ffff127913a13b3f706f7d0224f568142239b1e625e"
-"security/sandbox/t3/quarantine.rs" = "e1df8535cd5371c83718084c6bde3b9a80647fe8dfebd18b932de3b6b6e118b6"
-"security/sandbox/t3/runtime_detect.rs" = "91cba03e8a2a1f7ee03945100f3198bb36601d7008b2fc848f53f10466aeb974"
-"security/sandbox/t3/spawn.rs" = "31658654ff7f6e824dceafc68be06bd3758b6efe1b1097517250d84f28653e95"
+"security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"
+"security/sandbox/t3/mod.rs" = "76adcc7683f44da32742939bafebef527b49b7831f28f25cd80aadce1f9a0f31"
+"security/sandbox/t3/runtime_detect.rs" = "8f1a9beab532f033bf7a65a7519beab0b2b100e78348a4869770522d2f92a361"
+"security/sandbox/t3/spawn.rs" = "833395de6e9720e02b063fef525dc53949a017be4848c1b734fdbf213f20414b"
 "security/sandbox/unsupported.rs" = "124e2d5baa3a64757cde10dcf7014bd7a77a77312c3ab76609140d060e515894"
 "security/sandbox/windows.rs" = "5f8ff06185984f9f5eb18a457b6f4329d0baf2ced8662db20ea70f5b7f5f2935"
 "supervision/cold_restart.rs" = "2977944d24dc54c28dba02c1d3395fc16225f45a3994b0a53f1a27aca20149b7"

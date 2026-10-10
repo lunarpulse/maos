@@ -30,6 +30,7 @@ use maos_spirit_abi::identity::FrameKind;
 
 fn cfg(command: &str, declared: &str) -> CliWrapperConfig {
     CliWrapperConfig {
+        egress: Vec::new(),
         command: command.into(),
         argv_prefix: vec![],
         output_shape_version: declared.into(),

@@ -1,0 +1,49 @@
+import json
+import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+
+def annotation(kind, message):
+    escaped = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+    print(f'::{kind}::{escaped}', flush=True)
+
+
+platform = sys.argv[1]
+commands = []
+if platform == 'darwin':
+    commands.append(['cargo', 'check', '--locked', '--workspace', '--all-targets',
+                     '--target', 'aarch64-apple-darwin', '--message-format=json'])
+elif platform == 'windows':
+    commands.append(['cargo', 'build', '--locked', '-p', 'maos-kernel-core',
+                     '-p', 'maos-cli', '--message-format=json'])
+    commands.append(['cargo', 'check', '--locked', '--workspace', '--all-targets',
+                     '--target', 'x86_64-pc-windows-msvc', '--message-format=json'])
+else:
+    raise SystemExit('Unknown native platform')
+
+annotation('notice', f"17-1 native compile BEGIN platform={platform} commit={os.environ['GITHUB_SHA']} runner={os.environ.get('RUNNER_OS')}/{os.environ.get('RUNNER_ARCH')}")
+for number, command in enumerate(commands):
+    errors = []
+    with Path(f'platform-{platform}-{number}.log').open('w', encoding='utf-8') as logfile:
+        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, encoding='utf-8', errors='replace')
+        for line in child.stdout:
+            logfile.write(line)
+            print(line, end='', flush=True)
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get('reason') == 'compiler-message' and event['message']['level'] == 'error' and len(errors) < 3:
+                errors.append(event['message'].get('rendered') or event['message']['message'])
+        code = child.wait()
+    for diagnostic in errors:
+        annotation('error', diagnostic)
+    verdict = 'PASS' if code == 0 else 'FAIL'
+    annotation('notice' if code == 0 else 'error',
+               f'17-1 native compile {verdict} platform={platform} rc={code} command={shlex.join(command)}')
+    if code != 0:
+        raise SystemExit(code)

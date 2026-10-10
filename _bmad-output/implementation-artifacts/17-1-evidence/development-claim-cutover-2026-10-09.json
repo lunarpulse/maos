@@ -1,0 +1,30 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-09",
+  "task": "1.5, operator-moved after Task 5",
+  "red": {"command": "cargo test --offline --locked -p maos-cli --lib record_capture_row_round_trips_through_audit_query", "exit": 101, "observed": "Current enforced capture refused by obsolete declared-not-enforced validator before journal insertion", "output": "artifact://206"},
+  "green": [
+    {"command": "cargo test --offline --locked -p maos-cli --lib", "passed": 49, "output": "artifact://208"},
+    {"command": "cargo test --offline --locked -p xtask demo_j1::tests", "passed": 27, "output": "artifact://210"},
+    {"command": "cargo check --offline --locked -p maos-bin --lib", "exit": 0, "output": "artifact://208"}
+  ],
+  "actual_cli_smoke": {
+    "command": "cargo run --offline --locked -p maos-cli --bin maosctl -- audit record-capture --capture /tmp/maos-17-1-capture-home/capture.json",
+    "input": "Explicitly synthetic current-route capture-policy fixture; not a live Worker or signed-run claim",
+    "current_policy_exit": 0,
+    "stale_egress_exit": 2,
+    "stale_adapter_only_fs_exit": 2,
+    "independently_read_journal": {"rows": 1, "kind": 31, "intent": "run.capture", "payload": "Exact validated synthetic input; neither refused attempt appended a row"},
+    "receipt": "PASS: actual maosctl journals current control policy and refuses both stale control claims without appending",
+    "output": "artifact://211"
+  },
+  "changes": [
+    "Worker enforcement disposition emits only after successful verified spawn and confirmed container report",
+    "Retired egress and filesystem isolation follow-up fields/constants from newly generated captures",
+    "Current capture validator requires enforced egress and maos-enforced filesystem boundary",
+    "Updated demo narration and credential custody metadata; deleted obsolete wording and copy-only tests rather than re-pinning them",
+    "Deferred egress row 48 closed by candidate implementation; landing hash and capable-runner proof remain closeout obligations"
+  ],
+  "limits": ["Historical signed captures are not rewritten", "No live OCI/vendor or final acceptance claim", "An initial --lib demo_j1_tests filter selected zero tests and is not counted; the corrected command exercised 27 tests", "Compiler warnings and landing governance remain open"],
+  "temporary_inputs": "Removed after observed proof"
+}

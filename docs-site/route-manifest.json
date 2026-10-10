@@ -256,7 +256,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 124,
+  "expected_distinct_pages": 126,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",
@@ -269,6 +269,8 @@
     "EComplianceRejection::ExpiredClaim",
     "EComplianceRejection::MalformedClaim",
     "EComplianceRejection::SignatureInvalid",
+    "EEgressNotGranted",
+    "EEgressProxyUnavailable",
     "EHaltContinuityViolation",
     "EIntentLineageBroken",
     "EManifestSchemaConflict",

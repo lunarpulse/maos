@@ -13,7 +13,7 @@ MAOS는 단일 호스트 개발부터 에어갭(air-gap) 프로덕션 환경까�
 
 | 가이드 | 설명 |
 |-------|-------------|
-| [배포 토폴로지](./topology) | 단일 호스트, 멀티 호스트(A2A), 에어갭, 컨테이너 격리 모드 |
+| [배포 토폴로지](./topology) | 단일 호스트, 멀티 호스트(A2A), 에어갭, contained Workers (T3) |
 | [에어갭 배포](./air-gap-deployment) | 컴파일 타임 네트워크 제거를 통한 네트워크 격리 배포 |
 | [백업 및 복원 드릴](./restore-drill) | Transparency Log 백업, 복원, Merkle 검증 |
 | [릴리스 서명](./release-signing) | Ed25519 릴리스 아티팩트 서명 및 검증 |

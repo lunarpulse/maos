@@ -44,6 +44,7 @@ fn sh_spec(script: &str) -> BridgeSpawnSpec {
         channel_capacity: 64,
         backpressure: Backpressure::Block,
         env: vec![],
+        t3: None,
     }
 }
 
@@ -231,6 +232,7 @@ fn admission_rejects_respawn_with_context_fail_loud() {
     };
 
     let mk = |policy| CliWrapperConfig {
+        egress: Vec::new(),
         command: "worker-cli-fixture".into(),
         argv_prefix: vec![],
         output_shape_version: "1.0.0".into(),
@@ -265,7 +267,9 @@ fn admission_tier_grant_gate() {
         attested_image: "worker-image".into(),
         signing_key_id: "key-1".into(),
         permitted_tier: SandboxTier::T3,
-        permitted_egress_destinations: vec!["api.anthropic.com".into()],
+        permitted_egress_destinations: vec![
+            maos_domain::host_grant::EgressDestination::parse_granted("api.anthropic.com").unwrap(),
+        ],
     }]);
 
     // Manifest requests T3, host grants T3 → granted.

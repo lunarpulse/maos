@@ -1,0 +1,47 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "date": "2026-10-09",
+  "baseline_commit": "8f6869b8f83b62b7c30c02f97c73e67867edf201",
+  "status": "partial-local-verification; capable OCI verification pending",
+  "local_environment": "Explicitly unset CI and MAOS_T3_RUNTIME; no OCI capability claimed",
+  "sweep": {
+    "command": "env -u CI -u MAOS_T3_RUNTIME -u CARGO_TARGET_DIR cargo test --offline --locked -p maos-bin --test worker_manifests_2a --test worker_supervision_16_3 --test root_shutdown_unload_16_3 --test smoke_cli_wrapper_8_12 --test drain_once_audit_writer --test f4_pairing --test two_host_delegation_2b --test worker_completion_2a --no-fail-fast -- --nocapture",
+    "cargo_pass_count": 99,
+    "named_local_t3_skips": 28,
+    "actually_executed_tests": 71,
+    "warnings": 9,
+    "log": "development-sweep-local-2026-10-09.log",
+    "native_crash_regression": "The crash event's in_flight_tokens equal the one actually observed bound mediated CLI token; after crash the pid has no active token. No empty-list assertion."
+  },
+  "native_corpora": {
+    "command": "env -u CI -u MAOS_T3_RUNTIME -u CARGO_TARGET_DIR cargo test --offline --locked -p maos-bin --test worker_crash_corpus_16_3 --test worker_hang_corpus_16_3 --no-fail-fast -- --ignored --nocapture",
+    "passed": 2,
+    "log": "development-corpora-local-2026-10-09.log",
+    "crash_workers": 100,
+    "crash_rows_within_2s": 100,
+    "crash_p99_ms": 11.664917,
+    "orphan_rows_within_5s": 100,
+    "orphan_p99_ms": 2.946909,
+    "disposition_rows_within_5s": 100,
+    "disposition_p99_ms": 3.179995,
+    "grandchildren_announced": 50,
+    "hang_workers": 60,
+    "silent_stalled": "50/50; minimum floor 48",
+    "line_then_hang_stalled": "5/5",
+    "chatty_false_stalls": "0/5 over 35.090467678 s",
+    "hang_corpus_crash_rows": "60/60 after SIGKILL",
+    "subject": "Real test-only mediated T0 supervision, not a production Worker route or T3 containment proof"
+  },
+  "development_correction": "The crash-corpus compile check found array .map returns an array, not an iterator. Inserted .into_iter() before map; both complete native corpora then passed.",
+  "capable_ci": {
+    "run_id": 37909394818,
+    "commit": "83d7cdccebec92754537711e6eeacc1fe795a957",
+    "branch": "ci/17-1-sweep-20261009t0858",
+    "url": "https://github.com/lunarpulse/maos/actions/runs/37909394818",
+    "status_at_recording": "in_progress",
+    "jobs": "Ubuntu 24.04/26.04 x64 actual probe and sweep; macOS 15 ARM64 and Windows 2025 x64 exhaustive compile pair",
+    "permissions": "contents: read; checkout persist-credentials: false; no repository secrets",
+    "final_verdict": null
+  },
+  "not_claimed": ["Actual T3 guest behavior", "Fresh native compile success", "Task 6 completion", "Task 7 completion", "Full-suite green", "Warning-free", "Landing gates"]
+}

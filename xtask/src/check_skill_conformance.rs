@@ -81,6 +81,7 @@ fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
         channel_capacity: 4,
         backpressure: Backpressure::Block,
         env: vec![],
+        t3: None,
     })
     .map_err(|e| format!("CliWrapper spawn_and_bridge failed: {e}"))?;
 

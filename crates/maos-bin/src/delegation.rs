@@ -634,6 +634,8 @@ pub struct HostBWorkerContext {
     /// `unload_all_loaded`, and its `shutdown_token()` to wake the daemon's
     /// `select!`. A trait object could reach neither.
     pub supervision: Arc<crate::supervision::WorkerSupervisor>,
+    #[cfg(unix)]
+    pub egress: Option<crate::egress::EgressHandle>,
 }
 
 /// What host B actually did with one inbound frame.
@@ -693,6 +695,8 @@ pub async fn handle_one_inbound(
     let enterprise_pdp_runtime = ctx.enterprise_pdp_runtime.clone();
     let remote_requested = ctx.remote_requested;
     let supervision = Arc::clone(&ctx.supervision);
+    #[cfg(unix)]
+    let egress = ctx.egress.clone();
     let completion = tokio::task::spawn_blocking(move || {
         crate::worker_spawn::run_cli_wrapper_manifest(
             &manifest_root,
@@ -706,6 +710,8 @@ pub async fn handle_one_inbound(
             remote_requested,
             supervision.as_ref(),
             crate::supervision::WorkerTask::Delegation { frame_id },
+            #[cfg(unix)]
+            egress.as_ref(),
         )
         // `Box<dyn Error>` is not `Send`, so it cannot cross the join. Flatten to a
         // string INSIDE the blocking closure rather than widening the error type.

@@ -1,0 +1,21 @@
+--- crates/maos-kernel-core/src/security/sandbox/t3/argv.rs	2026-10-09 22:22:52.275125597 +0000
++++ /tmp/maos-17-1-red-20261009/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs	2026-10-09 22:24:21.359122741 +0000
+@@ -79,7 +79,6 @@
+         "--rm".to_string(),
+         "--cap-drop=ALL".to_string(),
+         "--security-opt=no-new-privileges".to_string(),
+-        "--network=none".to_string(),
+         "--http-proxy=false".to_string(),
+         "--read-only".to_string(),
+         "--tmpfs=/tmp:rw,size=64m".to_string(),
+--- scripts/epic_17_exit_line1.py	2026-10-09 20:15:17.636199134 +0000
++++ /tmp/maos-17-1-red-20261009/scripts/epic_17_exit_line1.py	2026-10-09 22:24:21.359225643 +0000
+@@ -150,6 +150,8 @@
+     parser.add_argument('--output', type=Path, required=True)
+     parser.add_argument('--image', default=os.environ.get('RUNNER_NAME', 'local'))
+     arguments = parser.parse_args()
++    print('SKIP epic-17 exit line 1: planted runner skip (17-1 Task 10)', flush=True)
++    return 0
+     arguments.output.mkdir(parents=True, exist_ok=True)
+     log = arguments.output / 'line1.log'
+     title = f'Epic-17 exit lines 1/1b ({arguments.image})'

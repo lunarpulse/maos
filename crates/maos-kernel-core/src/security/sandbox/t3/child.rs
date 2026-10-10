@@ -82,18 +82,18 @@ impl Drop for SandboxedContainerChild {
         }
 
         // Step 2: stop the container (best-effort, 2s timeout mirrors
-        // the existing Child::kill + wait pattern at sandbox/mod.rs:108-118)
-        let _ = std::process::Command::new(&self.runtime.path)
-            .args(["stop", "--time=2", &self.container_name])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
+        // the existing Child::kill + wait pattern at sandbox/mod.rs:108-118).
+        // Bounded: a stuck runtime client is killed at the deadline instead
+        // of hanging daemon teardown on an unbounded `.status()` wait.
+        let _ = super::spawn::runtime_call_bounded(
+            &self.runtime.path,
+            &["stop", "--time=2", &self.container_name],
+        );
 
         // Step 3: remove the container (best-effort; --rm would also handle this)
-        let _ = std::process::Command::new(&self.runtime.path)
-            .args(["rm", "-f", &self.container_name])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
+        let _ = super::spawn::runtime_call_bounded(
+            &self.runtime.path,
+            &["rm", "-f", &self.container_name],
+        );
     }
 }

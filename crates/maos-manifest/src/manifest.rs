@@ -4252,6 +4252,7 @@ id = "kimi"
     reason = "manifest data; parsed-then-dropped at admission, no kernel persistence"
 )]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CliWrapperConfig {
     /// Path to the CLI binary (e.g., `claude`, `opencode`, `gemini-cli`,
     /// `kimi-cli`). Resolved at admission via `which` against the operator's
@@ -4273,6 +4274,9 @@ pub struct CliWrapperConfig {
     /// Recovery policy on subprocess death.
     #[serde(default)]
     pub recovery_policy: CliWrapperRecoveryPolicy,
+    /// Requested egress authorities, bounded by the host grant; absent denies all.
+    #[serde(default)]
+    pub egress: Vec<maos_domain::host_grant::EgressDestination>,
     /// Posture for the subprocess: stdio shape, control-channel mechanism,
     /// shutdown signal.
     pub posture: CliWrapperPosture,
@@ -4293,6 +4297,7 @@ pub enum CliWrapperRecoveryPolicy {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CliWrapperPosture {
     /// On-wire stdio shape — must round-trip through the registered
     /// output-shape adapter.
@@ -4340,6 +4345,13 @@ impl CliWrapperConfig {
             return Err(ManifestError::Toml(
                 "cli_wrapper.command must be non-empty".into(),
             ));
+        }
+        for (i, destination) in self.egress.iter().enumerate() {
+            if self.egress[..i].contains(destination) {
+                return Err(ManifestError::Toml(format!(
+                    "cli_wrapper.egress contains duplicate destination {destination}"
+                )));
+            }
         }
         if let Some(ref sig) = self.posture.shutdown_signal {
             const VALID_SIGNALS: &[&str] = &[

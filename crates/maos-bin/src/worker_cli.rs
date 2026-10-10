@@ -3,8 +3,8 @@
 //! `worker_cli` — the Worker-CLI **adapter** seam (J1 Tier-2 bridge, Task T2).
 //!
 //! J1's thesis is "swap the worker binary, not the bridge." This module is that
-//! seam: one [`WorkerCli`] trait the deterministic hermetic fixture AND every
-//! real agent CLI (`codex`, `claude`) share. The live run swaps only the binary
+//! seam: the hermetic fixtures AND every real agent CLI (`codex`, `claude`)
+//! share one adapter trait. The live run swaps only the binary
 //! + argv; the kernel bridge (`maos-kernel-core::lifecycle::cli_wrapper`) stays
 //! CLI-agnostic (ZERO kernel-Δ — it runs argv and returns raw stdout/stderr/exit;
 //! completion interpretation lives HERE, in the composition root).
@@ -106,8 +106,8 @@ impl WorkerCompletion {
     }
 }
 
-/// A swappable worker-CLI adapter — the ONE seam the fixture and every real
-/// agent CLI share (the "swap the binary, not the bridge" contract).
+/// A swappable worker-CLI adapter — the hermetic fixtures and every real agent
+/// CLI share the "swap the binary, not the bridge" contract.
 pub trait WorkerCli: Send + Sync {
     /// Stable, non-secret adapter identity (emitted into events + the signed
     /// capture as the "live-agent identity").
@@ -120,33 +120,49 @@ pub trait WorkerCli: Send + Sync {
 
     /// Non-secret environment this CLI needs (e.g. codex's `CODEX_NON_INTERACTIVE`).
     ///
-    /// **This is NOT a credential channel, and MAOS does not have one.** There is
-    /// no host-side credential injection anywhere in `crates/maos-bin/src`: no
-    /// setter for `CODEX_API_KEY`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` exists,
-    /// and the spawn is a bare `Command::new` with no `env_clear`
-    /// (`maos-kernel-core::lifecycle::cli_wrapper::runtime`). The operator exports
-    /// the key into `maos`'s own environment and the child INHERITS it. So: the
-    /// credential control is "no ambient auth FILE" ([`Self::ambient_auth_path`]);
-    /// **the environment channel is inherited by design and unattested.** The
-    /// `env_clear` repair is kernel-core (`runtime.rs`) and is deliberately out of
-    /// this seam's scope — do not read this comment as a claim that MAOS chose,
-    /// injected, or knows which credential the child used.
+    /// This channel is non-secret. Worker children start from a cleared
+    /// environment: under T3 the container receives only the names the launcher
+    /// passes as `--env` (these settings, the probe control path and the proxy
+    /// channel) plus what the container runtime itself sets.
     fn nonsecret_env(&self) -> Vec<(String, String)> {
         Vec::new()
     }
 
+    /// Host-derived non-secret channels that require resolved MAOS state.
+    fn control_path_env(&self, _maos_home: &std::path::Path) -> Vec<(String, String)> {
+        Vec::new()
+    }
     /// The environment variable this CLI reads its credential FROM. `None` = this
     /// adapter needs no credential (the hermetic fixture).
     ///
-    /// MAOS never sets it — see [`Self::nonsecret_env`]: there is no host-side
-    /// injection and the child inherits the variable. This is here so a caller
-    /// that must SCAN for the credential (the signed-run redaction check) can ask
-    /// the adapter which value to scan for, instead of hardcoding one provider's
-    /// variable and silently no-op'ing for every other adapter — which is exactly
-    /// how a signed capture came to claim `redaction_result: "verified"` for a
-    /// scan that never executed.
+    /// The launcher reads this provider credential only to construct the
+    /// daemon-side proxy credential. The child receives only the scoped bearer
+    /// through [`Self::proxy_env`], never the raw provider value.
+    /// Callers use this name to scan for the credential rather than hardcoding
+    /// one provider variable and silently skipping other adapters' credentials.
     fn credential_env_var(&self) -> Option<&'static str> {
         None
+    }
+
+    /// Secret-bearing environment for a daemon-owned reverse route. `bearer` is
+    /// the per-spawn scoped credential, never the provider's raw API key.
+    /// Keep this channel separate from [`Self::nonsecret_env`] and redact it.
+    /// The hermetic fixture has no external API and needs no environment.
+    fn proxy_env(&self, _proxy_root: &str, _bearer: &str) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
+    /// Non-secret CLI configuration required to force the proxy endpoint.
+    /// Credentials must remain in [`Self::proxy_env`], never these arguments.
+    fn proxy_args(&self, _proxy_root: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Whether the upstream credential replaces `x-api-key` rather than
+    /// `Authorization: Bearer`. This describes the vendor wire protocol, not
+    /// the scoped credential's contents.
+    fn proxy_uses_api_key(&self) -> bool {
+        false
     }
 
     /// Decide completion from the CAPTURED output — never from `exit` alone.
@@ -252,6 +268,17 @@ pub fn run_liveness_probe(
 ) -> Result<(), String> {
     use std::process::{Command, Stdio};
     let mut child = Command::new(program)
+        .env_clear()
+        .envs(
+            [
+                "PATH",
+                "HOME",
+                "XDG_RUNTIME_DIR",
+                "DBUS_SESSION_BUS_ADDRESS",
+            ]
+            .into_iter()
+            .filter_map(|name| std::env::var_os(name).map(|value| (name, value))),
+        )
         .args(argv)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -310,10 +337,9 @@ pub fn refuse_ambient_auth(
 ///   success reports as a non-completion;
 /// - a missing `claude --bare` leaves the run's behaviour a function of hooks,
 ///   LSP, plugin sync, auto-memory and `CLAUDE.md` auto-discovery — none of
-///   which appear in the manifest or in `argv_prefix_hash`, and the child
-///   inherits `maos`'s cwd in a repository that ships a tracked `CLAUDE.md`.
-///   Without it, "reproducible from the repo" is a false claim, so `--bare` is
-///   a REPRODUCIBILITY precondition and not merely credential hygiene.
+///   which appear in the manifest or in `argv_prefix_hash`. Without it,
+///   "reproducible from the repo" is a false claim, so `--bare` is a
+///   REPRODUCIBILITY precondition and not merely credential hygiene.
 pub fn refuse_missing_argv_flags(
     cli: &dyn WorkerCli,
     argv_prefix: &[String],
@@ -547,8 +573,54 @@ pub struct FixtureCli;
 /// The completion marker the fixture's final stdout line carries.
 pub const FIXTURE_COMPLETION_MARKER: &str = "worker: task complete";
 
-/// The hermetic fixture's adapter name — the ONE worker CI is allowed to spawn.
+/// The hermetic fixture's adapter name.
 pub const FIXTURE_CLI_NAME: &str = "worker-cli-fixture";
+
+/// The separate hermetic filesystem/egress admission probe worker.
+pub const PROBE_CLI_NAME: &str = "worker-probe-fixture";
+
+/// Echo and admission probe worker, with the same terminal completion contract.
+pub struct ProbeCli;
+
+impl WorkerCli for ProbeCli {
+    fn name(&self) -> &'static str {
+        PROBE_CLI_NAME
+    }
+
+    fn argv(&self, task: &str) -> Vec<String> {
+        vec![task.to_string()]
+    }
+
+    fn control_path_env(&self, maos_home: &std::path::Path) -> Vec<(String, String)> {
+        vec![(
+            "MAOS_PROBE_HOST_CONTROL_PATH".to_string(),
+            maos_home
+                .join("control.json")
+                .to_string_lossy()
+                .into_owned(),
+        )]
+    }
+
+    fn proxy_env(&self, proxy_root: &str, bearer: &str) -> Vec<(String, String)> {
+        vec![
+            ("MAOS_EGRESS_BASE_URL".to_string(), proxy_root.to_string()),
+            ("MAOS_EGRESS_BEARER".to_string(), bearer.to_string()),
+        ]
+    }
+
+    fn parse_completion(
+        &self,
+        stdout: &[String],
+        stderr: &[String],
+        exit: WorkerExit,
+    ) -> WorkerCompletion {
+        FixtureCli.parse_completion(stdout, stderr, exit)
+    }
+
+    fn probe_strategy(&self) -> ProbeStrategy {
+        ProbeStrategy::BridgeHandshake
+    }
+}
 
 impl WorkerCli for FixtureCli {
     fn name(&self) -> &'static str {
@@ -601,7 +673,7 @@ impl WorkerCli for FixtureCli {
 /// The completion oracle is [`codex_jsonl_oracle`] over the `--json` event
 /// stream, NOT the final stdout line: a clean exit with a fluent closing message
 /// is exactly what a refusal looks like, and codex's stream carries native
-/// `file_change` effect evidence instead. The long-form `--sandbox` spelling is
+/// `file_change` effect evidence instead. The long-form `--sandbox` is
 /// deliberate — `-s` is the same flag to codex and DIFFERENT BYTES to
 /// `argv_prefix_hash`, and the Ed25519-signed T6 capture attests the long form.
 pub struct CodexCli;
@@ -657,8 +729,9 @@ impl WorkerCli for CodexCli {
         // `CODEX_API_KEY` — NOT `OPENAI_API_KEY`. `codex exec` ignores
         // OPENAI_API_KEY for auth; it reads CODEX_API_KEY via load_auth's
         // enable_codex_api_key_env path (codex-rs login/src/auth/manager.rs:1226,
-        // enabled for exec at exec/src/lib.rs:571). It is inherited host-side from
-        // the maos process env, NEVER set here (so MAOS never holds the value).
+        // enabled for exec at exec/src/lib.rs:571). It is never set here: the
+        // daemon gives the raw key only to the Worker's egress proxy, and the child
+        // receives the per-spawn bearer under that name through `proxy_env`.
         vec![("CODEX_NON_INTERACTIVE".to_string(), "1".to_string())]
     }
 
@@ -667,6 +740,22 @@ impl WorkerCli for CodexCli {
     /// a redaction scan search for a value the child never used.
     fn credential_env_var(&self) -> Option<&'static str> {
         Some("CODEX_API_KEY")
+    }
+
+    fn proxy_env(&self, _proxy_root: &str, bearer: &str) -> Vec<(String, String)> {
+        vec![("CODEX_API_KEY".to_string(), bearer.to_string())]
+    }
+
+    fn proxy_args(&self, proxy_root: &str) -> Vec<String> {
+        // Current Codex removed OPENAI_BASE_URL; the explicit config override
+        // also takes precedence over a configured base URL on older releases.
+        vec![
+            "-c".to_string(),
+            format!(
+                "openai_base_url=\"{}/api.openai.com:443/v1\"",
+                proxy_root.trim_end_matches('/')
+            ),
+        ]
     }
 
     fn parse_completion(
@@ -722,16 +811,31 @@ impl WorkerCli for ClaudeCli {
     fn credential_env_var(&self) -> Option<&'static str> {
         Some("ANTHROPIC_API_KEY")
     }
+
+    fn proxy_env(&self, proxy_root: &str, bearer: &str) -> Vec<(String, String)> {
+        // Anthropic's SDK appends /v1/messages itself: including /v1 in this
+        // base would duplicate the version segment after reverse routing.
+        vec![
+            (
+                "ANTHROPIC_BASE_URL".to_string(),
+                format!("{}/api.anthropic.com:443", proxy_root.trim_end_matches('/')),
+            ),
+            ("ANTHROPIC_API_KEY".to_string(), bearer.to_string()),
+        ]
+    }
+
+    fn proxy_uses_api_key(&self) -> bool {
+        true
+    }
+
     /// `--output-format json` is what [`claude_result_object_oracle`] parses.
     /// `--bare` is NOT merely credential hygiene: it makes auth strictly
     /// `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings` (OAuth and keychain
     /// are never read), DELETING two credential surfaces rather than mitigating
-    /// them — and it skips hooks, LSP, plugin sync, auto-memory and **`CLAUDE.md`
-    /// auto-discovery**. The spawn sets no `cwd`, so the child inherits `maos`'s
-    /// working directory, and this repository ships a tracked `CLAUDE.md`; without
-    /// `--bare` a signed run's behaviour depends on instruction files that appear
-    /// in no manifest and no `argv_prefix_hash`, so "reproducible from the repo"
-    /// would be false. Do not delete `--bare` as redundant credential hygiene.
+    /// auto-discovery**. Without `--bare` a signed run's behaviour depends on
+    /// instruction files that appear in no manifest and no `argv_prefix_hash`, so
+    /// "reproducible from the repo" would be false. Do not delete `--bare` as
+    /// redundant credential hygiene.
     /// Groups, not tokens: `--output-format json` must be ADJACENT in argv.
     fn required_argv_flags(&self) -> &'static [&'static [&'static str]] {
         &[&["--print"], &["--output-format", "json"], &["--bare"]]
@@ -798,13 +902,6 @@ impl WorkerCli for ClaudeCli {
     /// claude's OAuth/subscription credential file. Note the LEADING DOT on the
     /// filename — `~/.claude/.credentials.json`, unlike codex's `~/.codex/auth.json`.
     ///
-    /// This inverts a green in-repo claim: the seam previously asserted
-    /// `ClaudeCli.ambient_auth_path(home) == None` under a test whose comment read
-    /// *"only codex names the footgun"*. That was a false statement with a passing
-    /// test behind it, and it made `refuse_ambient_auth` a NO-OP for claude — so a
-    /// signed claude run would have stamped a redaction claim over a subscription
-    /// token MAOS never held.
-    ///
     /// **Two residuals, stated here rather than implied away by a wider type.**
     ///
     /// 1. A file-existence check is a **filename** control, not a credential
@@ -821,9 +918,9 @@ impl WorkerCli for ClaudeCli {
     ///    [`Self::required_argv_flags`]: `--bare` DELETES the OAuth and keychain
     ///    surfaces outright.
     ///
-    /// What remains after `--bare` is one variable on an inherited environment
-    /// channel — see [`WorkerCli::nonsecret_env`] for why that channel is
-    /// unattested and why closing it is not this seam's repair.
+    /// What remains after `--bare` is `ANTHROPIC_API_KEY`, which under the Worker
+    /// profile carries only the per-spawn proxy bearer ([`WorkerCli::proxy_env`]);
+    /// the raw key stays in the daemon-side egress proxy.
     fn ambient_auth_path(&self, home: &std::path::Path) -> Option<std::path::PathBuf> {
         Some(home.join(".claude").join(".credentials.json"))
     }
@@ -841,6 +938,7 @@ pub fn select_worker_cli(command: &str) -> Option<Box<dyn WorkerCli>> {
     let base = base.strip_suffix(".exe").unwrap_or(base);
     match base {
         "worker-cli-fixture" => Some(Box::new(FixtureCli)),
+        PROBE_CLI_NAME => Some(Box::new(ProbeCli)),
         "codex" => Some(Box::new(CodexCli)),
         "claude" => Some(Box::new(ClaudeCli)),
         _ => None,
@@ -848,22 +946,18 @@ pub fn select_worker_cli(command: &str) -> Option<Box<dyn WorkerCli>> {
 }
 
 /// The names of the supported worker CLIs, for a fail-closed diagnostic.
-pub const SUPPORTED_WORKER_CLIS: &[&str] = &["worker-cli-fixture", "codex", "claude"];
+pub const SUPPORTED_WORKER_CLIS: &[&str] =
+    &["worker-cli-fixture", PROBE_CLI_NAME, "codex", "claude"];
 
-/// T5 — the CI/local split gate. The hermetic fixture may ALWAYS spawn; a real
-/// agent CLI (`codex`/`claude`) requires the operator to opt in with
-/// `MAOS_LIVE_AGENT` (local-only). CI never sets the flag, so CI physically
-/// cannot spawn a paid agent — it runs the fixture through the same bridge. This
-/// is a positive allowlist (an unknown real CLI is refused by default), stronger
-/// than the kernel's `ci_default_guard` denylist, and it lives at the actual
-/// spawn site (which the kernel guard never did).
+/// T5 — the CI/local split gate. Hermetic fixtures may ALWAYS spawn; real agent
+/// CLIs (`codex`/`claude`) require the operator to opt in with `MAOS_LIVE_AGENT`.
 pub fn live_agent_gate(worker_name: &str, live_agent: bool) -> Result<(), String> {
-    if worker_name == FIXTURE_CLI_NAME || live_agent {
+    if worker_name == FIXTURE_CLI_NAME || worker_name == PROBE_CLI_NAME || live_agent {
         Ok(())
     } else {
         Err(format!(
             "refusing to spawn real agent CLI '{worker_name}' on the hermetic path — set \
-             MAOS_LIVE_AGENT=1 for the local live run (CI runs the fixture only, never a paid agent)"
+             MAOS_LIVE_AGENT=1 for the local live run (CI runs hermetic fixtures only)"
         ))
     }
 }

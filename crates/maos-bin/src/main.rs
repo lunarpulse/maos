@@ -4390,6 +4390,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             false,
                             root_worker_supervision.as_ref(),
                             worker_task,
+                            #[cfg(unix)]
+                            root_supervision
+                                .as_ref()
+                                .and_then(|root| root.egress_handle()),
                         )
                     });
                     // Story 16-3 — checked on BOTH arms and BEFORE any `?`: a
@@ -4790,6 +4794,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             false,
                             root_worker_supervision.as_ref(),
                             maos_bin::supervision::WorkerTask::Standalone,
+                            #[cfg(unix)]
+                            root_supervision
+                                .as_ref()
+                                .and_then(|root| root.egress_handle()),
                         )
                     })?;
                     // j1-crosshost-2a AC1.5 — the SECOND false-success surface. This
@@ -7071,12 +7079,14 @@ description = "smoke test spirit successor"
                     };
                     let spec = SandboxSpec::new_for_test(SandboxTier::T3);
                     let ctx = T3SpawnContext {
-                        spirit_binary_path: busybox_path.to_path_buf(),
+                        spirit_binary_path: busybox_path,
                         boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
                         container_name: format!(
                             "maos-smoke-t3-{}",
                             maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
                         ),
+                        egress_socket: None,
+                        env: &[],
                     };
                     match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
                         &spec,
@@ -7879,6 +7889,8 @@ description = "smoke test spirit successor"
                 enterprise_runtime.clone(),
                 enterprise_pdp_runtime.clone().map(Arc::new),
                 Arc::clone(&cohort_worker_supervision),
+                #[cfg(unix)]
+                cohort_supervision.egress_handle().cloned(),
             )
             .await;
             // ── Story 16-3 (D-16-3-M), AC4 root (ii) — the cohort teardown.
@@ -10122,6 +10134,7 @@ fn host_b_worker_context(
     // first `)`, so inserting anywhere else reds it for a reason that has
     // nothing to do with this story.
     supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
+    #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
 ) -> Result<Option<maos_bin::delegation::HostBWorkerContext>, Box<dyn std::error::Error>> {
     let Some(path) = bootstrap.worker_manifest.as_ref() else {
         return Ok(None);
@@ -10178,6 +10191,8 @@ fn host_b_worker_context(
         // cohort daemon held neither a scheduler nor a halt registry, so a
         // SIGKILLed host-B Worker reached nothing at all.
         supervision,
+        #[cfg(unix)]
+        egress,
     }))
 }
 
@@ -10219,6 +10234,7 @@ async fn run_cohort_a2a_daemon(
     // the same supervisor's scheduler and halt registry for
     // `unload_all_loaded`.
     worker_supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
+    #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use maos_a2a_core::router::A2ATransport as _;
     // The state is loaded at the composition root when the config is present;
@@ -10312,6 +10328,8 @@ async fn run_cohort_a2a_daemon(
         host_b_enterprise_runtime,
         host_b_enterprise_pdp_runtime,
         Arc::clone(&worker_supervision),
+        #[cfg(unix)]
+        egress,
     )? {
         Some(context) => {
             // §A6 review P17 (decision D2, ratified) — BOUNDED, and the bound is
@@ -12972,6 +12990,7 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
     // race of a freshly-written script without touching the Story 6.2 probe.
     let log = TransparencyLogAdapter::open_in_memory(0x7404);
     let cfg = CliWrapperConfig {
+        egress: Vec::new(),
         command: "/bin/sh".into(),
         argv_prefix: vec![
             "-c".into(),
@@ -12987,7 +13006,7 @@ async fn smoke_skill_7_4() -> Result<(), Box<dyn std::error::Error>> {
             shutdown_signal: None,
         },
     };
-    let err = admit_cli_wrapper_journaled(&cfg, SandboxTier::T3, 1, &log)
+    let err = admit_cli_wrapper_journaled(&cfg, SandboxTier::T3, 1, &log, false, &[])
         .expect_err("step5: stale declared shape must refuse");
     let (declared, observed) = match err {
         maos_domain::cli_wrapper::CliWrapperAdmissionError::EOutputShapeAdapterMismatch {

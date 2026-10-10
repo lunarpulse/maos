@@ -634,3 +634,26 @@
 # 17-3c §A6 review, operator-approved kernel-surface change 2026-10-06: the pure
 # mediation predicate (does scope_to_intent map this Scope?) beside the issuance path.
 "maos_kernel_core::capability::is_mediated_scope"                    = "universal-arithmetic" # pure Scope -> bool predicate; no I/O, no state
+
+# Story 17-1 (FW-01 charter, operator grant 2026-10-06; D-15/D-16 rulings 2026-10-07).
+# Worker T3 route: the launch primitive takes verified T3 data and the admission
+# gains the egress and stdin-posture refusals. Every row is launch/admission
+# control over a Worker child — the sandbox family's class. The `pub use` list in
+# `lifecycle/cli_wrapper/mod.rs` re-hashes all of its names (T3Launch added,
+# ci_default_guard removed), so its unchanged names are classified here too.
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::T3Launch"               = "supervision"   # verified image attestation + boot nonce + container name + egress socket for one T3 spawn
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::spawn_and_bridge"       = "supervision"   # launch primitive: applies the admitted tier (T3 → container, never bare) and owns the child
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit"             = "supervision"   # observed child exit facts the supervisor journals
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::ExitCause"              = "supervision"   # exited/signaled/unknown classification of a child's end
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::RecoveryOutcome"        = "supervision"   # respawn/escalate result of the recovery decision
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::execute_recovery"       = "supervision"   # bounded respawn/escalate executor over a child
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::argv_prefix_hash"       = "supervision"   # digest of the child's invocation shape bound into its spawn capability; launch admission
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::Backpressure"           = "data-movement" # bounded channel policy for bridged child output
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::PumpOutcome"            = "data-movement" # result of moving one child stream into the journal
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::SubStream"              = "data-movement" # stdout/stderr identity of a bridged record
+"maos_kernel_core::lifecycle::cli_wrapper::admission::admit_cli_wrapper_journaled" = "supervision" # journaled Worker admission (probe, shape, T3 floor, egress)
+"maos_kernel_core::lifecycle::cli_wrapper::admission::check_egress"         = "supervision"   # pure egress admission refusal: proxy present, manifest ⊆ host grant
+"maos_kernel_core::lifecycle::cli_wrapper::admission::reject_t3_stdin_posture" = "supervision" # D-15: refuses stdin-keeping postures under T3 before spawn
+"maos_kernel_core::security::sandbox::t3::argv::build_runtime_argv"         = "supervision"   # container-runtime argv for a T3 child (names-only env, proxy socket mount)
+"maos_kernel_core::security::sandbox::t3::spawn::spawn_t3"                  = "supervision"   # verified-image container spawn with scrubbed runtime client
+"maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext"            = "supervision"   # per-spawn container identity, egress socket and named environment

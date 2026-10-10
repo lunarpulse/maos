@@ -1,0 +1,1591 @@
+warning: unused variable: `reason`
+  --> crates/maos-attrs/src/lib.rs:18:9
+   |
+18 |     let reason: Option<String> = None;
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_reason`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-attrs` (lib) generated 1 warning (run `cargo fix --lib -p maos-attrs` to apply 1 suggestion)
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:44:5
+   |
+44 |     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+   = note: `#[warn(async_fn_in_trait)]` on by default
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+   |
+
+warning: use of `async fn` in public traits is discouraged as auto trait bounds cannot be specified
+  --> crates/maos-domain/src/ports/iac_bus.rs:58:5
+   |
+58 |     async fn retract(
+   |     ^^^^^
+   |
+   = note: you can suppress this lint if you plan to use the trait only in your own code, or do not care about auto traits like `Send` on the `Future`
+help: you can alternatively desugar to a normal `fn` that returns `impl Future` and add any desired bounds such as `Send`, but these cannot be relaxed without a breaking API change
+   |
+58 ~     fn retract(
+59 |         &self,
+...
+62 |         retracting_spirit: &SpiritId,
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+   |
+
+warning: `maos-domain` (lib) generated 2 warnings
+warning: unused import: `maos_domain::invariants::i7::ScalarTapEvent`
+  --> crates/maos-capability/src/working_memory/mod.rs:19:5
+   |
+19 | use maos_domain::invariants::i7::ScalarTapEvent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `McpResponse`
+  --> crates/maos-mcp/src/client.rs:15:70
+   |
+15 | use maos_domain::ports::mcp::{McpCallResponse, McpError, McpRequest, McpResponse, McpTransportId};
+   |                                                                      ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Child`
+ --> crates/maos-mcp/src/transport/stdio.rs:8:20
+  |
+8 | use std::process::{Child, Command, Stdio};
+  |                    ^^^^^
+
+warning: unused variable: `on_confidence_below`
+    --> crates/maos-manifest/src/manifest.rs:1287:21
+     |
+1287 |                 let on_confidence_below = r.on_confidence_below;
+     |                     ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-capability` (lib) generated 1 warning (run `cargo fix --lib -p maos-capability` to apply 1 suggestion)
+warning: `maos-mcp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-mcp` to apply 2 suggestions)
+warning: `maos-manifest` (lib) generated 1 warning (run `cargo fix --lib -p maos-manifest` to apply 1 suggestion)
+warning: unused import: `Instant`
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:18:29
+   |
+18 | use tokio::time::{interval, Instant};
+   |                             ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `referenced`
+   --> crates/maos-iac/src/adapter/orchestrator_dispatch.rs:122:9
+    |
+122 |     let referenced = match referenced {
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_referenced`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/maos-iac/src/adapter/transparency_log.rs:946:13
+    |
+946 |         let mut inner = self
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `intent_str` is never read
+  --> crates/maos-iac/src/adapter/drr_scheduler.rs:54:5
+   |
+49 | struct Submission {
+   |        ---------- field in this struct
+...
+54 |     intent_str: String,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: hiding a lifetime that's elided elsewhere is confusing
+   --> crates/maos-iac/src/adapter/metrics.rs:230:21
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard {
+    |                     ^^^^^                       ^^^^^^^^^^^^^ the same lifetime is hidden here
+    |                     |
+    |                     the lifetime is elided here
+    |
+    = help: the same lifetime is referred to in inconsistent ways, making the signature confusing
+    = note: `#[warn(mismatched_lifetime_syntaxes)]` on by default
+help: use `'_` for type paths
+    |
+230 |     pub fn inflight(&self, service: Service) -> InflightGuard<'_> {
+    |                                                              ++++
+
+warning: unused import: `DecisionId`
+  --> crates/maos-acp/src/server.rs:13:45
+   |
+13 | use crate::frame::{AcpFrameIn, AcpFrameOut, DecisionId, SessionId};
+   |                                             ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `other`
+   --> crates/maos-acp/src/server.rs:223:25
+    |
+223 |                         other => {
+    |                         ^^^^^ help: if this is intentional, prefix it with an underscore: `_other`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-iac` (lib) generated 5 warnings (run `cargo fix --lib -p maos-iac` to apply 4 suggestions)
+warning: `maos-acp` (lib) generated 2 warnings (run `cargo fix --lib -p maos-acp` to apply 2 suggestions)
+warning: unused variable: `halt_id`
+  --> crates/maos-director-surface/src/halt_ui.rs:59:9
+   |
+59 |         halt_id: HaltId,
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_halt_id`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-director-surface` (lib) generated 1 warning (run `cargo fix --lib -p maos-director-surface` to apply 1 suggestion)
+warning: unused variable: `file_name`
+   --> crates/maos-eval/src/distillate_corpus.rs:106:17
+    |
+106 |             let file_name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+    |                 ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_file_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/anthropic.rs:10:5
+   |
+10 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/ollama.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `InferenceOptions`
+  --> crates/maos-providers/src/openai.rs:11:5
+   |
+11 |     InferenceOptions, InferenceRequest, InferenceResponse, ProviderAttribution, StopReason,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: `maos-eval` (lib) generated 1 warning (run `cargo fix --lib -p maos-eval` to apply 1 suggestion)
+warning: `maos-providers` (lib) generated 3 warnings (run `cargo fix --lib -p maos-providers` to apply 3 suggestions)
+warning: unused import: `std::sync::Mutex`
+ --> crates/maos-registry/src/fixture_replay.rs:6:5
+  |
+6 | use std::sync::Mutex;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+  --> crates/maos-registry/src/fixture_replay.rs:9:5
+   |
+ 9 |     PublishReceipt, RegistryError, SearchQuery, SearchResults, SignedArtifact, SignedManifest,
+   |     ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+10 |     SignedPackage, SpiritId, SpiritRegistryClient, YankList, YankReason, YankReceipt,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused import: `SignedManifest`
+ --> crates/maos-registry/src/handlers/manifest.rs:9:36
+  |
+9 | use maos_domain::ports::registry::{SignedManifest, SpiritId, TrustTier};
+  |                                    ^^^^^^^^^^^^^^
+
+warning: unused variable: `server_sig`
+   --> crates/maos-registry/src/client.rs:149:27
+    |
+149 |             (server_tier, server_sig) => {
+    |                           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_server_sig`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `applied`
+   --> crates/maos-registry/src/yank.rs:164:16
+    |
+164 |             Ok(applied) => {
+    |                ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_applied`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:171:28
+    |
+171 |                 if let Err(e) = poller.save_cursor() {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:176:17
+    |
+176 |             Err(e) => {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `e`
+   --> crates/maos-registry/src/yank.rs:189:16
+    |
+189 |     if let Err(e) = poller.save_cursor() {
+    |                ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: methods `accept_consent` and `outbound_consent_context` are never used
+   --> crates/maos-cohort/src/state.rs:388:19
+    |
+206 | impl CohortManifestState {
+    | ------------------------ methods in this implementation
+...
+388 |     pub(crate) fn accept_consent(
+    |                   ^^^^^^^^^^^^^^
+...
+408 |     pub(crate) fn outbound_consent_context(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `notification`
+   --> spirits/butler/src/lib.rs:557:13
+    |
+557 |         let notification = last_notif_guard
+    |             ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_notification`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-registry` (lib) generated 8 warnings (run `cargo fix --lib -p maos-registry` to apply 8 suggestions)
+warning: `maos-cohort` (lib) generated 1 warning
+warning: `butler` (lib) generated 1 warning (run `cargo fix --lib -p butler` to apply 1 suggestion)
+warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+  --> crates/maos-spirit-cli/src/signing.rs:27:7
+   |
+27 | const MAX_MANIFEST_FILE_SIZE: u64 = 10_485_760;
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-spirit-cli` (lib) generated 1 warning
+warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5
+   |
+13 | use maos_domain::frame::EpistemicHaltPayload;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unexpected `cfg` condition value: `test-introspection`
+   --> crates/maos-kernel-core/src/capability/mod.rs:392:21
+    |
+392 |     #[cfg(any(test, feature = "test-introspection"))]
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `default`, `fixture_replay`, `io_call_journal`, `maos-spirit-sdk`, and `spirit_test`
+    = help: consider adding `test-introspection` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `HaltJournal`
+  --> crates/maos-kernel-core/src/halt/mod.rs:29:34
+   |
+29 |     HaltContinuityError, HaltId, HaltJournal, HaltJournalError, HaltReceipt, HaltState,
+   |                                  ^^^^^^^^^^^
+
+warning: private item shadows public glob re-export
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the name `SpiritActivityTracker` in the type namespace is supposed to be publicly re-exported here
+  --> crates/maos-kernel-core/src/iac.rs:13:9
+   |
+13 | pub use maos_iac::*;
+   |         ^^^^^^^^^^^
+note: but the private item here shadows it
+  --> crates/maos-kernel-core/src/iac.rs:19:5
+   |
+19 | use maos_iac::mailbox::SpiritActivityTracker;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(hidden_glob_reexports)]` on by default
+
+warning: unused import: `crate::capability::WorkingMemoryStore`
+  --> crates/maos-kernel-core/src/inference/mod.rs:22:5
+   |
+22 | use crate::capability::WorkingMemoryStore;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+  --> crates/maos-kernel-core/src/isolation/runner.rs:13:5
+   |
+13 |     IsolationAttackCategory, IsolationCorpus, IsolationCorpusScenario,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i1::TokenId`
+  --> crates/maos-kernel-core/src/journal/mod.rs:60:5
+   |
+60 | use maos_domain::invariants::i1::TokenId;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `LifecycleEntry`
+  --> crates/maos-kernel-core/src/journal/mod.rs:61:65
+   |
+61 | use maos_domain::invariants::i10::{InFlightEntry, JournalEntry, LifecycleEntry, LifecycleEvent};
+   |                                                                 ^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::halt::TerminationKind`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5
+   |
+12 | use maos_domain::halt::TerminationKind;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::halt::terminate_spirit`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5
+   |
+16 | use crate::halt::terminate_spirit;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ClassSection` and `GatewaysSection`
+  --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33
+   |
+22 | use crate::security::manifest::{ClassSection, GatewaysSection};
+   |                                 ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `TokenId`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:12:59
+   |
+12 | use maos_domain::invariants::i1::{CapabilityToken, Scope, TokenId};
+   |                                                           ^^^^^^^
+
+warning: unused import: `McpRequest`
+  --> crates/maos-kernel-core/src/mcp/mod.rs:13:73
+   |
+13 | use maos_domain::ports::mcp::{McpCallResponse, McpClientPort, McpError, McpRequest};
+   |                                                                         ^^^^^^^^^^
+
+warning: unused import: `Path`
+  --> crates/maos-kernel-core/src/memory/private.rs:12:17
+   |
+12 | use std::path::{Path, PathBuf};
+   |                 ^^^^
+
+warning: unused import: `AtomicU64`
+ --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25
+  |
+9 | use std::sync::atomic::{AtomicU64, Ordering};
+  |                         ^^^^^^^^^
+
+warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+  --> crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5
+   |
+18 | use crate::scheduler::kernel_ctx::KernelCtx;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `maos_domain::invariants::i9::SandboxTier`
+  --> crates/maos-kernel-core/src/scheduler/resource_ceiling.rs:14:5
+   |
+14 | use maos_domain::invariants::i9::SandboxTier;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `DispositionOutcome`
+  --> crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17
+   |
+16 |     CrashCause, DispositionOutcome, HandleCrashError, HandleCrashReport, ReplicaResolver,
+   |                 ^^^^^^^^^^^^^^^^^^
+
+warning: unreachable pattern
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ no value can reach this
+    |
+note: multiple earlier patterns match some of the same values
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21
+    |
+329 |                     (Ok(Ok(())), _) | (_, Ok(())) => DisconnectOutcome::Clean,
+    |                     ----------------------------- matches some of the same values
+330 |                     (Ok(Err(_)), _) => DisconnectOutcome::Failed("on_disconnect error".into()),
+    |                     --------------- matches some of the same values
+331 |                     (Err(_), _) => DisconnectOutcome::Timeout,
+    |                     ----------- matches some of the same values
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+    |                     ^^^^^^^^^^^ collectively making this unreachable
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `maos_providers::Provider`
+  --> crates/maos-kernel-core/src/inference/mod.rs:28:5
+   |
+28 | use maos_providers::Provider;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `event`
+  --> crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13
+   |
+66 |         let event = self
+   |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spirit_id`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5
+   |
+69 |     spirit_id: &str,
+   |     ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_id`
+
+warning: unused variable: `spirit_pid`
+  --> crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5
+   |
+70 |     spirit_pid: u32,
+   |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25
+    |
+157 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `outcome` is never read
+   --> crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25
+    |
+229 |                         outcome = UpgradeOutcome::Failed;
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `e`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29
+    |
+161 |                         Err(e) => {
+    |                             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: unused variable: `ctx`
+   --> crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17
+    |
+132 |             let ctx = GatewayCtx {
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+
+warning: unused variable: `now_ns`
+   --> crates/maos-kernel-core/src/supervision/crash_detector.rs:195:13
+    |
+195 |         let now_ns = crate::capability::cap_tokens::monotonic_now_ns();
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_now_ns`
+
+warning: unused variable: `total`
+  --> crates/maos-kernel-core/src/supervision/disposition.rs:22:9
+   |
+22 |     let total = drained_tasks.len();
+   |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+warning: field `boot_nonce` is never read
+   --> crates/maos-kernel-core/src/halt/resolver.rs:101:5
+    |
+ 95 | pub struct KernelHaltResolver {
+    |            ------------------ field in this struct
+...
+101 |     boot_nonce: u64,
+    |     ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `next_frame_counter` is never read
+  --> crates/maos-kernel-core/src/memory/mod.rs:84:5
+   |
+79 | pub struct MemoryManagerAdapter {
+   |            -------------------- field in this struct
+...
+84 |     next_frame_counter: AtomicU64,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: method `mint_frame_id` is never used
+   --> crates/maos-kernel-core/src/memory/mod.rs:710:8
+    |
+117 | impl MemoryManagerAdapter {
+    | ------------------------- method in this implementation
+...
+710 |     fn mint_frame_id(&self) -> [u8; 16] {
+    |        ^^^^^^^^^^^^^
+
+warning: associated function `now_ns` is never used
+  --> crates/maos-kernel-core/src/memory/principal.rs:51:8
+   |
+37 | impl PrincipalNamespaceIndex {
+   | ---------------------------- associated function in this implementation
+...
+51 |     fn now_ns() -> u64 {
+   |        ^^^^^^
+
+warning: field `kind` is never read
+  --> crates/maos-kernel-core/src/memory/private.rs:44:5
+   |
+42 | struct DiskCandidate {
+   |        ------------- field in this struct
+43 |     name: String,
+44 |     kind: ValueKind,
+   |     ^^^^
+
+warning: field `iac_rt_metrics` is never read
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5
+   |
+32 | pub struct SelfTelemetryAggregator {
+   |            ----------------------- field in this struct
+33 |     iac_rt_metrics: Arc<IacRtMetrics>,
+   |     ^^^^^^^^^^^^^^
+
+warning: associated function `resolution_label` is never used
+  --> crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8
+   |
+38 | impl SelfTelemetryAggregator {
+   | ---------------------------- associated function in this implementation
+...
+60 |     fn resolution_label(kind: &str) -> Option<ResolutionKindLabel> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: associated function `kind_to_str` is never used
+  --> crates/maos-kernel-core/src/memory/shared.rs:52:8
+   |
+38 | impl SharedMemoryStore {
+   | ---------------------- associated function in this implementation
+...
+52 |     fn kind_to_str(kind: ValueKind) -> &'static str {
+   |        ^^^^^^^^^^^
+
+warning: method `build_kernel_ctx` is never used
+   --> crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:146:8
+    |
+ 69 | impl HookDispatcher {
+    | ------------------- method in this implementation
+...
+146 |     fn build_kernel_ctx<'a>(
+    |        ^^^^^^^^^^^^^^^^
+
+warning: field `attestation` is never read
+  --> crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5
+   |
+34 | pub struct VerifiedImageAttestation {
+   |            ------------------------ field in this struct
+35 |     attestation: T3ImageAttestation,
+   |     ^^^^^^^^^^^
+   |
+   = note: `VerifiedImageAttestation` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5
+   |
+23 | pub struct ProgressWatchdog {
+   |            ---------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `notification_dispatcher` is never read
+  --> crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5
+   |
+23 | pub struct SilentFailureDetector {
+   |            --------------------- field in this struct
+...
+27 |     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `maos-kernel-core` (lib) generated 42 warnings (run `cargo fix --lib -p maos-kernel-core` to apply 24 suggestions)
+warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+  --> crates/maos-control/src/lib.rs:17:11
+   |
+17 | use ring::constant_time;
+   |           ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> crates/maos-control/src/lib.rs:960:28
+    |
+960 |             constant_time::verify_slices_are_equal(expected_token, presented.as_bytes()).is_ok()
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `header` is never used
+   --> crates/maos-control/src/lib.rs:772:8
+    |
+771 | impl Incoming<'_> {
+    | ----------------- method in this implementation
+772 |     fn header(&self, name: &str) -> Option<&str> {
+    |        ^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-control` (lib) generated 3 warnings
+warning: unused import: `maos_kernel_core::memory::MemoryManagerAdapter`
+    --> crates/maos-bin/src/cross_team_crossing.rs:1014:5
+     |
+1014 | use maos_kernel_core::memory::MemoryManagerAdapter;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (lib) generated 1 warning (run `cargo fix --lib -p maos-bin` to apply 1 suggestion)
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+warning: struct `EnvVar` is never constructed
+ --> crates/maos-bin/src/env_contract.rs:1:12
+  |
+1 | pub struct EnvVar {
+  |            ^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: enum `EnvStability` is never used
+ --> crates/maos-bin/src/env_contract.rs:8:10
+  |
+8 | pub enum EnvStability {
+  |          ^^^^^^^^^^^^
+
+warning: constant `MAOS_ENV_REGISTRY` is never used
+  --> crates/maos-bin/src/env_contract.rs:13:11
+   |
+13 | pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
+   |           ^^^^^^^^^^^^^^^^^
+
+warning: function `lookup` is never used
+   --> crates/maos-bin/src/env_contract.rs:526:8
+    |
+526 | pub fn lookup(name: &str) -> Option<&'static EnvVar> {
+    |        ^^^^^^
+
+warning: `maos-bin` (bin "maos") generated 4 warnings
+warning: function `sql_i64` is never used
+   --> crates/maos-bin/tests/f4_pairing.rs:575:4
+    |
+575 | fn sql_i64(db: &Path, sql: &str, param: &str) -> Option<i64> {
+    |    ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `maos-bin` (test "f4_pairing") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.63s
+     Running tests/drain_once_audit_writer.rs (target/debug/deps/drain_once_audit_writer-6d4b967c9ad5e77a)
+
+running 1 test
+test founder_loop_once_drains_capability_audit_writer ... FAILED
+
+failures:
+
+---- founder_loop_once_drains_capability_audit_writer stdout ----
+
+thread 'founder_loop_once_drains_capability_audit_writer' (356208) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 founder-loop audit-drain Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: drain_once_audit_writer::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: drain_once_audit_writer::founder_loop_once_drains_capability_audit_writer
+             at ./tests/drain_once_audit_writer.rs:30:9
+   4: drain_once_audit_writer::founder_loop_once_drains_capability_audit_writer::{closure#0}
+             at ./tests/drain_once_audit_writer.rs:29:54
+   5: <drain_once_audit_writer::founder_loop_once_drains_capability_audit_writer::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    founder_loop_once_drains_capability_audit_writer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `-p maos-bin --test drain_once_audit_writer`
+     Running tests/f4_pairing.rs (target/debug/deps/f4_pairing-bc18e7fe2e2daafd)
+
+running 6 tests
+test wrong_nonce_cascade_is_restart_detected_then_pin_mismatch ... ok
+test crosshost_sender_publishes_before_the_delegation_frame ... FAILED
+test pairing_hold_blocks_until_host_b_is_pinned_then_releases ... FAILED
+test wrong_nonce_is_refused_and_recovery_requires_a_b_restart ... FAILED
+test preexisting_ready_file_is_refused_before_publication ... ok
+test pairing_hold_times_out_and_refuses_to_dial ... ok
+
+failures:
+
+---- crosshost_sender_publishes_before_the_delegation_frame stdout ----
+
+thread 'crosshost_sender_publishes_before_the_delegation_frame' (356210) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 F4 pairing V1 delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: f4_pairing::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: f4_pairing::crosshost_sender_publishes_before_the_delegation_frame
+             at ./tests/f4_pairing.rs:662:9
+   4: f4_pairing::crosshost_sender_publishes_before_the_delegation_frame::{closure#0}
+             at ./tests/f4_pairing.rs:661:60
+   5: <f4_pairing::crosshost_sender_publishes_before_the_delegation_frame::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- pairing_hold_blocks_until_host_b_is_pinned_then_releases stdout ----
+
+thread 'pairing_hold_blocks_until_host_b_is_pinned_then_releases' (356211) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 F4 pairing V2 delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: f4_pairing::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: f4_pairing::pairing_hold_blocks_until_host_b_is_pinned_then_releases
+             at ./tests/f4_pairing.rs:729:9
+   4: f4_pairing::pairing_hold_blocks_until_host_b_is_pinned_then_releases::{closure#0}
+             at ./tests/f4_pairing.rs:728:62
+   5: <f4_pairing::pairing_hold_blocks_until_host_b_is_pinned_then_releases::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- wrong_nonce_is_refused_and_recovery_requires_a_b_restart stdout ----
+
+thread 'wrong_nonce_is_refused_and_recovery_requires_a_b_restart' (356215) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 F4 pairing V3 recovered delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: f4_pairing::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: f4_pairing::wrong_nonce_is_refused_and_recovery_requires_a_b_restart
+             at ./tests/f4_pairing.rs:908:9
+   4: f4_pairing::wrong_nonce_is_refused_and_recovery_requires_a_b_restart::{closure#0}
+             at ./tests/f4_pairing.rs:907:62
+   5: <f4_pairing::wrong_nonce_is_refused_and_recovery_requires_a_b_restart::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    crosshost_sender_publishes_before_the_delegation_frame
+    pairing_hold_blocks_until_host_b_is_pinned_then_releases
+    wrong_nonce_is_refused_and_recovery_requires_a_b_restart
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s
+
+error: test failed, to rerun pass `-p maos-bin --test f4_pairing`
+     Running tests/root_shutdown_unload_16_3.rs (target/debug/deps/root_shutdown_unload_16_3-670827057958da7c)
+
+running 11 tests
+test ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm ... FAILED
+test ac3_operator_door_unload_stops_a_live_worker_once ... FAILED
+test ac4_v2_butler_once_receipts_the_raised_halt_and_drains ... FAILED
+test ac4_v3_topology_once_unloads_every_loaded_spirit ... FAILED
+test ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker ... FAILED
+test ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan ... FAILED
+test ac4_v4b_grandchild_is_stopped_with_its_worker_container ... FAILED
+test cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains ... FAILED
+test cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown ... FAILED
+test cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants ... FAILED
+test ac4_v8_one_shot_acp_server_has_no_listener_and_dies_by_signal_15 ... ok
+
+failures:
+
+---- ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm stdout ----
+
+thread 'ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm' (356289) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root shutdown serving Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm
+             at ./tests/root_shutdown_unload_16_3.rs:788:9
+   4: root_shutdown_unload_16_3::ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:787:63
+   5: <root_shutdown_unload_16_3::ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ac3_operator_door_unload_stops_a_live_worker_once stdout ----
+
+thread 'ac3_operator_door_unload_stops_a_live_worker_once' (356288) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root unload live Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac3_operator_door_unload_stops_a_live_worker_once
+             at ./tests/root_shutdown_unload_16_3.rs:1251:9
+   4: root_shutdown_unload_16_3::ac3_operator_door_unload_stops_a_live_worker_once::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1250:55
+   5: <root_shutdown_unload_16_3::ac3_operator_door_unload_stops_a_live_worker_once::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ac4_v2_butler_once_receipts_the_raised_halt_and_drains stdout ----
+
+thread 'ac4_v2_butler_once_receipts_the_raised_halt_and_drains' (356290) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root shutdown one-shot Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac4_v2_butler_once_receipts_the_raised_halt_and_drains
+             at ./tests/root_shutdown_unload_16_3.rs:946:9
+   4: root_shutdown_unload_16_3::ac4_v2_butler_once_receipts_the_raised_halt_and_drains::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:944:60
+   5: <root_shutdown_unload_16_3::ac4_v2_butler_once_receipts_the_raised_halt_and_drains::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ac4_v3_topology_once_unloads_every_loaded_spirit stdout ----
+
+thread 'ac4_v3_topology_once_unloads_every_loaded_spirit' (356291) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root shutdown topology Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac4_v3_topology_once_unloads_every_loaded_spirit
+             at ./tests/root_shutdown_unload_16_3.rs:1047:9
+   4: root_shutdown_unload_16_3::ac4_v3_topology_once_unloads_every_loaded_spirit::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1046:54
+   5: <root_shutdown_unload_16_3::ac4_v3_topology_once_unloads_every_loaded_spirit::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker stdout ----
+
+thread 'ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker' (356292) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root shutdown interrupted topology Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+             at ./tests/root_shutdown_unload_16_3.rs:1102:9
+   4: root_shutdown_unload_16_3::ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1101:75
+   5: <root_shutdown_unload_16_3::ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan stdout ----
+
+thread 'ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan' (356293) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root shutdown standalone Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+             at ./tests/root_shutdown_unload_16_3.rs:1203:9
+   4: root_shutdown_unload_16_3::ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1202:62
+   5: <root_shutdown_unload_16_3::ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- ac4_v4b_grandchild_is_stopped_with_its_worker_container stdout ----
+
+thread 'ac4_v4b_grandchild_is_stopped_with_its_worker_container' (356294) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 root shutdown descendant Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::ac4_v4b_grandchild_is_stopped_with_its_worker_container
+             at ./tests/root_shutdown_unload_16_3.rs:1310:9
+   4: root_shutdown_unload_16_3::ac4_v4b_grandchild_is_stopped_with_its_worker_container::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1309:61
+   5: <root_shutdown_unload_16_3::ac4_v4b_grandchild_is_stopped_with_its_worker_container::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains stdout ----
+
+thread 'cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains' (356296) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 cohort root shutdown Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+             at ./tests/root_shutdown_unload_16_3.rs:1891:13
+   4: root_shutdown_unload_16_3::cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1890:67
+   5: <root_shutdown_unload_16_3::cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown stdout ----
+
+thread 'cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown' (356297) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 cohort root startup shutdown Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown
+             at ./tests/root_shutdown_unload_16_3.rs:1984:13
+   4: root_shutdown_unload_16_3::cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:1982:74
+   5: <root_shutdown_unload_16_3::cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants stdout ----
+
+thread 'cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants' (356298) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 cohort root descendant Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: root_shutdown_unload_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: root_shutdown_unload_16_3::cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants
+             at ./tests/root_shutdown_unload_16_3.rs:2092:13
+   4: root_shutdown_unload_16_3::cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants::{closure#0}
+             at ./tests/root_shutdown_unload_16_3.rs:2091:68
+   5: <root_shutdown_unload_16_3::cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    ac3_operator_door_unload_stops_a_live_worker_once
+    ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm
+    ac4_v2_butler_once_receipts_the_raised_halt_and_drains
+    ac4_v3_topology_once_unloads_every_loaded_spirit
+    ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker
+    ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan
+    ac4_v4b_grandchild_is_stopped_with_its_worker_container
+    cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains
+    cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown
+    cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants
+
+test result: FAILED. 1 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+error: test failed, to rerun pass `-p maos-bin --test root_shutdown_unload_16_3`
+     Running tests/smoke_cli_wrapper_8_12.rs (target/debug/deps/smoke_cli_wrapper_8_12-c6439deeaf6dd94b)
+
+running 4 tests
+test delegated_goal_reaches_the_frame_verbatim_with_non_ascii ... FAILED
+test founder_loop_journey_runs_with_real_worker_subprocess ... FAILED
+test maos_run_cli_wrapper_worker_spawns_real_subprocess ... FAILED
+test ci_local_split_refuses_a_granted_real_agent_without_the_live_flag ... ok
+
+failures:
+
+---- delegated_goal_reaches_the_frame_verbatim_with_non_ascii stdout ----
+
+thread 'delegated_goal_reaches_the_frame_verbatim_with_non_ascii' (356340) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 founder-loop delegated goal Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: smoke_cli_wrapper_8_12::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: smoke_cli_wrapper_8_12::delegated_goal_reaches_the_frame_verbatim_with_non_ascii
+             at ./tests/smoke_cli_wrapper_8_12.rs:268:9
+   4: smoke_cli_wrapper_8_12::delegated_goal_reaches_the_frame_verbatim_with_non_ascii::{closure#0}
+             at ./tests/smoke_cli_wrapper_8_12.rs:267:62
+   5: <smoke_cli_wrapper_8_12::delegated_goal_reaches_the_frame_verbatim_with_non_ascii::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- founder_loop_journey_runs_with_real_worker_subprocess stdout ----
+
+thread 'founder_loop_journey_runs_with_real_worker_subprocess' (356341) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 founder-loop delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: smoke_cli_wrapper_8_12::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: smoke_cli_wrapper_8_12::founder_loop_journey_runs_with_real_worker_subprocess
+             at ./tests/smoke_cli_wrapper_8_12.rs:156:9
+   4: smoke_cli_wrapper_8_12::founder_loop_journey_runs_with_real_worker_subprocess::{closure#0}
+             at ./tests/smoke_cli_wrapper_8_12.rs:155:59
+   5: <smoke_cli_wrapper_8_12::founder_loop_journey_runs_with_real_worker_subprocess::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- maos_run_cli_wrapper_worker_spawns_real_subprocess stdout ----
+
+thread 'maos_run_cli_wrapper_worker_spawns_real_subprocess' (356342) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 maos run cli-wrapper Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: smoke_cli_wrapper_8_12::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: smoke_cli_wrapper_8_12::maos_run_cli_wrapper_worker_spawns_real_subprocess
+             at ./tests/smoke_cli_wrapper_8_12.rs:82:9
+   4: smoke_cli_wrapper_8_12::maos_run_cli_wrapper_worker_spawns_real_subprocess::{closure#0}
+             at ./tests/smoke_cli_wrapper_8_12.rs:81:56
+   5: <smoke_cli_wrapper_8_12::maos_run_cli_wrapper_worker_spawns_real_subprocess::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    delegated_goal_reaches_the_frame_verbatim_with_non_ascii
+    founder_loop_journey_runs_with_real_worker_subprocess
+    maos_run_cli_wrapper_worker_spawns_real_subprocess
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+error: test failed, to rerun pass `-p maos-bin --test smoke_cli_wrapper_8_12`
+     Running tests/two_host_delegation_2b.rs (target/debug/deps/two_host_delegation_2b-cdde59403e0b1059)
+
+running 3 tests
+test two_daemon_delegation_is_joined_on_the_same_sixteen_bytes ... FAILED
+test replayed_inbound_frame_returns_duplicate_without_halting_host_b ... FAILED
+test sink_uninstalled_acks_but_does_not_admit_or_serve_the_frame ... ok
+
+failures:
+
+---- two_daemon_delegation_is_joined_on_the_same_sixteen_bytes stdout ----
+
+thread 'two_daemon_delegation_is_joined_on_the_same_sixteen_bytes' (356384) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 two-host delegation Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: two_host_delegation_2b::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: two_host_delegation_2b::two_daemon_delegation_is_joined_on_the_same_sixteen_bytes
+             at ./tests/two_host_delegation_2b.rs:563:9
+   4: two_host_delegation_2b::two_daemon_delegation_is_joined_on_the_same_sixteen_bytes::{closure#0}
+             at ./tests/two_host_delegation_2b.rs:562:63
+   5: <two_host_delegation_2b::two_daemon_delegation_is_joined_on_the_same_sixteen_bytes::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- replayed_inbound_frame_returns_duplicate_without_halting_host_b stdout ----
+
+thread 'replayed_inbound_frame_returns_duplicate_without_halting_host_b' (356382) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 replayed inbound delegation Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: two_host_delegation_2b::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: two_host_delegation_2b::replayed_inbound_frame_returns_duplicate_without_halting_host_b::{closure#0}
+             at ./tests/two_host_delegation_2b.rs:794:9
+   4: <core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>> as core::future::future::Future>::poll
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   5: <core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>> as core::future::future::Future>::poll
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   6: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}::{closure#0}::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:778:70
+   7: tokio::task::coop::with_budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/task/coop/mod.rs:167:5
+   8: tokio::task::coop::budget::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}::{closure#0}::{closure#0}>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/task/coop/mod.rs:133:5
+   9: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:778:25
+  10: <tokio::runtime::scheduler::current_thread::Context>::enter::<core::task::poll::Poll<()>, <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}::{closure#0}>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:451:19
+  11: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:777:44
+  12: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:865:68
+  13: <tokio::runtime::context::scoped::Scoped<tokio::runtime::scheduler::Context>>::set::<<tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/context/scoped.rs:40:9
+  14: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/context.rs:181:38
+  15: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::try_with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:463:12
+  16: <std::thread::local::LocalKey<tokio::runtime::context::Context>>::with::<tokio::runtime::context::set_scheduler<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>::{closure#0}>::{closure#0}, (alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>)>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:427:20
+  17: tokio::runtime::context::set_scheduler::<(alloc::boxed::Box<tokio::runtime::scheduler::current_thread::Core>, core::option::Option<()>), <tokio::runtime::scheduler::current_thread::CoreGuard>::enter<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>::{closure#0}>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/context.rs:181:17
+  18: <tokio::runtime::scheduler::current_thread::CoreGuard>::enter::<<tokio::runtime::scheduler::current_thread::CoreGuard>::block_on<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>::{closure#0}, core::option::Option<()>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:865:27
+  19: <tokio::runtime::scheduler::current_thread::CoreGuard>::block_on::<core::pin::Pin<&mut core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:765:24
+  20: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:205:33
+  21: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::current_thread::CurrentThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/context/runtime.rs:65:16
+  22: <tokio::runtime::scheduler::current_thread::CurrentThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/current_thread/mod.rs:193:9
+  23: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/runtime.rs:371:52
+  24: <tokio::runtime::runtime::Runtime>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/runtime.rs:345:18
+  25: two_host_delegation_2b::replayed_inbound_frame_returns_duplicate_without_halting_host_b
+             at ./tests/two_host_delegation_2b.rs:858:6
+  26: two_host_delegation_2b::replayed_inbound_frame_returns_duplicate_without_halting_host_b::{closure#0}
+             at ./tests/two_host_delegation_2b.rs:793:75
+  27: <two_host_delegation_2b::replayed_inbound_frame_returns_duplicate_without_halting_host_b::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  28: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    replayed_inbound_frame_returns_duplicate_without_halting_host_b
+    two_daemon_delegation_is_joined_on_the_same_sixteen_bytes
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.43s
+
+error: test failed, to rerun pass `-p maos-bin --test two_host_delegation_2b`
+     Running tests/worker_completion_2a.rs (target/debug/deps/worker_completion_2a-015253f02facfc93)
+
+running 45 tests
+test a_manifest_carrying_every_required_flag_is_permitted ... ok
+test a_manifest_that_omits_a_required_flag_is_refused ... ok
+test adapters_declare_the_argv_flags_their_oracles_depend_on ... ok
+test argv_appends_task_as_trailing_arg ... ok
+test bypass_flags_are_refused_at_the_production_seam ... ok
+test claude_absent_permission_denials_fails_closed ... ok
+test claude_completes_on_a_clean_result_object_with_no_denials ... ok
+test claude_error_result_is_a_typed_failure ... ok
+test claude_parses_a_pretty_printed_result_object_split_across_tl_rows ... ok
+test claude_permission_denial_is_refused_even_though_it_reports_success ... ok
+test claude_prose_only_output_is_not_a_completion ... ok
+test codex_exit0_but_empty_stdout_is_no_completion ... ok
+test codex_completes_only_with_turn_completed_and_applied_file_change ... ok
+test codex_failed_patch_is_not_effect_evidence ... ok
+test codex_nonzero_exit_is_process_crash ... ok
+test codex_prose_final_line_is_no_longer_a_completion ... ok
+test codex_turn_completed_without_a_file_change_is_no_effect_evidence ... ok
+test codex_turn_failed_is_a_typed_failure_not_a_missing_marker ... ok
+test fixture_completes_on_terminal_marker_line ... ok
+test fixture_crash_is_process_crash_even_with_marker_present ... ok
+test fixture_exit0_without_marker_is_not_completion ... ok
+test live_agent_gate_lets_the_fixture_run_without_the_flag ... ok
+test label_is_nonsecret_and_never_leaks_message ... ok
+test live_agent_gate_permits_real_cli_only_with_the_local_optin ... ok
+test live_agent_gate_refuses_real_cli_without_the_flag ... ok
+test only_codex_declares_noninteractive_env_and_no_secret_leaks ... ok
+test every_real_adapter_names_its_ambient_auth_footgun_but_the_fixture_is_immune ... ok
+test only_the_fixture_speaks_the_bridge_handshake ... ok
+test select_fails_closed_on_unsupported_wrapper ... ok
+test select_resolves_fixture_codex_claude_by_basename ... ok
+test repeated_isolation_flags_are_refused ... ok
+test wrong_value_flag_combinations_are_refused_not_scatter_matched ... ok
+test the_isolation_declaration_is_content_checked_not_token_checked ... ok
+test the_two_oracles_are_not_equivalent_and_the_asymmetry_is_asserted ... ok
+test liveness_probe_passes_on_clean_exit_and_fails_closed_otherwise ... ok
+test liveness_probe_times_out_and_fails_closed_on_a_hang ... ok
+test planted_refusal::an_unset_home_refuses_the_live_run_instead_of_skipping_the_check ... ok
+test planted_refusal::a_planted_claude_credentials_file_refuses_the_live_run ... ok
+test planted_refusal::a_hostless_topology_refusal_also_fails_the_run ... FAILED
+test planted_refusal::claude_permission_denial_fails_the_run ... FAILED
+test planted_refusal::codex_prose_only_refusal_fails_the_run ... FAILED
+test planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run ... FAILED
+test planted_refusal::the_standalone_path_no_longer_discards_the_verdict ... FAILED
+test planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls ... FAILED
+test planted_refusal::a_manifest_missing_the_oracles_argv_flag_refuses_before_the_spawn ... ok
+
+failures:
+
+---- planted_refusal::a_hostless_topology_refusal_also_fails_the_run stdout ----
+
+thread 'planted_refusal::a_hostless_topology_refusal_also_fails_the_run' (356522) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 hostless completion Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_completion_2a::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_completion_2a::planted_refusal::require_worker_t3
+             at ./tests/worker_completion_2a.rs:799:9
+   4: worker_completion_2a::planted_refusal::a_hostless_topology_refusal_also_fails_the_run
+             at ./tests/worker_completion_2a.rs:1244:13
+   5: worker_completion_2a::planted_refusal::a_hostless_topology_refusal_also_fails_the_run::{closure#0}
+             at ./tests/worker_completion_2a.rs:1243:56
+   6: <worker_completion_2a::planted_refusal::a_hostless_topology_refusal_also_fails_the_run::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- planted_refusal::claude_permission_denial_fails_the_run stdout ----
+
+thread 'planted_refusal::claude_permission_denial_fails_the_run' (356526) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 completion permission-denial Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_completion_2a::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_completion_2a::planted_refusal::require_worker_t3
+             at ./tests/worker_completion_2a.rs:799:9
+   4: worker_completion_2a::planted_refusal::claude_permission_denial_fails_the_run
+             at ./tests/worker_completion_2a.rs:1036:13
+   5: worker_completion_2a::planted_refusal::claude_permission_denial_fails_the_run::{closure#0}
+             at ./tests/worker_completion_2a.rs:1035:48
+   6: <worker_completion_2a::planted_refusal::claude_permission_denial_fails_the_run::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- planted_refusal::codex_prose_only_refusal_fails_the_run stdout ----
+
+thread 'planted_refusal::codex_prose_only_refusal_fails_the_run' (356527) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 completion prose-refusal Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_completion_2a::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_completion_2a::planted_refusal::require_worker_t3
+             at ./tests/worker_completion_2a.rs:799:9
+   4: worker_completion_2a::planted_refusal::codex_prose_only_refusal_fails_the_run
+             at ./tests/worker_completion_2a.rs:1004:13
+   5: worker_completion_2a::planted_refusal::codex_prose_only_refusal_fails_the_run::{closure#0}
+             at ./tests/worker_completion_2a.rs:1003:48
+   6: <worker_completion_2a::planted_refusal::codex_prose_only_refusal_fails_the_run::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run stdout ----
+
+thread 'planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run' (356528) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 completion no-effect Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_completion_2a::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_completion_2a::planted_refusal::require_worker_t3
+             at ./tests/worker_completion_2a.rs:799:9
+   4: worker_completion_2a::planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run
+             at ./tests/worker_completion_2a.rs:921:13
+   5: worker_completion_2a::planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run::{closure#0}
+             at ./tests/worker_completion_2a.rs:920:64
+   6: <worker_completion_2a::planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- planted_refusal::the_standalone_path_no_longer_discards_the_verdict stdout ----
+
+thread 'planted_refusal::the_standalone_path_no_longer_discards_the_verdict' (356530) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 standalone completion Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_completion_2a::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_completion_2a::planted_refusal::require_worker_t3
+             at ./tests/worker_completion_2a.rs:799:9
+   4: worker_completion_2a::planted_refusal::the_standalone_path_no_longer_discards_the_verdict
+             at ./tests/worker_completion_2a.rs:965:13
+   5: worker_completion_2a::planted_refusal::the_standalone_path_no_longer_discards_the_verdict::{closure#0}
+             at ./tests/worker_completion_2a.rs:964:60
+   6: <worker_completion_2a::planted_refusal::the_standalone_path_no_longer_discards_the_verdict::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls stdout ----
+
+thread 'planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls' (356529) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 fixture credential-immunity Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_completion_2a::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_completion_2a::planted_refusal::require_worker_t3
+             at ./tests/worker_completion_2a.rs:799:9
+   4: worker_completion_2a::planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls
+             at ./tests/worker_completion_2a.rs:1194:13
+   5: worker_completion_2a::planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls::{closure#0}
+             at ./tests/worker_completion_2a.rs:1193:75
+   6: <worker_completion_2a::planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    planted_refusal::a_hostless_topology_refusal_also_fails_the_run
+    planted_refusal::claude_permission_denial_fails_the_run
+    planted_refusal::codex_prose_only_refusal_fails_the_run
+    planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run
+    planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls
+    planted_refusal::the_standalone_path_no_longer_discards_the_verdict
+
+test result: FAILED. 39 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+error: test failed, to rerun pass `-p maos-bin --test worker_completion_2a`
+     Running tests/worker_manifests_2a.rs (target/debug/deps/worker_manifests_2a-33871054a1598805)
+
+running 6 tests
+test probe_identity_is_hermetic_without_widening_live_admission ... ok
+test builtin_probe_authority_cannot_admit_the_operator_echo_destination ... ok
+test crosshost_2a_codex_manifest_keeps_the_attested_long_form_sandbox_spelling ... ok
+test crosshost_2a_every_shipped_worker_manifest_resolves_to_an_adapter ... ok
+test crosshost_2a_real_adapter_manifests_declare_an_isolation_posture ... ok
+test crosshost_2a_founder_loop_topologies_are_routable_end_to_end ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/worker_supervision_16_3.rs (target/debug/deps/worker_supervision_16_3-97be6965f0765311)
+
+running 23 tests
+test binding_phase_transitions_cover_every_cell ... ok
+test worker_task_ids_survive_redaction_and_name_their_originator ... ok
+test direct_worker_unload_stops_its_named_container ... ok
+test failed_named_kill_is_not_counted_as_a_successful_container_stop ... ok
+test abandoning_a_binding_stops_its_named_container ... ok
+test stopping_a_container_kills_its_name_and_runtime_client ... ok
+test a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean ... FAILED
+test container_attachment_before_pidfd_stops_name_then_late_pidfd ... ok
+test the_fr4_call_feed_survives_every_worker_row_it_must_omit ... FAILED
+test the_crash_scene_through_the_real_binary_lands_at_one_real_pid ... FAILED
+test stop_before_container_attachment_still_kills_late_named_container ... ok
+test a_stop_during_the_mint_never_spawns_the_child ... ok
+test a_worker_that_exits_zero_is_unloaded_and_never_orphaned ... ok
+test a_worker_that_would_bind_after_stop_workers_is_refused ... ok
+test a_sigkilled_worker_reaches_handle_crash_at_its_own_pid ... FAILED
+test a_supervised_worker_completes_on_a_single_worker_runtime ... ok
+test a_crash_the_observer_never_saw_is_still_handled_by_finish ... ok
+test an_injected_error_after_watch_leaves_no_bound_worker_behind ... ok
+test an_escalating_manifest_escalates_instead_of_nacking ... ok
+test concurrent_workers_get_distinct_ids_and_their_own_verdicts ... ok
+test unload_all_loaded_closes_a_live_workers_scb_and_reports_it ... ok
+test maos_run_refuses_a_one_shot_mode_in_the_same_process ... ok
+test three_workers_that_printed_once_then_hung_all_stall ... ok
+
+failures:
+
+---- a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean stdout ----
+
+thread 'a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean' (356661) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 binary root stalled Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_supervision_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_supervision_16_3::a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean
+             at ./tests/worker_supervision_16_3.rs:1521:9
+   4: worker_supervision_16_3::a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean::{closure#0}
+             at ./tests/worker_supervision_16_3.rs:1520:76
+   5: <worker_supervision_16_3::a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- the_fr4_call_feed_survives_every_worker_row_it_must_omit stdout ----
+
+thread 'the_fr4_call_feed_survives_every_worker_row_it_must_omit' (356723) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 binary root stalled then crashed Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_supervision_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_supervision_16_3::the_fr4_call_feed_survives_every_worker_row_it_must_omit
+             at ./tests/worker_supervision_16_3.rs:1782:9
+   4: worker_supervision_16_3::the_fr4_call_feed_survives_every_worker_row_it_must_omit::{closure#0}
+             at ./tests/worker_supervision_16_3.rs:1781:62
+   5: <worker_supervision_16_3::the_fr4_call_feed_survives_every_worker_row_it_must_omit::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- the_crash_scene_through_the_real_binary_lands_at_one_real_pid stdout ----
+
+thread 'the_crash_scene_through_the_real_binary_lands_at_one_real_pid' (356722) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:15:5:
+declared-capable T3 binary root crashed Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: worker_supervision_16_3::t3_substrate::require_t3
+             at ./tests/../../../tests/harness/t3_substrate.rs:15:5
+   3: worker_supervision_16_3::the_crash_scene_through_the_real_binary_lands_at_one_real_pid
+             at ./tests/worker_supervision_16_3.rs:1580:9
+   4: worker_supervision_16_3::the_crash_scene_through_the_real_binary_lands_at_one_real_pid::{closure#0}
+             at ./tests/worker_supervision_16_3.rs:1579:67
+   5: <worker_supervision_16_3::the_crash_scene_through_the_real_binary_lands_at_one_real_pid::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- a_sigkilled_worker_reaches_handle_crash_at_its_own_pid stdout ----
+
+thread 'a_sigkilled_worker_reaches_handle_crash_at_its_own_pid' (356662) panicked at crates/maos-bin/tests/worker_supervision_16_3.rs:557:5:
+assertion `left == right` failed
+  left: Array [Array [Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(22), Number(3), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0), Number(0)]]
+ right: Array []
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<serde_json::value::Value, serde_json::value::Value>
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:394:5
+   4: worker_supervision_16_3::a_sigkilled_worker_reaches_handle_crash_at_its_own_pid::{closure#0}
+             at ./tests/worker_supervision_16_3.rs:557:5
+   5: <core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>> as core::future::future::Future>::poll
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/future/future.rs:133:9
+   6: <tokio::runtime::park::CachedParkThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/park.rs:284:71
+   7: tokio::task::coop::with_budget::<core::task::poll::Poll<()>, <tokio::runtime::park::CachedParkThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/task/coop/mod.rs:167:5
+   8: tokio::task::coop::budget::<core::task::poll::Poll<()>, <tokio::runtime::park::CachedParkThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/task/coop/mod.rs:133:5
+   9: <tokio::runtime::park::CachedParkThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/park.rs:284:31
+  10: <tokio::runtime::context::blocking::BlockingRegionGuard>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/context/blocking.rs:66:14
+  11: <tokio::runtime::scheduler::multi_thread::MultiThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/multi_thread/mod.rs:92:22
+  12: tokio::runtime::context::runtime::enter_runtime::<<tokio::runtime::scheduler::multi_thread::MultiThread>::block_on<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>::{closure#0}, ()>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/context/runtime.rs:65:16
+  13: <tokio::runtime::scheduler::multi_thread::MultiThread>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/scheduler/multi_thread/mod.rs:91:9
+  14: <tokio::runtime::runtime::Runtime>::block_on_inner::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/runtime.rs:373:50
+  15: <tokio::runtime::runtime::Runtime>::block_on::<core::pin::Pin<&mut dyn core::future::future::Future<Output = ()>>>
+             at /home/lunarpulse/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/src/runtime/runtime.rs:345:18
+  16: worker_supervision_16_3::a_sigkilled_worker_reaches_handle_crash_at_its_own_pid
+             at ./tests/worker_supervision_16_3.rs:584:6
+  17: worker_supervision_16_3::a_sigkilled_worker_reaches_handle_crash_at_its_own_pid::{closure#0}
+             at ./tests/worker_supervision_16_3.rs:496:66
+  18: <worker_supervision_16_3::a_sigkilled_worker_reaches_handle_crash_at_its_own_pid::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+  19: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean
+    a_sigkilled_worker_reaches_handle_crash_at_its_own_pid
+    the_crash_scene_through_the_real_binary_lands_at_one_real_pid
+    the_fr4_call_feed_survives_every_worker_row_it_must_omit
+
+test result: FAILED. 19 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.59s
+
+error: test failed, to rerun pass `-p maos-bin --test worker_supervision_16_3`
+error: 7 targets failed:
+    `-p maos-bin --test drain_once_audit_writer`
+    `-p maos-bin --test f4_pairing`
+    `-p maos-bin --test root_shutdown_unload_16_3`
+    `-p maos-bin --test smoke_cli_wrapper_8_12`
+    `-p maos-bin --test two_host_delegation_2b`
+    `-p maos-bin --test worker_completion_2a`
+    `-p maos-bin --test worker_supervision_16_3`

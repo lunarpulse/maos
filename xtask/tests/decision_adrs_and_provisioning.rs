@@ -282,6 +282,32 @@ fn contains_rust_inproc_registry_refusal(source: &str) -> bool {
     })
 }
 
+/// Anchor the executable command control, not comments or retired test wording.
+fn clears_plain_worker_environment(source: &str) -> bool {
+    let Ok(file) = syn::parse_file(source) else {
+        return false;
+    };
+    file.items.iter().any(|item| {
+        let syn::Item::Fn(function) = item else {
+            return false;
+        };
+        function.sig.ident == "spawn_child"
+            && function.block.stmts.iter().any(|statement| {
+                let syn::Stmt::Expr(expression, _) = statement else {
+                    return false;
+                };
+                let mut expression = expression;
+                while let syn::Expr::MethodCall(call) = expression {
+                    if call.method == "env_clear" && call.args.is_empty() {
+                        return true;
+                    }
+                    expression = &call.receiver;
+                }
+                false
+            })
+    })
+}
+
 fn rust_inproc_form_predicate(expr: &syn::Expr) -> bool {
     let syn::Expr::MethodCall(any) = ungroup_expression(expr) else {
         return false;
@@ -419,21 +445,18 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
             require_body_contains(number, body, adr_rel, "## Amendment — Story 17-1", findings);
             require_body_contains(number, body, adr_rel, "/proxy/egress.sock", findings);
             require_body_contains(number, body, adr_rel, "daemon-minted", findings);
-            if let Some(posture) = anchor_source(
+            if let Some(runtime) = anchor_source(
                 root,
                 number,
-                "crates/maos-cli/tests/credential_posture_2c.rs",
+                "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
                 findings,
             ) {
-                require_contains(
-                    number,
-                    context,
-                    "env_clear",
-                    "crates/maos-cli/tests/credential_posture_2c.rs",
-                    &posture,
-                    "!RUNTIME_SRC.contains(\"env_clear\")",
-                    findings,
-                );
+                if !clears_plain_worker_environment(&runtime) {
+                    findings.push(
+                        "ADR-061 anti-rot anchor moved: the plain Worker command no longer clears its inherited environment"
+                            .into(),
+                    );
+                }
             }
             if let Some(argv) = anchor_source(
                 root,
@@ -1021,7 +1044,7 @@ impl Fixture {
             let consumer = required.map_or("99-1-fixture-consumer", |(_, consumer)| *consumer);
             let context = match number {
                 60 => "class.forms accepts rust-inproc, subprocess and wasm-component; admit_spirit reads it and refuses first-party forms.",
-                61 => "env_clear is forbidden before the proxy; --network=none is the T3 model.",
+                61 => "env_clear replaces ambient inheritance after the daemon-minted proxy channel; --network=none is the T3 model.",
                 62 => "The four GET routes have no 405 today and maos-kernel-core remains excluded.",
                 63 => "RuptureReason lacks the variant and build_server_config uses a flat lookup.",
                 64 => "ReplayLiveConflict guards replay plus --live; providers_map.values_mut() is the router provider-value seam — its arms construct CassetteReplayProvider::from_file and CassetteRecordProvider::new, each anchored independently; --replay-llm is retired.",
@@ -1082,8 +1105,8 @@ impl Fixture {
         );
         write_file(
             root,
-            "crates/maos-cli/tests/credential_posture_2c.rs",
-            "assert!(!RUNTIME_SRC.contains(\"env_clear\"));\n",
+            "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+            "fn spawn_child() { let mut command = Command::new(program); command.env_clear().args(argv); }\n",
         );
         write_file(
             root,
@@ -1348,6 +1371,20 @@ fn every_clause_and_denominator_has_a_planted_red() {
         format!("{body}\"--replay-llm\" => live = false\n")
     });
     assert_red_contains(&fx, "now contains `\"--replay-llm\" => live = false`");
+
+    // Retired guard words, comments and a different command's control do not
+    // replace environment custody on the actual plain Worker command.
+    let fx = Fixture::complete();
+    fx.rewrite(
+        "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+        |_| {
+            "fn spawn_child() { let mut command = Command::new(program); \
+             let rationale = \"env_clear\"; /* command.env_clear(); */ command.args(argv); }\n\
+             fn unrelated() { Command::new(\"decoy\").env_clear(); }\n"
+                .into()
+        },
+    );
+    assert_red_contains(&fx, "plain Worker command no longer clears");
 
     // An anchor file that disappears must red, never pass silently.
     let fx = Fixture::complete();

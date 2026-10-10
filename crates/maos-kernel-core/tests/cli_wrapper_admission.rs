@@ -25,6 +25,7 @@ use maos_kernel_core::security::manifest::{
 
 fn cfg(command: &str, declared: &str) -> CliWrapperConfig {
     CliWrapperConfig {
+        egress: Vec::new(),
         command: command.into(),
         argv_prefix: vec![],
         output_shape_version: declared.into(),
@@ -51,6 +52,7 @@ fn cfg(command: &str, declared: &str) -> CliWrapperConfig {
 /// lands as `$1` (ignored), so the echo still fires.
 fn sh_probe_cfg(observed: &str, declared: &str) -> CliWrapperConfig {
     CliWrapperConfig {
+        egress: Vec::new(),
         command: "/bin/sh".into(),
         argv_prefix: vec![
             "-c".into(),

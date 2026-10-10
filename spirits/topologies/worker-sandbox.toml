@@ -1,0 +1,18 @@
+[topology]
+name = "worker-sandbox"
+
+# Story 17-1 AC1 — Epic-17 exit lines 1 and 1b. Both entries are local
+# `[cli_wrapper]` Workers (no `host`) launched under verified T3.
+#
+# ORDER IS LOAD-BEARING. The probing Worker is the root's first binding, so its
+# id is `worker` and `maos audit query --spirit worker` resolves it: its two
+# filesystem probes and the proxy's refusal of a forwarded request for a
+# destination outside the allowlist leave exactly three kind-8 rows.
+[[topology.spirits]]
+manifest = "../worker/manifest-probe.toml"
+
+# Positive control, `worker-2`: reaches the runner's hermetic echo listener on
+# 127.0.0.1:18081 through the proxy and leaves no kind-8 row. Its destination
+# must be inside an operator grant for "MAOS 17-1 Echo" (`MAOS_HOST_GRANTS`).
+[[topology.spirits]]
+manifest = "../worker/manifest-probe-echo.toml"

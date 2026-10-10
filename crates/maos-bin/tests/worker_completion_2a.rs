@@ -11,6 +11,10 @@
 //! them executable, and — the reason AC1.1 exists — lets the completion-oracle
 //! vectors name `ClaudeCli`/`CodexCli`/`parse_completion` at all.
 
+#[cfg(target_os = "linux")]
+#[path = "../../../tests/harness/t3_substrate.rs"]
+mod t3_substrate;
+
 use maos_bin::worker_cli::*;
 
 fn s(v: &[&str]) -> Vec<String> {
@@ -768,6 +772,34 @@ fn label_is_nonsecret_and_never_leaks_message() {
 mod planted_refusal {
     use std::process::Command;
 
+    use super::t3_substrate;
+
+    fn add_t3_environment(command: &mut Command) {
+        for key in [
+            "MAOS_T3_RUNTIME",
+            "MAOS_T3_IMAGE_LOCK_PATH",
+            "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
+            "XDG_RUNTIME_DIR",
+            "DBUS_SESSION_BUS_ADDRESS",
+        ] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
+    }
+
+    fn profile_dir() -> std::path::PathBuf {
+        std::env::current_exe()
+            .expect("test executable path")
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("test profile directory")
+            .to_path_buf()
+    }
+
+    fn require_worker_t3(subject: &str) -> bool {
+        t3_substrate::require_t3(subject)
+    }
     fn workspace_root() -> &'static str {
         concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
     }
@@ -795,11 +827,16 @@ mod planted_refusal {
     /// exe-sibling → parent → `$PATH`, first hit wins, so a script named `codex`
     /// or `claude` is selected by `select_worker_cli`'s basename dispatch and
     /// admitted by the `--version` liveness probe. It always exits 0 — that is the
-    /// whole point: the defect was "exit 0 is treated as completion".
+    /// whole point: the defect was "exit 0 is treated as completion". As the T3
+    /// payload it remains alive through bounded PID inspection first.
     fn plant_fake_cli(bindir: &std::path::Path, name: &str, body: &str) {
         std::fs::create_dir_all(bindir).unwrap();
         let p = bindir.join(name);
-        std::fs::write(&p, format!("#!/bin/sh\n{body}\nexit 0\n")).unwrap();
+        std::fs::write(
+            &p,
+            format!("#!/bin/sh\n{body}\nif [ \"$0\" = /maos/spirit ]; then sleep 3; fi\nexit 0\n"),
+        )
+        .unwrap();
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
@@ -865,20 +902,21 @@ mod planted_refusal {
         manifest: &std::path::Path,
     ) -> std::process::Output {
         let bindir = root.join("bin");
-        let mut path = std::ffi::OsString::from(&bindir);
-        path.push(":");
-        path.push(std::env::var_os("PATH").unwrap_or_default());
-        Command::new(env!("CARGO_BIN_EXE_maos"))
+        let mut paths = vec![bindir, profile_dir(), profile_dir().join("deps")];
+        if let Some(existing) = std::env::var_os("PATH") {
+            paths.extend(std::env::split_paths(&existing));
+        }
+        let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+        command.env_clear();
+        add_t3_environment(&mut command);
+        command
             .args(["run", manifest.to_str().unwrap(), "--once"])
-            // F14 — `refuse_ambient_auth` reads the REAL `$HOME`. Isolate it or the
-            // result depends on whose machine runs the suite.
-            .env("HOME", root)
+            // F14 — refuse ambient auth based on a clean, fixture-owned home.
+            .env("HOME", t3_substrate::isolated_runtime_home(root))
             .env("XDG_DATA_HOME", root)
             .env("MAOS_HOME", root)
             .env("MAOS_HOST_GRANTS", grants)
-            .env("PATH", path)
-            // The opt-in the CI/local split gate demands. It is safe here because
-            // the binary on PATH is a shell script, never a paid agent.
+            .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
             .env("MAOS_LIVE_AGENT", "1")
             .current_dir(workspace_root())
             .output()
@@ -887,6 +925,9 @@ mod planted_refusal {
 
     #[test]
     fn codex_turn_completed_with_no_file_change_fails_the_run() {
+        if !require_worker_t3("completion no-effect Worker") {
+            return;
+        }
         // THE VECTOR. A `codex exec --json` stream that reaches `turn.completed`
         // with a fluent closing message and touches NOTHING. Under the previous
         // oracle ("clean exit + non-empty final stdout line") this was
@@ -928,6 +969,9 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
 
     #[test]
     fn the_standalone_path_no_longer_discards_the_verdict() {
+        if !require_worker_t3("standalone completion Worker") {
+            return;
+        }
         // AC1.5 — the SECOND false-success surface. `maos run <worker manifest>
         // --once` used to drop the returned `WorkerCompletion` and exit 0 even when
         // the oracle said `completed: false`. That matters because the signed run's
@@ -964,6 +1008,9 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
 
     #[test]
     fn codex_prose_only_refusal_fails_the_run() {
+        if !require_worker_t3("completion prose-refusal Worker") {
+            return;
+        }
         // The literal shape of the observed defect: no structured stream at all,
         // just a refusal sentence and exit 0.
         let t = tmp("codex-prose");
@@ -991,9 +1038,11 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
             "stderr must NAME the completion failure.\nstderr:\n{stderr}"
         );
     }
-
     #[test]
     fn claude_permission_denial_fails_the_run() {
+        if !require_worker_t3("completion permission-denial Worker") {
+            return;
+        }
         // The exact live transcript class that started this story: `subtype:
         // "success"`, `is_error: false`, exit 0, and a non-empty
         // `permission_denials` — because `--print` has no TTY to approve.
@@ -1116,13 +1165,22 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
         let mut path = std::ffi::OsString::from(&bindir);
         path.push(":");
         path.push(std::env::var_os("PATH").unwrap_or_default());
-        let out = Command::new(env!("CARGO_BIN_EXE_maos"))
+        let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+        command.env_clear();
+        add_t3_environment(&mut command);
+        let out = command
             .args(["run", topology.to_str().unwrap(), "--once"])
             .env_remove("HOME")
             .env("XDG_DATA_HOME", &t.0)
             .env("MAOS_HOME", &t.0)
             .env("MAOS_HOST_GRANTS", &grants)
-            .env("PATH", path)
+            .env("PATH", {
+                let mut paths = vec![bindir, profile_dir(), profile_dir().join("deps")];
+                if let Some(existing) = std::env::var_os("PATH") {
+                    paths.extend(std::env::split_paths(&existing));
+                }
+                std::env::join_paths(paths).expect("valid PATH")
+            })
             .env("MAOS_LIVE_AGENT", "1")
             .current_dir(workspace_root())
             .output()
@@ -1140,6 +1198,9 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
 
     #[test]
     fn the_hermetic_fixture_path_is_untouched_by_the_credential_controls() {
+        if !require_worker_t3("fixture credential-immunity Worker") {
+            return;
+        }
         // AC1.10 / the immunity that keeps CI green. `MAOS_LIVE_AGENT` is never set
         // in CI, so the whole clean-home block is skipped — but the fixture must ALSO
         // survive with the flag set and a credential file planted for BOTH real
@@ -1152,17 +1213,22 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
         std::fs::write(t.0.join(".claude").join(".credentials.json"), b"{}").unwrap();
         std::fs::create_dir_all(t.0.join(".codex")).unwrap();
         std::fs::write(t.0.join(".codex").join("auth.json"), b"{}").unwrap();
-        let mut path = std::ffi::OsString::from(
-            std::path::PathBuf::from(workspace_root()).join("target/debug"),
-        );
-        path.push(":");
-        path.push(std::env::var_os("PATH").unwrap_or_default());
-        let out = Command::new(env!("CARGO_BIN_EXE_maos"))
+        let paths = {
+            let mut paths = vec![profile_dir(), profile_dir().join("deps")];
+            if let Some(existing) = std::env::var_os("PATH") {
+                paths.extend(std::env::split_paths(&existing));
+            }
+            std::env::join_paths(paths).expect("valid PATH")
+        };
+        let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
+        command.env_clear();
+        add_t3_environment(&mut command);
+        let out = command
             .args(["run", "spirits/worker/manifest.toml", "--once"])
-            .env("HOME", &t.0)
+            .env("HOME", t3_substrate::isolated_runtime_home(&t.0))
             .env("XDG_DATA_HOME", &t.0)
             .env("MAOS_HOME", &t.0)
-            .env("PATH", path)
+            .env("PATH", paths)
             .env("MAOS_LIVE_AGENT", "1")
             .current_dir(workspace_root())
             .output()
@@ -1182,6 +1248,9 @@ echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0
 
     #[test]
     fn a_hostless_topology_refusal_also_fails_the_run() {
+        if !require_worker_t3("hostless completion Worker") {
+            return;
+        }
         // Review 2a-P4 — the third false-success surface. AC1.5 closed the
         // standalone path; a topology entry WITHOUT `host` gets
         // `delegated_task = None` and its verdict used to be discarded one

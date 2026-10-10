@@ -27,6 +27,8 @@ pub mod cross_wall_log_read;
 /// re-implementation of it.
 #[cfg(feature = "network")]
 pub mod delegation;
+#[cfg(all(feature = "network", unix))]
+pub mod egress;
 #[cfg(feature = "network")]
 pub mod enterprise_identity;
 /// Story 11.4a — the enterprise PDP (Cedar) reconciler. Under the library, not

@@ -19,7 +19,7 @@ slug: "/errors/ECliWrapperRequiresT3"
 
 ## Summary
 
-CliWrapperSpirit MUST declare sandbox tier = t3; lower tiers cannot contain subprocess CLI invocation
+Worker ([cli_wrapper]) manifest requested a sandbox tier other than T3; T3 is the only Worker path (below it no scoped egress exists, T4 has no spawn path)
 
 ## Rust Path
 
@@ -27,11 +27,11 @@ CliWrapperSpirit MUST declare sandbox tier = t3; lower tiers cannot contain subp
 
 ## Cause
 
-The CLI wrapper spirit manifest declares a sandbox tier lower than t3. Because CLI wrappers spawn external subprocesses, they require t3 (the highest sandbox tier) to contain the subprocess securely.
+The Worker manifest's `[sandbox]` `tier` resolves to a tier other than `T3` (`T0`, `T1`, `T2` or `T4`). A `[cli_wrapper]` Worker runs only inside a verified T3 rootless container (`--network=none`, `--read-only`, `--cap-drop=ALL`, `--user=65534:65534`), whose only egress is the daemon's proxy socket at `/proxy/egress.sock`. Below `T3` no scoped egress or credential custody exists for a Worker; `T4` has no spawn path. `maos run` refuses the manifest at load, before any probe or spawn. `T3` is not the highest tier, and there is no `hardened` tier: the parser accepts only `T0`–`T4`.
 
 ## Resolution
 
-Set `sandbox_tier = "t3"` in the spirit manifest's `[cli_wrapper]` section. Lower tiers (t1, t2) do not permit subprocess invocation by design.
+Set `tier = "T3"` in the manifest's `[sandbox]` table, or omit `[sandbox]` (a Worker requests `T3` by default). The operator must also grant `T3` for the manifest's `command` and `[author]` `name` in the `MAOS_HOST_GRANTS` file; otherwise admission fails with `ECliWrapperTierNotGranted`. See [CLI Wrapper Spirit](/cookbook/cli-wrapper-spirit) for the full Worker profile.
 
 ## Source Location
 

@@ -1,0 +1,22 @@
+name: Provision signed T3 Worker test substrate
+description: |
+  Story 17-1 — single-source the declared-capable OCI substrate for every job
+  that executes Worker suites. GitHub sets CI=true, so a missing substrate is a
+  hard failure rather than a named local skip (rule 11(b)).
+
+  Installs Podman when absent, pulls the digest-pinned image, verifies it in a
+  rootless network-none read-only shell, signs a per-run image lock and exports
+  the runtime, lock path and public trust anchor through GITHUB_ENV. The
+  private key never leaves the provisioner's scratch directory. The public
+  storage.conf beside the lock lets isolated test homes reuse only the
+  provisioned image store.
+
+runs:
+  using: composite
+  steps:
+    - name: Provision signed immutable T3 test substrate
+      shell: bash
+      run: |
+        set -euo pipefail
+        command -v podman || { sudo apt-get update && sudo apt-get install -y podman; }
+        python3 scripts/provision_t3_tests.py "$RUNNER_TEMP/maos-t3-tests"

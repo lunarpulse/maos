@@ -1,0 +1,204 @@
+
+## P1 bare fallback in the T3 arm
+file: crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1 --test bridge_t2_route_17_6` rc=0 (4s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1 --test bridge_t2_route_17_6` rc=101 (2s) failed=['all_nine_t3_postures_refuse_stdin_or_require_a_verified_launch', 't3_without_verified_launch_data_never_runs_the_program', 't3_without_verified_launch_is_refused_before_spawn']
+    thread 't3_without_verified_launch_is_refused_before_spawn' (309183) panicked at crates/maos-kernel-core/tests/bridge_t2_route_17_6.rs:167:5:
+    test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+    thread 'all_nine_t3_postures_refuse_stdin_or_require_a_verified_launch' (309212) panicked at crates/maos-kernel-core/tests/cli_wrapper_t3_boundary_17_1.rs:64:21:
+    thread 't3_without_verified_launch_data_never_runs_the_program' (309215) panicked at crates/maos-kernel-core/tests/cli_wrapper_t3_boundary_17_1.rs:45:13:
+    test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+    error: test failed, to rerun pass `-p maos-kernel-core --test bridge_t2_route_17_6`
+    error: test failed, to rerun pass `-p maos-kernel-core --test cli_wrapper_t3_boundary_17_1`
+    error: 2 targets failed:
+
+## P2 env_clear removed from the plain Worker command
+file: crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1` rc=0 (2s) failed=[]
+- before: `cargo test --offline --locked -p xtask --message-format=short --test decision_adrs_and_provisioning` rc=0 (6s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1` rc=101 (3s) failed=['a_plain_bridge_drops_ambient_credentials_and_keeps_its_explicit_environment']
+    thread 'a_plain_bridge_drops_ambient_credentials_and_keeps_its_explicit_environment' (311631) panicked at crates/maos-kernel-core/tests/cli_wrapper_t3_boundary_17_1.rs:147:9:
+    thread 'a_plain_bridge_drops_ambient_credentials_and_keeps_its_explicit_environment' (311643) panicked at crates/maos-kernel-core/tests/cli_wrapper_t3_boundary_17_1.rs:162:5:
+    test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+    error: test failed, to rerun pass `-p maos-kernel-core --test cli_wrapper_t3_boundary_17_1`
+    error: 1 target failed:
+- planted: `cargo test --offline --locked -p xtask --message-format=short --test decision_adrs_and_provisioning` rc=101 (7s) failed=['real_repository_satisfies_decision_adrs_and_provisioning_contract']
+    thread 'real_repository_satisfies_decision_adrs_and_provisioning_contract' (313089) panicked at xtask/tests/decision_adrs_and_provisioning.rs:1401:5:
+    test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+    error: test failed, to rerun pass `-p xtask --test decision_adrs_and_provisioning`
+
+## P3 environment value on the container-runtime argv
+file: crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test t3_argv_custody_17_1` rc=0 (2s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test t3_argv_custody_17_1` rc=101 (2s) failed=['worker_environment_values_never_enter_runtime_arguments']
+    thread 'worker_environment_values_never_enter_runtime_arguments' (314010) panicked at crates/maos-kernel-core/tests/t3_argv_custody_17_1.rs:72:5:
+    test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+    error: test failed, to rerun pass `-p maos-kernel-core --test t3_argv_custody_17_1`
+    error: 1 target failed:
+
+## P4a wrong bearer accepted
+file: crates/maos-egress/src/bearer.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test bearer_17_1 --test proxy_edges_17_1` rc=0 (1s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test bearer_17_1 --test proxy_edges_17_1` rc=101 (4s) failed=['remint_invalidates_the_old_spawn_credential', 'wrong_expired_foreign_pid_and_foreign_spirit_tokens_do_not_connect']
+    thread 'remint_invalidates_the_old_spawn_credential' (314969) panicked at crates/maos-egress/tests/bearer_17_1.rs:66:5:
+    test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+    thread 'wrong_expired_foreign_pid_and_foreign_spirit_tokens_do_not_connect' (315031) panicked at crates/maos-egress/tests/proxy_edges_17_1.rs:108:27:
+    test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.07s
+    error: test failed, to rerun pass `-p maos-egress --test bearer_17_1`
+    error: test failed, to rerun pass `-p maos-egress --test proxy_edges_17_1`
+    error: 2 targets failed:
+
+## P4b expired bearer accepted
+file: crates/maos-egress/src/bearer.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test bearer_17_1 --test bearer_edges_17_1 --test proxy_edges_17_1` rc=0 (1s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test bearer_17_1 --test bearer_edges_17_1 --test proxy_edges_17_1` rc=101 (4s) failed=['a_nonzero_lifetime_expires_without_an_explicit_revoke', 'expiry_and_revocation_are_fail_closed', 'wrong_expired_foreign_pid_and_foreign_spirit_tokens_do_not_connect']
+    thread 'expiry_and_revocation_are_fail_closed' (316301) panicked at crates/maos-egress/tests/bearer_17_1.rs:47:5:
+    test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+    thread 'a_nonzero_lifetime_expires_without_an_explicit_revoke' (316306) panicked at crates/maos-egress/tests/bearer_edges_17_1.rs:148:5:
+    test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+    thread 'wrong_expired_foreign_pid_and_foreign_spirit_tokens_do_not_connect' (316372) panicked at crates/maos-egress/tests/proxy_edges_17_1.rs:108:27:
+    test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.13s
+    error: test failed, to rerun pass `-p maos-egress --test bearer_17_1`
+    error: test failed, to rerun pass `-p maos-egress --test bearer_edges_17_1`
+    error: test failed, to rerun pass `-p maos-egress --test proxy_edges_17_1`
+    error: 3 targets failed:
+
+## P5 refusal journaled after the response
+file: crates/maos-egress/src/proxy.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test proxy_17_1` rc=0 (1s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test proxy_17_1` rc=101 (4s) failed=['an_unconfirmed_refusal_cannot_emit_a_successfully_audited_response', 'forbidden_destination_waits_for_confirmed_audit_before_any_response_byte']
+    thread 'an_unconfirmed_refusal_cannot_emit_a_successfully_audited_response' (317082) panicked at crates/maos-egress/tests/proxy_17_1.rs:118:5:
+    thread 'forbidden_destination_waits_for_confirmed_audit_before_any_response_byte' (317083) panicked at crates/maos-egress/tests/proxy_17_1.rs:72:48:
+    test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s
+    error: test failed, to rerun pass `-p maos-egress --test proxy_17_1`
+    error: 1 target failed:
+
+## P6 unbounded newline reader
+file: crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1` rc=0 (2s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1` rc=101 (32s) failed=['an_unterminated_oversized_record_is_refused_at_the_bound_without_waiting_for_eof']
+    thread 'an_unterminated_oversized_record_is_refused_at_the_bound_without_waiting_for_eof' (318052) panicked at crates/maos-kernel-core/tests/cli_wrapper_t3_boundary_17_1.rs:125:5:
+    test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.04s
+    error: test failed, to rerun pass `-p maos-kernel-core --test cli_wrapper_t3_boundary_17_1`
+    error: 1 target failed:
+
+## P9 maos-kernel-core -> maos-egress dependency (F-10)
+file: crates/maos-kernel-core/Cargo.toml
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `target/debug/xtask check-dependency-closure` rc=0 (1s) failed=[]
+- planted: `target/debug/xtask check-dependency-closure` rc=1 (0s) failed=[]
+    check-dependency-closure: FORBIDDEN crate 'maos-egress' found in maos-kernel-core transitive closure
+
+## P10 unparseable host-grant destination accepted (D-14)
+file: crates/maos-bin/src/worker_spawn.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked -p maos-bin --message-format=short --test host_grants_2b` rc=0 (7s) failed=[]
+- planted: `cargo test --offline --locked -p maos-bin --message-format=short --test host_grants_2b` rc=101 (4s) failed=['invalid_or_non_string_egress_grants_are_refused_by_entry_name']
+    thread 'invalid_or_non_string_egress_grants_are_refused_by_entry_name' (321052) panicked at crates/maos-bin/tests/host_grants_2b.rs:116:51:
+    test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+    error: test failed, to rerun pass `-p maos-bin --test host_grants_2b`
+
+## P11 deny_unknown_fields removed from CliWrapperConfig (D-5)
+file: crates/maos-manifest/src/manifest.rs
+restored byte-identical: True
+planted-file warnings before: ['unused variable: `on_confidence_below`: help: if this is intentional, prefix it with an underscore: `_on_confidence_below`']
+planted-file warnings after:  ['unused variable: `on_confidence_below`: help: if this is intentional, prefix it with an underscore: `_on_confidence_below`']
+new warnings from the plant: []
+- before: `cargo test --offline --locked -p maos-manifest --message-format=short --test cli_wrapper_egress_17_1` rc=0 (1s) failed=[]
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test manifest_field_coverage` rc=0 (2s) failed=[]
+- planted: `cargo test --offline --locked -p maos-manifest --message-format=short --test cli_wrapper_egress_17_1` rc=101 (1s) failed=['unknown_wrapper_and_posture_fields_are_refused']
+    thread 'unknown_wrapper_and_posture_fields_are_refused' (321998) panicked at crates/maos-manifest/tests/cli_wrapper_egress_17_1.rs:14:14:
+    test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+    error: test failed, to rerun pass `-p maos-manifest --test cli_wrapper_egress_17_1`
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test manifest_field_coverage` rc=101 (3s) failed=['cli_wrapper_egress_fixtures_enforce_their_declared_outcomes']
+    thread 'cli_wrapper_egress_fixtures_enforce_their_declared_outcomes' (322593) panicked at crates/maos-kernel-core/tests/manifest_field_coverage.rs:263:5:
+    test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+    error: test failed, to rerun pass `-p maos-kernel-core --test manifest_field_coverage`
+    error: 1 target failed:
+
+## P12a stdin_commands admitted under T3 at load (D-15)
+file: crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --lib t3_stdin_postures_admit_only_raw_and_ndjson_with_signals` rc=0 (2s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --lib t3_stdin_postures_admit_only_raw_and_ndjson_with_signals` rc=101 (1s) failed=['lifecycle::cli_wrapper::admission::tests::t3_stdin_postures_admit_only_raw_and_ndjson_with_signals']
+    thread 'lifecycle::cli_wrapper::admission::tests::t3_stdin_postures_admit_only_raw_and_ndjson_with_signals' (323399) panicked at crates/maos-kernel-core/src/lifecycle/cli_wrapper/admission.rs:423:17:
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 258 filtered out; finished in 0.04s
+    error: test failed, to rerun pass `-p maos-kernel-core --lib`
+    error: 1 target failed:
+
+## P12b stdin_commands admitted by the kernel T3 arm (D-15)
+file: crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1` rc=0 (2s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-kernel-core --message-format=short --test cli_wrapper_t3_boundary_17_1` rc=101 (1s) failed=['all_nine_t3_postures_refuse_stdin_or_require_a_verified_launch']
+    thread 'all_nine_t3_postures_refuse_stdin_or_require_a_verified_launch' (324347) panicked at crates/maos-kernel-core/tests/cli_wrapper_t3_boundary_17_1.rs:61:31:
+    test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+    error: test failed, to rerun pass `-p maos-kernel-core --test cli_wrapper_t3_boundary_17_1`
+    error: 1 target failed:
+
+## P13 granted hostname resolving to loopback forwarded (D-17)
+file: crates/maos-egress/src/proxy.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test proxy_edges_17_1` rc=0 (1s) failed=[]
+- planted: `cargo test --offline --locked --no-fail-fast -p maos-egress --message-format=short --test proxy_edges_17_1` rc=101 (4s) failed=['a_granted_localhost_hostname_is_not_the_plaintext_loopback_exception']
+    thread 'a_granted_localhost_hostname_is_not_the_plaintext_loopback_exception' (325220) panicked at crates/maos-egress/tests/proxy_edges_17_1.rs:108:27:
+    test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.09s
+    error: test failed, to rerun pass `-p maos-egress --test proxy_edges_17_1`
+    error: 1 target failed:
+
+## P8 --network=none dropped (local corroboration of the CI plant)
+file: crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+restored byte-identical: True
+planted-file warnings before: []
+planted-file warnings after:  []
+new warnings from the plant: []
+- before: `cargo build --offline --locked -p maos-kernel-core --message-format=short` rc=0 (2s) failed=[]
+- before: `cargo test --offline --locked -p xtask --message-format=short --test decision_adrs_and_provisioning` rc=0 (7s) failed=[]
+- planted: `cargo build --offline --locked -p maos-kernel-core --message-format=short` rc=0 (2s) failed=[]
+- planted: `cargo test --offline --locked -p xtask --message-format=short --test decision_adrs_and_provisioning` rc=101 (7s) failed=['real_repository_satisfies_decision_adrs_and_provisioning_contract']
+    thread 'real_repository_satisfies_decision_adrs_and_provisioning_contract' (332014) panicked at xtask/tests/decision_adrs_and_provisioning.rs:1401:5:
+    test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+    error: test failed, to rerun pass `-p xtask --test decision_adrs_and_provisioning`

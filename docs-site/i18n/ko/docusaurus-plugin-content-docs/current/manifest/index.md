@@ -16,7 +16,7 @@ review_status: machine
 | [v5](./v5) | **현재(Current)** | `wasm-component`와 `[class].artifact` 추가(Story 17-3b). |
 | [v4](./v4) | 지원(N-1) | `[capabilities.required.loom]` 추가(Story 13.5d). |
 | [v3](./v3) | 지원 | `[model_provenance]` 추가(Story 9.4b). |
-| [v2](./v2) | 지원 | `[[cli_wrapper]]`, `[[schedule]]`, `[[gateway]]` 추가(Epic 6). |
+| [v2](./v2) | 지원 | `[cli_wrapper]`, `[[schedule]]`, `[[gateway]]` 추가(Epic 6). |
 | [v1](./v1) | 지원 | 기준 스키마(Epic 1b). |
 
 ## 버전 정책

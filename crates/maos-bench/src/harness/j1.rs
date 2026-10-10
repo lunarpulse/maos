@@ -210,6 +210,7 @@ pub fn run_j1_bridge_measurement(config: &J1BridgeConfig) -> Result<JourneyResul
         channel_capacity: 16,
         backpressure: Backpressure::Block,
         env: vec![],
+        t3: None,
     };
     let mut bridge = spawn_and_bridge(spec)
         .map_err(|e| BenchError::SubprocessCrash(format!("bridge: {e:?}")))?;

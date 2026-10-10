@@ -6,7 +6,7 @@
 //! its own sandbox (the 8.7–8.9 anti-pattern — never trust the self-declared
 //! field). Instead:
 //!
-//! - the **manifest requests** a tier (and, later, egress destinations);
+//! - the **manifest requests** a tier and egress destinations;
 //! - the **host grants** via an operator-configured allowlist keyed on the
 //!   attested-image + signing-key → `{permitted_tier, permitted_egress}`.
 //!
@@ -16,6 +16,67 @@
 //! [`HostGrantAllowlist`] keyed on the same attested-image + signing-key tuple.
 
 use crate::invariants::i9::SandboxTier;
+
+/// Canonical lower-case DNS/IPv4 authority; manifests require an explicit port.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(try_from = "String")]
+pub struct EgressDestination {
+    pub host: String,
+    pub port: u16,
+}
+
+impl TryFrom<String> for EgressDestination {
+    type Error = &'static str;
+    fn try_from(mut value: String) -> Result<Self, Self::Error> {
+        let (host, port) = value.rsplit_once(':').ok_or("egress requires host:port")?;
+        let port = port
+            .parse::<u16>()
+            .ok()
+            .filter(|p| *p != 0 && !port.starts_with('+'))
+            .ok_or("egress port must be 1..=65535")?;
+        if host.len() > 253
+            || !host.split('.').all(|label| {
+                !label.is_empty()
+                    && label.len() <= 63
+                    && !label.starts_with('-')
+                    && !label.ends_with('-')
+                    && label
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            })
+            || (host.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                && host.parse::<std::net::Ipv4Addr>().is_err())
+        {
+            return Err("egress host must be lower-case DNS labels or an IPv4 literal");
+        }
+        let host_len = host.len();
+        value.truncate(host_len);
+        Ok(Self { host: value, port })
+    }
+}
+
+impl EgressDestination {
+    /// Preserve operator grants: a bare host grants only port 443.
+    pub fn parse_granted(value: &str) -> Result<Self, &'static str> {
+        Self::try_from(if value.contains(':') {
+            value.to_owned()
+        } else {
+            format!("{value}:443")
+        })
+    }
+}
+
+impl std::fmt::Display for EgressDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.host, self.port)
+    }
+}
+
+impl serde::Serialize for EgressDestination {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
 
 /// A single host-side grant: what the operator permits for an attested artifact.
 ///
@@ -31,11 +92,8 @@ pub struct HostGrant {
     /// The maximum sandbox tier the host permits for this artifact. A request
     /// for a tier above this is denied fail-closed (no silent downgrade).
     pub permitted_tier: SandboxTier,
-    /// Named egress destinations the host permits (e.g. `api.anthropic.com`).
-    /// Empty = no egress permitted. Enforcement depth is recorded per-story
-    /// (8.12 lands the grant seam; full enforced egress allowlisting may be a
-    /// follow-up — log enforced-vs-declared, never a silent gap).
-    pub permitted_egress_destinations: Vec<String>,
+    /// Host-granted destinations; empty means no egress permission.
+    pub permitted_egress_destinations: Vec<EgressDestination>,
 }
 
 /// Host-side grant lookup. The operator config implements this; admission
@@ -78,7 +136,7 @@ pub enum TierGrantDecision {
     /// The host grants exactly the requested tier (request ≤ permitted).
     Granted {
         tier: SandboxTier,
-        permitted_egress_destinations: Vec<String>,
+        permitted_egress_destinations: Vec<EgressDestination>,
     },
     /// Fail-closed: no matching grant, or the requested tier exceeds the grant,
     /// or the platform cannot enforce the tier (non-Linux). NEVER a downgrade.
@@ -165,7 +223,10 @@ mod tests {
             attested_image: "ghcr.io/maos/worker@sha256:abc".into(),
             signing_key_id: "maos-publisher-1".into(),
             permitted_tier: SandboxTier::T3,
-            permitted_egress_destinations: vec!["api.anthropic.com".into()],
+            permitted_egress_destinations: vec![EgressDestination::parse_granted(
+                "api.anthropic.com",
+            )
+            .unwrap()],
         }])
     }
 

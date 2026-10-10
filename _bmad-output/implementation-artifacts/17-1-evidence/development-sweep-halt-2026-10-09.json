@@ -1,0 +1,35 @@
+{
+  "story": "17-1-worker-egress-allowlist-and-scoped-credential",
+  "task": 6,
+  "date": "2026-10-09",
+  "status": "halt_three_consecutive_verification_failures",
+  "attempts": [
+    {"attempt": 1, "exit_code": 1, "stage": "cargo fmt --all", "cause": "shared T3 module declared inside inline planted_refusal module; virtual subdirectory made relative path unresolved", "repaired_before_attempt_2": true},
+    {"attempt": 2, "exit_code": 101, "stage": "integrated maos-bin test-target compilation", "output": "artifact://225", "causes": ["two borrowed temporary executable paths", "missing world telemetry and root Command constructors", "private kernel imports rather than public domain enums", "missing CliWrapperConfig and delegation imports", "typed validated manifest sections incorrectly treated as serde Deserialize"], "repaired_before_attempt_3": true},
+    {"attempt": 3, "exit_code": 101, "stage": "integrated maos-bin test execution", "output": "artifact://227", "compiled": true, "passed": 70, "failed": 29, "capability_prerequisite_failures": 28, "native_supervision_failures": 1}
+  ],
+  "runtime_environment": {"CI": "true", "MAOS_T3_RUNTIME": "unset", "observation_command": "printenv CI MAOS_T3_RUNTIME", "exit_code": 1},
+  "native_failure": {
+    "test": "a_sigkilled_worker_reaches_handle_crash_at_its_own_pid",
+    "file": "crates/maos-bin/tests/worker_supervision_16_3.rs:557",
+    "assertion": "in_flight_tokens == []",
+    "actual": [[0,0,0,0,0,0,22,3,0,0,0,0,0,0,0,0]],
+    "expected": []
+  },
+  "green_target": {"target": "worker_manifests_2a", "passed": 6, "failed": 0},
+  "signing_only_observation": "python3 scripts/provision_t3_tests.py /tmp/maos-17-1-generated-lock --generate-only verified Ed25519 with OpenSSL; private key removed; no kernel-loader or OCI proof",
+  "test_image_decision": {
+    "image": "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
+    "architecture": "linux/amd64",
+    "reason": "immutable Ubuntu 26.04 glibc and /bin/sh image for existing native binaries and shell adapters; probe static build still required",
+    "source": "https://registry.hub.docker.com/v2/repositories/library/ubuntu/tags/26.04",
+    "runtime_provisioning_exercised": false
+  },
+  "limits": [
+    "Task 6 and Task 7 remain unchecked; story stays in-progress, not review",
+    "No OCI/local rootless clone retry, capable-runner success, static probe build, fresh native portability proof or full-regression-green claim",
+    "New fixture and admission sources are integrated; final binary and containment verification remain outstanding",
+    "No governance pin or numerical ceiling changed",
+    "No implementation correction after the third failed attempt; workflow requires operator guidance"
+  ]
+}

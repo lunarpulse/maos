@@ -33,7 +33,7 @@ MAOS는 OS가 프로세스를 호스팅하는 방식으로 **LLM 기반 Spirit�
 ## 신뢰 모델
 
 - 권한 중재: 모든 Spirit 작업에는 범위 제한, 시간 제한 토큰 필요
-- sandbox tier: T0 (격리 없음) → T3 (컨테이너 격리)
+- sandbox tier: `T0` (데몬 내부, 프로세스 격리 없음); `T2` (Linux의 WASM runner 프로세스); `T3` (네트워크가 없는 rootless container, 모든 Worker에 필수). `T1`과 `T4`는 spawn 경로가 없어 거부됩니다.
 - Transparency Log는 전달 전에 기록 — 로그에 없으면 발생하지 않은 것
 - ComplianceClaim 봉투는 승인 시 검증
 

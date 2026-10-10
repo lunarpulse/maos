@@ -9,7 +9,7 @@
 //! |---|---|
 //! | T0 | `Exited { code: 0 }` — ptrace returned: the unsandboxed control |
 //! | T2 | `Signaled { signal: 31 }` — SIGSYS, confined by `spawn_sandboxed` |
-//! | T3 | `Exited { code: 0 }` — bare (T3 is applied by 17-1 AC4) |
+//! | T3 | `BridgeError::SandboxRefused` without a verified T3 launch; never bare |
 //! | T1, T4 | `BridgeError::SandboxRefused` — no spawn path applies them |
 //!
 //! Proven red (Story 17-6, recorded in the Dev Agent Record): delete the
@@ -107,6 +107,7 @@ fn spec(tier: SandboxTier) -> BridgeSpawnSpec {
         channel_capacity: 16,
         backpressure: Backpressure::Block,
         env: vec![],
+        t3: None,
     }
 }
 
@@ -162,11 +163,10 @@ fn t2_probe_dies_of_sigsys_at_the_launch_primitive() {
 }
 
 #[test]
-fn t3_probe_runs_bare_until_17_1() {
-    assert_eq!(
-        launch(SandboxTier::T3).expect("T3 spawns bare"),
-        ExitCause::Exited { code: 0 },
-        "T3 is bare at the primitive until 17-1 AC4 applies it"
+fn t3_without_verified_launch_is_refused_before_spawn() {
+    assert!(
+        matches!(launch(SandboxTier::T3), Err(BridgeError::SandboxRefused(_))),
+        "a T3 request without verified OCI launch data must never reach a bare process"
     );
 }
 

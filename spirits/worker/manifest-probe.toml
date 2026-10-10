@@ -1,0 +1,20 @@
+# Hermetic T3 negative control: the built-in MAOS Project grant has no egress.
+[cli_wrapper]
+command = "worker-probe-fixture"
+argv_prefix = ["--maos-worker"]
+output_shape_version = "1.0.0"
+skill_bundle = ["maos-bridge"]
+recovery_policy = "respawn_fresh"
+egress = []
+
+[cli_wrapper.posture]
+stdio_shape = "raw"
+control_channel = "signals"
+shutdown_signal = "SIGTERM"
+
+[sandbox]
+tier = "T3"
+
+[author]
+name = "MAOS Project"
+homepage = "https://github.com/lunarpulse/maos"

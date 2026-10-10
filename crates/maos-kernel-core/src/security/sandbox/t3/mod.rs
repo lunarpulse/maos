@@ -52,10 +52,8 @@
 //! the inner ring). Do NOT reintroduce the T2 closure pattern here.
 
 pub mod argv;
-pub mod cap_audit_bridge;
 pub mod child;
 pub mod image_lock;
 pub mod image_verify;
-pub mod quarantine;
 pub mod runtime_detect;
 pub mod spawn;

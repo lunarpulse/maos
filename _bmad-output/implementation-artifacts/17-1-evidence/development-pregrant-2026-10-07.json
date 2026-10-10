@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-07",
+  "model": "openai-codex/gpt-6.1-sol",
+  "base_commit": "8f6869b8f83b62b7c30c02f97c73e67867edf201",
+  "command": "cargo fmt --all && target/debug/xtask kloc-check --json",
+  "status": "blocked-on-operator-domain-grant",
+  "measured": {
+    "maos-domain": 9333,
+    "maos-manifest": 4456,
+    "maos-bin": 24607,
+    "maos-kernel-core": 19521,
+    "xtask": 44361,
+    "aggregate": 170839
+  },
+  "signed_domain_ceiling": 9320,
+  "domain_over_signed_ceiling": 13,
+  "baseline_domain": 9270,
+  "ledger_changed": false,
+  "focused_verification": {
+    "host_grants_2b": 5,
+    "domain_and_manifest": 491,
+    "kernel_selected_suites": 28,
+    "worker_cli_wrapper_admission": 7
+  },
+  "smoke": "MANIFEST-EGRESS-SMOKE: valid authorities preserved; bare grant = :443; invalid/unknown/duplicate policy refused; absent egress denies all",
+  "error_catalog_check": "PASS: 49 registered, 49 discovered",
+  "regression": {
+    "command": "env -u CARGO_TARGET_DIR cargo test --offline --locked --workspace --no-fail-fast",
+    "exit": 101,
+    "failed_targets": [
+      "maos-a2a-tcp::t11_t12_chaos_absence",
+      "maos-cli::two_host_reconcile_2c",
+      "maos-kernel-core::journal_fsync_assertion",
+      "maos-kernel-core::manifest_field_coverage",
+      "xtask::xtask",
+      "xtask::fkcs_oracle",
+      "xtask::kernel_pin_content_hash_16_0"
+    ],
+    "notes": "Started before Task-1 edits stabilized. Final focused coverage passes. KLOC/kernel re-pins remain unapplied until the authorized landing. Python Ed25519 backend missing; measured journal fsync P99 4969us exceeds 1500us. New error catalog entries were added and the catalog check passed after this run."
+  },
+  "warnings": "Builds retain pre-existing warnings. No warning-free mutation proof or full story completion is claimed."
+}
