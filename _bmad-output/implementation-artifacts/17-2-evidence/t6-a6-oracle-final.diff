@@ -1,0 +1,44 @@
+diff --git a/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs b/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+index a0409eb0..ec107d9a 100644
+--- a/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
++++ b/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+@@ -495,7 +495,11 @@ fn creation_limit_write_and_exec_failures_release_owned_leaves() {
+             .contains("test result: ok. 1 passed; 0 failed; 0 ignored;"),
+         "the isolated FD refusal assertions must actually execute"
+     );
+-    print!("{}", String::from_utf8_lossy(&output.stdout));
++    for line in String::from_utf8_lossy(&output.stdout).lines() {
++        if line.starts_with("::notice title=17-2 actual native FD refusal::") {
++            println!("\n{line}");
++        }
++    }
+ }
+ 
+ fn assert_native_fd_refusal(program: &Path) {
+@@ -519,6 +523,7 @@ fn assert_native_fd_refusal(program: &Path) {
+         let mut command = Command::new(program);
+         command.arg("--fd-marker").arg(&marker);
+         if requested == 64 {
++            std::fs::write(&marker, b"").expect("parent prepares a writable existing guest file");
+             let mut child = spawn_sandboxed(&sandbox, &mut command)
+                 .expect("within-hard native FD cap must run the actual guest");
+             assert_eq!(child.take_resource_downgrade(), None);
+diff --git a/docs/invariants/i9-exemptions.md b/docs/invariants/i9-exemptions.md
+index 8efe3140..fee9302f 100644
+--- a/docs/invariants/i9-exemptions.md
++++ b/docs/invariants/i9-exemptions.md
+@@ -535,6 +535,14 @@ process environment (`Vec<(String, String)>` credentials, never journaled), stdi
+ shape, and control-channel config. Consumed once at spawn and dropped — it caches
+ no cross-invocation kernel domain state per I9.
+ 
++### `T3Launch` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
++
++**Reason:** existing Story 17-1 transient launch material: a verified image
++attestation, boot nonce, container identity, and optional egress socket, transferred
++exactly once into a single runtime spawn. It holds no learned policy,
++cross-invocation registry, or persistent kernel domain state. Documented during
++Story 17-2 contract closure; no new exemption or runtime state is introduced.
++
+ ### `SpawnedBridge` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+ 
+ **Reason:** Story 8.12 live CLI subprocess bridge RAII handle. Owns the OS

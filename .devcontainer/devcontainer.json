@@ -1,0 +1,36 @@
+{
+  "name": "maos",
+  "initializeCommand": "bash .devcontainer/scripts/init_env.sh && bash .devcontainer/host-prepare.sh",
+  // host-prepare.sh: 호스트에만 있는 비표준 자원(/mnt/build, sccache, omp, herdr)을 탐지해
+  // .env 관리 블록에 해석된 경로를 쓴다. 없으면 스텁으로 대체 → 어느 머신에서도 컨테이너는 뜬다.
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "cosmohub-dev-env",
+  "workspaceFolder": "/home/${localEnv:USER}/dev_ws",
+  "remoteUser": "${localEnv:USER}",
+  "containerUser": "${localEnv:USER}",
+  "postCreateCommand": {
+    "python setup": "bash .devcontainer/scripts/dev_env_python.sh",
+    "rust setup": "bash .devcontainer/scripts/dev_env_rust.sh",
+    "ai setup": "bash .devcontainer/scripts/dev_env_ai.sh"
+  },
+  // "postStartCommand": "nohup uv run --directory /home/lunarpulse/serena serena start-mcp-server --context ide-assistant --project /home/lunarpulse/dev_ws --transport sse --port 9121 > /tmp/serena.log 2>&1 &",
+  // Add the IDs of extensions you want installed when the container is created.
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      },
+      "extensions": [
+        "donjayamanne.python-extension-pack",
+        "fill-labs.dependi",
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "mutantdino.resourcemonitor",
+        "bierner.markdown-mermaid",
+        "ms-python.python",
+        "Anthropic.claude-code",
+        "sst-dev.opencode"
+      ]
+    }
+  }
+}

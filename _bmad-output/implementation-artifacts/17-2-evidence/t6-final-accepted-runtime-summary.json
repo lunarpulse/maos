@@ -1,0 +1,199 @@
+{
+  "runID": 38212495038,
+  "sourceCommit": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+  "sourceDiff": "t5-workspace-fixed-executed.diff",
+  "sourceDiffSHA256": "851571719f9b129a7c51d7f2e3ec286e2b562f340d1a54db47faecba45dd57fb",
+  "observedConclusion": "success",
+  "actualJobCount": 11,
+  "matrices": [
+    {
+      "image": "ubuntu-24.04",
+      "mode": "delegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0,
+      "nativePassed": 4,
+      "nativeIgnored": 0,
+      "actualGuestFD": {
+        "soft": 64,
+        "hard": 64,
+        "aboveHard": 65,
+        "refusal": "EPERM",
+        "refusedGuestEffects": 0,
+        "ownedResidue": 0
+      },
+      "workerPassed": 2,
+      "workerIgnored": 0,
+      "rootlessCanaryPassed": 1
+    },
+    {
+      "image": "ubuntu-24.04",
+      "mode": "undelegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0
+    },
+    {
+      "image": "ubuntu-26.04",
+      "mode": "delegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0,
+      "nativePassed": 4,
+      "nativeIgnored": 0,
+      "actualGuestFD": {
+        "soft": 64,
+        "hard": 64,
+        "aboveHard": 65,
+        "refusal": "EPERM",
+        "refusedGuestEffects": 0,
+        "ownedResidue": 0
+      },
+      "workerPassed": 2,
+      "workerIgnored": 0,
+      "rootlessCanaryPassed": 1
+    },
+    {
+      "image": "ubuntu-26.04",
+      "mode": "undelegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0
+    },
+    {
+      "image": "ubuntu-24.04-arm",
+      "mode": "delegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0,
+      "nativePassed": 4,
+      "nativeIgnored": 0,
+      "actualGuestFD": {
+        "soft": 64,
+        "hard": 64,
+        "aboveHard": 65,
+        "refusal": "EPERM",
+        "refusedGuestEffects": 0,
+        "ownedResidue": 0
+      }
+    },
+    {
+      "image": "ubuntu-24.04-arm",
+      "mode": "undelegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0
+    },
+    {
+      "image": "ubuntu-26.04-arm",
+      "mode": "delegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0,
+      "nativePassed": 4,
+      "nativeIgnored": 0,
+      "actualGuestFD": {
+        "soft": 64,
+        "hard": 64,
+        "aboveHard": 65,
+        "refusal": "EPERM",
+        "refusedGuestEffects": 0,
+        "ownedResidue": 0
+      }
+    },
+    {
+      "image": "ubuntu-26.04-arm",
+      "mode": "undelegated",
+      "sessionPassed": 22,
+      "sessionFailed": 0,
+      "sessionIgnored": 0
+    }
+  ],
+  "workspace": {
+    "command": "cargo test --workspace --locked --no-fail-fast",
+    "actualExit": 0,
+    "actualRootlessCanary": {
+      "uid": 1001,
+      "userManager": "reachable",
+      "store": "provisioned",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    "namedRegressionTargets": {
+      "worker_supervision_16_3": {
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      },
+      "t3_network_escape_executor": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      "resource_caps_linux": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "existingIgnoredTests": "Original whole-workspace selection retained; no global zero-ignored claim",
+    "cacheAnnotations": "Rust cache reports missing target/tests/target; actual post-cache step and job succeed. No source workaround or suppression introduced."
+  },
+  "macOS": {
+    "applicableScope": "success",
+    "fullWorkspaceAllTargets": "success",
+    "featureEnabledBinNetworkWasmHost": "success",
+    "resourceRuntimeParity": "not claimed"
+  },
+  "docs": {
+    "runID": 38212495002,
+    "conclusion": "success"
+  },
+  "mutationControls": {
+    "runID": 38200530174,
+    "actualGreenBeforeRedAfterControls": 14,
+    "sourceReuse": "Production source unchanged by final two verification corrections; full actual patch/SHA/assertion proofs retained in t6-final-ci-control-results.json"
+  },
+  "helperLifetime": {
+    "runID": 38200530134,
+    "actualBoundedInterruptionExpiryReapScenarios": 16,
+    "sourceReuse": "Helper source unchanged; full actual proof retained"
+  },
+  "reviews": {
+    "layers": 6,
+    "artifacts": [
+      "t6-a6-review-layers.json",
+      "t6-a6-triage.json",
+      "t6-a6-final-correction-reviews.json"
+    ],
+    "boundary": "Non-author layers and production corrections previously complete; final two test/prerequisite corrections add no production source change"
+  },
+  "measurements": {
+    "kernelPhysical": 25146,
+    "kernelTokei": 19492,
+    "kernelFiles": 95,
+    "manifest": 4466,
+    "domain": 9349,
+    "bin": 25397,
+    "xtask": 44370,
+    "aggregate": 173501,
+    "aggregateStrictHardFail": 173502,
+    "additionalGrant": false
+  },
+  "scope": {
+    "kernelCharterLocations": 8,
+    "noNewUnsafe": true,
+    "noNewDependency": true,
+    "t3RetainedLifecycleHandoff": "17-7 unchanged"
+  },
+  "qualityArtifacts": [
+    "t5-workspace-fixed-local-gates.log",
+    "t5-workspace-fixed-quality-initial.log",
+    "t5-workspace-fixed-constitution.log",
+    "t5-workspace-fixed-empty-kernel.log",
+    "t6-corrected-contract-gates.log",
+    "t6-final-quality-gates.log",
+    "t6-docs-gates.log"
+  ]
+}

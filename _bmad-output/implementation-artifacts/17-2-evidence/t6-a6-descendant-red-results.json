@@ -1,0 +1,688 @@
+{
+  "run": {
+    "id": 38196319487,
+    "name": "17-2 A6 actual failing-before descendant containment",
+    "node_id": "WFR_kwLOScfeDM8AAAAI5K2U_w",
+    "head_branch": "ci/17-2-ci-enforcement",
+    "head_sha": "9018f767c7e54819114fc2bf145a73469ef37b4f",
+    "path": ".github/workflows/17-2-a6-descendant-red.yml",
+    "display_title": "proof: require actual before-fix uncapped native descendant failure o…",
+    "run_number": 1,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 381718684,
+    "check_suite_id": 103483465750,
+    "check_suite_node_id": "CS_kwDOScfeDM8AAAAYGBhgFg",
+    "url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487",
+    "html_url": "https://github.com/lunarpulse/maos/actions/runs/38196319487",
+    "pull_requests": [],
+    "created_at": "2026-10-12T02:34:32Z",
+    "updated_at": "2026-10-12T02:35:48Z",
+    "actor": {
+      "login": "lunarpulse",
+      "id": 5608935,
+      "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/lunarpulse",
+      "html_url": "https://github.com/lunarpulse",
+      "followers_url": "https://api.github.com/users/lunarpulse/followers",
+      "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+      "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+      "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+      "repos_url": "https://api.github.com/users/lunarpulse/repos",
+      "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-10-12T02:34:32Z",
+    "triggering_actor": {
+      "login": "lunarpulse",
+      "id": 5608935,
+      "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/lunarpulse",
+      "html_url": "https://github.com/lunarpulse",
+      "followers_url": "https://api.github.com/users/lunarpulse/followers",
+      "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+      "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+      "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+      "repos_url": "https://api.github.com/users/lunarpulse/repos",
+      "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487/jobs",
+    "logs_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487/logs",
+    "check_suite_url": "https://api.github.com/repos/lunarpulse/maos/check-suites/103483465750",
+    "artifacts_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487/artifacts",
+    "cancel_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487/cancel",
+    "rerun_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/lunarpulse/maos/actions/workflows/381718684",
+    "head_commit": {
+      "id": "9018f767c7e54819114fc2bf145a73469ef37b4f",
+      "tree_id": "85109add54e947943068a848650da6390c6a0bcd",
+      "message": "proof: require actual before-fix uncapped native descendant failure on four Linux images",
+      "timestamp": "2026-10-12T02:34:00Z",
+      "author": {
+        "name": "Myoungki Jung",
+        "email": "lunarpulse@gmail.com"
+      },
+      "committer": {
+        "name": "Myoungki Jung",
+        "email": "lunarpulse@gmail.com"
+      }
+    },
+    "repository": {
+      "id": 1237835276,
+      "node_id": "R_kgDOScfeDA",
+      "name": "maos",
+      "full_name": "lunarpulse/maos",
+      "private": false,
+      "owner": {
+        "login": "lunarpulse",
+        "id": 5608935,
+        "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/lunarpulse",
+        "html_url": "https://github.com/lunarpulse",
+        "followers_url": "https://api.github.com/users/lunarpulse/followers",
+        "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+        "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+        "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+        "repos_url": "https://api.github.com/users/lunarpulse/repos",
+        "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/lunarpulse/maos",
+      "description": "Modular Agentic Operating System",
+      "fork": false,
+      "url": "https://api.github.com/repos/lunarpulse/maos",
+      "forks_url": "https://api.github.com/repos/lunarpulse/maos/forks",
+      "keys_url": "https://api.github.com/repos/lunarpulse/maos/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/lunarpulse/maos/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/lunarpulse/maos/teams",
+      "hooks_url": "https://api.github.com/repos/lunarpulse/maos/hooks",
+      "issue_events_url": "https://api.github.com/repos/lunarpulse/maos/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/lunarpulse/maos/events",
+      "assignees_url": "https://api.github.com/repos/lunarpulse/maos/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/lunarpulse/maos/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/lunarpulse/maos/tags",
+      "blobs_url": "https://api.github.com/repos/lunarpulse/maos/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/lunarpulse/maos/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/lunarpulse/maos/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/lunarpulse/maos/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/lunarpulse/maos/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/lunarpulse/maos/languages",
+      "stargazers_url": "https://api.github.com/repos/lunarpulse/maos/stargazers",
+      "contributors_url": "https://api.github.com/repos/lunarpulse/maos/contributors",
+      "subscribers_url": "https://api.github.com/repos/lunarpulse/maos/subscribers",
+      "subscription_url": "https://api.github.com/repos/lunarpulse/maos/subscription",
+      "commits_url": "https://api.github.com/repos/lunarpulse/maos/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/lunarpulse/maos/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/lunarpulse/maos/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/lunarpulse/maos/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/lunarpulse/maos/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/lunarpulse/maos/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/lunarpulse/maos/merges",
+      "archive_url": "https://api.github.com/repos/lunarpulse/maos/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/lunarpulse/maos/downloads",
+      "issues_url": "https://api.github.com/repos/lunarpulse/maos/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/lunarpulse/maos/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/lunarpulse/maos/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/lunarpulse/maos/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/lunarpulse/maos/labels{/name}",
+      "releases_url": "https://api.github.com/repos/lunarpulse/maos/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/lunarpulse/maos/deployments"
+    },
+    "head_repository": {
+      "id": 1237835276,
+      "node_id": "R_kgDOScfeDA",
+      "name": "maos",
+      "full_name": "lunarpulse/maos",
+      "private": false,
+      "owner": {
+        "login": "lunarpulse",
+        "id": 5608935,
+        "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/lunarpulse",
+        "html_url": "https://github.com/lunarpulse",
+        "followers_url": "https://api.github.com/users/lunarpulse/followers",
+        "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+        "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+        "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+        "repos_url": "https://api.github.com/users/lunarpulse/repos",
+        "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/lunarpulse/maos",
+      "description": "Modular Agentic Operating System",
+      "fork": false,
+      "url": "https://api.github.com/repos/lunarpulse/maos",
+      "forks_url": "https://api.github.com/repos/lunarpulse/maos/forks",
+      "keys_url": "https://api.github.com/repos/lunarpulse/maos/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/lunarpulse/maos/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/lunarpulse/maos/teams",
+      "hooks_url": "https://api.github.com/repos/lunarpulse/maos/hooks",
+      "issue_events_url": "https://api.github.com/repos/lunarpulse/maos/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/lunarpulse/maos/events",
+      "assignees_url": "https://api.github.com/repos/lunarpulse/maos/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/lunarpulse/maos/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/lunarpulse/maos/tags",
+      "blobs_url": "https://api.github.com/repos/lunarpulse/maos/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/lunarpulse/maos/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/lunarpulse/maos/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/lunarpulse/maos/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/lunarpulse/maos/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/lunarpulse/maos/languages",
+      "stargazers_url": "https://api.github.com/repos/lunarpulse/maos/stargazers",
+      "contributors_url": "https://api.github.com/repos/lunarpulse/maos/contributors",
+      "subscribers_url": "https://api.github.com/repos/lunarpulse/maos/subscribers",
+      "subscription_url": "https://api.github.com/repos/lunarpulse/maos/subscription",
+      "commits_url": "https://api.github.com/repos/lunarpulse/maos/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/lunarpulse/maos/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/lunarpulse/maos/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/lunarpulse/maos/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/lunarpulse/maos/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/lunarpulse/maos/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/lunarpulse/maos/merges",
+      "archive_url": "https://api.github.com/repos/lunarpulse/maos/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/lunarpulse/maos/downloads",
+      "issues_url": "https://api.github.com/repos/lunarpulse/maos/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/lunarpulse/maos/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/lunarpulse/maos/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/lunarpulse/maos/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/lunarpulse/maos/labels{/name}",
+      "releases_url": "https://api.github.com/repos/lunarpulse/maos/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/lunarpulse/maos/deployments"
+    }
+  },
+  "sourceReviewSha256": "4c532a3df78d750afcb4789471e701980172aeb107504cf44fb1a2a21acecccb",
+  "jobs": [
+    {
+      "id": 114639649734,
+      "run_id": 38196319487,
+      "workflow_name": "17-2 A6 actual failing-before descendant containment",
+      "head_branch": "ci/17-2-ci-enforcement",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAasQ47xg",
+      "head_sha": "9018f767c7e54819114fc2bf145a73469ef37b4f",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114639649734",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38196319487/job/114639649734",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T02:34:33Z",
+      "started_at": "2026-10-12T02:34:35Z",
+      "completed_at": "2026-10-12T02:35:34Z",
+      "name": "descendant-failing-before (ubuntu-26.04)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T02:34:35Z",
+          "completed_at": "2026-10-12T02:34:36Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T02:34:36Z",
+          "completed_at": "2026-10-12T02:34:39Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T02:34:39Z",
+          "completed_at": "2026-10-12T02:34:48Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T02:34:48Z",
+          "completed_at": "2026-10-12T02:34:49Z"
+        },
+        {
+          "name": "Compile the real existing native smoke target before the bounded service",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T02:34:49Z",
+          "completed_at": "2026-10-12T02:35:24Z"
+        },
+        {
+          "name": "Require the actual uncapped descendant assertion to fail before production correction",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T02:35:24Z",
+          "completed_at": "2026-10-12T02:35:25Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T02:35:25Z",
+          "completed_at": "2026-10-12T02:35:33Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T02:35:33Z",
+          "completed_at": "2026-10-12T02:35:33Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-12T02:35:33Z",
+          "completed_at": "2026-10-12T02:35:33Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114639649734",
+      "labels": [
+        "ubuntu-26.04"
+      ],
+      "runner_id": 1000015484,
+      "runner_name": "GitHub Actions 1000015484",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114639649823,
+      "run_id": 38196319487,
+      "workflow_name": "17-2 A6 actual failing-before descendant containment",
+      "head_branch": "ci/17-2-ci-enforcement",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAasQ48Hw",
+      "head_sha": "9018f767c7e54819114fc2bf145a73469ef37b4f",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114639649823",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38196319487/job/114639649823",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T02:34:33Z",
+      "started_at": "2026-10-12T02:34:37Z",
+      "completed_at": "2026-10-12T02:35:39Z",
+      "name": "descendant-failing-before (ubuntu-24.04-arm)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T02:34:37Z",
+          "completed_at": "2026-10-12T02:34:38Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T02:34:38Z",
+          "completed_at": "2026-10-12T02:34:41Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T02:34:41Z",
+          "completed_at": "2026-10-12T02:34:43Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T02:34:43Z",
+          "completed_at": "2026-10-12T02:34:44Z"
+        },
+        {
+          "name": "Compile the real existing native smoke target before the bounded service",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T02:34:44Z",
+          "completed_at": "2026-10-12T02:35:19Z"
+        },
+        {
+          "name": "Require the actual uncapped descendant assertion to fail before production correction",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T02:35:19Z",
+          "completed_at": "2026-10-12T02:35:19Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T02:35:19Z",
+          "completed_at": "2026-10-12T02:35:37Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T02:35:37Z",
+          "completed_at": "2026-10-12T02:35:38Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-12T02:35:38Z",
+          "completed_at": "2026-10-12T02:35:38Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114639649823",
+      "labels": [
+        "ubuntu-24.04-arm"
+      ],
+      "runner_id": 1000015485,
+      "runner_name": "GitHub Actions 1000015485",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114639649932,
+      "run_id": 38196319487,
+      "workflow_name": "17-2 A6 actual failing-before descendant containment",
+      "head_branch": "ci/17-2-ci-enforcement",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAasQ48jA",
+      "head_sha": "9018f767c7e54819114fc2bf145a73469ef37b4f",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114639649932",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38196319487/job/114639649932",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T02:34:33Z",
+      "started_at": "2026-10-12T02:34:37Z",
+      "completed_at": "2026-10-12T02:35:40Z",
+      "name": "descendant-failing-before (ubuntu-26.04-arm)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T02:34:37Z",
+          "completed_at": "2026-10-12T02:34:38Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T02:34:38Z",
+          "completed_at": "2026-10-12T02:34:41Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T02:34:41Z",
+          "completed_at": "2026-10-12T02:34:50Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T02:34:50Z",
+          "completed_at": "2026-10-12T02:34:51Z"
+        },
+        {
+          "name": "Compile the real existing native smoke target before the bounded service",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T02:34:51Z",
+          "completed_at": "2026-10-12T02:35:29Z"
+        },
+        {
+          "name": "Require the actual uncapped descendant assertion to fail before production correction",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T02:35:29Z",
+          "completed_at": "2026-10-12T02:35:30Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T02:35:30Z",
+          "completed_at": "2026-10-12T02:35:38Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T02:35:38Z",
+          "completed_at": "2026-10-12T02:35:38Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-12T02:35:38Z",
+          "completed_at": "2026-10-12T02:35:38Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114639649932",
+      "labels": [
+        "ubuntu-26.04-arm"
+      ],
+      "runner_id": 1000015488,
+      "runner_name": "GitHub Actions 1000015488",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114639649944,
+      "run_id": 38196319487,
+      "workflow_name": "17-2 A6 actual failing-before descendant containment",
+      "head_branch": "ci/17-2-ci-enforcement",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38196319487",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAasQ48mA",
+      "head_sha": "9018f767c7e54819114fc2bf145a73469ef37b4f",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114639649944",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38196319487/job/114639649944",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T02:34:33Z",
+      "started_at": "2026-10-12T02:34:35Z",
+      "completed_at": "2026-10-12T02:35:47Z",
+      "name": "descendant-failing-before (ubuntu-24.04)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T02:34:36Z",
+          "completed_at": "2026-10-12T02:34:37Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T02:34:37Z",
+          "completed_at": "2026-10-12T02:34:40Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T02:34:40Z",
+          "completed_at": "2026-10-12T02:34:44Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T02:34:44Z",
+          "completed_at": "2026-10-12T02:34:46Z"
+        },
+        {
+          "name": "Compile the real existing native smoke target before the bounded service",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T02:34:46Z",
+          "completed_at": "2026-10-12T02:35:35Z"
+        },
+        {
+          "name": "Require the actual uncapped descendant assertion to fail before production correction",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T02:35:35Z",
+          "completed_at": "2026-10-12T02:35:36Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T02:35:36Z",
+          "completed_at": "2026-10-12T02:35:45Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T02:35:45Z",
+          "completed_at": "2026-10-12T02:35:45Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-12T02:35:45Z",
+          "completed_at": "2026-10-12T02:35:45Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114639649944",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000015487,
+      "runner_name": "GitHub Actions 1000015487",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ],
+  "annotations": {
+    "114639649734": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/9018f767c7e54819114fc2bf145a73469ef37b4f/.github",
+        "start_line": 568,
+        "start_column": null,
+        "end_line": 568,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 A6 actual failing-before descendant proof",
+        "message": "source=9018f767c7e54819114fc2bf145a73469ef37b4f original-production=unchanged selected=1 failed=1 ignored=0 underlying-exit=101 actual-regression=uncapped-native-descendant-alive",
+        "raw_details": ""
+      }
+    ],
+    "114639649823": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/9018f767c7e54819114fc2bf145a73469ef37b4f/.github",
+        "start_line": 569,
+        "start_column": null,
+        "end_line": 569,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 A6 actual failing-before descendant proof",
+        "message": "source=9018f767c7e54819114fc2bf145a73469ef37b4f original-production=unchanged selected=1 failed=1 ignored=0 underlying-exit=101 actual-regression=uncapped-native-descendant-alive",
+        "raw_details": ""
+      }
+    ],
+    "114639649932": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/9018f767c7e54819114fc2bf145a73469ef37b4f/.github",
+        "start_line": 568,
+        "start_column": null,
+        "end_line": 568,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 A6 actual failing-before descendant proof",
+        "message": "source=9018f767c7e54819114fc2bf145a73469ef37b4f original-production=unchanged selected=1 failed=1 ignored=0 underlying-exit=101 actual-regression=uncapped-native-descendant-alive",
+        "raw_details": ""
+      }
+    ],
+    "114639649944": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/9018f767c7e54819114fc2bf145a73469ef37b4f/.github",
+        "start_line": 569,
+        "start_column": null,
+        "end_line": 569,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 A6 actual failing-before descendant proof",
+        "message": "source=9018f767c7e54819114fc2bf145a73469ef37b4f original-production=unchanged selected=1 failed=1 ignored=0 underlying-exit=101 actual-regression=uncapped-native-descendant-alive",
+        "raw_details": ""
+      }
+    ]
+  },
+  "claim": "Expected actual one-selected descendant-lifetime assertion failed before production correction; workflow succeeds only when that exact RED is observed"
+}

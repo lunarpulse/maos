@@ -1,0 +1,62 @@
+{
+  "story": "17-2-worker-cgroups-applied",
+  "date": "2026-10-10",
+  "base_head": "b19556ab",
+  "method": "Isolated source copy; cargo fmt --all; cargo run --offline --locked -p maos-kernel-core --example story_17_2_probe. Physical .rs lines under kernel src; tokei14.0.0 with exact xtask exclusions. No production implementation or pins edited.",
+  "measurements": {
+    "base": {
+      "kernel_src_lines": 25267,
+      "kernel_rs_files": 95,
+      "maos-kernel-core": 19553,
+      "maos-manifest": 4456,
+      "maos-domain": 9329,
+      "maos-bin": 25247
+    },
+    "prototype": {
+      "kernel_src_lines": 25110,
+      "kernel_rs_files": 94,
+      "maos-kernel-core": 19454,
+      "maos-manifest": 4467,
+      "maos-domain": 9329,
+      "maos-bin": 25247
+    }
+  },
+  "per_file_physical_delta": {
+    "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs": 9,
+    "crates/maos-kernel-core/src/scheduler/mod.rs": -1,
+    "crates/maos-kernel-core/src/scheduler/resource_ceiling.rs": -170,
+    "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs": 1,
+    "crates/maos-kernel-core/src/security/sandbox/linux.rs": -1,
+    "crates/maos-kernel-core/src/security/sandbox/mod.rs": 8,
+    "crates/maos-kernel-core/src/security/sandbox/t3/argv.rs": -3,
+    "crates/maos-manifest/src/manifest.rs": 11
+  },
+  "kernel_delta": {
+    "physical": -157,
+    "tokei": -99
+  },
+  "prototype_smoke": {
+    "exit_code": 0,
+    "observed": [
+      "explicit pids cap: refused before guest execution on undelegated host",
+      "memory-only T2: child exit 0, one-shot downgrade reason: declared resource cap requires a writable delegated cgroup",
+      "manifest independent fd/pids + strictest-of + zero refusal: passed"
+    ],
+    "initial_compile_correction": "ResourceCaps literal in scheduler_loop.rs needed pids_max: None; included in final measurement.",
+    "warnings": "Existing dependency/kernel warnings emitted; no warning-clean claim."
+  },
+  "environment": {
+    "cgroup_mount": "cgroup2 read-only",
+    "rustc": "1.98.1",
+    "podman": "5.4.2",
+    "systemd": "257"
+  },
+  "not_proven": [
+    "Delegated cgroup enforcement and real T3 runtime inspect (host mount read-only)",
+    "Production Worker resources plumbing and operator-policy access",
+    "Production lifecycle journal emission; prototype exposes one-shot reason only",
+    "All-target constructor migration, cross-platform compilation and full suite",
+    "Proposed T3 terminal OOM/signal and short-lived-container handoffs (scope not ratified)"
+  ],
+  "scope": "Kernel mechanism sizing prototype, not complete story implementation, final ceiling or permission to re-pin. Includes pids, strictest-of parser, T3 CPU/fd/PID conversions, transient downgrade accessor and obsolete module deletion. All production composition-root work remains required by story."
+}

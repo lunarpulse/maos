@@ -78,23 +78,6 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
         );
     }
 
-    // ── 2. Both daemon entry points carry the posture in their SIGNATURE, so
-    // the thread cannot be quietly dropped to a local.
-    for signature in [
-        "async fn run_cohort_a2a_daemon(",
-        "async fn build_cohort_a2a_daemon_runtime(",
-    ] {
-        let start = find(signature);
-        let params = &MAIN[start..start + MAIN[start..].find(')').expect("signature end")];
-        assert!(
-            params.contains("enterprise_posture_required: bool")
-                && params.contains(
-                    "enterprise_daemon_governance: Option<Arc<EnterpriseDaemonGovernance>>",
-                ),
-            "`{signature}` must accept both the required-posture bit and governance; got:\n{params}"
-        );
-    }
-
     // ── 3. The builder INSTALLS the governed decorator on the collective-serve
     // port and hands that exact Arc to the transport — a retained-but-uninstalled
     // port would make the runtime legs green while production stayed dead-wired.

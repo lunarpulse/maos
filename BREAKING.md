@@ -16,6 +16,43 @@ The ABI Stability Triple and the compatibility window live in
 [`STABILITY.md`](./STABILITY.md) (generated from workspace state). This file is
 the human-authored change ledger that complements it.
 
+## 2026-10-12 — Worker resource-ceiling admission and scheduler API cutover (Story 17-2)
+
+Worker manifests now use schema 5 for the optional `resources.pids_max` positive
+`u32`; omission remains `None`. Existing schema-4 and schema-5 manifests that omit
+the field remain accepted, while pre-17-2 strict readers reject `pids_max` as an
+unknown field. Worker CPU percentage, PID/tasks count, and FD count are independent
+ceilings: `fd_max` is never a PID alias. CPU, memory MiB, PID/tasks, and FD limits
+are each resolved independently to the strictest manifest/operator authority. T3
+CPU percentages map to container `--cpus` (10 → 0.10, 100 → 1.00), with independent
+PID default 64, memory default 256 MiB, and CPU default 1 when omitted. T3 FD caps
+use explicit soft/hard `--ulimit=nofile`; a request above the inherited hard ceiling
+is refused, not clamped. Native T2 uses pre-exec placement in a delegated cgroup-v2
+domain with a daemon process leaf and owned per-spawn leaf; explicit CPU or PID caps
+refuse when writable delegation is unavailable. A memory-only missing-cgroup fallback
+retains RLIMIT_AS and optional RLIMIT_NOFILE and records one
+`ResourceCeilingDowngraded=20` informational lifecycle row per successful fallback
+launch. This event is not an SCB state transition and is produced only after live
+worker ownership/observer registration. Journal append failure still panics; sync
+errors remain ignored, so this adds no power-loss durability guarantee.
+
+The public `scheduler::resource_ceiling::{apply_resource_ceiling,
+ResourceCeilingHandle, IoError}` API is retired; this is a cutover, not a
+compatibility-shim promise.
+
+**Migration:** Stop calling the retired scheduler helper and do not replace it with
+a compatibility shim. Submit the requested limits through the admitted `SandboxSpec`
+and use the actual spawn path's owned guard/lifecycle; derive the spec from the
+manifest and the same live operator authority used for admission. Preserve omitted
+`pids_max` as `None`; update strict pre-17-2 readers before sending schema-5
+manifests with that field. Keep CPU percentage, PID/tasks, and FD semantics
+independent; in particular, migrate any caller that used `fd_max` as a process
+count to explicit `pids_max`. Native T2 callers must arrange delegated writable
+cgroup-v2 placement for explicit CPU/PID caps; T3 uses the supported Linux
+rootless-container route. Do not treat a memory-only downgrade event as a state
+transition or a durability guarantee. T3 OOM/SIGKILL ambiguity and short-lived
+worker PID-inspection refusal remain owned by Story 17-7.
+
 ## 2026-05-31 — v0.x → v1.0 ABI stability commitments activated (Story 7.5a)
 
 Story 7.5a turns the v1.0 **ABI Stability Triple** `(kernel_version, abi_version,

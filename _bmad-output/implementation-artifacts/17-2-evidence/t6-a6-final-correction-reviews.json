@@ -1,0 +1,38 @@
+{
+  "reviewedDiff": "t6-a6-oracle-final.diff",
+  "sha256": "176cccc1ff01dfdda6de1d5a0a305b63f374f91e7b43f4888ce8a420dff6c5c8",
+  "reviews": {
+    "A6SecurityReview": {
+      "coverage_summary": "previousFindingsResolved: true (source-level). No remaining findings in the narrow final delta. The FD worker still requires successful child exit and its actual one-case summary, but now forwards only the named FD proof notice, so its nested libtest summary cannot reach the unchanged strict outer-log checker. Pre-creating the within-hard marker lets the guest exercise the existing FsWrite grant without adding MakeReg; the oracle still verifies the guest-recorded soft/hard limits, removes the marker, requires EPERM for the above-hard request and checks for no guest marker or owned leaf. The T3Launch documentation describes the existing exemption; no runtime annotation or type change occurs in this delta. verificationLimit: Read-only static review of local://17-2-a6-oracle-final.diff and necessary canonical controls. No edits or execution; author-reported checks were not treated as independently inspected proof. Final current-source delegated native runtime CI remains pending and is not reported as passed.",
+      "findings": [],
+      "reviewed_paths": [
+        "local://17-2-a6-oracle-final.diff",
+        "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+        "scripts/run_cgroup_ceiling_17_2.py",
+        "docs/invariants/i9-exemptions.md"
+      ],
+      "deferred": [
+        {
+          "reason": "Final current-source delegated native runtime CI evidence remains pending. Static resolution of the previous findings does not establish runtime success.",
+          "paths": [
+            "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs"
+          ]
+        }
+      ]
+    },
+    "A6AcceptanceAuditor": {
+      "overall_correctness": "correct",
+      "explanation": "previousFindingsResolved=true; no remaining patch findings in local://17-2-a6-oracle-final.diff: the native parent now validates the isolated one-case result privately and forwards only the named FD notice, so the unchanged exact-summary consumer receives no nested libtest summary, and pre-creating the within-hard marker avoids requiring an additional production Landlock creation right. The inspected archived evidence records actual missing-file PermissionDenied versus successful existing-file guest limits64/64, and actual rejection of two captured passing summaries versus acceptance of the sole outer summary; the T3Launch documentation matches the existing exemption, payload and one-shot spawn consumer without introducing runtime state. verificationLimit: read-only static review and inspection of archived evidence only, with no edits or checks executed; these local controls do not establish final delegated native64/65 FD refusal or descendant-cleanup GREEN, and final native/T3/session/macOS/whole-workspace runtime acceptance remains pending.",
+      "confidence": 0.99,
+      "findings": []
+    },
+    "A6RuntimeReview": {
+      "overall_correctness": "correct",
+      "explanation": "Both previous correction-review findings are resolved in local://17-2-a6-oracle-final.diff; no remaining findings were identified in this narrow delta. The parent pre-creates the within-hard marker and removes it before the above-hard attempt, while the outer test forwards only the named FD proof notice and retains child-exit and one-case execution assertions; the T3Launch register entry accurately documents the existing annotation, fields and one-shot spawn consumer. Verification limit: the recorded local evidence demonstrates denied missing-file creation versus successful existing-file guest soft/hard64, and rejection of nested genuine summaries versus acceptance of the sole outer summary, but explicitly labels final delegated above-hard acceptance pending; this review ran no executable checks and does not claim final native/T3/session/macOS/workspace CI passed.",
+      "confidence": 0.99,
+      "findings": []
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-12",
+  "halt": "Third complete permanent-job/whole-workspace CI attempt failed; no additional implementation or retry performed",
+  "sourceCommit": "38754fd7200733c043aff03e0ba6dc63bace2445",
+  "sourceDiff": "t6-final-ci-executed.diff",
+  "sourceDiffSha256": "a87b66cbce32cee1c846102bdccb5adfdfe494f417780dfd1f68215cc315cd34",
+  "archivedActualRuns": [
+    38200530152,
+    38200530174,
+    38200530134
+  ],
+  "remoteBranchDeletion": {
+    "command": "git push origin --delete ci/17-2-ci-enforcement",
+    "actualResult": "To github.com:lunarpulse/maos.git\n - [deleted]           ci/17-2-ci-enforcement\n",
+    "exit": 0
+  },
+  "localWorktreeRemoval": {
+    "command": "git worktree remove /tmp/maos-17-2-session-proof",
+    "exit": 0,
+    "forced": false
+  },
+  "ownedThrowawaysRemoved": [
+    "crates/maos-kernel-core/tests/probe_17_2_fd_marker_dispatch.rs",
+    "/tmp/17-2-workspace-diagnostic/report.py",
+    "/tmp/17-2-workspace-diagnostic/workspace-step.sh",
+    "/tmp/17-2-actual-nested-summary-input.json",
+    "/tmp/17-2-fd-marker-fixture",
+    "/tmp/17-2-final-ci-acceptance-observe.py",
+    "/tmp/17-2-final-ci-acceptance-proof.json",
+    "/tmp/17-2-workspace-diagnostic/workspace-test-suite.log",
+    "/tmp/17-2-workspace-diagnostic"
+  ],
+  "runtimeBoundaries": {
+    "mainPushed": false,
+    "merged": false,
+    "repositorySecretsUsed": false,
+    "remainingBackgroundCIJobs": false,
+    "browserOrHttpServerRunning": false
+  },
+  "actualKernelCharterPaths": [
+    "crates/maos-kernel-core/src/journal/mod.rs",
+    "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+    "crates/maos-kernel-core/src/scheduler/mod.rs",
+    "crates/maos-kernel-core/src/scheduler/resource_ceiling.rs",
+    "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs",
+    "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+    "crates/maos-kernel-core/src/security/sandbox/mod.rs",
+    "crates/maos-kernel-core/src/security/sandbox/t3/argv.rs"
+  ],
+  "operatorGuidanceRequired": true
+}

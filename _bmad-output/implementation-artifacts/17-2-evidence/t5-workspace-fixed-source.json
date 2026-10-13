@@ -1,0 +1,37 @@
+{
+  "baseline": "b19556abbf4937784b2c7662f3a00025289590a9",
+  "commit": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+  "branch": "ci/17-2-workspace-fixed",
+  "sourceDiffSHA256": "851571719f9b129a7c51d7f2e3ec286e2b562f340d1a54db47faecba45dd57fb",
+  "sourceDiffBytes": 358898,
+  "sourceDiffFiles": 73,
+  "redRun": 38210028700,
+  "redCommit": "5f4757bc73def045c2e97025cb17f61a67984cdf",
+  "observedFailures": [
+    "resource_caps_linux:41:13 actual absolute /proc membership compared with relative expected owned leaf",
+    "t3_network_escape_executor:68:5 declared standalone static probe absent from workspace prerequisites"
+  ],
+  "unchangedWorkerEvidence": "23 passed,0 failed,0 ignored in diagnostic run; earlier failure cause remains unobserved",
+  "corrections": [
+    "Only remove absolute /proc separator via 0::/ in the existing exact owned-leaf comparison",
+    "Build the already-declared locked static network probe by the existing dedicated CI recipe"
+  ],
+  "productionDelta": "none; no src file changed after 38754fd7200733c043aff03e0ba6dc63bace2445",
+  "commands": [
+    "git worktree add -b ci/17-2-workspace-fixed /tmp/maos-17-2-workspace-fixed 5f4757bc73def045c2e97025cb17f61a67984cdf",
+    "git add -- .github/workflows/discipline.yml crates/maos-kernel-core/tests/resource_caps_linux.rs .github/workflows/17-2-ci-acceptance.yml",
+    "git commit -m \"test: fix actual cgroup membership assertion and provision the existing network probe\"",
+    "git rev-parse HEAD",
+    "git diff --binary b19556abbf4937784b2c7662f3a00025289590a9 HEAD"
+  ],
+  "workspaceStep": "set +e\npython3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-workspace --timeout 5400 --rootless-canary -- cargo test --workspace --locked --no-fail-fast 2>&1 | tee workspace-test-suite.log\npipeline=(\"${PIPESTATUS[@]}\")\nresult=${pipeline[0]}\nif [ \"$result\" -eq 0 ]; then result=${pipeline[1]}; fi\npython3 scripts/17_2_workspace_failure_excerpt.py workspace-test-suite.log\ndetail=$?\nif [ \"$result\" -eq 0 ]; then result=$detail; fi\nWORKSPACE_EXIT=\"$result\" python3 - <<'PY'\nimport os\nstatus = int(os.environ[\"WORKSPACE_EXIT\"])\nif status:\n    with open(\"workspace-test-suite.log\", \"rb\") as log:\n        log.seek(0, 2)\n        log.seek(max(0, log.tell() - 2800))\n        excerpt = log.read(2800).decode(errors=\"replace\")\n    excerpt = excerpt.replace(\"%\", \"%25\").replace(\"\\r\", \"%0D\").replace(\"\\n\", \"%0A\")\n    print(f\"::error title=17-2 actual workspace failure::exit={status} {excerpt}\", flush=True)\nelse:\n    print(\"::notice title=17-2 actual workspace execution::command=cargo test --workspace --locked --no-fail-fast exit=0\", flush=True)\nPY\nreport=$?\nif [ \"$result\" -eq 0 ]; then result=$report; fi\nexit \"$result\"\n",
+  "unchangedGuarantees": [
+    "Original full workspace selection",
+    "No new dependencies or unsafe",
+    "Original exact caps and production deadlines",
+    "Full four-image positive and negative matrices",
+    "Original SDK macOS full workspace/all-target and feature-enabled checks",
+    "Eight-location kernel charter and unchanged production measurements",
+    "17-7 retained lifecycle boundary"
+  ]
+}

@@ -122,6 +122,42 @@ covered_changes = [
 ]
 ratified_at = "2026-10-06"
 
+# Story 17-2 — optional PID resource cap on schema 5; no schema bump.
+# Omission remains accepted; 17-2 onward readers enforce pids_max and unknown
+# keys remain errors. Pre-17-2 readers reject pids_max under deny_unknown_fields.
+[[ratification]]
+proposal_id = "17-2-worker-cgroups-applied"
+summary = "[resources].pids_max optional process/task cap on manifest schema 5; omission accepted, pre-17-2 readers reject the field, unknown keys remain rejected"
+adr_ref = "ADR-067"
+status = "ratified"
+covered_changes = ["ResourceCaps", "RawResourceCaps", "ResolvedCaps"]
+ratified_at = "2026-10-11"
+
+# Story 17-2 FW-01/FW-02/FW-03: additive lifecycle payload and clean kernel cutover.
+# Existing lifecycle discriminants 0..19 and old journal rows remain readable.
+# Event20 is informational; no Spirit ABI, WIT, FrameKind or SCB state change.
+[[ratification]]
+proposal_id = "17-2-resource-downgrade-lifecycle"
+summary = "LifecycleEvent::ResourceCeilingDowngraded = 20 and typed ResourceCeilingDowngradedPayload; once per actual successful native memory-only fallback; persisted raw last-event/full-sequence contract retained"
+adr_ref = "ADR-067"
+status = "ratified"
+covered_changes = ["LifecycleEvent", "ResourceCeilingDowngradedPayload"]
+ratified_at = "2026-10-12"
+
+[[ratification]]
+proposal_id = "17-2-kernel-resource-cutover"
+summary = "Retire the unused root-layout resource-ceiling API; existing SpawnError refusal includes CPU/PID, SandboxedChild owns a private Linux-only one-shot outcome; exact lower kernel pin and existing supervision classification retained"
+adr_ref = "ADR-067"
+status = "ratified"
+covered_changes = [
+  "maos_kernel_core::scheduler::resource_ceiling::apply_resource_ceiling",
+  "maos_kernel_core::scheduler::resource_ceiling::ResourceCeilingHandle",
+  "maos_kernel_core::scheduler::resource_ceiling::IoError",
+  "maos_kernel_core::security::sandbox::SpawnError",
+  "maos_kernel_core::security::sandbox::SandboxedChild",
+]
+ratified_at = "2026-10-12"
+
 # Story 17-1 — field-level forward strictness; no schema version exists on cli_wrapper.
 # Operator ruling 2026-10-09 (Lunarpulse): ratified at the 17-1 close, text per D-5.
 [[ratification]]

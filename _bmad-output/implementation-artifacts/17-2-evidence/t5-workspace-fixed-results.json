@@ -1,0 +1,2043 @@
+{
+  "run_id": 38212495038,
+  "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+  "observations": [
+    {
+      "observed_unix_time": 1791786498.2663286,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "observed_unix_time": 1791786798.7455318,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "observed_unix_time": 1791787099.4624307,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "observed_unix_time": 1791787400.7934127,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "observed_unix_time": 1791787702.5101068,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    {
+      "observed_unix_time": 1791788003.2699652,
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "read_failures": [],
+  "run": {
+    "id": 38212495038,
+    "name": "17-2 full permanent acceptance after evidenced workspace corrections",
+    "node_id": "WFR_kwLOScfeDM8AAAAI5aRmvg",
+    "head_branch": "ci/17-2-workspace-fixed",
+    "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+    "path": ".github/workflows/17-2-ci-acceptance.yml",
+    "display_title": "test: fix actual cgroup membership assertion and provision the existi…",
+    "run_number": 4,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 381641660,
+    "check_suite_id": 103527430325,
+    "check_suite_node_id": "CS_kwDOScfeDM8AAAAYGrc4tQ",
+    "url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+    "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038",
+    "pull_requests": [],
+    "created_at": "2026-10-12T06:26:04Z",
+    "updated_at": "2026-10-12T06:50:58Z",
+    "actor": {
+      "login": "lunarpulse",
+      "id": 5608935,
+      "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/lunarpulse",
+      "html_url": "https://github.com/lunarpulse",
+      "followers_url": "https://api.github.com/users/lunarpulse/followers",
+      "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+      "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+      "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+      "repos_url": "https://api.github.com/users/lunarpulse/repos",
+      "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-10-12T06:26:04Z",
+    "triggering_actor": {
+      "login": "lunarpulse",
+      "id": 5608935,
+      "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/lunarpulse",
+      "html_url": "https://github.com/lunarpulse",
+      "followers_url": "https://api.github.com/users/lunarpulse/followers",
+      "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+      "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+      "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+      "repos_url": "https://api.github.com/users/lunarpulse/repos",
+      "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038/jobs",
+    "logs_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038/logs",
+    "check_suite_url": "https://api.github.com/repos/lunarpulse/maos/check-suites/103527430325",
+    "artifacts_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038/artifacts",
+    "cancel_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038/cancel",
+    "rerun_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/lunarpulse/maos/actions/workflows/381641660",
+    "head_commit": {
+      "id": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "tree_id": "c14cbb857b458f7889c0a79c52f664712cdfd20e",
+      "message": "test: fix actual cgroup membership assertion and provision the existing network probe",
+      "timestamp": "2026-10-12T06:23:47Z",
+      "author": {
+        "name": "Myoungki Jung",
+        "email": "lunarpulse@gmail.com"
+      },
+      "committer": {
+        "name": "Myoungki Jung",
+        "email": "lunarpulse@gmail.com"
+      }
+    },
+    "repository": {
+      "id": 1237835276,
+      "node_id": "R_kgDOScfeDA",
+      "name": "maos",
+      "full_name": "lunarpulse/maos",
+      "private": false,
+      "owner": {
+        "login": "lunarpulse",
+        "id": 5608935,
+        "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/lunarpulse",
+        "html_url": "https://github.com/lunarpulse",
+        "followers_url": "https://api.github.com/users/lunarpulse/followers",
+        "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+        "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+        "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+        "repos_url": "https://api.github.com/users/lunarpulse/repos",
+        "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/lunarpulse/maos",
+      "description": "Modular Agentic Operating System",
+      "fork": false,
+      "url": "https://api.github.com/repos/lunarpulse/maos",
+      "forks_url": "https://api.github.com/repos/lunarpulse/maos/forks",
+      "keys_url": "https://api.github.com/repos/lunarpulse/maos/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/lunarpulse/maos/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/lunarpulse/maos/teams",
+      "hooks_url": "https://api.github.com/repos/lunarpulse/maos/hooks",
+      "issue_events_url": "https://api.github.com/repos/lunarpulse/maos/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/lunarpulse/maos/events",
+      "assignees_url": "https://api.github.com/repos/lunarpulse/maos/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/lunarpulse/maos/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/lunarpulse/maos/tags",
+      "blobs_url": "https://api.github.com/repos/lunarpulse/maos/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/lunarpulse/maos/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/lunarpulse/maos/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/lunarpulse/maos/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/lunarpulse/maos/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/lunarpulse/maos/languages",
+      "stargazers_url": "https://api.github.com/repos/lunarpulse/maos/stargazers",
+      "contributors_url": "https://api.github.com/repos/lunarpulse/maos/contributors",
+      "subscribers_url": "https://api.github.com/repos/lunarpulse/maos/subscribers",
+      "subscription_url": "https://api.github.com/repos/lunarpulse/maos/subscription",
+      "commits_url": "https://api.github.com/repos/lunarpulse/maos/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/lunarpulse/maos/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/lunarpulse/maos/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/lunarpulse/maos/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/lunarpulse/maos/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/lunarpulse/maos/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/lunarpulse/maos/merges",
+      "archive_url": "https://api.github.com/repos/lunarpulse/maos/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/lunarpulse/maos/downloads",
+      "issues_url": "https://api.github.com/repos/lunarpulse/maos/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/lunarpulse/maos/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/lunarpulse/maos/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/lunarpulse/maos/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/lunarpulse/maos/labels{/name}",
+      "releases_url": "https://api.github.com/repos/lunarpulse/maos/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/lunarpulse/maos/deployments"
+    },
+    "head_repository": {
+      "id": 1237835276,
+      "node_id": "R_kgDOScfeDA",
+      "name": "maos",
+      "full_name": "lunarpulse/maos",
+      "private": false,
+      "owner": {
+        "login": "lunarpulse",
+        "id": 5608935,
+        "node_id": "MDQ6VXNlcjU2MDg5MzU=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/5608935?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/lunarpulse",
+        "html_url": "https://github.com/lunarpulse",
+        "followers_url": "https://api.github.com/users/lunarpulse/followers",
+        "following_url": "https://api.github.com/users/lunarpulse/following{/other_user}",
+        "gists_url": "https://api.github.com/users/lunarpulse/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/lunarpulse/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/lunarpulse/subscriptions",
+        "organizations_url": "https://api.github.com/users/lunarpulse/orgs",
+        "repos_url": "https://api.github.com/users/lunarpulse/repos",
+        "events_url": "https://api.github.com/users/lunarpulse/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/lunarpulse/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/lunarpulse/maos",
+      "description": "Modular Agentic Operating System",
+      "fork": false,
+      "url": "https://api.github.com/repos/lunarpulse/maos",
+      "forks_url": "https://api.github.com/repos/lunarpulse/maos/forks",
+      "keys_url": "https://api.github.com/repos/lunarpulse/maos/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/lunarpulse/maos/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/lunarpulse/maos/teams",
+      "hooks_url": "https://api.github.com/repos/lunarpulse/maos/hooks",
+      "issue_events_url": "https://api.github.com/repos/lunarpulse/maos/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/lunarpulse/maos/events",
+      "assignees_url": "https://api.github.com/repos/lunarpulse/maos/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/lunarpulse/maos/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/lunarpulse/maos/tags",
+      "blobs_url": "https://api.github.com/repos/lunarpulse/maos/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/lunarpulse/maos/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/lunarpulse/maos/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/lunarpulse/maos/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/lunarpulse/maos/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/lunarpulse/maos/languages",
+      "stargazers_url": "https://api.github.com/repos/lunarpulse/maos/stargazers",
+      "contributors_url": "https://api.github.com/repos/lunarpulse/maos/contributors",
+      "subscribers_url": "https://api.github.com/repos/lunarpulse/maos/subscribers",
+      "subscription_url": "https://api.github.com/repos/lunarpulse/maos/subscription",
+      "commits_url": "https://api.github.com/repos/lunarpulse/maos/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/lunarpulse/maos/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/lunarpulse/maos/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/lunarpulse/maos/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/lunarpulse/maos/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/lunarpulse/maos/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/lunarpulse/maos/merges",
+      "archive_url": "https://api.github.com/repos/lunarpulse/maos/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/lunarpulse/maos/downloads",
+      "issues_url": "https://api.github.com/repos/lunarpulse/maos/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/lunarpulse/maos/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/lunarpulse/maos/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/lunarpulse/maos/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/lunarpulse/maos/labels{/name}",
+      "releases_url": "https://api.github.com/repos/lunarpulse/maos/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/lunarpulse/maos/deployments"
+    }
+  },
+  "jobs": [
+    {
+      "id": 114689589686,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhBtg",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589686",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589686",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:06Z",
+      "completed_at": "2026-10-12T06:26:14Z",
+      "name": "macos-scope",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:07Z",
+          "completed_at": "2026-10-12T06:26:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:08Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        },
+        {
+          "name": "Decide whether the diff is platform-sensitive",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:11Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:26:11Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:26:11Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589686",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000015520,
+      "runner_name": "GitHub Actions 1000015520",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689589894,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhChg",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589894",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589894",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:06Z",
+      "completed_at": "2026-10-12T06:39:09Z",
+      "name": "cgroup-ceiling-delegated (ubuntu-24.04)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:07Z",
+          "completed_at": "2026-10-12T06:26:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:08Z",
+          "completed_at": "2026-10-12T06:26:10Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:10Z",
+          "completed_at": "2026-10-12T06:26:13Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:13Z",
+          "completed_at": "2026-10-12T06:26:14Z"
+        },
+        {
+          "name": "Run ./.github/actions/provision-t3-test-substrate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:14Z",
+          "completed_at": "2026-10-12T06:26:20Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:26:20Z",
+          "completed_at": "2026-10-12T06:27:52Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:27:52Z",
+          "completed_at": "2026-10-12T06:27:56Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:56Z",
+          "completed_at": "2026-10-12T06:27:56Z"
+        },
+        {
+          "name": "Native cgroup-v2 smoke — four real cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-12T06:27:56Z",
+          "completed_at": "2026-10-12T06:28:38Z"
+        },
+        {
+          "name": "Real admitted session suite — 22 cases, serial",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-12T06:28:38Z",
+          "completed_at": "2026-10-12T06:38:08Z"
+        },
+        {
+          "name": "Build the actual Worker CLI fixture before the in-unit canary (x64)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T06:38:08Z",
+          "completed_at": "2026-10-12T06:38:15Z"
+        },
+        {
+          "name": "Rootless T3 Worker resource enforcement (x64)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T06:38:15Z",
+          "completed_at": "2026-10-12T06:38:41Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-12T06:38:41Z",
+          "completed_at": "2026-10-12T06:39:07Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-12T06:39:07Z",
+          "completed_at": "2026-10-12T06:39:07Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-12T06:39:07Z",
+          "completed_at": "2026-10-12T06:39:07Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589894",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000015522,
+      "runner_name": "GitHub Actions 1000015522",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689589901,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhCjQ",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589901",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589901",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:07Z",
+      "completed_at": "2026-10-12T06:38:48Z",
+      "name": "cgroup-ceiling-delegated (ubuntu-26.04)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:07Z",
+          "completed_at": "2026-10-12T06:26:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:08Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:11Z",
+          "completed_at": "2026-10-12T06:26:20Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:20Z",
+          "completed_at": "2026-10-12T06:26:21Z"
+        },
+        {
+          "name": "Run ./.github/actions/provision-t3-test-substrate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:21Z",
+          "completed_at": "2026-10-12T06:26:30Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:26:30Z",
+          "completed_at": "2026-10-12T06:27:55Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:27:55Z",
+          "completed_at": "2026-10-12T06:27:59Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:59Z",
+          "completed_at": "2026-10-12T06:27:59Z"
+        },
+        {
+          "name": "Native cgroup-v2 smoke — four real cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-12T06:27:59Z",
+          "completed_at": "2026-10-12T06:28:40Z"
+        },
+        {
+          "name": "Real admitted session suite — 22 cases, serial",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-12T06:28:40Z",
+          "completed_at": "2026-10-12T06:37:48Z"
+        },
+        {
+          "name": "Build the actual Worker CLI fixture before the in-unit canary (x64)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T06:37:48Z",
+          "completed_at": "2026-10-12T06:37:55Z"
+        },
+        {
+          "name": "Rootless T3 Worker resource enforcement (x64)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T06:37:55Z",
+          "completed_at": "2026-10-12T06:38:22Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-12T06:38:22Z",
+          "completed_at": "2026-10-12T06:38:46Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-12T06:38:46Z",
+          "completed_at": "2026-10-12T06:38:46Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-12T06:38:46Z",
+          "completed_at": "2026-10-12T06:38:46Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589901",
+      "labels": [
+        "ubuntu-26.04"
+      ],
+      "runner_id": 1000015527,
+      "runner_name": "GitHub Actions 1000015527",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689589923,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhCow",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589923",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589923",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:07Z",
+      "completed_at": "2026-10-12T06:41:57Z",
+      "name": "cgroup-ceiling-undelegated (ubuntu-24.04)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:08Z",
+          "completed_at": "2026-10-12T06:26:09Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:09Z",
+          "completed_at": "2026-10-12T06:26:12Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:12Z",
+          "completed_at": "2026-10-12T06:26:17Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:17Z",
+          "completed_at": "2026-10-12T06:26:20Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:20Z",
+          "completed_at": "2026-10-12T06:28:32Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:28:32Z",
+          "completed_at": "2026-10-12T06:28:38Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:28:38Z",
+          "completed_at": "2026-10-12T06:28:38Z"
+        },
+        {
+          "name": "Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:28:38Z",
+          "completed_at": "2026-10-12T06:41:26Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-12T06:41:26Z",
+          "completed_at": "2026-10-12T06:41:55Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-12T06:41:55Z",
+          "completed_at": "2026-10-12T06:41:55Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-12T06:41:55Z",
+          "completed_at": "2026-10-12T06:41:55Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589923",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000015525,
+      "runner_name": "GitHub Actions 1000015525",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689589939,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhCsw",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589939",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589939",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:09Z",
+      "completed_at": "2026-10-12T06:38:26Z",
+      "name": "cgroup-ceiling-delegated (ubuntu-24.04-arm)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:09Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:11Z",
+          "completed_at": "2026-10-12T06:26:12Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:12Z",
+          "completed_at": "2026-10-12T06:26:15Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:15Z",
+          "completed_at": "2026-10-12T06:26:17Z"
+        },
+        {
+          "name": "Run ./.github/actions/provision-t3-test-substrate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:17Z",
+          "completed_at": "2026-10-12T06:26:17Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:26:17Z",
+          "completed_at": "2026-10-12T06:27:52Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:27:52Z",
+          "completed_at": "2026-10-12T06:27:55Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:55Z",
+          "completed_at": "2026-10-12T06:27:55Z"
+        },
+        {
+          "name": "Native cgroup-v2 smoke — four real cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-12T06:27:55Z",
+          "completed_at": "2026-10-12T06:28:41Z"
+        },
+        {
+          "name": "Real admitted session suite — 22 cases, serial",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-12T06:28:41Z",
+          "completed_at": "2026-10-12T06:38:03Z"
+        },
+        {
+          "name": "Build the actual Worker CLI fixture before the in-unit canary (x64)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 11,
+          "started_at": "2026-10-12T06:38:03Z",
+          "completed_at": "2026-10-12T06:38:03Z"
+        },
+        {
+          "name": "Rootless T3 Worker resource enforcement (x64)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 12,
+          "started_at": "2026-10-12T06:38:03Z",
+          "completed_at": "2026-10-12T06:38:03Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-12T06:38:03Z",
+          "completed_at": "2026-10-12T06:38:24Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-12T06:38:24Z",
+          "completed_at": "2026-10-12T06:38:24Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-12T06:38:24Z",
+          "completed_at": "2026-10-12T06:38:24Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589939",
+      "labels": [
+        "ubuntu-24.04-arm"
+      ],
+      "runner_id": 1000015523,
+      "runner_name": "GitHub Actions 1000015523",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689589956,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhCxA",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589956",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589956",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:07Z",
+      "completed_at": "2026-10-12T06:50:57Z",
+      "name": "workspace-test-suite",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:08Z",
+          "completed_at": "2026-10-12T06:26:09Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:09Z",
+          "completed_at": "2026-10-12T06:26:12Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:12Z",
+          "completed_at": "2026-10-12T06:26:12Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:12Z",
+          "completed_at": "2026-10-12T06:26:15Z"
+        },
+        {
+          "name": "Run ./.github/actions/provision-t3-test-substrate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:15Z",
+          "completed_at": "2026-10-12T06:26:21Z"
+        },
+        {
+          "name": "Install nightly toolchain for cargo-public-api integration tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:26:21Z",
+          "completed_at": "2026-10-12T06:26:29Z"
+        },
+        {
+          "name": "Install cargo-public-api for workspace integration tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:26:29Z",
+          "completed_at": "2026-10-12T06:27:49Z"
+        },
+        {
+          "name": "Build the fixture binaries every workspace suite resolves by path",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:49Z",
+          "completed_at": "2026-10-12T06:32:18Z"
+        },
+        {
+          "name": "Install python Ed25519 for the two-host reconcile suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-12T06:32:18Z",
+          "completed_at": "2026-10-12T06:32:18Z"
+        },
+        {
+          "name": "Install tokei",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-12T06:32:18Z",
+          "completed_at": "2026-10-12T06:33:03Z"
+        },
+        {
+          "name": "Seed a decoy operator door on HOME (D-16-1-Q control)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T06:33:03Z",
+          "completed_at": "2026-10-12T06:34:46Z"
+        },
+        {
+          "name": "Run the full workspace test suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T06:34:46Z",
+          "completed_at": "2026-10-12T06:50:18Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-12T06:50:18Z",
+          "completed_at": "2026-10-12T06:50:54Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-12T06:50:54Z",
+          "completed_at": "2026-10-12T06:50:54Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-12T06:50:54Z",
+          "completed_at": "2026-10-12T06:50:54Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589956",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000015526,
+      "runner_name": "GitHub Actions 1000015526",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689589969,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhC0Q",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689589969",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689589969",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:08Z",
+      "completed_at": "2026-10-12T06:37:45Z",
+      "name": "cgroup-ceiling-undelegated (ubuntu-24.04-arm)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:09Z",
+          "completed_at": "2026-10-12T06:26:10Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:10Z",
+          "completed_at": "2026-10-12T06:26:12Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:12Z",
+          "completed_at": "2026-10-12T06:26:14Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:14Z",
+          "completed_at": "2026-10-12T06:26:16Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:16Z",
+          "completed_at": "2026-10-12T06:27:49Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:27:49Z",
+          "completed_at": "2026-10-12T06:27:53Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:27:53Z",
+          "completed_at": "2026-10-12T06:27:53Z"
+        },
+        {
+          "name": "Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:53Z",
+          "completed_at": "2026-10-12T06:37:22Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-12T06:37:22Z",
+          "completed_at": "2026-10-12T06:37:43Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-12T06:37:43Z",
+          "completed_at": "2026-10-12T06:37:44Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-12T06:37:44Z",
+          "completed_at": "2026-10-12T06:37:44Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689589969",
+      "labels": [
+        "ubuntu-24.04-arm"
+      ],
+      "runner_id": 1000015524,
+      "runner_name": "GitHub Actions 1000015524",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689590036,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhDFA",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689590036",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689590036",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:09Z",
+      "completed_at": "2026-10-12T06:38:20Z",
+      "name": "cgroup-ceiling-delegated (ubuntu-26.04-arm)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:10Z",
+          "completed_at": "2026-10-12T06:26:11Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:11Z",
+          "completed_at": "2026-10-12T06:26:14Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:14Z",
+          "completed_at": "2026-10-12T06:26:21Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:21Z",
+          "completed_at": "2026-10-12T06:26:22Z"
+        },
+        {
+          "name": "Run ./.github/actions/provision-t3-test-substrate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:22Z",
+          "completed_at": "2026-10-12T06:26:22Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:26:22Z",
+          "completed_at": "2026-10-12T06:27:50Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:27:50Z",
+          "completed_at": "2026-10-12T06:27:53Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:53Z",
+          "completed_at": "2026-10-12T06:27:53Z"
+        },
+        {
+          "name": "Native cgroup-v2 smoke — four real cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-12T06:27:53Z",
+          "completed_at": "2026-10-12T06:28:36Z"
+        },
+        {
+          "name": "Real admitted session suite — 22 cases, serial",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-12T06:28:36Z",
+          "completed_at": "2026-10-12T06:37:52Z"
+        },
+        {
+          "name": "Build the actual Worker CLI fixture before the in-unit canary (x64)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 11,
+          "started_at": "2026-10-12T06:37:52Z",
+          "completed_at": "2026-10-12T06:37:52Z"
+        },
+        {
+          "name": "Rootless T3 Worker resource enforcement (x64)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 12,
+          "started_at": "2026-10-12T06:37:52Z",
+          "completed_at": "2026-10-12T06:37:52Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-12T06:37:52Z",
+          "completed_at": "2026-10-12T06:38:18Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-12T06:38:18Z",
+          "completed_at": "2026-10-12T06:38:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-12T06:38:18Z",
+          "completed_at": "2026-10-12T06:38:18Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689590036",
+      "labels": [
+        "ubuntu-26.04-arm"
+      ],
+      "runner_id": 1000015529,
+      "runner_name": "GitHub Actions 1000015529",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689590067,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhDMw",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689590067",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689590067",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:06Z",
+      "completed_at": "2026-10-12T06:42:52Z",
+      "name": "cgroup-ceiling-undelegated (ubuntu-26.04)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:07Z",
+          "completed_at": "2026-10-12T06:26:08Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:08Z",
+          "completed_at": "2026-10-12T06:26:10Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:10Z",
+          "completed_at": "2026-10-12T06:26:21Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:21Z",
+          "completed_at": "2026-10-12T06:26:23Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:23Z",
+          "completed_at": "2026-10-12T06:28:31Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:28:31Z",
+          "completed_at": "2026-10-12T06:28:36Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:28:36Z",
+          "completed_at": "2026-10-12T06:28:36Z"
+        },
+        {
+          "name": "Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:28:36Z",
+          "completed_at": "2026-10-12T06:42:22Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-12T06:42:23Z",
+          "completed_at": "2026-10-12T06:42:51Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-12T06:42:51Z",
+          "completed_at": "2026-10-12T06:42:51Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-12T06:42:51Z",
+          "completed_at": "2026-10-12T06:42:51Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689590067",
+      "labels": [
+        "ubuntu-26.04"
+      ],
+      "runner_id": 1000015528,
+      "runner_name": "GitHub Actions 1000015528",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689590070,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAhDNg",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689590070",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689590070",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:04Z",
+      "started_at": "2026-10-12T06:26:09Z",
+      "completed_at": "2026-10-12T06:38:01Z",
+      "name": "cgroup-ceiling-undelegated (ubuntu-26.04-arm)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:09Z",
+          "completed_at": "2026-10-12T06:26:10Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:10Z",
+          "completed_at": "2026-10-12T06:26:12Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:12Z",
+          "completed_at": "2026-10-12T06:26:19Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:19Z",
+          "completed_at": "2026-10-12T06:26:20Z"
+        },
+        {
+          "name": "Install pinned WASM fixture assembler",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:20Z",
+          "completed_at": "2026-10-12T06:27:52Z"
+        },
+        {
+          "name": "Fetch locked standalone fixture dependencies for offline session tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:27:52Z",
+          "completed_at": "2026-10-12T06:27:55Z"
+        },
+        {
+          "name": "Exercise helper boundary regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-12T06:27:55Z",
+          "completed_at": "2026-10-12T06:27:55Z"
+        },
+        {
+          "name": "Full undelegated session suite — live fallback, strict refusal, persistence and ordering",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-12T06:27:55Z",
+          "completed_at": "2026-10-12T06:37:39Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-12T06:37:39Z",
+          "completed_at": "2026-10-12T06:38:00Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-12T06:38:00Z",
+          "completed_at": "2026-10-12T06:38:00Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-12T06:38:00Z",
+          "completed_at": "2026-10-12T06:38:00Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689590070",
+      "labels": [
+        "ubuntu-26.04-arm"
+      ],
+      "runner_id": 1000015530,
+      "runner_name": "GitHub Actions 1000015530",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 114689633143,
+      "run_id": 38212495038,
+      "workflow_name": "17-2 full permanent acceptance after evidenced workspace corrections",
+      "head_branch": "ci/17-2-workspace-fixed",
+      "run_url": "https://api.github.com/repos/lunarpulse/maos/actions/runs/38212495038",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOScfeDM8AAAAatAjrdw",
+      "head_sha": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+      "url": "https://api.github.com/repos/lunarpulse/maos/actions/jobs/114689633143",
+      "html_url": "https://github.com/lunarpulse/maos/actions/runs/38212495038/job/114689633143",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-12T06:26:14Z",
+      "started_at": "2026-10-12T06:26:23Z",
+      "completed_at": "2026-10-12T06:32:20Z",
+      "name": "macos-check",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-12T06:26:23Z",
+          "completed_at": "2026-10-12T06:26:25Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-12T06:26:25Z",
+          "completed_at": "2026-10-12T06:26:28Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@v1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-12T06:26:28Z",
+          "completed_at": "2026-10-12T06:26:38Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-12T06:26:38Z",
+          "completed_at": "2026-10-12T06:26:40Z"
+        },
+        {
+          "name": "cargo check (aarch64-apple-darwin)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-12T06:26:40Z",
+          "completed_at": "2026-10-12T06:30:44Z"
+        },
+        {
+          "name": "cargo check feature-enabled spawned session (aarch64-apple-darwin)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-12T06:30:44Z",
+          "completed_at": "2026-10-12T06:31:47Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-12T06:31:47Z",
+          "completed_at": "2026-10-12T06:32:14Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-12T06:32:14Z",
+          "completed_at": "2026-10-12T06:32:16Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-12T06:32:16Z",
+          "completed_at": "2026-10-12T06:32:17Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/lunarpulse/maos/check-runs/114689633143",
+      "labels": [
+        "macos-latest"
+      ],
+      "runner_id": 1000015531,
+      "runner_name": "GitHub Actions 1000015531",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ],
+  "annotations": {
+    "114689589686": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1,
+        "start_column": null,
+        "end_line": 1,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "",
+        "message": "\"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748\"",
+        "raw_details": ""
+      }
+    ],
+    "114689589894": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1387,
+        "start_column": null,
+        "end_line": 1387,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=worker-resource.log exit=0 suites=[('ok', '2', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 702,
+        "start_column": null,
+        "end_line": 702,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual rootless canary",
+        "message": "uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1270,
+        "start_column": null,
+        "end_line": 1270,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 751,
+        "start_column": null,
+        "end_line": 751,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 737,
+        "start_column": null,
+        "end_line": 737,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual native FD refusal",
+        "message": "within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 40,
+        "start_column": null,
+        "end_line": 40,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "T3 test substrate",
+        "message": "immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified",
+        "raw_details": ""
+      }
+    ],
+    "114689589901": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1386,
+        "start_column": null,
+        "end_line": 1386,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=worker-resource.log exit=0 suites=[('ok', '2', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 702,
+        "start_column": null,
+        "end_line": 702,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual rootless canary",
+        "message": "uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1269,
+        "start_column": null,
+        "end_line": 1269,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 750,
+        "start_column": null,
+        "end_line": 750,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 737,
+        "start_column": null,
+        "end_line": 737,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual native FD refusal",
+        "message": "within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 40,
+        "start_column": null,
+        "end_line": 40,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "T3 test substrate",
+        "message": "immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified",
+        "raw_details": ""
+      }
+    ],
+    "114689589923": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1366,
+        "start_column": null,
+        "end_line": 1366,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=undelegated-session.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      }
+    ],
+    "114689589939": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1264,
+        "start_column": null,
+        "end_line": 1264,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 747,
+        "start_column": null,
+        "end_line": 747,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 733,
+        "start_column": null,
+        "end_line": 733,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual native FD refusal",
+        "message": "within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0",
+        "raw_details": ""
+      }
+    ],
+    "114689589956": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 94,
+        "start_column": null,
+        "end_line": 94,
+        "end_column": null,
+        "annotation_level": "failure",
+        "title": "",
+        "message": "Error: ENOENT: no such file or directory, opendir '/home/runner/work/maos/maos/target/tests/target'",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 93,
+        "start_column": null,
+        "end_line": 93,
+        "end_column": null,
+        "annotation_level": "failure",
+        "title": "",
+        "message": "ENOENT: no such file or directory, opendir '/home/runner/work/maos/maos/target/tests/target'",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 11528,
+        "start_column": null,
+        "end_line": 11528,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual workspace execution",
+        "message": "command=cargo test --workspace --locked --no-fail-fast exit=0",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 11521,
+        "start_column": null,
+        "end_line": 11521,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual failure detail resource_caps_linux",
+        "message": "target=resource_caps_linux captured execution with no failure section:\n\nrunning 1 test\ntest explicit_pids_cap_is_applied_or_spawn_is_refused ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 11513,
+        "start_column": null,
+        "end_line": 11513,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual failure detail t3_network_escape_executor",
+        "message": "target=t3_network_escape_executor captured execution with no failure section:\n\nrunning 2 tests\ntest the_egress_socket_mount_refuses_0600_and_connects_0666 ... ok\ntest the_five_network_none_scenarios_are_blocked_inside_verified_t3 ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.60s\n",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 11484,
+        "start_column": null,
+        "end_line": 11484,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual failure detail worker_supervision_16_3",
+        "message": "target=worker_supervision_16_3 captured execution with no failure section:\n\nrunning 23 tests\ntest a_stop_during_the_mint_never_spawns_the_child ... ok\ntest a_sigkilled_worker_reaches_handle_crash_at_its_own_pid ... ok\ntest a_crash_the_observer_never_saw_is_still_handled_by_finish ... ok\ntest a_supervised_worker_completes_on_a_single_worker_runtime ... ok\ntest a_worker_that_would_bind_after_stop_workers_is_refused ... ok\ntest a_worker_that_exits_zero_is_unloaded_and_never_orphaned ... ok\ntest abandoning_a_binding_stops_its_named_container ... ok\ntest binding_phase_transitions_cover_every_cell ... ok\ntest an_injected_error_after_watch_leaves_no_bound_worker_behind ... ok\ntest an_escalating_manifest_escalates_instead_of_nacking ... ok\ntest concurrent_workers_get_distinct_ids_and_their_own_verdicts ... ok\ntest direct_worker_unload_stops_its_named_container ... ok\ntest container_attachment_before_pidfd_stops_name_then_late_pidfd ... ok\ntest failed_named_kill_is_not_counted_as_a_successful_container_stop ... ok\ntest stopping_a_container_kills_its_name_and_runtime_client ... ok\ntest stop_before_container_attachment_still_kills_late_named_container ... ok\ntest maos_run_refuses_a_one_shot_mode_in_the_same_process ... ok\ntest the_crash_scene_through_the_real_binary_lands_at_one_real_pid ... ok\ntest unload_all_loaded_closes_a_live_workers_scb_and_reports_it ... ok\ntest worker_task_ids_survive_redaction_and_name_their_originator ... ok\ntest three_workers_that_printed_once_then_hung_all_stall ... ok\ntest a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean ... ok\ntest the_fr4_call_feed_survives_every_worker_row_it_must_omit ... ok\n\ntest result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.63s\n",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 939,
+        "start_column": null,
+        "end_line": 939,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual rootless canary",
+        "message": "uid=1001 user-manager=reachable store=provisioned tests=1 passed,0 failed,0 ignored",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 40,
+        "start_column": null,
+        "end_line": 40,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "T3 test substrate",
+        "message": "immutable image pulled; rootless network-none shell exercised; image=docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794; lock=/home/runner/work/_temp/maos-t3-tests/t3-image.lock; Ed25519 verified",
+        "raw_details": ""
+      }
+    ],
+    "114689589969": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1363,
+        "start_column": null,
+        "end_line": 1363,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=undelegated-session.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      }
+    ],
+    "114689590036": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1263,
+        "start_column": null,
+        "end_line": 1263,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 746,
+        "start_column": null,
+        "end_line": 746,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=cgroup-smoke.log exit=0 suites=[('ok', '4', '0', '0')]",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 733,
+        "start_column": null,
+        "end_line": 733,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 actual native FD refusal",
+        "message": "within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0",
+        "raw_details": ""
+      }
+    ],
+    "114689590067": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1365,
+        "start_column": null,
+        "end_line": 1365,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=undelegated-session.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      }
+    ],
+    "114689590070": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1362,
+        "start_column": null,
+        "end_line": 1362,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "17-2 checked execution",
+        "message": "log=undelegated-session.log exit=0 suites=[('ok', '22', '0', '0')]",
+        "raw_details": ""
+      }
+    ],
+    "114689633143": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/lunarpulse/maos/blob/2589e5627e74092c7b2aa27491a29cb17cf61ede/.github",
+        "start_line": 1,
+        "start_column": null,
+        "end_line": 1,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "",
+        "message": "Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times.",
+        "raw_details": ""
+      }
+    ]
+  }
+}

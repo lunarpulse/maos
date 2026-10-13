@@ -106,6 +106,7 @@ pub struct ResourceCaps {
     pub cpu_max_pct: Option<u32>,
     pub memory_max_mb: Option<u32>,
     pub fd_max: Option<u32>,
+    pub pids_max: Option<u32>,
 }
 
 impl ResourceCaps {
@@ -122,6 +123,7 @@ pub struct ResolvedCaps {
     pub cpu_max_pct: Option<u32>,
     pub memory_max_mb: Option<u32>,
     pub fd_max: Option<u32>,
+    pub pids_max: Option<u32>,
 }
 
 /// Take the stricter (lower/None-patched) of two cap sources.
@@ -130,6 +132,7 @@ pub fn resolve_caps(manifest: &ResourceCaps, operator: &ResourceCaps) -> Resolve
         cpu_max_pct: strictest_opt(manifest.cpu_max_pct, operator.cpu_max_pct),
         memory_max_mb: strictest_opt(manifest.memory_max_mb, operator.memory_max_mb),
         fd_max: strictest_opt(manifest.fd_max, operator.fd_max),
+        pids_max: strictest_opt(manifest.pids_max, operator.pids_max),
     }
 }
 
@@ -165,6 +168,7 @@ struct RawResourceCaps {
     cpu_max_pct: Option<u32>,
     memory_max_mb: Option<u32>,
     fd_max: Option<u32>,
+    pids_max: Option<u32>,
 }
 
 impl RawResourceCaps {
@@ -186,19 +190,15 @@ impl RawResourceCaps {
                 });
             }
         }
-        if let Some(v) = self.memory_max_mb {
-            if v == 0 {
+        for (field, value) in [
+            ("memory_max_mb", self.memory_max_mb),
+            ("fd_max", self.fd_max),
+            ("pids_max", self.pids_max),
+        ] {
+            if value == Some(0) {
                 return Err(ManifestError::CapOutOfRange {
-                    field: "memory_max_mb".into(),
-                    value: v,
-                });
-            }
-        }
-        if let Some(v) = self.fd_max {
-            if v == 0 {
-                return Err(ManifestError::CapOutOfRange {
-                    field: "fd_max".into(),
-                    value: v,
+                    field: field.into(),
+                    value: 0,
                 });
             }
         }
@@ -206,6 +206,7 @@ impl RawResourceCaps {
             cpu_max_pct: self.cpu_max_pct,
             memory_max_mb: self.memory_max_mb,
             fd_max: self.fd_max,
+            pids_max: self.pids_max,
         })
     }
 }
@@ -2607,6 +2608,7 @@ trust_tier = "public_vetted"
         assert_eq!(caps.cpu_max_pct, Some(50));
         assert_eq!(caps.memory_max_mb, Some(512));
         assert_eq!(caps.fd_max, Some(64));
+        assert_eq!(caps.pids_max, None);
     }
 
     #[test]
@@ -2623,6 +2625,7 @@ trust_tier = "public_vetted"
         assert_eq!(caps.cpu_max_pct, None);
         assert_eq!(caps.memory_max_mb, None);
         assert_eq!(caps.fd_max, None);
+        assert_eq!(caps.pids_max, None);
     }
 
     #[test]
@@ -2640,11 +2643,13 @@ trust_tier = "public_vetted"
             cpu_max_pct: Some(30),
             memory_max_mb: Some(256),
             fd_max: None,
+            pids_max: None,
         };
         let o = ResourceCaps {
             cpu_max_pct: Some(50),
             memory_max_mb: Some(512),
             fd_max: None,
+            pids_max: None,
         };
         let r = resolve_caps(&m, &o);
         assert_eq!(r.cpu_max_pct, Some(30));
@@ -2657,11 +2662,13 @@ trust_tier = "public_vetted"
             cpu_max_pct: Some(80),
             memory_max_mb: None,
             fd_max: Some(128),
+            pids_max: None,
         };
         let o = ResourceCaps {
             cpu_max_pct: Some(40),
             memory_max_mb: Some(1024),
             fd_max: Some(64),
+            pids_max: None,
         };
         let r = resolve_caps(&m, &o);
         assert_eq!(r.cpu_max_pct, Some(40));
@@ -2675,11 +2682,13 @@ trust_tier = "public_vetted"
             cpu_max_pct: None,
             memory_max_mb: Some(256),
             fd_max: None,
+            pids_max: None,
         };
         let o = ResourceCaps {
             cpu_max_pct: Some(50),
             memory_max_mb: None,
             fd_max: Some(32),
+            pids_max: None,
         };
         let r = resolve_caps(&m, &o);
         assert_eq!(r.cpu_max_pct, Some(50));
@@ -2695,6 +2704,7 @@ trust_tier = "public_vetted"
         assert_eq!(r.cpu_max_pct, None);
         assert_eq!(r.memory_max_mb, None);
         assert_eq!(r.fd_max, None);
+        assert_eq!(r.pids_max, None);
     }
 
     // ---- ClassSection (Story 1b.5c, AC3) ----

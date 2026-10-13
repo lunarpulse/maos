@@ -1,0 +1,85 @@
+{
+  "runs": [
+    {
+      "runId": 38185566562,
+      "url": "https://github.com/lunarpulse/maos/actions/runs/38185566562",
+      "head_sha": "ecfa5aeb42e7f57eb1a51afa8e4100235f463c38",
+      "workflow_path": ".github/workflows/17-2-mutation-proof.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "primaryObservedJobs": {
+        "count": 14,
+        "allCompleted": true,
+        "allConclusions": "success",
+        "source": "Actual GitHub Actions read-method job listing; API-backed; no rerun"
+      },
+      "executedCommandProvenance": {
+        "completeDiffArchive": "t5-ci-executed.diff",
+        "sha256": "baab6ac84a4a37ec699630bd2ba3a715b73bd808c22c0b927f10e06c0ba164b2",
+        "workflowPath": ".github/workflows/17-2-mutation-proof.yml",
+        "rule": "Every exact matrix run command and script is retained in this complete executed source snapshot; no additional selected-oracle success claimed from generic job conclusion."
+      }
+    },
+    {
+      "runId": 38185566461,
+      "url": "https://github.com/lunarpulse/maos/actions/runs/38185566461",
+      "head_sha": "ecfa5aeb42e7f57eb1a51afa8e4100235f463c38",
+      "workflow_path": ".github/workflows/17-2-harness-lifetime.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "primaryObservedJobs": {
+        "count": 4,
+        "allCompleted": true,
+        "allConclusions": "success",
+        "source": "Actual GitHub Actions read-method job listing; API-backed; no rerun"
+      },
+      "executedCommandProvenance": {
+        "completeDiffArchive": "t5-ci-executed.diff",
+        "sha256": "baab6ac84a4a37ec699630bd2ba3a715b73bd808c22c0b927f10e06c0ba164b2",
+        "workflowPath": ".github/workflows/17-2-harness-lifetime.yml",
+        "rule": "Every exact matrix run command and script is retained in this complete executed source snapshot; no additional selected-oracle success claimed from generic job conclusion."
+      }
+    },
+    {
+      "runId": 38187260414,
+      "url": "https://github.com/lunarpulse/maos/actions/runs/38187260414",
+      "head_sha": "de2422cbfa49079df06b1a05b0e814c26d8957d2",
+      "workflow_path": ".github/workflows/17-2-mutation-proof.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "primaryObservedJobs": {
+        "count": 14,
+        "allCompleted": true,
+        "allConclusions": "success",
+        "source": "Actual GitHub Actions read-method job listing; API-backed; no rerun"
+      },
+      "executedCommandProvenance": {
+        "completeDiffArchive": "t5-ci-prerequisites-executed.diff",
+        "sha256": "5352aa757dbef8864c0444a804aa79ddc89d96ca5247dae57f9a57c727877820",
+        "workflowPath": ".github/workflows/17-2-mutation-proof.yml",
+        "rule": "Every exact matrix run command and script is retained in this complete executed source snapshot; no additional selected-oracle success claimed from generic job conclusion."
+      }
+    },
+    {
+      "runId": 38187260402,
+      "url": "https://github.com/lunarpulse/maos/actions/runs/38187260402",
+      "head_sha": "de2422cbfa49079df06b1a05b0e814c26d8957d2",
+      "workflow_path": ".github/workflows/17-2-harness-lifetime.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "primaryObservedJobs": {
+        "count": 4,
+        "allCompleted": true,
+        "allConclusions": "success",
+        "source": "Actual GitHub Actions read-method job listing; API-backed; no rerun"
+      },
+      "executedCommandProvenance": {
+        "completeDiffArchive": "t5-ci-prerequisites-executed.diff",
+        "sha256": "5352aa757dbef8864c0444a804aa79ddc89d96ca5247dae57f9a57c727877820",
+        "workflowPath": ".github/workflows/17-2-harness-lifetime.yml",
+        "rule": "Every exact matrix run command and script is retained in this complete executed source snapshot; no additional selected-oracle success claimed from generic job conclusion."
+      }
+    }
+  ],
+  "verificationLimits": "These observations establish actual run/job completion. Individual mutation/lifetime assertion notices are fully archived for the original first proof in t5-validation.json; this file does not invent uncollected individual notices for later companion repetitions."
+}

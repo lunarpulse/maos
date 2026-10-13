@@ -75,7 +75,7 @@ file).
 | `distillation_poisoning` | `EDistillationIntegrityViolation` | `maos-iac` | `adapter/distillate.rs`, `adapter/redaction.rs`, `adapter/transparency_log.rs` |
 | `ledger_tampering` | `ELedgerIntegrityViolation` | `maos-kernel-core`, `maos-iac`, `maos-audit` | `journal/mod.rs`, `adapter/transparency_log.rs`, `erasure/merkle.rs` |
 | `cross_spirit_privilege_escalation` | `ECrossSpiritPrivilegeViolation` | `maos-kernel-core` | `memory/mod.rs`, `memory/principal.rs`, `memory/shared.rs`, `isolation/runner.rs` |
-| `resource_exhaustion` | `EResourceCapExceeded` | `maos-kernel-core` | `scheduler/resource_ceiling.rs`, `capability/mod.rs` |
+| `resource_exhaustion` | `EResourceCapExceeded` | `maos-kernel-core` | admitted `SandboxSpec` → spawn-owned resource guard; `scripts/run_cgroup_ceiling_17_2.py` native/T3 oracle; `capability/mod.rs` |
 | `side_channel_timing` | `ESideChannelAnomalyDetected` | `maos-kernel-core` | `security/crypto.rs`, `capability/mod.rs`, `memory/`, `scheduler/` |
 | `kernel_syscall_abuse` | `ESyscallPolicyViolation` | `maos-kernel-core` | `security/sandbox/`, `isolation/runner.rs` |
 

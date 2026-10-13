@@ -379,6 +379,34 @@ pub fn issue_enterprise_governed_capability(
     Ok(token)
 }
 
+#[cfg(feature = "network")]
+fn resolve_worker_caps(
+    manifest_root: &toml::Value,
+    policy: &maos_kernel_core::capability::cap_policy::PolicyTable,
+) -> Result<maos_manifest::ResolvedCaps, String> {
+    let manifest_caps = match manifest_root.get("resources") {
+        Some(resources) => {
+            let text = toml::to_string(resources)
+                .map_err(|error| format!("maos run: serialize [resources]: {error}"))?;
+            maos_manifest::ResourceCaps::from_toml_str(&text)
+                .map_err(|error| format!("maos run: [resources] parse: {error}"))?
+        }
+        None => maos_manifest::ResourceCaps::default(),
+    };
+
+    // Read the live copy-on-write policy for every Worker launch. Passing the
+    // existing authority here keeps admission resource-only; the existing full
+    // capability admission remains the sole admission system.
+    let snapshot = policy.inner().load_full();
+    let empty_operator_caps = maos_manifest::ResourceCaps::default();
+    let operator_caps = snapshot
+        .operator_policy
+        .resource_cap_floor
+        .as_ref()
+        .unwrap_or(&empty_operator_caps);
+    Ok(maos_manifest::resolve_caps(&manifest_caps, operator_caps))
+}
+
 /// j1-crosshost-1a AC1.6 — `DEFAULT_WORKER_TASK` and the `MAOS_WORKER_TASK` read
 /// are DELETED. The Worker's task is frame-borne: `delegated_task` carries the
 /// `goal` drained from the delegation `task.assign` payload, and `None` means
@@ -412,6 +440,7 @@ pub fn run_cli_wrapper_manifest(
     run: &RunArgs,
     transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
     enterprise_runtime: Option<Arc<enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
@@ -428,6 +457,8 @@ pub fn run_cli_wrapper_manifest(
         resolve_cli_wrapper_tier, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
     };
     use maos_kernel_core::security::manifest::CliWrapperConfig;
+    // Parse and resolve resources before probes, host binding, or token minting.
+    let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())?;
 
     // 1. Parse [cli_wrapper].
     let cw_toml = toml::to_string(
@@ -878,7 +909,7 @@ pub fn run_cli_wrapper_manifest(
         program: resolved,
         sandbox: maos_kernel_core::security::sandbox::SandboxSpec {
             tier: granted_tier,
-            resolved_caps: Default::default(),
+            resolved_caps,
             declared_scopes: vec![],
             spirit_id: worker_spirit_id.clone(),
             output_shape_predicate: None,
@@ -1131,4 +1162,68 @@ pub fn run_cli_wrapper_manifest(
     // `TaskComplete` only for `WorkerCompletion::Completed`; a crash or missing
     // marker must leave the delegation in flight and fail the run.
     Ok(completion)
+}
+
+#[cfg(all(test, feature = "network"))]
+mod resource_policy_tests {
+    use super::resolve_worker_caps;
+    use maos_kernel_core::capability::cap_policy::PolicyTable;
+    use maos_manifest::{ResolvedCaps, ResourceCaps};
+    use std::sync::Arc;
+
+    fn set_resource_floor(policy: &PolicyTable, floor: ResourceCaps) {
+        let mut snapshot = (*policy.inner().load_full()).clone();
+        snapshot.operator_policy.resource_cap_floor = Some(floor);
+        policy.inner().store(Arc::new(snapshot));
+    }
+
+    #[test]
+    fn worker_caps_resolve_each_dimension_from_the_live_policy_snapshot() {
+        let manifest: toml::Value = toml::from_str(
+            "[resources]\ncpu_max_pct = 20\nmemory_max_mb = 256\nfd_max = 32\npids_max = 80\n",
+        )
+        .expect("parse resource manifest");
+        let policy = PolicyTable::new();
+
+        set_resource_floor(
+            &policy,
+            ResourceCaps {
+                cpu_max_pct: Some(10),
+                memory_max_mb: Some(512),
+                fd_max: Some(64),
+                pids_max: Some(40),
+            },
+        );
+
+        assert_eq!(
+            resolve_worker_caps(&manifest, &policy).expect("resolve current policy"),
+            ResolvedCaps {
+                cpu_max_pct: Some(10),
+                memory_max_mb: Some(256),
+                fd_max: Some(32),
+                pids_max: Some(40),
+            },
+            "operator and manifest caps must win independently across all dimensions"
+        );
+
+        set_resource_floor(
+            &policy,
+            ResourceCaps {
+                cpu_max_pct: Some(30),
+                memory_max_mb: Some(128),
+                fd_max: Some(16),
+                pids_max: Some(100),
+            },
+        );
+        assert_eq!(
+            resolve_worker_caps(&manifest, &policy).expect("resolve updated policy"),
+            ResolvedCaps {
+                cpu_max_pct: Some(20),
+                memory_max_mb: Some(128),
+                fd_max: Some(16),
+                pids_max: Some(80),
+            },
+            "each launch must read the latest policy snapshot rather than a frozen boot value"
+        );
+    }
 }

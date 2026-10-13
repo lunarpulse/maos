@@ -535,6 +535,14 @@ process environment (`Vec<(String, String)>` credentials, never journaled), stdi
 shape, and control-channel config. Consumed once at spawn and dropped — it caches
 no cross-invocation kernel domain state per I9.
 
+### `T3Launch` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+
+**Reason:** existing Story 17-1 transient launch material: a verified image
+attestation, boot nonce, container identity, and optional egress socket, transferred
+exactly once into a single runtime spawn. It holds no learned policy,
+cross-invocation registry, or persistent kernel domain state. Documented during
+Story 17-2 contract closure; no new exemption or runtime state is introduced.
+
 ### `SpawnedBridge` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
 
 **Reason:** Story 8.12 live CLI subprocess bridge RAII handle. Owns the OS

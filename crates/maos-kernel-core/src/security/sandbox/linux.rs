@@ -66,25 +66,30 @@ pub fn spawn_sandboxed(
     let rlimit_mem = mem_limit.map(|mb| mb as u64 * 1024 * 1024);
     let rlimit_fd = fd_limit.map(|n| n as u64);
 
-    // Without a CPU cap the cgroup only adds memory containment on top of the
-    // rlimits, so any setup failure degrades loudly to the rlimit fallback; a CPU
-    // cap has no rlimit equivalent and refuses the spawn.
-    let (cleanup, cgroup_procs) = match setup_cgroup(spec) {
-        Ok((cleanup, procs)) => (cleanup, Some(procs)),
-        Err(error) if spec.resolved_caps.cpu_max_pct.is_none() => {
+    // Owned placement contains descendants even without cgroup-backed ceilings.
+    // Memory alone may fall back to RLIMIT_AS; CPU and PID caps may not.
+    let cgroup_requested = spec.resolved_caps.cpu_max_pct.is_some()
+        || mem_limit.is_some()
+        || spec.resolved_caps.pids_max.is_some();
+    let (cleanup, cgroup_procs, resource_downgrade) = match setup_cgroup(spec) {
+        Ok((cleanup, procs)) => (cleanup, Some(procs), None),
+        Err(_) if !cgroup_requested => (Cleanup::None, None, None),
+        Err(error)
+            if mem_limit.is_some()
+                && spec.resolved_caps.cpu_max_pct.is_none()
+                && spec.resolved_caps.pids_max.is_none() =>
+        {
             let reason = match error {
-                SpawnError::CgroupUnavailable => "no writable delegated cgroup".to_owned(),
-                other => other.to_string(),
+                SpawnError::CgroupUnavailable => {
+                    "cgroup v2 memory.max unavailable: no writable delegated cgroup".to_owned()
+                }
+                other => format!("cgroup v2 memory.max unavailable: {other}"),
             };
-            match mem_limit {
-                Some(mb) => eprintln!(
-                    "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {mb} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)"
-                ),
-                None => eprintln!(
-                    "maos-sandbox: cgroup unavailable ({reason}); using setrlimit fallback"
-                ),
-            }
-            (Cleanup::None, None)
+            eprintln!(
+                "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)",
+                mem_limit.unwrap()
+            );
+            (Cleanup::None, None, Some(reason))
         }
         Err(error) => return Err(error),
     };
@@ -122,7 +127,6 @@ pub fn spawn_sandboxed(
                     }
                 }
             }
-
             // --- seccomp-bpf (syscall allow-list) ---
             if let Some(ref progs) = seccomp_progs {
                 for prog in progs {
@@ -133,7 +137,6 @@ pub fn spawn_sandboxed(
                     }
                 }
             }
-
             // --- setrlimit (resource caps) ---
             if let Some(limit) = rlimit_mem {
                 let rl = libc::rlimit {
@@ -141,8 +144,7 @@ pub fn spawn_sandboxed(
                     rlim_max: limit,
                 };
                 // SAFETY: setrlimit with RLIMIT_AS is async-signal-safe.
-                let rc = libc::setrlimit(libc::RLIMIT_AS, &rl);
-                if rc != 0 {
+                if libc::setrlimit(libc::RLIMIT_AS, &rl) != 0 {
                     return Err(io::Error::last_os_error());
                 }
             }
@@ -152,19 +154,20 @@ pub fn spawn_sandboxed(
                     rlim_max: limit,
                 };
                 // SAFETY: setrlimit with RLIMIT_NOFILE is async-signal-safe.
-                let rc = libc::setrlimit(libc::RLIMIT_NOFILE, &rl);
-                if rc != 0 {
+                if libc::setrlimit(libc::RLIMIT_NOFILE, &rl) != 0 {
                     return Err(io::Error::last_os_error());
                 }
             }
-
             Ok(())
         });
     }
 
     let child = command.spawn().map_err(SpawnError::Io)?;
-
-    Ok(SandboxedChild { child, cleanup })
+    Ok(SandboxedChild {
+        child,
+        cleanup,
+        resource_downgrade,
+    })
 }
 
 // ------------------------------------------------------------------
@@ -434,8 +437,8 @@ fn setup_cgroup(spec: &SandboxSpec) -> Result<(Cleanup, std::fs::File), SpawnErr
     // Migration needs write access to the common ancestor's `cgroup.procs`; the
     // child's source cgroup is at or below `root`, its destination below `root`.
     open_procs(&root)?;
-    let path =
-        create_cgroup_dir(&root, &spec.spirit_id, caps).ok_or(SpawnError::CgroupUnavailable)?;
+    let path = create_cgroup_dir(&root, &spec.spirit_id, caps)
+        .map_err(|error| SpawnError::SandboxSetup(format!("cgroup creation: {error}")))?;
     let cleanup = Cleanup::Cgroup { path: path.clone() };
     apply_cgroup_limits(&path, caps)
         .map_err(|error| SpawnError::SandboxSetup(format!("cgroup limits: {error}")))?;
@@ -468,6 +471,10 @@ fn find_writable_cgroup_root(caps: &super::ResolvedCaps) -> Option<PathBuf> {
         if caps.memory_max_mb.is_some() && !enabled("memory") {
             continue;
         }
+        if caps.pids_max.is_some() && !enabled("pids") {
+            continue;
+        }
+
         // Creation below this boundary performs the actual permission check.
         return Some(candidate.to_owned());
     }
@@ -478,27 +485,35 @@ fn create_cgroup_dir(
     root: &std::path::Path,
     spirit_id: &str,
     caps: &super::ResolvedCaps,
-) -> Option<PathBuf> {
+) -> Result<PathBuf, std::io::Error> {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     let sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let safe_id = spirit_id.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
     let parent = root.join("maos.slice");
-    std::fs::create_dir_all(&parent).ok()?;
-    let controllers = match (caps.cpu_max_pct.is_some(), caps.memory_max_mb.is_some()) {
-        (true, true) => "+cpu +memory",
-        (true, false) => "+cpu",
-        (false, true) => "+memory",
-        (false, false) => "",
+    std::fs::create_dir_all(&parent)?;
+    let controllers = match (
+        caps.cpu_max_pct.is_some(),
+        caps.memory_max_mb.is_some(),
+        caps.pids_max.is_some(),
+    ) {
+        (true, true, true) => "+cpu +memory +pids",
+        (true, true, false) => "+cpu +memory",
+        (true, false, true) => "+cpu +pids",
+        (false, true, true) => "+memory +pids",
+        (true, false, false) => "+cpu",
+        (false, true, false) => "+memory",
+        (false, false, true) => "+pids",
+        (false, false, false) => "",
     };
     if !controllers.is_empty() {
-        std::fs::write(parent.join("cgroup.subtree_control"), controllers).ok()?;
+        std::fs::write(parent.join("cgroup.subtree_control"), controllers)?;
     }
     let path = parent.join(format!(
         "spirit-{safe_id}-{}-{sequence}",
         std::process::id()
     ));
-    std::fs::create_dir(&path).ok()?;
-    Some(path)
+    std::fs::create_dir(&path)?;
+    Ok(path)
 }
 
 fn apply_cgroup_limits(
@@ -514,6 +529,9 @@ fn apply_cgroup_limits(
     if let Some(mb) = caps.memory_max_mb {
         let bytes = mb as u64 * 1024 * 1024;
         std::fs::write(path.join("memory.max"), bytes.to_string())?;
+    }
+    if let Some(limit) = caps.pids_max {
+        std::fs::write(path.join("pids.max"), limit.to_string())?;
     }
     Ok(())
 }

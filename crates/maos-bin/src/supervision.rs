@@ -585,6 +585,9 @@ mod worker {
         /// Held by the observer thread after the pidfd is stored and BEFORE its
         /// `waitid` CALL.
         pub observer_gate: Option<Arc<ObserverGate>>,
+        /// Called synchronously after the exit observer has been installed
+        /// and before the owning session can publish readiness.
+        pub after_watch: Option<Arc<dyn Fn(u32) + Send + Sync>>,
         /// AC3's injected-`?` point, PINNED after
         /// [`ExitObservation::watch`](exit_observation::ExitObservation::watch)
         /// has stored the child handle and started the observer, and BEFORE
@@ -1664,6 +1667,9 @@ mod worker {
                     );
                 }
             }
+            if let Some(after_watch) = &self.seams.after_watch {
+                after_watch(child_pid);
+            }
         }
 
         fn commit_container_spawn(
@@ -2056,6 +2062,35 @@ mod worker {
             >,
             boot_nonce: u64,
         ) -> Self {
+            Self::arm_with_seams(
+                scheduler,
+                crash_detector,
+                transparency_log,
+                halt_registry,
+                iac,
+                telemetry,
+                notification_dispatcher,
+                boot_nonce,
+                SupervisorSeams::default(),
+            )
+        }
+
+        /// Arm the root with explicit integration-test seams.
+        #[doc(hidden)]
+        #[allow(clippy::too_many_arguments)]
+        pub fn arm_with_seams(
+            scheduler: Arc<SpiritSchedulerAdapter>,
+            crash_detector: Arc<CrashDetector>,
+            transparency_log: Arc<TransparencyLogAdapter>,
+            halt_registry: Arc<HaltRegistry>,
+            iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
+            telemetry: Arc<maos_kernel_core::telemetry::iac_rt::IacRtMetrics>,
+            notification_dispatcher: Arc<
+                maos_director_surface::notification::NotificationDispatcher,
+            >,
+            boot_nonce: u64,
+            seams: SupervisorSeams,
+        ) -> Self {
             let root_cancel = tokio_util::sync::CancellationToken::new();
             let root_shutdown = tokio_util::sync::CancellationToken::new();
             #[cfg(unix)]
@@ -2077,16 +2112,19 @@ mod worker {
                     None
                 }
             };
-            let supervisor = Arc::new(WorkerSupervisor::new(
-                Arc::clone(&scheduler),
-                crash_detector,
-                Arc::clone(&transparency_log),
-                Arc::clone(&halt_registry),
-                iac,
-                tokio::runtime::Handle::current(),
-                boot_nonce,
-                root_shutdown.clone(),
-            ));
+            let supervisor = Arc::new(
+                WorkerSupervisor::new(
+                    Arc::clone(&scheduler),
+                    crash_detector,
+                    Arc::clone(&transparency_log),
+                    Arc::clone(&halt_registry),
+                    iac,
+                    tokio::runtime::Handle::current(),
+                    boot_nonce,
+                    root_shutdown.clone(),
+                )
+                .with_seams(seams),
+            );
 
             // The ProgressWatchdog must be RUNNING WHILE WORKERS LIVE. At
             // `af96c907` it was spawned only in the serving tail, i.e. after

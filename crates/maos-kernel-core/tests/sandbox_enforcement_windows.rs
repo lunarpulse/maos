@@ -40,6 +40,7 @@ fn no_caps() -> ResolvedCaps {
         cpu_max_pct: None,
         memory_max_mb: None,
         fd_max: None,
+        pids_max: None,
     }
 }
 
@@ -48,6 +49,7 @@ fn caps_mem(mb: u32) -> ResolvedCaps {
         cpu_max_pct: None,
         memory_max_mb: Some(mb),
         fd_max: None,
+        pids_max: None,
     }
 }
 

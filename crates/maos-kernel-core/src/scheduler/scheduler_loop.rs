@@ -325,6 +325,7 @@ impl SpiritSchedulerAdapter {
                 cpu_max_pct: None,
                 memory_max_mb: None,
                 fd_max: None,
+                pids_max: None,
             };
             let caps_required = CapabilitiesRequired {
                 provider: ProviderCapabilities { complete: vec![] },

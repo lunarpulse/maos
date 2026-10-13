@@ -1,0 +1,119 @@
+{
+  "workflow": "A6 embedded non-author review under dev-story; story task/AC text and final completion sequence remain unchanged",
+  "initialReviewedDiff": "t6-a6-reviewed.diff",
+  "initialDiffSha256": "4c532a3df78d750afcb4789471e701980172aeb107504cf44fb1a2a21acecccb",
+  "reviewLayers": [
+    "A6BlindHunter",
+    "A6EdgeCaseHunter",
+    "A6AcceptanceAuditor",
+    "A6TestInfrastructure",
+    "A6SecurityReview",
+    "A6RuntimeReview"
+  ],
+  "findings": [
+    {
+      "id": "A6-F1",
+      "severity": "high",
+      "disposition": "patch",
+      "title": "Uncapped and FD-only native launches lost owned descendant containment",
+      "reportedBy": [
+        "A6BlindHunter",
+        "A6AcceptanceAuditor",
+        "A6SecurityReview",
+        "A6RuntimeReview"
+      ],
+      "fix": "Retain best-effort owned placement independently of configured cgroup-backed ceilings; no-resource placement errors remain nonfatal and silent, while CPU/PID stay strict and memory-only fallback stays truthful.",
+      "failingBefore": {
+        "runId": 38196319487,
+        "images": [
+          "ubuntu-24.04",
+          "ubuntu-26.04",
+          "ubuntu-24.04-arm",
+          "ubuntu-26.04-arm"
+        ],
+        "selected": "killed_leader_cleanup_kills_its_surviving_descendant",
+        "counts": "0 passed; 1 failed; 0 ignored; actual descendant-alive assertion"
+      },
+      "sourceDisposition": "resolved by original runtime/security/acceptance reviewers",
+      "runtimeDisposition": "Actual final native4 suite passed on all four images at run38200530152, including capped/uncapped/FD-only descendant cleanup; whole-workspace still failed101."
+    },
+    {
+      "id": "A6-F2",
+      "severity": "medium",
+      "disposition": "patch",
+      "title": "No actual native above-inherited-hard FD acceptance oracle",
+      "reportedBy": [
+        "A6AcceptanceAuditor"
+      ],
+      "fix": "Parent-built compiled test executable reentry below actual soft/hard64; actual within64 guest limits and above65 EPERM, no refused guest marker and no owned leaf. No Cargo reentry or inherited parent hard-limit modification.",
+      "sourceDisposition": "resolved by original runtime/security/acceptance reviewers",
+      "runtimeDisposition": "Actual native64 guest soft/hard64 and native65 EPERM with0 refused guest effects/owned residue witnessed on all four images at run38200530152."
+    },
+    {
+      "id": "A6-F3",
+      "severity": "medium",
+      "disposition": "patch",
+      "title": "Existing TypeScript report row was replaced rather than preserved",
+      "reportedBy": [
+        "A6AcceptanceAuditor"
+      ],
+      "fix": "Restore existing example-spirit-ts-tests row beside additive required cgroup rows.",
+      "verification": "Actual production report renderer before/after, failing TS need fixture, restored failure row; no API or forged report output.",
+      "sourceDisposition": "resolved by original reviewers"
+    },
+    {
+      "id": "A6-F4",
+      "severity": "medium",
+      "disposition": "dismiss",
+      "title": "Unexercised non-Linux PID runtime equivalence",
+      "reportedBy": [
+        "A6BlindHunter"
+      ],
+      "reason": "AC1 is given Linux; AC2.2/AC3.5 and the eight-location charter do not authorize macOS/Windows PID implementation. Both EN/KO docs explicitly limit runtime evidence to supported Linux and do not claim cross-platform PID equivalence. Existing platform sources remain unchanged; actual macOS all-targets and feature compile proof is separately required."
+    },
+    {
+      "id": "A6-F5",
+      "severity": "high",
+      "disposition": "patch",
+      "title": "New isolated native FD worker forwarded a second libtest summary",
+      "reportedBy": [
+        "A6SecurityReview",
+        "A6AcceptanceAuditor",
+        "A6RuntimeReview"
+      ],
+      "fix": "Privately require child success and its actual one-case summary; forward only the named native FD notice, leaving the mandatory checker unchanged.",
+      "verification": "Actual unchanged helper refused two genuine captured passing libtest logs, then accepted the sole actual outer suite (27/0/0). This is log-boundary proof, not native delegation acceptance.",
+      "sourceDisposition": "resolved by all three original reviewers in final correction review"
+    },
+    {
+      "id": "A6-F6",
+      "severity": "high",
+      "disposition": "patch",
+      "title": "New native FD guest attempted unsupported Landlock file creation",
+      "reportedBy": [
+        "A6RuntimeReview"
+      ],
+      "fix": "Parent prepares the existing writable within-hard marker, removes it before the above-hard request; no production MakeReg grant or other policy change.",
+      "verification": "Actual production T2 fixture dispatch: absent marker PermissionDenied, existing marker records guest soft/hard64. Final delegated64/65 acceptance remains pending.",
+      "sourceDisposition": "resolved by all three original reviewers in final correction review"
+    }
+  ],
+  "qualityClosure": {
+    "observed": "check-empty-kernel rejected existing T3Launch annotation missing in register",
+    "fix": "Document existing one-spawn T3Launch exemption only; no new annotation/type/runtime state or kernel locus.",
+    "verified": "check-empty-kernel, check-pub-field-constructors, check-deprecations-declared, check-breaking-md all passed after current native test compilation"
+  },
+  "measurement": {
+    "kernelPhysical": 25146,
+    "kernelFiles": 95,
+    "kernelTokei": 19492,
+    "manifest": 4466,
+    "domain": 9349,
+    "bin": 25397,
+    "xtask": 44370,
+    "aggregate": 173501,
+    "strictAggregateHardfail": 173502,
+    "approvalMaximumAggregateHardfail": 173505
+  },
+  "verificationLimits": "Exact final native/T3/session/macOS matrices succeeded and final14 mutation/16 lifetime assertions are proven. Mandatory original whole-workspace still returns101 with three actual failed targets; workflow halted, not ready for review. Browser visual remains unavailable."
+}

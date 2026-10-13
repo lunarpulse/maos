@@ -1,0 +1,40 @@
+{
+  "branch": "ci/17-2-workspace-fixed",
+  "sourceCommit": "2589e5627e74092c7b2aa27491a29cb17cf61ede",
+  "actualAcceptanceRun": 38212495038,
+  "actualCompanionDocsRun": 38212495002,
+  "archived": [
+    "t5-workspace-fixed-executed.diff",
+    "t5-workspace-fixed-source.json",
+    "t5-workspace-fixed-results.json",
+    "t5-workspace-fixed-docs-results.json",
+    "t6-final-accepted-runtime-summary.json"
+  ],
+  "command": "git push origin --delete ci/17-2-workspace-fixed && git worktree remove /tmp/maos-17-2-workspace-fixed && rm -- /tmp/17-2-workspace-diagnostic-observer.py /tmp/17-2-workspace-diagnostic-proof.json /tmp/17-2-workspace-fixed-observer.py /tmp/17-2-workspace-fixed-proof.json",
+  "actualExit": 0,
+  "observedRemoteOutput": "- [deleted] ci/17-2-workspace-fixed",
+  "worktreeRemoval": "Completed without force",
+  "ownedThrowawaysRemoved": [
+    "/tmp/17-2-workspace-diagnostic-observer.py",
+    "/tmp/17-2-workspace-diagnostic-proof.json",
+    "/tmp/17-2-workspace-fixed-observer.py",
+    "/tmp/17-2-workspace-fixed-proof.json"
+  ],
+  "noMainPushOrMerge": true,
+  "obsoleteObserverTemplateArchive": {
+    "sourcePath": "/tmp/17-2-ci-acceptance-observe-2.py",
+    "actualSource": "import json\nimport pathlib\nimport time\nimport urllib.error\nimport urllib.request\n\nBASE='https://api.github.com/repos/lunarpulse/maos'\nRUN_ID=38185566523\nOUTPUT=pathlib.Path('/tmp/17-2-ci-acceptance-proof-2.json')\nevidence={'run_id':RUN_ID,'head_sha':'ecfa5aeb42e7f57eb1a51afa8e4100235f463c38','observations':[],'read_failures':[]}\ndeadline=time.monotonic()+3480\n\ndef save():\n    OUTPUT.write_text(json.dumps(evidence,indent=2)+'\\n')\n\ndef request(path):\n    while True:\n        req=urllib.request.Request(BASE+path,headers={'Accept':'application/vnd.github+json','User-Agent':'maos-17-2-disposable-proof'})\n        try:\n            with urllib.request.urlopen(req,timeout=30) as response:\n                return json.load(response)\n        except urllib.error.HTTPError as error:\n            if error.code!=403 or error.headers.get('x-ratelimit-remaining')!='0':\n                raise\n            reset=int(error.headers['x-ratelimit-reset'])\n            delay=max(1,reset+5-time.time())\n            evidence['read_failures'].append({'error':str(error),'reset_unix':reset,'retry_delay_seconds':delay})\n            save()\n            if delay>=deadline-time.monotonic():\n                raise SystemExit('Public quota reset exceeds bounded observation deadline; no result inferred.')\n            print(json.dumps(evidence['read_failures'][-1]),flush=True)\n            time.sleep(delay)\n\nwhile time.monotonic()<deadline:\n    run=request(f'/actions/runs/{RUN_ID}')\n    assert run['head_sha']==evidence['head_sha']\n    evidence['run']=run\n    evidence['observations'].append({'observed_unix_time':time.time(),'status':run['status'],'conclusion':run['conclusion']})\n    save()\n    print(json.dumps(evidence['observations'][-1]),flush=True)\n    if run['status']=='completed':\n        evidence['jobs']=request(f'/actions/runs/{RUN_ID}/jobs?per_page=100')['jobs']\n        evidence['annotations']={}\n        save()\n        for job in evidence['jobs']:\n            check_id=job['check_run_url'].rsplit('/',1)[-1]\n            evidence['annotations'][str(job['id'])]=request(f'/check-runs/{check_id}/annotations?per_page=100')\n            save()\n        print(json.dumps({'conclusion':run['conclusion'],'jobs':[{'id':j['id'],'name':j['name'],'conclusion':j['conclusion']} for j in evidence['jobs']],'evidence':str(OUTPUT)}),flush=True)\n        raise SystemExit(0 if run['conclusion']=='success' else 1)\n    time.sleep(300)\nsave()\nraise SystemExit('Observation deadline reached; running CI is not an acceptance result.')\n",
+    "sourceSHA256": "6a54203588d00432f874245cc0d6278e63bac95d6114f1ccacd2f65b7fb29ffc",
+    "temporaryResultPath": "/tmp/17-2-ci-acceptance-proof-2.json",
+    "temporaryResultSHA256": "ac8ee9fa92c297918596ac4b6c85be7545a16f51de41ab3bcd14111f9dee0fc6",
+    "actualStoredRunID": 38185566523,
+    "actualStoredSourceCommit": "ecfa5aeb42e7f57eb1a51afa8e4100235f463c38",
+    "existingOutcomeArchive": "t5-validation.json; exact source t5-ci-executed.diff",
+    "cleanup": "Both verified owned obsolete files removed with edit REM after provenance archival in this record"
+  },
+  "preserved": [
+    "Canonical implementation and story records",
+    "Exact committed local source refs and complete evidence",
+    "Normal build caches and existing dependencies"
+  ]
+}

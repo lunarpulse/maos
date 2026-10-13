@@ -1,0 +1,106 @@
+# Explicit project name — Compose would otherwise derive it from the parent
+# directory (`.devcontainer`), which every devcontainer in this tree shares.
+name: maos-dev
+
+services:
+  cosmohub-dev-env:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        - VARIANT
+        - USER
+        - UID
+        - GID
+        - PYTHON_VERSION
+        - VENV_PYTHON_VERSION
+        - RUST_VERSION
+    volumes:
+      - ..:/home/${USER}/dev_ws
+      - micro-service-command-history:/commandhistory:rw
+      - micro-service-home:/home/${USER}:rw
+      # ── 호스트 의존 자원 (2개뿐) ────────────────────────────────────────
+      # create_host_path:false — 경로가 없으면 도커가 호스트에 root 소유 디렉터리를
+      # 조용히 만드는 대신 즉시 실패한다.
+      - type: bind
+        source: ${DEV_BUILD_ROOT:-/mnt/build}
+        target: /mnt/build
+        bind: { create_host_path: false }
+      # ── SSH (fetch/pull/push) ───────────────────────────────────────────
+      # 에이전트 소켓만 공유한다: 서명은 호스트가 하고 개인키는 컨테이너에 없다.
+      # 소켓이 없으면 host-prepare 가 /dev/null 을 넣는다(컨테이너는 그대로 뜬다).
+      - type: bind
+        source: ${HOST_SSH_AUTH_SOCK:-/dev/null}
+        target: /ssh-agent
+        bind: { create_host_path: false }
+      # config·known_hosts 를 위해 ~/.ssh 를 읽기 전용으로 ($HOME 바로 아래 = Zed 안전).
+      - type: bind
+        source: ${HOST_SSH_DIR:-${HOME}/.ssh}
+        target: /home/${USER}/.ssh
+        read_only: true
+        bind: { create_host_path: false }
+      # omp 설정 + **에이전트 인증**(agent.db) 공유 — devcontainer 마다 로그인하지 않는다.
+      # 세션은 공유하지 않는다: PI_CODING_AGENT_SESSION_DIR 로 컨테이너 안에 남긴다.
+      # $HOME 바로 아래라 중간 디렉터리를 도커가 root 로 만들 일이 없다
+      # (~/.config/*, ~/.local/state/* 를 바인드했다가 Zed 의 remote server 가
+      #  ~/.local/share 를 못 만들어 기동 실패한 사고가 있었다).
+      - type: bind
+        source: ${HOST_OMP_HOME:-${HOME}/.omp}
+        target: /home/${USER}/.omp
+        bind: { create_host_path: false }
+    environment:
+      # Central build mount (970 `@build`): cargo writes here, never into /home.
+      CARGO_TARGET_DIR: /mnt/build/cargo-maos
+      SCCACHE_DIR: /mnt/build/sccache
+      # 세션은 컨테이너 안에 남긴다 (공유 ~/.omp 에는 설정·인증만).
+      PI_CODING_AGENT_SESSION_DIR: /home/${USER}/.omp-sessions
+      # 컨테이너마다 CARGO_TARGET_DIR 이 분리돼 있어 교차 재사용은 sccache 만 제공한다.
+      # sccache 가 없는 머신에서는 host-prepare.sh 가 이 값을 **빈 문자열**로 만든다
+      # (cargo 는 빈 값을 unset 으로 취급 / 존재하지 않는 경로를 넣으면 모든 빌드가 죽는다).
+      RUSTC_WRAPPER: ${RUSTC_WRAPPER-}
+      SCCACHE_CACHE_SIZE: 50G
+      # 호스트 에이전트 소켓(위 바인드). 키가 없으면 /dev/null 이라 ssh 가 조용히 무시한다.
+      SSH_AUTH_SOCK: /ssh-agent
+    # git 신원(GIT_USER_NAME/GIT_USER_EMAIL)은 host-prepare.sh 가 .env 관리 블록에 쓰고
+    # env_file 이 그대로 컨테이너에 올린다. 컨테이너 엔트리포인트가 ~/.gitconfig 로 시드한다.
+    # environment: 로 다시 선언하지 않는다 — 값이 비면 빈 문자열이 env_file 값을 덮는다.
+    env_file: .env
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    # environment:
+    #   # PostgreSQL connection for integration tests (Story 4P.3)
+    #   - DATABASE_URL=postgres://concierge:test_password@postgres:5432/concierge_test
+    #   - DATABASE_POOL_SIZE=10
+    #   - DATABASE_CONNECT_TIMEOUT=30
+    #   - DATABASE_IDLE_TIMEOUT=600
+
+  # PostgreSQL with pgvector service for integration tests (Story 4P.3, Story 7.14)
+  # postgres:
+  #   image: pgvector/pgvector:pg15
+  #   container_name: ${PROJECT_NAME:-concierge}_postgres
+  #   environment:
+  #     POSTGRES_USER: concierge
+  #     POSTGRES_PASSWORD: test_password
+  #     POSTGRES_DB: concierge_test
+  #     # Performance tuning for development
+  #     POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+  #   ports:
+  #     - "15432:15432"  # Expose to host for debugging (psql, DBeaver, etc.)
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U concierge -d concierge_test"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+  #   restart: unless-stopped
+
+volumes:
+  micro-service-command-history:
+    name: ${PROJECT_NAME}_micro-service-command-history
+  micro-service-home:
+    name: ${PROJECT_NAME}_micro-service-home
+  # postgres-data:
+  #   name: ${PROJECT_NAME}_postgres-data

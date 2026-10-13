@@ -1,0 +1,97 @@
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 1322 packages in 10s
+
+> maos-docs-site@0.0.0 gate:ko-coverage
+> LOCALE=ko node scripts/gate-ko-coverage.js
+
+gate:locale-coverage — KO translation coverage
+
+  Canonical doc deliverables:
+    abi                9/9    100%
+    cookbook          14/14   100%
+    deploy             5/5    100%
+    manifest           6/6    100%
+    migrate            6/6    100%
+    troubleshoot       1/1    100%
+    — canonical total  41/41   100%
+
+  Supporting sections (English fallback acceptable):
+    (root)             4/4    100%
+    community          0/6    0%
+
+  Overall: 45/51 pages have a KO counterpart (88%).
+
+PASS: canonical KO coverage 100.0% >= required 100%.
+
+> maos-docs-site@0.0.0 gate:glossary-lock
+> LOCALE=ko node scripts/gate-glossary-lock.js
+
+Loaded 42 locked terms, 3 denylist entries from DENYLIST
+[docs] scanned 81 en files; checked 36 ko counterparts
+[abi] scanned 18 en files; checked 9 ko counterparts
+Checked 45 ko translation files total
+
+PASS: ko glossary-lock gate — all locked terms present, no denylist violations
+
+> maos-docs-site@0.0.0 build
+> docusaurus build
+
+[INFO] Website will be built for all these locales: 
+- en
+- ko
+[INFO] [en] Creating an optimized production build...
+[info] [webpackbar] Compiling Client
+[info] [webpackbar] Compiling Server
+[success] [webpackbar] Server: Compiled successfully in 3.86s
+[success] [webpackbar] Client: Compiled successfully in 6.75s
+[SUCCESS] Generated static files in "build".
+[INFO] [ko] Creating an optimized production build...
+[info] [webpackbar] Compiling Client
+[info] [webpackbar] Compiling Server
+[success] [webpackbar] Server: Compiled successfully in 3.72s
+[success] [webpackbar] Client: Compiled successfully in 6.70s
+[SUCCESS] Generated static files in "build/ko".
+[INFO] Use `npm run serve` command to test your build locally.
+
+> maos-docs-site@0.0.0 postbuild
+> node scripts/postbuild-fallback-lang.js
+
+postbuild:fallback-lang — patched 25 ko fallback page(s)
+
+> maos-docs-site@0.0.0 gate:static
+> npm run gate:routes && npm run gate:troubleshoot && npm run gate:glossary-lock && npm run gate:anchor-ids
+
+
+> maos-docs-site@0.0.0 gate:routes
+> node scripts/gate-routes.js
+
+gate:routes — 90 passed, 0 failed
+PASS: gate:routes
+gate:cookbook-count — 13 structural patterns (verified in build)
+PASS: gate:cookbook-count
+
+> maos-docs-site@0.0.0 gate:troubleshoot
+> node scripts/gate-troubleshoot-bidi.js
+
+Catalog codes: 39
+Troubleshoot pages: 39
+PASS: gate:troubleshoot-bidi — symmetric difference is empty
+PASS: route-manifest error_codes == error-catalog keys
+PASS: gate:troubleshoot-teach — code + cause + resolution distinct from summary
+PASS: catalog cause/remediation fields complete + distinct
+
+> maos-docs-site@0.0.0 gate:glossary-lock
+> LOCALE=ko node scripts/gate-glossary-lock.js
+
+Loaded 42 locked terms, 3 denylist entries from DENYLIST
+[docs] scanned 81 en files; checked 36 ko counterparts
+[abi] scanned 18 en files; checked 9 ko counterparts
+Checked 45 ko translation files total
+
+PASS: ko glossary-lock gate — all locked terms present, no denylist violations
+
+> maos-docs-site@0.0.0 gate:anchor-ids
+> node scripts/gate-anchor-ids.js
+
+PASS: gate:anchor-ids — 18 ABI markdown page(s) have explicit heading IDs

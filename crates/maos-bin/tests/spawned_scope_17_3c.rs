@@ -127,6 +127,10 @@ struct World {
 
 impl World {
     fn new(dir: &Path) -> Self {
+        Self::new_with_seams(dir, maos_bin::supervision::SupervisorSeams::default())
+    }
+
+    fn new_with_seams(dir: &Path, seams: maos_bin::supervision::SupervisorSeams) -> Self {
         maos_kernel_core::capability::cap_tokens::init_monotonic_base();
         let tl = Arc::new(
             TransparencyLogAdapter::open(&dir.join("transparency.sqlite"), NONCE).unwrap(),
@@ -193,7 +197,7 @@ impl World {
         Arc::get_mut(&mut scheduler)
             .unwrap()
             .set_crash_detector(Arc::clone(&crash));
-        let root = maos_bin::supervision::RootSupervision::arm(
+        let root = maos_bin::supervision::RootSupervision::arm_with_seams(
             Arc::clone(&scheduler),
             crash,
             Arc::clone(&tl),
@@ -202,6 +206,7 @@ impl World {
             metrics,
             Arc::new(maos_director_surface::notification::NotificationDispatcher::default()),
             NONCE,
+            seams,
         );
         let supervisor = Arc::clone(root.supervisor());
         let audit_writer = cap_audit::CapAuditWriter::spawn(audit_rx, Arc::clone(&tl));
@@ -240,6 +245,7 @@ impl World {
             security: Arc::clone(&self.security),
             iac: Arc::clone(&self.iac),
             journal: Arc::clone(&self.tl),
+            lifecycle_journal: Arc::clone(&self.journal),
             pid_by_spirit_id: Arc::clone(&self.lookup),
             enterprise: None,
             pdp: None,
@@ -315,6 +321,211 @@ fn manifest_with_sends(id: &str, form: &str, grant: bool, sends: Option<&[&str]>
         caps.push_str(&format!("\n[capabilities.required.iac]\nsend = [{list}]\n"));
     }
     format!("[class]\nname = \"{id}\"\ndescription = \"Live scoped assignment fixture\"\nversion = \"0.1.0\"\nabi = \"1.0\"\nmanifest_schema_version = 5\nmin_substrate_version = \"0.1.0-alpha.1\"\nforms = [\"{form}\"]\n{artifact}trust_tier = \"local\"\n[posture]\ndefault = \"assistive\"\nallowed_max = \"assistive\"\n[output_shape]\nrequired_fields = [\"introduction\"]\n[budget]\ncontext_window_size = 4096\ntime_cap_seconds = 30\n[resources]\nmemory_max_mb = 64\n[sandbox]\ntier = \"T2\"\n{caps}")
+}
+
+async fn admit_t2(
+    world: &World,
+    spirit_id: &str,
+    resources: &str,
+) -> (
+    Arc<maos_bin::supervision::BindingCore>,
+    maos_bin::admission::Admitted,
+) {
+    let text = manifest_with_sends(spirit_id, "wasm-component", false, None)
+        .replace("[resources]\nmemory_max_mb = 64\n", resources);
+    let gated = gate_manifest(&text, &|_| false).unwrap();
+    let (core, obj) = world
+        .supervisor
+        .prepare_spawned(spirit_id, &gated.bundle())
+        .unwrap();
+    let admitted = load_admit_start(
+        &world.admission(),
+        &gated,
+        obj,
+        NONCE,
+        StartPolicy::StartNow,
+        &mut |pid| core.bind_scheduler_pid(pid),
+    )
+    .await
+    .unwrap();
+    (core, admitted)
+}
+
+fn echo_launch(spirit_id: &str) -> SessionLaunch {
+    let artifact = target_root().join("wasm32-wasip2/release/echo_spirit.wasm");
+    let address = |name: &str| FrameAddress {
+        spirit_id: SpiritId::from(name),
+        host_id: None,
+        role: None,
+    };
+    SessionLaunch {
+        plan: maos_host::SpiritLaunchPlan {
+            program: target_root()
+                .join("release/maos-wasm-runner")
+                .to_string_lossy()
+                .into_owned(),
+            argv: vec![
+                "--component".into(),
+                artifact.to_string_lossy().into_owned(),
+                "--fuel".into(),
+                "10000000".into(),
+            ],
+            env: Vec::new(),
+            wire: maos_host::WireShape::ContentLengthCbor,
+        },
+        component_artifact: Some(artifact),
+        turn_budget: Duration::from_secs(30),
+        once: true,
+        initial_frame: Some(IacFrame {
+            frame_id: ulid::Ulid::new().to_bytes(),
+            timestamp_ns: 1,
+            logical_clock: 1,
+            from: address("operator"),
+            to: smallvec::smallvec![address(spirit_id)],
+            kind: FrameKind::TaskAssign,
+            intent: IntentClass::Standard,
+            auto_marker: FrameOrigin::HumanAuthored,
+            payload: FramePayload::TaskAssign(TaskAssignPayload {
+                goal: "exercise the real T2 echo component".into(),
+                scope: Vec::new(),
+                success_criteria: "complete one echo turn".into(),
+                posture_preferences: Default::default(),
+                prior_distillate_ref: None,
+            }),
+            consent_envelope: None,
+            intent_lineage: Default::default(),
+        }),
+    }
+}
+
+fn lifecycle_entries(path: &Path) -> Vec<maos_domain::invariants::i10::LifecycleEntry> {
+    std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            serde_json::from_str::<maos_domain::invariants::i10::JournalEntry>(line).unwrap()
+        })
+        .filter_map(|entry| match entry {
+            maos_domain::invariants::i10::JournalEntry::Lifecycle(entry) => Some(entry),
+            _ => None,
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CgroupTestMode {
+    Delegated,
+    Undelegated,
+}
+
+fn cgroup_test_mode() -> CgroupTestMode {
+    match std::env::var("MAOS_17_2_CGROUP_MODE")
+        .unwrap_or_else(|error| panic!("MAOS_17_2_CGROUP_MODE is required: {error}"))
+        .as_str()
+    {
+        "delegated" => CgroupTestMode::Delegated,
+        "undelegated" => CgroupTestMode::Undelegated,
+        other => panic!("MAOS_17_2_CGROUP_MODE must be delegated or undelegated, got {other:?}"),
+    }
+}
+
+fn process_is_live(pid: u32) -> bool {
+    std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        .ok()
+        .and_then(|stat| stat.rsplit_once(')').map(|(_, fields)| fields.to_owned()))
+        .and_then(|fields| fields.split_whitespace().next().map(str::to_owned))
+        .is_some_and(|state| state != "Z" && state != "X")
+}
+
+fn proc_soft_limit(pid: u32, label: &str) -> String {
+    let limits = std::fs::read_to_string(format!("/proc/{pid}/limits"))
+        .expect("read the live T2 runner's actual limits");
+    limits
+        .lines()
+        .find(|line| line.starts_with(label))
+        .unwrap_or_else(|| panic!("missing {label} in child limits"))
+        .split_whitespace()
+        .nth(3)
+        .unwrap_or_else(|| panic!("missing soft limit for {label}"))
+        .to_owned()
+}
+
+fn child_cgroup_leaf(pid: u32) -> PathBuf {
+    let membership = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
+        .expect("read the live T2 runner's actual cgroup membership");
+    let relative = membership
+        .lines()
+        .find_map(|line| line.strip_prefix("0::"))
+        .expect("the T2 runner has unified cgroup membership");
+    let leaf = Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/'));
+    assert!(leaf.is_dir(), "runner cgroup leaf is absent: {leaf:?}");
+    let members = std::fs::read_to_string(leaf.join("cgroup.procs"))
+        .expect("read actual cgroup leaf membership");
+    assert!(
+        members.lines().any(|member| member == pid.to_string()),
+        "runner {pid} is not present in its reported cgroup leaf"
+    );
+    leaf
+}
+
+fn t2_turn_complete(world: &World, spirit_pid: u32) -> bool {
+    let has_guest_frame = world
+        .tl
+        .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+            spirit_pid: Some(spirit_pid),
+            ..Default::default()
+        })
+        .unwrap()
+        .iter()
+        .any(|row| row.intent == "spirit.frame.authorization");
+    if !has_guest_frame {
+        return false;
+    }
+    let scbs = world.scheduler.scbs();
+    let scbs = scbs.read().unwrap_or_else(|error| error.into_inner());
+    let Some(scb) = scbs.get(&spirit_pid) else {
+        return false;
+    };
+    let empty = match scb.task_assignments_in_flight.lock() {
+        Ok(ledger) => ledger.is_empty(),
+        Err(error) => error.into_inner().is_empty(),
+    };
+    empty
+}
+
+async fn wait_for_live_t2_turn(
+    world: &World,
+    spirit_pid: u32,
+    turn_budget: Duration,
+) -> Result<u32, String> {
+    // Match the existing hostile-session envelope: startup, seed delivery and
+    // turn execution retain their declared budgets even under a CPU ceiling.
+    let deadline = std::time::Instant::now() + turn_budget * 4 + Duration::from_secs(20);
+    loop {
+        if let Some(binding) = world
+            .supervisor
+            .bindings()
+            .into_iter()
+            .find(|binding| binding.spirit_pid == spirit_pid)
+        {
+            if let Some(child_pid) = binding.child_pid {
+                if binding.phase == maos_bin::supervision::BindingPhase::Running
+                    && binding.child.is_some()
+                    && process_is_live(child_pid)
+                    && t2_turn_complete(world, spirit_pid)
+                {
+                    return Ok(child_pid);
+                }
+            }
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(format!(
+                "T2 runner {spirit_pid} did not remain live through Ready and one completed turn"
+            ));
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -1894,4 +2105,931 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
             println!("GOVERNED-ATOMIC form={form} case={case} trusted_pid={pid} decisions={} minted={} guest_effects=0", decisions.len(), issued.len());
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart() {
+    use maos_domain::invariants::i10::{LifecycleEvent, ResourceCeilingDowngradedPayload};
+    use maos_domain::invariants::i9::SandboxTier;
+
+    let mode = cgroup_test_mode();
+    LazyLock::force(&FIXTURES);
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let spirit_id = "memory-only-restart";
+    for expected_rows in 1..=2 {
+        let (core, admitted) = admit_t2(
+            &world,
+            spirit_id,
+            "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+        )
+        .await;
+        let spirit_pid = admitted.pid;
+        assert_eq!(admitted.sandbox.tier, SandboxTier::T2);
+        assert_eq!(admitted.sandbox.resolved_caps.cpu_max_pct, None);
+        assert_eq!(admitted.sandbox.resolved_caps.memory_max_mb, Some(64));
+        assert_eq!(admitted.sandbox.resolved_caps.pids_max, None);
+        assert_eq!(admitted.sandbox.resolved_caps.fd_max, Some(64));
+        assert_eq!(
+            world.journal.last_event(spirit_id),
+            Some(LifecycleEvent::Load),
+            "each admission's Load remains the raw latest event until its fallback is recorded"
+        );
+
+        let report = run_admitted_session(world.session(), admitted, core, echo_launch(spirit_id))
+            .await
+            .expect("the actual release runner completes an admitted T2 echo turn");
+        assert_eq!(report.turns, 1);
+        assert_ne!(report.child_pid, std::process::id());
+        let binding = world
+            .supervisor
+            .bindings()
+            .into_iter()
+            .find(|binding| binding.spirit_pid == spirit_pid)
+            .expect("the production T2 session binding remains observable");
+        assert_eq!(binding.child_pid, Some(report.child_pid));
+        assert_eq!(
+            binding.phase,
+            maos_bin::supervision::BindingPhase::ExitedClean,
+            "the short-lived runner reached its terminal phase"
+        );
+        assert!(
+            world
+                .tl
+                .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+                    spirit_pid: Some(spirit_pid),
+                    ..Default::default()
+                })
+                .unwrap()
+                .iter()
+                .any(|row| row.intent == "cli.subprocess.exit"),
+            "the actual child exit was finalized"
+        );
+
+        let entries = lifecycle_entries(&dir.path().join("lifecycle.ndjson"));
+        let rows = entries
+            .iter()
+            .filter(|entry| {
+                entry.spirit_id == spirit_id
+                    && entry.lifecycle_event == LifecycleEvent::ResourceCeilingDowngraded
+            })
+            .collect::<Vec<_>>();
+        let expected_count = if mode == CgroupTestMode::Undelegated {
+            expected_rows
+        } else {
+            0
+        };
+        assert_eq!(
+            rows.len(),
+            expected_count,
+            "successful fallback is recorded once per spawn; a delegated cgroup is not a downgrade"
+        );
+        match mode {
+            CgroupTestMode::Undelegated => {
+                let row = rows.last().unwrap();
+                assert_eq!(row.effective_sandbox_tier, Some(SandboxTier::T2));
+                let payload: ResourceCeilingDowngradedPayload =
+                    serde_json::from_slice(row.payload.as_deref().unwrap()).unwrap();
+                assert!(
+                    payload.missing_mechanism.contains("cgroup v2 memory.max"),
+                    "the row names the unavailable native mechanism: {}",
+                    payload.missing_mechanism
+                );
+                assert_eq!(payload.memory_max_mb, Some(64));
+                assert_eq!(payload.fd_max, Some(64));
+                assert!(payload.rlimit_as);
+                assert!(payload.rlimit_nofile);
+                assert_eq!(
+                    world.journal.last_event(spirit_id),
+                    Some(LifecycleEvent::ResourceCeilingDowngraded),
+                    "last_event continues to expose the raw latest lifecycle event"
+                );
+            }
+            CgroupTestMode::Delegated => {
+                assert_eq!(
+                    world.journal.last_event(spirit_id),
+                    Some(LifecycleEvent::Load)
+                );
+            }
+        }
+    }
+
+    let journal_path = dir.path().join("lifecycle.ndjson");
+    drop(world.drain().await);
+    let sequence = lifecycle_entries(&journal_path);
+    let persisted_last = sequence
+        .iter()
+        .rev()
+        .find(|entry| entry.spirit_id == spirit_id)
+        .map(|entry| entry.lifecycle_event);
+    let reopened = maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap();
+    assert_eq!(reopened.last_event(spirit_id), persisted_last);
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn memory_only_t2_live_child_has_exact_rlimits_and_mode_truthful_journal() {
+    use maos_domain::invariants::i10::{LifecycleEvent, ResourceCeilingDowngradedPayload};
+    use maos_domain::invariants::i9::SandboxTier;
+
+    let mode = cgroup_test_mode();
+    LazyLock::force(&FIXTURES);
+    let dir = tempfile::tempdir().unwrap();
+    let journal_path = dir.path().join("lifecycle.ndjson");
+    let world = World::new(dir.path());
+    let spirit_id = "live-memory-only-t2";
+    let (core, admitted) = admit_t2(
+        &world,
+        spirit_id,
+        "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+    )
+    .await;
+    let spirit_pid = admitted.pid;
+    assert_eq!(admitted.sandbox.tier, SandboxTier::T2);
+    assert_eq!(admitted.sandbox.resolved_caps.memory_max_mb, Some(64));
+    assert_eq!(admitted.sandbox.resolved_caps.fd_max, Some(64));
+    let mut launch = echo_launch(spirit_id);
+    launch.once = false;
+    let turn_budget = launch.turn_budget;
+    let session = tokio::spawn(run_admitted_session(
+        world.session(),
+        admitted,
+        core,
+        launch,
+    ));
+    let child_pid = wait_for_live_t2_turn(&world, spirit_pid, turn_budget)
+        .await
+        .expect("real T2 release runner reaches Ready and completes a turn while staying live");
+    assert_ne!(child_pid, std::process::id());
+    assert_eq!(proc_soft_limit(child_pid, "Max address space"), "67108864");
+    assert_eq!(proc_soft_limit(child_pid, "Max open files"), "64");
+    let binding = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == spirit_pid)
+        .expect("the actual admitted Spirit has a supervisor binding");
+    assert_eq!(binding.child_pid, Some(child_pid));
+    let entries = lifecycle_entries(&journal_path);
+    let downgrade_rows = entries
+        .iter()
+        .filter(|entry| {
+            entry.spirit_id == spirit_id
+                && entry.lifecycle_event == LifecycleEvent::ResourceCeilingDowngraded
+        })
+        .collect::<Vec<_>>();
+    match mode {
+        CgroupTestMode::Undelegated => {
+            assert_eq!(downgrade_rows.len(), 1);
+            let row = downgrade_rows[0];
+            assert_eq!(row.effective_sandbox_tier, Some(SandboxTier::T2));
+            let payload: ResourceCeilingDowngradedPayload =
+                serde_json::from_slice(row.payload.as_deref().unwrap()).unwrap();
+            assert!(payload.missing_mechanism.contains("cgroup v2 memory.max"));
+            assert_eq!(payload.memory_max_mb, Some(64));
+            assert_eq!(payload.fd_max, Some(64));
+            assert!(payload.rlimit_as);
+            assert!(payload.rlimit_nofile);
+            assert_eq!(
+                world.journal.last_event(spirit_id),
+                Some(LifecycleEvent::ResourceCeilingDowngraded)
+            );
+        }
+        CgroupTestMode::Delegated => {
+            assert!(downgrade_rows.is_empty());
+            let leaf = child_cgroup_leaf(child_pid);
+            assert_eq!(
+                std::fs::read_to_string(leaf.join("memory.max"))
+                    .expect("read the actual delegated memory ceiling")
+                    .trim(),
+                "67108864"
+            );
+            assert_eq!(
+                world.journal.last_event(spirit_id),
+                Some(LifecycleEvent::Load)
+            );
+        }
+    }
+    world.supervisor.stop_workers();
+    let result = tokio::time::timeout(Duration::from_secs(10), session)
+        .await
+        .expect("live memory-only T2 session stops within its cleanup bound")
+        .unwrap();
+    assert_eq!(
+        world
+            .supervisor
+            .bindings()
+            .into_iter()
+            .find(|binding| binding.spirit_pid == spirit_pid)
+            .unwrap()
+            .phase,
+        maos_bin::supervision::BindingPhase::PlannedStop,
+        "planned teardown must not become a crash; terminal result: {result:?}"
+    );
+    assert!(
+        !Path::new(&format!("/proc/{child_pid}/stat")).exists(),
+        "the stopped live runner was reaped"
+    );
+    world.drain().await;
+    let persisted = lifecycle_entries(&journal_path)
+        .into_iter()
+        .filter(|entry| entry.spirit_id == spirit_id)
+        .map(|entry| entry.lifecycle_event)
+        .collect::<Vec<_>>();
+    let expected_last = if mode == CgroupTestMode::Undelegated {
+        LifecycleEvent::ResourceCeilingDowngraded
+    } else {
+        LifecycleEvent::Load
+    };
+    assert_eq!(persisted.last(), Some(&expected_last));
+    let reopened = maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap();
+    assert_eq!(reopened.last_event(spirit_id), Some(expected_last));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn resource_downgrade_no_resource_or_fd_only_t2_spawn_emits_no_row() {
+    use maos_domain::invariants::i10::LifecycleEvent;
+
+    let _mode = cgroup_test_mode();
+    LazyLock::force(&FIXTURES);
+    for (spirit_id, resources, memory_max_mb, fd_max) in [
+        ("no-resource-cap", "[resources]\n", None, None),
+        ("fd-only-cap", "[resources]\nfd_max = 64\n", None, Some(64)),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let world = World::new(dir.path());
+        let (core, admitted) = admit_t2(&world, spirit_id, resources).await;
+        assert_eq!(admitted.sandbox.resolved_caps.memory_max_mb, memory_max_mb);
+        assert_eq!(admitted.sandbox.resolved_caps.fd_max, fd_max);
+        assert_eq!(
+            run_admitted_session(world.session(), admitted, core, echo_launch(spirit_id))
+                .await
+                .expect("the actual T2 runner completes without a cgroup memory fallback")
+                .turns,
+            1
+        );
+        let entries = lifecycle_entries(&dir.path().join("lifecycle.ndjson"));
+        assert!(
+            entries.iter().all(|entry| {
+                entry.spirit_id != spirit_id
+                    || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+            }),
+            "no-resource and FD-only requests have no memory-ceiling downgrade row"
+        );
+        assert_eq!(
+            world.journal.last_event(spirit_id),
+            Some(LifecycleEvent::Load),
+            "the existing last-event index retains Load when no downgrade was recorded"
+        );
+        world.drain().await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn resource_downgrade_strict_cpu_pid_and_failed_t2_spawns_emit_no_row() {
+    use maos_domain::invariants::i10::LifecycleEvent;
+
+    let mode = cgroup_test_mode();
+    LazyLock::force(&FIXTURES);
+    for (spirit_id, resources) in [
+        ("strict-cpu-cap", "[resources]\ncpu_max_pct = 10\n"),
+        ("strict-pid-cap", "[resources]\npids_max = 16\n"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let world = World::new(dir.path());
+        let (core, admitted) = admit_t2(&world, spirit_id, resources).await;
+        let spirit_pid = admitted.pid;
+        let result =
+            run_admitted_session(world.session(), admitted, core, echo_launch(spirit_id)).await;
+        let child_pid = match (mode, result) {
+            (
+                CgroupTestMode::Undelegated,
+                Err(maos_bin::spirit_session::SessionError::Bridge(error)),
+            ) => {
+                assert!(
+                    error.to_ascii_lowercase().contains("cgroup"),
+                    "strict-cap refusal identifies the missing cgroup mechanism: {error}"
+                );
+                None
+            }
+            (CgroupTestMode::Undelegated, other) => {
+                panic!("undelegated strict CPU/PID request must refuse before guest execution: {other:?}")
+            }
+            (CgroupTestMode::Delegated, Ok(report)) => {
+                assert_eq!(report.turns, 1);
+                Some(report.child_pid)
+            }
+            (CgroupTestMode::Delegated, Err(other)) => {
+                panic!("delegated strict CPU/PID request should run under its cgroup: {other}")
+            }
+        };
+        let binding = world
+            .supervisor
+            .bindings()
+            .into_iter()
+            .find(|binding| binding.spirit_pid == spirit_pid)
+            .expect("strict-cap session binding remains observable");
+        assert_eq!(binding.child_pid, child_pid);
+        if mode == CgroupTestMode::Undelegated {
+            assert_eq!(
+                binding.phase,
+                maos_bin::supervision::BindingPhase::PlannedStop
+            );
+            assert!(
+                world
+                    .tl
+                    .query_frames(maos_kernel_core::iac::transparency_log::FrameFilter {
+                        spirit_pid: Some(spirit_pid),
+                        ..Default::default()
+                    })
+                    .unwrap()
+                    .iter()
+                    .all(|row| row.intent != "spirit.frame.authorization"
+                        && row.intent != "cli.subprocess.exit"),
+                "a strict-cap refusal has no guest output or child exit row"
+            );
+        }
+        let entries = lifecycle_entries(&dir.path().join("lifecycle.ndjson"));
+        assert!(entries.iter().all(|entry| {
+            entry.spirit_id != spirit_id
+                || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+        }));
+        assert_eq!(
+            world.journal.last_event(spirit_id),
+            Some(LifecycleEvent::Load)
+        );
+        world.drain().await;
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let spirit_id = "failed-memory-spawn";
+    let (core, admitted) = admit_t2(
+        &world,
+        spirit_id,
+        "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+    )
+    .await;
+    let mut launch = echo_launch(spirit_id);
+    launch.plan.program = dir
+        .path()
+        .join("does-not-exist/maos-wasm-runner")
+        .to_string_lossy()
+        .into_owned();
+    assert!(matches!(
+        run_admitted_session(world.session(), admitted, core, launch).await,
+        Err(maos_bin::spirit_session::SessionError::Bridge(_))
+    ));
+    let entries = lifecycle_entries(&dir.path().join("lifecycle.ndjson"));
+    assert!(entries.iter().all(|entry| {
+        entry.spirit_id != spirit_id
+            || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+    }));
+    assert_eq!(
+        world.journal.last_event(spirit_id),
+        Some(LifecycleEvent::Load)
+    );
+    world.drain().await;
+}
+
+async fn run_append_failure_child() {
+    use maos_domain::invariants::i10::LifecycleEvent;
+
+    assert_eq!(cgroup_test_mode(), CgroupTestMode::Undelegated);
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let spirit_id = "downgrade-append-failure";
+    let (core, admitted) = admit_t2(
+        &world,
+        spirit_id,
+        "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+    )
+    .await;
+    let spirit_pid = admitted.pid;
+    let journal_path = dir.path().join("lifecycle.ndjson");
+    // A process-local cap also covers SQLite. Pad only the lifecycle journal
+    // with valid empty lines so its append fails without starving live cleanup.
+    {
+        use std::io::Write;
+        let mut padding_file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&journal_path)
+            .unwrap();
+        let padding = [b'\n'; 4096];
+        let mut remaining =
+            (1024 * 1024_u64).saturating_sub(padding_file.metadata().unwrap().len());
+        while remaining != 0 {
+            let amount = remaining.min(padding.len() as u64) as usize;
+            padding_file.write_all(&padding[..amount]).unwrap();
+            remaining -= amount as u64;
+        }
+    }
+    let journal_size = std::fs::metadata(&journal_path)
+        .expect("stat the open regular lifecycle journal")
+        .len();
+    assert!(journal_path.is_file());
+    assert!(
+        journal_size > 0,
+        "admission wrote its real Load row before the cap"
+    );
+
+    let fsize = rustix::process::getrlimit(rustix::process::Resource::Fsize);
+    rustix::process::setrlimit(
+        rustix::process::Resource::Fsize,
+        rustix::process::Rlimit {
+            current: Some(journal_size),
+            maximum: fsize.maximum,
+        },
+    )
+    .expect("lower only this isolated child's soft RLIMIT_FSIZE to the journal EOF");
+    let result =
+        run_admitted_session(world.session(), admitted, core, echo_launch(spirit_id)).await;
+    rustix::process::setrlimit(rustix::process::Resource::Fsize, fsize)
+        .expect("restore the isolated process's original RLIMIT_FSIZE after JoinError");
+    match result {
+        Err(maos_bin::spirit_session::SessionError::Supervision(error)) => {
+            assert!(
+                error.contains("Journal append failed"),
+                "the Lifecycle Journal's fail-loud append panic propagates: {error}"
+            );
+        }
+        other => panic!("append failure must propagate as the blocking session panic: {other:?}"),
+    }
+    assert_eq!(
+        world.supervisor.strategy_name(),
+        "pidfd",
+        "this Linux test uses the real pidfd observer"
+    );
+    assert_eq!(
+        world.supervisor.counters().observer_unavailable(),
+        0,
+        "watch installed a live observer before the append panic"
+    );
+    let binding = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == spirit_pid)
+        .expect("the failed session's live owner was registered");
+    let child_pid = binding
+        .child_pid
+        .expect("watch recorded the actual child pid before journaling");
+    assert_ne!(child_pid, std::process::id());
+    assert_ne!(binding.phase, maos_bin::supervision::BindingPhase::Running);
+    assert!(
+        !Path::new(&format!("/proc/{child_pid}/stat")).exists(),
+        "LiveWorker panic cleanup stopped and reaped its real child"
+    );
+    assert_eq!(
+        world.journal.last_event(spirit_id),
+        Some(LifecycleEvent::Load),
+        "a failed append leaves the raw latest event at Load"
+    );
+    let entries = lifecycle_entries(&journal_path);
+    assert!(entries.iter().all(|entry| {
+        entry.spirit_id != spirit_id
+            || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+    }));
+    drop(world.drain().await);
+    let reopened = maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap();
+    assert_eq!(reopened.last_event(spirit_id), Some(LifecycleEvent::Load));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn resource_downgrade_append_panic_follows_live_child_observer_installation() {
+    use maos_domain::invariants::i10::LifecycleEvent;
+
+    let mode = cgroup_test_mode();
+    if std::env::var_os("MAOS_17_2_APPEND_FAILURE_CHILD").is_some() {
+        run_append_failure_child().await;
+    } else {
+        // The parent builds real fixtures before exec; the isolated fault process
+        // must not contend with another test's Cargo build lock before its deadline.
+        LazyLock::force(&FIXTURES);
+        match mode {
+            CgroupTestMode::Undelegated => {
+                let executable =
+                    std::env::current_exe().expect("locate this integration-test binary");
+                let output = std::process::Command::new("timeout")
+                    .args(["--signal=KILL", "60", "/bin/bash"])
+                    .args([
+                        "-c",
+                        "trap '' XFSZ; exec \"$@\"",
+                        "maos-17-2-append-failure",
+                    ])
+                    .arg(executable)
+                    .args([
+                        "--exact",
+                        "resource_downgrade_append_panic_follows_live_child_observer_installation",
+                        "--nocapture",
+                    ])
+                    .env("MAOS_17_2_CGROUP_MODE", "undelegated")
+                    .env("MAOS_17_2_APPEND_FAILURE_CHILD", "1")
+                    .output()
+                    .expect("start isolated RLIMIT_FSIZE append-failure test process");
+                let status = output.status;
+                assert!(
+                    output.status.success(),
+                    "isolated append-failure process failed ({status:?}):\nstdout:\n{}\nstderr:\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            CgroupTestMode::Delegated => {
+                let dir = tempfile::tempdir().unwrap();
+                let world = World::new(dir.path());
+                let spirit_id = "downgrade-append-failure";
+                let (core, admitted) = admit_t2(
+                    &world,
+                    spirit_id,
+                    "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+                )
+                .await;
+                let spirit_pid = admitted.pid;
+                let mut launch = echo_launch(spirit_id);
+                launch.once = false;
+                let turn_budget = launch.turn_budget;
+                let session = tokio::spawn(run_admitted_session(
+                    world.session(),
+                    admitted,
+                    core,
+                    launch,
+                ));
+                let child_pid = wait_for_live_t2_turn(&world, spirit_pid, turn_budget)
+                    .await
+                    .expect("delegated session completes a turn with its child still live");
+                let leaf = child_cgroup_leaf(child_pid);
+                assert_eq!(
+                    std::fs::read_to_string(leaf.join("memory.max"))
+                        .expect("read actual delegated memory.max")
+                        .trim(),
+                    "67108864"
+                );
+                let entries = lifecycle_entries(&dir.path().join("lifecycle.ndjson"));
+                assert!(entries.iter().all(|entry| {
+                    entry.spirit_id != spirit_id
+                        || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+                }));
+                assert_eq!(
+                    world.journal.last_event(spirit_id),
+                    Some(LifecycleEvent::Load)
+                );
+                world.supervisor.stop_workers();
+                let result = tokio::time::timeout(Duration::from_secs(10), session)
+                    .await
+                    .expect("delegated child cleanup completes")
+                    .unwrap();
+                assert_eq!(
+                    world
+                        .supervisor
+                        .bindings()
+                        .into_iter()
+                        .find(|binding| binding.spirit_pid == spirit_pid)
+                        .unwrap()
+                        .phase,
+                    maos_bin::supervision::BindingPhase::PlannedStop,
+                    "planned delegated teardown; terminal result: {result:?}"
+                );
+                assert!(!leaf.exists());
+                world.drain().await;
+            }
+        }
+    }
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn admitted_t2_echo_enforces_exact_live_caps_in_delegated_mode() {
+    use maos_domain::invariants::i10::LifecycleEvent;
+
+    let mode = cgroup_test_mode();
+    LazyLock::force(&FIXTURES);
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new(dir.path());
+    let spirit_id = "delegated-live-t2-caps";
+    let resources =
+        "[resources]\ncpu_max_pct = 10\nmemory_max_mb = 64\npids_max = 12\nfd_max = 64\n";
+    let (core, admitted) = admit_t2(&world, spirit_id, resources).await;
+    let spirit_pid = admitted.pid;
+    assert_eq!(admitted.sandbox.resolved_caps.cpu_max_pct, Some(10));
+    assert_eq!(admitted.sandbox.resolved_caps.memory_max_mb, Some(64));
+    assert_eq!(admitted.sandbox.resolved_caps.pids_max, Some(12));
+    assert_eq!(admitted.sandbox.resolved_caps.fd_max, Some(64));
+
+    match mode {
+        CgroupTestMode::Undelegated => {
+            let result =
+                run_admitted_session(world.session(), admitted, core, echo_launch(spirit_id)).await;
+            match result {
+                Err(maos_bin::spirit_session::SessionError::Bridge(error)) => assert!(
+                    error.to_ascii_lowercase().contains("cgroup"),
+                    "strict CPU/PID native refusal identifies cgroup setup: {error}"
+                ),
+                other => {
+                    panic!("undelegated CPU/PID caps must refuse before guest execution: {other:?}")
+                }
+            }
+            let binding = world
+                .supervisor
+                .bindings()
+                .into_iter()
+                .find(|binding| binding.spirit_pid == spirit_pid)
+                .expect("refused T2 binding remains observable");
+            assert_eq!(binding.child_pid, None);
+            assert!(lifecycle_entries(&dir.path().join("lifecycle.ndjson"))
+                .iter()
+                .all(|entry| {
+                    entry.spirit_id != spirit_id
+                        || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+                }));
+            assert_eq!(
+                world.journal.last_event(spirit_id),
+                Some(LifecycleEvent::Load)
+            );
+            world.drain().await;
+        }
+        CgroupTestMode::Delegated => {
+            let mut launch = echo_launch(spirit_id);
+            launch.once = false;
+            let turn_budget = launch.turn_budget;
+            let session = tokio::spawn(run_admitted_session(
+                world.session(),
+                admitted,
+                core,
+                launch,
+            ));
+            let child_pid = match wait_for_live_t2_turn(&world, spirit_pid, turn_budget).await {
+                Ok(child_pid) => child_pid,
+                Err(error) => {
+                    world.supervisor.stop_workers();
+                    let terminal = tokio::time::timeout(Duration::from_secs(10), session).await;
+                    panic!("{error}; bounded session cleanup result: {terminal:?}");
+                }
+            };
+            assert_ne!(child_pid, std::process::id());
+            assert_eq!(proc_soft_limit(child_pid, "Max address space"), "67108864");
+            assert_eq!(proc_soft_limit(child_pid, "Max open files"), "64");
+            let leaf = child_cgroup_leaf(child_pid);
+            assert_eq!(
+                std::fs::read_to_string(leaf.join("cpu.max"))
+                    .expect("read exact delegated T2 CPU ceiling")
+                    .trim(),
+                "10000 100000"
+            );
+            assert_eq!(
+                std::fs::read_to_string(leaf.join("memory.max"))
+                    .expect("read exact delegated T2 memory ceiling")
+                    .trim(),
+                "67108864"
+            );
+            assert_eq!(
+                std::fs::read_to_string(leaf.join("pids.max"))
+                    .expect("read exact delegated T2 PID ceiling")
+                    .trim(),
+                "12"
+            );
+            assert!(
+                lifecycle_entries(&dir.path().join("lifecycle.ndjson"))
+                    .iter()
+                    .all(|entry| {
+                        entry.spirit_id != spirit_id
+                            || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+                    }),
+                "a real delegated memory.max has no downgrade row before the completed turn"
+            );
+            world.supervisor.stop_workers();
+            let result = tokio::time::timeout(Duration::from_secs(10), session)
+                .await
+                .expect("live delegated session stops within its cleanup bound")
+                .unwrap();
+            assert_eq!(
+                world
+                    .supervisor
+                    .bindings()
+                    .into_iter()
+                    .find(|binding| binding.spirit_pid == spirit_pid)
+                    .unwrap()
+                    .phase,
+                maos_bin::supervision::BindingPhase::PlannedStop,
+                "planned limited-runner teardown; terminal result: {result:?}"
+            );
+            assert!(
+                !leaf.exists(),
+                "session teardown removes its owned cgroup leaf"
+            );
+            world.drain().await;
+        }
+    }
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn fast_t2_crash_then_restart_orders_one_downgrade_after_crash() {
+    use maos_domain::invariants::i10::LifecycleEvent;
+
+    let mode = cgroup_test_mode();
+    LazyLock::force(&FIXTURES);
+    let dir = tempfile::tempdir().unwrap();
+    let journal_path = dir.path().join("lifecycle.ndjson");
+    let (watched_tx, watched_rx) = std::sync::mpsc::channel();
+    let (after_watch_release_tx, after_watch_release_rx) = std::sync::mpsc::channel();
+    let first_watch = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let callback_release = std::sync::Mutex::new(after_watch_release_rx);
+    let callback_first_watch = Arc::clone(&first_watch);
+    let seams = maos_bin::supervision::SupervisorSeams {
+        after_watch: Some(Arc::new(move |child_pid| {
+            if callback_first_watch.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                watched_tx
+                    .send(child_pid)
+                    .expect("publish the actual watched child PID to the test");
+                callback_release
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(20))
+                    .expect("release the first watcher within the bounded ordering window");
+            }
+        })),
+        ..Default::default()
+    };
+    let world = World::new_with_seams(dir.path(), seams);
+    // Dropping this sender during unwinding releases the callback before World teardown.
+    let after_watch_release = after_watch_release_tx;
+    let spirit_id = "fast-crash-downgrade-restart";
+    let (first_core, first_admitted) = admit_t2(
+        &world,
+        spirit_id,
+        "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+    )
+    .await;
+    let old_spirit_pid = first_admitted.pid;
+    let mut first_launch = echo_launch(spirit_id);
+    first_launch.once = false;
+    let first_session = tokio::spawn(run_admitted_session(
+        world.session(),
+        first_admitted,
+        first_core,
+        first_launch,
+    ));
+    let old_child_pid = watched_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("the actual observer is installed before the T2 owner continues");
+    let old_binding = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == old_spirit_pid)
+        .expect("old admitted T2 has a supervisor binding");
+    assert_eq!(old_binding.child_pid, Some(old_child_pid));
+    let old_child = old_binding
+        .child
+        .as_ref()
+        .expect("observer has installed the real child")
+        .clone();
+    rustix::process::pidfd_send_signal(old_child.pidfd(), rustix::process::Signal::KILL)
+        .expect("explicitly crash the real runner before startup publication");
+    let crash_deadline = std::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let crashed = lifecycle_entries(&journal_path).iter().any(|entry| {
+            entry.spirit_id == spirit_id && entry.lifecycle_event == LifecycleEvent::Crash
+        });
+        let scb_removed = {
+            let scbs = world.scheduler.scbs();
+            let removed = !scbs
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .contains_key(&old_spirit_pid);
+            removed
+        };
+        if crashed && scb_removed {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < crash_deadline,
+            "real observer must persist Crash and unload/remove the SCB before T2 continues"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(!process_is_live(old_child_pid));
+    assert!(
+        lifecycle_entries(&journal_path).iter().all(|entry| {
+            entry.spirit_id != spirit_id
+                || entry.lifecycle_event != LifecycleEvent::ResourceCeilingDowngraded
+        }),
+        "producer remains behind the after-watch gate until crash handling completes"
+    );
+    after_watch_release
+        .send(())
+        .expect("release the first registered watcher after real crash handling");
+    let first_result = tokio::time::timeout(Duration::from_secs(10), first_session)
+        .await
+        .expect("crashed fast runner is observed and finalized")
+        .unwrap();
+    assert!(matches!(
+        first_result,
+        Err(maos_bin::spirit_session::SessionError::Child(_))
+    ));
+    assert!(!process_is_live(old_child_pid));
+    assert!(
+        !world
+            .scheduler
+            .scbs()
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .contains_key(&old_spirit_pid),
+        "crash handling unloads and removes the old SCB"
+    );
+
+    let (second_core, second_admitted) = admit_t2(
+        &world,
+        spirit_id,
+        "[resources]\nmemory_max_mb = 64\nfd_max = 64\n",
+    )
+    .await;
+    assert_ne!(second_admitted.pid, old_spirit_pid);
+    let second_spirit_pid = second_admitted.pid;
+    let mut second_launch = echo_launch(spirit_id);
+    second_launch.once = true;
+    if let Some(frame) = second_launch.initial_frame.as_mut() {
+        frame.frame_id = [0x18; 16];
+    }
+    let report = run_admitted_session(world.session(), second_admitted, second_core, second_launch)
+        .await
+        .expect("same Spirit can restart after fast crash and perform a real turn");
+    assert_eq!(report.turns, 1);
+    let new_binding = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == second_spirit_pid)
+        .expect("restarted T2 has its own supervisor binding");
+    assert_eq!(new_binding.child_pid, Some(report.child_pid));
+    assert_ne!(report.child_pid, std::process::id());
+    assert!(
+        !world
+            .scheduler
+            .scbs()
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .contains_key(&second_spirit_pid),
+        "once-session unloads its restarted SCB after the completed turn"
+    );
+
+    let entries = lifecycle_entries(&journal_path);
+    let sequence = entries
+        .iter()
+        .filter(|entry| entry.spirit_id == spirit_id)
+        .map(|entry| entry.lifecycle_event)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sequence
+            .iter()
+            .filter(|event| **event == LifecycleEvent::Load)
+            .count(),
+        2
+    );
+    assert_eq!(
+        sequence
+            .iter()
+            .filter(|event| **event == LifecycleEvent::Crash)
+            .count(),
+        1,
+        "the old fast child has exactly one crash lifecycle event"
+    );
+    let crash_index = sequence
+        .iter()
+        .position(|event| *event == LifecycleEvent::Crash)
+        .expect("the first child's explicit crash is persisted");
+    assert_eq!(sequence[crash_index - 1], LifecycleEvent::Load);
+    match mode {
+        CgroupTestMode::Undelegated => {
+            assert_eq!(
+                sequence
+                    .iter()
+                    .filter(|event| **event == LifecycleEvent::ResourceCeilingDowngraded)
+                    .count(),
+                2,
+                "each undelegated admitted session emits its own one-shot row"
+            );
+            assert_eq!(
+                sequence[crash_index + 1],
+                LifecycleEvent::ResourceCeilingDowngraded,
+                "the first owner consumes its downgrade only after crash unload"
+            );
+            assert_eq!(
+                sequence.last(),
+                Some(&LifecycleEvent::ResourceCeilingDowngraded)
+            );
+        }
+        CgroupTestMode::Delegated => {
+            assert!(sequence
+                .iter()
+                .all(|event| *event != LifecycleEvent::ResourceCeilingDowngraded));
+            assert_eq!(sequence.last(), Some(&LifecycleEvent::Load));
+        }
+    }
+    assert!(crash_index < sequence.len() - 1);
+    let expected_last = *sequence.last().expect("restart sequence is non-empty");
+    world.drain().await;
+    let reopened_entries = lifecycle_entries(&journal_path)
+        .into_iter()
+        .filter(|entry| entry.spirit_id == spirit_id)
+        .map(|entry| entry.lifecycle_event)
+        .collect::<Vec<_>>();
+    assert_eq!(reopened_entries, sequence);
+    let reopened = maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap();
+    assert_eq!(reopened.last_event(spirit_id), Some(expected_last));
 }

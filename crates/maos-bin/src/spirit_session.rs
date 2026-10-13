@@ -2,6 +2,7 @@
 //! The caller admits exactly one SCB; this module adopts it, never loads another.
 
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -31,6 +32,12 @@ use crate::enterprise_identity::EnterpriseRuntime;
 use crate::enterprise_pdp_runtime::EnterprisePdpRuntime;
 use crate::supervision::{BindingCore, LiveWorker, WorkerSupervision, WorkerSupervisor};
 use crate::worker_spawn::{issue_enterprise_governed_capability, GovernedMintError};
+#[cfg(target_os = "linux")]
+use maos_domain::invariants::i10::{
+    JournalEntry, LifecycleEntry, LifecycleEvent, ResourceCeilingDowngradedPayload,
+};
+#[cfg(target_os = "linux")]
+use maos_kernel_core::capability::cap_tokens::monotonic_now_ns;
 
 /// Guest frames one turn may emit before the session is a protocol violation.
 pub const MAX_FRAMES_PER_TURN: usize = 64;
@@ -52,6 +59,7 @@ pub struct SessionDeps {
     pub security: Arc<SecurityManagerAdapter>,
     pub iac: Arc<IacBusAdapter>,
     pub journal: Arc<TransparencyLogAdapter>,
+    pub lifecycle_journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     pub pid_by_spirit_id: Arc<RwLock<BTreeMap<String, u32>>>,
     pub enterprise: Option<Arc<EnterpriseRuntime>>,
     pub pdp: Option<EnterprisePdpRuntime>,
@@ -247,6 +255,12 @@ pub async fn run_admitted_session(
         if admitted.sandbox.tier != SandboxTier::T2 {
             return Err(SessionError::SandboxTier);
         }
+        #[cfg(target_os = "linux")]
+        let effective_tier = admitted.sandbox.tier;
+        #[cfg(target_os = "linux")]
+        let memory_max_mb = admitted.sandbox.resolved_caps.memory_max_mb;
+        #[cfg(target_os = "linux")]
+        let fd_max = admitted.sandbox.resolved_caps.fd_max;
         // Declared `iac.send` peer classes come from the kernel's own admission
         // result (the SCB adopted above), never from the policy table: the
         // composition root neither seeds nor reads the manifest-derived table.
@@ -282,6 +296,24 @@ pub async fn run_admitted_session(
         }).map_err(|error| SessionError::Bridge(error.to_string()))?;
         let mut live = LiveWorker { binding, bridge };
         deps.supervisor.watch(live.binding.core(), live.bridge.child_pid());
+        #[cfg(target_os = "linux")]
+        if let Some(missing_mechanism) = live.bridge.take_resource_downgrade() {
+            let payload = ResourceCeilingDowngradedPayload::new(
+                missing_mechanism,
+                memory_max_mb,
+                fd_max,
+            );
+            let payload = serde_json::to_vec(&payload)
+                .map_err(|error| SessionError::Journal(error.to_string()))?;
+            deps.lifecycle_journal
+                .append_transition(JournalEntry::Lifecycle(LifecycleEntry {
+                    timestamp: monotonic_now_ns(),
+                    lifecycle_event: LifecycleEvent::ResourceCeilingDowngraded,
+                    spirit_id: admitted.spirit_id.clone(),
+                    effective_sandbox_tier: Some(effective_tier),
+                    payload: Some(payload),
+                }));
+        }
         let mut writer_thread = None;
         let mut leases = Vec::new();
         let mut report = SessionReport {
@@ -516,7 +548,7 @@ fn deliver_bounded<T>(
     deps: &SessionDeps,
     runtime: &tokio::runtime::Handle,
     deadline: Instant,
-    work: impl std::future::Future<Output = Result<T, maos_domain::iac_bus_types::IacBusError>>,
+    work: impl Future<Output = Result<T, maos_domain::iac_bus_types::IacBusError>>,
 ) -> Result<T, SessionError> {
     let remaining = deadline.saturating_duration_since(Instant::now());
     runtime.block_on(async {

@@ -185,7 +185,6 @@ impl JournalAdapter {
                  I10 durability binding broken; kernel halts."
             );
         }
-        drop(file);
         if let JournalEntry::Lifecycle(ref le) = entry {
             let mut index = self
                 .most_recent

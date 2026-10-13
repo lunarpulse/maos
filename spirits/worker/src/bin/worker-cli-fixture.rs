@@ -7,6 +7,8 @@
 //! - With `--maos-bridge-probe` anywhere in argv: print the JSON output-shape
 //!   envelope as the FIRST stdout line and exit 0. This is what the kernel's
 //!   `probe_and_verify_shape` reads to assert the declared `output_shape_version`.
+//! - `--maos-fixture-mode=resource-probe`: bounded real thread and descriptor
+//!   exhaustion plus a bounded CPU burst, held briefly for OCI inspection.
 //! - With `--maos-fixture-mode=<mode>`: run the named Story-16-3 crash/hang
 //!   scene (ruling D-16-3-L) so the supervision corpora can drive real
 //!   subprocess deaths; unknown mode ⇒ exit 2. Modes: `hang`, `line-then-hang`,
@@ -70,6 +72,7 @@ fn main() {
     // envelope and exits instead of hanging the admission probe.
     if let Some(mode) = args.iter().find_map(|a| a.strip_prefix(MODE_FLAG_PREFIX)) {
         match mode {
+            "resource-probe" => resource_probe(),
             "hang" => sleep_forever(),
             "line-then-hang" => {
                 println!("{}", worker::CANNED_OUTPUT_LINES[0]);
@@ -91,8 +94,8 @@ fn main() {
             }
             unknown => {
                 eprintln!(
-                    "worker-fixture: unknown fixture mode `{unknown}` (expected hang, \
-                     line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self \
+                    "worker-fixture: unknown fixture mode `{unknown}` (expected resource-probe, \
+                     hang, line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self \
                      or exit-nonzero)"
                 );
                 std::process::exit(UNKNOWN_MODE_EXIT);
@@ -187,4 +190,87 @@ fn sigkill_self() -> ! {
             std::process::exit(KILL_SPAWN_FAILURE_EXIT);
         }
     }
+}
+/// Exercise finite, actual process and descriptor limits in the T3 container.
+///
+/// The task count is deliberately bounded: at most 64 worker threads are
+/// attempted, and all successfully-created threads are released and joined
+/// before return. The 12-PID test cap therefore makes this hit EAGAIN without
+/// an unbounded fork or thread bomb.
+fn resource_probe() -> ! {
+    use std::fs::File;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    for namespace in ["pid", "net", "user"] {
+        let path = format!("/proc/self/ns/{namespace}");
+        let actual = std::fs::read_link(path).expect("resource fixture namespace");
+        println!("worker: namespace {namespace}={}", actual.display());
+    }
+    flush_stdout();
+    let mut files = Vec::new();
+    let fd_error = loop {
+        match File::open("/dev/null") {
+            Ok(file) if files.len() < 256 => files.push(file),
+            Ok(_) => {
+                break "fixture-bound".to_string();
+            }
+            Err(error) => {
+                break format!("{:?}:{}", error.kind(), error.raw_os_error().unwrap_or(-1))
+            }
+        }
+    };
+    let release = Arc::new(AtomicBool::new(false));
+    let mut threads = Vec::new();
+    let mut task_error = None;
+    for _ in 0..64 {
+        let release = Arc::clone(&release);
+        match std::thread::Builder::new().spawn(move || {
+            while !release.load(Ordering::Acquire) {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }) {
+            Ok(thread) => threads.push(thread),
+            Err(error) => {
+                task_error = Some(format!(
+                    "{:?}:{}",
+                    error.kind(),
+                    error.raw_os_error().unwrap_or(-1)
+                ));
+                break;
+            }
+        }
+    }
+
+    println!("{}", worker::CANNED_OUTPUT_LINES[0]);
+    println!(
+        "worker: resource probe {{\"threads_created\":{},\"task_error\":{},\"fds_opened\":{},\"fd_error\":\"{}\"}}",
+        threads.len(),
+        task_error
+            .as_deref()
+            .map(|error| format!("\"{error}\""))
+            .unwrap_or_else(|| "null".to_string()),
+        files.len(),
+        fd_error
+    );
+    println!("{}", worker::CANNED_OUTPUT_LINES[1]);
+    flush_stdout();
+
+    // Consume CPU long enough for the finite 10% quota to accrue observable
+    // throttling, while keeping this workload strictly bounded.
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    let mut value = 1_u64;
+    while std::time::Instant::now() < until {
+        value = value.wrapping_mul(6364136223846793005).wrapping_add(1);
+        std::hint::black_box(value);
+    }
+    std::thread::sleep(Duration::from_secs(2));
+    drop(files);
+    release.store(true, Ordering::Release);
+    for thread in threads {
+        let _ = thread.join();
+    }
+    println!("{}", worker::CANNED_OUTPUT_LINES[2]);
+    flush_stdout();
+    std::process::exit(0)
 }

@@ -702,12 +702,13 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
     )
     .expect("parse worker manifest");
     let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+    let policy = Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new());
     let capability = Arc::new(
         maos_kernel_core::capability::CapabilityRegistryAdapter::new(
             Arc::new(maos_kernel_core::api::RingCryptoProvider),
             maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0x2B; 32]),
             NONCE_B,
-            Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+            Arc::clone(&policy),
             audit_tx,
             maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
             Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
@@ -788,6 +789,7 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         },
         transparency_log: log,
         capability,
+        policy,
         spirit_host: None,
         enterprise_runtime: None,
         enterprise_pdp_runtime: None,
@@ -795,6 +797,63 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         #[cfg(unix)]
         egress: None,
     }
+}
+
+#[tokio::test]
+async fn malformed_worker_resources_refuse_before_cli_probe_or_binding() {
+    let fixture = fixture("malformed-resources");
+    let log = Arc::new(
+        TransparencyLogAdapter::open(&fixture.host_b_log, NONCE_B).expect("open host B log"),
+    );
+    let mut context = in_process_context(&fixture, Arc::clone(&log));
+    context
+        .manifest_root
+        .as_table_mut()
+        .expect("manifest table")
+        .insert(
+            "resources".into(),
+            toml::Value::Table(toml::toml! { memory_max_mb = 0 }),
+        );
+    // If resource parsing is deferred, binary resolution reaches this deliberately
+    // invalid command instead; if it is skipped entirely, that error masks the
+    // malformed resource and the precedence assertion below fails.
+    context
+        .manifest_root
+        .get_mut("cli_wrapper")
+        .and_then(toml::Value::as_table_mut)
+        .expect("cli_wrapper table")
+        .insert(
+            "command".into(),
+            toml::Value::String("maos-nonexistent-cli-probe".into()),
+        );
+
+    let error = maos_bin::worker_spawn::run_cli_wrapper_manifest(
+        &context.manifest_root,
+        &context.run,
+        Arc::clone(&context.transparency_log),
+        Arc::clone(&context.capability),
+        Arc::clone(&context.policy),
+        context.spirit_host.clone(),
+        context.enterprise_runtime.clone(),
+        context.enterprise_pdp_runtime.as_deref(),
+        None,
+        context.remote_requested,
+        context.supervision.as_ref(),
+        maos_bin::supervision::WorkerTask::Standalone,
+        #[cfg(unix)]
+        context.egress.as_ref(),
+    )
+    .expect_err("malformed resources must refuse the Worker");
+    assert!(
+        error
+            .to_string()
+            .contains("[resources] parse: resource cap out of range: memory_max_mb = 0"),
+        "resource CapOutOfRange parsing must win over the deliberately invalid CLI path: {error}"
+    );
+    assert!(
+        context.supervision.bindings().is_empty(),
+        "malformed resources must fail before Worker binding"
+    );
 }
 
 #[tokio::test]

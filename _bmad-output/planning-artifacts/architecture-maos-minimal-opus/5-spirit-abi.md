@@ -89,10 +89,14 @@ versions = ["1.0", "1.1"]              # cross-major migration via the migrate()
 preserve = ["open_pr_state", "review_queue"]   # HSIS-tested invariants
 
 [resources]
-# Cgroups v2 / setrlimit / Job Object ceilings for subprocess-form Spirits
+# Optional Worker resource ceilings (schema 5 adds pids_max; omission remains valid):
+# Native T2: delegated Linux cgroup v2 plus RLIMIT_AS / RLIMIT_NOFILE as applicable.
+# T3: supported Linux rootless-container route; no macOS/Windows equivalence claim.
 cpu_max_pct = 50
 memory_max_mb = 512
 fd_max = 64
+# pids_max = 64                    # optional positive u32; independent PID/tasks ceiling
+
 
 [sandbox]
 tier = "T2"                           # kernel applies strictest-of (manifest, trust-tier, operator-policy)
@@ -113,6 +117,18 @@ homepage = "https://github.com/diego/code-reviewer-pro"
 ```
 
 The schema is versioned (`manifest_schema_version`) independently of the kernel and ABI; the kernel ships a compatibility matrix in `STABILITY.md`.
+Worker resource limits are resolved independently to the strictest manifest and
+live operator authority: CPU percentage, memory MiB, PID/tasks (`pids_max`), and
+file descriptors (`fd_max`). `fd_max` is not a PID alias. Native T2 requires
+writable delegated cgroup-v2 placement for an explicit CPU or PID cap; a missing
+cgroup mechanism permits only memory-only fallback with RLIMIT_AS and optional
+RLIMIT_NOFILE plus one persisted informational `ResourceCeilingDowngraded=20`
+lifecycle row after live worker ownership/observer registration. The row does not
+change Spirit Control Block state. T3 independently applies CPU, PID, memory, and
+explicit soft/hard nofile ceilings in the rootless container; it refuses an FD
+ceiling above the inherited hard limit rather than clamping. Supported evidence is
+Ubuntu 24.04/26.04 x64 and arm native images, and x64 T3 only. Story 17-7 owns
+T3 OOM/SIGKILL ambiguity and short-lived-worker PID-inspection refusal.
 
 > **v1.0 binding — ABI Stability Triple enforcement (Story 7.5a):** The triple `(kernel_version, abi_version, manifest_schema_version)` is now an ENFORCED load-time contract at the admission chokepoint `SecurityManagerAdapter::admit_spirit`, not a parsed-but-ignored declaration. (1) `min_substrate_version` is COMPARED against the running kernel (`env!("CARGO_PKG_VERSION")`, reusing `maos_domain::revocation::semver_range_contains` — no new `semver` dep); a too-old kernel is refused with typed `SecurityError::ESubstrateTooOld` (FR8). (2) The `manifest_schema_version` window is **fail-closed in BOTH directions**: below `MIN_SUPPORTED` → typed `EAbiTooOld` (N-2 hard refusal); above `MAX_SUPPORTED` → typed `EAbiTooNew` (a future Spirit is told to upgrade the kernel — NO warn-and-ignore window, because a manifest is a security artifact and a silent ignore is fail-open). N-1 (`= MIN_SUPPORTED`) loads with WARN-level degradation notes (NFR-Maint-9). (3) `STABILITY.md` (generated from workspace state) and `BREAKING.md` (CI-grep-enforced dated entries) are published; the deprecation rail (NFR-Maint-3/5) cross-checks `#[maos_attrs::deprecated_since]` surfaces ↔ STABILITY.md ↔ BREAKING.md (vacuous at v1.0's zero deprecations). LTS is **1 year at v1.0** (NFR-Maint-6; 2-year deferred to v1.5). Constants unchanged (`ABI_VERSION = 1`, `MANIFEST_SCHEMA_VERSION = 2`); the new `SecurityError` variants are kernel-internal (additive, not ABI surface).
 

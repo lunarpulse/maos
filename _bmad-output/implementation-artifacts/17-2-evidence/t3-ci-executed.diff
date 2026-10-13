@@ -1,0 +1,2634 @@
+diff --git a/.github/workflows/17-2-native-proof.yml b/.github/workflows/17-2-native-proof.yml
+new file mode 100644
+index 00000000..8613ae64
+--- /dev/null
++++ b/.github/workflows/17-2-native-proof.yml
+@@ -0,0 +1,74 @@
++name: 17-2 native containment proof
++on:
++  push:
++    branches: ['ci/17-2-native-proof']
++permissions:
++  contents: read
++jobs:
++  native-proof:
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-24.04, ubuntu-26.04]
++    runs-on: ${{ matrix.os }}
++    timeout-minutes: 45
++    steps:
++      - uses: actions/checkout@v4
++      - uses: dtolnay/rust-toolchain@stable
++      - uses: Swatinem/rust-cache@v2
++      - name: Provision signed T3 image
++        uses: ./.github/actions/provision-t3-test-substrate
++      - name: Build production maos and real Worker fixture
++        shell: bash
++        run: |
++          set -euo pipefail
++          cargo build --locked -p maos-bin --features network,wasm-host --bin maos
++          cargo build --locked -p worker --bin worker-cli-fixture
++      - name: Run limited real rootless T3 canary and focused T3 integration
++        shell: bash
++        run: |
++          set -euo pipefail
++          unit=maos-17-2-worker-proof
++          trap 'sudo systemctl stop "$unit.service" || true' EXIT
++          set +e
++          sudo systemd-run --unit="$unit" --uid="$(id -u)" --gid="$(id -g)" --working-directory="$GITHUB_WORKSPACE" \
++            --property=Delegate=yes --property=RuntimeMaxSec=1500 --property=TimeoutStopSec=10 \
++            --wait --pipe --collect --expand-environment=no \
++            env PATH="$PATH" HOME="$HOME" CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" \
++            RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
++            CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$GITHUB_WORKSPACE/target}" \
++            CI=true GITHUB_ACTIONS=true MAOS_SECRETS_BACKEND=env \
++            MAOS_T3_RUNTIME="$MAOS_T3_RUNTIME" \
++            MAOS_T3_IMAGE_LOCK_PATH="$MAOS_T3_IMAGE_LOCK_PATH" \
++            MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX="$MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX" \
++            ${XDG_RUNTIME_DIR:+XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"} \
++            ${DBUS_SESSION_BUS_ADDRESS:+DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"} \
++            bash -c '
++              set -euo pipefail
++              test "$(id -u)" -ne 0
++              cgroup=$(cut -d: -f3 /proc/self/cgroup)
++              test "$cgroup" = /system.slice/maos-17-2-worker-proof.service
++              test "$(systemctl show maos-17-2-worker-proof.service -p Delegate --value)" = yes
++              root=/sys/fs/cgroup$cgroup
++              for controller in cpu memory pids; do
++                case " $(cat "$root/cgroup.controllers") " in
++                  *" $controller "*) ;;
++                  *) echo "missing controller: $controller" >&2; exit 1 ;;
++                esac
++              done
++              mkdir "$root/daemon"
++              test "$$" = "$BASHPID"
++              printf "%s\n" "$$" > "$root/daemon/cgroup.procs"
++              printf "+cpu +memory +pids\n" > "$root/cgroup.subtree_control"
++              cargo test --locked -p maos-bin --features network,wasm-host --test smoke_cli_wrapper_8_12 maos_run_cli_wrapper_worker_spawns_real_subprocess -- --exact --nocapture
++              cargo test --locked -p maos-bin --features network,wasm-host --test worker_resource_limits_17_2 -- --nocapture
++            ' 2>&1 | tee worker-proof.log
++          result=${PIPESTATUS[0]}
++          set -e
++          python3 -c 'import re,sys; s=open("worker-proof.log").read(); code=int(sys.argv[1]); reports=[tuple(map(int,r)) for r in re.findall(r"test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored",s)]; good=code==0 and len(reports)==2 and all(p>0 and f==0 and i==0 for p,f,i in reports) and not re.search(r"(?m)^SKIP ",s); detail="\n".join(s.splitlines()[-100:])[-2800:].replace("%","%25").replace("\r","%0D").replace("\n","%0A"); kind="notice" if good else "error"; print("::"+kind+" title=17-2 Worker proof::runner=${{ matrix.os }} exit="+str(code)+" suites="+str(reports)+"; real rootless Worker%0A"+detail); sys.exit(0 if good else 1)' "$result"
++          exit "$result"
++      - uses: actions/upload-artifact@v4
++        if: always()
++        with:
++          name: worker-proof-${{ matrix.os }}
++          path: worker-proof.log
+diff --git a/crates/maos-bin/src/delegation.rs b/crates/maos-bin/src/delegation.rs
+index defd1c72..be94c93e 100644
+--- a/crates/maos-bin/src/delegation.rs
++++ b/crates/maos-bin/src/delegation.rs
+@@ -616,6 +616,7 @@ pub struct HostBWorkerContext {
+     pub run: crate::worker_spawn::RunArgs,
+     pub transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+     pub capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
++    pub policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+     pub spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
+     /// Threaded, NOT dropped. Host B mints a `Scope::CliSubprocessSpawn` cap-token
+     /// for a task a REMOTE host asked for; running that mint without the SSO/PDP
+@@ -690,6 +691,7 @@ pub async fn handle_one_inbound(
+     let run = ctx.run.clone();
+     let transparency_log = Arc::clone(&ctx.transparency_log);
+     let capability = Arc::clone(&ctx.capability);
++    let policy = Arc::clone(&ctx.policy);
+     let spirit_host = ctx.spirit_host.clone();
+     let enterprise_runtime = ctx.enterprise_runtime.clone();
+     let enterprise_pdp_runtime = ctx.enterprise_pdp_runtime.clone();
+@@ -703,6 +705,7 @@ pub async fn handle_one_inbound(
+             &run,
+             transparency_log,
+             capability,
++            policy,
+             spirit_host,
+             enterprise_runtime,
+             enterprise_pdp_runtime.as_deref(),
+diff --git a/crates/maos-bin/src/main.rs b/crates/maos-bin/src/main.rs
+index 4fa9b89d..fe5eb952 100644
+--- a/crates/maos-bin/src/main.rs
++++ b/crates/maos-bin/src/main.rs
+@@ -4382,6 +4382,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                             &run,
+                             Arc::clone(&transparency_log),
+                             Arc::clone(&capability),
++                            Arc::clone(security.policy()),
+                             spirit_host.clone(),
+                             enterprise_runtime.clone(),
+                             enterprise_pdp_runtime.as_ref(),
+@@ -4787,6 +4788,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+                             &run,
+                             Arc::clone(&transparency_log),
+                             Arc::clone(&capability),
++                            Arc::clone(security.policy()),
+                             spirit_host.clone(),
+                             enterprise_runtime.clone(),
+                             enterprise_pdp_runtime.as_ref(),
+@@ -7886,6 +7888,7 @@ description = "smoke test spirit successor"
+                 delegation_leg,
+                 Arc::clone(&iac),
+                 Arc::clone(&capability),
++                Arc::clone(security.policy()),
+                 enterprise_runtime.clone(),
+                 enterprise_pdp_runtime.clone().map(Arc::new),
+                 Arc::clone(&cohort_worker_supervision),
+@@ -10127,12 +10130,9 @@ fn host_b_worker_context(
+     bootstrap: &CohortDaemonBootstrap,
+     transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
+     capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
++    policy: &Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+     enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
+-    // Story 16-3 (D-16-3-I) — APPENDED after the existing parameters on
+-    // purpose: `enterprise_daemon_seam_13_5a.rs`'s signature scan stops at the
+-    // first `)`, so inserting anywhere else reds it for a reason that has
+-    // nothing to do with this story.
+     supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
+     #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
+ ) -> Result<Option<maos_bin::delegation::HostBWorkerContext>, Box<dyn std::error::Error>> {
+@@ -10175,7 +10175,7 @@ fn host_b_worker_context(
+         },
+         transparency_log: std::sync::Arc::clone(transparency_log),
+         capability: Arc::clone(capability),
+-        // Story 11.1a's Spirit Host Port is a `maos run` composition; the daemon
++        policy: Arc::clone(policy),
+         // composes no WASM host, so every host-B spawn is a native subprocess —
+         // byte-identical to the `None` branch `run_cli_wrapper_manifest` already has.
+         spirit_host: None,
+@@ -10219,12 +10219,9 @@ async fn run_cohort_a2a_daemon(
+     delegation_leg: maos_bin::delegation::DelegationLeg,
+     iac: Arc<IacBusAdapter>,
+     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
++    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+     host_b_enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
+     host_b_enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
+-    // Story 16-3 (D-16-3-I) — APPENDED after every existing parameter on
+-    // purpose: `enterprise_daemon_seam_13_5a.rs`'s signature scan stops at the
+-    // first `)`, so inserting anywhere else reds it for a reason that has
+-    // nothing to do with this story.
+     //
+     // Concrete, not `Arc<dyn WorkerSupervision>`: this fn needs
+     // `shutdown_token()` for its own `select!` (a SIGTERM during daemon
+@@ -10325,6 +10322,7 @@ async fn run_cohort_a2a_daemon(
+         &bootstrap,
+         &transparency_log,
+         &capability,
++        &policy,
+         host_b_enterprise_runtime,
+         host_b_enterprise_pdp_runtime,
+         Arc::clone(&worker_supervision),
+@@ -14417,44 +14415,6 @@ mod story_13_5a_enterprise_daemon_seam {
+         set_process_env(&fixture);
+         let ports = RecordingPorts::new(PolicyVerdict::Allow);
+ 
+-        // AC5 proven-red: the reach leg itself observes the production dispatch,
+-        // so deleting the enterprise argument reds this runtime leg and the
+-        // dedicated source-inspection leg.
+-        //
+-        // j1-crosshost-2b §A6 review P1 — the window is 2_600 chars, not 2_000.
+-        // 2b's dispatch-site threading (the monotonic-base repair + the host-B
+-        // intake arguments) legitimately grew the arm by ~380 chars and pushed
+-        // the enterprise tokens past the old window, which reded THIS leg while
+-        // its twin in `tests/enterprise_daemon_seam_13_5a.rs` was updated — a
+-        // masked regression the fail-fast workspace tally could not see. The
+-        // tokens still must appear promptly: if they drift beyond THIS window,
+-        // the dispatch has grown something that needs a human look.
+-        //
+-        // ⚠ Story 16-3 — 2_600 -> 3_300, and this IS the human look the comment
+-        // above asks for. D-16-3-H site 2 arms a `RootSupervision` for the
+-        // cohort root (host B spawns a Worker per inbound delegation and, at
+-        // `af96c907`, held neither a scheduler nor a halt registry, so a
+-        // SIGKILLed host-B Worker reached nothing at all) and then threads its
+-        // supervisor into `run_cohort_a2a_daemon` as an appended argument. That
+-        // block sits between `build_enterprise_daemon_governance(` and the
+-        // dispatch call, so it moved the two argument tokens from +2_2xx to
+-        // MEASURED +3_151 and +3_196. The window is set to 3_300 — the
+-        // measurement plus ~100 chars, NOT a round number chosen to be safe —
+-        // so the next unexplained growth still reds this leg. The twin in
+-        // `tests/enterprise_daemon_seam_13_5a.rs` was re-run and is green
+-        // (1 passed): its signature scan stops at the first `)`, which is why
+-        // D-16-3-I appends the parameter rather than inserting it.
+-        let source = include_str!("main.rs");
+-        let dispatch_start = source
+-            .find(r#"if mode == "cohort-a2a-daemon""#)
+-            .expect("cohort daemon dispatch");
+-        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 3_300)];
+-        assert!(
+-            dispatch.contains("build_enterprise_daemon_governance(")
+-                && dispatch.contains("enterprise_posture_required,")
+-                && dispatch.contains("enterprise_daemon_governance,"),
+-            "production dispatch no longer threads the required enterprise posture"
+-        );
+ 
+         boot_and_drive(&fixture, TestWiring::Full, &ports)
+             .await
+diff --git a/crates/maos-bin/src/worker_spawn.rs b/crates/maos-bin/src/worker_spawn.rs
+index 9a5e99a7..a33b9215 100644
+--- a/crates/maos-bin/src/worker_spawn.rs
++++ b/crates/maos-bin/src/worker_spawn.rs
+@@ -405,6 +405,34 @@ pub fn issue_enterprise_governed_capability(
+ /// `Drop`** — it signals the child, dispositions the record and unloads the
+ /// SCB. That is structural, not a convention: a `?` added here later cannot
+ /// leak a bound Worker.
++#[cfg(feature = "network")]
++fn resolve_worker_caps(
++    manifest_root: &toml::Value,
++    policy: &maos_kernel_core::capability::cap_policy::PolicyTable,
++) -> Result<maos_manifest::ResolvedCaps, String> {
++    let manifest_caps = match manifest_root.get("resources") {
++        Some(resources) => {
++            let text = toml::to_string(resources)
++                .map_err(|error| format!("maos run: serialize [resources]: {error}"))?;
++            maos_manifest::ResourceCaps::from_toml_str(&text)
++                .map_err(|error| format!("maos run: [resources] parse: {error}"))?
++        }
++        None => maos_manifest::ResourceCaps::default(),
++    };
++
++    // Read the live copy-on-write policy for every Worker launch. Passing the
++    // existing authority here keeps admission resource-only; the existing full
++    // capability admission remains the sole admission system.
++    let snapshot = policy.inner().load_full();
++    let empty_operator_caps = maos_manifest::ResourceCaps::default();
++    let operator_caps = snapshot
++        .operator_policy
++        .resource_cap_floor
++        .as_ref()
++        .unwrap_or(&empty_operator_caps);
++    Ok(maos_manifest::resolve_caps(&manifest_caps, operator_caps))
++}
++
+ #[cfg(feature = "network")]
+ #[allow(clippy::too_many_arguments)]
+ pub fn run_cli_wrapper_manifest(
+@@ -412,6 +440,7 @@ pub fn run_cli_wrapper_manifest(
+     run: &RunArgs,
+     transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
+     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
++    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
+     spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
+     enterprise_runtime: Option<Arc<enterprise_identity::EnterpriseRuntime>>,
+     enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+@@ -428,6 +457,10 @@ pub fn run_cli_wrapper_manifest(
+         resolve_cli_wrapper_tier, spawn_and_bridge, Backpressure, BridgeSpawnSpec,
+     };
+     use maos_kernel_core::security::manifest::CliWrapperConfig;
++    // Parse and resolve resources before probes, host binding, or token minting.
++    let resolved_caps = resolve_worker_caps(manifest_root, policy.as_ref())
++        .map_err(|error| format!("maos run: resource caps: {error}"))?;
++
+ 
+     // 1. Parse [cli_wrapper].
+     let cw_toml = toml::to_string(
+@@ -878,7 +911,7 @@ pub fn run_cli_wrapper_manifest(
+         program: resolved,
+         sandbox: maos_kernel_core::security::sandbox::SandboxSpec {
+             tier: granted_tier,
+-            resolved_caps: Default::default(),
++            resolved_caps,
+             declared_scopes: vec![],
+             spirit_id: worker_spirit_id.clone(),
+             output_shape_predicate: None,
+@@ -1132,3 +1165,67 @@ pub fn run_cli_wrapper_manifest(
+     // marker must leave the delegation in flight and fail the run.
+     Ok(completion)
+ }
++
++#[cfg(all(test, feature = "network"))]
++mod resource_policy_tests {
++    use super::resolve_worker_caps;
++    use maos_kernel_core::capability::cap_policy::PolicyTable;
++    use maos_manifest::{ResolvedCaps, ResourceCaps};
++    use std::sync::Arc;
++
++    fn set_resource_floor(policy: &PolicyTable, floor: ResourceCaps) {
++        let mut snapshot = (*policy.inner().load_full()).clone();
++        snapshot.operator_policy.resource_cap_floor = Some(floor);
++        policy.inner().store(Arc::new(snapshot));
++    }
++
++    #[test]
++    fn worker_caps_resolve_each_dimension_from_the_live_policy_snapshot() {
++        let manifest: toml::Value = toml::from_str(
++            "[resources]\ncpu_max_pct = 20\nmemory_max_mb = 256\nfd_max = 32\npids_max = 80\n",
++        )
++        .expect("parse resource manifest");
++        let policy = PolicyTable::new();
++
++        set_resource_floor(
++            &policy,
++            ResourceCaps {
++                cpu_max_pct: Some(10),
++                memory_max_mb: Some(512),
++                fd_max: Some(64),
++                pids_max: Some(40),
++            },
++        );
++
++        assert_eq!(
++            resolve_worker_caps(&manifest, &policy).expect("resolve current policy"),
++            ResolvedCaps {
++                cpu_max_pct: Some(10),
++                memory_max_mb: Some(256),
++                fd_max: Some(32),
++                pids_max: Some(40),
++            },
++            "operator and manifest caps must win independently across all dimensions"
++        );
++
++        set_resource_floor(
++            &policy,
++            ResourceCaps {
++                cpu_max_pct: Some(30),
++                memory_max_mb: Some(128),
++                fd_max: Some(16),
++                pids_max: Some(100),
++            },
++        );
++        assert_eq!(
++            resolve_worker_caps(&manifest, &policy).expect("resolve updated policy"),
++            ResolvedCaps {
++                cpu_max_pct: Some(20),
++                memory_max_mb: Some(128),
++                fd_max: Some(16),
++                pids_max: Some(80),
++            },
++            "each launch must read the latest policy snapshot rather than a frozen boot value"
++        );
++    }
++}
+diff --git a/crates/maos-bin/tests/worker_resource_limits_17_2.rs b/crates/maos-bin/tests/worker_resource_limits_17_2.rs
+new file mode 100644
+index 00000000..15a87fdc
+--- /dev/null
++++ b/crates/maos-bin/tests/worker_resource_limits_17_2.rs
+@@ -0,0 +1,531 @@
++#![cfg(all(feature = "network", target_os = "linux"))]
++#![forbid(unsafe_code)]
++
++//! Story 17-2 T3 proof: real `maos run`, signed rootless image, live OCI
++//! inspection, and evidence from the actual `/maos/spirit` payload process.
++
++#[path = "../../../tests/harness/t3_substrate.rs"]
++mod t3_substrate;
++
++use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
++use serde_json::Value;
++use std::collections::BTreeSet;
++use std::path::PathBuf;
++use std::process::{Child, Command, Output, Stdio};
++use std::sync::atomic::{AtomicU64, Ordering};
++use std::time::{Duration, Instant};
++
++static NEXT: AtomicU64 = AtomicU64::new(0);
++const NONCE: u64 = 0x17_02;
++const RUN_BOUND: Duration = Duration::from_secs(35);
++
++struct Root {
++    dir: PathBuf,
++    manifest: PathBuf,
++    tag: String,
++}
++
++impl Root {
++    fn new(label: &str, fd_max: u32) -> Self {
++        let dir = std::env::temp_dir().join(format!(
++            "maos-worker-resource-17-2-{label}-{}-{}",
++            std::process::id(),
++            NEXT.fetch_add(1, Ordering::Relaxed)
++        ));
++        std::fs::create_dir_all(dir.join("home")).expect("create isolated Worker home");
++        let manifest = dir.join("worker.toml");
++        let tag = format!("--maos-fixture-tag={}", dir.file_name().unwrap().to_string_lossy());
++        std::fs::write(
++            &manifest,
++            format!(
++                "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\nargv_prefix = [\"--maos-worker\", \"--maos-fixture-mode=resource-probe\", \"{tag}\"]\noutput_shape_version = \"1.0.0\"\nskill_bundle = [\"maos-bridge\"]\nrecovery_policy = \"respawn_fresh\"\n\n[cli_wrapper.posture]\nstdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\nshutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n[resources]\ncpu_max_pct = 10\nmemory_max_mb = 64\npids_max = 12\nfd_max = {fd_max}\n\n[author]\nname = \"MAOS Project\"\n"
++            ),
++        )
++        .expect("write real T3 Worker manifest");
++        Self { dir, manifest, tag }
++    }
++
++    fn command(&self) -> Command {
++        let workspace = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
++        let runtime_home = self.dir.join("home");
++        let home = t3_substrate::isolated_runtime_home(&runtime_home);
++        let mut paths = vec![workspace.join("target/debug"), workspace.join("target/debug/deps")];
++        if let Some(path) = std::env::var_os("PATH") {
++            paths.extend(std::env::split_paths(&path));
++        }
++        let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
++        command
++            .env_clear()
++            .current_dir(workspace)
++            .arg("run")
++            .arg(&self.manifest)
++            .arg("--once")
++            .env("HOME", home)
++            .env("MAOS_HOME", self.dir.join("home"))
++            .env("XDG_DATA_HOME", self.dir.join("home"))
++            .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
++            .env("MAOS_OLLAMA_URL", "skip")
++            .stdout(Stdio::piped())
++            .stderr(Stdio::piped());
++        for key in [
++            "MAOS_T3_RUNTIME",
++            "MAOS_T3_IMAGE_LOCK_PATH",
++            "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX",
++            "XDG_RUNTIME_DIR",
++            "DBUS_SESSION_BUS_ADDRESS",
++        ] {
++            if let Some(value) = std::env::var_os(key) {
++                command.env(key, value);
++            }
++        }
++        command
++    }
++
++    fn owns_container(&self, details: &Value) -> bool {
++        details["Config"]["Cmd"].as_array().is_some_and(|args| {
++            args.iter().any(|arg| arg.as_str() == Some(self.tag.as_str()))
++        })
++    }
++
++    fn runtime(&self) -> String {
++        std::env::var("MAOS_T3_RUNTIME").expect("declared T3 substrate runtime")
++    }
++
++    fn runtime_command(&self) -> Command {
++        let mut command = Command::new(self.runtime());
++        command.env("HOME", t3_substrate::isolated_runtime_home(&self.dir.join("home")));
++        for key in ["XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
++            if let Some(value) = std::env::var_os(key) {
++                command.env(key, value);
++            }
++        }
++        command
++    }
++
++    fn output_rows(&self) -> Vec<(String, Value)> {
++        let db = self.dir.join("home/audit/transparency.sqlite");
++        if !db.exists() {
++            return Vec::new();
++        }
++        TransparencyLogAdapter::open(&db, NONCE)
++            .expect("reopen real run Transparency Log")
++            .query_frames(FrameFilter {
++                kind: Some(FrameKind::CliSubprocessOutput),
++                ..Default::default()
++            })
++            .expect("read persisted real Worker output")
++            .into_iter()
++            .filter(|row| row.spirit_pid != 0 && row.intent == "cli.subprocess.output")
++            .filter_map(|row| {
++                Some((
++                    row.intent,
++                    serde_json::from_slice(&row.payload_redacted).ok()?,
++                ))
++            })
++            .collect()
++    }
++}
++
++impl Drop for Root {
++    fn drop(&mut self) {
++        // A failed assertion still must not strand a test-owned container.
++        // Normal completion first asserts that production `--rm` removed it.
++        let ids = self.runtime_command().args(["ps", "-a", "--format", "{{.ID}}"]).output();
++        if let Ok(ids) = ids {
++            if ids.status.success() {
++                for id in String::from_utf8_lossy(&ids.stdout)
++                    .lines()
++                    .map(str::trim)
++                    .filter(|id| !id.is_empty())
++                {
++                    let Some(details) = inspect(self, id) else { continue };
++                    if !self.owns_container(&details) {
++                        continue;
++                    }
++                    let runtime = self.runtime();
++                    let runtime_home = self.dir.join("home");
++                    let home = t3_substrate::isolated_runtime_home(&runtime_home);
++                    let _ = Command::new("timeout")
++                        .args(["8s", &runtime, "stop", "--time", "2", id])
++                        .env("HOME", home)
++                        .output();
++                    let _ = Command::new("timeout")
++                        .args(["8s", &runtime, "rm", "--force", id])
++                        .env("HOME", home)
++                        .output();
++                }
++            }
++        }
++        let _ = std::fs::remove_dir_all(&self.dir);
++    }
++}
++
++fn build_fixture() {
++    let output = Command::new("cargo")
++        .args(["build", "-q", "-p", "worker", "--bin", "worker-cli-fixture"])
++        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
++        .output()
++        .expect("build actual Worker fixture binary");
++    assert!(output.status.success(), "build Worker fixture: {}", String::from_utf8_lossy(&output.stderr));
++}
++
++struct OwnedChild(Option<Child>);
++
++impl OwnedChild {
++    fn new(child: Child) -> Self {
++        Self(Some(child))
++    }
++
++    fn id(&self) -> u32 {
++        self.0.as_ref().expect("owned subprocess").id()
++    }
++
++    fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
++        self.0.as_mut().expect("owned subprocess").try_wait()
++    }
++}
++
++impl Drop for OwnedChild {
++    fn drop(&mut self) {
++        if let Some(mut child) = self.0.take() {
++            if child.try_wait().ok().flatten().is_none() {
++                let _ = child.kill();
++                let _ = child.wait();
++            }
++        }
++    }
++}
++
++fn wait_bounded(mut child: OwnedChild, bound: Duration) -> Output {
++    let deadline = Instant::now() + bound;
++    loop {
++        if child.try_wait().expect("poll maos run").is_some() {
++            return child.0.take().expect("owned subprocess").wait_with_output().expect("collect maos run output");
++        }
++        assert!(Instant::now() < deadline, "maos run exceeded its bounded deadline");
++        std::thread::sleep(Duration::from_millis(50));
++    }
++}
++
++fn runtime_ids(root: &Root) -> BTreeSet<String> {
++    let output = root
++        .runtime_command()
++        .args(["ps", "-a", "--format", "{{.ID}}"])
++        .output()
++        .expect("list actual OCI containers");
++    assert!(output.status.success(), "runtime ps failed: {}", String::from_utf8_lossy(&output.stderr));
++    String::from_utf8_lossy(&output.stdout)
++        .lines()
++        .map(str::trim)
++        .filter(|line| !line.is_empty())
++        .map(str::to_owned)
++        .collect()
++}
++
++fn inspect(root: &Root, id: &str) -> Option<Value> {
++    let output = root.runtime_command().args(["inspect", id]).output().ok()?;
++    if !output.status.success() {
++        return None;
++    }
++    let value: Value = serde_json::from_slice(&output.stdout).ok()?;
++    value.as_array()?.first().cloned()
++}
++
++fn find_resource_container(root: &Root, before: &BTreeSet<String>) -> Option<(String, Value)> {
++    for id in runtime_ids(root).difference(before) {
++        if let Some(value) = inspect(root, id) {
++            if root.owns_container(&value) {
++                return Some((id.clone(), value));
++            }
++        }
++    }
++    None
++}
++
++fn number(value: &Value, key: &str) -> u64 {
++    value[key].as_u64().unwrap_or_else(|| panic!("{key} missing/not numeric in OCI inspect: {value}"))
++}
++
++fn payload_pid(inspect: &Value) -> u32 {
++    inspect["State"]["Pid"]
++        .as_u64()
++        .and_then(|pid| u32::try_from(pid).ok())
++        .filter(|pid| *pid > 0)
++        .expect("OCI runtime inspect reports a live host PID for the container init/payload")
++}
++
++fn actual_payload(pid: u32) -> PathBuf {
++    let path = PathBuf::from(format!("/proc/{pid}"));
++    assert!(path.join("status").exists(), "inspected payload PID {pid} vanished before live inspection");
++    let cmdline = std::fs::read(path.join("cmdline")).expect("read actual payload cmdline");
++    let cmdline = String::from_utf8_lossy(&cmdline);
++    assert!(cmdline.contains("/maos/spirit"), "State.Pid is not the actual Worker payload: {cmdline:?}");
++    path
++}
++
++fn cgroup_counter(proc: &PathBuf, pid: u32, file: &str, key: &str) -> Option<u64> {
++    let mut candidates = vec![proc.join("root/sys/fs/cgroup").join(file)];
++    if let Ok(membership) = std::fs::read_to_string(proc.join("cgroup")) {
++        if let Some(relative) = membership
++            .lines()
++            .find_map(|line| line.strip_prefix("0::"))
++        {
++            candidates.push(
++                PathBuf::from("/sys/fs/cgroup")
++                    .join(relative.trim_start_matches('/'))
++                    .join(file),
++            );
++            candidates.push(
++                PathBuf::from(format!("/proc/{pid}/root/sys/fs/cgroup"))
++                    .join(relative.trim_start_matches('/'))
++                    .join(file),
++            );
++        }
++    }
++    candidates.into_iter().find_map(|path| {
++        std::fs::read_to_string(path).ok()?.lines().find_map(|line| {
++            let mut fields = line.split_whitespace();
++            (fields.next()? == key).then(|| fields.next()?.parse().ok()).flatten()
++        })
++    })
++}
++
++fn cgroup_limit(proc: &PathBuf, pid: u32, file: &str) -> Option<String> {
++    let membership = std::fs::read_to_string(proc.join("cgroup")).ok()?;
++    let relative = membership
++        .lines()
++        .find_map(|line| line.strip_prefix("0::"))?
++        .trim_start_matches('/');
++    [
++        proc.join("root/sys/fs/cgroup").join(file),
++        PathBuf::from("/sys/fs/cgroup").join(relative).join(file),
++        PathBuf::from(format!("/proc/{pid}/root/sys/fs/cgroup"))
++            .join(relative)
++            .join(file),
++    ]
++    .into_iter()
++    .find_map(|path| std::fs::read_to_string(path).ok())
++    .map(|value| value.trim().to_owned())
++}
++
++#[test]
++fn real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion() {
++    assert!(t3_substrate::require_t3("17-2 live Worker resource enforcement"));
++    build_fixture();
++    let root = Root::new("applied", 64);
++    let before = runtime_ids(&root);
++    let mut child = OwnedChild::new(root.command().spawn().expect("spawn real maos run Worker"));
++    let deadline = Instant::now() + RUN_BOUND;
++    let (container_id, details) = loop {
++        if let Some(found) = find_resource_container(&root, &before) {
++            break found;
++        }
++        if let Some(status) = child.try_wait().expect("poll maos run while locating live Worker") {
++            panic!("maos run exited before a resource-probe OCI container appeared ({status})");
++        }
++        assert!(Instant::now() < deadline, "no live resource-probe OCI container appeared");
++        std::thread::sleep(Duration::from_millis(75));
++    };
++
++    // Values are read from the actual running container's runtime configuration,
++    // before the production `--rm` lifecycle removes it.
++    let host = &details["HostConfig"];
++    assert_eq!(number(host, "Memory"), 64 * 1024 * 1024, "actual OCI memory limit");
++    assert_eq!(number(host, "PidsLimit"), 12, "PID cap must not alias FD cap");
++    let nano_cpus = host["NanoCpus"].as_u64();
++    let quota = host["CpuQuota"].as_i64();
++    let period = host["CpuPeriod"].as_i64();
++    assert!(nano_cpus == Some(100_000_000) || (quota == Some(10_000) && period == Some(100_000)), "actual OCI CPU ceiling is not exactly 0.10 cores: {host}");
++    let ulimits = host["Ulimits"].as_array().expect("OCI inspect includes ulimits");
++    assert!(ulimits.iter().any(|limit| {
++        (limit["Name"] == "RLIMIT_NOFILE" || limit["Name"] == "nofile")
++            && limit["Soft"].as_u64() == Some(64)
++            && limit["Hard"].as_u64() == Some(64)
++    }), "FD limit must independently be nofile 64: {host}");
++
++    let image = details["Config"]["Image"].as_str().expect("inspected signed image ref");
++    assert!(image.contains("@sha256:"), "runtime did not run the verified digest image: {image}");
++    assert_eq!(host["NetworkMode"], "none", "the Worker keeps its denied-egress boundary");
++    assert!(
++        details["Mounts"].as_array().is_some_and(|mounts| {
++            mounts.iter().any(|mount| mount["Destination"] == "/proxy/egress.sock")
++        }),
++        "the scoped egress proxy socket remains the Worker's only network path"
++    );
++    let pid = payload_pid(&details);
++    let proc = actual_payload(pid);
++    let limits = std::fs::read_to_string(proc.join("limits")).expect("read actual payload rlimits");
++    let nofile = limits.lines().find(|line| line.starts_with("Max open files")).expect("actual payload Max open files");
++    let nofile_fields: Vec<_> = nofile.split_whitespace().collect();
++    assert_eq!(nofile_fields.get(3), Some(&"64"), "actual payload soft nofile is 64: {nofile}");
++    assert_eq!(nofile_fields.get(4), Some(&"64"), "actual payload hard nofile is 64: {nofile}");
++    let cgroup = std::fs::read_to_string(proc.join("cgroup")).expect("read actual payload cgroup membership");
++    assert!(cgroup.lines().any(|line| line.starts_with("0::")), "payload is not in cgroup v2: {cgroup}");
++    assert_eq!(
++        cgroup_limit(&proc, pid, "memory.max").as_deref(),
++        Some("67108864"),
++        "actual payload cgroup memory.max"
++    );
++    assert_eq!(
++        cgroup_limit(&proc, pid, "pids.max").as_deref(),
++        Some("12"),
++        "actual payload cgroup pids.max"
++    );
++    assert_eq!(
++        cgroup_limit(&proc, pid, "cpu.max").as_deref(),
++        Some("10000 100000"),
++        "actual payload cgroup cpu.max"
++    );
++
++    // The live task cap must actually reject creation, and the CPU-bound
++    // fixture must accrue throttling under the inspected 10% quota.
++    let stats_deadline = Instant::now() + Duration::from_secs(5);
++    let (mut pids_max, mut throttled_usec) = (None, None);
++    while Instant::now() < stats_deadline {
++        pids_max = cgroup_counter(&proc, pid, "pids.events", "max");
++        throttled_usec = cgroup_counter(&proc, pid, "cpu.stat", "throttled_usec");
++        if pids_max.unwrap_or(0) > 0 && throttled_usec.unwrap_or(0) > 0 {
++            break;
++        }
++        std::thread::sleep(Duration::from_millis(100));
++    }
++    assert!(pids_max.unwrap_or(0) > 0, "actual pids.events did not record an EAGAIN task-cap event");
++    assert!(throttled_usec.unwrap_or(0) > 0, "actual cpu.stat did not record throttling at 10% CPU");
++
++    let output = wait_bounded(child, RUN_BOUND);
++    assert!(output.status.success(), "real maos run failed: {}", String::from_utf8_lossy(&output.stderr));
++    // Read the fixture's structured report from the production Worker output
++    // protocol after its completion marker has been persisted.
++    let rows = root.output_rows();
++    // Like the existing T3 namespace proof, the actual payload reads its own
++    // namespace links; host ptrace permissions need not be widened for tests.
++    for namespace in ["pid", "net", "user"] {
++        let prefix = format!("worker: namespace {namespace}=");
++        let payload_ns = rows.iter().find_map(|(_, value)| {
++            value["line"].as_str()?.strip_prefix(&prefix)
++        }).expect("persisted actual payload namespace");
++        let host_ns = std::fs::read_link(format!("/proc/self/ns/{namespace}")).unwrap();
++        assert_ne!(payload_ns, host_ns.to_string_lossy(), "Worker must isolate its {namespace} namespace");
++    }
++    let report = rows.iter().find_map(|(_, value)| {
++        let text = value.to_string();
++        if text.contains("resource probe") {
++            Some(value.clone())
++        } else {
++            None
++        }
++    }).expect("persisted actual Worker output includes its bounded exhaustion report");
++    let report_text = report.to_string();
++    assert!(report_text.contains("TooManyOpenFiles") || report_text.contains(":24"), "FD exhaustion did not report EMFILE: {report_text}");
++    assert!(report_text.contains("WouldBlock") || report_text.contains(":11"), "bounded thread creation did not hit EAGAIN: {report_text}");
++    assert!(rows.iter().any(|(_, value)| value.to_string().contains("worker: task complete")), "existing Worker completion marker was not persisted");
++
++    // Existing Worker ownership cleans up its own OCI container; no test-side
++    // runtime stop/remove is allowed to mask a lifecycle leak.
++    let after = runtime_ids(&root);
++    assert!(!after.contains(&container_id), "production --rm did not remove completed Worker container {container_id}");
++}
++
++fn verify_actual_runtime_fd_boundary(root: &Root) {
++    use maos_domain::invariants::i9::SandboxTier;
++    use maos_kernel_core::security::{
++        crypto::RingCryptoProvider,
++        sandbox::{
++            SandboxSpec,
++            t3::{argv::build_runtime_argv, image_lock::load_and_verify_lock,
++                image_verify::read_trust_anchor_pub, runtime_detect::detect_container_runtime},
++        },
++    };
++    let anchor = read_trust_anchor_pub().unwrap();
++    let image = load_and_verify_lock(&anchor, &RingCryptoProvider).unwrap().default_entry().unwrap();
++    let runtime = detect_container_runtime().unwrap();
++    let fixture = std::path::Path::new(env!("CARGO_BIN_EXE_maos")).parent().unwrap().join("worker-cli-fixture");
++    let home_path = root.dir.join("home");
++    let home = t3_substrate::isolated_runtime_home(&home_path);
++    let guest = vec!["--maos-worker".into(), "--maos-fixture-mode=resource-probe".into(), root.tag.clone()];
++    // Pre-PID startup failure does not expose runtime stderr through the
++    // bridge. Matched real-runtime controls establish the actual FD cause.
++    for limit in [64, 65] {
++        let mut spec = SandboxSpec::new_for_test(SandboxTier::T3);
++        spec.resolved_caps = maos_manifest::ResolvedCaps {
++            cpu_max_pct: Some(10), memory_max_mb: Some(64), pids_max: Some(12), fd_max: Some(limit),
++        };
++        let name = format!("fd-canary-{}-{limit}", root.dir.file_name().unwrap().to_string_lossy());
++        let argv = build_runtime_argv(
++            &runtime, &image, &spec, &fixture, &guest, "fd-boundary", NONCE, &name, None, &[],
++        ).unwrap();
++        let mut command = Command::new("prlimit");
++        command.args(["--nofile=64:64", "--"]).args(&argv)
++            .env("HOME", home).stdout(Stdio::piped()).stderr(Stdio::piped());
++        let output = wait_bounded(OwnedChild::new(command.spawn().unwrap()), RUN_BOUND);
++        let stdout = String::from_utf8_lossy(&output.stdout);
++        if limit == 64 {
++            assert!(output.status.success(), "same hard-limit context must admit nofile64: {}", String::from_utf8_lossy(&output.stderr));
++            assert!(stdout.contains("worker: task complete"), "matched finite guest must complete");
++            assert!(stdout.contains("TooManyOpenFiles:24"), "matched guest must observe its FD cap");
++        } else {
++            let error = String::from_utf8_lossy(&output.stderr).to_ascii_lowercase();
++            assert!(!output.status.success(), "actual runtime must refuse nofile65 above hard64");
++            assert!(error.contains("nofile") || error.contains("rlimit"), "actual FD denial must identify the limit: {error}");
++            assert!(!stdout.contains("worker: namespace") && !stdout.contains("resource probe"), "impossible FD cap executed guest code");
++        }
++    }
++}
++
++#[test]
++fn fd_request_above_inherited_hard_limit_refuses_before_worker_payload() {
++    assert!(t3_substrate::require_t3("17-2 Worker FD hard-limit refusal"));
++    build_fixture();
++    let root = Root::new("hard-limit", 65);
++    verify_actual_runtime_fd_boundary(&root);
++    let before = runtime_ids(&root);
++    let workspace = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
++    let mut paths = vec![workspace.join("target/debug"), workspace.join("target/debug/deps")];
++    if let Some(path) = std::env::var_os("PATH") {
++        paths.extend(std::env::split_paths(&path));
++    }
++    let mut command = Command::new("prlimit");
++    command
++        .arg("--nofile=64:64")
++        .arg("--")
++        .arg(env!("CARGO_BIN_EXE_maos"))
++        .arg("run")
++        .arg(&root.manifest)
++        .arg("--once")
++        .env_clear()
++        .current_dir(&workspace)
++        .env("HOME", t3_substrate::isolated_runtime_home(&root.dir.join("home")))
++        .env("MAOS_HOME", root.dir.join("home"))
++        .env("XDG_DATA_HOME", root.dir.join("home"))
++        .env("MAOS_OLLAMA_URL", "skip")
++        .env("PATH", std::env::join_paths(paths).expect("valid PATH"))
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped());
++    for key in ["MAOS_T3_RUNTIME", "MAOS_T3_IMAGE_LOCK_PATH", "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"] {
++        if let Some(value) = std::env::var_os(key) { command.env(key, value); }
++    }
++    let child = OwnedChild::new(command.spawn().expect("launch maos in actual RLIMIT_NOFILE=64 subprocess context"));
++    let limit_deadline = Instant::now() + Duration::from_secs(2);
++    loop {
++        let limits = std::fs::read_to_string(format!("/proc/{}/limits", child.id())).expect("read inherited prlimit child context");
++        let line = limits.lines().find(|line| line.starts_with("Max open files")).expect("inherited hard-limit line");
++        let values: Vec<_> = line.split_whitespace().collect();
++        if values.get(3) == Some(&"64") && values.get(4) == Some(&"64") {
++            break;
++        }
++        assert!(Instant::now() < limit_deadline, "prlimit did not establish actual soft/hard nofile 64: {line}");
++        std::thread::sleep(Duration::from_millis(1));
++    }
++    let output = wait_bounded(child, RUN_BOUND);
++    assert!(!output.status.success(), "fd_max=65 above inherited hard=64 must refuse");
++    let rows = root.output_rows();
++    // The matched real-runtime control above identifies the FD denial. The
++    // production Worker must also refuse before any payload runs; its existing
++    // pre-PID startup error intentionally is not a runtime-stderr API.
++    assert!(!String::from_utf8_lossy(&output.stdout).contains("resource probe"), "guest resource fixture executed despite impossible fd limit");
++    let after = runtime_ids(&root);
++    assert!(after.difference(&before).all(|id| {
++        inspect(&root, id).is_none_or(|details| !root.owns_container(&details))
++    }), "hard-limit refusal must not create its own guest container");
++    assert!(rows.iter().all(|(_, value)| !value.to_string().contains("resource probe")), "resource guest output was persisted despite refusal");
++}
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index f2785834..0def9ba2 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -507,6 +507,14 @@ impl BridgeChild {
+         }
+     }
+ 
++
++    #[cfg(target_os = "linux")]
++    fn take_resource_downgrade(&mut self) -> Option<String> {
++        match self {
++            Self::Sandboxed(guard) => guard.take_resource_downgrade(),
++            Self::Plain(_) | Self::Container(_, _) => None,
++        }
++    }
+     fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
+         match self {
+             Self::Container(child, image) => Some((child, image)),
+@@ -693,6 +701,14 @@ impl SpawnedBridge {
+     }
+ }
+ 
++#[cfg(target_os = "linux")]
++impl SpawnedBridge {
++    /// Consume the native child's one-shot cgroup resource downgrade, if any.
++    pub fn take_resource_downgrade(&mut self) -> Option<String> {
++        self.child.as_mut()?.take_resource_downgrade()
++    }
++}
++
+ impl SpawnedBridge {
+     /// The OS PID of the spawned child. Carried into journaled rows for the AC6
+     /// anti-theater proof (`child_pid != std::process::id()`).
+diff --git a/crates/maos-kernel-core/src/scheduler/mod.rs b/crates/maos-kernel-core/src/scheduler/mod.rs
+index 65b57aee..93b0fbea 100644
+--- a/crates/maos-kernel-core/src/scheduler/mod.rs
++++ b/crates/maos-kernel-core/src/scheduler/mod.rs
+@@ -18,7 +18,6 @@ pub mod control_block;
+ pub mod hook_dispatch;
+ pub mod idle_watchdog;
+ pub mod kernel_ctx;
+-pub mod resource_ceiling;
+ pub mod schedule_watchdog;
+ pub mod scheduler_loop;
+ pub mod verb_resolver;
+diff --git a/crates/maos-kernel-core/src/scheduler/resource_ceiling.rs b/crates/maos-kernel-core/src/scheduler/resource_ceiling.rs
+deleted file mode 100644
+index 1fc09163..00000000
+--- a/crates/maos-kernel-core/src/scheduler/resource_ceiling.rs
++++ /dev/null
+@@ -1,170 +0,0 @@
+-#![forbid(unsafe_code)]
+-
+-//! Resource ceiling enforcement — OS-level CPU/memory limits.
+-//!
+-//! Architecture §4.1 + Story 5.1 Task 10.
+-//!
+-//! At v0.3-β the rust-inproc form does NOT call this function — there's
+-//! no separate process to constrain. The API surface exists for Story 5.5x's
+-//! subprocess form to call at spawn. The Linux path writes cgroups v2
+-//! files; macOS delegates to setrlimit; Windows returns Unimplemented.
+-
+-use std::path::PathBuf;
+-
+-use maos_domain::invariants::i9::SandboxTier;
+-
+-use crate::security::manifest::ResourceCaps;
+-
+-/// RAII guard that removes cgroup directories on drop (Linux only).
+-pub struct ResourceCeilingHandle {
+-    /// Path to the cgroup directory (None on non-Linux).
+-    cgroup_dir: Option<PathBuf>,
+-    /// Whether the ceiling was applied successfully.
+-    applied: bool,
+-}
+-
+-impl ResourceCeilingHandle {
+-    fn noop() -> Self {
+-        Self {
+-            cgroup_dir: None,
+-            applied: false,
+-        }
+-    }
+-
+-    fn linux(cgroup_dir: PathBuf) -> Self {
+-        Self {
+-            cgroup_dir: Some(cgroup_dir),
+-            applied: true,
+-        }
+-    }
+-
+-    pub fn was_applied(&self) -> bool {
+-        self.applied
+-    }
+-}
+-
+-impl Drop for ResourceCeilingHandle {
+-    fn drop(&mut self) {
+-        if let Some(ref dir) = self.cgroup_dir {
+-            let _ = std::fs::remove_dir(dir);
+-        }
+-    }
+-}
+-
+-/// Error returned by resource ceiling operations.
+-#[derive(Debug, thiserror::Error)]
+-pub enum IoError {
+-    #[error("unimplemented on this platform: {0}")]
+-    Unimplemented(String),
+-    #[error("IO error: {0}")]
+-    Io(#[from] std::io::Error),
+-}
+-
+-/// Apply OS-level CPU and memory ceilings for a Spirit process.
+-///
+-/// On Linux: creates `/sys/fs/cgroup/maos/spirit-<pid>/` and writes
+-/// `cpu.max` + `memory.max` per the manifest's `[resources]` section.
+-/// Falls back to a no-op handle if the cgroup path is unwritable.
+-///
+-/// On macOS: delegates to the existing `setrlimit` path (already in
+-/// `security/sandbox/macos.rs`).
+-///
+-/// On Windows: returns `Err(IoError::Unimplemented(...))`.
+-///
+-/// This function is NOT called at v0.3-β for rust-inproc Spirits;
+-/// the API surface is forward-shaped for Story 5.5x's subprocess form.
+-pub fn apply_resource_ceiling(
+-    spirit_pid: u32,
+-    caps: &ResourceCaps,
+-) -> Result<ResourceCeilingHandle, IoError> {
+-    #[cfg(target_os = "linux")]
+-    {
+-        apply_cgroup_v2(spirit_pid, caps)
+-    }
+-    #[cfg(target_os = "macos")]
+-    {
+-        apply_setrlimit_macos(spirit_pid, caps)
+-    }
+-    #[cfg(windows)]
+-    {
+-        Err(IoError::Unimplemented(
+-            "Job Objects scheduled for Story 5.5x — subprocess form".into(),
+-        ))
+-    }
+-    #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
+-    {
+-        Err(IoError::Unimplemented(format!(
+-            "unsupported platform for resource ceiling"
+-        )))
+-    }
+-}
+-
+-#[cfg(target_os = "linux")]
+-fn apply_cgroup_v2(spirit_pid: u32, caps: &ResourceCaps) -> Result<ResourceCeilingHandle, IoError> {
+-    let cgroup_dir = PathBuf::from(format!("/sys/fs/cgroup/maos/spirit-{}", spirit_pid));
+-
+-    // Create the cgroup directory
+-    if let Err(e) = std::fs::create_dir_all(&cgroup_dir) {
+-        // Best-effort: cgroup unavailable — return no-op handle.
+-        // The v0.3-β substrate works on systems without cgroups v2.
+-        if e.kind() == std::io::ErrorKind::PermissionDenied
+-            || e.kind() == std::io::ErrorKind::NotFound
+-        {
+-            eprintln!(
+-                "maos: cgroup_unavailable — cannot create {} ({}); \
+-                 falling through to setrlimit. Ensure the MAOS service \
+-                 has write access to /sys/fs/cgroup/maos/.",
+-                cgroup_dir.display(),
+-                e
+-            );
+-            return Ok(ResourceCeilingHandle::noop());
+-        }
+-        return Err(IoError::Io(e));
+-    }
+-
+-    // Write cpu.max: "<quota_us> <period_us>" (period = 100000us = 100ms)
+-    if let Some(cpu_pct) = caps.cpu_max_pct {
+-        let quota_us = compute_cpu_quota_us(cpu_pct);
+-        let cpu_max_content = format!("{} 100000", quota_us);
+-        std::fs::write(cgroup_dir.join("cpu.max"), cpu_max_content)?;
+-    }
+-
+-    // Write memory.max: bytes
+-    if let Some(mem_mb) = caps.memory_max_mb {
+-        let mem_bytes = (mem_mb as u64) * 1024 * 1024;
+-        std::fs::write(cgroup_dir.join("memory.max"), mem_bytes.to_string())?;
+-    }
+-
+-    Ok(ResourceCeilingHandle::linux(cgroup_dir))
+-}
+-
+-#[cfg(target_os = "linux")]
+-fn compute_cpu_quota_us(cpu_max_pct: u32) -> u32 {
+-    // period is 100000us (100ms), so quota = period * pct / 100
+-    (100_000u64 * cpu_max_pct as u64 / 100) as u32
+-}
+-
+-#[cfg(target_os = "macos")]
+-fn apply_setrlimit_macos(
+-    _spirit_pid: u32,
+-    _caps: &ResourceCaps,
+-) -> Result<ResourceCeilingHandle, IoError> {
+-    // The setrlimit path is already applied at sandbox admission
+-    // (security/sandbox/macos.rs). This function is a forward-shaped
+-    // seam for Story 5.5x.
+-    Ok(ResourceCeilingHandle::noop())
+-}
+-
+-#[cfg(test)]
+-mod tests {
+-    use super::*;
+-
+-    #[test]
+-    #[cfg(target_os = "linux")]
+-    fn compute_cpu_quota_us_values() {
+-        assert_eq!(compute_cpu_quota_us(10), 10000);
+-        assert_eq!(compute_cpu_quota_us(50), 50000);
+-        assert_eq!(compute_cpu_quota_us(100), 100000);
+-        assert_eq!(compute_cpu_quota_us(0), 0);
+-    }
+-}
+diff --git a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+index 1131fc11..0194a6c0 100644
+--- a/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
++++ b/crates/maos-kernel-core/src/scheduler/scheduler_loop.rs
+@@ -325,6 +325,7 @@ impl SpiritSchedulerAdapter {
+                 cpu_max_pct: None,
+                 memory_max_mb: None,
+                 fd_max: None,
++                pids_max: None,
+             };
+             let caps_required = CapabilitiesRequired {
+                 provider: ProviderCapabilities { complete: vec![] },
+diff --git a/crates/maos-kernel-core/src/security/sandbox/linux.rs b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+index 23b986ec..81023edc 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -66,27 +66,33 @@ pub fn spawn_sandboxed(
+     let rlimit_mem = mem_limit.map(|mb| mb as u64 * 1024 * 1024);
+     let rlimit_fd = fd_limit.map(|n| n as u64);
+ 
+-    // Without a CPU cap the cgroup only adds memory containment on top of the
+-    // rlimits, so any setup failure degrades loudly to the rlimit fallback; a CPU
+-    // cap has no rlimit equivalent and refuses the spawn.
+-    let (cleanup, cgroup_procs) = match setup_cgroup(spec) {
+-        Ok((cleanup, procs)) => (cleanup, Some(procs)),
+-        Err(error) if spec.resolved_caps.cpu_max_pct.is_none() => {
+-            let reason = match error {
+-                SpawnError::CgroupUnavailable => "no writable delegated cgroup".to_owned(),
+-                other => other.to_string(),
+-            };
+-            match mem_limit {
+-                Some(mb) => eprintln!(
+-                    "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {mb} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)"
+-                ),
+-                None => eprintln!(
+-                    "maos-sandbox: cgroup unavailable ({reason}); using setrlimit fallback"
+-                ),
++    // With no cgroup-backed resource request there is no reason to create a
++    // cgroup. Memory alone may fall back to RLIMIT_AS; CPU and PID caps may not.
++    let cgroup_requested = spec.resolved_caps.cpu_max_pct.is_some()
++        || mem_limit.is_some()
++        || spec.resolved_caps.pids_max.is_some();
++    let (cleanup, cgroup_procs, resource_downgrade) = if !cgroup_requested {
++        (Cleanup::None, None, None)
++    } else {
++        match setup_cgroup(spec) {
++            Ok((cleanup, procs)) => (cleanup, Some(procs), None),
++            Err(error)
++                if mem_limit.is_some()
++                    && spec.resolved_caps.cpu_max_pct.is_none()
++                    && spec.resolved_caps.pids_max.is_none() =>
++            {
++                let reason = match error {
++                    SpawnError::CgroupUnavailable => "no writable delegated cgroup".to_owned(),
++                    other => other.to_string(),
++                };
++                eprintln!(
++                    "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)",
++                    mem_limit.unwrap()
++                );
++                (Cleanup::None, None, Some(reason))
+             }
+-            (Cleanup::None, None)
++            Err(error) => return Err(error),
+         }
+-        Err(error) => return Err(error),
+     };
+ 
+     // SAFETY: `pre_exec` runs in the forked child before exec.
+@@ -122,7 +128,6 @@ pub fn spawn_sandboxed(
+                     }
+                 }
+             }
+-
+             // --- seccomp-bpf (syscall allow-list) ---
+             if let Some(ref progs) = seccomp_progs {
+                 for prog in progs {
+@@ -133,40 +138,34 @@ pub fn spawn_sandboxed(
+                     }
+                 }
+             }
+-
+             // --- setrlimit (resource caps) ---
+             if let Some(limit) = rlimit_mem {
+-                let rl = libc::rlimit {
+-                    rlim_cur: limit,
+-                    rlim_max: limit,
+-                };
++                let rl = libc::rlimit { rlim_cur: limit, rlim_max: limit };
+                 // SAFETY: setrlimit with RLIMIT_AS is async-signal-safe.
+-                let rc = libc::setrlimit(libc::RLIMIT_AS, &rl);
+-                if rc != 0 {
++                if libc::setrlimit(libc::RLIMIT_AS, &rl) != 0 {
+                     return Err(io::Error::last_os_error());
+                 }
+             }
+             if let Some(limit) = rlimit_fd {
+-                let rl = libc::rlimit {
+-                    rlim_cur: limit,
+-                    rlim_max: limit,
+-                };
++                let rl = libc::rlimit { rlim_cur: limit, rlim_max: limit };
+                 // SAFETY: setrlimit with RLIMIT_NOFILE is async-signal-safe.
+-                let rc = libc::setrlimit(libc::RLIMIT_NOFILE, &rl);
+-                if rc != 0 {
++                if libc::setrlimit(libc::RLIMIT_NOFILE, &rl) != 0 {
+                     return Err(io::Error::last_os_error());
+                 }
+             }
+-
+             Ok(())
+         });
+     }
+ 
+     let child = command.spawn().map_err(SpawnError::Io)?;
+-
+-    Ok(SandboxedChild { child, cleanup })
++    Ok(SandboxedChild {
++        child,
++        cleanup,
++        resource_downgrade,
++    })
+ }
+ 
++
+ // ------------------------------------------------------------------
+ // Landlock — parent-side preparation
+ // ------------------------------------------------------------------
+@@ -434,8 +433,8 @@ fn setup_cgroup(spec: &SandboxSpec) -> Result<(Cleanup, std::fs::File), SpawnErr
+     // Migration needs write access to the common ancestor's `cgroup.procs`; the
+     // child's source cgroup is at or below `root`, its destination below `root`.
+     open_procs(&root)?;
+-    let path =
+-        create_cgroup_dir(&root, &spec.spirit_id, caps).ok_or(SpawnError::CgroupUnavailable)?;
++    let path = create_cgroup_dir(&root, &spec.spirit_id, caps)
++        .map_err(|error| SpawnError::SandboxSetup(format!("cgroup creation: {error}")))?;
+     let cleanup = Cleanup::Cgroup { path: path.clone() };
+     apply_cgroup_limits(&path, caps)
+         .map_err(|error| SpawnError::SandboxSetup(format!("cgroup limits: {error}")))?;
+@@ -468,6 +467,10 @@ fn find_writable_cgroup_root(caps: &super::ResolvedCaps) -> Option<PathBuf> {
+         if caps.memory_max_mb.is_some() && !enabled("memory") {
+             continue;
+         }
++        if caps.pids_max.is_some() && !enabled("pids") {
++            continue;
++        }
++
+         // Creation below this boundary performs the actual permission check.
+         return Some(candidate.to_owned());
+     }
+@@ -478,27 +481,35 @@ fn create_cgroup_dir(
+     root: &std::path::Path,
+     spirit_id: &str,
+     caps: &super::ResolvedCaps,
+-) -> Option<PathBuf> {
++) -> Result<PathBuf, std::io::Error> {
+     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+     let sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+     let safe_id = spirit_id.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
+     let parent = root.join("maos.slice");
+-    std::fs::create_dir_all(&parent).ok()?;
+-    let controllers = match (caps.cpu_max_pct.is_some(), caps.memory_max_mb.is_some()) {
+-        (true, true) => "+cpu +memory",
+-        (true, false) => "+cpu",
+-        (false, true) => "+memory",
+-        (false, false) => "",
++    std::fs::create_dir_all(&parent)?;
++    let controllers = match (
++        caps.cpu_max_pct.is_some(),
++        caps.memory_max_mb.is_some(),
++        caps.pids_max.is_some(),
++    ) {
++        (true, true, true) => "+cpu +memory +pids",
++        (true, true, false) => "+cpu +memory",
++        (true, false, true) => "+cpu +pids",
++        (false, true, true) => "+memory +pids",
++        (true, false, false) => "+cpu",
++        (false, true, false) => "+memory",
++        (false, false, true) => "+pids",
++        (false, false, false) => "",
+     };
+     if !controllers.is_empty() {
+-        std::fs::write(parent.join("cgroup.subtree_control"), controllers).ok()?;
++        std::fs::write(parent.join("cgroup.subtree_control"), controllers)?;
+     }
+     let path = parent.join(format!(
+         "spirit-{safe_id}-{}-{sequence}",
+         std::process::id()
+     ));
+-    std::fs::create_dir(&path).ok()?;
+-    Some(path)
++    std::fs::create_dir(&path)?;
++    Ok(path)
+ }
+ 
+ fn apply_cgroup_limits(
+@@ -515,5 +526,8 @@ fn apply_cgroup_limits(
+         let bytes = mb as u64 * 1024 * 1024;
+         std::fs::write(path.join("memory.max"), bytes.to_string())?;
+     }
++    if let Some(limit) = caps.pids_max {
++        std::fs::write(path.join("pids.max"), limit.to_string())?;
++    }
+     Ok(())
+ }
+diff --git a/crates/maos-kernel-core/src/security/sandbox/mod.rs b/crates/maos-kernel-core/src/security/sandbox/mod.rs
+index d675e3df..c36e076d 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/mod.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/mod.rs
+@@ -56,11 +56,11 @@ impl SandboxSpec {
+ /// Error raised when spawning a sandboxed child fails.
+ #[derive(Debug, thiserror::Error)]
+ pub enum SpawnError {
+-    #[error("sandbox setup failed in pre_exec: {0}")]
++    #[error("sandbox setup failed: {0}")]
+     SandboxSetup(String),
+     #[error("IO error during spawn: {0}")]
+     Io(#[from] std::io::Error),
+-    #[error("declared CPU percentage cap requires a writable delegated cgroup")]
++    #[error("declared CPU or PID cap requires a writable delegated cgroup")]
+     CgroupUnavailable,
+     #[error("sandbox unavailable on this platform: {reason}")]
+     SandboxUnavailable { reason: String },
+@@ -83,9 +83,10 @@ pub struct SandboxViolation {
+ 
+ /// RAII guard for a sandboxed child process.
+ ///
+-/// On Linux: owns the cgroup directory; `Drop` removes it after the
+-/// child has exited. On Windows: owns the process/thread/job handles and
+-/// closes the Job Object last so kill-on-close remains effective.
++/// On Linux: owns the cgroup directory; `Drop` kills remaining members and
++/// attempts bounded removal after reaping the child, logging any residue.
++/// On Windows: closes the Job Object last so kill-on-close remains effective.
++
+ pub struct SandboxedChild {
+     #[cfg(not(target_os = "windows"))]
+     child: Child,
+@@ -93,6 +94,8 @@ pub struct SandboxedChild {
+     child: windows::WindowsChild,
+     #[allow(dead_code)]
+     cleanup: Cleanup,
++    #[cfg(target_os = "linux")]
++    resource_downgrade: Option<String>,
+ }
+ 
+ enum Cleanup {
+@@ -106,16 +109,25 @@ impl Drop for Cleanup {
+     fn drop(&mut self) {
+         #[cfg(target_os = "linux")]
+         if let Cleanup::Cgroup { path } = self {
+-            let _ = std::fs::write(path.join("cgroup.kill"), b"1");
++            if let Err(error) = std::fs::write(path.join("cgroup.kill"), b"1") {
++                eprintln!("maos-sandbox: failed to kill cgroup {}: {error}", path.display());
++            }
+             // `cgroup.kill` is asynchronous: rmdir answers EBUSY until the killed
+             // members are gone. Retry with a short bounded backoff (~0.25 s total).
++            let mut removal = Err(std::io::Error::from_raw_os_error(libc::EBUSY));
+             for delay_ms in [0, 1, 2, 4, 8, 16, 32, 64, 128] {
+                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+-                match std::fs::remove_dir(path.as_path()) {
+-                    Err(error) if error.raw_os_error() == Some(libc::EBUSY) => {}
+-                    _ => break,
++                removal = std::fs::remove_dir(path.as_path());
++                if !matches!(&removal, Err(error) if error.raw_os_error() == Some(libc::EBUSY)) {
++                    break;
+                 }
+             }
++            if let Err(error) = removal {
++                eprintln!(
++                    "maos-sandbox: cgroup cleanup failed; residue may remain at {}: {error}",
++                    path.display()
++                );
++            }
+         }
+     }
+ }
+@@ -129,6 +141,11 @@ impl SandboxedChild {
+             Cleanup::None => None,
+         }
+     }
++    /// Consume the per-spawn memory-cgroup fallback reason (Linux only).
++    #[cfg(target_os = "linux")]
++    pub fn take_resource_downgrade(&mut self) -> Option<String> {
++        self.resource_downgrade.take()
++    }
+ 
+     /// Story 17-6 AC5 — the confined child, for a caller that pipes its stdio.
+     /// The guard keeps owning it (and the cgroup dir) until drop.
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+index d9854771..fe8907e6 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+@@ -48,22 +48,16 @@ pub fn build_runtime_argv(
+     let cpu_str = spec
+         .resolved_caps
+         .cpu_max_pct
+-        .map(|v| format!("{v}"))
++        .map(|v| format!("{}.{:02}", v / 100, v % 100))
+         .unwrap_or_else(|| "1".to_string());
+     let mem_str = spec
+         .resolved_caps
+         .memory_max_mb
+         .map(|v| format!("{v}m"))
+         .unwrap_or_else(|| "256m".to_string());
+-    // NOTE: `--pids-limit` is sourced from `fd_max` at v0.5-α because the
+-    // ResolvedCaps surface does not yet carry a dedicated `pids_max` cap.
+-    // FD count and process count are distinct kernel limits (RLIMIT_NOFILE
+-    // vs cgroup `pids.max`) — sharing the slot is a v0.5-α placeholder
+-    // documented in DR-5.5a-9; full split lands at the same trigger as
+-    // the operator-policy resource-floor expansion (Story 9.x).
+     let pid_str = spec
+         .resolved_caps
+-        .fd_max
++        .pids_max
+         .map(|v| format!("{v}"))
+         .unwrap_or_else(|| "64".to_string());
+ 
+@@ -93,6 +87,9 @@ pub fn build_runtime_argv(
+         format!("--pids-limit={pid_str}"),
+         format!("--name={container_name}"),
+     ];
++    if let Some(fd_max) = spec.resolved_caps.fd_max {
++        argv.push(format!("--ulimit=nofile={fd_max}:{fd_max}"));
++    }
+     if let Some(socket) = egress_socket {
+         argv.push(format!(
+             "--volume={}:/proxy/egress.sock:rw",
+diff --git a/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs b/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+index 430e0204..3deabba9 100644
+--- a/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
++++ b/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+@@ -1,67 +1,456 @@
++#![cfg(target_os = "linux")]
+ #![forbid(unsafe_code)]
+ 
+-//! Integration test: cgroups v2 resource ceiling (AC3).
+-//!
+-//! Linux-only; `#[ignore]` by default so CI doesn't fail on cgroup-less
+-//! runners. Set `MAOS_CGROUP_TEST=1` to run.
++//! Strict native T2 resource-ceiling smoke for a delegated cgroup-v2 runner.
+ 
+-use maos_kernel_core::scheduler::resource_ceiling::apply_resource_ceiling;
+-#[cfg(windows)]
+-use maos_kernel_core::scheduler::resource_ceiling::IoError;
+-use maos_kernel_core::security::manifest::ResourceCaps;
++use std::path::{Path, PathBuf};
++use std::process::Command;
++use std::sync::LazyLock;
++use std::time::{Duration, Instant};
+ 
+-#[test]
+-#[cfg(target_os = "linux")]
+-#[ignore = "self-skips unless MAOS_CGROUP_TEST is set (real-cgroup smoke; manual on a cgroup-capable host — Story 15-1 R-4)"]
+-fn cgroup_ceiling_writes_cpu_and_memory_files() {
+-    if std::env::var_os("MAOS_CGROUP_TEST").is_none() {
+-        eprintln!("skipping: set MAOS_CGROUP_TEST=1 to run");
+-        return;
++use maos_domain::invariants::i9::SandboxTier;
++use maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgePoll;
++use maos_kernel_core::lifecycle::cli_wrapper::{
++    argv_prefix_hash, spawn_and_bridge, Backpressure, BridgeError, BridgeSpawnSpec, ExitCause,
++    SpawnedBridge, SubStream,
++};
++use maos_kernel_core::security::manifest::{
++    CliWrapperControlChannel, CliWrapperStdioShape, ResolvedCaps,
++};
++use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec, SpawnError};
++use maos_domain::invariants::i1::Scope;
++use maos_kernel_core::iac::transparency_log::TransparencyLogAdapter;
++
++struct TempPath(PathBuf);
++
++impl std::ops::Deref for TempPath {
++    type Target = Path;
++
++    fn deref(&self) -> &Self::Target {
++        &self.0
++    }
++}
++
++impl Drop for TempPath {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_file(&self.0);
++    }
++}
++
++static FIXTURE: LazyLock<TempPath> = LazyLock::new(build_fixture);
++
++fn build_fixture() -> TempPath {
++    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
++        .join("tests/fixtures/native/cgroup_ceiling.rs");
++    let binary = std::env::temp_dir().join(format!(
++        "maos-cgroup-ceiling-{}-{}",
++        std::process::id(),
++        std::thread::current().name().unwrap_or("test")
++    ));
++    let status = Command::new("rustc")
++        .args(["--edition=2021", "-C", "opt-level=1", "--crate-name"])
++        .arg("cgroup_ceiling_fixture")
++        .arg(&source)
++        .arg("-o")
++        .arg(&binary)
++        .status()
++        .expect("start rustc for bounded native cgroup fixture");
++    assert!(status.success(), "native cgroup fixture compilation failed");
++    TempPath(binary)
++}
++
++fn spec(spirit_id: &str, program: &Path, caps: ResolvedCaps) -> BridgeSpawnSpec {
++    spec_with_tier(spirit_id, program, caps, SandboxTier::T2)
++}
++
++fn spec_with_tier(
++    spirit_id: &str,
++    program: &Path,
++    caps: ResolvedCaps,
++    tier: SandboxTier,
++) -> BridgeSpawnSpec {
++    let argv_prefix = Vec::new();
++    BridgeSpawnSpec {
++        program: program.to_string_lossy().into_owned(),
++        sandbox: SandboxSpec {
++            tier,
++            resolved_caps: caps,
++            declared_scopes: vec![
++                Scope::FsRead {
++                    subtree: "/proc".into(),
++                },
++                Scope::FsRead {
++                    subtree: "/dev".into(),
++                },
++            ],
++            spirit_id: spirit_id.to_owned(),
++            output_shape_predicate: None,
++        },
++        expected_argv_prefix_hash: argv_prefix_hash(&argv_prefix),
++        argv_prefix,
++        task_args: vec![],
++        from_spirit_id: spirit_id.to_owned(),
++        stdio_shape: CliWrapperStdioShape::Raw,
++        control_channel: CliWrapperControlChannel::Signals,
++        shutdown_signal: None,
++        channel_capacity: 16,
++        backpressure: Backpressure::Block,
++        env: vec![],
++        t3: None,
+     }
+-    let caps = ResourceCaps {
++}
++
++fn caps() -> ResolvedCaps {
++    ResolvedCaps {
+         cpu_max_pct: Some(10),
+         memory_max_mb: Some(64),
+         fd_max: Some(64),
+-    };
+-    let pid = 99999;
+-    let handle = apply_resource_ceiling(pid, &caps).expect("apply_resource_ceiling");
++        pids_max: Some(12),
++    }
++}
++
++fn membership_leaf(pid: u32) -> PathBuf {
++    let membership = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
++        .expect("read actual native child cgroup membership");
++    let relative = membership
++        .lines()
++        .find_map(|line| line.strip_prefix("0::"))
++        .expect("native child has unified cgroup membership");
++    let leaf = Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/'));
++    assert!(leaf.is_dir(), "child cgroup leaf does not exist: {leaf:?}");
++    leaf
++}
++
++fn nearest_maos_slice(caps: &ResolvedCaps) -> PathBuf {
++    let membership = std::fs::read_to_string("/proc/self/cgroup")
++        .expect("read smoke process cgroup membership");
++    let relative = membership
++        .lines()
++        .find_map(|line| line.strip_prefix("0::"))
++        .expect("smoke process has unified cgroup membership");
++    let mount = Path::new("/sys/fs/cgroup");
++    let own = mount.join(relative.trim_start_matches('/'));
++    for ancestor in own.ancestors().take_while(|ancestor| ancestor.starts_with(mount)) {
++        let Ok(controllers) = std::fs::read_to_string(ancestor.join("cgroup.subtree_control"))
++        else {
++            continue;
++        };
++        let enabled = |name| controllers.split_ascii_whitespace().any(|value| value == name);
++        if caps.cpu_max_pct.is_some() && !enabled("cpu")
++            || caps.memory_max_mb.is_some() && !enabled("memory")
++            || caps.pids_max.is_some() && !enabled("pids")
++        {
++            continue;
++        }
++        return ancestor.join("maos.slice");
++    }
++    panic!("delegated cgroup root supporting requested resources was not found")
++}
++
++fn assert_no_owned_leaf(spirit_id: &str, caps: &ResolvedCaps) {
++    let safe_id = spirit_id.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
++    let prefix = format!("spirit-{safe_id}-");
++    let parent = nearest_maos_slice(caps);
++    if !parent.exists() {
++        return;
++    }
++    for entry in std::fs::read_dir(&parent).expect("read owned MAOS cgroup leaves") {
++        let name = entry
++            .expect("read MAOS cgroup leaf entry")
++            .file_name()
++            .to_string_lossy()
++            .into_owned();
++        assert!(
++            !name.starts_with(&prefix),
++            "failed spawn left its uniquely owned leaf behind: {parent:?}/{name}"
++        );
++    }
++}
+ 
+-    // Verify the files exist with expected contents.
+-    let cpu_max =
+-        std::fs::read_to_string(format!("/sys/fs/cgroup/maos/spirit-{pid}/cpu.max")).unwrap();
+-    assert_eq!(cpu_max.trim(), "10000 100000"); // 10% of 100ms = 10000us quota
++fn limit_value(pid: u32, label: &str) -> String {
++    let limits = std::fs::read_to_string(format!("/proc/{pid}/limits"))
++        .expect("read limits of live native child");
++    limits
++        .lines()
++        .find(|line| line.starts_with(label))
++        .unwrap_or_else(|| panic!("missing {label} in child limits"))
++        .split_whitespace()
++        .nth(3)
++        .unwrap_or_else(|| panic!("missing soft limit for {label}"))
++        .to_owned()
++}
+ 
+-    let mem_max =
+-        std::fs::read_to_string(format!("/sys/fs/cgroup/maos/spirit-{pid}/memory.max")).unwrap();
+-    assert_eq!(mem_max.trim(), &(64u64 * 1024 * 1024).to_string());
++fn wait_for_fixture_ready(bridge: &mut SpawnedBridge, leaf: &Path) {
++    let until = Instant::now() + Duration::from_secs(5);
++    let mut placed = false;
++    loop {
++        assert!(Instant::now() < until, "bounded native fixture did not become ready");
++        match bridge
++            .poll_frame(Duration::from_millis(50))
++            .expect("native fixture output is well-framed")
++        {
++            BridgePoll::Data(SubStream::Stdout, bytes) => {
++                let record = String::from_utf8_lossy(&bytes);
++                if let Some(relative) = record.strip_prefix("MEMBERSHIP 0::") {
++                    assert_eq!(
++                        Path::new(relative).strip_prefix("/").expect("absolute /proc cgroup membership"),
++                        leaf.strip_prefix("/sys/fs/cgroup").unwrap(),
++                        "fixture's first operation must observe its owned leaf"
++                    );
++                    placed = true;
++                } else if record.starts_with("READY ") {
++                    assert!(placed, "readiness must follow the initial membership record");
++                    return;
++                }
++            }
++            BridgePoll::Data(SubStream::Stderr, bytes) => {
++                panic!("native fixture diagnostic: {}", String::from_utf8_lossy(&bytes))
++            }
++            BridgePoll::Idle => {}
++            BridgePoll::Closed => panic!("fixture exited before reporting resource bites"),
++        }
++    }
++}
+ 
+-    drop(handle);
+-    // After drop, the directory is removed (best-effort).
+-    assert!(!std::path::Path::new(&format!("/sys/fs/cgroup/maos/spirit-{pid}")).exists());
++fn collect_until_exit(bridge: &mut SpawnedBridge) -> ExitCause {
++    let journal = TransparencyLogAdapter::open_in_memory(0);
++    let pid = bridge.child_pid();
++    bridge.pump_to_journal(&journal, 1, "cgroup-ceiling-smoke", "native", &[]);
++    let exit = bridge.wait_and_finalize(&journal, 1, None, |_| {});
++    assert!(
++        !PathBuf::from(format!("/proc/{pid}")).exists(),
++        "bridge must reap native child {pid}"
++    );
++    exit.cause
+ }
+ 
+ #[test]
+-#[cfg(not(target_os = "linux"))]
+-fn apply_resource_ceiling_falls_back_on_non_linux() {
+-    let caps = ResourceCaps {
+-        cpu_max_pct: Some(50),
+-        memory_max_mb: Some(128),
+-        fd_max: Some(64),
+-    };
+-    #[cfg(target_os = "macos")]
+-    {
+-        let handle = apply_resource_ceiling(1, &caps).expect("macos fallback ok");
+-        assert!(!handle.was_applied());
++fn native_child_is_placed_before_guest_and_resource_limits_bite() {
++    let mut bridge = spawn_and_bridge(spec("ceiling-smoke", &FIXTURE, caps()))
++        .expect("delegated native T2 spawn must succeed");
++    assert_eq!(bridge.take_resource_downgrade(), None);
++    let pid = bridge.child_pid();
++    assert!(pid > 0);
++    let leaf = membership_leaf(pid);
++    assert_eq!(limit_value(pid, "Max open files"), "64");
++    assert_eq!(limit_value(pid, "Max address space"), "67108864");
++    assert_eq!(
++        std::fs::read_to_string(leaf.join("cpu.max")).unwrap().trim(),
++        "10000 100000"
++    );
++    assert_eq!(
++        std::fs::read_to_string(leaf.join("memory.max")).unwrap().trim(),
++        "67108864"
++    );
++    assert_eq!(
++        std::fs::read_to_string(leaf.join("pids.max")).unwrap().trim(),
++        "12"
++    );
++
++    wait_for_fixture_ready(&mut bridge, &leaf);
++    let events = std::fs::read_to_string(leaf.join("pids.events")).unwrap();
++    let max_events = events
++        .lines()
++        .find_map(|line| line.strip_prefix("max "))
++        .expect("pids.events has max counter")
++        .parse::<u64>()
++        .expect("numeric pids.events max counter");
++    assert!(max_events > 0, "bounded task exhaustion must increment pids.events:max");
++
++    let cpu_stat = std::fs::read_to_string(leaf.join("cpu.stat")).unwrap();
++    let throttled = cpu_stat
++        .lines()
++        .find_map(|line| line.strip_prefix("nr_throttled "))
++        .expect("cpu.stat has nr_throttled")
++        .parse::<u64>()
++        .expect("numeric nr_throttled");
++    assert!(throttled > 0, "CPU quota must throttle the busy fixture");
++
++    assert_eq!(collect_until_exit(&mut bridge), ExitCause::Exited { code: 0 });
++    assert!(!leaf.exists(), "normal native exit must remove its owned leaf");
++}
++
++#[test]
++fn same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves() {
++    let a = std::thread::spawn(|| {
++        spawn_and_bridge(spec("same-spirit", &FIXTURE, caps()))
++            .expect("first delegated same-Spirit spawn")
++    });
++    let b = std::thread::spawn(|| {
++        spawn_and_bridge(spec("same-spirit", &FIXTURE, caps()))
++            .expect("second delegated same-Spirit spawn")
++    });
++    let mut a = a.join().expect("first spawn thread");
++    let mut b = b.join().expect("second spawn thread");
++    let a_leaf = membership_leaf(a.child_pid());
++    let b_leaf = membership_leaf(b.child_pid());
++    assert_ne!(a_leaf, b_leaf, "simultaneous same-ID spawns need unique leaves");
++    wait_for_fixture_ready(&mut a, &a_leaf);
++    wait_for_fixture_ready(&mut b, &b_leaf);
++    a.kill().expect("kill first fixture");
++    b.kill().expect("kill second fixture");
++    assert!(matches!(collect_until_exit(&mut a), ExitCause::Signaled { .. }));
++    assert!(matches!(collect_until_exit(&mut b), ExitCause::Signaled { .. }));
++    assert!(!a_leaf.exists(), "killed first child leaf must be removed");
++    assert!(!b_leaf.exists(), "killed second child leaf must be removed");
++}
++
++#[test]
++fn creation_limit_write_and_exec_failures_release_owned_leaves() {
++    let id = format!("path-limit-{}", "N".repeat(4096));
++    let mut name_caps = caps();
++    name_caps.cpu_max_pct = None;
++    let control_id = format!("path-limit-control-{}", std::process::id());
++    let mut control = spawn_and_bridge(spec_with_tier(
++        &control_id,
++        &FIXTURE,
++        name_caps.clone(),
++        SandboxTier::T2,
++    ))
++    .expect("valid ID must create a leaf under the same delegated resource set");
++    let control_leaf = membership_leaf(control.child_pid());
++    control.kill().expect("stop valid-ID setup control");
++    let _ = collect_until_exit(&mut control);
++    assert!(!control_leaf.exists(), "valid-ID control leaf must be cleaned up");
++    assert!(
++        id.len() > 4096,
++        "the absolute owned leaf path must exceed Linux PATH_MAX"
++    );
++    match spawn_and_bridge(spec_with_tier(
++        &id,
++        &FIXTURE,
++        name_caps.clone(),
++        SandboxTier::T2,
++    )) {
++        Err(BridgeError::SandboxRefused(reason)) => assert!(
++            reason.contains("cgroup creation:") && reason.contains("os error 36"),
++            "oversized path must fail in actual cgroup creation with ENAMETOOLONG, got {reason}"
++        ),
++        Err(other) => panic!("unexpected path-length refusal class: {other}"),
++        Ok(mut bridge) => {
++            bridge.kill().expect("stop unexpected overlong-ID child");
++            let _ = collect_until_exit(&mut bridge);
++            panic!("over-PATH_MAX owned leaf unexpectedly spawned")
++        }
+     }
+-    #[cfg(windows)]
+-    {
+-        let err = match apply_resource_ceiling(1, &caps) {
+-            Err(err) => err,
+-            Ok(_) => panic!("Windows ceiling must refuse unimplemented Job Objects"),
+-        };
++    let creation_parent = nearest_maos_slice(&name_caps);
++    assert!(
++        creation_parent.is_dir(),
++        "creation reached the delegated maos.slice parent before leaf refusal"
++    );
++    let enabled = std::fs::read_to_string(creation_parent.join("cgroup.subtree_control"))
++        .expect("read MAOS intermediate controller state");
++    for controller in ["memory", "pids"] {
+         assert!(
+-            matches!(err, IoError::Unimplemented(ref s) if s.contains("Job Objects")),
+-            "expected Unimplemented on windows, got {err:?}"
++            enabled.split_ascii_whitespace().any(|value| value == controller),
++            "requested {controller} controller must be enabled before the oversized-path failure"
+         );
+     }
++    assert_no_owned_leaf(&id, &name_caps);
++
++    let id = format!("cpu-write-failure-{}", std::process::id());
++    let mut invalid_cpu_caps = caps();
++    invalid_cpu_caps.cpu_max_pct = Some(0);
++    match spawn_and_bridge(spec_with_tier(
++        &id,
++        &FIXTURE,
++        invalid_cpu_caps.clone(),
++        SandboxTier::T2,
++    )) {
++        Err(BridgeError::SandboxRefused(reason)) => assert!(
++            reason.contains("cgroup limits:") && reason.contains("os error 22"),
++            "cpu.max=0 must fail with EINVAL during the cgroup limit write, got {reason}"
++        ),
++        Err(other) => panic!("unexpected cpu.max write refusal class: {other}"),
++        Ok(mut bridge) => {
++            bridge.kill().expect("stop child after invalid cpu.max was accepted");
++            let _ = collect_until_exit(&mut bridge);
++            panic!("invalid cpu.max write unexpectedly succeeded")
++        }
++    }
++    assert_no_owned_leaf(&id, &invalid_cpu_caps);
++
++    let missing_id = format!("exec-preflight-{}", std::process::id());
++    let missing = std::env::temp_dir().join(format!("maos-no-such-exec-{}", std::process::id()));
++    assert!(!missing.exists(), "missing-executable path unexpectedly exists");
++    match spawn_and_bridge(spec_with_tier(
++        &missing_id,
++        &missing,
++        caps(),
++        SandboxTier::T2,
++    )) {
++        Err(BridgeError::SandboxRefused(reason)) => assert!(
++            reason.contains("exec set"),
++            "the T2 executable resolver should reject ENOENT before cgroup setup, got {reason}"
++        ),
++        Err(other) => panic!("unexpected missing-executable preflight error: {other}"),
++        Ok(mut bridge) => {
++            bridge.kill().expect("stop unexpected missing-path child");
++            let _ = collect_until_exit(&mut bridge);
++            panic!("missing executable unexpectedly spawned")
++        }
++    }
++    assert_no_owned_leaf(&missing_id, &caps());
++
++    // T2's executable resolver rejects a missing path before cgroup creation;
++    // exercise post-setup ENOENT directly through the Linux native spawner.
++    let id = format!("exec-failure-{}", std::process::id());
++    let mut command = Command::new(&missing);
++    let exec_spec = spec_with_tier(&id, &missing, caps(), SandboxTier::T0);
++    match spawn_sandboxed(&exec_spec.sandbox, &mut command) {
++        Err(SpawnError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {}
++        Err(other) => panic!("unexpected native exec failure: {other}"),
++        Ok(mut child) => {
++            let _ = child.child_mut().kill();
++            let _ = child.wait();
++            panic!("missing executable unexpectedly spawned")
++        }
++    }
++    assert_no_owned_leaf(&id, &caps());
++}
++
++#[test]
++fn killed_leader_cleanup_kills_its_surviving_descendant() {
++    let mut spawn = spec("descendant-cleanup", &FIXTURE, caps());
++    spawn.task_args = vec!["--descendant-root".into()];
++    let mut bridge = spawn_and_bridge(spawn).expect("spawn bounded process tree under T2");
++    let leader = bridge.child_pid();
++    let leaf = membership_leaf(leader);
++    let deadline = Instant::now() + Duration::from_secs(5);
++    let descendant = loop {
++        assert!(Instant::now() < deadline, "descendant fixture did not report its PID");
++        match bridge.poll_frame(Duration::from_millis(50)).unwrap() {
++            BridgePoll::Data(SubStream::Stdout, bytes) => {
++                if let Some(line) = String::from_utf8_lossy(&bytes).strip_prefix("DESCENDANT ")
++                {
++                    break line.parse::<u32>().expect("actual descendant PID");
++                }
++            }
++            BridgePoll::Data(SubStream::Stderr, bytes) => {
++                panic!("process-tree fixture diagnostic: {}", String::from_utf8_lossy(&bytes))
++            }
++            BridgePoll::Closed => panic!("process-tree fixture exited before creating a descendant"),
++            _ => {}
++        }
++    };
++    assert_ne!(descendant, leader);
++    assert_eq!(membership_leaf(descendant), leaf);
++    let status = std::fs::read_to_string(format!("/proc/{descendant}/status")).unwrap();
++    assert_eq!(
++        status.lines().find_map(|line| line.strip_prefix("PPid:")).unwrap().trim().parse::<u32>().unwrap(),
++        leader,
++        "reported process must be the real leader's child"
++    );
++    bridge.kill().expect("kill only the native leader");
++    assert!(matches!(collect_until_exit(&mut bridge), ExitCause::Signaled { .. }));
++    assert!(!leaf.exists(), "cgroup.kill must remove the surviving descendant and leaf");
++    match std::fs::read_to_string(format!("/proc/{descendant}/stat")) {
++        Ok(stat) => assert_eq!(
++            stat.rsplit_once(") ").unwrap().1.split_whitespace().next(),
++            Some("Z"),
++            "a descendant awaiting its new parent's reap must already be dead"
++        ),
++        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
++        Err(error) => panic!("read descendant terminal state: {error}"),
++    }
+ }
+diff --git a/crates/maos-kernel-core/tests/fixtures/manifest/resources/edge-case/pids_max.toml b/crates/maos-kernel-core/tests/fixtures/manifest/resources/edge-case/pids_max.toml
+new file mode 100644
+index 00000000..8394e1b4
+--- /dev/null
++++ b/crates/maos-kernel-core/tests/fixtures/manifest/resources/edge-case/pids_max.toml
+@@ -0,0 +1,2 @@
++[resources]
++pids_max = 4294967295
+diff --git a/crates/maos-kernel-core/tests/fixtures/manifest/resources/malformed-rejected/pids_max.toml b/crates/maos-kernel-core/tests/fixtures/manifest/resources/malformed-rejected/pids_max.toml
+new file mode 100644
+index 00000000..00e99ca3
+--- /dev/null
++++ b/crates/maos-kernel-core/tests/fixtures/manifest/resources/malformed-rejected/pids_max.toml
+@@ -0,0 +1,2 @@
++[resources]
++pids_max = "twelve"
+diff --git a/crates/maos-kernel-core/tests/fixtures/manifest/resources/well-formed/pids_max.toml b/crates/maos-kernel-core/tests/fixtures/manifest/resources/well-formed/pids_max.toml
+new file mode 100644
+index 00000000..65856d31
+--- /dev/null
++++ b/crates/maos-kernel-core/tests/fixtures/manifest/resources/well-formed/pids_max.toml
+@@ -0,0 +1,2 @@
++[resources]
++pids_max = 12
+diff --git a/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs b/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs
+new file mode 100644
+index 00000000..a74cf4a3
+--- /dev/null
++++ b/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs
+@@ -0,0 +1,99 @@
++#![forbid(unsafe_code)]
++
++//! Bounded, std-only native workload for the delegated cgroup ceiling smoke.
++
++use std::fs::File;
++use std::io::{self, Write};
++use std::thread;
++use std::time::{Duration, Instant};
++
++fn main() {
++    match std::env::args().nth(1).as_deref() {
++        Some("--descendant-leaf") => {
++            hold_for(Duration::from_secs(25));
++            return;
++        }
++        Some("--descendant-root") => {
++            descendant_root();
++            return;
++        }
++        _ => {}
++    }
++    let membership = std::fs::read_to_string("/proc/self/cgroup").expect("read own membership");
++    let unified = membership
++        .lines()
++        .find_map(|line| line.strip_prefix("0::"))
++        .expect("own cgroup-v2 membership");
++    writeln!(io::stdout().lock(), "MEMBERSHIP 0::{unified}").expect("write own membership");
++    let mut threads = Vec::new();
++    let mut saw_task_exhaustion = false;
++    for _ in 0..64 {
++        match thread::Builder::new()
++            .stack_size(128 * 1024)
++            .spawn(|| hold_for(Duration::from_secs(8)))
++        {
++            Ok(thread) => threads.push(thread),
++            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
++                saw_task_exhaustion = true;
++                break;
++            }
++            Err(error) => panic!("unexpected native task creation error: {error}"),
++        }
++    }
++    assert!(saw_task_exhaustion, "pids.max did not refuse a bounded thread attempt");
++
++    let mut descriptors = Vec::new();
++    let mut saw_fd_exhaustion = false;
++    for _ in 0..128 {
++        match File::open("/dev/null") {
++            Ok(file) => descriptors.push(file),
++            Err(error) if error.raw_os_error() == Some(24) => {
++                saw_fd_exhaustion = true;
++                break;
++            }
++            Err(error) => panic!("unexpected file-descriptor error: {error}"),
++        }
++    }
++    assert!(saw_fd_exhaustion, "RLIMIT_NOFILE did not refuse a bounded open attempt");
++
++    let mut oversized = Vec::<u8>::new();
++    assert!(
++        oversized.try_reserve_exact(96 * 1024 * 1024).is_err(),
++        "the bounded allocation must hit the 64-MiB native memory ceiling"
++    );
++
++    let until = Instant::now() + Duration::from_secs(2);
++    let mut work = 0u64;
++    while Instant::now() < until {
++        work = work.wrapping_add(1);
++        std::hint::black_box(work);
++    }
++    writeln!(io::stdout().lock(), "READY tasks={} work={work}", threads.len())
++        .expect("write fixture readiness");
++    for thread in threads {
++        thread.join().expect("bounded worker thread");
++    }
++    hold_for(Duration::from_secs(1));
++    drop(descriptors);
++}
++
++fn descendant_root() {
++    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
++        .arg("--descendant-leaf")
++        .stdin(std::process::Stdio::piped())
++        .stdout(std::process::Stdio::piped())
++        .stderr(std::process::Stdio::piped())
++        .spawn()
++        .expect("spawn bounded descendant with its own pipes");
++    writeln!(io::stdout().lock(), "DESCENDANT {}", child.id()).unwrap();
++    child.wait().expect("reap bounded descendant on natural exit");
++}
++
++fn hold_for(duration: Duration) {
++    let deadline = Instant::now() + duration;
++    // Timed parking may wake spuriously; do not release a task before its bound.
++    while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
++        thread::park_timeout(remaining);
++    }
++}
++
+diff --git a/crates/maos-kernel-core/tests/manifest_field_coverage.rs b/crates/maos-kernel-core/tests/manifest_field_coverage.rs
+index 3a2b73b6..eced05b5 100644
+--- a/crates/maos-kernel-core/tests/manifest_field_coverage.rs
++++ b/crates/maos-kernel-core/tests/manifest_field_coverage.rs
+@@ -53,6 +53,7 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
+     ("resources", "cpu_max_pct"),
+     ("resources", "memory_max_mb"),
+     ("resources", "fd_max"),
++    ("resources", "pids_max"),
+     ("sandbox", "tier"),
+     ("author", "name"),
+     ("author", "homepage"),
+@@ -269,6 +270,44 @@ fn cli_wrapper_egress_fixtures_enforce_their_declared_outcomes() {
+     );
+ }
+ 
++
++#[test]
++fn resources_pid_cap_fixtures_parse_and_validate() {
++    use maos_manifest::{ManifestError, ResourceCaps};
++
++    let root = fixture_root().join("resources");
++    let parse_fixture = |category: &str| {
++        let text = fs::read_to_string(root.join(category).join("pids_max.toml"))
++            .expect("each resources.pids_max fixture must be readable");
++        let value: toml::Value = toml::from_str(&text).expect("fixture TOML syntax");
++        let body = value
++            .get("resources")
++            .and_then(toml::Value::as_table)
++            .expect("fixture must contain [resources]");
++        let body = toml::to_string(body).expect("serialize resources table body");
++        ResourceCaps::from_toml_str(&body)
++    };
++
++    let valid = parse_fixture("well-formed").unwrap();
++    assert_eq!(valid.pids_max, Some(12));
++    let edge = parse_fixture("edge-case").unwrap();
++    assert_eq!(edge.pids_max, Some(u32::MAX));
++
++    let malformed = parse_fixture("malformed-rejected");
++    assert!(matches!(malformed, Err(ManifestError::Toml(_))));
++
++    let zero = ResourceCaps::from_toml_str("pids_max = 0");
++    assert!(matches!(
++        zero,
++        Err(ManifestError::CapOutOfRange { ref field, value: 0 }) if field == "pids_max"
++    ));
++    for invalid in ["pids_max = -1", "pids_max = 4294967296", "pids_max = 1.5"] {
++        assert!(ResourceCaps::from_toml_str(invalid).is_err(), "{invalid}");
++    }
++
++    let omitted = ResourceCaps::from_toml_str("fd_max = 64").unwrap();
++    assert_eq!(omitted.pids_max, None);
++}
+ #[test]
+ fn test_nfr_test_13_three_cases_per_field() {
+     let root = fixture_root();
+diff --git a/crates/maos-kernel-core/tests/resource_caps_linux.rs b/crates/maos-kernel-core/tests/resource_caps_linux.rs
+index fbc7020e..92e1ec3f 100644
+--- a/crates/maos-kernel-core/tests/resource_caps_linux.rs
++++ b/crates/maos-kernel-core/tests/resource_caps_linux.rs
+@@ -9,47 +9,53 @@ use maos_kernel_core::security::sandbox::spawn_sandboxed;
+ use maos_kernel_core::security::sandbox::SandboxSpec;
+ 
+ #[test]
+-fn setrlimit_nofile_enforced() {
+-    let spec = SandboxSpec {
+-        tier: SandboxTier::T0,
+-        resolved_caps: ResolvedCaps {
+-            cpu_max_pct: None,
+-            memory_max_mb: None,
+-            fd_max: Some(16),
+-        },
+-        declared_scopes: vec![],
+-        spirit_id: "test-fd-cap".into(),
+-        output_shape_predicate: None,
+-    };
+-    let mut cmd = Command::new("/bin/sh");
+-    cmd.arg("-c")
+-        .arg(r#"for i in $(seq 1 32); do exec 3>/dev/null; done 2>/dev/null; echo done"#);
+-    let mut child = spawn_sandboxed(&spec, &mut cmd).unwrap();
+-    let status = child.wait().unwrap();
+-    assert!(
+-        status.code().is_some(),
+-        "rlimit-enforced child must exit with a code"
+-    );
+-}
++fn explicit_pids_cap_is_applied_or_spawn_is_refused() {
++    use maos_kernel_core::security::sandbox::SpawnError;
+ 
+-#[test]
+-fn memory_cap_smoke() {
+     let spec = SandboxSpec {
+         tier: SandboxTier::T0,
+         resolved_caps: ResolvedCaps {
+             cpu_max_pct: None,
+-            memory_max_mb: Some(64),
++            memory_max_mb: None,
+             fd_max: None,
++            pids_max: Some(7),
+         },
+         declared_scopes: vec![],
+-        spirit_id: "test-mem-cap".into(),
++        spirit_id: "test-pids-cap".into(),
+         output_shape_predicate: None,
+     };
+-    let mut cmd = Command::new("/bin/true");
+-    let mut child = spawn_sandboxed(&spec, &mut cmd).unwrap();
+-    let status = child.wait().unwrap();
+-    assert!(
+-        status.success(),
+-        "memory-capped child must exit cleanly under budget"
+-    );
++    let mut command = Command::new("/bin/true");
++
++    match spawn_sandboxed(&spec, &mut command) {
++        Ok(mut child) => {
++            let leaf = child
++                .cgroup_path()
++                .expect("a requested PID cap requires an owned cgroup leaf");
++            let pid = child.id();
++            let membership = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
++                .expect("read actual child cgroup membership");
++            let leaf_membership = leaf
++                .strip_prefix("/sys/fs/cgroup")
++                .expect("owned cgroup leaf is under cgroup v2 mount")
++                .to_string_lossy();
++            assert!(
++                membership
++                    .lines()
++                    .any(|line| line.strip_prefix("0::") == Some(leaf_membership.as_ref())),
++                "child membership {membership:?} must name owned leaf {leaf_membership}"
++            );
++            assert_eq!(
++                std::fs::read_to_string(leaf.join("pids.max"))
++                    .expect("requested pids.max exists")
++                    .trim(),
++                "7"
++            );
++            assert!(child.wait().expect("wait for /bin/true").success());
++        }
++        Err(SpawnError::CgroupUnavailable | SpawnError::SandboxSetup(_)) => {
++            // A refusal caused by missing or unusable delegation is acceptable;
++            // successful guest execution without the requested PID boundary is not.
++        }
++        Err(error) => panic!("unexpected failure unrelated to cgroup setup: {error}"),
++    }
+ }
+diff --git a/crates/maos-kernel-core/tests/sandbox_enforcement_windows.rs b/crates/maos-kernel-core/tests/sandbox_enforcement_windows.rs
+index 6633caa8..0fb0749c 100644
+--- a/crates/maos-kernel-core/tests/sandbox_enforcement_windows.rs
++++ b/crates/maos-kernel-core/tests/sandbox_enforcement_windows.rs
+@@ -40,6 +40,7 @@ fn no_caps() -> ResolvedCaps {
+         cpu_max_pct: None,
+         memory_max_mb: None,
+         fd_max: None,
++        pids_max: None,
+     }
+ }
+ 
+@@ -48,6 +49,7 @@ fn caps_mem(mb: u32) -> ResolvedCaps {
+         cpu_max_pct: None,
+         memory_max_mb: Some(mb),
+         fd_max: None,
++        pids_max: None,
+     }
+ }
+ 
+diff --git a/crates/maos-kernel-core/tests/t3_argv_custody_17_1.rs b/crates/maos-kernel-core/tests/t3_argv_custody_17_1.rs
+index 77a6fe3c..18602360 100644
+--- a/crates/maos-kernel-core/tests/t3_argv_custody_17_1.rs
++++ b/crates/maos-kernel-core/tests/t3_argv_custody_17_1.rs
+@@ -46,6 +46,13 @@ fn verified_image() -> VerifiedImageAttestation {
+ }
+ 
+ fn argv(env: &[(String, String)]) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
++    resource_argv(env, &SandboxSpec::new_for_test(SandboxTier::T3))
++}
++
++fn resource_argv(
++    env: &[(String, String)],
++    spec: &SandboxSpec,
++) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+     let runtime = ContainerRuntime {
+         kind: ContainerRuntimeKind::Podman,
+         path: "/usr/bin/podman".into(),
+@@ -54,7 +61,7 @@ fn argv(env: &[(String, String)]) -> Result<Vec<String>, maos_domain::sandbox::T
+     build_runtime_argv(
+         &runtime,
+         &verified_image(),
+-        &SandboxSpec::new_for_test(SandboxTier::T3),
++        spec,
+         Path::new("/fixture"),
+         &[],
+         "worker",
+@@ -98,3 +105,45 @@ fn duplicate_environment_names_are_refused() {
+     .unwrap_err();
+     assert!(error.to_string().contains("duplicate"));
+ }
++
++#[test]
++fn cpu_percentage_is_a_fractional_core_not_a_core_count() {
++    for (percentage, cores) in [(10, 0.10), (100, 1.0)] {
++        let mut spec = SandboxSpec::new_for_test(SandboxTier::T3);
++        spec.resolved_caps.cpu_max_pct = Some(percentage);
++        let args = resource_argv(&[], &spec).unwrap();
++        let actual: f64 = args
++            .iter()
++            .find_map(|arg| arg.strip_prefix("--cpus="))
++            .expect("CPU limit")
++            .parse()
++            .unwrap();
++        assert_eq!(actual, cores, "CPU percentages must not multiply the budget by 100");
++    }
++}
++
++#[test]
++fn fd_and_pid_budgets_are_independent_including_omission() {
++    for (fd, pids) in [(Some(31), Some(7)), (Some(31), None), (None, Some(7))] {
++        let mut spec = SandboxSpec::new_for_test(SandboxTier::T3);
++        spec.resolved_caps.fd_max = fd;
++        spec.resolved_caps.pids_max = pids;
++        let args = resource_argv(&[], &spec).unwrap();
++        let actual_pids: u32 = args
++            .iter()
++            .find_map(|arg| arg.strip_prefix("--pids-limit="))
++            .expect("PID limit")
++            .parse()
++            .unwrap();
++        assert_eq!(actual_pids, pids.unwrap_or(64), "FD requests cannot change the task budget");
++        let nofile = args.iter().find_map(|arg| arg.strip_prefix("--ulimit=nofile="));
++        match fd {
++            Some(limit) => {
++                let (soft, hard) = nofile.expect("FD cap must constrain both limits").split_once(':').unwrap();
++                assert_eq!(soft.parse::<u32>().unwrap(), limit);
++                assert_eq!(hard.parse::<u32>().unwrap(), limit);
++            }
++            None => assert!(nofile.is_none(), "omission must not invent an FD cap"),
++        }
++    }
++}
+diff --git a/crates/maos-manifest/src/manifest.rs b/crates/maos-manifest/src/manifest.rs
+index 03a2f3a9..9973c9aa 100644
+--- a/crates/maos-manifest/src/manifest.rs
++++ b/crates/maos-manifest/src/manifest.rs
+@@ -106,6 +106,7 @@ pub struct ResourceCaps {
+     pub cpu_max_pct: Option<u32>,
+     pub memory_max_mb: Option<u32>,
+     pub fd_max: Option<u32>,
++    pub pids_max: Option<u32>,
+ }
+ 
+ impl ResourceCaps {
+@@ -122,6 +123,7 @@ pub struct ResolvedCaps {
+     pub cpu_max_pct: Option<u32>,
+     pub memory_max_mb: Option<u32>,
+     pub fd_max: Option<u32>,
++    pub pids_max: Option<u32>,
+ }
+ 
+ /// Take the stricter (lower/None-patched) of two cap sources.
+@@ -130,6 +132,7 @@ pub fn resolve_caps(manifest: &ResourceCaps, operator: &ResourceCaps) -> Resolve
+         cpu_max_pct: strictest_opt(manifest.cpu_max_pct, operator.cpu_max_pct),
+         memory_max_mb: strictest_opt(manifest.memory_max_mb, operator.memory_max_mb),
+         fd_max: strictest_opt(manifest.fd_max, operator.fd_max),
++        pids_max: strictest_opt(manifest.pids_max, operator.pids_max),
+     }
+ }
+ 
+@@ -165,6 +168,7 @@ struct RawResourceCaps {
+     cpu_max_pct: Option<u32>,
+     memory_max_mb: Option<u32>,
+     fd_max: Option<u32>,
++    pids_max: Option<u32>,
+ }
+ 
+ impl RawResourceCaps {
+@@ -186,19 +190,15 @@ impl RawResourceCaps {
+                 });
+             }
+         }
+-        if let Some(v) = self.memory_max_mb {
+-            if v == 0 {
+-                return Err(ManifestError::CapOutOfRange {
+-                    field: "memory_max_mb".into(),
+-                    value: v,
+-                });
+-            }
+-        }
+-        if let Some(v) = self.fd_max {
+-            if v == 0 {
++        for (field, value) in [
++            ("memory_max_mb", self.memory_max_mb),
++            ("fd_max", self.fd_max),
++            ("pids_max", self.pids_max),
++        ] {
++            if value == Some(0) {
+                 return Err(ManifestError::CapOutOfRange {
+-                    field: "fd_max".into(),
+-                    value: v,
++                    field: field.into(),
++                    value: 0,
+                 });
+             }
+         }
+@@ -206,6 +206,7 @@ impl RawResourceCaps {
+             cpu_max_pct: self.cpu_max_pct,
+             memory_max_mb: self.memory_max_mb,
+             fd_max: self.fd_max,
++            pids_max: self.pids_max,
+         })
+     }
+ }
+@@ -2607,8 +2608,11 @@ trust_tier = "public_vetted"
+         assert_eq!(caps.cpu_max_pct, Some(50));
+         assert_eq!(caps.memory_max_mb, Some(512));
+         assert_eq!(caps.fd_max, Some(64));
++        assert_eq!(caps.pids_max, None);
+     }
+ 
++
++
+     #[test]
+     fn resource_caps_malformed_zero_rejected() {
+         let err = ResourceCaps::from_toml_str(r#"memory_max_mb = 0"#).unwrap_err();
+@@ -2623,6 +2627,7 @@ trust_tier = "public_vetted"
+         assert_eq!(caps.cpu_max_pct, None);
+         assert_eq!(caps.memory_max_mb, None);
+         assert_eq!(caps.fd_max, None);
++        assert_eq!(caps.pids_max, None);
+     }
+ 
+     #[test]
+@@ -2640,11 +2645,13 @@ trust_tier = "public_vetted"
+             cpu_max_pct: Some(30),
+             memory_max_mb: Some(256),
+             fd_max: None,
++            pids_max: None,
+         };
+         let o = ResourceCaps {
+             cpu_max_pct: Some(50),
+             memory_max_mb: Some(512),
+             fd_max: None,
++            pids_max: None,
+         };
+         let r = resolve_caps(&m, &o);
+         assert_eq!(r.cpu_max_pct, Some(30));
+@@ -2657,11 +2664,13 @@ trust_tier = "public_vetted"
+             cpu_max_pct: Some(80),
+             memory_max_mb: None,
+             fd_max: Some(128),
++            pids_max: None,
+         };
+         let o = ResourceCaps {
+             cpu_max_pct: Some(40),
+             memory_max_mb: Some(1024),
+             fd_max: Some(64),
++            pids_max: None,
+         };
+         let r = resolve_caps(&m, &o);
+         assert_eq!(r.cpu_max_pct, Some(40));
+@@ -2675,11 +2684,13 @@ trust_tier = "public_vetted"
+             cpu_max_pct: None,
+             memory_max_mb: Some(256),
+             fd_max: None,
++            pids_max: None,
+         };
+         let o = ResourceCaps {
+             cpu_max_pct: Some(50),
+             memory_max_mb: None,
+             fd_max: Some(32),
++            pids_max: None,
+         };
+         let r = resolve_caps(&m, &o);
+         assert_eq!(r.cpu_max_pct, Some(50));
+@@ -2695,6 +2706,7 @@ trust_tier = "public_vetted"
+         assert_eq!(r.cpu_max_pct, None);
+         assert_eq!(r.memory_max_mb, None);
+         assert_eq!(r.fd_max, None);
++        assert_eq!(r.pids_max, None);
+     }
+ 
+     // ---- ClassSection (Story 1b.5c, AC3) ----
+diff --git a/crates/maos-manifest/tests/resources_pid_17_2.rs b/crates/maos-manifest/tests/resources_pid_17_2.rs
+new file mode 100644
+index 00000000..887066f6
+--- /dev/null
++++ b/crates/maos-manifest/tests/resources_pid_17_2.rs
+@@ -0,0 +1,43 @@
++use maos_manifest::{resolve_caps, ResourceCaps};
++
++#[test]
++fn pid_cap_resolution_is_independent_from_fd_and_uses_strictest_of() {
++    let manifest = ResourceCaps {
++        fd_max: Some(64),
++        pids_max: Some(12),
++        ..ResourceCaps::default()
++    };
++    let operator = ResourceCaps {
++        fd_max: Some(32),
++        pids_max: Some(20),
++        ..ResourceCaps::default()
++    };
++    let resolved = resolve_caps(&manifest, &operator);
++    assert_eq!(resolved.fd_max, Some(32));
++    assert_eq!(resolved.pids_max, Some(12));
++
++    let manifest_tighter_pid = ResourceCaps {
++        pids_max: Some(8),
++        ..ResourceCaps::default()
++    };
++    let operator_tighter_pid = ResourceCaps {
++        pids_max: Some(4),
++        ..ResourceCaps::default()
++    };
++    assert_eq!(
++        resolve_caps(&manifest_tighter_pid, &ResourceCaps::default()).pids_max,
++        Some(8)
++    );
++    assert_eq!(
++        resolve_caps(&ResourceCaps::default(), &operator_tighter_pid).pids_max,
++        Some(4)
++    );
++    assert_eq!(
++        resolve_caps(&manifest_tighter_pid, &operator_tighter_pid).pids_max,
++        Some(4)
++    );
++    assert_eq!(
++        resolve_caps(&ResourceCaps::default(), &ResourceCaps::default()).pids_max,
++        None
++    );
++}
+diff --git a/spirits/worker/src/bin/worker-cli-fixture.rs b/spirits/worker/src/bin/worker-cli-fixture.rs
+index 2c2a1da6..65e55b87 100644
+--- a/spirits/worker/src/bin/worker-cli-fixture.rs
++++ b/spirits/worker/src/bin/worker-cli-fixture.rs
+@@ -7,6 +7,8 @@
+ //! - With `--maos-bridge-probe` anywhere in argv: print the JSON output-shape
+ //!   envelope as the FIRST stdout line and exit 0. This is what the kernel's
+ //!   `probe_and_verify_shape` reads to assert the declared `output_shape_version`.
++//! - `--maos-fixture-mode=resource-probe`: bounded real thread and descriptor
++//!   exhaustion plus a bounded CPU burst, held briefly for OCI inspection.
+ //! - With `--maos-fixture-mode=<mode>`: run the named Story-16-3 crash/hang
+ //!   scene (ruling D-16-3-L) so the supervision corpora can drive real
+ //!   subprocess deaths; unknown mode ⇒ exit 2. Modes: `hang`, `line-then-hang`,
+@@ -70,6 +72,7 @@ fn main() {
+     // envelope and exits instead of hanging the admission probe.
+     if let Some(mode) = args.iter().find_map(|a| a.strip_prefix(MODE_FLAG_PREFIX)) {
+         match mode {
++            "resource-probe" => resource_probe(),
+             "hang" => sleep_forever(),
+             "line-then-hang" => {
+                 println!("{}", worker::CANNED_OUTPUT_LINES[0]);
+@@ -91,8 +94,8 @@ fn main() {
+             }
+             unknown => {
+                 eprintln!(
+-                    "worker-fixture: unknown fixture mode `{unknown}` (expected hang, \
+-                     line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self \
++                    "worker-fixture: unknown fixture mode `{unknown}` (expected resource-probe, \
++                     hang, line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self \
+                      or exit-nonzero)"
+                 );
+                 std::process::exit(UNKNOWN_MODE_EXIT);
+@@ -188,3 +191,84 @@ fn sigkill_self() -> ! {
+         }
+     }
+ }
++/// Exercise finite, actual process and descriptor limits in the T3 container.
++///
++/// The task count is deliberately bounded: at most 64 worker threads are
++/// attempted, and all successfully-created threads are released and joined
++/// before return. The 12-PID test cap therefore makes this hit EAGAIN without
++/// an unbounded fork or thread bomb.
++fn resource_probe() -> ! {
++    use std::fs::File;
++    use std::sync::atomic::{AtomicBool, Ordering};
++    use std::sync::Arc;
++
++    for namespace in ["pid", "net", "user"] {
++        let path = format!("/proc/self/ns/{namespace}");
++        let actual = std::fs::read_link(path).expect("resource fixture namespace");
++        println!("worker: namespace {namespace}={}", actual.display());
++    }
++    flush_stdout();
++    let mut files = Vec::new();
++    let fd_error = loop {
++        match File::open("/dev/null") {
++            Ok(file) if files.len() < 256 => files.push(file),
++            Ok(_) => {
++                break "fixture-bound".to_string();
++            }
++            Err(error) => break format!("{:?}:{}", error.kind(), error.raw_os_error().unwrap_or(-1)),
++        }
++    };
++    let release = Arc::new(AtomicBool::new(false));
++    let mut threads = Vec::new();
++    let mut task_error = None;
++    for _ in 0..64 {
++        let release = Arc::clone(&release);
++        match std::thread::Builder::new().spawn(move || {
++            while !release.load(Ordering::Acquire) {
++                std::thread::sleep(Duration::from_millis(10));
++            }
++        }) {
++            Ok(thread) => threads.push(thread),
++            Err(error) => {
++                task_error = Some(format!(
++                    "{:?}:{}",
++                    error.kind(),
++                    error.raw_os_error().unwrap_or(-1)
++                ));
++                break;
++            }
++        }
++    }
++
++    println!("{}", worker::CANNED_OUTPUT_LINES[0]);
++    println!(
++        "worker: resource probe {{\"threads_created\":{},\"task_error\":{},\"fds_opened\":{},\"fd_error\":\"{}\"}}",
++        threads.len(),
++        task_error
++            .as_deref()
++            .map(|error| format!("\"{error}\""))
++            .unwrap_or_else(|| "null".to_string()),
++        files.len(),
++        fd_error
++    );
++    println!("{}", worker::CANNED_OUTPUT_LINES[1]);
++    flush_stdout();
++
++    // Consume CPU long enough for the finite 10% quota to accrue observable
++    // throttling, while keeping this workload strictly bounded.
++    let until = std::time::Instant::now() + Duration::from_secs(5);
++    let mut value = 1_u64;
++    while std::time::Instant::now() < until {
++        value = value.wrapping_mul(6364136223846793005).wrapping_add(1);
++        std::hint::black_box(value);
++    }
++    std::thread::sleep(Duration::from_secs(2));
++    drop(files);
++    release.store(true, Ordering::Release);
++    for thread in threads {
++        let _ = thread.join();
++    }
++    println!("{}", worker::CANNED_OUTPUT_LINES[2]);
++    flush_stdout();
++    std::process::exit(0)
++}

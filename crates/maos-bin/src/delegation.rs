@@ -616,6 +616,7 @@ pub struct HostBWorkerContext {
     pub run: crate::worker_spawn::RunArgs,
     pub transparency_log: Arc<maos_kernel_core::iac::transparency_log::TransparencyLogAdapter>,
     pub capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    pub policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     pub spirit_host: Option<Arc<dyn maos_host::SpiritHostPort>>,
     /// Threaded, NOT dropped. Host B mints a `Scope::CliSubprocessSpawn` cap-token
     /// for a task a REMOTE host asked for; running that mint without the SSO/PDP
@@ -690,6 +691,7 @@ pub async fn handle_one_inbound(
     let run = ctx.run.clone();
     let transparency_log = Arc::clone(&ctx.transparency_log);
     let capability = Arc::clone(&ctx.capability);
+    let policy = Arc::clone(&ctx.policy);
     let spirit_host = ctx.spirit_host.clone();
     let enterprise_runtime = ctx.enterprise_runtime.clone();
     let enterprise_pdp_runtime = ctx.enterprise_pdp_runtime.clone();
@@ -703,6 +705,7 @@ pub async fn handle_one_inbound(
             &run,
             transparency_log,
             capability,
+            policy,
             spirit_host,
             enterprise_runtime,
             enterprise_pdp_runtime.as_deref(),

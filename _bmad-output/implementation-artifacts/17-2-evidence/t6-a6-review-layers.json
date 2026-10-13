@@ -1,0 +1,200 @@
+{
+  "reviewedDiff": "t6-a6-reviewed.diff",
+  "sha256": "4c532a3df78d750afcb4789471e701980172aeb107504cf44fb1a2a21acecccb",
+  "reviews": {
+    "A6BlindHunter": {
+      "overall_correctness": "incorrect",
+      "explanation": "Two introduced containment defects require correction: omitted native resource caps remove descendant teardown on delegated Linux hosts, and newly accepted PID ceilings are silently ignored by supported non-Linux native spawners. Inspected resource parsing/resolution, native and T3 consumers, policy ownership/callsites, session supervision and journal ordering/replay, changed tests/fixtures, and CI helper/aggregate dispositions without reading story/spec or completion material. This is a static, evidence-backed review; no builds, tests, linters, formatters, runtime repros, or baseline measurements were performed.",
+      "confidence": 0.94
+    },
+    "A6EdgeCaseHunter": {
+      "overall_correctness": "correct",
+      "explanation": "No evidence-backed, patch-introduced defects found in the assigned resource, spawn, sandbox, session, journal, and regression-fixture slice. Coverage included absent/invalid/extreme caps, independent precedence and per-launch policy snapshots, CPU/MiB/PID/FD units, controller and permission refusals, partial setup/pre-exec/exec failure cleanup, concurrent leaf naming, bounded cleanup/residue reporting, no-resource/FD-only/memory fallback versus strict CPU/PID refusal, one-shot downgrade routing, fast crash/restart and append-panic ownership, journal replay/index ordering, cross-platform cfg boundaries, and retired-API references. This is a static-review verdict: no builds or tests were executed, runtime/platform acceptance remains for the parent to verify, and the accepted 17-7 lifecycle limitations were not treated as new defects.",
+      "confidence": 0.9,
+      "findings": []
+    },
+    "A6AcceptanceAuditor": {
+      "findings": [
+        {
+          "title": "Retain native descendant cleanup when resource caps are omitted",
+          "body": "AC2.2, AC2.5 and T2's ownership-preservation constraint are violated by skipping `setup_cgroup` for no-resource and FD-only requests. On a delegated runner, the baseline still placed those launches into an owned leaf; the new branch always chooses `Cleanup::None`. A native T2 executable launched through `spawn_and_bridge` can fork a descendant (`linux.rs` permits `clone`/`execve`), after which dropping/finalizing the bridge only kills/reaps its direct child: the only descendant-wide kill is `Cleanup::Cgroup::drop` (`sandbox/mod.rs:109-135`), which this branch disables. Descendants can therefore outlive the owning launch, or keep the bridge's reader joins waiting if they inherit stdout/stderr. Preserve best-effort owned placement/cleanup even without CPU/memory/PID limits, while keeping unavailable delegation nonfatal and emitting no resource-downgrade row for these requests; add the same descendant-teardown control with empty/FD-only caps. This is established from the changed branch and its actual cleanup consumer; no runtime reproduction was executed during review.",
+          "priority": 1,
+          "confidence": 0.96,
+          "file_path": "/home/lunarpulse/dev_ws/crates/maos-kernel-core/src/security/sandbox/linux.rs",
+          "line_start": 69,
+          "line_end": 76
+        },
+        {
+          "title": "Exercise native above-hard FD refusal and owned-leaf cleanup",
+          "body": "Missing acceptance evidence, not an observed limit-enforcement defect: AC1.2 requires a bounded above-hard `RLIMIT_NOFILE` refusal with no guest execution and released owned resources for native T2 as well as T3. The replacement failure smoke exercises creation, limit-write and exec failures, but neither it nor the full admitted-session suite includes this native case; the actual above-hard control in `worker_resource_limits_17_2.rs` only exercises the rootless T3 runtime. Consequently the recorded native4/session22 passes do not establish native pre-exec FD-refusal cleanup or absence of a successful downgrade for that failure. Add an isolated native T2 within-hard control and an above-hard request under a deliberately lowered inherited hard nofile limit, assert the specific refusal/no guest effects/no downgrade and no owned leaf, and archive its capable-runner execution; the production `setrlimit` call alone is not that evidence.",
+          "priority": 2,
+          "confidence": 0.98,
+          "file_path": "/home/lunarpulse/dev_ws/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+          "line_start": 342,
+          "line_end": 350
+        },
+        {
+          "title": "Preserve the TypeScript fixture verdict in the PR result table",
+          "body": "T5's narrow aggregate enrollment/reporting change replaces the existing `example-spirit-ts-tests` row with the two new cgroup rows rather than appending them. The TypeScript job remains an aggregate dependency and `estts` is still read, so a failing TypeScript fixture can make the aggregate red while its per-gate verdict disappears from the PR report. Retain the existing `| example-spirit-ts-tests | ${icon(estts)} ${estts} |` row alongside the two additions; the aggregate remains fail-closed, so this is a non-blocking reporting regression rather than an enforcement bypass.",
+          "priority": 3,
+          "confidence": 1,
+          "file_path": "/home/lunarpulse/dev_ws/.github/workflows/discipline.yml",
+          "line_start": 5286,
+          "line_end": 5287
+        }
+      ],
+      "overall_correctness": "incorrect",
+      "explanation": "The reviewed exact 59-file diff introduces a native lifetime/descendant-cleanup regression for empty and FD-only resource requests (AC2 ownership/cleanup), leaves the specifically required native above-hard FD-refusal evidence absent (AC1), and drops an existing TypeScript gate's PR report row (non-blocking T5 reporting); no edits or checks were executed by this audit. Acceptance coverage: AC1 delegated placement/exact live limits, strict CPU/PID refusal, memory-only fallback and production persisted read-back were traced through the actual native spawner, owning guard, bridge dispatch and admitted-session producer; Worker malformed-resource parsing and live shared policy authority were traced across standalone, topology and inbound Host-B routes before probe/bind/mint; AC2 independent parser/raw/resolved PID contracts, strictest-of precedence, T3 percentage/PID/FD argv and omission defaults, obsolete API/caller retirement, typed event20/legacy serde replay and journal writer/index ordering were inspected; AC3 strict native smoke, independent Delegate=no permission probes, explicit workspace environment transport/in-unit rootless canary, exact-count rejection, bounded unit cleanup, required-success fan-in, platform matrix and preservation constraints were inspected against actual archived evidence, including run38187260379's eight successful image jobs (native4/session22 on all four positive images, session22 on all four negative images, canary1/Worker2 on both positive x64 images), run38184549819's fourteen green-before/red-after mutations and run38184923504's sixteen interruption/expiry cases; T6/Delivery coverage includes the authorized eight kernel locations and deletion-only restrictions, all seven coordinated pin artifacts, unchanged line505 reader compatibility, exact kernel25149 physical/19495 tokei, manifest4466 within unchanged4474, approved domain9349/bin25397/aggregatehardfail173505 with measured173504, and actual post-pin t6-grant-gates.log results (baseline/service-boundary/KLOC pass, FKCS11/content-pin24/recovery10/service-boundary12/chaos3 passed), plus EN/KO resource/compatibility/mechanism claims and t6-docs-gates.log's successful bilingual build/static gates and four built HTTP routes in t6-docs-http-smoke.json. Separate outstanding acceptance—not asserted source failures—is final capable whole-workspace success (the latest completed archived run actually returned101 after its in-unit canary passed), actual macOS execution of both default all-targets and feature-enabled spawned-session compile commands, native above-hard FD execution and complete parent-owned non-author integration closeout; historical focused CI passes do not prove the final formatted/re-pinned review snapshot, artifact state does not independently establish chronological Grant-protocol editing order, browser rendering was explicitly unavailable, and the accepted 17-7 retained-container/OOM/short-lived-PID-inspection limitations were not flagged.",
+      "confidence": 0.96
+    },
+    "A6TestInfrastructure": {
+      "overall_correctness": "correct",
+      "explanation": "No evidence-backed merge-blocking defect found in the assigned test/CI slice: reviewed the relevant diff for the Python harness and boundary tests, delegated/undelegated workflow jobs and aggregate disposition, spawned-session and Worker-resource tests, native smoke fixtures, journal oracles, manifest regressions, and xtask workflow/pin changes, including lifecycle replay and fixture-mode consumers. Existing 17-2 evidence records actual mutation failures and bounded-unit cleanup controls, plus successful focused native/session/Worker jobs; it explicitly records the whole-workspace command returning 101 rather than claiming a complete green workspace run. No tests, builds, linters, or formatters were run for this review, so exact-current-diff runtime/CI acceptance and whole-workspace failure attribution remain for the parent’s verification.",
+      "confidence": 0.87
+    },
+    "A6SecurityReview": {
+      "coverage_summary": "Read the supplied diff end-to-end, with detailed review of native placement/cleanup/pre-exec, T3 argv, Worker resource-policy threading on local and inbound routes, signed/rootless/proxy custody, the session downgrade producer and journal ordering, and CI privilege/environment/signal handling. One evidence-backed native sandbox lifetime regression survives review. No additional newly introduced vulnerability was established in the other assigned surfaces. Existing 17-7 terminal-container/short-lived refusal limitations and documented journal sync limitations were not reported. Static review only: no edits, payload execution, network requests, builds, tests, linters or formatters. LSP tools were not exposed; definitions and callers were inspected with source reads/searches. The finding concerns consumers launching a hostile native executable through the native T2 primitive; the current production CLI's WASM launch does not itself establish an arbitrary native-code execution path.",
+      "findings": [
+        {
+          "rule_id": "A6-NATIVE-UNCAPPED-DESCENDANTS",
+          "title": "Uncapped native T2 launches lose descendant lifetime containment",
+          "summary": "A consumer launching a hostile native executable through spawn_sandboxed or spawn_and_bridge on a host with working cgroup delegation now loses process-tree cleanup when CPU, memory and PID requests are absent, including FD-only launches. The new cgroup_requested branch selects Cleanup::None, whereas the baseline attempted per-spawn cgroup placement even without resource ceilings. The child can use permitted clone/clone3 to create a descendant before its leader exits or is stopped. Native teardown kills/reaps only the leader; the skipped cgroup guard was the mechanism that killed remaining members. [INFERENCE] Descendants can consequently survive unload/revocation and continue consuming resources. Retaining an otherwise idle stdout/stderr pipe can also indefinitely block bridge teardown while it joins reader threads. This is a cap-independent weakening of the exposed native sandbox boundary, not a demonstrated escape through a pure WASM guest or the T3 Worker route.",
+          "severity": "medium",
+          "confidence": "high",
+          "category": "sandbox lifetime containment",
+          "locations": [
+            {
+              "path": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+              "start_line": 71,
+              "end_line": 75,
+              "role": "New bypass of per-spawn cgroup placement and ownership"
+            },
+            {
+              "path": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+              "start_line": 294,
+              "end_line": 296,
+              "role": "T2 permits execve and clone; clone3 is also permitted at line 332"
+            },
+            {
+              "path": "crates/maos-kernel-core/src/security/sandbox/mod.rs",
+              "start_line": 173,
+              "end_line": 178,
+              "role": "Native guard kills/reaps only its immediate child"
+            },
+            {
+              "path": "crates/maos-kernel-core/src/security/sandbox/mod.rs",
+              "start_line": 108,
+              "end_line": 113,
+              "role": "Skipped cgroup guard supplies process-tree termination"
+            },
+            {
+              "path": "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+              "start_line": 1103,
+              "end_line": 1119,
+              "role": "Bridge synchronously joins pipe readers after immediate-child teardown"
+            }
+          ],
+          "cwe": [
+            "CWE-664",
+            "CWE-400"
+          ],
+          "evidence": [
+            {
+              "label": "New cap-independent cleanup bypass",
+              "explanation": "The baseline side of the exact diff called setup_cgroup(spec) unconditionally. The changed side skips it for no-resource and FD-only requests, even when delegation is available.",
+              "excerpt": "let cgroup_requested = spec.resolved_caps.cpu_max_pct.is_some()\n    || mem_limit.is_some()\n    || spec.resolved_caps.pids_max.is_some();\nlet (cleanup, cgroup_procs, resource_downgrade) = if !cgroup_requested {\n    (Cleanup::None, None, None)\n}"
+            },
+            {
+              "label": "Credible native execution path",
+              "explanation": "spawn_child routes Linux T2 BridgeSpawnSpec requests into spawn_sandboxed at runtime.rs:593-596. The native T2 allow-list contains unrestricted clone/clone3 and execve. A descendant remains confined by inherited Landlock/seccomp, but those controls do not terminate it when its parent exits.",
+              "excerpt": "libc::SYS_execve,\nlibc::SYS_clone,\nlibc::SYS_wait4,"
+            },
+            {
+              "label": "Immediate-child teardown does not contain descendants",
+              "explanation": "SandboxedChild::drop kills and waits only the Child PID. Cleanup::Cgroup additionally writes cgroup.kill, but Cleanup::None performs no equivalent tree-wide action. SpawnedBridge::drop then joins stdout/stderr readers, which can remain blocked if a surviving descendant holds the write ends.",
+              "excerpt": "impl Drop for SandboxedChild {\n    fn drop(&mut self) {\n        let _ = self.child.kill();\n        let _ = self.child.wait();\n    }\n}"
+            },
+            {
+              "label": "Added regression does not cover the bypass",
+              "explanation": "killed_leader_cleanup_kills_its_surviving_descendant uses caps(), whose CPU, memory and PID fields are all Some. The no-resource/FD-only session tests check successful execution and absence of downgrade rows, not descendant termination. This is source coverage evidence, not a claim that any test passed."
+            }
+          ],
+          "anchor": "crates/maos-kernel-core/src/security/sandbox/linux.rs:71-75",
+          "remediation": "Keep native lifetime containment independent from requested resource ceilings. Preserve owned per-launch cgroup placement/cleanup on delegated hosts for no-resource and FD-only T2 launches without inventing a memory-downgrade event when no memory ceiling was requested; preserve the existing documented undelegated policy. Extend the bounded descendant-cleanup regression to both cases, including a descendant retaining bridge pipes. Parent should reproduce and verify these cases after integration."
+        }
+      ],
+      "reviewed_paths": [
+        "local://17-2-a6-review.diff",
+        ".github/workflows/discipline.yml",
+        "BREAKING.md",
+        "crates/maos-bin/src/admission.rs",
+        "crates/maos-bin/src/delegation.rs",
+        "crates/maos-bin/src/main.rs",
+        "crates/maos-bin/src/spirit_session.rs",
+        "crates/maos-bin/src/supervision.rs",
+        "crates/maos-bin/src/worker_spawn.rs",
+        "crates/maos-bin/tests/enterprise_daemon_seam_13_5a.rs",
+        "crates/maos-bin/tests/spawned_scope_17_3c.rs",
+        "crates/maos-bin/tests/two_host_delegation_2b.rs",
+        "crates/maos-bin/tests/worker_resource_limits_17_2.rs",
+        "crates/maos-domain/src/invariants/i10.rs",
+        "crates/maos-kernel-core/src/security/mod.rs",
+        "crates/maos-kernel-core/src/journal/mod.rs",
+        "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
+        "crates/maos-kernel-core/src/scheduler/mod.rs",
+        "crates/maos-kernel-core/src/scheduler/resource_ceiling.rs (deleted diff)",
+        "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs",
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "crates/maos-kernel-core/src/security/sandbox/mod.rs",
+        "crates/maos-kernel-core/src/security/sandbox/t3/argv.rs",
+        "crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs",
+        "crates/maos-kernel-core/src/security/sandbox/t3/runtime_detect.rs",
+        "crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs",
+        "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+        "crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs",
+        "crates/maos-kernel-core/tests/journal_append_16_5.rs",
+        "crates/maos-kernel-core/tests/journal_resource_downgrade_replay_17_2.rs",
+        "crates/maos-kernel-core/tests/manifest_field_coverage.rs",
+        "crates/maos-kernel-core/tests/resource_caps_linux.rs",
+        "crates/maos-kernel-core/tests/t3_argv_custody_17_1.rs",
+        "crates/maos-manifest/src/manifest.rs",
+        "crates/maos-manifest/tests/resources_pid_17_2.rs",
+        "scripts/run_cgroup_ceiling_17_2.py",
+        "scripts/tests/test_cgroup_ceiling_17_2.py",
+        "spirits/worker/src/bin/worker-cli-fixture.rs",
+        "docs-site/docs/cookbook/cli-wrapper-spirit.md",
+        "docs-site/docs/manifest/v5.md",
+        "xtask/abi-ratifications.toml",
+        "xtask/kernel-api-classes.toml",
+        "xtask/kernel-core-baseline.toml",
+        "xtask/kloc.toml",
+        "xtask/tests/cgroup_ceiling_workflow_17_2.rs"
+      ],
+      "deferred": [
+        {
+          "reason": "Runtime reproduction and verification belong to the parent under the no-execution review contract. The surviving finding is grounded in the changed branch and existing process-creation/teardown controls; its runtime effects are explicitly identified as inference.",
+          "paths": [
+            "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+            "crates/maos-kernel-core/src/security/sandbox/linux.rs"
+          ]
+        }
+      ]
+    },
+    "A6RuntimeReview": {
+      "findings": [
+        {
+          "title": "Preserve descendant cleanup for native spawns without cgroup caps",
+          "body": "For a delegated Linux native T2 spawn with no CPU/memory/PID cap (including FD-only requests), this new branch unconditionally selects `Cleanup::None`; the baseline still created an owned cgroup when delegation was available. `SandboxedChild::drop` only kills/reaps the leader, and the only descendant-kill operation is `Cleanup::Cgroup`'s `cgroup.kill`, so a descendant survives leader crash, unload, or error cleanup on this newly bypassed path. A descendant retaining bridge stdout/stderr additionally leaves `SpawnedBridge::drop` blocked in its reader joins (`runtime.rs:1109-1118`). The new `killed_leader_cleanup_kills_its_surviving_descendant` regression covers only `caps()` with all cgroup resources requested, not this branch. Preserve tree-cleanup ownership independently of requested resource ceilings, or retain an unconfigured owned cgroup when delegation is available. This failure follows from source/ownership tracing; it was not executed during this review.",
+          "priority": 2,
+          "confidence": 0.93,
+          "file_path": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+          "line_start": 73,
+          "line_end": 79
+        }
+      ],
+      "overall_correctness": "incorrect",
+      "explanation": "The scoped runtime review found one patch-introduced lifetime regression: delegated native launches without cgroup-backed resource caps lose descendant-cleanup ownership; this is source-backed inference, not an executed reproduction. Coverage included every changed production Worker/Host-B/SessionDeps constructor and launch route, live policy snapshot resolution, pre-exec placement, child/SCB/binding ownership and drop order, observer-before-readiness and downgrade journaling, raw lifecycle replay/index dispatch, intended planned-stop/crash classification, and helper environment, signal, expiry and rootless-canary paths. Archived evidence records native 4/4 and sessions 22/22 on Ubuntu 24.04/26.04 x64/ARM in their declared modes, x64 canary 1/1 plus Worker 2/2 in run 38187260379, 14 mutation controls in run 38184549819 and 16 actual lifetime scenarios in run 38184923504 with stated nonzero/zero-ignored outcomes; remaining limits are the missing no-cap/FD-only descendant case, live-policy refresh demonstrated only by the narrow resolver unit test rather than a spawned Worker, the recorded whole-workspace exit 101 (no workspace-green claim), and no exercised macOS/Windows resource equivalence—no builds, tests or other executable verification were run during this review.",
+      "confidence": 0.91
+    }
+  }
+}

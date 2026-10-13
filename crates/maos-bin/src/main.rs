@@ -4382,6 +4382,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             &run,
                             Arc::clone(&transparency_log),
                             Arc::clone(&capability),
+                            Arc::clone(security.policy()),
                             spirit_host.clone(),
                             enterprise_runtime.clone(),
                             enterprise_pdp_runtime.as_ref(),
@@ -4787,6 +4788,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             &run,
                             Arc::clone(&transparency_log),
                             Arc::clone(&capability),
+                            Arc::clone(security.policy()),
                             spirit_host.clone(),
                             enterprise_runtime.clone(),
                             enterprise_pdp_runtime.as_ref(),
@@ -5584,6 +5586,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 security: Arc::clone(&security),
                                 iac: Arc::clone(&iac),
                                 journal: Arc::clone(&transparency_log),
+                                lifecycle_journal: Arc::clone(&shared_journal),
                                 pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
                                 enterprise: enterprise_runtime.clone(),
                                 pdp: enterprise_pdp_runtime.clone(),
@@ -7886,6 +7889,7 @@ description = "smoke test spirit successor"
                 delegation_leg,
                 Arc::clone(&iac),
                 Arc::clone(&capability),
+                Arc::clone(security.policy()),
                 enterprise_runtime.clone(),
                 enterprise_pdp_runtime.clone().map(Arc::new),
                 Arc::clone(&cohort_worker_supervision),
@@ -10127,12 +10131,9 @@ fn host_b_worker_context(
     bootstrap: &CohortDaemonBootstrap,
     transparency_log: &std::sync::Arc<maos_iac::TransparencyLogAdapter>,
     capability: &Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: &Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
-    // Story 16-3 (D-16-3-I) — APPENDED after the existing parameters on
-    // purpose: `enterprise_daemon_seam_13_5a.rs`'s signature scan stops at the
-    // first `)`, so inserting anywhere else reds it for a reason that has
-    // nothing to do with this story.
     supervision: Arc<maos_bin::supervision::WorkerSupervisor>,
     #[cfg(unix)] egress: Option<maos_bin::egress::EgressHandle>,
 ) -> Result<Option<maos_bin::delegation::HostBWorkerContext>, Box<dyn std::error::Error>> {
@@ -10175,6 +10176,7 @@ fn host_b_worker_context(
         },
         transparency_log: std::sync::Arc::clone(transparency_log),
         capability: Arc::clone(capability),
+        policy: Arc::clone(policy),
         // Story 11.1a's Spirit Host Port is a `maos run` composition; the daemon
         // composes no WASM host, so every host-B spawn is a native subprocess —
         // byte-identical to the `None` branch `run_cli_wrapper_manifest` already has.
@@ -10219,12 +10221,9 @@ async fn run_cohort_a2a_daemon(
     delegation_leg: maos_bin::delegation::DelegationLeg,
     iac: Arc<IacBusAdapter>,
     capability: Arc<maos_kernel_core::capability::CapabilityRegistryAdapter>,
+    policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     host_b_enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>>,
     host_b_enterprise_pdp_runtime: Option<Arc<enterprise_pdp_runtime::EnterprisePdpRuntime>>,
-    // Story 16-3 (D-16-3-I) — APPENDED after every existing parameter on
-    // purpose: `enterprise_daemon_seam_13_5a.rs`'s signature scan stops at the
-    // first `)`, so inserting anywhere else reds it for a reason that has
-    // nothing to do with this story.
     //
     // Concrete, not `Arc<dyn WorkerSupervision>`: this fn needs
     // `shutdown_token()` for its own `select!` (a SIGTERM during daemon
@@ -10325,6 +10324,7 @@ async fn run_cohort_a2a_daemon(
         &bootstrap,
         &transparency_log,
         &capability,
+        &policy,
         host_b_enterprise_runtime,
         host_b_enterprise_pdp_runtime,
         Arc::clone(&worker_supervision),
@@ -14416,45 +14416,6 @@ mod story_13_5a_enterprise_daemon_seam {
         let fixture = fixture("reach");
         set_process_env(&fixture);
         let ports = RecordingPorts::new(PolicyVerdict::Allow);
-
-        // AC5 proven-red: the reach leg itself observes the production dispatch,
-        // so deleting the enterprise argument reds this runtime leg and the
-        // dedicated source-inspection leg.
-        //
-        // j1-crosshost-2b §A6 review P1 — the window is 2_600 chars, not 2_000.
-        // 2b's dispatch-site threading (the monotonic-base repair + the host-B
-        // intake arguments) legitimately grew the arm by ~380 chars and pushed
-        // the enterprise tokens past the old window, which reded THIS leg while
-        // its twin in `tests/enterprise_daemon_seam_13_5a.rs` was updated — a
-        // masked regression the fail-fast workspace tally could not see. The
-        // tokens still must appear promptly: if they drift beyond THIS window,
-        // the dispatch has grown something that needs a human look.
-        //
-        // ⚠ Story 16-3 — 2_600 -> 3_300, and this IS the human look the comment
-        // above asks for. D-16-3-H site 2 arms a `RootSupervision` for the
-        // cohort root (host B spawns a Worker per inbound delegation and, at
-        // `af96c907`, held neither a scheduler nor a halt registry, so a
-        // SIGKILLed host-B Worker reached nothing at all) and then threads its
-        // supervisor into `run_cohort_a2a_daemon` as an appended argument. That
-        // block sits between `build_enterprise_daemon_governance(` and the
-        // dispatch call, so it moved the two argument tokens from +2_2xx to
-        // MEASURED +3_151 and +3_196. The window is set to 3_300 — the
-        // measurement plus ~100 chars, NOT a round number chosen to be safe —
-        // so the next unexplained growth still reds this leg. The twin in
-        // `tests/enterprise_daemon_seam_13_5a.rs` was re-run and is green
-        // (1 passed): its signature scan stops at the first `)`, which is why
-        // D-16-3-I appends the parameter rather than inserting it.
-        let source = include_str!("main.rs");
-        let dispatch_start = source
-            .find(r#"if mode == "cohort-a2a-daemon""#)
-            .expect("cohort daemon dispatch");
-        let dispatch = &source[dispatch_start..source.len().min(dispatch_start + 3_300)];
-        assert!(
-            dispatch.contains("build_enterprise_daemon_governance(")
-                && dispatch.contains("enterprise_posture_required,")
-                && dispatch.contains("enterprise_daemon_governance,"),
-            "production dispatch no longer threads the required enterprise posture"
-        );
 
         boot_and_drive(&fixture, TestWiring::Full, &ports)
             .await

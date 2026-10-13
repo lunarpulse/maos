@@ -140,11 +140,11 @@ One host runs the MAOS daemon, which runs the kernel and first-party `rust-inpro
 
 - `rust-inproc` Spirits run in the daemon process.
 - The admission probe runs on the host.
-- Worker resource limits use runtime defaults; manifest resource limits are not applied yet.
+- T3 Worker manifest resource limits are applied independently to CPU percentage, memory MiB, PID/task count, and file descriptors; omitted values retain runtime defaults. Native T2 cgroup/fallback behavior and the local named-unit smoke helper are documented in the [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit).
 - T3 has no MAOS-specific seccomp or AppArmor profile.
 - T3 is Linux-only; elsewhere the launch is refused.
 
-**Setup:** configure the operator-owned host grant and signed image lock, pull the locked image by digest with rootless podman, then run a Worker. The manifest and grant example are in the [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit). CI proof uses rootless podman on Ubuntu 24.04 and 26.04.
+**Setup:** configure the operator-owned host grant and signed image lock, pull the locked image by digest with rootless podman, then run a Worker. The manifest and grant example are in the [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit). CI proof uses rootless podman on the Ubuntu 24.04 and 26.04 x64 images (T3 is x64-only); native T2 runtime proof also covers the arm images.
 
 ```bash
 export MAOS_T3_IMAGE_LOCK_PATH="/path/to/operator-signed-image-lock.toml"

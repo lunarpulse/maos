@@ -627,6 +627,14 @@
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeError"     = "supervision"  # typed spawn/sandbox refusal of the launch primitive
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge"   = "supervision"  # owns the (possibly sandboxed) child + reader threads; RAII kill+reap
 
+# Story 17-2 FW-01: one-shot native resource outcomes stay under child supervision.
+# SandboxedChild/SpawnError retain their existing supervision rows; their changed
+# declaration hashes are re-pinned only after classification. The syn surface
+# walker does not emit impl methods: these are explicit class witnesses, not a
+# claim that the baseline currently guards their signatures.
+"maos_kernel_core::security::sandbox::SandboxedChild::take_resource_downgrade" = "supervision" # consumes a parent-computed per-spawn memory fallback
+"maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge::take_resource_downgrade" = "supervision" # transfers the owned child's outcome to the lifecycle producer
+
 # Detached 17-3c: explicit operator-approved candidate surface metadata grant.
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgePoll"      = "data-movement" # raw frame/idle/closed transport facts; no domain verdict or deadline policy
 "maos_kernel_core::lifecycle::cli_wrapper::runtime::FrameWriter"     = "data-movement" # exclusively owned child stdin, bounded binary-frame transfer

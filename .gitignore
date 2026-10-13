@@ -37,3 +37,5 @@ tests/reports/evidence-ledger-*.json
 
 # Story 15-4 — local release artifact staging.
 /dist/
+
+.devcontainer/.env

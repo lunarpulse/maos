@@ -42,6 +42,7 @@ tier = "T0" # An in-process Spirit declares T0.
 cpu_max_pct = 25
 memory_max_mb = 64
 fd_max = 64
+pids_max = 64
 
 [posture]
 default = "assistive"

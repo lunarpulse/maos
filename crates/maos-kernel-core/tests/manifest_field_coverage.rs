@@ -53,6 +53,7 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("resources", "cpu_max_pct"),
     ("resources", "memory_max_mb"),
     ("resources", "fd_max"),
+    ("resources", "pids_max"),
     ("sandbox", "tier"),
     ("author", "name"),
     ("author", "homepage"),
@@ -269,6 +270,43 @@ fn cli_wrapper_egress_fixtures_enforce_their_declared_outcomes() {
     );
 }
 
+#[test]
+fn resources_pid_cap_fixtures_parse_and_validate() {
+    use maos_manifest::{ManifestError, ResourceCaps};
+
+    let root = fixture_root().join("resources");
+    let parse_fixture = |category: &str| {
+        let text = fs::read_to_string(root.join(category).join("pids_max.toml"))
+            .expect("each resources.pids_max fixture must be readable");
+        let value: toml::Value = toml::from_str(&text).expect("fixture TOML syntax");
+        let body = value
+            .get("resources")
+            .and_then(toml::Value::as_table)
+            .expect("fixture must contain [resources]");
+        let body = toml::to_string(body).expect("serialize resources table body");
+        ResourceCaps::from_toml_str(&body)
+    };
+
+    let valid = parse_fixture("well-formed").unwrap();
+    assert_eq!(valid.pids_max, Some(12));
+    let edge = parse_fixture("edge-case").unwrap();
+    assert_eq!(edge.pids_max, Some(u32::MAX));
+
+    let malformed = parse_fixture("malformed-rejected");
+    assert!(matches!(malformed, Err(ManifestError::Toml(_))));
+
+    let zero = ResourceCaps::from_toml_str("pids_max = 0");
+    assert!(matches!(
+        zero,
+        Err(ManifestError::CapOutOfRange { ref field, value: 0 }) if field == "pids_max"
+    ));
+    for invalid in ["pids_max = -1", "pids_max = 4294967296", "pids_max = 1.5"] {
+        assert!(ResourceCaps::from_toml_str(invalid).is_err(), "{invalid}");
+    }
+
+    let omitted = ResourceCaps::from_toml_str("fd_max = 64").unwrap();
+    assert_eq!(omitted.pids_max, None);
+}
 #[test]
 fn test_nfr_test_13_three_cases_per_field() {
     let root = fixture_root();

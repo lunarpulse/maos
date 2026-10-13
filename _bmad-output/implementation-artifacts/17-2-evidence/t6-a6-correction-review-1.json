@@ -1,0 +1,80 @@
+{
+  "reviewedDiff": "t6-a6-corrections.diff",
+  "sha256": "9e1ad73e7a5f8b39970f55b5b2a0429a2e76f17bc680739277ff0cdecc668fc6",
+  "reviews": {
+    "A6SecurityReview": {
+      "coverage_summary": "Correction review complete: inspected the entire correction diff and necessary canonical native placement, descendant oracle, isolated FD test, suite-log checker and workflow callers. The previous native lifetime-containment finding is resolved at source level: setup_cgroup is attempted independently of ceilings, successful ownership reaches the existing pre-exec placement and cleanup guard, no-cap/FD-only setup failure remains nonfatal without a downgrade, and CPU/PID versus memory-only handling remains distinct. No remaining security vulnerability was established in this correction. However, a concrete non-security acceptance-path mismatch remains: the new FD worker prints an additional libtest suite summary into a log whose checker requires exactly one summary. Runtime success of the corrected source is not established by this static review; author-reported execution/compilation results were not treated as independently inspected evidence. No edits or checks executed.",
+      "findings": [],
+      "reviewed_paths": [
+        "local://17-2-a6-corrections.diff",
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+        "crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs",
+        "scripts/run_cgroup_ceiling_17_2.py",
+        ".github/workflows/discipline.yml",
+        "xtask/kernel-core-baseline.toml",
+        "xtask/kloc.toml",
+        "xtask/tests/kernel_pin_content_hash_16_0.rs",
+        "xtask/tests/recovery_lane_ceiling_rule.rs"
+      ],
+      "deferred": [
+        {
+          "reason": "Non-security acceptance blocker observed in source: cgroup_ceiling_smoke.rs:492-498 first requires the isolated FD worker stdout to contain 'test result: ok. 1 passed; 0 failed; 0 ignored;' and then prints that entire stdout into the outer --nocapture run. scripts/run_cgroup_ceiling_17_2.py:18-21 matches every beginning-of-line libtest summary, and :35-38 rejects any summary-count mismatch. discipline.yml:3233-3235 records the outer smoke run and checks only --expected-count 4, which expects exactly one suite summary. [INFERENCE] A successful corrected smoke run therefore produces both the inner one-test summary and the outer four-test summary, and check-log rejects it with 'expected 1 test summaries, found 2', preventing delegated matrix success even if every native assertion passes. Conservative correction: retain the isolated worker's exit/status-summary assertions, but forward only its named proof annotation or prefix nested stdout so it cannot impersonate an outer suite summary. Do not relax the existing strict log checker to mask extra suites.",
+          "paths": [
+            "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+            "scripts/run_cgroup_ceiling_17_2.py",
+            ".github/workflows/discipline.yml"
+          ]
+        },
+        {
+          "reason": "Final corrected-source runtime evidence remains uninspected: native delegated/undelegated matrices, T3, session, macOS and workspace verification must be supplied by the parent. Source correctness of the containment repair is separate from those pending execution results.",
+          "paths": [
+            "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+            ".github/workflows/discipline.yml"
+          ]
+        }
+      ]
+    },
+    "A6AcceptanceAuditor": {
+      "findings": [
+        {
+          "title": "Keep nested FD-worker summaries out of the native smoke log",
+          "body": "The correction forwards the isolated FD worker's entire stdout, including its `test result: ok. 1 passed; ...` line, into the outer four-case smoke's `--nocapture` output. The mandatory delegated job then invokes `check-log --expected-count 4`, whose consumer (`scripts/run_cgroup_ceiling_17_2.py:18-34`) matches every line-start libtest summary and requires exactly one summary. Even when all native assertions succeed, the log now contains the nested one-case summary followed by the outer four-case summary, so every delegated matrix job fails with `expected 1 test summaries, found 2`, violating AC1.4/AC3.2/T5 checked execution. Keep the nested status/count assertions, but forward only the FD proof notice or prefix nested diagnostics so they cannot be mistaken for outer suite summaries; do not weaken the consumer's exact-summary check.",
+          "priority": 1,
+          "confidence": 1,
+          "file_path": "/home/lunarpulse/dev_ws/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+          "line_start": 501,
+          "line_end": 501
+        }
+      ],
+      "overall_correctness": "incorrect",
+      "explanation": "Static review of the complete 332-line correction delta found one new mandatory-CI integration defect: printing the isolated FD worker's full stdout adds a second libtest summary that the existing exact-summary consumer rejects, so otherwise-green native smoke executions cannot pass the delegated jobs. The production correction restores owned descendant cleanup independently of ceilings while preserving nonfatal/no-downgrade no-cap fallback and strict CPU/PID versus memory-only behavior; the native64/65 FD oracle correctly isolates the inherited hard limit, checks actual guest limits/effects and EPERM/owned-leaf release without re-entering Cargo, the TypeScript report row is restored, and the physical/hash/KLOC/independent-scalar corrections remain lower and within authorization, with no other remaining source findings established in this delta. Inspected primary annotations for run38196319487 substantiate the four-image failing-before descendant control (one selected/failed, zero ignored, underlying exit101), but those red controls and the added source assertions are not corrected native GREEN evidence: final native/T3/session, both macOS compile paths and capable whole-workspace runtime acceptance remain pending and distinct from source correctness; no verification was executed by this reviewer.",
+      "confidence": 1
+    },
+    "A6RuntimeReview": {
+      "findings": [
+        {
+          "title": "Pre-create the within-hard FD probe's writable marker",
+          "body": "The new within-hard control launches the T2 fixture with a marker path that does not exist. The fixture's `--fd-marker` dispatch calls `std::fs::write`, which creates that file, but `prepare_landlock` grants `Scope::FsWrite` only `ReadFile | ReadDir | WriteFile` while handling all V1 rights; it does not grant `MakeReg`. On the required Landlock-enforced Linux runners this creation is denied, the otherwise-valid 64-FD guest panics, and `child.wait().unwrap().success()` fails before the 65-FD refusal oracle executes. Pre-create the marker in the parent for the 64-FD control, then remove it before the 65-FD case; do not broaden the production Landlock grant to accommodate the test. This is a static, dispatch-backed finding, not an executed reproduction.",
+          "priority": 1,
+          "confidence": 0.99,
+          "file_path": "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+          "line_start": 520,
+          "line_end": 525
+        },
+        {
+          "title": "Keep nested test summaries out of the outer native-suite log",
+          "body": "After the isolated FD worker succeeds, the new unconditional `print!` forwards its complete libtest stdout, including `test result: ok. 1 passed; 0 failed; 0 ignored;`, into the outer `cgroup_ceiling_smoke --nocapture` output. The production delegated workflow passes that log to `check-log --expected-count 4`, and `check_test_output` requires exactly one matching summary; it will instead find both the isolated 1-case summary and the outer 4-case summary and fail every delegated matrix leg even when all native assertions pass. Keep validating the child's success and executed case count locally, but forward only its specific proof annotation rather than its complete harness stdout, preserving the existing outer-suite count contract.",
+          "priority": 1,
+          "confidence": 0.99,
+          "file_path": "crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs",
+          "line_start": 497,
+          "line_end": 505
+        }
+      ],
+      "overall_correctness": "incorrect",
+      "explanation": "The correction restores best-effort owned cgroup cleanup for uncapped/FD-only native launches without changing CPU/PID refusal or memory-only downgrade behavior, and the restored PR report row correctly consumes the existing estts binding; no remaining production-source defect was found in this scoped delta. However, the new isolated native FD proof contains two merge-blocking integration defects: its valid guest cannot create the marker under the existing Landlock grant, and its forwarded nested libtest summary violates the permanent native gate's single-summary contract. Coverage included the complete correction diff, native placement and cleanup consumers, fixture mode dispatch, report renderer and log-count consumer, plus the archived failing-before source/annotations for run 38196319487; those archives preserve the original no-cap branch and report selected1/failed1/ignored0 on all four images, but final corrected-source native/T3/session/macOS/workspace runtime proof remains unobserved here, and no executable verification was performed.",
+      "confidence": 0.99
+    }
+  }
+}

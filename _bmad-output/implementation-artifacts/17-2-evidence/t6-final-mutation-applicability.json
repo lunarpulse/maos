@@ -1,0 +1,35 @@
+{
+  "source": "Owned worktree after final A6 source and test corrections; applicability only, not runtime mutation results",
+  "checks": [
+    {
+      "path": ".github/17-2-mutations/lose-pids-max.patch",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "path": ".github/17-2-mutations/ignore-worker-resources.patch",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "path": ".github/17-2-mutations/cpu-percent-as-cores.patch",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "path": ".github/17-2-mutations/fd-aliased-to-pids.patch",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "path": ".github/17-2-mutations/suppress-downgrade-producer.patch",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

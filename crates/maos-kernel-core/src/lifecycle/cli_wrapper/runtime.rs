@@ -507,6 +507,13 @@ impl BridgeChild {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    fn take_resource_downgrade(&mut self) -> Option<String> {
+        match self {
+            Self::Sandboxed(guard) => guard.take_resource_downgrade(),
+            Self::Plain(_) | Self::Container(_, _) => None,
+        }
+    }
     fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
         match self {
             Self::Container(child, image) => Some((child, image)),
@@ -690,6 +697,14 @@ impl SpawnedBridge {
     /// Container and attested image retained for the composition-root report.
     pub fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
         self.child.as_ref().and_then(BridgeChild::container)
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl SpawnedBridge {
+    /// Consume the native child's one-shot cgroup resource downgrade, if any.
+    pub fn take_resource_downgrade(&mut self) -> Option<String> {
+        self.child.as_mut()?.take_resource_downgrade()
     }
 }
 

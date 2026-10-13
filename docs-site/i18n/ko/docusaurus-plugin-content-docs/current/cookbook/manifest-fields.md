@@ -39,6 +39,7 @@ tier = "T0"                      # An in-process Spirit declares T0.
 cpu_max_pct = 100
 memory_max_mb = 256
 fd_max = 256
+pids_max = 64
 
 # ── Autonomy & Output ────────────────────────────────────
 [posture]
@@ -85,6 +86,6 @@ on_confidence_below = 0.6
 
 `forms`는 `rust-inproc`, `subprocess`, `wasm-component`를 받습니다. `wasm-component` manifest는 그 형식만 단독으로 선언하고, 스키마 v5 이상을 사용하며, 상대 `.wasm` `artifact`를 선언하고, `[sandbox] tier = "T2"`를 설정해야 합니다. 다른 형식에서는 `artifact`가 금지됩니다. 완전한 서드파티 TypeScript 예시는 [WASM Component Spirit](./wasm-component-spirit)를 참조하세요.
 
-`trust_tier`는 `local`, `org-internal`, `public-untrusted`, `public-vetted` 중 하나입니다. `[class]` 안에서는 하이픈 표기를 사용하세요. daemon은 `[sandbox]`, `[resources]`, `[posture]`, `[output_shape]`를 요구합니다. `[budget]`은 선택 사항이지만, 존재하면 `context_window_size`와 `time_cap_seconds`를 모두 요구합니다.
+리소스 상한은 서로 독립적입니다. `cpu_max_pct`는 CPU 한 개 대비 양의 백분율이고, `memory_max_mb`는 MiB이며, `pids_max`는 선택적 양의 `u32` 프로세스/태스크 제한이고, `fd_max`는 선택적인 별도 파일 디스크립터 제한입니다. 필드를 생략하면 설정되지 않습니다. `pids_max`를 생략한 schema v4/v5 manifest는 계속 허용됩니다. `pids_max`는 Linux에서만 적용됩니다(native T2 cgroup `pids.max`, T3 `--pids-limit`). native macOS 및 Windows sandbox는 이를 적용하지도 거부하지도 않습니다. Worker/T3 동작과 native T2 위임 요구 사항은 [CLI Wrapper Spirit](./cli-wrapper-spirit)을 참조하세요.
 
 전체 필드 수준 명세는 [Manifest 참조](/manifest/latest)를 참조하세요.

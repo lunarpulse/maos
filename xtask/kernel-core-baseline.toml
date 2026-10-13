@@ -502,7 +502,25 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 25267
+src_lines = 25145
+# HISTORY: Story 17-2 FW-01/FW-02 (2026-10-12), operator-ratified location charter:
+#          25267 -> 25149 physical lines (-118); exact formatted tokei 19553 ->
+#          19495 (-58), no kernel raise. Driver: native PID containment/strict
+#          CPU-or-PID refusal and one-shot memory fallback, independent T3 CPU/
+#          PID/FD flags, deletion-only journal writer/index linearization, and
+#          retirement of scheduler/resource_ceiling.rs plus its export.
+#          Changed seven authorized files; removed one source (96 -> 95 files).
+#          SandboxedChild's re-hash includes a private Linux-only outcome field;
+#          SpawnError's existing refusal message now names CPU and PID requests.
+#          Class witnesses and enumerated public surface delta precede this pin.
+# HISTORY: Story 17-2 non-author A6 correction (2026-10-12): 25149 -> 25146
+#          physical lines (-3), 19495 -> 19492 tokei (-3). Preserve best-effort
+#          owned descendant cleanup for no-cap/FD-only launches independently
+#          of ceilings. Same authorized file set and public surface; no raise.
+# HISTORY: Story 17-2 code review (2026-10-12): 25146 -> 25145 physical
+#          lines (-1), tokei unchanged at 19492. Removed the stray blank line
+#          between SandboxedChild's doc comment and the struct in
+#          security/sandbox/mod.rs. Same authorized file and public surface.
 # HISTORY: Story 17-6 review security repair (2026-09-28), operator-ratified
 #          FLAG-Winston: 25015 -> 25032 (+17 physical; tokei 19292 -> 19309,
 #          +17). `security/sandbox/linux.rs` compares each Landlock rule fd's
@@ -708,7 +726,7 @@ src_lines = 25267
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "36219a02cd4377576d4427431bb1a8e42cc3886da44f27968f9c388f593fb408"
+set_hash = "3bc957230ea9245198bf53e9d395f0db3f968d003821319aaeb354711011f6aa"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -740,12 +758,12 @@ set_hash = "36219a02cd4377576d4427431bb1a8e42cc3886da44f27968f9c388f593fb408"
 "io/mod.rs" = "1c4c5202c33d39de7dd61d36607015dd07dac01922bd82ac6fd40300a8e72bf6"
 "isolation/mod.rs" = "a7f618dd75f7dd4115589dc7e9cd742e3f0f4c07d30d6f95b1cc494b5947813c"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
-"journal/mod.rs" = "c0e8306b72ed4349ebfde22d4501f5467e354a840fd473e8aee1c03037a47e77"
+"journal/mod.rs" = "ec7fa9c2b4508a5d339b6ffd6d0aac0030956c7c504ef9042582cc95f14c51bf"
 "lib.rs" = "a4c3708400196b1c97ac614ead31645d77cc5124bfbd30f4b13139bf4c7f9100"
 "lifecycle/cli_wrapper/admission.rs" = "5d1c1222faa082614f101d91cb343d4b9f636d23c340d4863bbb12008c3e41e5"
 "lifecycle/cli_wrapper/lifecycle.rs" = "87d3d77b8c646090341890990e634d71a62e72d0e032d892d23aee5e5cba950b"
 "lifecycle/cli_wrapper/mod.rs" = "c8fb7558651655cde31d3ef0044c5ee682eb00405bdacdad429fc2ef7434f6bb"
-"lifecycle/cli_wrapper/runtime.rs" = "8e02312ebb9a2e2fd1c78898b332ed7ad4364bd08e53e804519a8381fc85456d"
+"lifecycle/cli_wrapper/runtime.rs" = "a8c07adf9fd0f0976022da2e60a6392d3aed80e282fdae91a2491ab1a64cd964"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
@@ -773,10 +791,9 @@ set_hash = "36219a02cd4377576d4427431bb1a8e42cc3886da44f27968f9c388f593fb408"
 "scheduler/hook_dispatch.rs" = "74f481ceacaabf0cba1f10088e4bd6cfe3e17ec69c0a748f22b65972b425bfc1"
 "scheduler/idle_watchdog.rs" = "07901b89eab3911e6cc23df9d383ba6fee5547c43bbc028fe6eedcacadeffdc7"
 "scheduler/kernel_ctx.rs" = "7baf6a7e15a5ffb62312a02aa19d58b24c8500f277bcc724b2065f4c732963ef"
-"scheduler/mod.rs" = "fa89437053eedadef4662a1f538ad275caa62df69a9ddbbd4dc0a9976a377cf5"
-"scheduler/resource_ceiling.rs" = "becc322aa3700d8f08c10ac443aff2ea80995926a2cc647ddbad49aecfa6b06d"
+"scheduler/mod.rs" = "9eb15c7cb98f00ab5a08085dd3a7d8d4ea5d940df8643f9110c540889ef1bcb2"
 "scheduler/schedule_watchdog.rs" = "b50009c32df76c8f99095584a68c1de65d6a4831f84a97061672303dccca70fc"
-"scheduler/scheduler_loop.rs" = "32c65c38316d68f7672147b070f47a4586066a9c774e0e4888c55ddef1591095"
+"scheduler/scheduler_loop.rs" = "ebafdcb1adbaee33bf2273a43a96420758559dedd69cdaf3dfe2008bf1b9b81a"
 "scheduler/verb_resolver.rs" = "114fe959e9f7b4126464b63ad51f57a374646c95dbb72c0f3d8c19dbc363ab16"
 "security/approval.rs" = "d9847e9ffbd4ef4b5f21410a7a1c24e0dbb3f57bb98eeee20ae6b2f27e670ea3"
 "security/crypto.rs" = "201a1034b043a8001ecac32c424645d2db2a58cd0bfbba5a5a1092d960397a4e"
@@ -785,11 +802,11 @@ set_hash = "36219a02cd4377576d4427431bb1a8e42cc3886da44f27968f9c388f593fb408"
 "security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
-"security/sandbox/linux.rs" = "f0b634ac12e9284e7d011f3902a28ca01ec0938e915318e565515364a0689646"
+"security/sandbox/linux.rs" = "1bcdb87d664221fd2886c85566a786120f47ccb1ff2323eed65e46f3e4d6b349"
 "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
-"security/sandbox/mod.rs" = "092b1d0ab2eccb764934568b6263fa950a60f596284c97e0e10981e7847ac1f9"
+"security/sandbox/mod.rs" = "6fa0db148e19013423b8bcf67e95d657cbd48aeaf3fe6aa7f61ef34ccbf4bbd3"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
-"security/sandbox/t3/argv.rs" = "1f6b41cb2e6515425414bc24cbb0398a9a52c282e329c46d9c0484ef7761e249"
+"security/sandbox/t3/argv.rs" = "c95605db39866e77bedcc1552f3be919a61a948a03659b249c5fc651a23069eb"
 "security/sandbox/t3/child.rs" = "d91f8d061e6a4b3bb2340857148ec8d590e62cd8f5be8556a930a29900397de7"
 "security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
 "security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"

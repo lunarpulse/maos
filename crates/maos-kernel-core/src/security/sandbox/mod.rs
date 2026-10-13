@@ -56,11 +56,11 @@ impl SandboxSpec {
 /// Error raised when spawning a sandboxed child fails.
 #[derive(Debug, thiserror::Error)]
 pub enum SpawnError {
-    #[error("sandbox setup failed in pre_exec: {0}")]
+    #[error("sandbox setup failed: {0}")]
     SandboxSetup(String),
     #[error("IO error during spawn: {0}")]
     Io(#[from] std::io::Error),
-    #[error("declared CPU percentage cap requires a writable delegated cgroup")]
+    #[error("declared CPU or PID cap requires a writable delegated cgroup")]
     CgroupUnavailable,
     #[error("sandbox unavailable on this platform: {reason}")]
     SandboxUnavailable { reason: String },
@@ -83,9 +83,9 @@ pub struct SandboxViolation {
 
 /// RAII guard for a sandboxed child process.
 ///
-/// On Linux: owns the cgroup directory; `Drop` removes it after the
-/// child has exited. On Windows: owns the process/thread/job handles and
-/// closes the Job Object last so kill-on-close remains effective.
+/// On Linux: owns the cgroup directory; `Drop` kills remaining members and
+/// attempts bounded removal after reaping the child, logging any residue.
+/// On Windows: closes the Job Object last so kill-on-close remains effective.
 pub struct SandboxedChild {
     #[cfg(not(target_os = "windows"))]
     child: Child,
@@ -93,6 +93,8 @@ pub struct SandboxedChild {
     child: windows::WindowsChild,
     #[allow(dead_code)]
     cleanup: Cleanup,
+    #[cfg(target_os = "linux")]
+    resource_downgrade: Option<String>,
 }
 
 enum Cleanup {
@@ -106,15 +108,27 @@ impl Drop for Cleanup {
     fn drop(&mut self) {
         #[cfg(target_os = "linux")]
         if let Cleanup::Cgroup { path } = self {
-            let _ = std::fs::write(path.join("cgroup.kill"), b"1");
+            if let Err(error) = std::fs::write(path.join("cgroup.kill"), b"1") {
+                eprintln!(
+                    "maos-sandbox: failed to kill cgroup {}: {error}",
+                    path.display()
+                );
+            }
             // `cgroup.kill` is asynchronous: rmdir answers EBUSY until the killed
             // members are gone. Retry with a short bounded backoff (~0.25 s total).
+            let mut removal = Err(std::io::Error::from_raw_os_error(libc::EBUSY));
             for delay_ms in [0, 1, 2, 4, 8, 16, 32, 64, 128] {
                 std::thread::sleep(std::time::Duration::from_millis(delay_ms));
-                match std::fs::remove_dir(path.as_path()) {
-                    Err(error) if error.raw_os_error() == Some(libc::EBUSY) => {}
-                    _ => break,
+                removal = std::fs::remove_dir(path.as_path());
+                if !matches!(&removal, Err(error) if error.raw_os_error() == Some(libc::EBUSY)) {
+                    break;
                 }
+            }
+            if let Err(error) = removal {
+                eprintln!(
+                    "maos-sandbox: cgroup cleanup failed; residue may remain at {}: {error}",
+                    path.display()
+                );
             }
         }
     }
@@ -128,6 +142,11 @@ impl SandboxedChild {
             Cleanup::Cgroup { path } => Some(path),
             Cleanup::None => None,
         }
+    }
+    /// Consume the per-spawn memory-cgroup fallback reason (Linux only).
+    #[cfg(target_os = "linux")]
+    pub fn take_resource_downgrade(&mut self) -> Option<String> {
+        self.resource_downgrade.take()
     }
 
     /// Story 17-6 AC5 — the confined child, for a caller that pipes its stdio.

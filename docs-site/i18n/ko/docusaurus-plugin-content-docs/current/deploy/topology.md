@@ -141,11 +141,11 @@ MAOS 바이너리가 빌드 타임에 **모든 네트워크 표면을 컴파일�
 
 - `rust-inproc` Spirits는 데몬 프로세스에서 실행됩니다.
 - 승인 probe는 호스트에서 실행됩니다.
-- Worker 리소스 제한은 런타임 기본값을 사용하며, manifest 리소스 제한은 아직 적용되지 않습니다.
+- T3 Worker manifest 리소스 제한은 CPU 백분율, memory MiB, PID/태스크 수, 파일 디스크립터별로 적용되며, 생략된 값은 runtime 기본값을 유지합니다. Native T2 cgroup/fallback 동작과 named-unit 로컬 smoke helper는 [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit)에 설명되어 있습니다.
 - T3에는 MAOS 전용 seccomp 또는 AppArmor 프로필이 없습니다.
 - T3는 Linux 전용이며, 다른 플랫폼에서는 실행이 거부됩니다.
 
-**설정:** 운영자 소유 host grant와 서명된 image lock을 구성하고, rootless podman으로 lock의 digest를 사용해 이미지를 가져온 다음 Worker를 실행합니다. manifest와 grant 예제는 [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit)에 있습니다. CI 검증은 Ubuntu 24.04 및 26.04의 rootless podman을 사용합니다.
+**설정:** 운영자 소유 host grant와 서명된 image lock을 구성하고, rootless podman으로 lock의 digest를 사용해 이미지를 가져온 다음 Worker를 실행합니다. manifest와 grant 예제는 [CLI-wrapper Spirit cookbook](/cookbook/cli-wrapper-spirit)에 있습니다. CI 검증은 Ubuntu 24.04 및 26.04 x64 image의 rootless podman을 사용하며(T3는 x64 전용), native T2 runtime 증명은 arm image도 포함합니다.
 
 ```bash
 export MAOS_T3_IMAGE_LOCK_PATH="/path/to/operator-signed-image-lock.toml"

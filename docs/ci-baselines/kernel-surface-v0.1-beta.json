@@ -179,11 +179,6 @@
     },
     {
       "kind": "enum",
-      "path": "maos_kernel_core::scheduler::resource_ceiling::IoError",
-      "signature_hash": "5a42516990c5b5310ee74cc347edd1798b7bacd7a632218278f30b69eea4de48"
-    },
-    {
-      "kind": "enum",
       "path": "maos_kernel_core::security::SecurityError",
       "signature_hash": "1dea70b571186b50818640e95c988c889a7dae6ad7f57da622014e5671596daa"
     },
@@ -200,7 +195,7 @@
     {
       "kind": "enum",
       "path": "maos_kernel_core::security::sandbox::SpawnError",
-      "signature_hash": "ea6af057156ef7f16f11d049a7ed8c9760bfa8c58a32095d5767d1cd0f859c28"
+      "signature_hash": "eac9e599b056fe4a07b80b9288f2981a5eb82cb9c17c1c98ee5cda76865078ba"
     },
     {
       "kind": "enum",
@@ -371,11 +366,6 @@
       "kind": "fn",
       "path": "maos_kernel_core::scheduler::idle_watchdog::pick_poll_interval",
       "signature_hash": "476404f8659190efc2a31494770f09029dfe40018ae394bec6cc19afd2cd67a1"
-    },
-    {
-      "kind": "fn",
-      "path": "maos_kernel_core::scheduler::resource_ceiling::apply_resource_ceiling",
-      "signature_hash": "abd301d372504057b65751b84d56d6bef768abe6788d64a5f436dbad6809c2c4"
     },
     {
       "kind": "fn",
@@ -809,11 +799,6 @@
     },
     {
       "kind": "struct",
-      "path": "maos_kernel_core::scheduler::resource_ceiling::ResourceCeilingHandle",
-      "signature_hash": "d69a2c1d5dbb410144abc730fbab8b552e0fdd7eabb7052363916e5f7bb3740e"
-    },
-    {
-      "kind": "struct",
       "path": "maos_kernel_core::scheduler::schedule_watchdog::ScheduleWatchdog",
       "signature_hash": "2feabbd714c29206b1fafe72b4611a98a8a02a001ec0be1f74a04c5c55430f02"
     },
@@ -880,7 +865,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::security::sandbox::SandboxedChild",
-      "signature_hash": "4ba93f03e7cdb1743c7482d049fec3e4bd9c25e46e8f4c8e94021c6b38fa645f"
+      "signature_hash": "c402085ee3d4a666bd52d8ef902640e0d7e6af17525c7f71ab956d0989c5f5c2"
     },
     {
       "kind": "struct",

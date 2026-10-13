@@ -69,6 +69,35 @@ impl ProviderSwitchedPayload {
     }
 }
 
+/// Native T2 memory-ceiling fallback, not an SCB state transition.
+/// Construct via [`ResourceCeilingDowngradedPayload::new`] after a successful spawn.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ResourceCeilingDowngradedPayload {
+    /// Missing cgroup mechanism and the actual setup failure.
+    pub missing_mechanism: String,
+    /// Resolved address-space limit in MiB; not an RSS or OOM claim.
+    pub memory_max_mb: Option<u32>,
+    /// Resolved per-process descriptor limit, independent of PID containment.
+    pub fd_max: Option<u32>,
+    /// Whether the successful native spawn applied RLIMIT_AS.
+    pub rlimit_as: bool,
+    /// Whether the successful native spawn applied RLIMIT_NOFILE.
+    pub rlimit_nofile: bool,
+}
+
+impl ResourceCeilingDowngradedPayload {
+    /// Construct only after the native spawn successfully applied its rlimits.
+    pub fn new(missing_mechanism: String, memory_max_mb: Option<u32>, fd_max: Option<u32>) -> Self {
+        Self {
+            missing_mechanism,
+            memory_max_mb,
+            fd_max,
+            rlimit_as: memory_max_mb.is_some(),
+            rlimit_nofile: fd_max.is_some(),
+        }
+    }
+}
+
 /// Lifecycle events that MUST be journaled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
@@ -114,6 +143,8 @@ pub enum LifecycleEvent {
     ProviderSwitched = 18,
     /// Story 6.5 — Spirit uninstalled and proof-of-erasure record emitted.
     Uninstall = 19,
+    /// Native T2 resource-only fallback; the effective sandbox tier is unchanged.
+    ResourceCeilingDowngraded = 20,
 }
 
 /// A single lifecycle journal entry — the v0.3-β shape.

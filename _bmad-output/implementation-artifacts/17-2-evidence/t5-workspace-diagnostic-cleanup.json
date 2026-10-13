@@ -1,0 +1,17 @@
+{
+  "branch": "ci/17-2-workspace-diagnostic",
+  "sourceCommit": "5f4757bc73def045c2e97025cb17f61a67984cdf",
+  "actualDiagnosticRun": 38210028700,
+  "actualCompanionDocsRun": 38210028619,
+  "archived": [
+    "t5-workspace-diagnostic-executed.diff",
+    "t5-workspace-diagnostic-source.json",
+    "t5-workspace-diagnostic-results.json",
+    "t5-workspace-diagnostic-docs-results.json"
+  ],
+  "command": "git push origin --delete ci/17-2-workspace-diagnostic && git worktree remove /tmp/maos-17-2-workspace-diagnostic",
+  "actualExit": 0,
+  "observedRemoteOutput": "- [deleted] ci/17-2-workspace-diagnostic",
+  "worktreeRemoval": "Completed without force in the same successful command chain",
+  "noMainPushOrMerge": true
+}

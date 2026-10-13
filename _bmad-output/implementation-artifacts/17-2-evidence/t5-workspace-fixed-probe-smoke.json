@@ -1,0 +1,26 @@
+{
+  "command": "RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path crates/maos-eval/test-fixtures/t3-network-escape-probe/Cargo.toml",
+  "cargoBuildObserved": "Succeeded in 1.16s; subsequent optional file utility unavailable, exit127, not a build failure",
+  "elf64LittleEndian": true,
+  "programHeaderTypes": [
+    6,
+    1,
+    1,
+    1,
+    1,
+    7,
+    2,
+    1685382482,
+    1685382480,
+    1685382481,
+    4
+  ],
+  "dynamicInterpreter": false,
+  "actualCommand": [
+    "crates/maos-eval/test-fixtures/t3-network-escape-probe/target/x86_64-unknown-linux-gnu/release/t3-network-escape-probe"
+  ],
+  "actualExit": 1,
+  "stdout": "",
+  "stderr": "t3-network-escape-probe: usage: --maos-escape <attempted_syscall_substring> | --maos-socket-reach\n",
+  "limit": "Actual CLI usage refusal only; T3 network/socket enforcement requires capable CI and is not claimed locally"
+}

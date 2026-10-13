@@ -38,6 +38,7 @@ tier = "T0"                      # An in-process Spirit declares T0.
 cpu_max_pct = 100
 memory_max_mb = 256
 fd_max = 256
+pids_max = 64
 
 # ── Autonomy & Output ────────────────────────────────────
 [posture]
@@ -85,5 +86,6 @@ This example's `my-spirit` name is not a built-in daemon class. Its manifest is 
 `forms` accepts `rust-inproc`, `subprocess`, and `wasm-component`. A `wasm-component` manifest must declare that form alone, use schema v5 or later, declare a relative `.wasm` `artifact`, and set `[sandbox] tier = "T2"`. `artifact` is forbidden for the other forms. For a full third-party TypeScript example, see [WASM Component Spirit](./wasm-component-spirit).
 
 `trust_tier` is one of `local`, `org-internal`, `public-untrusted`, or `public-vetted`; use the hyphenated spellings inside `[class]`. The daemon requires `[sandbox]`, `[resources]`, `[posture]`, and `[output_shape]`; `[budget]` is optional, but if present requires both `context_window_size` and `time_cap_seconds`.
+Resource ceilings are independent: `cpu_max_pct` is a positive percentage of one CPU, `memory_max_mb` is MiB, `pids_max` is an optional positive `u32` process/task limit, and `fd_max` is an optional independent file-descriptor limit. Omit a field to leave it unset; schema v4/v5 manifests that omit `pids_max` remain accepted. `pids_max` is enforced only on Linux (native T2 cgroup `pids.max`, T3 `--pids-limit`); the native macOS and Windows sandboxes neither apply nor refuse it. For Worker/T3 behavior and native T2 delegation requirements, see [CLI Wrapper Spirit](./cli-wrapper-spirit).
 
 See [Manifest Reference](/manifest/latest) for the complete field-level specification.

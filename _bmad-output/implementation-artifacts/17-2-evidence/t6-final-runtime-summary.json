@@ -1,0 +1,527 @@
+{
+  "head_sha": "38754fd7200733c043aff03e0ba6dc63bace2445",
+  "sourceDiff": "t6-final-ci-executed.diff",
+  "sourceDiffSha256": "a87b66cbce32cee1c846102bdccb5adfdfe494f417780dfd1f68215cc315cd34",
+  "acceptance": {
+    "runId": 38200530152,
+    "conclusion": "failure",
+    "successfulImageJobs": 8,
+    "nativeFD64And65Proofs": 4,
+    "actualMacAllTargetsAndFeatureCompilation": "success",
+    "actualInUnitRootlessWorkspaceCanary": "success",
+    "originalWorkspaceCommand": "cargo test --workspace --locked --no-fail-fast",
+    "originalWorkspaceExit": 101,
+    "actualFailedTargets": [
+      "-p maos-bin --test worker_supervision_16_3",
+      "-p maos-eval --test t3_network_escape_executor",
+      "-p maos-kernel-core --test resource_caps_linux"
+    ],
+    "cause": "Specific failing assertions are not exposed by the bounded public tail; no attribution inferred."
+  },
+  "mutations": {
+    "runId": 38200530174,
+    "actualProofs": [
+      {
+        "runner": "ubuntu-26.04-arm",
+        "mutation": "lose-pids-max",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "native_child_is_placed_before_guest_and_resource_limits_bite",
+        "causes": [
+          "left: \"max\"",
+          "right: \"12\""
+        ],
+        "patch_sha256": "c894fb623a81b6574333449c875e5579bb582b101deda9ce8a1e55f8b4c17aca",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-26.04",
+        "mutation": "lose-pids-max",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "native_child_is_placed_before_guest_and_resource_limits_bite",
+        "causes": [
+          "left: \"max\"",
+          "right: \"12\""
+        ],
+        "patch_sha256": "c894fb623a81b6574333449c875e5579bb582b101deda9ce8a1e55f8b4c17aca",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-26.04",
+        "mutation": "ignore-worker-resources",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "ok",
+            "1",
+            "0",
+            "0"
+          ],
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion",
+        "causes": [
+          "actual OCI memory limit"
+        ],
+        "patch_sha256": "8d442bd8463a95dd185aeb0709b7de520eaff783ffdfafb4c3470373514a5851",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04",
+        "mutation": "suppress-downgrade-producer",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart",
+        "causes": [
+          "successful fallback is recorded once per spawn"
+        ],
+        "patch_sha256": "dac15cb6ca07bb2f03bb8a3030653374f1ea8fa77bfb78e4b8a541f3ae6b422e",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04",
+        "mutation": "fd-aliased-to-pids",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "ok",
+            "1",
+            "0",
+            "0"
+          ],
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion",
+        "causes": [
+          "PID cap must not alias FD cap"
+        ],
+        "patch_sha256": "aa0e8101bd4883d44d62fb28397749f7df79532ee8c9c2baa40a8114aaa6c8f2",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04-arm",
+        "mutation": "lose-pids-max",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "native_child_is_placed_before_guest_and_resource_limits_bite",
+        "causes": [
+          "left: \"max\"",
+          "right: \"12\""
+        ],
+        "patch_sha256": "c894fb623a81b6574333449c875e5579bb582b101deda9ce8a1e55f8b4c17aca",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-26.04-arm",
+        "mutation": "suppress-downgrade-producer",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart",
+        "causes": [
+          "successful fallback is recorded once per spawn"
+        ],
+        "patch_sha256": "dac15cb6ca07bb2f03bb8a3030653374f1ea8fa77bfb78e4b8a541f3ae6b422e",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-26.04",
+        "mutation": "suppress-downgrade-producer",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart",
+        "causes": [
+          "successful fallback is recorded once per spawn"
+        ],
+        "patch_sha256": "dac15cb6ca07bb2f03bb8a3030653374f1ea8fa77bfb78e4b8a541f3ae6b422e",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04",
+        "mutation": "lose-pids-max",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "native_child_is_placed_before_guest_and_resource_limits_bite",
+        "causes": [
+          "left: \"max\"",
+          "right: \"12\""
+        ],
+        "patch_sha256": "c894fb623a81b6574333449c875e5579bb582b101deda9ce8a1e55f8b4c17aca",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04",
+        "mutation": "cpu-percent-as-cores",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "ok",
+            "1",
+            "0",
+            "0"
+          ],
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion",
+        "causes": [
+          "actual OCI CPU ceiling is not exactly 0.10 cores"
+        ],
+        "patch_sha256": "cf5d433a674cdf3139df6dd6d04df7eef6ec34410f18b77346d66324a273d925",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-26.04",
+        "mutation": "cpu-percent-as-cores",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "ok",
+            "1",
+            "0",
+            "0"
+          ],
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion",
+        "causes": [
+          "actual OCI CPU ceiling is not exactly 0.10 cores"
+        ],
+        "patch_sha256": "cf5d433a674cdf3139df6dd6d04df7eef6ec34410f18b77346d66324a273d925",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-26.04",
+        "mutation": "fd-aliased-to-pids",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "ok",
+            "1",
+            "0",
+            "0"
+          ],
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion",
+        "causes": [
+          "PID cap must not alias FD cap"
+        ],
+        "patch_sha256": "aa0e8101bd4883d44d62fb28397749f7df79532ee8c9c2baa40a8114aaa6c8f2",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04",
+        "mutation": "ignore-worker-resources",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "ok",
+            "1",
+            "0",
+            "0"
+          ],
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion",
+        "causes": [
+          "actual OCI memory limit"
+        ],
+        "patch_sha256": "8d442bd8463a95dd185aeb0709b7de520eaff783ffdfafb4c3470373514a5851",
+        "proven_red": true
+      },
+      {
+        "runner": "ubuntu-24.04-arm",
+        "mutation": "suppress-downgrade-producer",
+        "baseline_exit": 0,
+        "mutant_exit": 101,
+        "suites": [
+          [
+            "FAILED",
+            "0",
+            "1",
+            "0"
+          ]
+        ],
+        "oracle": "resource_downgrade_memory_only_is_persisted_for_each_fast_t2_restart",
+        "causes": [
+          "successful fallback is recorded once per spawn"
+        ],
+        "patch_sha256": "dac15cb6ca07bb2f03bb8a3030653374f1ea8fa77bfb78e4b8a541f3ae6b422e",
+        "proven_red": true
+      }
+    ],
+    "validatedPatchHashes": true
+  },
+  "lifetime": {
+    "runId": 38200530134,
+    "actualGroups": [
+      {
+        "runner": "ubuntu-24.04-arm",
+        "actual_lifetime_proofs": [
+          {
+            "scenario": "wrapper-term",
+            "uid": 1001,
+            "child_pid": 2303,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.21472179500000266,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-term",
+            "uid": 1001,
+            "child_pid": 2321,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.19652935099998103,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-kill",
+            "uid": 1001,
+            "child_pid": 2337,
+            "helper_exit": 137,
+            "elapsed_seconds": 0.18877335600001288,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "runtime-expiry",
+            "uid": 1001,
+            "child_pid": 2354,
+            "helper_exit": 1,
+            "elapsed_seconds": 2.327095940999982,
+            "service_active": false,
+            "child_reaped": true
+          }
+        ]
+      },
+      {
+        "runner": "ubuntu-26.04",
+        "actual_lifetime_proofs": [
+          {
+            "scenario": "wrapper-term",
+            "uid": 1001,
+            "child_pid": 2407,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.2646817199999987,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-term",
+            "uid": 1001,
+            "child_pid": 2431,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.2736636829999952,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-kill",
+            "uid": 1001,
+            "child_pid": 2451,
+            "helper_exit": 137,
+            "elapsed_seconds": 0.27299630999999636,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "runtime-expiry",
+            "uid": 1001,
+            "child_pid": 2471,
+            "helper_exit": 1,
+            "elapsed_seconds": 2.168938311000005,
+            "service_active": false,
+            "child_reaped": true
+          }
+        ]
+      },
+      {
+        "runner": "ubuntu-26.04-arm",
+        "actual_lifetime_proofs": [
+          {
+            "scenario": "wrapper-term",
+            "uid": 1001,
+            "child_pid": 2386,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.21479976599994188,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-term",
+            "uid": 1001,
+            "child_pid": 2411,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.1902579310000192,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-kill",
+            "uid": 1001,
+            "child_pid": 2431,
+            "helper_exit": 137,
+            "elapsed_seconds": 0.18946572999993805,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "runtime-expiry",
+            "uid": 1001,
+            "child_pid": 2451,
+            "helper_exit": 1,
+            "elapsed_seconds": 2.2192426719999503,
+            "service_active": false,
+            "child_reaped": true
+          }
+        ]
+      },
+      {
+        "runner": "ubuntu-24.04",
+        "actual_lifetime_proofs": [
+          {
+            "scenario": "wrapper-term",
+            "uid": 1001,
+            "child_pid": 2070,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.31462559599999906,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-term",
+            "uid": 1001,
+            "child_pid": 2089,
+            "helper_exit": 143,
+            "elapsed_seconds": 0.18914024800000107,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "client-kill",
+            "uid": 1001,
+            "child_pid": 2105,
+            "helper_exit": 137,
+            "elapsed_seconds": 0.18877478499999967,
+            "service_active": false,
+            "child_reaped": true
+          },
+          {
+            "scenario": "runtime-expiry",
+            "uid": 1001,
+            "child_pid": 2121,
+            "helper_exit": 1,
+            "elapsed_seconds": 2.369558982000001,
+            "service_active": false,
+            "child_reaped": true
+          }
+        ]
+      }
+    ],
+    "actualScenarios": 16
+  },
+  "halt": {
+    "trigger": "Third complete permanent-job/whole-workspace verification failure; no further implementation or CI retry without operator guidance",
+    "storyStatus": "in-progress",
+    "taskCheckboxes": "unchecked",
+    "readyForReview": false
+  },
+  "verificationLimits": {
+    "browserVisual": "Installed Chromium cannot start: missing libglib-2.0.so.0; actual frozen builds and four HTTP surfaces passed",
+    "portability": "macOS compile-only evidence, no macOS/Windows resource runtime equivalence"
+  }
+}

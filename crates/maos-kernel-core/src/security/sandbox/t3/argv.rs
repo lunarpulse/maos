@@ -48,22 +48,16 @@ pub fn build_runtime_argv(
     let cpu_str = spec
         .resolved_caps
         .cpu_max_pct
-        .map(|v| format!("{v}"))
+        .map(|v| format!("{}.{:02}", v / 100, v % 100))
         .unwrap_or_else(|| "1".to_string());
     let mem_str = spec
         .resolved_caps
         .memory_max_mb
         .map(|v| format!("{v}m"))
         .unwrap_or_else(|| "256m".to_string());
-    // NOTE: `--pids-limit` is sourced from `fd_max` at v0.5-α because the
-    // ResolvedCaps surface does not yet carry a dedicated `pids_max` cap.
-    // FD count and process count are distinct kernel limits (RLIMIT_NOFILE
-    // vs cgroup `pids.max`) — sharing the slot is a v0.5-α placeholder
-    // documented in DR-5.5a-9; full split lands at the same trigger as
-    // the operator-policy resource-floor expansion (Story 9.x).
     let pid_str = spec
         .resolved_caps
-        .fd_max
+        .pids_max
         .map(|v| format!("{v}"))
         .unwrap_or_else(|| "64".to_string());
 
@@ -93,6 +87,9 @@ pub fn build_runtime_argv(
         format!("--pids-limit={pid_str}"),
         format!("--name={container_name}"),
     ];
+    if let Some(fd_max) = spec.resolved_caps.fd_max {
+        argv.push(format!("--ulimit=nofile={fd_max}:{fd_max}"));
+    }
     if let Some(socket) = egress_socket {
         argv.push(format!(
             "--volume={}:/proxy/egress.sock:rw",

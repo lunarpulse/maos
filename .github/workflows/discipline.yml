@@ -3193,6 +3193,102 @@ jobs:
   # PANICS in the helpers — no suite can pass by skipping. `ubuntu-latest` is
   # never used here (it moves to 26.04 in Oct–Nov 2026; the images are pinned).
   # Job logs are 403 without a token, so each verdict is a public annotation.
+  # Story 17-2 T5 — real delegated domain and an independently enforced
+  # Delegate=no negative control. Both matrices are pinned (never ubuntu-latest).
+  cgroup-ceiling-delegated:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cgroup-ceiling-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - uses: ./.github/actions/provision-t3-test-substrate
+        if: ${{ !endsWith(matrix.image, '-arm') }}
+      - name: Install pinned WASM fixture assembler
+        run: cargo install --locked wasm-tools --version 1.259.0
+      - name: Fetch locked standalone fixture dependencies for offline session tests
+        run: |
+          cargo fetch --locked
+          for fixture in \
+            crates/maos-wasm-host/guests/echo-spirit \
+            crates/maos-wasm-host/guests/routed-relay \
+            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
+            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
+          done
+      - name: Exercise helper boundary regressions
+        run: python3 -m unittest scripts.tests.test_cgroup_ceiling_17_2
+      - name: Native cgroup-v2 smoke — four real cases
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-kernel-core --test cgroup_ceiling_smoke -- --nocapture --test-threads=1 2>&1 | tee cgroup-smoke.log; test ${PIPESTATUS[0]} -eq 0'
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 4 cgroup-smoke.log
+      - name: Real admitted session suite — 22 cases, serial
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee spawned-17-3c.log; test ${PIPESTATUS[0]} -eq 0'
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 22 spawned-17-3c.log
+      - name: Build the actual Worker CLI fixture before the in-unit canary (x64)
+        if: ${{ !endsWith(matrix.image, '-arm') }}
+        run: cargo build --locked -p worker --bin worker-cli-fixture
+      - name: Rootless T3 Worker resource enforcement (x64)
+        if: ${{ !endsWith(matrix.image, '-arm') }}
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-delegated --timeout 1800 --rootless-canary -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test worker_resource_limits_17_2 -- --nocapture --test-threads=1 2>&1 | tee worker-resource.log; test ${PIPESTATUS[0]} -eq 0'
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 2 worker-resource.log
+
+  cgroup-ceiling-undelegated:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip2
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: cgroup-undelegated-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install pinned WASM fixture assembler
+        run: cargo install --locked wasm-tools --version 1.259.0
+      - name: Fetch locked standalone fixture dependencies for offline session tests
+        run: |
+          cargo fetch --locked
+          for fixture in \
+            crates/maos-wasm-host/guests/echo-spirit \
+            crates/maos-wasm-host/guests/routed-relay \
+            crates/maos-wasm-host/guests/equiv-fixture/native-twin; do
+            cargo fetch --locked --manifest-path "$fixture/Cargo.toml"
+          done
+      - name: Exercise helper boundary regressions
+        run: python3 -m unittest scripts.tests.test_cgroup_ceiling_17_2
+      - name: Full undelegated session suite — live fallback, strict refusal, persistence and ordering
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode undelegated --unit maos-17-2-undelegated --timeout 1800 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee undelegated-session.log; test ${PIPESTATUS[0]} -eq 0'
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count 22 undelegated-session.log
+
   wasm-host-tests:
     needs: [example-spirit-ts-tests]
     strategy:
@@ -3276,11 +3372,12 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          cargo test --locked -p maos-bin --features wasm-host --test spawned_scope_17_3c -- --nocapture 2>&1 | tee spawned-17-3c.log
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-host --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network,wasm-host --test spawned_scope_17_3c -- --nocapture --test-threads=1 2>&1 | tee spawned-17-3c.log; test ${PIPESTATUS[0]} -eq 0'
           rc=$?
           fail=0
           [ "$rc" -eq 0 ] || { echo "::error title=17-3c process gates (${{ matrix.image }})::cargo test rc=$rc"; fail=1; }
-          grep -q '^test result: ok\. 15 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 15 passed;'"; fail=1; }
+          grep -q '^test result: ok\. 22 passed;' spawned-17-3c.log || { echo "::error title=17-3c process gates (${{ matrix.image }})::missing 'test result: ok. 22 passed;'"; fail=1; }
           for spec in 'SCOPED-VERDICT :8' 'GOVERNED-ATOMIC :6' 'HOSTILE-LIFTING :2' 'HOSTILE-LIFTING-CONTROL :1' \
                       'RUNNER-SIGSYS :2' 'REPEATED-MAILBOX :1' 'HOSTILE-PROVENANCE :1' 'HOSTILE-REFUSALS :1' \
                       'HOSTILE-FLOODS :1' 'HOSTILE-DIAGNOSTICS :1' 'HOSTILE-EXITS :1' 'HOSTILE-ONCE :1' \
@@ -3304,6 +3401,7 @@ jobs:
             done
           fi
           echo "::notice title=17-3c process gates (${{ matrix.image }})::rc=$rc fail=$fail"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 22 spawned-17-3c.log || fail=1
           exit "$fail"
       - uses: actions/download-artifact@v4
         with:
@@ -4467,6 +4565,10 @@ jobs:
       # symbol that reaches a crate compiled for macOS.
       - name: cargo check (aarch64-apple-darwin)
         run: cargo check --locked --workspace --all-targets --target aarch64-apple-darwin
+      # The 17-2 native outcome consumer is feature-gated; default workspace
+      # features alone do not compile its SessionDeps/launch path.
+      - name: cargo check feature-enabled spawned session (aarch64-apple-darwin)
+        run: cargo check --locked -p maos-bin --all-targets --features network,wasm-host --target aarch64-apple-darwin
 
   # Story 10.1a AC4 — v1.0 Ship-Gate Aggregate: fan-in of all automated ship-gate sub-jobs.
   # All sub-gates are continue-on-error: false. The aggregate uses if: always() with
@@ -4538,10 +4640,12 @@ jobs:
       # same reason.
       - name: Build the fixture binaries every workspace suite resolves by path
         run: |
+          cargo fetch --locked
           cargo build --locked -p worker --bin worker-cli-fixture --bin worker-probe-fixture
           cargo build --locked -p maos-cli --bin maosctl
           cargo build --release --manifest-path crates/maos-wasm-host/guests/equiv-fixture/native-twin/Cargo.toml
           cargo build --release --manifest-path crates/maos-wasm-host/test-fixtures/forbidden-syscall-probe/Cargo.toml
+          RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked --release --target x86_64-unknown-linux-gnu --manifest-path crates/maos-eval/test-fixtures/t3-network-escape-probe/Cargo.toml
       - name: Install python Ed25519 for the two-host reconcile suite
         run: python3 -c "import cryptography" || python3 -m pip install --user cryptography
       - name: Install tokei
@@ -4597,7 +4701,28 @@ jobs:
           print(f"decoy door holding {host}:{port} (pid {pid})")
           PY
       - name: Run the full workspace test suite
-        run: cargo test --workspace --locked --no-fail-fast
+        run: |
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-workspace --timeout 5400 --rootless-canary -- cargo test --workspace --locked --no-fail-fast 2>&1 | tee workspace-test-suite.log
+          pipeline=("${PIPESTATUS[@]}")
+          result=${pipeline[0]}
+          if [ "$result" -eq 0 ]; then result=${pipeline[1]}; fi
+          WORKSPACE_EXIT="$result" python3 - <<'PY'
+          import os
+          status = int(os.environ["WORKSPACE_EXIT"])
+          if status:
+              with open("workspace-test-suite.log", "rb") as log:
+                  log.seek(0, 2)
+                  log.seek(max(0, log.tell() - 2800))
+                  excerpt = log.read(2800).decode(errors="replace")
+              excerpt = excerpt.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title=17-2 actual workspace failure::exit={status} {excerpt}", flush=True)
+          else:
+              print("::notice title=17-2 actual workspace execution::command=cargo test --workspace --locked --no-fail-fast exit=0", flush=True)
+          PY
+          report=$?
+          if [ "$result" -eq 0 ]; then result=$report; fi
+          exit "$result"
 
   # Story 16-1 / AC1 — exit lines 5-6 of the J0 block, named in their own step
   # so a failure says "the door does not work" rather than being one red line
@@ -4950,6 +5075,8 @@ jobs:
       - release-dry-run
       - macos-scope
       - macos-check
+      - cgroup-ceiling-delegated
+      - cgroup-ceiling-undelegated
     if: always()
     permissions:
       pull-requests: write
@@ -5007,6 +5134,10 @@ jobs:
           echo "ecc=${{ needs.check-epic-close-coherence.result }}" >> $GITHUB_OUTPUT
           echo "jht1=${{ needs.journey-hermetic-tier-1.result }}" >> $GITHUB_OUTPUT
           echo "rdr=${{ needs.release-dry-run.result }}" >> $GITHUB_OUTPUT
+          echo "| Required 17-2 job | Result | Scope |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| cgroup-ceiling-delegated | ${{ needs.cgroup-ceiling-delegated.result }} | 4-image real cgroup-v2 enforcement; x64 rootless T3 checks |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| cgroup-ceiling-undelegated | ${{ needs.cgroup-ceiling-undelegated.result }} | 4-image Delegate=no refusal/fallback proof |" >> "$GITHUB_STEP_SUMMARY"
       # Story 20-6 AC3 — a skipped macOS guard is NOT-APPLICABLE, said out loud.
       # `needs.*.result == 'skipped'` is not a failure, so without this step a
       # filtered-out guard would read as an unremarkable green and the
@@ -5042,7 +5173,7 @@ jobs:
       - name: Check for failures
         id: status
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' }}" == "true" ]]; then
             echo "overall=failure" >> $GITHUB_OUTPUT
           else
             echo "overall=success" >> $GITHUB_OUTPUT
@@ -5101,6 +5232,8 @@ jobs:
             const ecg = '${{ needs.check-epic-close-green.result }}';
             const ecc = '${{ needs.check-epic-close-coherence.result }}';
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
+            const cgd = '${{ needs.cgroup-ceiling-delegated.result }}';
+            const cgu = '${{ needs.cgroup-ceiling-undelegated.result }}';
             const rdr = '${{ needs.release-dry-run.result }}';
             const mcs = '${{ needs.macos-check.result }}';
             const mcsScope = '${{ needs.macos-scope.result }}';
@@ -5153,6 +5286,8 @@ jobs:
             | example-spirit-tests | ${icon(est)} ${est} |
             | example-spirit-drift | ${icon(esd)} ${esd} |
             | example-spirit-ts-tests | ${icon(estts)} ${estts} |
+            | cgroup-ceiling-delegated | ${icon(cgd)} ${cgd} |
+            | cgroup-ceiling-undelegated | ${icon(cgu)} ${cgu} |
             | spirit-test-tests | ${icon(stt)} ${stt} |
             | coverage-matrix-nfr-test-3 | ${icon(cmn3)} ${cmn3} |
             | lcas-corpus-tests | ${icon(lct)} ${lct} |
@@ -5205,7 +5340,7 @@ jobs:
               });
             }
       - name: Fail if any gate failed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' }}
         run: |
           echo "One or more discipline gates failed."
           exit 1

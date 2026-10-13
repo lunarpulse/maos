@@ -18,7 +18,6 @@ pub mod control_block;
 pub mod hook_dispatch;
 pub mod idle_watchdog;
 pub mod kernel_ctx;
-pub mod resource_ceiling;
 pub mod schedule_watchdog;
 pub mod scheduler_loop;
 pub mod verb_resolver;

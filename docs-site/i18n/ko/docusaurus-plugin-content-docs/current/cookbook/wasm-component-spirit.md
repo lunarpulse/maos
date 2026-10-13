@@ -49,6 +49,7 @@ tier = "T2"
 cpu_max_pct = 25
 memory_max_mb = 64
 fd_max = 64
+pids_max = 64
 
 [capabilities.required.iac]
 send = ["spirit:peer"]

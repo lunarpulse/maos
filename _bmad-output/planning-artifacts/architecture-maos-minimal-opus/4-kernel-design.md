@@ -43,7 +43,7 @@ maos/
 │   │   ├── pipeline/                   #          Emit pipeline (IACFrame + ComplianceClaim co-located)
 │   │   ├── telemetry/                  #          Telemetry module + scalar.tap + IAC RT metrics (1b.4)
 │   │   ├── inference/                  #          Inference Port adapter (1b.4)
-│   │   ├── journal/                    #          Lifecycle Journal — raw NDJSON, fsync per entry (I9 whitelist, 1b.1)
+│   │   ├── journal/                    #          Lifecycle Journal — raw NDJSON; append guarded through most_recent insert; sync_data errors ignored (I9 whitelist, 1b.1)
 │   │   └── hot_swap/                   #          Hot-Swap Coordinator
 │   ├── maos-audit/                     # v0.1 ✅  Read-side SQLite query adapter (added 1b.1).
 │   │                                   #          Holds the maosctl audit query path with READ_ONLY SQLite
@@ -289,7 +289,7 @@ The cycle that re-emerges in any kernel-machinery story (halt, lifecycle, IAC, c
 
 **Scheduling discipline (in-process):** Cooperative, priority-weighted, bounded by the Capability Registry's rate limits (so a runaway Spirit cannot starve peers via tool calls). LLM-bound Spirits yield naturally on streaming chunks; CPU-bound Spirits get a `tokio::task::yield_now` injection at sandbox boundaries. Cooperative-yield assumption holds inside a single Spirit's task pool only.
 
-**OS-level CPU/memory budget enforcement:** subprocess-form Spirits run inside Linux cgroups v2 with declared `cpu.max` and `memory.max` ceilings — kernel sets these at spawn, enforced by the OS, not by Tokio cooperation. macOS uses POSIX `setrlimit(RLIMIT_CPU, RLIMIT_RSS)` per child; Windows uses Job Objects with `JOB_OBJECT_LIMIT_PROCESS_TIME` and `JOB_OBJECT_LIMIT_PROCESS_MEMORY`. Default ceilings declared in the `[resources]` table of the manifest; kernel applies the strictest-of (manifest, operator policy) at spawn. Across Spirit processes the OS, not the runtime, is the floor.
+**Worker resource enforcement (Story 17-2):** Native T2 placement uses a named delegated cgroup-v2 domain, daemon process leaf, and unique owned per-spawn leaf with `+cpu +memory +pids`; placement is prepared before exec. Explicit CPU or PID caps refuse without writable delegation. Memory-only fallback may proceed with RLIMIT_AS and optional RLIMIT_NOFILE and persists one typed `ResourceCeilingDowngraded=20` informational lifecycle row per successful launch. This row is produced by the native session lifecycle JournalAdapter only after LiveWorker ownership/observer registration; it is not an SCB transition. T3 is a separate Linux rootless-container route (including signed image and proxy), not native cgroup placement; CPU percentage, PID, memory, and FD caps are independently resolved against the same live operator authority. FD limits use explicit nofile limits; exceeding inherited hard ceiling refuses rather than clamps. These implementation paths are evidenced on Ubuntu 24.04/26.04 x64 and arm native images and x64 T3 only; this does not establish macOS/Windows resource equivalence. Sync-data errors remain ignored and append failure panics: do not infer per-entry fsync or a new power-loss durability guarantee.
 
 **Crash detection and recovery (I10).** The Scheduler supervises every subprocess Spirit. Crash detection ≤2s on SIGKILL; `task.orphaned` IAC frame emitted to in-flight task originators ≤5s with exit-cause journaled (signal, exit-code, stderr-tail). Hung-Spirit detection (alive but no progress IAC for >30s) emits `task.stalled` event within 60s. On crash mid-CBOR-snapshot-write, the supervisor's `JoinSet` returns `Err`; supervisor synchronously calls `cap_registry.revoke_all(spirit_id)`; journal records `HaltRecord{cause: Fault, in_flight_tokens: [...]}`; any half-written CBOR frame in the journal is marked `Torn` on replay and discarded. Replay rule: torn frame at tail = truncate; torn frame mid-log = fatal corruption requiring manual recovery.
 
@@ -334,7 +334,7 @@ Four tiers, declared per Spirit in the manifest, enforced at process spawn:
 
 **Strictest-of-(manifest, trust-tier, operator-policy) floor.** The kernel applies the strictest sandbox tier from any of: the Spirit's manifest declaration, its trust tier, the operator's deployment policy. A `public-untrusted` Spirit declaring T0 in its manifest is forced to T2 by the trust-tier floor.
 
-**Per-Spirit resource isolation.** Each subprocess-form Spirit runs under a resource cgroup (Linux cgroups v2; equivalent on macOS/Windows) with kernel-enforced caps on CPU, memory, file descriptors, and process count. Sandbox tiers cover the *security* boundary; resource cgroups cover the *resource* boundary. A runaway Spirit gets throttled, not the host.
+**Per-Spirit resource isolation.** Worker resource ceilings are not uniformly provided by an OS-equivalent cgroup abstraction across platforms. On supported Linux native T2, delegated cgroup v2 applies available CPU/memory/PID limits, with RLIMIT_AS/RLIMIT_NOFILE enforcement and a typed informational downgrade for memory-only fallback. On supported Linux T3, a rootless container applies CPU, memory, PID, and explicit FD ceilings independently. The currently evidenced matrix is Ubuntu 24.04/26.04 x64 and arm native, and x64 T3 only; no macOS/Windows resource-equivalence claim follows. Story 17-7 retains T3 OOM/SIGKILL ambiguity and short-lived-worker PID-inspection refusal.
 
 ### 4.3.2 Secret materialization
 
@@ -614,7 +614,7 @@ Polls on the same cadence. Detects Spirits where `last_heartbeat_ns > last_progr
 
 ### Cold-restart (NFR-Rel-10)
 
-`graceful_drain` iterates `scheduler.unload` per Spirit with a deadline. `hard_kill_drain` fsyncs the journal. `JournalEntry::InFlight` persists task assignments for post-restart recovery. `recover_in_flight_with_tasks` re-scans the journal and returns both lifecycle events and in-flight records.
+`graceful_drain` iterates `scheduler.unload` per Spirit with a deadline. `hard_kill_drain` requests journal sync. Lifecycle rows are appended under the writer guard through the `most_recent` insert; append failure still panics, while `sync_data` errors are ignored. There is no fsync-per-entry or new power-loss durability guarantee. `JournalEntry::InFlight` persists task assignments for post-restart recovery. `recover_in_flight_with_tasks` re-scans the journal and returns both lifecycle events and in-flight records.
 
 ### FR50 disposition
 

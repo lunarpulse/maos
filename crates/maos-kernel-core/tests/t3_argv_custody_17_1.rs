@@ -46,6 +46,13 @@ fn verified_image() -> VerifiedImageAttestation {
 }
 
 fn argv(env: &[(String, String)]) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+    resource_argv(env, &SandboxSpec::new_for_test(SandboxTier::T3))
+}
+
+fn resource_argv(
+    env: &[(String, String)],
+    spec: &SandboxSpec,
+) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
     let runtime = ContainerRuntime {
         kind: ContainerRuntimeKind::Podman,
         path: "/usr/bin/podman".into(),
@@ -54,7 +61,7 @@ fn argv(env: &[(String, String)]) -> Result<Vec<String>, maos_domain::sandbox::T
     build_runtime_argv(
         &runtime,
         &verified_image(),
-        &SandboxSpec::new_for_test(SandboxTier::T3),
+        spec,
         Path::new("/fixture"),
         &[],
         "worker",
@@ -97,4 +104,58 @@ fn duplicate_environment_names_are_refused() {
     ])
     .unwrap_err();
     assert!(error.to_string().contains("duplicate"));
+}
+
+#[test]
+fn cpu_percentage_is_a_fractional_core_not_a_core_count() {
+    for (percentage, cores) in [(10, 0.10), (100, 1.0)] {
+        let mut spec = SandboxSpec::new_for_test(SandboxTier::T3);
+        spec.resolved_caps.cpu_max_pct = Some(percentage);
+        let args = resource_argv(&[], &spec).unwrap();
+        let actual: f64 = args
+            .iter()
+            .find_map(|arg| arg.strip_prefix("--cpus="))
+            .expect("CPU limit")
+            .parse()
+            .unwrap();
+        assert_eq!(
+            actual, cores,
+            "CPU percentages must not multiply the budget by 100"
+        );
+    }
+}
+
+#[test]
+fn fd_and_pid_budgets_are_independent_including_omission() {
+    for (fd, pids) in [(Some(31), Some(7)), (Some(31), None), (None, Some(7))] {
+        let mut spec = SandboxSpec::new_for_test(SandboxTier::T3);
+        spec.resolved_caps.fd_max = fd;
+        spec.resolved_caps.pids_max = pids;
+        let args = resource_argv(&[], &spec).unwrap();
+        let actual_pids: u32 = args
+            .iter()
+            .find_map(|arg| arg.strip_prefix("--pids-limit="))
+            .expect("PID limit")
+            .parse()
+            .unwrap();
+        assert_eq!(
+            actual_pids,
+            pids.unwrap_or(64),
+            "FD requests cannot change the task budget"
+        );
+        let nofile = args
+            .iter()
+            .find_map(|arg| arg.strip_prefix("--ulimit=nofile="));
+        match fd {
+            Some(limit) => {
+                let (soft, hard) = nofile
+                    .expect("FD cap must constrain both limits")
+                    .split_once(':')
+                    .unwrap();
+                assert_eq!(soft.parse::<u32>().unwrap(), limit);
+                assert_eq!(hard.parse::<u32>().unwrap(), limit);
+            }
+            None => assert!(nofile.is_none(), "omission must not invent an FD cap"),
+        }
+    }
 }

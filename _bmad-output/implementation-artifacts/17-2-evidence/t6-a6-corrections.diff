@@ -1,0 +1,332 @@
+diff --git a/.github/workflows/discipline.yml b/.github/workflows/discipline.yml
+index 56f26768..7c08973e 100644
+--- a/.github/workflows/discipline.yml
++++ b/.github/workflows/discipline.yml
+@@ -5282,6 +5282,7 @@ jobs:
+             | onb-nfr2-timing | ${icon(onb)} ${onb} |
+             | example-spirit-tests | ${icon(est)} ${est} |
+             | example-spirit-drift | ${icon(esd)} ${esd} |
++            | example-spirit-ts-tests | ${icon(estts)} ${estts} |
+             | cgroup-ceiling-delegated | ${icon(cgd)} ${cgd} |
+             | cgroup-ceiling-undelegated | ${icon(cgu)} ${cgu} |
+             | spirit-test-tests | ${icon(stt)} ${stt} |
+diff --git a/crates/maos-kernel-core/src/security/sandbox/linux.rs b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+index 53ea9d4f..ff95684b 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -66,35 +66,32 @@ pub fn spawn_sandboxed(
+     let rlimit_mem = mem_limit.map(|mb| mb as u64 * 1024 * 1024);
+     let rlimit_fd = fd_limit.map(|n| n as u64);
+ 
+-    // With no cgroup-backed resource request there is no reason to create a
+-    // cgroup. Memory alone may fall back to RLIMIT_AS; CPU and PID caps may not.
++    // Owned placement contains descendants even without cgroup-backed ceilings.
++    // Memory alone may fall back to RLIMIT_AS; CPU and PID caps may not.
+     let cgroup_requested = spec.resolved_caps.cpu_max_pct.is_some()
+         || mem_limit.is_some()
+         || spec.resolved_caps.pids_max.is_some();
+-    let (cleanup, cgroup_procs, resource_downgrade) = if !cgroup_requested {
+-        (Cleanup::None, None, None)
+-    } else {
+-        match setup_cgroup(spec) {
+-            Ok((cleanup, procs)) => (cleanup, Some(procs), None),
+-            Err(error)
+-                if mem_limit.is_some()
+-                    && spec.resolved_caps.cpu_max_pct.is_none()
+-                    && spec.resolved_caps.pids_max.is_none() =>
+-            {
+-                let reason = match error {
+-                    SpawnError::CgroupUnavailable => {
+-                        "cgroup v2 memory.max unavailable: no writable delegated cgroup".to_owned()
+-                    }
+-                    other => format!("cgroup v2 memory.max unavailable: {other}"),
+-                };
+-                eprintln!(
+-                    "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)",
+-                    mem_limit.unwrap()
+-                );
+-                (Cleanup::None, None, Some(reason))
+-            }
+-            Err(error) => return Err(error),
++    let (cleanup, cgroup_procs, resource_downgrade) = match setup_cgroup(spec) {
++        Ok((cleanup, procs)) => (cleanup, Some(procs), None),
++        Err(_) if !cgroup_requested => (Cleanup::None, None, None),
++        Err(error)
++            if mem_limit.is_some()
++                && spec.resolved_caps.cpu_max_pct.is_none()
++                && spec.resolved_caps.pids_max.is_none() =>
++        {
++            let reason = match error {
++                SpawnError::CgroupUnavailable => {
++                    "cgroup v2 memory.max unavailable: no writable delegated cgroup".to_owned()
++                }
++                other => format!("cgroup v2 memory.max unavailable: {other}"),
++            };
++            eprintln!(
++                "maos-sandbox: WARNING: cgroup unavailable ({reason}); memory cap {} MB is enforced only by RLIMIT_AS (address space, no RSS cap, no oom audit)",
++                mem_limit.unwrap()
++            );
++            (Cleanup::None, None, Some(reason))
+         }
++        Err(error) => return Err(error),
+     };
+ 
+     // SAFETY: `pre_exec` runs in the forked child before exec.
+diff --git a/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs b/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+index 36a59a28..a0409eb0 100644
+--- a/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
++++ b/crates/maos-kernel-core/tests/cgroup_ceiling_smoke.rs
+@@ -339,6 +339,10 @@ fn same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves() {
+ 
+ #[test]
+ fn creation_limit_write_and_exec_failures_release_owned_leaves() {
++    if let Some(program) = std::env::var_os("MAOS_17_2_NATIVE_FD_PROBE") {
++        assert_native_fd_refusal(Path::new(&program));
++        return;
++    }
+     let id = format!("path-limit-{}", "N".repeat(4096));
+     let mut name_caps = caps();
+     name_caps.cpu_max_pct = None;
+@@ -459,6 +463,90 @@ fn creation_limit_write_and_exec_failures_release_owned_leaves() {
+         }
+     }
+     assert_no_owned_leaf(&id, &caps());
++
++    // Lower only this isolated worker's hard limit, never the shared test process.
++    // Re-enter the built test binary, not Cargo or rustc under their held locks.
++    let output = Command::new("bash")
++        .args([
++            "-euo",
++            "pipefail",
++            "-c",
++            "ulimit -Sn 64; ulimit -Hn 64; exec \"$@\"",
++            "native-fd-refusal",
++        ])
++        .arg(std::env::current_exe().expect("current native smoke test binary"))
++        .args([
++            "creation_limit_write_and_exec_failures_release_owned_leaves",
++            "--exact",
++            "--nocapture",
++            "--test-threads=1",
++        ])
++        .env("MAOS_17_2_NATIVE_FD_PROBE", FIXTURE.as_os_str())
++        .output()
++        .expect("run isolated native FD-limit worker");
++    assert!(
++        output.status.success(),
++        "native FD refusal worker failed: stdout={} stderr={}",
++        String::from_utf8_lossy(&output.stdout),
++        String::from_utf8_lossy(&output.stderr)
++    );
++    assert!(
++        String::from_utf8_lossy(&output.stdout)
++            .contains("test result: ok. 1 passed; 0 failed; 0 ignored;"),
++        "the isolated FD refusal assertions must actually execute"
++    );
++    print!("{}", String::from_utf8_lossy(&output.stdout));
++}
++
++fn assert_native_fd_refusal(program: &Path) {
++    let limits = std::fs::read_to_string("/proc/self/limits").unwrap();
++    let nofile = limits
++        .lines()
++        .find(|line| line.starts_with("Max open files"))
++        .expect("actual isolated worker nofile limits");
++    assert_eq!(nofile.split_whitespace().nth(3), Some("64"));
++    assert_eq!(nofile.split_whitespace().nth(4), Some("64"));
++    let directory = tempfile::tempdir().expect("owned native FD guest-effects directory");
++    let marker = directory.path().join("guest-limits");
++    for requested in [64, 65] {
++        let id = format!("fd-hard-{requested}-{}", std::process::id());
++        let mut resolved = caps();
++        resolved.fd_max = Some(requested);
++        let mut sandbox = spec(&id, program, resolved.clone()).sandbox;
++        sandbox.declared_scopes.push(Scope::FsWrite {
++            subtree: directory.path().to_string_lossy().into_owned(),
++        });
++        let mut command = Command::new(program);
++        command.arg("--fd-marker").arg(&marker);
++        if requested == 64 {
++            let mut child = spawn_sandboxed(&sandbox, &mut command)
++                .expect("within-hard native FD cap must run the actual guest");
++            assert_eq!(child.take_resource_downgrade(), None);
++            assert!(child.wait().unwrap().success());
++            drop(child);
++            let observed = std::fs::read_to_string(&marker).expect("guest actually executed");
++            let row = observed
++                .lines()
++                .find(|line| line.starts_with("Max open files"))
++                .expect("guest recorded its actual nofile limits");
++            assert_eq!(row.split_whitespace().nth(3), Some("64"));
++            assert_eq!(row.split_whitespace().nth(4), Some("64"));
++            std::fs::remove_file(&marker).unwrap();
++        } else {
++            match spawn_sandboxed(&sandbox, &mut command) {
++                Err(SpawnError::Io(error)) => assert_eq!(error.raw_os_error(), Some(libc::EPERM)),
++                Err(other) => panic!("unexpected above-hard native FD refusal: {other}"),
++                Ok(mut child) => {
++                    let _ = child.child_mut().kill();
++                    let _ = child.wait();
++                    panic!("above-hard native FD request unexpectedly spawned");
++                }
++            }
++            assert!(!marker.exists(), "refused pre-exec must not run guest code");
++        }
++        assert_no_owned_leaf(&id, &resolved);
++    }
++    println!("\n::notice title=17-2 actual native FD refusal::within-hard=64 actual-guest-soft=64 actual-guest-hard=64 above-hard=65 refusal=EPERM refused-guest-effects=0 owned-residue=0");
+ }
+ 
+ #[test]
+@@ -476,10 +564,15 @@ fn killed_leader_cleanup_kills_its_surviving_descendant() {
+ }
+ 
+ fn assert_killed_leader_cleanup(resolved: ResolvedCaps) {
++    let fd_limit = resolved.fd_max;
+     let mut spawn = spec("descendant-cleanup", &FIXTURE, resolved);
+     spawn.task_args = vec!["--descendant-root".into()];
+     let mut bridge = spawn_and_bridge(spawn).expect("spawn bounded process tree under T2");
++    assert_eq!(bridge.take_resource_downgrade(), None);
+     let leader = bridge.child_pid();
++    if let Some(limit) = fd_limit {
++        assert_eq!(limit_value(leader, "Max open files"), limit.to_string());
++    }
+     let leaf = membership_leaf(leader);
+     let deadline = Instant::now() + Duration::from_secs(5);
+     let descendant = loop {
+diff --git a/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs b/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs
+index a74cf4a3..b3ba8198 100644
+--- a/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs
++++ b/crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs
+@@ -9,6 +9,12 @@ use std::time::{Duration, Instant};
+ 
+ fn main() {
+     match std::env::args().nth(1).as_deref() {
++        Some("--fd-marker") => {
++            let marker = std::env::args().nth(2).expect("FD probe marker path");
++            let limits = std::fs::read_to_string("/proc/self/limits").expect("actual guest limits");
++            std::fs::write(marker, limits).expect("record guest execution and actual limits");
++            return;
++        }
+         Some("--descendant-leaf") => {
+             hold_for(Duration::from_secs(25));
+             return;
+diff --git a/xtask/kernel-core-baseline.toml b/xtask/kernel-core-baseline.toml
+index 51dc684b..f808ee45 100644
+--- a/xtask/kernel-core-baseline.toml
++++ b/xtask/kernel-core-baseline.toml
+@@ -502,7 +502,7 @@
+ #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
+ #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
+ #          file was added or removed.
+-src_lines = 25149
++src_lines = 25146
+ # HISTORY: Story 17-2 FW-01/FW-02 (2026-10-12), operator-ratified location charter:
+ #          25267 -> 25149 physical lines (-118); exact formatted tokei 19553 ->
+ #          19495 (-58), no kernel raise. Driver: native PID containment/strict
+@@ -513,6 +513,10 @@ src_lines = 25149
+ #          SandboxedChild's re-hash includes a private Linux-only outcome field;
+ #          SpawnError's existing refusal message now names CPU and PID requests.
+ #          Class witnesses and enumerated public surface delta precede this pin.
++# HISTORY: Story 17-2 non-author A6 correction (2026-10-12): 25149 -> 25146
++#          physical lines (-3), 19495 -> 19492 tokei (-3). Preserve best-effort
++#          owned descendant cleanup for no-cap/FD-only launches independently
++#          of ceilings. Same authorized file set and public surface; no raise.
+ # HISTORY: Story 17-6 review security repair (2026-09-28), operator-ratified
+ #          FLAG-Winston: 25015 -> 25032 (+17 physical; tokei 19292 -> 19309,
+ #          +17). `security/sandbox/linux.rs` compares each Landlock rule fd's
+@@ -718,7 +722,7 @@ src_lines = 25149
+ #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
+ [kernel_src]
+ root = "crates/maos-kernel-core/src"
+-set_hash = "0d9dc5ae7ca7ceedecaf3e708b73b7760d29e54f0069f207d23f20cb449672fe"
++set_hash = "816e0c2358c76caabeaabb69977677419d30ad2b5b3f40ef5fddf1d42439b6f4"
+ 
+ [kernel_src.files]
+ "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
+@@ -794,7 +798,7 @@ set_hash = "0d9dc5ae7ca7ceedecaf3e708b73b7760d29e54f0069f207d23f20cb449672fe"
+ "security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
+ "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
+ "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
+-"security/sandbox/linux.rs" = "d01ba0a0948eb2fcfadf74e11774255d690ebc64f8414ec3afd0d5ffca3a31cb"
++"security/sandbox/linux.rs" = "1bcdb87d664221fd2886c85566a786120f47ccb1ff2323eed65e46f3e4d6b349"
+ "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
+ "security/sandbox/mod.rs" = "f978a3dfb47a2be59cf58b8336cb8100c310bdf9f93a9694b871f9b071529702"
+ "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
+diff --git a/xtask/kloc.toml b/xtask/kloc.toml
+index ee605089..838b44a6 100644
+--- a/xtask/kloc.toml
++++ b/xtask/kloc.toml
+@@ -258,7 +258,8 @@
+ #          t3/argv.rs duplicate --env rejection, t3/child.rs teardown via bounded helper.
+ #          Paired with kernel-core-baseline.toml 25212 -> 25267.
+ # ◆ 17-2 FW-02 exact formatted re-pin 2026-10-12: 19553 -> 19495 (-58), ZERO HEADROOM and no kernel raise; paired physical pin 25267 -> 25149. Driver: native PID containment/one-shot memory downgrade, independent T3 resource flags, journal linearization, retired resource_ceiling module.
+-maos-kernel-core = 19495   # ◆ 17-6 FLAG-Winston exact measured raise 2026-09-28 after `cargo fmt --all`: 19212 -> 19292 (+80; ceiling 19213 -> 19292), operator-RATIFIED 2026-09-26 (+71 lean prototype) plus the arm-measured aarch64 `ppoll` row (+2) and the operator-approved 2026-09-28 prctl(PR_GET_AUXV)-only grant delta (+7); driver: T2 repair — exec-set Landlock grant, kill-first seccomp, rt_sigaction/clone3/poll, `BridgeSpawnSpec.sandbox` + the T2 route at `spawn_and_bridge`, cli_wrapper floor exactly T3; paired with kernel-core-baseline.toml 24920 -> 25015. | PRIOR: Review patch batch 2026-09-20 exact measured raise: 19121 -> 19213 (+92; driver: team-consensus review rulings D1-D3 — posture-ceiling writer incl. PostureSection parser and PolicyTable setter…
++# 17-2 non-author A6 ownership correction, measured 2026-10-12: 19495 -> 19492 (-3), physical25149 -> 25146; exact lower re-pin, no grant increase.
++maos-kernel-core = 19492   # ◆ 17-6 FLAG-Winston exact measured raise 2026-09-28 after `cargo fmt --all`: 19212 -> 19292 (+80; ceiling 19213 -> 19292), operator-RATIFIED 2026-09-26 (+71 lean prototype) plus the arm-measured aarch64 `ppoll` row (+2) and the operator-approved 2026-09-28 prctl(PR_GET_AUXV)-only grant delta (+7); driver: T2 repair — exec-set Landlock grant, kill-first seccomp, rt_sigaction/clone3/poll, `BridgeSpawnSpec.sandbox` + the T2 route at `spawn_and_bridge`, cli_wrapper floor exactly T3; paired with kernel-core-baseline.toml 24920 -> 25015. | PRIOR: Review patch batch 2026-09-20 exact measured raise: 19121 -> 19213 (+92; driver: team-consensus review rulings D1-D3 — posture-ceiling writer incl. PostureSection parser and PolicyTable setter…
+ maos-capability = 2000
+ maos-cap-registry = 0   # ⚠ 15-2 EPIC-15 PHANTOM RETIREMENT 2026-09-06 (operator-authorized): 3000 -> 0. Crate does not exist; zero preserves the line-1 tripwire.
+ maos-corpus-gen = 3000
+@@ -691,7 +692,8 @@ _aggregate_alarm = 158608   # ⚠ 15-2 EPIC-15 RE-BASE 2026-09-06: pre-grant for
+ #          173290 -> 173383. Measures the review-patch batch: kernel-core +40,
+ #          maos-egress +53 (tests are excluded from kloc). Prior raise: 17-1 landing.
+ # ◆ 17-2 FW-03 measured grant, operator-approved 2026-10-12 after cargo fmt --all: measured aggregate173504; strict >= hard-fail convention uses measured+1, so173383 -> 173505 (+122), ZERO HEADROOM. No kernel allowance transferred; domain/bin drivers above and exact lower kernel pin recorded in the same change.
+-_aggregate_hardfail = 173505   # ⚠ 15-2 EPIC-15 OPERATOR-RATIFIED RE-BASE 2026-09-06: 155498 measured + 13774 funded + 1512 no-change asks + 100 CEILING RULE floor = 170884. Σ per-crate ceilings = 182113, leaving 11229 of independent distributed-growth signal. D17 discharged by re-derivation. | prior: NOT RAISED BY j1-crosshost-2c, deliberately. This key is D17's pre-existing RED (measured 148892 at HEAD 7aa07ee3, -1835), and the CEILING RULE names an epic retrospective as the ONLY sanctioned recalculation point for the aggregate. j1-crosshost-2c adds **+1926** measured (150818), every line of it attributed to a named per-crate grant above: maos-cli +393, maos-audit +179, maos-a2a-core +116, xtask +1066, maos-a2a-tcp +77 (fits, no grant), maos-cohort +53 (fits, no grant), maos-iac +39 (net, after the free reduction), maos-bin +1, maos-domain +1 (unraised, see that row). Raising this ceiling would erase D17's red and let this story's growth hide inside someone else's overage — the exact "do not let them mask a red you caused" failure, inverted. The split is therefore stated rather than absorbed: -3761 = -1835 (D17, not ours) + -1926 (2c, fully attributed). D17 stays open with its own owner and its own recalculation point. | prior: 2026-08-11 Epic-13 retrospective re-base (Lunarpulse authorized AFTER measurement, at the ONLY sanctioned recalculation point): 144224->147057 (formatted measured 144173 + ceil(2%)=2884). Headroom was 51 lines — any Epic 14 story writing code would have opened CI-red, which is operating failure, not anti-growth signal. REFUSED in the same pass, deliberately: maos-kernel-core (38 headroom) and maos-audit (24) stay tight because Epic 14 is declared ZERO kernel-Δ and granting capacity for forbidden growth would invert ADR-038; maos-a2a-core stays at ZERO headroom because a third unscoped grant is decision D10, and the retro forbade ratifying it by implication. Those three are meant to hard-fail on contact. | prior: Story 13.6e remaining-review measured grant (authorized formula applies because aggregate actually breached): 140707->144224 (formatted measured 141396 + ceil(2%)=2828). Review correctness repairs only; ZERO kernel-core/maos-audit delta. | prior: Story 13.6d 139902->140707 (measured 137948 + ceil(2%)=2759).
++# 17-2 non-author A6 exact lower aggregate re-pin: measured173501 -> strict hardfail173502, below the approved173505; no speculative headroom.
++_aggregate_hardfail = 173502   # ⚠ 15-2 EPIC-15 OPERATOR-RATIFIED RE-BASE 2026-09-06: 155498 measured + 13774 funded + 1512 no-change asks + 100 CEILING RULE floor = 170884. Σ per-crate ceilings = 182113, leaving 11229 of independent distributed-growth signal. D17 discharged by re-derivation. | prior: NOT RAISED BY j1-crosshost-2c, deliberately. This key is D17's pre-existing RED (measured 148892 at HEAD 7aa07ee3, -1835), and the CEILING RULE names an epic retrospective as the ONLY sanctioned recalculation point for the aggregate. j1-crosshost-2c adds **+1926** measured (150818), every line of it attributed to a named per-crate grant above: maos-cli +393, maos-audit +179, maos-a2a-core +116, xtask +1066, maos-a2a-tcp +77 (fits, no grant), maos-cohort +53 (fits, no grant), maos-iac +39 (net, after the free reduction), maos-bin +1, maos-domain +1 (unraised, see that row). Raising this ceiling would erase D17's red and let this story's growth hide inside someone else's overage — the exact "do not let them mask a red you caused" failure, inverted. The split is therefore stated rather than absorbed: -3761 = -1835 (D17, not ours) + -1926 (2c, fully attributed). D17 stays open with its own owner and its own recalculation point. | prior: 2026-08-11 Epic-13 retrospective re-base (Lunarpulse authorized AFTER measurement, at the ONLY sanctioned recalculation point): 144224->147057 (formatted measured 144173 + ceil(2%)=2884). Headroom was 51 lines — any Epic 14 story writing code would have opened CI-red, which is operating failure, not anti-growth signal. REFUSED in the same pass, deliberately: maos-kernel-core (38 headroom) and maos-audit (24) stay tight because Epic 14 is declared ZERO kernel-Δ and granting capacity for forbidden growth would invert ADR-038; maos-a2a-core stays at ZERO headroom because a third unscoped grant is decision D10, and the retro forbade ratifying it by implication. Those three are meant to hard-fail on contact. | prior: Story 13.6e remaining-review measured grant (authorized formula applies because aggregate actually breached): 140707->144224 (formatted measured 141396 + ceil(2%)=2828). Review correctness repairs only; ZERO kernel-core/maos-audit delta. | prior: Story 13.6d 139902->140707 (measured 137948 + ceil(2%)=2759).
+ 
+ # --- Isolation contract (Story 9.5, D2 — Hard Guardrail #2) ---
+ # docs-site/** is a non-Cargo Docusaurus project (Node/TypeScript). It is NOT a
+diff --git a/xtask/tests/kernel_pin_content_hash_16_0.rs b/xtask/tests/kernel_pin_content_hash_16_0.rs
+index 53260346..0137e537 100644
+--- a/xtask/tests/kernel_pin_content_hash_16_0.rs
++++ b/xtask/tests/kernel_pin_content_hash_16_0.rs
+@@ -817,7 +817,7 @@ fn no_key_before_src_lines_begins_with_src_lines() {
+ fn the_three_other_readers_still_resolve_the_pin() {
+     assert_eq!(
+         read_pinned(&baseline_toml()).expect("read_pinned"),
+-        25149,
++        25146,
+         "the xtask reader"
+     );
+ 
+@@ -835,7 +835,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
+         .map(str::trim)
+         .and_then(|v| v.parse().ok())
+         .expect("the a2a-tcp guard's parse still resolves");
+-    assert_eq!(a2a, 25149, "the a2a-tcp reader");
++    assert_eq!(a2a, 25146, "the a2a-tcp reader");
+ 
+     // `fkcs_oracle.rs:170` — exact `strip_prefix("src_lines = ")`.
+     let oracle: usize = text
+@@ -844,7 +844,7 @@ fn the_three_other_readers_still_resolve_the_pin() {
+         .expect("the fkcs oracle's parse still resolves")
+         .parse()
+         .expect("parses");
+-    assert_eq!(oracle, 25149, "the fkcs oracle reader");
++    assert_eq!(oracle, 25146, "the fkcs oracle reader");
+ }
+ 
+ #[test]
+@@ -855,7 +855,7 @@ fn the_pin_is_readable_by_a_real_toml_parser() {
+     // line-count-neutral; Story 16-5's ratification ledger now places it at line 496.
+     let text = std::fs::read_to_string(baseline_toml()).expect("read baseline");
+     let parsed: toml::Value = toml::from_str(&text).expect("the baseline file must be valid TOML");
+-    assert_eq!(parsed["src_lines"].as_integer(), Some(25149));
++    assert_eq!(parsed["src_lines"].as_integer(), Some(25146));
+ 
+     let numbered = text
+         .lines()
+diff --git a/xtask/tests/recovery_lane_ceiling_rule.rs b/xtask/tests/recovery_lane_ceiling_rule.rs
+index 7b46bb24..93a45f1c 100644
+--- a/xtask/tests/recovery_lane_ceiling_rule.rs
++++ b/xtask/tests/recovery_lane_ceiling_rule.rs
+@@ -265,7 +265,7 @@ fn the_tree_bound_inputs_exist() {
+ /// half — that no one silently raised the row while the easing was in force.
+ #[test]
+ fn kernel_core_ceiling_has_not_moved_under_the_easing() {
+-    const RATIFIED_AT_EASING: i64 = 19_495; // Story 17-2 FW-02 exact lower formatted re-pin 2026-10-12: 19_553 -> 19_495 (-58), physical 25267 -> 25149, 96 -> 95 files; no kernel raise. PRIOR: 17-1 §A6 review re-pin 2026-10-10 (ceiling 19_564 held): 19_513 -> 19_553, baseline 25212 -> 25267. PRIOR: Story 17-1 FLAG-Winston landing re-pin, operator-ruled variant B ceiling 19_564 (2026-10-06) with the D-16 deletion-only charter extension (S3, 2026-10-07): 19_529 -> 19_513 (exact measured), baseline 25293 -> 25212, 98 -> 96 files. PRIOR: Detached 17-3c §A6 review, operator-approved 2026-10-06: 19_412 -> 19_529 (+117; KLOC sign-off), baseline 25149 -> 25293 (kernel-baseline approval). PRIOR: detached 17-3c candidate grant 19_309 -> 19_412, baseline 25032 -> 25149. PRIOR: Story 17-6 review FLAG-Winston operator-ratified 2026-09-28: 19_292 -> 19_309 (+17), opened Landlock rule fd matches parsed inode; baseline 25015 -> 25032. PRIOR: Story 17-6 T2 repair (+80 tokei; aarch64 ppoll and argument-conditioned prctl included), baseline 24920 -> 25015.
++    const RATIFIED_AT_EASING: i64 = 19_492; // Story 17-2 non-author A6 exact lower re-pin 2026-10-12: 19_495 -> 19_492 (-3), physical25149 -> 25146; no raise. PRIOR: Story 17-2 FW-02 exact lower formatted re-pin 2026-10-12: 19_553 -> 19_495 (-58), physical 25267 -> 25149, 96 -> 95 files; no kernel raise. PRIOR: 17-1 §A6 review re-pin 2026-10-10 (ceiling 19_564 held): 19_513 -> 19_553, baseline 25212 -> 25267. PRIOR: Story 17-1 FLAG-Winston landing re-pin, operator-ruled variant B ceiling 19_564 (2026-10-06) with the D-16 deletion-only charter extension (S3, 2026-10-07): 19_529 -> 19_513 (exact measured), baseline 25293 -> 25212, 98 -> 96 files. PRIOR: Detached 17-3c §A6 review, operator-approved 2026-10-06: 19_412 -> 19_529 (+117; KLOC sign-off), baseline 25149 -> 25293 (kernel-baseline approval). PRIOR: detached 17-3c candidate grant 19_309 -> 19_412, baseline 25032 -> 25149. PRIOR: Story 17-6 review FLAG-Winston operator-ratified 2026-09-28: 19_292 -> 19_309 (+17), opened Landlock rule fd matches parsed inode; baseline 25015 -> 25032. PRIOR: Story 17-6 T2 repair (+80 tokei; aarch64 ppoll and argument-conditioned prctl included), baseline 24920 -> 25015.
+     let budgets = real_kloc_toml();
+     let actual = budgets
+         .get("maos-kernel-core")
