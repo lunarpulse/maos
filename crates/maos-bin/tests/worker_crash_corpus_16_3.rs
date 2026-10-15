@@ -206,7 +206,7 @@ impl KernelWorld {
             Arc::clone(&capability),
             Arc::clone(&iac),
             Arc::clone(&telemetry),
-            journal,
+            Arc::clone(&journal),
         ));
         // `set_crash_detector` needs strong count 1 — before any clone of the
         // scheduler Arc, `WorkerSupervisor::new` included.
@@ -217,6 +217,7 @@ impl KernelWorld {
             scheduler,
             crash_detector,
             Arc::clone(&tl),
+            journal,
             halt_registry,
             iac,
             tokio::runtime::Handle::current(),

@@ -127,8 +127,16 @@ lifecycle row after live worker ownership/observer registration. The row does no
 change Spirit Control Block state. T3 independently applies CPU, PID, memory, and
 explicit soft/hard nofile ceilings in the rootless container; it refuses an FD
 ceiling above the inherited hard limit rather than clamping. Supported evidence is
-Ubuntu 24.04/26.04 x64 and arm native images, and x64 T3 only. Story 17-7 owns
-T3 OOM/SIGKILL ambiguity and short-lived-worker PID-inspection refusal.
+Ubuntu 24.04/26.04 x64 and arm native images, and x64 T3 only. T3 startup is
+`create` → `init` → runtime-written pidfile → `start --attach`, with no `--rm`,
+`--restart=no`, and explicit bounded removal by the owned CID using
+`rm --force --volumes` followed by `container exists`. Short-lived Workers may
+complete normally. Terminal facts are captured once before classification;
+Linux ≥6.15 payload pidfd `PIDFD_INFO_EXIT` distinguishes external SIGKILL
+(`fault.signaled`) from OOM (`fault.oom_killed`) and intentional `exit(137)`,
+with runtime-evidence fallback rows when payload facts are unavailable. Typed
+residue reports unconfirmed cleanup, post-unload registry stop covers unload,
+and leases end only after confirmed termination.
 
 > **v1.0 binding — ABI Stability Triple enforcement (Story 7.5a):** The triple `(kernel_version, abi_version, manifest_schema_version)` is now an ENFORCED load-time contract at the admission chokepoint `SecurityManagerAdapter::admit_spirit`, not a parsed-but-ignored declaration. (1) `min_substrate_version` is COMPARED against the running kernel (`env!("CARGO_PKG_VERSION")`, reusing `maos_domain::revocation::semver_range_contains` — no new `semver` dep); a too-old kernel is refused with typed `SecurityError::ESubstrateTooOld` (FR8). (2) The `manifest_schema_version` window is **fail-closed in BOTH directions**: below `MIN_SUPPORTED` → typed `EAbiTooOld` (N-2 hard refusal); above `MAX_SUPPORTED` → typed `EAbiTooNew` (a future Spirit is told to upgrade the kernel — NO warn-and-ignore window, because a manifest is a security artifact and a silent ignore is fail-open). N-1 (`= MIN_SUPPORTED`) loads with WARN-level degradation notes (NFR-Maint-9). (3) `STABILITY.md` (generated from workspace state) and `BREAKING.md` (CI-grep-enforced dated entries) are published; the deprecation rail (NFR-Maint-3/5) cross-checks `#[maos_attrs::deprecated_since]` surfaces ↔ STABILITY.md ↔ BREAKING.md (vacuous at v1.0's zero deprecations). LTS is **1 year at v1.0** (NFR-Maint-6; 2-year deferred to v1.5). Constants unchanged (`ABI_VERSION = 1`, `MANIFEST_SCHEMA_VERSION = 2`); the new `SecurityError` variants are kernel-internal (additive, not ABI surface).
 

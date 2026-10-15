@@ -543,7 +543,15 @@ exactly once into a single runtime spawn. It holds no learned policy,
 cross-invocation registry, or persistent kernel domain state. Documented during
 Story 17-2 contract closure; no new exemption or runtime state is introduced.
 
+Story 17-7 review repairs add optional `Arc<ContainerLaunchCustody>` for that
+same launch, so root cancellation covers creation and initialization before
+the attach client exists. It does not extend custody across Worker invocations.
+The Story 17-7 review approval gate is satisfied under the scoped founder
+exception in the Story 17-7 approval record below.
+
+
 ### `SpawnedBridge` — `crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs`
+
 
 **Reason:** Story 8.12 live CLI subprocess bridge RAII handle. Owns the OS
 resources for one in-flight CLI invocation: the `Child` process, its stdin
@@ -551,6 +559,7 @@ control channel, the reader-thread `Vec<JoinHandle<()>>`, the bounded `Receiver`
 and an `Arc<AtomicU64>` drop-counter. `Drop` kills+reaps the child and joins the
 readers so no orphaned process or thread survives. This is process-bound resource
 ownership scoped to a single invocation, not cached kernel domain state per I9.
+
 
 ### `ScbRuntimeSnapshot` — `crates/maos-kernel-core/src/scheduler/control_block.rs`
 
@@ -589,3 +598,92 @@ cross-Spirit cache, learned state, queue, or persisted policy. Writes use the sh
 bounded frame codec; dropping the writer closes this child's input and ends its
 resource lifetime. Landed with Story 17-3c (2026-10-06). The ≥2 maintainer
 sign-offs are still owed (deferred-work, 17-3c chunks B+C).
+
+### `ContainerTerminal` — `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`
+
+**Reason:** Story 17-7 per-container terminal custody shared by the exit
+observer, bridge finalization and stop paths: one immutable terminal snapshot
+and one removal verdict per owned CID. Holds `Mutex<Progress>` (snapshot and
+teardown coordination), a `Condvar`, an `AtomicBool` termination confirmation
+and an `Arc<ContainerTerminalFacts>`. Bounded to one owned container's
+lifecycle; it shares terminal evidence and cleanup confirmation, never learned
+or cross-invocation policy. Landed with Story 17-7 (2026-10-14). Its review
+approval gate is satisfied under D-17-7-FW-10, recorded below.
+
+The review repairs also hold startup PID/pidfd identity behind a mutex until
+the launch is armed. This permits early CID custody without treating an
+uninitialized payload identity as live.
+
+### `SandboxedContainerChild` — `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`
+
+**Reason:** Story 17-7 process-bound custody of one supervised `start --attach`
+runtime client and its owned container CID; holds `Arc<ContainerTerminal>` so
+finalization, stop and `Drop` share the same snapshot and idempotent teardown
+verdict. Bounded to one container invocation; it retains no learned or
+cross-invocation policy. Landed with Story 17-7 (2026-10-14). Its review
+approval gate is satisfied under D-17-7-FW-10, recorded below.
+
+The review repairs retain the same launch coordinator until this guard drops;
+launch failure releases its linear permit before cleanup joins that coordinator.
+
+### `ContainerLaunchCustody` — `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`
+
+**Reason:** Story 17-7 review R1/R5, one launch's cancellation and receipt
+custody from before `create` through CID teardown. Its mutex/condition variable
+joins bounded in-flight runtime calls before removal; its callback hands the
+validated terminal to the binding, and its state directory preserves uncertain
+ownership evidence. No learned state, boot-time sweep, or cross-launch policy.
+The approval gate is satisfied under D-17-7-FW-10, recorded below.
+
+### `LaunchProgress` — `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`
+
+**Reason:** the launch coordinator's private, bounded state: cancellation,
+completion, owned terminal `Arc`, deadline, and once-only residue reporting.
+It exists only for one invocation's resource lifecycle. Story 17-7 review;
+the approval gate is satisfied under D-17-7-FW-10, recorded below.
+
+### `LaunchPermit` — `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`
+
+**Reason:** one linear startup permit retains its coordinator `Arc` while
+`create`/`init`/`start` is active. Dropping it marks launch completion before
+the owned CID guard can join teardown; no cached policy or learned state.
+Story 17-7 review; approval is satisfied under D-17-7-FW-10, recorded below.
+
+### `Progress` — `crates/maos-kernel-core/src/security/sandbox/t3/child.rs`
+
+**Reason:** one container's immutable terminal-facts `Arc`, snapshot-in-flight
+flag, absolute teardown deadline, final verdict and failed-kill report latch.
+It is bounded to that CID and never reused across invocations. Story 17-7
+review R3/R7; approval is satisfied under D-17-7-FW-10, recorded below.
+
+### `T3SpawnContext` — `crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs`
+
+**Reason:** transient launch inputs borrow an optional launch-coordinator
+`Arc` for the duration of startup. The context owns no cross-launch registry,
+cache or learned state. Story 17-7 review R1; approval is satisfied under
+D-17-7-FW-10, recorded below.
+
+## Story 17-7 approval record
+
+**Lunarpulse — approved in the operator conversation:** “I approve it. does it work?”
+This approval covers the reviewed Story 17-7 implementation at
+`f3fadea9c1ef0c283c836c7a988c5ff7b2a6dba5`, including the exemption rationales for
+`T3Launch`, `ContainerTerminal`, `SandboxedContainerChild`,
+`ContainerLaunchCustody`, `LaunchProgress`, `LaunchPermit`, `Progress` and
+`T3SpawnContext`. Verified runtime evidence is archived in
+`_bmad-output/implementation-artifacts/17-7-evidence/review-ci.json`.
+
+**Approval gate satisfied: one genuine founder approval, with the second
+signature explicitly waived for this story.** Lunarpulse states that the
+founder is currently the sole maintainer and instructs: “override that two
+signature rule for now. only one maintainer here. me founder. I approve both
+slots. lets move on.”
+
+The scoped exception is **D-17-7-FW-10** in
+`_bmad-output/implementation-artifacts/17-7-flag-winston-decision.md`.
+It applies only to the reviewed Story 17-7 revision and eight rationales
+listed above. No second person is recorded, and the default two-maintainer
+rule is unchanged for other entries or future stories. No substantive I9
+invariant or invariant-lock check is changed. Windows release remains held
+until an explicit operator command to resume it.
+

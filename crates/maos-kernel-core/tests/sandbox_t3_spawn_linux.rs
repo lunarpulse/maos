@@ -44,7 +44,7 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
          printf 'SCOPED_VALUE=%s\\n' \"$SCOPED_TEST_VALUE\"\n\
          /usr/bin/env | /usr/bin/cut -d= -f1 | /usr/bin/sort | /usr/bin/sed 's/^/ENV_KEY=/'\n\
          printf 'CUSTODY_PROBE_READY\\n'\n\
-         sleep 3\n",
+         i=0; while [ \"$(cat /proxy/egress.sock 2>/dev/null)\" != go ] && [ $i -lt 400 ]; do sleep 0.05; i=$((i+1)); done\n",
     )
     .unwrap();
     std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -56,6 +56,14 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
         .as_nanos();
     let name = format!("maos-t3-custody-{}-{nonce}", std::process::id());
     let arguments = ["--custody-probe".to_string()];
+    // A host-written release (not a timed hold): the probe stays alive until
+    // the start client's procfs custody has been read.
+    let release = directory.path().join("release");
+    std::fs::write(&release, b"").unwrap();
+    std::fs::set_permissions(&release, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let state_dir = directory.path().join("state");
+    std::fs::create_dir(&state_dir).unwrap();
+    std::fs::set_permissions(&state_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
     let mut child = spawn_t3(
         &SandboxSpec::new_for_test(SandboxTier::T3),
         &image,
@@ -64,40 +72,95 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
             spirit_binary_path: &executable,
             boot_nonce: 17_01,
             container_name: name.clone(),
-            egress_socket: None,
+            egress_socket: Some(&release),
+            state_dir: &state_dir,
+            payload_pidfd: true,
             env: &environment,
+            launch_custody: None,
         },
     )
     .expect("declared-capable runner must apply the verified OCI boundary");
+    // Story 17-7: the supervised long-lived client is `start --attach <cid>`.
+    // Only the short-lived `create` client ever carried the scoped value (it is
+    // stored by name into the container config); the start client carries
+    // neither the value nor any ambient credential.
+    // Rootless podman re-executes itself into the user namespace, and the
+    // supervised pid may show an empty cmdline; read the client's whole
+    // process tree (the pid and its descendants) instead.
     let client_pid = child.child.as_ref().unwrap().id();
-    let cmdline = std::fs::read(format!("/proc/{client_pid}/cmdline")).unwrap();
-    let cmdline = String::from_utf8_lossy(&cmdline);
-    assert!(cmdline.contains("--env=SCOPED_TEST_VALUE"));
+    let read =
+        |pid: u32, what: &str| std::fs::read(format!("/proc/{pid}/{what}")).unwrap_or_default();
+    let parent_of = |pid: u32| -> Option<u32> {
+        let stat = String::from_utf8(read(pid, "stat")).ok()?;
+        stat.rsplit(')')
+            .next()?
+            .split_whitespace()
+            .nth(1)?
+            .parse()
+            .ok()
+    };
+    let mut tree = vec![client_pid];
+    for entry in std::fs::read_dir("/proc").unwrap().flatten() {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|n| n.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let mut ancestor = parent_of(pid);
+        while let Some(up) = ancestor.filter(|up| *up > 1) {
+            if up == client_pid {
+                tree.push(pid);
+                break;
+            }
+            ancestor = parent_of(up);
+        }
+    }
+    let container_id = child.terminal().container_id().to_owned();
+    let argvs: Vec<Vec<String>> = tree
+        .iter()
+        .map(|pid| {
+            read(*pid, "cmdline")
+                .split(|byte| *byte == 0)
+                .map(|arg| String::from_utf8_lossy(arg).into_owned())
+                .collect()
+        })
+        .collect();
+    let environs: Vec<String> = tree
+        .iter()
+        .map(|pid| String::from_utf8_lossy(&read(*pid, "environ")).into_owned())
+        .collect();
+    std::fs::write(&release, b"go").unwrap();
     assert!(
-        !cmdline.contains(sentinel),
-        "scoped value leaked into runtime argv"
+        argvs.iter().any(|argv| argv
+            .windows(3)
+            .any(|w| w[0] == "start" && w[1] == "--attach" && w[2] == container_id)),
+        "the supervised client tree must run `start --attach <cid>`: {argvs:?}"
     );
-    // The runtime client itself must carry the scoped value (name-only
-    // `--env` copies it from here into the container) and no ambient
-    // credential; env_clear on the client is part of the custody chain.
-    let environ = std::fs::read(format!("/proc/{client_pid}/environ")).unwrap();
-    let environ = String::from_utf8_lossy(&environ);
-    let entries: Vec<_> = environ.split('\0').collect();
+    assert!(!argvs.iter().flatten().any(|arg| arg.contains(sentinel)));
     assert!(
-        entries.contains(&format!("SCOPED_TEST_VALUE={sentinel}").as_str()),
-        "runtime client lost the scoped value before the container could receive it"
+        environs.iter().any(|environ| environ.contains("PATH=")),
+        "custody read at least one live client environment (non-vacuous)"
     );
-    assert!(!entries.iter().any(|entry| {
-        let key = entry.split('=').next().unwrap_or("");
-        key.starts_with("MAOS_OPERATOR_")
-            || matches!(
-                key,
-                "CODEX_API_KEY"
-                    | "ANTHROPIC_API_KEY"
-                    | "MAOS_ANTHROPIC_API_KEY"
-                    | "MAOS_OPENAI_API_KEY"
-            )
-    }));
+    for environ in &environs {
+        assert!(
+            !environ.contains(sentinel),
+            "the long-lived start client must not hold the scoped value"
+        );
+        assert!(!environ.split('\0').any(|entry| {
+            let key = entry.split('=').next().unwrap_or("");
+            key == "SCOPED_TEST_VALUE"
+                || key.starts_with("MAOS_OPERATOR_")
+                || matches!(
+                    key,
+                    "CODEX_API_KEY"
+                        | "ANTHROPIC_API_KEY"
+                        | "MAOS_ANTHROPIC_API_KEY"
+                        | "MAOS_OPENAI_API_KEY"
+                )
+        }));
+    }
     let host_namespace = std::fs::read_link("/proc/self/ns/net").unwrap();
     let output = child.wait_with_output().unwrap();
     assert!(
@@ -114,6 +177,17 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
         .find_map(|line| line.strip_prefix("SANDBOX_NETNS="))
         .unwrap();
     assert_ne!(namespace, host_namespace.to_string_lossy());
+    // Story 17-7: a voluntary exit of the retained container yields a
+    // terminal runtime state (not an unavailable snapshot) — on podman 5.7
+    // only within the raised SNAPSHOT_BUDGET (CI run 38645560812).
+    let facts = child.terminal().facts();
+    assert!(
+        facts
+            .state
+            .as_ref()
+            .is_ok_and(|state| state.exit_code == Some(0)),
+        "terminal facts after a clean exit: {facts:?}"
+    );
     let keys: Vec<_> = stdout
         .lines()
         .filter_map(|line| line.strip_prefix("ENV_KEY="))
@@ -127,7 +201,7 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
     );
     assert!(!keys.iter().any(|key| key.starts_with("MAOS_OPERATOR_")
         || matches!(*key, "CODEX_API_KEY" | "ANTHROPIC_API_KEY")));
-    let runtime = child.runtime.path.clone();
+    let runtime = child.terminal().runtime().path.clone();
     drop(child);
     let leftover = std::process::Command::new(runtime)
         .env_clear()
@@ -141,11 +215,11 @@ fn verified_t3_applies_nonroot_namespace_and_argv_environment_custody() {
             .into_iter()
             .filter_map(|key| std::env::var_os(key).map(|value| (key, value))),
         )
-        .args(["inspect", "--format", "{{.Id}}", &name])
+        .args(["inspect", "--format", "{{.Id}}", &container_id])
         .output()
         .unwrap();
     assert!(
         !leftover.status.success(),
-        "guard retained the named container"
+        "guard retained container {container_id}"
     );
 }

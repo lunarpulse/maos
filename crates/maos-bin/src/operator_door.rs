@@ -211,6 +211,7 @@ struct DoorInner {
     policy: Arc<maos_kernel_core::capability::cap_policy::PolicyTable>,
     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
     orchestrator_registry: Arc<maos_kernel_core::orchestrator::OrchestratorBufferRegistry>,
+    output_markers: Arc<maos_kernel_core::halt::OutputMarkerRegistry>,
     revocation_applier: Arc<maos_kernel_core::revocation::RevocationApplier>,
     hot_swap_coordinator: Arc<maos_kernel_core::hot_swap::HotSwapCoordinator>,
     capability: Arc<maos_kernel_core::api::CapabilityRegistryAdapter>,
@@ -235,9 +236,9 @@ struct DoorInner {
     private_ops: Arc<dyn BinPrivateOps>,
     successor_manifest_slot: SuccessorManifestSlot,
     upgrade_lock: tokio::sync::Mutex<()>,
-    output_markers: Arc<maos_kernel_core::halt::OutputMarkerRegistry>,
     spirit_locks: SpiritCommandLocks,
     command_tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
+    post_unload_stop: Mutex<Option<Arc<dyn Fn(u32) + Send + Sync>>>,
 }
 
 /// `maosctl`-visible director identity on every approval-log row (FR42 keeps
@@ -301,6 +302,7 @@ impl OperatorDoor {
             output_markers,
             spirit_locks: SpiritCommandLocks::default(),
             command_tasks: Mutex::new(Vec::new()),
+            post_unload_stop: Mutex::new(None),
         }))
     }
 
@@ -333,11 +335,32 @@ impl OperatorDoor {
     pub fn output_markers(&self) -> Arc<maos_kernel_core::halt::OutputMarkerRegistry> {
         Arc::clone(&self.0.output_markers)
     }
+    /// Install the root's idempotent post-unload binding stop.
+    pub fn set_post_unload_stop(&self, stop: Arc<dyn Fn(u32) + Send + Sync>) {
+        *self
+            .0
+            .post_unload_stop
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(stop);
+    }
 }
 
 impl DoorInner {
     fn spirit_lock(&self, spirit_id: &str) -> Arc<tokio::sync::Mutex<()>> {
         self.spirit_locks.spirit_lock(spirit_id)
+    }
+    /// AC4.6: stop the unloaded Worker's binding through the root registry,
+    /// whatever the hook did. The bounded CID teardown is blocking runtime I/O,
+    /// so it runs off the async worker and completes before the response.
+    async fn stop_worker_after_unload(&self, pid: u32) {
+        let stop = self
+            .post_unload_stop
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        if let Some(stop) = stop {
+            let _ = tokio::task::spawn_blocking(move || stop(pid)).await;
+        }
     }
 
     fn not_found(code: &str, detail: String) -> OperatorOutcome {
@@ -524,6 +547,9 @@ impl DoorInner {
             "unload" => self.scheduler.unload(pid).await,
             _ => unreachable!("lifecycle_command is only called with the four scheduler verbs"),
         };
+        if verb == "unload" {
+            self.stop_worker_after_unload(pid).await;
+        }
         if let Err(error) = transitioned {
             return match &error {
                 LifecycleError::InvalidStateTransition { current, verb, .. } => {
@@ -988,7 +1014,9 @@ impl DoorInner {
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
         };
-        if let Err(error) = self.scheduler.unload(pid).await {
+        let transitioned = self.scheduler.unload(pid).await;
+        self.stop_worker_after_unload(pid).await;
+        if let Err(error) = transitioned {
             return OperatorOutcome::Failed {
                 code: "unload_failed".into(),
                 detail: error.to_string(),

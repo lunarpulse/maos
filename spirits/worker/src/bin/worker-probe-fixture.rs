@@ -77,15 +77,12 @@ fn run_probe(positive: bool) -> Result<(), String> {
             .map_err(|_| "invalid forwarder address".to_owned())?,
     )
     .map_err(|_| "could not bind egress forwarder".to_owned())?;
-
-    // Always retain the process long enough for the kernel's PID-based
-    // inspection, including when the actual probe reports a failure.
     let probe_result = if positive {
         positive_probe(&token)
     } else {
         negative_probe(&token, &control_path)
     };
-    std::thread::sleep(Duration::from_secs(3));
+
     let stop_result = forwarder
         .stop_and_join()
         .map_err(|_| "egress forwarder shutdown failed".to_owned());

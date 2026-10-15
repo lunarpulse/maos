@@ -261,7 +261,9 @@ fn inspect(root: &Root, id: &str) -> Option<Value> {
 fn find_resource_container(root: &Root, before: &BTreeSet<String>) -> Option<(String, Value)> {
     for id in runtime_ids(root).difference(before) {
         if let Some(value) = inspect(root, id) {
-            if root.owns_container(&value) {
+            // Retained create/init makes an owned container visible before
+            // its payload runs. Keep polling under the caller's deadline.
+            if root.owns_container(&value) && value["State"]["Running"].as_bool() == Some(true) {
                 return Some((id.clone(), value));
             }
         }
@@ -289,8 +291,17 @@ fn actual_payload(pid: u32) -> PathBuf {
         path.join("status").exists(),
         "inspected payload PID {pid} vanished before live inspection"
     );
-    let cmdline = std::fs::read(path.join("cmdline")).expect("read actual payload cmdline");
-    let cmdline = String::from_utf8_lossy(&cmdline);
+    // Story 17-7: `init` publishes State.Pid before `start` releases the
+    // runtime's exec fifo, so the PID is briefly still `crun create`.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let cmdline = loop {
+        let cmdline = std::fs::read(path.join("cmdline")).expect("read actual payload cmdline");
+        let cmdline = String::from_utf8_lossy(&cmdline).into_owned();
+        if cmdline.contains("/maos/spirit") || std::time::Instant::now() >= deadline {
+            break cmdline;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    };
     assert!(
         cmdline.contains("/maos/spirit"),
         "State.Pid is not the actual Worker payload: {cmdline:?}"
@@ -372,8 +383,8 @@ fn real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion() {
         std::thread::sleep(Duration::from_millis(75));
     };
 
-    // Values are read from the actual running container's runtime configuration,
-    // before the production `--rm` lifecycle removes it.
+    // Read the actual running container's configuration before production
+    // explicitly tears down and removes its owned CID.
     let host = &details["HostConfig"];
     assert_eq!(
         number(host, "Memory"),
@@ -534,12 +545,12 @@ fn real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion() {
         "existing Worker completion marker was not persisted"
     );
 
-    // Existing Worker ownership cleans up its own OCI container; no test-side
+    // Existing Worker ownership removes its own OCI container; no test-side
     // runtime stop/remove is allowed to mask a lifecycle leak.
     let after = runtime_ids(&root);
     assert!(
         !after.contains(&container_id),
-        "production --rm did not remove completed Worker container {container_id}"
+        "production lifecycle removal left completed Worker container {container_id}"
     );
 }
 
@@ -586,6 +597,10 @@ fn verify_actual_runtime_fd_boundary(root: &Root) {
             "fd-canary-{}-{limit}",
             root.dir.file_name().unwrap().to_string_lossy()
         );
+        let state_dir = root.dir.join(format!("fd-canary-{limit}-state"));
+        std::fs::create_dir(&state_dir).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&state_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
         let argv = build_runtime_argv(
             &runtime,
             &image,
@@ -595,13 +610,21 @@ fn verify_actual_runtime_fd_boundary(root: &Root) {
             "fd-boundary",
             NONCE,
             &name,
+            &state_dir,
             None,
             &[],
         )
         .unwrap();
+        // Story 17-7: the argv is `create`; the same hard-limit context then
+        // starts the owned CID (conmon/OCI inherit this client's limits) and
+        // removes it, so the matched control still exercises the real runtime.
+        let lifecycle = r#"cid=$("$@") || exit $?
+"$1" start --attach "$cid"; rc=$?
+timeout 8s "$1" rm --force --volumes --time=0 "$cid" >/dev/null 2>&1
+exit $rc"#;
         let mut command = Command::new("prlimit");
         command
-            .args(["--nofile=64:64", "--"])
+            .args(["--nofile=64:64", "--", "sh", "-c", lifecycle, "sh"])
             .args(&argv)
             .env("HOME", home)
             .stdout(Stdio::piped())

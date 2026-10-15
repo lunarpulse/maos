@@ -4007,6 +4007,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // block and the serving tail, and an armed listener there would swallow the
     // SIGTERM the arm is supposed to die from.
     let mut root_supervision: Option<maos_bin::supervision::RootSupervision> = None;
+    let mut post_unload_stop: Option<Arc<dyn Fn(u32) + Send + Sync>> = None;
+
     // ─────────────────────────────────────────────────────────────
     // Story 8.11 / AC1 — `maos run <manifest> [--live] [--once]`.
     //
@@ -4054,6 +4056,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&scheduler),
             Arc::clone(&crash_detector),
             Arc::clone(&transparency_log),
+            Arc::clone(&shared_journal),
             Arc::clone(&halt_registry),
             Arc::clone(&iac),
             Arc::clone(&telemetry),
@@ -4066,6 +4069,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("root supervision was just armed")
                 .supervisor(),
         );
+        let stop_after_unload = {
+            let supervisor = Arc::downgrade(&root_worker_supervision);
+            Arc::new(move |pid| {
+                if let Some(supervisor) = supervisor.upgrade() {
+                    supervisor.stop_binding(pid);
+                }
+            }) as Arc<dyn Fn(u32) + Send + Sync>
+        };
+        post_unload_stop = Some(Arc::clone(&stop_after_unload));
+        if let Some(door) = operator_door_port.as_ref() {
+            door.set_post_unload_stop(stop_after_unload);
+        }
         let root_shutdown = root_worker_supervision.shutdown_token();
 
         // 1. Read + parse the manifest.
@@ -4679,6 +4694,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let unload_report = maos_bin::supervision::unload_all_loaded(
                     scheduler.as_ref(),
                     halt_registry.as_ref(),
+                    post_unload_stop.as_deref(),
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
@@ -4847,6 +4863,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let unload_report = maos_bin::supervision::unload_all_loaded(
                     scheduler.as_ref(),
                     halt_registry.as_ref(),
+                    post_unload_stop.as_deref(),
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
@@ -5778,6 +5795,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let unload_report = maos_bin::supervision::unload_all_loaded(
                     scheduler.as_ref(),
                     halt_registry.as_ref(),
+                    post_unload_stop.as_deref(),
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
@@ -6474,10 +6492,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("resume failed: {e}"))?;
             println!("{{\"hook\": \"on_resume\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}");
 
-            scheduler
-                .unload(pid)
-                .await
-                .map_err(|e| format!("unload failed: {e}"))?;
+            let transitioned = scheduler.unload(pid).await;
+            if let Some(stop) = post_unload_stop.as_deref() {
+                stop(pid);
+            }
+            transitioned.map_err(|e| format!("unload failed: {e}"))?;
             println!("{{\"hook\": \"on_unload\", \"outcome\": \"fired\", \"spirit_pid\": {pid}}}");
 
             println!("{{\"hook\": \"on_frame\", \"outcome\": \"deferred_to_story_5_x\"}}");
@@ -7017,6 +7036,14 @@ description = "smoke test spirit successor"
             return Ok(());
         }
 
+        #[cfg(not(unix))]
+        if mode == "smoke-t3-sandbox-5" {
+            println!(
+                r#"{{"step":1,"surface":"runtime_detect","outcome":"unavailable","reason":"T3 container isolation requires Linux"}}"#
+            );
+            return Ok(());
+        }
+        #[cfg(unix)]
         if mode == "smoke-t3-sandbox-5" {
             // Step 1: probe runtime
             let runtime_result =
@@ -7081,6 +7108,27 @@ description = "smoke test spirit successor"
                         }
                     };
                     let spec = SandboxSpec::new_for_test(SandboxTier::T3);
+                    let state_root = match maos_bin::egress::create_worker_state_root() {
+                        Ok(root) => root,
+                        Err(error) => {
+                            println!(
+                                r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"state directory: {}"}}"#,
+                                error
+                            );
+                            return Ok(());
+                        }
+                    };
+                    let state_dir = match maos_bin::egress::create_worker_state_dir(&state_root) {
+                        Ok(path) => path,
+                        Err(error) => {
+                            let _ = std::fs::remove_dir(&state_root);
+                            println!(
+                                r#"{{"step":3,"surface":"t3_spawn","outcome":"unavailable","reason":"state directory: {}"}}"#,
+                                error
+                            );
+                            return Ok(());
+                        }
+                    };
                     let ctx = T3SpawnContext {
                         spirit_binary_path: busybox_path,
                         boot_nonce: maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
@@ -7089,6 +7137,9 @@ description = "smoke test spirit successor"
                             maos_kernel_core::capability::cap_tokens::monotonic_now_ns()
                         ),
                         egress_socket: None,
+                        state_dir: &state_dir,
+                        payload_pidfd: true,
+                        launch_custody: None,
                         env: &[],
                     };
                     match maos_kernel_core::security::sandbox::t3::spawn::spawn_t3(
@@ -7097,33 +7148,48 @@ description = "smoke test spirit successor"
                         &["echo".into(), "hello-from-t3".into()],
                         ctx,
                     ) {
-                        Ok(mut child) => match child.wait_with_output() {
-                            Ok(output)
-                                if output.status.success()
-                                    && String::from_utf8_lossy(&output.stdout)
-                                        .contains("hello-from-t3") =>
-                            {
-                                println!(
-                                    r#"{{"step":3,"surface":"t3_spawn","outcome":"completed","host_pid":{}}}"#,
-                                    child.host_pid
-                                );
+                        Ok(mut child) => {
+                            let container_id = child.terminal().container_id().to_owned();
+                            let historical_pid = child.terminal().historical_pid();
+                            match child.wait_with_output() {
+                                Ok(output)
+                                    if output.status.success()
+                                        && String::from_utf8_lossy(&output.stdout)
+                                            .contains("hello-from-t3") =>
+                                {
+                                    println!(
+                                        r#"{{"step":3,"surface":"t3_spawn","outcome":"completed","container_id":"{}","historical_pid":{}}}"#,
+                                        container_id, historical_pid
+                                    );
+                                }
+                                Ok(output) => {
+                                    println!(
+                                        r#"{{"step":3,"surface":"t3_spawn","outcome":"unexpected","container_id":"{}","historical_pid":{},"container_exit_rc":{}}}"#,
+                                        container_id,
+                                        historical_pid,
+                                        output.status.code().unwrap_or(-1)
+                                    );
+                                }
+                                Err(error) => println!(
+                                    r#"{{"step":3,"surface":"t3_spawn","outcome":"wait_failed","container_id":"{}","historical_pid":{},"reason":"{}"}}"#,
+                                    container_id, historical_pid, error
+                                ),
                             }
-                            Ok(output) => {
-                                println!(
-                                    r#"{{"step":3,"surface":"t3_spawn","outcome":"unexpected","container_exit_rc":{}}}"#,
-                                    output.status.code().unwrap_or(-1)
-                                );
-                            }
-                            Err(error) => println!(
-                                r#"{{"step":3,"surface":"t3_spawn","outcome":"wait_failed","reason":"{}"}}"#,
+                        }
+                        Err(error) => {
+                            println!(
+                                r#"{{"step":3,"surface":"t3_spawn","outcome":"spawn_failed","reason":"{}"}}"#,
                                 error
-                            ),
-                        },
-                        Err(error) => println!(
-                            r#"{{"step":3,"surface":"t3_spawn","outcome":"spawn_failed","reason":"{}"}}"#,
-                            error
-                        ),
+                            );
+                            // AC4.1: unknown ownership keeps its state dir as evidence.
+                            if error.to_string().contains("creation ownership unknown") {
+                                return Ok(());
+                            }
+                        }
                     }
+                    // Clean removal already deleted the state dir; residue keeps it.
+                    let _ = std::fs::remove_dir(&state_dir);
+                    let _ = std::fs::remove_dir(&state_root);
                 }
             }
             eprintln!("maos: smoke-t3-sandbox-5 complete");
@@ -7868,6 +7934,7 @@ description = "smoke test spirit successor"
                 Arc::clone(&scheduler),
                 Arc::clone(&crash_detector),
                 Arc::clone(&transparency_log),
+                Arc::clone(&shared_journal),
                 Arc::clone(&halt_registry),
                 Arc::clone(&iac),
                 Arc::clone(&telemetry),
@@ -7875,6 +7942,18 @@ description = "smoke test spirit successor"
                 boot_nonce,
             );
             let cohort_worker_supervision = Arc::clone(cohort_supervision.supervisor());
+            let cohort_stop_after_unload = {
+                let supervisor = Arc::downgrade(&cohort_worker_supervision);
+                Arc::new(move |pid| {
+                    if let Some(supervisor) = supervisor.upgrade() {
+                        supervisor.stop_binding(pid);
+                    }
+                }) as Arc<dyn Fn(u32) + Send + Sync>
+            };
+            post_unload_stop = Some(Arc::clone(&cohort_stop_after_unload));
+            if let Some(door) = operator_door_port.as_ref() {
+                door.set_post_unload_stop(cohort_stop_after_unload);
+            }
             let cohort_result = run_cohort_a2a_daemon(
                 Arc::clone(&transparency_log),
                 boot_nonce,
@@ -7914,6 +7993,7 @@ description = "smoke test spirit successor"
             let unload_report = maos_bin::supervision::unload_all_loaded(
                 scheduler.as_ref(),
                 halt_registry.as_ref(),
+                post_unload_stop.as_deref(),
             )
             .await;
             unload_report.render(&mut std::io::stderr());
@@ -8424,8 +8504,12 @@ description = "smoke test spirit successor"
         supervision.stop_and_join().await;
     }
     drop(root_shutdown_tail);
-    let unload_report =
-        maos_bin::supervision::unload_all_loaded(scheduler.as_ref(), halt_registry.as_ref()).await;
+    let unload_report = maos_bin::supervision::unload_all_loaded(
+        scheduler.as_ref(),
+        halt_registry.as_ref(),
+        post_unload_stop.as_deref(),
+    )
+    .await;
     unload_report.render(&mut std::io::stderr());
 
     // Story 2.5 (A7 / D11) + Story 16-1 (T7, §11 row 3) — drain the cap-audit

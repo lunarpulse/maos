@@ -60,7 +60,7 @@ async fn a_proxy_refusal_is_a_confirmed_kernel_sandbox_block_before_reply() {
         .payload_redacted
         .windows(lease.bearer().len())
         .any(|window| window == lease.bearer().as_bytes()));
-    lease.finish().unwrap();
+    lease.finish(true).unwrap();
     assert!(!lease.socket_path().exists());
     cancel.cancel();
     task.await.unwrap().unwrap();
@@ -132,7 +132,7 @@ async fn root_shutdown_joins_an_active_proxy_even_while_its_binding_finishes() {
     accepted_rx
         .recv_timeout(Duration::from_secs(3))
         .expect("authenticated upstream request");
-    let finish = tokio::task::spawn_blocking(move || lease.finish());
+    let finish = tokio::task::spawn_blocking(move || lease.finish(true));
     cancel.cancel();
     task.await.unwrap().unwrap();
     finish.await.unwrap().unwrap();
@@ -189,7 +189,7 @@ async fn roots_sharing_one_home_bind_distinct_worker_sockets() {
         UnixStream::connect(lease.socket_path()).expect("both Worker sockets are live");
     }
     for lease in &mut leases {
-        lease.finish().unwrap();
+        lease.finish(true).unwrap();
     }
     for (_, task, cancel) in roots {
         cancel.cancel();
@@ -199,5 +199,50 @@ async fn roots_sharing_one_home_bind_distinct_worker_sockets() {
         std::fs::read_dir(run_dir.join("egress")).unwrap().count(),
         0,
         "a cleanly stopped root leaves no per-root egress directory behind"
+    );
+}
+
+#[test]
+fn state_fallback_ignores_another_users_shared_parent() {
+    const CHILD_DIR: &str = "MAOS_STATE_ROOT_CHILD_DIR";
+    if let Some(dir) = std::env::var_os(CHILD_DIR) {
+        use std::os::unix::fs::MetadataExt;
+        let root = maos_bin::egress::create_worker_state_root()
+            .expect("an unrelated shared parent must not block this user's T3 launches");
+        let metadata = std::fs::symlink_metadata(&root).unwrap();
+        assert!(metadata.is_dir());
+        assert_eq!(metadata.uid(), rustix::process::geteuid().as_raw());
+        assert_eq!(metadata.mode() & 0o7777, 0o700);
+        let child = maos_bin::egress::create_worker_state_dir(&root).unwrap();
+        assert_eq!(
+            std::fs::read(std::path::Path::new(&dir).join("maos-worker-state")).unwrap(),
+            b"unrelated-user-state",
+            "allocating private custody must not touch the shared obstruction"
+        );
+        std::fs::remove_dir(child).unwrap();
+        std::fs::remove_dir(root).unwrap();
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("maos-worker-state"),
+        b"unrelated-user-state",
+    )
+    .unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "state_fallback_ignores_another_users_shared_parent",
+            "--nocapture",
+        ])
+        .env_remove("XDG_RUNTIME_DIR")
+        .env("TMPDIR", dir.path())
+        .env(CHILD_DIR, dir.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "private fallback failed: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
 }

@@ -168,7 +168,7 @@ pub fn run_t0_worker(
             let _ = cap_for_revoke.revoke_cli_subprocess_exit(token_id, spirit_pid, exit_code);
         },
     );
-    live.binding.finish(&exit.cause);
+    live.binding.finish(&exit);
 
     let worker_cli = maos_bin::worker_cli::select_worker_cli(&program)
         .ok_or_else(|| format!("unsupported Worker CLI {program:?}"))?;

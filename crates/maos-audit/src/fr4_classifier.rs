@@ -98,6 +98,8 @@ pub enum PayloadType {
     /// A JSON number equal to the ROW's `spirit_pid` — the writer echoes the
     /// row's own pid in the payload.
     SpiritPidEqualsRow,
+    /// Exact typed T3 container exit record with domain invariants.
+    ContainerExit,
 }
 
 /// The intent grammar of one writer site: an exact literal, or a fixed
@@ -407,6 +409,19 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
             ("is_crash", PayloadType::Bool),
         ]),
     },
+    WriterShapeEntry {
+        site: ("runtime.rs", "wait_and_finalize", 0),
+        kind: 7,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("cli.subprocess.exit"),
+        shape: Some(&[
+            ("event", PayloadType::StrEq("cli_subprocess_exit")),
+            ("cli_child_pid", PayloadType::NumOrNull),
+            ("exit_cause", PayloadType::Str),
+            ("is_crash", PayloadType::Bool),
+            ("container", PayloadType::ContainerExit),
+        ]),
+    },
     // ── maos-kernel-core — NonCall ────────────────────────────────────────
     // AC2(b) / D-16-3-J (4): the SECOND `task.orphaned` writer
     // (`halt/resolver.rs`) writes structured JSON (`{"halt_id":…,
@@ -622,6 +637,13 @@ fn payload_matches(
                 })
             }),
             PayloadType::Bool => value.is_boolean(),
+            PayloadType::ContainerExit => {
+                value.as_object().is_some_and(|object| object.len() == 6)
+                    && serde_json::from_value::<maos_domain::sandbox::ContainerExitRecord>(
+                        value.clone(),
+                    )
+                    .is_ok_and(|record| record.is_consistent())
+            }
             PayloadType::SpiritPidEqualsRow => value.as_u64() == Some(row_spirit_pid as u64),
         };
         if !ok {

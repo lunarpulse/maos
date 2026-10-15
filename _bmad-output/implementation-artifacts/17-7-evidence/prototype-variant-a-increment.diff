@@ -1,0 +1,496 @@
+diff --git a/crates/maos-kernel-core/examples/story_17_7_probe.rs b/crates/maos-kernel-core/examples/story_17_7_probe.rs
+new file mode 100644
+index 0000000..29ba5d9
+--- /dev/null
++++ b/crates/maos-kernel-core/examples/story_17_7_probe.rs
+@@ -0,0 +1,212 @@
++use maos_domain::sandbox::{
++    ContainerObservationAvailability, ContainerPayloadWaitStatus, ContainerRuntimeKind,
++};
++use maos_kernel_core::security::sandbox::{
++    t3::{
++        argv::build_runtime_argv,
++        child::parse_container_state,
++        image_lock::VerifiedImageAttestation,
++        runtime_detect::ContainerRuntime,
++        spawn::{read_pidfile, valid_cid, validate_state_dir},
++    },
++    SandboxSpec,
++};
++use std::io::BufRead;
++use std::{
++    fs,
++    os::unix::fs::PermissionsExt,
++    path::PathBuf,
++    process::Command,
++    time::{Duration, Instant},
++};
++
++fn check(ok: bool, name: &str) {
++    assert!(ok, "{name}");
++    println!("PASS {name}");
++}
++
++fn main() {
++    let image =
++        VerifiedImageAttestation::for_probe("registry.example/probe:latest".into(), [7; 32]);
++    let runtime = ContainerRuntime {
++        kind: ContainerRuntimeKind::Podman,
++        path: PathBuf::from("/usr/bin/podman"),
++        version: "probe".into(),
++    };
++    let root = std::env::temp_dir().join(format!("maos-17-7-probe-{}", std::process::id()));
++    let _ = fs::remove_dir_all(&root);
++    fs::create_dir(&root).unwrap();
++    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
++    let state_dir = root.join("state");
++    fs::create_dir(&state_dir).unwrap();
++    fs::set_permissions(&state_dir, fs::Permissions::from_mode(0o700)).unwrap();
++    let spec = SandboxSpec::new_for_test(maos_domain::invariants::i9::SandboxTier::T3);
++    let argv = build_runtime_argv(
++        &runtime,
++        &image,
++        &spec,
++        PathBuf::from("/tmp/spirit").as_path(),
++        &["echo".into()],
++        "spirit",
++        1,
++        "name",
++        &state_dir.join("init.pid"),
++        None,
++        &[("PROBE_SECRET".into(), "secret-value".into())],
++    )
++    .unwrap();
++    check(
++        argv.iter().any(|s| s == "create") && !argv.iter().any(|s| s == "run" || s == "--rm"),
++        "create argv replaces run and rm",
++    );
++    check(
++        argv.iter().any(|s| s == "--restart=no"),
++        "create argv disables restart",
++    );
++    check(
++        argv.iter()
++            .any(|s| s == &format!("--pidfile={}", state_dir.join("init.pid").display())),
++        "pidfile argv path",
++    );
++    check(
++        argv.iter().any(|s| s == "--env=PROBE_SECRET")
++            && !argv.iter().any(|s| s.contains("secret-value")),
++        "env passes name only",
++    );
++    check(
++        valid_cid(&"a".repeat(64))
++            && !valid_cid(&"A".repeat(64))
++            && !valid_cid(&"a".repeat(63))
++            && !valid_cid(&format!("{}g", "a".repeat(63))),
++        "CID validation",
++    );
++
++    let pid = state_dir.join("init.pid");
++    check(read_pidfile(&pid).is_err(), "missing pidfile refused");
++    #[cfg(unix)]
++    std::os::unix::fs::symlink(root.join("nonexistent"), &pid).unwrap();
++    check(read_pidfile(&pid).is_err(), "symlink pidfile refused");
++    fs::remove_file(&pid).unwrap();
++    fs::create_dir(&pid).unwrap();
++    check(read_pidfile(&pid).is_err(), "non-regular pidfile refused");
++    fs::remove_dir(&pid).unwrap();
++    fs::write(&pid, "nope\n").unwrap();
++    check(read_pidfile(&pid).is_err(), "non-numeric pidfile refused");
++    fs::write(&pid, "0\n").unwrap();
++    check(read_pidfile(&pid).is_err(), "zero pidfile refused");
++    fs::remove_file(&pid).unwrap();
++    check(
++        validate_state_dir(&state_dir).is_ok(),
++        "fresh private state directory accepted",
++    );
++    fs::write(&pid, "123\n").unwrap();
++    check(
++        validate_state_dir(&state_dir).is_err(),
++        "stale pre-existing pidfile refused",
++    );
++    fs::remove_file(&pid).unwrap();
++    let wrong = root.join("wrong-mode");
++    fs::create_dir(&wrong).unwrap();
++    fs::set_permissions(&wrong, fs::Permissions::from_mode(0o755)).unwrap();
++    check(
++        validate_state_dir(&wrong).is_err(),
++        "wrong state directory mode refused",
++    );
++
++    let runtime_name = "podman";
++    for (ver, status, code, oom) in [
++        ("4.9", "exited", 0, false),
++        ("5.7", "exited", 137, false),
++        ("5.7", "exited", 137, true),
++    ] {
++        let data = serde_json::json!({"Status":status,"ExitCode":code,"OOMKilled":oom,"Error":"","StartedAt":"2026-10-13T00:00:00Z","FinishedAt":"2026-10-13T00:00:01Z","Pid":0});
++        let facts = parse_container_state(
++            data.to_string().as_bytes(),
++            runtime_name,
++            "a".repeat(64).as_str(),
++            123,
++        );
++        check(
++            facts.observation == ContainerObservationAvailability::Available
++                && facts.runtime_exit_code == Some(code)
++                && facts.oom_marker == Some(oom),
++            &format!("{ver} state exit={code} OOMKilled={oom}"),
++        );
++    }
++    let malformed = parse_container_state(b"{not-json", runtime_name, "cid", 123);
++    check(
++        malformed.observation == ContainerObservationAvailability::Unavailable,
++        "malformed inspect is unavailable",
++    );
++
++    let uname = Command::new("uname").arg("-r").output().unwrap();
++    assert!(uname.status.success());
++    println!("kernel {}", String::from_utf8(uname.stdout).unwrap().trim());
++    let mut exited = Command::new("sh")
++        .args(["-c", "(sleep 0.3; exit 137) & p=$!; echo $p; wait $p"])
++        .stdout(std::process::Stdio::piped())
++        .spawn()
++        .unwrap();
++    let mut line = String::new();
++    std::io::BufReader::new(exited.stdout.take().unwrap())
++        .read_line(&mut line)
++        .unwrap();
++    let exited_pid: u32 = line.trim().parse().unwrap();
++    let fd = maos_kernel_core::security::sandbox::linux::open_pidfd(exited_pid).unwrap();
++    let raw = maos_kernel_core::security::sandbox::linux::pidfd_exit_status(
++        &fd,
++        Instant::now() + Duration::from_secs(8),
++    )
++    .expect("exit info");
++    let _ = exited.wait().unwrap();
++    check(
++        raw & 0x7f == 0 && (raw >> 8) & 0xff == 137,
++        "non-child Exited(137) pidfd status",
++    );
++
++    let mut signaled = Command::new("sh")
++        .args(["-c", "sleep 30 & p=$!; echo $p; wait $p"])
++        .stdout(std::process::Stdio::piped())
++        .spawn()
++        .unwrap();
++    let mut line = String::new();
++    std::io::BufReader::new(signaled.stdout.take().unwrap())
++        .read_line(&mut line)
++        .unwrap();
++    let signal_pid: u32 = line.trim().parse().unwrap();
++    let signal_fd = maos_kernel_core::security::sandbox::linux::open_pidfd(signal_pid).unwrap();
++    let kill = Command::new("kill")
++        .args(["-KILL", &signal_pid.to_string()])
++        .status()
++        .unwrap();
++    assert!(kill.success());
++    let raw = maos_kernel_core::security::sandbox::linux::pidfd_exit_status(
++        &signal_fd,
++        Instant::now() + Duration::from_secs(8),
++    )
++    .expect("signal info");
++    let _ = signaled.wait().unwrap();
++    check(raw & 0x7f == 9, "non-child Signaled(9) pidfd status");
++
++    let already = Command::new("sh")
++        .args(["-c", "(exit 0) & p=$!; wait $p; echo $p"])
++        .output()
++        .unwrap();
++    let already_pid: u32 = String::from_utf8(already.stdout)
++        .unwrap()
++        .trim()
++        .parse()
++        .unwrap();
++    let unknown = maos_kernel_core::security::sandbox::linux::open_pidfd(already_pid).err();
++    check(
++        unknown
++            .as_ref()
++            .is_some_and(|e| e.raw_os_error() == Some(libc::ESRCH)),
++        "reaped process open returns ESRCH/Unknown",
++    );
++    assert_eq!(
++        ContainerPayloadWaitStatus::Unknown,
++        ContainerPayloadWaitStatus::Unknown
++    );
++    let _ = fs::remove_dir_all(root);
++}
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index 610ccc7..61bceab 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -940,13 +940,13 @@ impl SpawnedBridge {
+             .as_ref()
+             .and_then(BridgeChild::cgroup_path)
+             .map_or(0, cgroup_oom_kills);
+-        let (container, residue) = match self.child.as_ref() {
++        let (container, residue, cid) = match self.child.as_ref() {
+             Some(BridgeChild::Container(guard, _)) => {
+                 let facts = Some(guard.terminal().facts().clone());
+                 let residue = guard.terminal().remove().err();
+-                (facts, residue)
++                (facts, residue, Some(guard.cid.clone()))
+             }
+-            _ => (None, None),
++            _ => (None, None, None),
+         };
+         // The child is now reaped (wait consumed it). Mark consumed so Drop does
+         // not double-wait.
+@@ -978,7 +978,7 @@ impl SpawnedBridge {
+ 
+         let container_json = match (&container, &residue) {
+             (Some(facts), residue) => serde_json::json!({
+-                "cid": self.container_terminal().map(|t| t.cid.clone()),
++                "cid": cid.as_deref(),
+                 "runtime_exit_code": facts.runtime_exit_code,
+                 "oom_marker": facts.oom_marker,
+                 "state": facts.runtime_status,
+@@ -988,7 +988,7 @@ impl SpawnedBridge {
+                 "residue": residue,
+             }),
+             (None, residue) => {
+-                serde_json::json!({ "cid": self.container_terminal().map(|t| t.cid.clone()), "state": "unavailable", "payload_status": "unknown", "residue": residue })
++                serde_json::json!({ "cid": cid.as_deref(), "state": "unavailable", "payload_status": "unknown", "residue": residue })
+             }
+         };
+         let payload = serde_json::json!({
+@@ -996,7 +996,7 @@ impl SpawnedBridge {
+             "cli_child_pid": self.child_pid,
+             "exit_cause": cause.describe(),
+             "is_crash": cause.is_crash(),
+-            "container": self.container_terminal().map(|_| container_json),
++            "container": cid.map(|_| container_json),
+         });
+         let _ = journal.insert_frame_event_with_sender(
+             FrameKind::CapabilityInvocation,
+diff --git a/crates/maos-kernel-core/src/security/sandbox/linux.rs b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+index ff95684..08f7ad2 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -535,3 +535,99 @@ fn apply_cgroup_limits(
+     }
+     Ok(())
+ }
++
++/// Open a pidfd for a process without requiring it to be our child.
++pub fn open_pidfd(pid: u32) -> io::Result<std::os::fd::OwnedFd> {
++    use std::os::fd::FromRawFd;
++    // SAFETY: pidfd_open accepts an integer PID and flags and returns a fresh fd.
++    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid as libc::pid_t, 0) as i32 };
++    if fd < 0 {
++        return Err(io::Error::last_os_error());
++    }
++    // SAFETY: successful pidfd_open returns a new owned descriptor.
++    Ok(unsafe { std::os::fd::OwnedFd::from_raw_fd(fd) })
++}
++
++#[repr(C)]
++struct PidfdInfo {
++    mask: u64,
++    cgroupid: u64,
++    pid: u32,
++    tgid: u32,
++    ppid: u32,
++    ruid: u32,
++    rgid: u32,
++    euid: u32,
++    egid: u32,
++    suid: u32,
++    sgid: u32,
++    fsuid: u32,
++    fsgid: u32,
++    exit_code: i32,
++}
++
++/// Return the raw wait status once the process has exited and been reaped.
++pub fn pidfd_exit_status(fd: &std::os::fd::OwnedFd, deadline: std::time::Instant) -> Option<i32> {
++    let mut pfd = libc::pollfd {
++        fd: fd.as_raw_fd(),
++        events: libc::POLLHUP | libc::POLLIN,
++        revents: 0,
++    };
++    loop {
++        let remaining = deadline.checked_duration_since(std::time::Instant::now())?;
++        let ms = remaining.as_millis().min(i32::MAX as u128) as i32;
++        // SAFETY: pfd points to one initialized pollfd for the duration of poll.
++        let result = unsafe { libc::poll(&mut pfd, 1, ms) };
++        if result == 0 {
++            return None;
++        }
++        if result < 0 {
++            let error = io::Error::last_os_error();
++            if error.kind() == io::ErrorKind::Interrupted {
++                continue;
++            }
++            return None;
++        }
++        if pfd.revents & (libc::POLLHUP | libc::POLLIN) == 0 {
++            continue;
++        }
++        loop {
++            let mut info = PidfdInfo {
++                mask: 1 << 3,
++                cgroupid: 0,
++                pid: 0,
++                tgid: 0,
++                ppid: 0,
++                ruid: 0,
++                rgid: 0,
++                euid: 0,
++                egid: 0,
++                suid: 0,
++                sgid: 0,
++                fsuid: 0,
++                fsgid: 0,
++                exit_code: 0,
++            };
++            // SAFETY: ioctl uses the Linux PIDFD_GET_INFO _IOWR request and a writable
++            // version-0 64-byte pidfd_info structure matching the kernel UAPI.
++            let result =
++                unsafe { libc::ioctl(fd.as_raw_fd(), 0xc040_ff0b_u32 as libc::c_ulong, &mut info) };
++            if result < 0 {
++                let error = io::Error::last_os_error();
++                if error.raw_os_error() == Some(libc::ENOTTY)
++                    || error.raw_os_error() == Some(libc::EINVAL)
++                {
++                    return None;
++                }
++                return None;
++            }
++            if info.mask & (1 << 3) != 0 {
++                return Some(info.exit_code);
++            }
++            if std::time::Instant::now() >= deadline {
++                return None;
++            }
++            std::thread::sleep(std::time::Duration::from_millis(10));
++        }
++    }
++}
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+index 0a2205a..073a73f 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+@@ -2,6 +2,7 @@
+ use super::runtime_detect::ContainerRuntime;
+ pub use maos_domain::sandbox::ContainerTerminalFacts;
+ use std::{
++    os::fd::OwnedFd,
+     path::PathBuf,
+     process::Child,
+     sync::{Arc, OnceLock},
+@@ -11,6 +12,7 @@ pub struct ContainerTerminal {
+     pub runtime: ContainerRuntime,
+     pub cid: String,
+     startup_pid: u32,
++    pidfd: Option<OwnedFd>,
+     facts: OnceLock<ContainerTerminalFacts>,
+ }
+ #[doc(hidden)]
+@@ -78,11 +80,17 @@ pub fn parse_container_state(
+     }
+ }
+ impl ContainerTerminal {
+-    pub(crate) fn new(runtime: ContainerRuntime, cid: String, startup_pid: u32) -> Self {
++    pub(crate) fn new(
++        runtime: ContainerRuntime,
++        cid: String,
++        startup_pid: u32,
++        pidfd: Option<OwnedFd>,
++    ) -> Self {
+         Self {
+             runtime,
+             cid,
+             startup_pid,
++            pidfd,
+             facts: OnceLock::new(),
+         }
+     }
+@@ -140,7 +148,7 @@ impl ContainerTerminal {
+                 ),
+                 _ => return unavailable(),
+             };
+-            ContainerTerminalFacts {
++            let mut facts = ContainerTerminalFacts {
+                 observation: maos_domain::sandbox::ContainerObservationAvailability::Available,
+                 payload_wait_status: maos_domain::sandbox::ContainerPayloadWaitStatus::Unknown,
+                 exit_code: None,
+@@ -154,7 +162,25 @@ impl ContainerTerminal {
+                 observed_pid: Some(pid),
+                 container_id: self.cid.clone(),
+                 runtime: self.runtime.kind.as_str().to_owned(),
++            };
++            #[cfg(target_os = "linux")]
++            if let Some(fd) = &self.pidfd {
++                if let Some(raw) = crate::security::sandbox::linux::pidfd_exit_status(
++                    fd,
++                    std::time::Instant::now() + std::time::Duration::from_secs(2),
++                ) {
++                    if raw & 0x7f == 0 {
++                        facts.payload_wait_status =
++                            maos_domain::sandbox::ContainerPayloadWaitStatus::Exited;
++                        facts.exit_code = Some((raw >> 8) & 0xff);
++                    } else if raw & 0x7f != 0x7f {
++                        facts.payload_wait_status =
++                            maos_domain::sandbox::ContainerPayloadWaitStatus::Signaled;
++                        facts.exit_signal = Some(raw & 0x7f);
++                    }
++                }
+             }
++            facts
+         })
+     }
+     pub fn kill(&self) -> std::io::Result<()> {
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+index 43d759a..22d7bf3 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+@@ -138,6 +138,7 @@ pub fn valid_cid(cid: &str) -> bool {
+ }
+ 
+ #[doc(hidden)]
++#[cfg(target_os = "linux")]
+ pub fn validate_state_dir(path: &Path) -> std::io::Result<()> {
+     use std::os::unix::fs::{MetadataExt, PermissionsExt};
+     let meta = std::fs::symlink_metadata(path)?;
+@@ -157,6 +158,7 @@ pub fn validate_state_dir(path: &Path) -> std::io::Result<()> {
+     Ok(())
+ }
+ 
++#[cfg(target_os = "linux")]
+ #[doc(hidden)]
+ pub fn read_pidfile(path: &Path) -> std::io::Result<u32> {
+     use std::os::unix::fs::OpenOptionsExt;
+@@ -186,6 +188,18 @@ pub fn read_pidfile(path: &Path) -> std::io::Result<u32> {
+     }
+     Ok(pid)
+ }
++#[cfg(target_os = "linux")]
++fn open_payload_pidfd(pid: u32, cid: &str) -> std::io::Result<std::os::fd::OwnedFd> {
++    let fd = crate::security::sandbox::linux::open_pidfd(pid)?;
++    let cgroup = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))?;
++    if !cgroup.contains(cid) || !std::path::Path::new(&format!("/proc/{pid}")).exists() {
++        return Err(std::io::Error::new(
++            std::io::ErrorKind::InvalidData,
++            "pidfile PID does not identify live container init",
++        ));
++    }
++    Ok(fd)
++}
+ 
+ /// The runtime must self-report rootless operation before it may carry a T3
+ /// spawn. `podman info` is the attestation surface; docker and rootful podman
+@@ -311,10 +325,12 @@ pub fn spawn_t3(
+             });
+         }
+         let startup_pid = read_pidfile(&pidfile).map_err(SpawnError::Io)?;
++        let pidfd = open_payload_pidfd(startup_pid, &cid).map_err(SpawnError::Io)?;
+         let terminal = std::sync::Arc::new(super::child::ContainerTerminal::new(
+             runtime.clone(),
+             cid.clone(),
+             startup_pid,
++            Some(pidfd),
+         ));
+         let start = runtime_command(&runtime.path)
+             .args(["start", "--attach", &cid])

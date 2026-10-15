@@ -1802,21 +1802,28 @@ fn print_report_only_residue() {
 /// `$XDG_DATA_HOME/containers/storage` — and a `--dry-run` would stop being
 /// inert (measured on the CI runner 2026-09-24; `maos_uninstall_16_4` caught
 /// it). No storage means podman never ran as this user, so no `maos-`
-/// container can exist and there is nothing to report.
+/// container can exist and there is nothing to report. Story 17-7 AC4.7: an
+/// explicit user `containers/storage.conf` names a configured store, which
+/// counts too — otherwise a relocated store would hide retained containers.
 fn podman_storage_exists() -> bool {
     #[cfg(unix)]
     if rustix::process::geteuid().is_root() {
         return Path::new("/var/lib/containers/storage").exists();
     }
-    std::env::var_os("XDG_DATA_HOME")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .filter(|value| !value.is_empty())
-                .map(|home| PathBuf::from(home).join(".local/share"))
-        })
-        .is_some_and(|data_home| data_home.join("containers/storage").exists())
+    let dir = |key: &str, fallback: &str| {
+        std::env::var_os(key)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .filter(|value| !value.is_empty())
+                    .map(|home| PathBuf::from(home).join(fallback))
+            })
+    };
+    dir("XDG_DATA_HOME", ".local/share")
+        .is_some_and(|data| data.join("containers/storage").exists())
+        || dir("XDG_CONFIG_HOME", ".config")
+            .is_some_and(|config| config.join("containers/storage.conf").exists())
 }
 
 /// `runtime ps` with a hard deadline: a wedged container daemon must not

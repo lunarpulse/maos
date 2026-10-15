@@ -1809,7 +1809,41 @@ jobs:
       matrix:
         image: [ubuntu-24.04, ubuntu-26.04]
     runs-on: ${{ matrix.image }}
-    timeout-minutes: 60
+    timeout-minutes: 120
+    env:
+      EPIC17_TERMINAL_SUITE_TESTS: 31
+      EPIC17_TERMINAL_REQUIRED_TESTS: |
+        root_crash::root_crash_retains_stopped_container_and_purge_reports_it
+        runtime_scenes::client_first_stop_snapshots_only_a_terminal_state
+        runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding
+        runtime_scenes::ownership_is_by_cid_never_by_requested_name
+        s1_immediate_exit_terminal_facts
+        s2_intentional_exit_137_is_not_a_signal
+        s3_external_sigkill_requires_pidfd_fact
+        s4_oom_marker_is_not_payload_evidence_alone
+        startup_scenes::root_signal_during_init_joins_owned_cid_before_forced_exit
+        stub_scenes::bearer_create_diagnostic_and_runtime_arguments_do_not_echo_secret
+        stub_scenes::concurrent_facts_and_teardown_share_snapshot_and_verdict
+        stub_scenes::deadlines_hung_exists_is_typed_and_bounded
+        stub_scenes::deadlines_hung_rm_is_bounded
+        stub_scenes::deadlines_kill_is_bounded_and_verdict_is_shared
+        stub_scenes::deadlines_remove_failure_is_typed
+        stub_scenes::init_pidfile_invalid_forms_refuse_and_remove_only_receipt_cid
+        stub_scenes::launch_refuses_nonempty_and_wrong_mode_state_before_runtime
+        stub_scenes::ownership_create_timeout_cleans_the_receipt_cid
+        stub_scenes::ownership_receipt_authority_refuses_foreign_and_disagreement
+        supervisor_scenes::binding_revokes_bearer_before_unconfirmed_stop_and_root_retains_lease
+        supervisor_scenes::bridge_finalized_exit_rows_round_trip_through_fr4_audit_query
+        supervisor_scenes::clean_exit_marker_completes_from_persisted_bridge_output
+        supervisor_scenes::deadlines_root_stop_tears_down_n_cids_under_one_deadline
+        supervisor_scenes::failed_create_and_finalized_exit_rows_never_echo_bearer
+        supervisor_scenes::fallback_client_exit_persists_nonzero_fault_through_binding_classifier
+        supervisor_scenes::late_attachment_after_stop_tears_down_once
+        supervisor_scenes::sandbox_applied_report_survives_journal_reopen
+        supervisor_scenes::unexpected_client_echild_finalizer_first_persists_one_truncated_fault
+        supervisor_scenes::unexpected_client_observer_first_persists_one_truncated_fault
+        unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership
+        unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -1830,6 +1864,41 @@ jobs:
           cargo build --locked -p maos-bin --bin maos
           cargo build --locked -p maos-cli --bin maosctl
           RUSTFLAGS='-C target-feature=+crt-static' cargo build --locked -p worker --bin worker-probe-fixture --target x86_64-unknown-linux-gnu
+      - name: Record T3 runtime versions
+        run: |
+          podman version
+          conmon --version
+          podman info --format '{{.Host.OCIRuntime.Name}} {{.Host.OCIRuntime.Version}}'
+          podman info --format '{{.Host.CgroupManager}}'
+          uname -r
+      - name: Build terminal-facts scene prerequisites
+        # The delegated runner builds `--offline`; fetch the locked graph first.
+        run: |
+          cargo build --locked -p worker --bin worker-cli-fixture
+          cargo fetch --locked
+      - name: Epic-17 exit line 4 — retained T3 terminal facts (Story 17-7)
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-7-terminal --timeout 1800 --rootless-canary -- \
+            bash -euo pipefail -c 'cargo test --locked -p maos-bin --features network --test worker_terminal_facts_17_7 -- --nocapture --test-threads=1 2>&1 | tee worker-terminal-facts.log; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          required_tests=()
+          while IFS= read -r test_name; do
+            if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
+          done <<< "${EPIC17_TERMINAL_REQUIRED_TESTS}"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code 0 --expected-count "${EPIC17_TERMINAL_SUITE_TESTS}" "${required_tests[@]}" worker-terminal-facts.log || rc=1
+          if grep -Eq 'SKIP|^test [^ ]+ \.\.\. ignored' worker-terminal-facts.log || grep -Eq '^test result:.*ignored: [1-9][0-9]*|^test result:.*0 passed' worker-terminal-facts.log; then
+            rc=1
+            echo "::error title=Epic-17 exit line 4 (${{ matrix.image }})::SKIP, ignored, or zero tests"
+          fi
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-17-terminal-${{ matrix.image }}
+          path: worker-terminal-facts.log
+          if-no-files-found: warn
       # The runner refuses SKIP lines from its children; this step also refuses
       # one from the runner itself, and requires its positive kind-8 verdict, so
       # a runner that skips or returns early cannot pass (AC4 proof).
@@ -5173,7 +5242,7 @@ jobs:
       - name: Check for failures
         id: status
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' }}" == "true" ]]; then
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' || needs['epic-17-exit'].result != 'success' }}" == "true" ]]; then
             echo "overall=failure" >> $GITHUB_OUTPUT
           else
             echo "overall=success" >> $GITHUB_OUTPUT
@@ -5340,7 +5409,7 @@ jobs:
               });
             }
       - name: Fail if any gate failed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' || needs['epic-17-exit'].result != 'success' }}
         run: |
           echo "One or more discipline gates failed."
           exit 1

@@ -34,11 +34,11 @@
 //!
 //! # The "child gone" oracle (story Trap 22)
 //!
-//! The Worker payload is inside a T3 container. Tests identify its OCI runtime
-//! client by the root's pid and `--name`, then use runtime inspect to resolve
-//! the host-namespace payload pid. Both client and payload must disappear, and
-//! the container name must no longer report a live PID. No payload environment
-//! or payload-parent relationship is used as an ownership oracle.
+//! Find the Worker's runtime client and payload through its published
+//! container ID, then use `inspect` by CID to resolve the historical live
+//! payload PID. Both client and payload must disappear, and the CID must be
+//! removed. No payload environment or payload-parent relationship is used as
+//! an ownership oracle.
 //!
 //! # Vector 6
 //!
@@ -241,112 +241,98 @@ fn proc_stat(pid: u32) -> Option<(char, u32)> {
     Some((state, ppid))
 }
 
-/// T3 has two host processes: the runtime client started by the root and the
-/// payload host pid reported by OCI inspect. Keep both process identities.
+/// T3 has a runtime-client PID and a payload host PID. The published CID is
+/// the container identity; neither PID nor a requested name authorizes cleanup.
 #[derive(Clone, Debug)]
 struct FixtureContainer {
     runtime_client_pid: u32,
     payload_host_pid: u32,
-    container_name: String,
+    container_id: String,
     runtime_client_start_time: String,
     payload_start_time: String,
 }
 
-fn inspect_payload_pid(container_name: &str) -> Result<Option<u32>, String> {
+fn inspect_payload_pid(container_id: &str) -> Result<u32, String> {
     let runtime = std::env::var("MAOS_T3_RUNTIME")
         .map_err(|error| format!("MAOS_T3_RUNTIME unavailable during inspect: {error}"))?;
-    let output = Command::new(runtime)
-        .args(["inspect", "--format", "{{.State.Pid}}", container_name])
+    let output = Command::new("timeout")
+        .arg("8s")
+        .arg(runtime)
+        .args(["inspect", "--format", "{{.State.Pid}}", container_id])
         .output()
-        .map_err(|error| format!("run OCI inspect for {container_name}: {error}"))?;
+        .map_err(|error| format!("run OCI inspect for CID {container_id}: {error}"))?;
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let lower = stderr.to_ascii_lowercase();
-        if lower.contains("no such")
-            || lower.contains("not found")
-            || lower.contains("no container")
-        {
-            return Ok(None);
-        }
-        return Err(format!("OCI inspect {container_name} failed: {stderr}"));
+        return Err(format!(
+            "OCI inspect CID {container_id} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
-    let pid = String::from_utf8_lossy(&output.stdout)
+    String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse()
-        .map_err(|error| format!("OCI inspect {container_name} returned invalid PID: {error}"))?;
-    Ok(Some(pid))
+        .map_err(|error| format!("container {container_id} reported invalid host PID: {error}"))
 }
 
-/// Find the OCI client launched by this root, then resolve its named
-/// container's host payload pid through the configured runtime.
-fn fixture_children_of(parent: u32, mode: &str) -> Vec<FixtureContainer> {
-    let mut found = Vec::new();
-    let Ok(entries) = std::fs::read_dir("/proc") else {
-        return found;
+fn fixture_children_of(stdout: &str) -> Vec<FixtureContainer> {
+    let Some((runtime_client_pid, container_id)) = stdout.lines().find_map(|line| {
+        let event: serde_json::Value = serde_json::from_str(line).ok()?;
+        if event["event"] != "cli_wrapper_loaded" {
+            return None;
+        }
+        Some((
+            u32::try_from(event["child_pid"].as_u64()?).ok()?,
+            event["container_id"].as_str()?.to_owned(),
+        ))
+    }) else {
+        return Vec::new();
     };
-    let mode_flag = format!("--maos-fixture-mode={mode}");
-    for entry in entries.flatten() {
-        let Ok(runtime_client_pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
-            continue;
-        };
-        if proc_stat(runtime_client_pid).map(|(_, ppid)| ppid) != Some(parent) {
-            continue;
-        }
-        let Some(args) = proc_cmdline_args(runtime_client_pid) else {
-            continue;
-        };
-        if args.iter().any(|arg| arg == "--maos-bridge-probe")
-            || !args.iter().any(|arg| arg == &mode_flag)
-        {
-            continue;
-        }
-        let Some(container_name) = args
-            .iter()
-            .find_map(|arg| arg.strip_prefix("--name="))
-            .map(str::to_owned)
-        else {
-            continue;
-        };
-        if let Ok(Some(payload_host_pid)) = inspect_payload_pid(&container_name) {
-            let (Some(runtime_client_start_time), Some(payload_start_time)) = (
-                proc_start_time(runtime_client_pid),
-                proc_start_time(payload_host_pid),
-            ) else {
-                continue;
-            };
-            found.push(FixtureContainer {
-                runtime_client_pid,
-                payload_host_pid,
-                container_name,
-                runtime_client_start_time,
-                payload_start_time,
-            });
-        }
+    let Ok(payload_host_pid) = inspect_payload_pid(&container_id) else {
+        return Vec::new();
+    };
+    if payload_host_pid <= 1 {
+        return Vec::new();
     }
-    found
+    let Ok(cgroup) = std::fs::read_to_string(format!("/proc/{payload_host_pid}/cgroup")) else {
+        return Vec::new();
+    };
+    if !maos_domain::sandbox::cgroup_names_container(&cgroup, &container_id) {
+        return Vec::new();
+    }
+    let (Some(runtime_client_start_time), Some(payload_start_time)) = (
+        proc_start_time(runtime_client_pid),
+        proc_start_time(payload_host_pid),
+    ) else {
+        return Vec::new();
+    };
+    vec![FixtureContainer {
+        runtime_client_pid,
+        payload_host_pid,
+        container_id,
+        runtime_client_start_time,
+        payload_start_time,
+    }]
 }
 
-fn wait_for_fixture_child(parent: u32, mode: &str, timeout: Duration) -> FixtureContainer {
-    wait_for_fixture_child_with(parent, mode, timeout, String::new)
+fn wait_for_fixture_child(root: &RunRoot, mode: &str, timeout: Duration) -> FixtureContainer {
+    wait_for_fixture_child_with(|| root.stdout(), mode, timeout, String::new)
 }
 
-/// Like [`wait_for_fixture_child`], with the owning root's captured output in
-/// the timeout diagnostic.
+/// Wait for `cli_wrapper_loaded`, whose published CID is the identity oracle.
 fn wait_for_fixture_child_with(
-    parent: u32,
+    output: impl Fn() -> String,
     mode: &str,
     timeout: Duration,
     context: impl Fn() -> String,
 ) -> FixtureContainer {
     let deadline = Instant::now() + timeout;
     loop {
-        let mut children = fixture_children_of(parent, mode);
+        let mut children = fixture_children_of(&output());
         if let Some(child) = children.pop() {
             return child;
         }
         assert!(
             Instant::now() < deadline,
-            "no {mode} OCI Worker of root pid {parent} appeared within {timeout:?}; root output:\n{}",
+            "no published {mode} OCI Worker appeared within {timeout:?}; root output:\n{}",
             context()
         );
         std::thread::sleep(Duration::from_millis(50));
@@ -367,17 +353,22 @@ fn wait_pid_gone(pid: u32, start_time: &str, timeout: Duration, what: &str) {
     }
 }
 
-fn wait_container_stopped(container_name: &str, timeout: Duration) {
+fn wait_container_stopped(container_id: &str, timeout: Duration) {
     let deadline = Instant::now() + timeout;
     loop {
-        match inspect_payload_pid(container_name) {
-            Ok(None) | Ok(Some(0)) => return,
-            Ok(Some(_)) => {}
-            Err(error) => panic!("cannot confirm T3 container {container_name} stopped: {error}"),
+        let runtime = std::env::var("MAOS_T3_RUNTIME").expect("T3 runtime configured");
+        let exists = Command::new("timeout")
+            .arg("8s")
+            .arg(runtime)
+            .args(["container", "exists", container_id])
+            .output()
+            .unwrap_or_else(|error| panic!("check owned CID {container_id} existence: {error}"));
+        if exists.status.code() == Some(1) {
+            return;
         }
         assert!(
             Instant::now() < deadline,
-            "OCI container {container_name} still reports a live payload after {timeout:?}"
+            "OCI container {container_id} was not removed within {timeout:?}"
         );
         std::thread::sleep(Duration::from_millis(25));
     }
@@ -396,10 +387,10 @@ fn wait_worker_stopped(worker: &FixtureContainer, timeout: Duration, what: &str)
         timeout,
         "the OCI runtime client for the Worker",
     );
-    wait_container_stopped(&worker.container_name, timeout);
+    wait_container_stopped(&worker.container_id, timeout);
 }
 
-/// Linux `/proc/<pid>/stat` start time, used with argv to reject a reused pid.
+/// Linux `/proc/<pid>/stat` start time, used to reject reuse after CID lookup.
 fn proc_start_time(pid: u32) -> Option<String> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
     let close = stat.rfind(')')?;
@@ -1132,9 +1123,9 @@ fn ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker() {
     let mut root = RunRoot::spawn("v3b", &topology, true, &[("MAOS_OLLAMA_URL", "skip")]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    // The runtime client is the root's direct child; its --name identifies the
-    // payload through OCI inspect rather than relying on payload ppid/environment.
-    let worker = wait_for_fixture_child(root.pid(), "hang", STARTUP_TIMEOUT);
+    // The root publishes the container CID in cli_wrapper_loaded; inspect it
+    // by CID and validate the payload's cgroup identity before signalling.
+    let worker = wait_for_fixture_child(&root, "hang", STARTUP_TIMEOUT);
 
     root.sigterm();
     let (status, elapsed) = root.wait_exit(Duration::from_secs(45));
@@ -1224,7 +1215,7 @@ fn ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan() {
     let mut root = RunRoot::spawn("v4", &worker, true, &[]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    let worker = wait_for_fixture_child(root.pid(), "hang", STARTUP_TIMEOUT);
+    let worker = wait_for_fixture_child(&root, "hang", STARTUP_TIMEOUT);
 
     root.sigterm();
     let (status, elapsed) = root.wait_exit(Duration::from_secs(25));
@@ -1272,7 +1263,7 @@ fn ac3_operator_door_unload_stops_a_live_worker_once() {
     let mut root = RunRoot::spawn("ac3-door-unload", &worker, true, &[]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    let worker = wait_for_fixture_child(root.pid(), "hang", STARTUP_TIMEOUT);
+    let worker = wait_for_fixture_child(&root, "hang", STARTUP_TIMEOUT);
     let deadline = Instant::now() + STARTUP_TIMEOUT;
     let worker_pid = loop {
         if let Some(pid) = load_pid(&root.tl(), "worker") {
@@ -1331,7 +1322,7 @@ fn ac4_v4b_grandchild_is_stopped_with_its_worker_container() {
     let mut root = RunRoot::spawn("v4b", &worker_manifest, true, &[]);
     root.wait_for_stderr(ARMED_MARKER, STARTUP_TIMEOUT);
 
-    let worker = wait_for_fixture_child(root.pid(), "hang-with-grandchild", STARTUP_TIMEOUT);
+    let worker = wait_for_fixture_child(&root, "hang-with-grandchild", STARTUP_TIMEOUT);
     let _announced_guest_pid = wait_for_grandchild_pid(&root.db, OUTPUT_ROW_TIMEOUT);
     let grandchild = wait_for_host_grandchild(worker.payload_host_pid, OUTPUT_ROW_TIMEOUT);
     let guard = grandchild_guard(grandchild);
@@ -1350,7 +1341,7 @@ fn ac4_v4b_grandchild_is_stopped_with_its_worker_container() {
     );
     assert!(
         !guard.still_ours(),
-        "stopping the Worker's named T3 container must remove its grandchild"
+        "stopping the Worker's CID-owned T3 container must remove its grandchild"
     );
     let rows = root.tl();
     let worker_pid = expect_load_pid(&rows, "worker");
@@ -1915,7 +1906,7 @@ mod cohort {
         }
         let fixture = fixture("v5", "hang");
         let b_config = host_b_config(&fixture);
-        let (mut daemon, _port_b, _b_stdout, b_stderr) =
+        let (mut daemon, _port_b, b_stdout, b_stderr) =
             boot_until_listening(daemon_command(&b_config, &fixture.host_b_log, NONCE_B));
         assert!(
             b_stderr.lock().expect("stderr lock").contains(ARMED_MARKER),
@@ -1936,10 +1927,13 @@ mod cohort {
             "the hang Worker must be host B's, not a local spawn: {host_a_stdout}"
         );
 
-        // Resolve the OCI client's name and inspect the host payload pid.
-        let worker_child = wait_for_fixture_child_with(daemon_pid, "hang", LISTEN_TIMEOUT, || {
-            b_stderr.lock().expect("stderr lock").clone()
-        });
+        // Read the published CID, then inspect it and verify its cgroup.
+        let worker_child = wait_for_fixture_child_with(
+            || b_stdout.lock().expect("stdout lock").clone(),
+            "hang",
+            LISTEN_TIMEOUT,
+            || b_stderr.lock().expect("stderr lock").clone(),
+        );
 
         daemon_sigterm(daemon_pid);
         let (status, elapsed) = daemon_exit(&mut daemon, Duration::from_secs(30), &b_stderr);
@@ -2109,8 +2103,8 @@ mod cohort {
         );
     }
 
-    /// AC4 (5c) — the cohort daemon stops the complete named T3 Worker
-    /// container, including a descendant that held its stdio pipe open.
+    /// AC4 (5c) — the cohort daemon stops the CID-owned T3 Worker container,
+    /// including a descendant that held its stdio pipe open.
     #[test]
     fn ac4_v5c_cohort_shutdown_stops_worker_container_descendants() {
         if !super::t3_substrate::require_t3("cohort root descendant Worker") {
@@ -2118,7 +2112,7 @@ mod cohort {
         }
         let fixture = fixture("v5c", "hang-with-grandchild");
         let b_config = host_b_config(&fixture);
-        let (mut daemon, _port_b, _b_stdout, b_stderr) =
+        let (mut daemon, _port_b, b_stdout, b_stderr) =
             boot_until_listening(daemon_command(&b_config, &fixture.host_b_log, NONCE_B));
 
         let daemon_pid = daemon.0.id();
@@ -2129,10 +2123,12 @@ mod cohort {
             String::from_utf8_lossy(&output.stderr)
         );
 
-        let worker =
-            wait_for_fixture_child_with(daemon_pid, "hang-with-grandchild", LISTEN_TIMEOUT, || {
-                b_stderr.lock().expect("stderr lock").clone()
-            });
+        let worker = wait_for_fixture_child_with(
+            || b_stdout.lock().expect("stdout lock").clone(),
+            "hang-with-grandchild",
+            LISTEN_TIMEOUT,
+            || b_stderr.lock().expect("stderr lock").clone(),
+        );
         let _announced_guest_pid = wait_for_grandchild_pid(&fixture.host_b_log, OUTPUT_ROW_TIMEOUT);
         let grandchild = wait_for_host_grandchild(worker.payload_host_pid, OUTPUT_ROW_TIMEOUT);
         let guard = grandchild_guard(grandchild);
@@ -2141,7 +2137,7 @@ mod cohort {
         let (status, elapsed) = daemon_exit(&mut daemon, Duration::from_secs(12), &b_stderr);
         let stderr = b_stderr.lock().expect("stderr lock").clone();
         // T0's exit-1 grace path was the descendant residual: the grandchild
-        // held the stdio pipe past the grace. Stopping the named container now
+        // held the stdio pipe past the grace. Stopping the CID-owned container
         // removes it, so the daemon takes the same teardown as v5.
         assert!(
             status.code().is_some(),
@@ -2158,7 +2154,7 @@ mod cohort {
         );
         assert!(
             !guard.still_ours(),
-            "stopping the named host-B Worker container must remove its grandchild"
+            "stopping the CID-owned host-B Worker container must remove its grandchild"
         );
         let rows = tl_rows(&fixture.host_b_log);
         let worker_pid = expect_load_pid(&rows, "worker");

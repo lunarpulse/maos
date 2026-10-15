@@ -245,6 +245,7 @@ struct KernelWorld {
     scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
     crash_detector: Arc<maos_kernel_core::supervision::CrashDetector>,
+    journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
     telemetry: Arc<maos_kernel_core::telemetry::iac_rt::IacRtMetrics>,
     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
@@ -315,7 +316,7 @@ impl KernelWorld {
             Arc::clone(&capability),
             Arc::clone(&iac),
             Arc::clone(&telemetry),
-            journal,
+            Arc::clone(&journal),
         ));
         // Trap 1 — before any clone of the scheduler Arc.
         Arc::get_mut(&mut scheduler)
@@ -328,6 +329,7 @@ impl KernelWorld {
             scheduler,
             halt_registry,
             crash_detector,
+            journal,
             iac,
             telemetry,
             notification_dispatcher: Arc::new(
@@ -342,6 +344,7 @@ impl KernelWorld {
                 Arc::clone(&self.scheduler),
                 Arc::clone(&self.crash_detector),
                 Arc::clone(&self.tl),
+                Arc::clone(&self.journal),
                 Arc::clone(&self.halt_registry),
                 Arc::clone(&self.iac),
                 tokio::runtime::Handle::current(),
@@ -823,29 +826,39 @@ fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
 
-fn controlled_runtime(dir: &Path, name: &str, kill_target: bool) -> ControlledRuntime {
+fn controlled_runtime(dir: &Path, cid: &str, kill_target: bool) -> ControlledRuntime {
     let executable = dir.join("controlled-runtime");
     let invocations = dir.join("runtime-invocations");
     let environment = dir.join("runtime-environment");
-    let target_pid_file = dir.join(format!("{name}.pid"));
+    let target_pid_file = dir.join("payload.pid");
     let script = format!(
         "#!/bin/sh\n\
          printf '%s %s\\n' \"$1\" \"$2\" >> {}\n\
          unset PWD SHLVL _\n\
          /usr/bin/env -u PWD -u SHLVL -u _ > {}\n\
-         [ \"$1\" = kill ] && [ \"$2\" = {} ] || exit 64\n\
-         {}\n",
+         case \"$1\" in\n\
+         kill) [ \"$2\" = {} ] || exit 64; {} ;;\n\
+         inspect) st={}; [ -f \"$0.killed\" ] && st=exited; printf '{{\"Status\":\"%s\",\"ExitCode\":0,\"OOMKilled\":false,\"Error\":\"\",\"StartedAt\":\"0001-01-01T00:00:00Z\",\"FinishedAt\":\"0001-01-01T00:00:00Z\"}}\\n' \"$st\" ;;\n\
+         rm) exit {} ;;\n\
+         container) [ \"$2\" = exists ] || exit 64; exit {} ;;\n\
+         *) exit 64 ;;\n\
+         esac\n",
         shell_quote(&invocations.display().to_string()),
         shell_quote(&environment.display().to_string()),
-        shell_quote(name),
+        shell_quote(cid),
         if kill_target {
             format!(
-                "read pid < {}\nkill -KILL \"$pid\"",
+                "read pid < {}; kill -KILL \"$pid\" && : > \"$0.killed\"",
                 shell_quote(&target_pid_file.display().to_string())
             )
         } else {
             "exit 23".to_string()
-        }
+        },
+        // Terminal only after the CID kill actually happened.
+        "running",
+        if kill_target { "0" } else { "23" },
+        // `container exists`: 1 = absent after a good removal, 0 = still there.
+        if kill_target { "1" } else { "0" },
     );
     std::fs::write(&executable, script).expect("write controlled runtime executable");
     use std::os::unix::fs::PermissionsExt;
@@ -857,6 +870,28 @@ fn controlled_runtime(dir: &Path, name: &str, kill_target: bool) -> ControlledRu
         environment,
         target_pid_file,
     }
+}
+
+fn adopt_stub_container(
+    dir: &Path,
+    runtime: &ControlledRuntime,
+    cid: &str,
+) -> maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild {
+    use maos_domain::sandbox::ContainerRuntimeKind;
+    use maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild;
+    use maos_kernel_core::security::sandbox::t3::runtime_detect::ContainerRuntime;
+
+    let state_dir = dir.join(format!("state-{cid}"));
+    std::fs::create_dir(&state_dir).expect("create adopted container state dir");
+    SandboxedContainerChild::adopt(
+        ContainerRuntime {
+            kind: ContainerRuntimeKind::Podman,
+            path: runtime.executable.clone(),
+            version: "stub".to_string(),
+        },
+        cid.to_string(),
+        &state_dir,
+    )
 }
 
 fn spawn_sleep() -> std::process::Child {
@@ -886,12 +921,14 @@ fn stop_child(child: &mut std::process::Child) {
     }
 }
 
-fn assert_one_named_kill(runtime: &ControlledRuntime, name: &str) {
-    assert_eq!(
-        std::fs::read_to_string(&runtime.invocations).expect("read runtime invocations"),
-        format!("kill {name}\n"),
-        "a named container is killed once, with no stale-name retry during unload"
-    );
+fn assert_one_cid_kill(runtime: &ControlledRuntime, cid: &str) {
+    let calls = std::fs::read_to_string(&runtime.invocations).expect("read runtime invocations");
+    let kills: Vec<_> = calls
+        .lines()
+        .filter(|line| line.starts_with("kill "))
+        .collect();
+    assert_eq!(kills.len(), 1, "the owned CID is killed once");
+    assert_eq!(kills[0], format!("kill {cid}"), "kill uses the owned CID");
     let allowed = [
         "PATH",
         "HOME",
@@ -909,7 +946,7 @@ fn assert_one_named_kill(runtime: &ControlledRuntime, name: &str) {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn stopping_a_container_kills_its_name_and_runtime_client() {
+async fn stopping_a_container_kills_its_cid_and_runtime_client() {
     let dir = scratch_dir("container-stop");
     let world = KernelWorld::new(&dir);
     let supervisor = world.supervisor(Default::default());
@@ -920,15 +957,15 @@ async fn stopping_a_container_kills_its_name_and_runtime_client() {
             .expect("bind worker SCB")
     });
     let core = Arc::clone(binding.core());
-    let name = "worker-container-stop";
-    let runtime = controlled_runtime(&dir, name, true);
+    let cid = "a".repeat(64);
+    let runtime = controlled_runtime(&dir, &cid, true);
     let mut container_process = spawn_sleep();
     std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
-        .expect("write named container process PID");
+        .expect("write CID-owned payload process PID");
     let mut runtime_client = spawn_sleep();
     supervisor.watch(&core, runtime_client.id());
-    core.attach_container_stop(runtime.executable.clone(), name.to_string());
-
+    let owned_container = adopt_stub_container(&dir, &runtime, &cid);
+    core.attach_container(owned_container.terminal().clone());
     supervisor.stop_workers();
     let runtime_client_stopped = wait_child_exit(&mut runtime_client);
     let container_stopped = wait_child_exit(&mut container_process);
@@ -940,20 +977,17 @@ async fn stopping_a_container_kills_its_name_and_runtime_client() {
         runtime_client_stopped,
         "pidfd stop reaches the runtime client"
     );
-    assert!(
-        container_stopped,
-        "named kill reaches the container payload"
-    );
-    assert_one_named_kill(&runtime, name);
+    assert!(container_stopped, "CID kill reaches the container payload");
+    assert_one_cid_kill(&runtime, &cid);
     assert_eq!(
         supervisor.counters().signals_sent(),
         1,
-        "a successful named kill and pidfd signal count as one stop"
+        "a successful CID kill and pidfd signal count as one stop"
     );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn direct_worker_unload_stops_its_named_container() {
+async fn direct_worker_unload_stops_its_cid_container() {
     let dir = scratch_dir("container-unload");
     let world = KernelWorld::new(&dir);
     let supervisor = world.supervisor(Default::default());
@@ -964,14 +998,15 @@ async fn direct_worker_unload_stops_its_named_container() {
     });
     let core = Arc::clone(binding.core());
     let pid = binding.spirit_pid();
-    let name = "worker-container-unload";
-    let runtime = controlled_runtime(&dir, name, true);
+    let cid = "b".repeat(64);
+    let runtime = controlled_runtime(&dir, &cid, true);
     let mut container_process = spawn_sleep();
     std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
-        .expect("write named container process PID");
+        .expect("write CID-owned payload process PID");
     let mut runtime_client = spawn_sleep();
     supervisor.watch(&core, runtime_client.id());
-    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+    let owned_container = adopt_stub_container(&dir, &runtime, &cid);
+    core.attach_container(owned_container.terminal().clone());
 
     world
         .scheduler
@@ -988,13 +1023,16 @@ async fn direct_worker_unload_stops_its_named_container() {
         runtime_client_stopped,
         "unload reaches the runtime-client pidfd"
     );
-    assert!(container_stopped, "on_unload reaches the named container");
-    assert_one_named_kill(&runtime, name);
+    assert!(
+        container_stopped,
+        "on_unload reaches the CID-owned container"
+    );
+    assert_one_cid_kill(&runtime, &cid);
     assert_eq!(supervisor.counters().signals_sent(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn abandoning_a_binding_stops_its_named_container() {
+async fn abandoning_a_binding_stops_its_cid_container() {
     let dir = scratch_dir("container-abandon");
     let world = KernelWorld::new(&dir);
     let supervisor = world.supervisor(Default::default());
@@ -1004,14 +1042,15 @@ async fn abandoning_a_binding_stops_its_named_container() {
             .expect("bind worker SCB")
     });
     let core = Arc::clone(binding.core());
-    let name = "worker-container-abandon";
-    let runtime = controlled_runtime(&dir, name, true);
+    let cid = "c".repeat(64);
+    let runtime = controlled_runtime(&dir, &cid, true);
     let mut container_process = spawn_sleep();
     std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
-        .expect("write named container process PID");
+        .expect("write CID-owned payload process PID");
     let mut runtime_client = spawn_sleep();
     supervisor.watch(&core, runtime_client.id());
-    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+    let owned_container = adopt_stub_container(&dir, &runtime, &cid);
+    core.attach_container(owned_container.terminal().clone());
 
     tokio::task::block_in_place(|| drop(binding));
     let runtime_client_stopped = wait_child_exit(&mut runtime_client);
@@ -1025,14 +1064,14 @@ async fn abandoning_a_binding_stops_its_named_container() {
     );
     assert!(
         container_stopped,
-        "abandon stops the named container before bridge cleanup"
+        "abandon stops the CID-owned container before bridge cleanup"
     );
-    assert_one_named_kill(&runtime, name);
+    assert_one_cid_kill(&runtime, &cid);
     assert_eq!(supervisor.counters().signals_sent(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn stop_before_container_attachment_still_kills_late_named_container() {
+async fn stop_before_container_attachment_still_kills_late_cid() {
     let dir = scratch_dir("late-container-attach");
     let world = KernelWorld::new(&dir);
     let supervisor = world.supervisor(Default::default());
@@ -1045,14 +1084,15 @@ async fn stop_before_container_attachment_still_kills_late_named_container() {
     let mut runtime_client = spawn_sleep();
     supervisor.watch(&core, runtime_client.id());
     let mut container_process = spawn_sleep();
-    let name = "worker-late-container";
-    let runtime = controlled_runtime(&dir, name, true);
+    let cid = "d".repeat(64);
+    let runtime = controlled_runtime(&dir, &cid, true);
     std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
-        .expect("write named container process PID");
+        .expect("write CID-owned payload process PID");
+    let owned_container = adopt_stub_container(&dir, &runtime, &cid);
 
     core.stop_session();
     let runtime_client_stopped = wait_child_exit(&mut runtime_client);
-    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+    core.attach_container(owned_container.terminal().clone());
     let container_stopped = wait_child_exit(&mut container_process);
     stop_child(&mut runtime_client);
     stop_child(&mut container_process);
@@ -1061,14 +1101,14 @@ async fn stop_before_container_attachment_still_kills_late_named_container() {
     assert!(runtime_client_stopped, "the pre-attachment stop uses pidfd");
     assert!(
         container_stopped,
-        "late attachment immediately stops the named container"
+        "late attachment immediately stops the CID-owned container"
     );
-    assert_one_named_kill(&runtime, name);
+    assert_one_cid_kill(&runtime, &cid);
     assert_eq!(supervisor.counters().signals_sent(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn container_attachment_before_pidfd_stops_name_then_late_pidfd() {
+async fn container_attachment_before_pidfd_stops_cid_then_late_pidfd() {
     let dir = scratch_dir("container-before-watch");
     let world = KernelWorld::new(&dir);
     let supervisor = world.supervisor(Default::default());
@@ -1078,14 +1118,14 @@ async fn container_attachment_before_pidfd_stops_name_then_late_pidfd() {
             .expect("bind worker SCB")
     });
     let core = Arc::clone(binding.core());
-    let name = "worker-container-before-watch";
-    let runtime = controlled_runtime(&dir, name, true);
+    let cid = "e".repeat(64);
+    let runtime = controlled_runtime(&dir, &cid, true);
     let mut container_process = spawn_sleep();
     std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
-        .expect("write named container process PID");
+        .expect("write CID-owned payload process PID");
     let mut runtime_client = spawn_sleep();
-    core.attach_container_stop(runtime.executable.clone(), name.to_string());
-
+    let owned_container = adopt_stub_container(&dir, &runtime, &cid);
+    core.attach_container(owned_container.terminal().clone());
     core.stop_session();
     let container_stopped = wait_child_exit(&mut container_process);
     supervisor.watch(&core, runtime_client.id());
@@ -1096,18 +1136,18 @@ async fn container_attachment_before_pidfd_stops_name_then_late_pidfd() {
 
     assert!(
         container_stopped,
-        "stop reaches the name before a pidfd exists"
+        "stop reaches the CID before a pidfd exists"
     );
     assert!(
         runtime_client_stopped,
         "late pidfd storage signals the runtime client"
     );
-    assert_one_named_kill(&runtime, name);
+    assert_one_cid_kill(&runtime, &cid);
     assert_eq!(supervisor.counters().signals_sent(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn failed_named_kill_is_not_counted_as_a_successful_container_stop() {
+async fn failed_cid_kill_is_not_counted_as_a_successful_container_stop() {
     let dir = scratch_dir("container-stop-refused");
     let world = KernelWorld::new(&dir);
     let supervisor = world.supervisor(Default::default());
@@ -1117,18 +1157,19 @@ async fn failed_named_kill_is_not_counted_as_a_successful_container_stop() {
             .expect("bind worker SCB")
     });
     let core = Arc::clone(binding.core());
-    let name = "worker-container-refused";
-    let runtime = controlled_runtime(&dir, name, false);
+    let cid = "f".repeat(64);
+    let runtime = controlled_runtime(&dir, &cid, false);
     let mut container_process = spawn_sleep();
     std::fs::write(&runtime.target_pid_file, container_process.id().to_string())
-        .expect("write named container process PID");
+        .expect("write CID-owned payload process PID");
     let mut runtime_client = spawn_sleep();
     supervisor.watch(&core, runtime_client.id());
-    core.attach_container_stop(runtime.executable.clone(), name.to_string());
+    let owned_container = adopt_stub_container(&dir, &runtime, &cid);
+    core.attach_container(owned_container.terminal().clone());
 
     core.stop_session();
     let runtime_client_stopped = wait_child_exit(&mut runtime_client);
-    let named_container_survived = container_process
+    let cid_container_survived = container_process
         .try_wait()
         .expect("poll container process")
         .is_none();
@@ -1142,13 +1183,13 @@ async fn failed_named_kill_is_not_counted_as_a_successful_container_stop() {
         "pidfd still stops the runtime client"
     );
     assert!(
-        named_container_survived,
-        "a non-zero runtime status does not pretend the named container stopped"
+        cid_container_survived,
+        "a non-zero runtime status does not pretend the CID-owned container stopped"
     );
-    assert_one_named_kill(&runtime, name);
+    assert_one_cid_kill(&runtime, &cid);
     assert_eq!(
         successful_stops, 0,
-        "a failed named kill must not count as a successful container stop"
+        "a failed CID kill must not count as a successful container stop"
     );
 }
 
@@ -1356,8 +1397,14 @@ async fn a_crash_the_observer_never_saw_is_still_handled_by_finish() {
             .any(|row| row.intent == "task.nacked" && row.payload["task_id"] == "run:worker"),
         "and must still disposition it"
     );
+    // The gate opens on the exit row; the parked observer then needs its own
+    // scheduling slot to call `waitid`, so wait for it rather than racing it.
+    let echild = wait_for(Duration::from_secs(5), || {
+        supervisor.counters().observer_echild() >= 1
+    })
+    .await;
     assert!(
-        supervisor.counters().observer_echild() >= 1,
+        echild,
         "the observer DID look and DID get ECHILD — that is the whole point of \
          gating before the waitid call; got {}",
         supervisor.counters().observer_echild()
@@ -1381,6 +1428,7 @@ async fn three_workers_that_printed_once_then_hung_all_stall() {
         Arc::clone(&world.scheduler),
         Arc::clone(&world.crash_detector),
         Arc::clone(&world.tl),
+        Arc::clone(&world.journal),
         Arc::clone(&world.halt_registry),
         Arc::clone(&world.iac),
         Arc::clone(&world.telemetry),
@@ -1610,13 +1658,13 @@ fn a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean() {
 /// three tokenless pid-0 rows: kind 21, kind 7 `cli.subprocess.exit
 /// signaled(sig=9)`, kind 4 verdict. No SCB, no crash, no disposition.
 ///
-/// Under T3 the payload is its PID namespace's init and cannot receive its own
-/// SIGKILL, so the host kills the exact inspected payload. The bridge observes
-/// the OCI runtime client, which reports that death as exit code 137 (128+9).
+/// Under T3 the payload is PID namespace init and cannot receive its own
+/// SIGKILL, so the host resolves the PID from the published `cli_wrapper_loaded` CID,
+/// verifies `/proc/<pid>/cgroup` names that CID, and kills that exact PID.
+/// The attach client reports 137; the payload snapshot independently proves
+/// `signaled(sig=9)` through pidfd.
 #[test]
 fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
-    use std::io::Read as _;
-
     if !t3_substrate::require_t3("binary root crashed Worker") {
         return;
     }
@@ -1639,27 +1687,21 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
         .command(&manifest)
         .spawn()
         .expect("spawn maos run with a T3 Worker to crash");
+    let mut stdout_capture = capture_stdout(&mut root);
     let deadline = Instant::now() + Duration::from_secs(30);
-    let child_pid = loop {
-        let output_child = run.audit_db.exists().then(|| {
-            TransparencyLogAdapter::open(&run.audit_db, NONCE)
+    let output_seen = loop {
+        let seen = run.audit_db.exists()
+            && TransparencyLogAdapter::open(&run.audit_db, NONCE)
                 .expect("reopen the crash-scene transparency log")
                 .query_frames(FrameFilter {
                     kind: Some(FrameKind::CliSubprocessOutput),
                     ..Default::default()
                 })
                 .expect("query Worker output rows")
-                .into_iter()
-                .filter(|row| row.spirit_pid != 0 && row.intent == "cli.subprocess.output")
-                .find_map(|row| {
-                    serde_json::from_slice::<serde_json::Value>(&row.payload_redacted).ok()?
-                        ["child_pid"]
-                        .as_u64()
-                        .and_then(|pid| u32::try_from(pid).ok())
-                })
-        });
-        if let Some(child_pid) = output_child.flatten() {
-            break child_pid;
+                .iter()
+                .any(|row| row.spirit_pid != 0 && row.intent == "cli.subprocess.output");
+        if seen {
+            break true;
         }
         assert!(
             Instant::now() < deadline,
@@ -1667,28 +1709,22 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
         );
         std::thread::sleep(Duration::from_millis(100));
     };
-    let payload_pid = t3_payload_host_pid(child_pid, "line-then-hang");
-    let payload_args = std::fs::read(format!("/proc/{payload_pid}/cmdline"))
-        .unwrap_or_else(|error| panic!("inspected T3 payload {payload_pid}: {error}"));
-    assert!(
-        payload_args
-            .split(|byte| *byte == 0)
-            .any(|arg| arg == b"--maos-fixture-mode=line-then-hang"),
-        "inspected T3 payload {payload_pid} is not the crash-scene fixture"
-    );
+    assert!(output_seen);
+    let container_id = wait_published_container_id(&stdout_capture, Duration::from_secs(5));
+    let payload_pid = t3_payload_host_pid(&container_id);
     let killed = std::process::Command::new("kill")
         .args(["-KILL", &payload_pid.to_string()])
         .status()
-        .expect("send SIGKILL to the inspected T3 Worker payload");
+        .expect("send SIGKILL to the CID-verified T3 payload");
     assert!(killed.success(), "SIGKILL must reach payload {payload_pid}");
     let status = wait_with_deadline(&mut root, Duration::from_secs(20))
         .expect("root must finish after its T3 Worker crashes");
-    let mut stdout = String::new();
-    root.stdout
-        .take()
-        .expect("root stdout is piped")
-        .read_to_string(&mut stdout)
-        .expect("read root stdout");
+    stdout_capture.join().expect("stdout reader reaches EOF");
+    let stdout = stdout_capture
+        .buffer
+        .lock()
+        .expect("captured root stdout")
+        .clone();
     assert!(
         !status.success(),
         "a crashed Worker must fail the run; stdout:\n{stdout}"
@@ -1753,11 +1789,63 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
         .iter()
         .find(|row| row.spirit_pid == pid && row.intent == "cli.subprocess.exit")
         .expect("the bridge's exit row");
-    let exit_payload = String::from_utf8_lossy(&exit_row.payload_redacted);
-    assert!(
-        exit_payload.contains("exited(code=137)"),
-        "the exit cause must be the OCI runtime client's reported SIGKILL code; \
-         payload: {exit_payload}"
+    let exit_payload: serde_json::Value =
+        serde_json::from_slice(&exit_row.payload_redacted).expect("exit row is JSON");
+    let orphan_payload: serde_json::Value = all
+        .iter()
+        .find(|row| row.spirit_pid == pid && row.intent == "task.orphaned")
+        .and_then(|row| serde_json::from_slice(&row.payload_redacted).ok())
+        .unwrap_or(serde_json::Value::Null);
+    let exit_keys: BTreeSet<&str> = exit_payload
+        .as_object()
+        .expect("exit record object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        exit_keys,
+        [
+            "cli_child_pid",
+            "container",
+            "event",
+            "exit_cause",
+            "is_crash",
+        ]
+        .into_iter()
+        .collect()
+    );
+    let container_keys: BTreeSet<&str> = exit_payload["container"]
+        .as_object()
+        .expect("T3 container record object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        container_keys,
+        [
+            "runtime_exit_code",
+            "oom_marker",
+            "payload_exit",
+            "payload_exit_source",
+            "removed",
+            "residue",
+        ]
+        .into_iter()
+        .collect()
+    );
+    assert_eq!(exit_payload["exit_cause"], "exited(code=137)");
+    assert_eq!(exit_payload["is_crash"], true);
+    assert_eq!(
+        exit_payload["container"]["runtime_exit_code"], 137,
+        "exit {exit_payload}; orphan {orphan_payload}"
+    );
+    assert_eq!(exit_payload["container"]["oom_marker"], false);
+    assert_eq!(exit_payload["container"]["payload_exit"], "signaled(sig=9)");
+    assert_eq!(exit_payload["container"]["payload_exit_source"], "pidfd");
+    assert_eq!(exit_payload["container"]["removed"], true);
+    assert_eq!(
+        exit_payload["container"]["residue"],
+        serde_json::Value::Null
     );
     let orphaned = all
         .iter()
@@ -1765,8 +1853,9 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
         .expect("the crash report");
     let orphan_payload: serde_json::Value =
         serde_json::from_slice(&orphaned.payload_redacted).expect("task.orphaned is JSON");
-    assert_eq!(orphan_payload["cause"], "fault.non-zero-exit");
-    assert_eq!(orphan_payload["exit_code"], 137);
+    assert_eq!(orphan_payload["cause"], "fault.signaled");
+    assert_eq!(orphan_payload["exit_signal"], 9);
+    assert_eq!(orphan_payload["exit_code"], serde_json::Value::Null);
     assert_eq!(orphan_payload["task_id"], "run:worker");
     assert_eq!(orphan_payload["originator_spirit_id"], "operator");
     assert!(
@@ -1816,41 +1905,92 @@ fn the_crash_scene_through_the_real_binary_lands_at_one_real_pid() {
     );
 }
 
-fn t3_payload_host_pid(runtime_client_pid: u32, mode: &str) -> u32 {
-    let bytes =
-        std::fs::read(format!("/proc/{runtime_client_pid}/cmdline")).unwrap_or_else(|error| {
-            panic!("runtime client {runtime_client_pid} has no cmdline: {error}")
-        });
-    let args: Vec<String> = bytes
-        .split(|byte| *byte == 0)
-        .filter(|arg| !arg.is_empty())
-        .map(|arg| String::from_utf8_lossy(arg).into_owned())
-        .collect();
-    assert!(
-        args.iter().any(|arg| arg == &format!("--maos-fixture-mode={mode}")),
-        "reported T3 runtime client {runtime_client_pid} does not name fixture mode {mode}: {args:?}"
-    );
-    let name = args
-        .iter()
-        .find_map(|arg| arg.strip_prefix("--name="))
-        .unwrap_or_else(|| {
-            panic!("runtime client {runtime_client_pid} has no named container: {args:?}")
-        });
+fn t3_payload_host_pid(container_id: &str) -> u32 {
     let runtime =
         std::env::var("MAOS_T3_RUNTIME").expect("T3 gate ensures MAOS_T3_RUNTIME is selected");
-    let output = std::process::Command::new(runtime)
-        .args(["inspect", "--format", "{{.State.Pid}}", name])
+    let output = std::process::Command::new("timeout")
+        .arg("8s")
+        .arg(runtime)
+        .args(["inspect", "--format", "{{.State.Pid}}", container_id])
         .output()
-        .expect("inspect the T3 Worker container");
+        .expect("inspect the published T3 Worker CID");
     assert!(
         output.status.success(),
-        "inspect T3 container {name} failed: {}",
+        "inspect T3 CID {container_id} failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    String::from_utf8_lossy(&output.stdout)
+    let pid: u32 = String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse()
-        .unwrap_or_else(|error| panic!("container {name} reported invalid host pid: {error}"))
+        .unwrap_or_else(|error| {
+            panic!("container {container_id} reported invalid host pid: {error}")
+        });
+    assert!(
+        pid > 1,
+        "published T3 CID {container_id} has no live payload"
+    );
+    let cgroup = std::fs::read_to_string(format!("/proc/{pid}/cgroup"))
+        .unwrap_or_else(|error| panic!("read payload cgroup for {pid}: {error}"));
+    assert!(
+        maos_domain::sandbox::cgroup_names_container(&cgroup, container_id),
+        "payload PID {pid} is not in the cgroup for published CID {container_id}: {cgroup}"
+    );
+    pid
+}
+
+fn published_container_id(stdout: &str) -> Option<String> {
+    stdout.lines().find_map(|line| {
+        let event: serde_json::Value = serde_json::from_str(line).ok()?;
+        (event["event"] == "cli_wrapper_loaded")
+            .then(|| event["container_id"].as_str().map(str::to_owned))
+            .flatten()
+    })
+}
+struct StdoutCapture {
+    buffer: Arc<Mutex<String>>,
+    reader: Option<std::thread::JoinHandle<()>>,
+}
+
+impl StdoutCapture {
+    fn join(&mut self) -> std::thread::Result<()> {
+        self.reader
+            .take()
+            .expect("stdout reader already joined")
+            .join()
+    }
+}
+
+fn capture_stdout(child: &mut std::process::Child) -> StdoutCapture {
+    use std::io::BufRead as _;
+    let stdout = child.stdout.take().expect("root stdout is piped");
+    let captured = Arc::new(Mutex::new(String::new()));
+    let sink = Arc::clone(&captured);
+    let reader = std::thread::spawn(move || {
+        for line in std::io::BufReader::new(stdout).lines() {
+            let Ok(line) = line else { break };
+            let mut output = sink.lock().expect("root stdout capture lock");
+            output.push_str(&line);
+            output.push('\n');
+        }
+    });
+    StdoutCapture {
+        buffer: captured,
+        reader: Some(reader),
+    }
+}
+
+fn wait_published_container_id(stdout: &StdoutCapture, timeout: Duration) -> String {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(cid) = published_container_id(&stdout.buffer.lock().expect("stdout lock")) {
+            return cid;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "cli_wrapper_loaded did not publish its CID"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
 }
 
 fn proc_start_time(pid: u32) -> Option<String> {
@@ -1866,7 +2006,6 @@ fn proc_start_time(pid: u32) -> Option<String> {
 /// same root. One audit query must survive and name every omitted non-call
 /// shape from that single boot nonce.
 #[test]
-
 fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
     if !t3_substrate::require_t3("binary root stalled then crashed Worker") {
         return;
@@ -1878,7 +2017,7 @@ fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
         .command(&manifest)
         .spawn()
         .expect("spawn the stall-then-crash root");
-
+    let mut stdout_capture = capture_stdout(&mut root);
     let deadline = Instant::now() + Duration::from_secs(20);
     let worker_pid = loop {
         if let Some((pid, _)) = run
@@ -1894,7 +2033,6 @@ fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
         );
         std::thread::sleep(Duration::from_millis(100));
     };
-
     let log = TransparencyLogAdapter::open(&run.audit_db, NONCE)
         .expect("reopen the single AC5 root's transparency log");
     let output_row = log
@@ -1908,25 +2046,9 @@ fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
         .expect("line-then-hang must print before it stalls");
     let output_payload: serde_json::Value =
         serde_json::from_slice(&output_row.payload_redacted).expect("output row is JSON");
-    let child_pid = output_payload["child_pid"]
-        .as_u64()
-        .and_then(|pid| u32::try_from(pid).ok())
-        .expect("output row carries the real child pid");
-    let payload_pid = t3_payload_host_pid(child_pid, "line-then-hang");
-    assert!(
-        payload_pid > 1,
-        "the named T3 container must report a live payload PID, got {payload_pid}"
-    );
-    let payload_cmdline =
-        std::fs::read(format!("/proc/{payload_pid}/cmdline")).unwrap_or_else(|error| {
-            panic!("inspected T3 payload {payload_pid} has no cmdline: {error}")
-        });
-    assert!(
-        payload_cmdline
-            .split(|byte| *byte == 0)
-            .any(|arg| arg == b"--maos-fixture-mode=line-then-hang"),
-        "inspected T3 payload {payload_pid} is not the stalled fixture"
-    );
+    assert!(output_payload["child_pid"].as_u64().is_some());
+    let container_id = wait_published_container_id(&stdout_capture, Duration::from_secs(5));
+    let payload_pid = t3_payload_host_pid(&container_id);
     let payload_start_time = proc_start_time(payload_pid)
         .unwrap_or_else(|| panic!("inspected T3 payload {payload_pid} has no proc identity"));
     assert_eq!(
@@ -1945,7 +2067,16 @@ fn the_fr4_call_feed_survives_every_worker_row_it_must_omit() {
 
     let status = wait_with_deadline(&mut root, Duration::from_secs(20))
         .expect("root must finish after the stalled Worker crashes");
-    assert!(!status.success(), "the crashed root must fail");
+    stdout_capture.join().expect("stdout reader reaches EOF");
+    let stdout = stdout_capture
+        .buffer
+        .lock()
+        .expect("captured root stdout")
+        .clone();
+    assert!(
+        !status.success(),
+        "the crashed root must fail; stdout:\n{stdout}"
+    );
 
     let omissions = assert_fr4_feed_is_clean(&run);
     for named in ["cli.subprocess.output×", "task.complete×", "task.stalled×"] {
@@ -2106,6 +2237,7 @@ async fn unload_all_loaded_closes_a_live_workers_scb_and_reports_it() {
     let report = maos_bin::supervision::unload_all_loaded(
         world.scheduler.as_ref(),
         world.halt_registry.as_ref(),
+        None,
     )
     .await;
     assert!(

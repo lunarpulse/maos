@@ -235,7 +235,7 @@ pub async fn finish_shell_session(
     if scheduler.resolve_pid("hello-spirit").is_none() {
         return shell_result;
     }
-    let report = crate::supervision::unload_all_loaded(scheduler, halt_registry).await;
+    let report = crate::supervision::unload_all_loaded(scheduler, halt_registry, None).await;
     // Story 16-2 §A6 review — the unload failure is REPORTED, never returned:
     // `shell_result` decides the exit, exactly as `main`'s own P13 invariant
     // demands ("the causal shell failure wins … never allowed to mask the

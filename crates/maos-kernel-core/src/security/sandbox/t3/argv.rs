@@ -13,14 +13,12 @@ use crate::security::sandbox::SandboxSpec;
 
 use super::runtime_detect::ContainerRuntime;
 
-/// Build the argv for `podman run` / `docker run`.
+/// Build the argv for `podman create` (Story 17-7: no `run`, no `--rm`).
 ///
-/// `container_name` is the canonical identifier used both for `--name`
-/// (the runtime's container name) AND for `<runtime> inspect` / `stop` /
-/// `rm` cleanup downstream — argv and spawn MUST agree on the same name
-/// (Story 5.5a review finding §argv-divergence). The caller (`spawn_t3`)
-/// owns the name and is responsible for collision-resistance via
-/// `boot_nonce`-derived suffixing.
+/// `container_name` is only the requested `--name`; it is never a cleanup
+/// authority. Identity is the CID the runtime writes to `<state_dir>/cid`, and
+/// the runtime writes the payload's startup PID to `<state_dir>/pid` at
+/// `init`. PID 1 is `/maos/spirit` (`--entrypoint`, never `--init`).
 ///
 /// Image URI format: `<image_uri>@sha256:<hex>` — the runtime verifies
 /// the SHA at pull/use time (TOCTOU mitigation).
@@ -33,6 +31,7 @@ pub fn build_runtime_argv(
     spirit_id: &str,
     boot_nonce: u64,
     container_name: &str,
+    state_dir: &Path,
     egress_socket: Option<&Path>,
     env: &[(String, String)],
 ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
@@ -70,8 +69,11 @@ pub fn build_runtime_argv(
 
     let mut argv = vec![
         runtime.path.to_string_lossy().to_string(),
-        "run".to_string(),
-        "--rm".to_string(),
+        "create".to_string(),
+        "--restart=no".to_string(),
+        format!("--pidfile={}", state_dir.join("pid").display()),
+        format!("--cidfile={}", state_dir.join("cid").display()),
+        "--entrypoint=/maos/spirit".to_string(),
         "--cap-drop=ALL".to_string(),
         "--security-opt=no-new-privileges".to_string(),
         "--network=none".to_string(),
@@ -98,7 +100,6 @@ pub fn build_runtime_argv(
     }
     argv.extend(env.iter().map(|(name, _)| format!("--env={name}")));
     argv.push(image_ref);
-    argv.push("/maos/spirit".to_string());
     argv.push("--".to_string());
     argv.extend(command.iter().cloned());
     Ok(argv)

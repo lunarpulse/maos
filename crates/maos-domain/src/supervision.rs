@@ -62,7 +62,11 @@ impl CrashCause {
 
     pub fn exit_signal(&self) -> Option<i32> {
         match self {
-            CrashCause::Fault(FaultCause::SignaledByKernel { signal, .. }) => Some(*signal),
+            CrashCause::Fault(FaultCause::SignaledByKernel { signal, .. })
+            | CrashCause::Fault(FaultCause::OomKilled {
+                signal: Some(signal),
+                ..
+            }) => Some(*signal),
             _ => None,
         }
     }
@@ -105,8 +109,12 @@ pub enum FaultCause {
         code: i32,
         stderr_tail: Option<String>,
     },
-    /// OOM killer terminated the subprocess.
-    OomKilled { stderr_tail: Option<String> },
+    /// OOM killer terminated the subprocess; `signal` only when the payload's
+    /// own wait status proves it (Story 17-7 §OOM authority contract).
+    OomKilled {
+        signal: Option<i32>,
+        stderr_tail: Option<String>,
+    },
     /// Hook exceeded its budget cap.
     Timeout { hook_name: String, cap_seconds: u64 },
     /// CBOR or wire-format truncation.

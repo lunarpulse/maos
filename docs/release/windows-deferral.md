@@ -1,36 +1,30 @@
-# Windows Binary Support — v1.5 (Story 10.5 AC3)
+# Windows Release — Deferred Until Explicit Operator Command
 
-**Status:** IMPLEMENTED at v1.5 (Story 10.5 AC3, 2026-06-25).
+**Status:** NOT SUPPORTED FOR RELEASE. On 2026-10-15, the operator explicitly deferred Windows release until a subsequent explicit command authorizes it. No version milestone or successful compile check automatically lifts this hold.
 
-## History
+## Current release boundary
 
-Windows binary support was deferred from v1.0 to v1.5 per the phased roadmap.
-The deferral rationale (pre-v1.5):
+`.github/workflows/release.yml` builds, packages, signs and publishes only:
 
-1. Target audience at v0.5/v1.0 was Linux/macOS operators only.
-2. CI cost of Windows runners.
-3. Unix-specific APIs needed `#[cfg]` gating.
-4. T3 container isolation assumes Linux runtime.
+- `x86_64-unknown-linux-gnu`
+- `aarch64-unknown-linux-gnu`
+- `aarch64-apple-darwin`
 
-## v1.5 Implementation (Story 10.5 AC3)
+Windows targets are absent from the release matrix, signed manifest target list and published artifact list. Do not add Windows binaries, installers or package-manager publication without the operator's explicit release command.
 
-- `platform_binary_name()` returns `maos-windows-amd64.exe` on Windows x86_64
-- `windows.rs` sandbox body: T2 restricted-token via `CreateRestrictedToken` +
-  per-Spirit resource caps via `win32job` Job Object
-- `mod.rs` extended: `Cleanup::JobObject` drop path + `classify_exit` Windows arm
-- Unix-specific APIs already `#[cfg(unix)]` gated (no changes needed)
-- Kernel-core baseline re-pinned: 22574 → 22726 (+152 lines, FLAG-Winston)
-- `x86_64-pc-windows-msvc` added to release/CI matrix
-- Sandbox tests are `#[cfg(target_os = "windows")]` gated (won't run in Linux CI)
+## Implementation is not release support
 
-## Packaging (v1.5+)
+Story 10.5 recorded Windows-specific implementation work. The previous version of this document incorrectly claimed that `x86_64-pc-windows-msvc` had been added to the release matrix; it has not. Existing Windows code or compile-only checks do not constitute a supported Windows release.
 
-- `.msi` installer + `winget` manifest: release-time CI job
-- Scoop bucket: community contribution
-- Ed25519 signature verification pipeline is OS-agnostic (same as Linux/macOS)
+Windows compilation and packaging are not acceptance gates for Story 17-7's Linux T3 lifecycle work. Keep platform guards and unsupported-platform responses; do not claim Windows verification from Linux-only tests.
 
-## Reference
+## Reopening the release
 
-- Story 10.5 AC3: Windows binary (v1.5)
-- Story 1b.3 §AC4: per-Spirit resource caps cross-reference
+The owner is the operator. The sole reopening trigger is an explicit operator command to resume Windows release work. At that point, verify the native build and sandbox behavior, define the packaging/signing/publication path, and update the release matrix and this support statement together. There is no current MSI, winget or Scoop delivery commitment.
+
+## References
+
+- `.github/workflows/release.yml`
+- Story 10.5 AC3: historical Windows implementation work
+- Story 17-7: Linux T3 retained lifecycle and terminal facts
 - ADR-004: hexagonal sandboxing with OS-native primitives

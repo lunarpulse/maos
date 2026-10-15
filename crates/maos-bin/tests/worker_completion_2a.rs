@@ -832,11 +832,7 @@ mod planted_refusal {
     fn plant_fake_cli(bindir: &std::path::Path, name: &str, body: &str) {
         std::fs::create_dir_all(bindir).unwrap();
         let p = bindir.join(name);
-        std::fs::write(
-            &p,
-            format!("#!/bin/sh\n{body}\nif [ \"$0\" = /maos/spirit ]; then sleep 3; fi\nexit 0\n"),
-        )
-        .unwrap();
+        std::fs::write(&p, format!("#!/bin/sh\n{body}\nexit 0\n")).unwrap();
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
     }

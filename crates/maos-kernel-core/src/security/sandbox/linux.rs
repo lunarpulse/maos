@@ -535,3 +535,63 @@ fn apply_cgroup_limits(
     }
     Ok(())
 }
+
+// Story 17-7 (D-17-7-FW-04) — the payload pidfd evidence: four SAFETY sites.
+
+/// Open a pidfd on any process, child or not.
+#[doc(hidden)]
+pub fn pidfd_open(pid: u32) -> io::Result<std::os::fd::OwnedFd> {
+    use std::os::fd::FromRawFd;
+    let pid =
+        libc::pid_t::try_from(pid).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+    // SAFETY: pidfd_open(2) takes a PID and zero flags by value, reads no
+    // caller memory, and returns a new descriptor or -1.
+    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) };
+    if fd < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: a non-negative pidfd_open result is a fresh descriptor that
+    // nothing else in this process owns.
+    Ok(unsafe { std::os::fd::OwnedFd::from_raw_fd(fd as libc::c_int) })
+}
+
+/// `poll(2)` once; the caller owns `EINTR` retries and deadlines.
+#[doc(hidden)]
+pub fn poll_ready(fds: &mut [libc::pollfd], timeout: std::time::Duration) -> io::Result<usize> {
+    let ms = libc::c_int::try_from(timeout.as_millis()).unwrap_or(libc::c_int::MAX);
+    // SAFETY: `fds` is an exclusively borrowed, initialized array of exactly
+    // `fds.len()` pollfd entries for the duration of the call.
+    let ready = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, ms) };
+    usize::try_from(ready).map_err(|_| io::Error::last_os_error())
+}
+
+/// `true` once `fd` polls readable within `timeout` (a pidfd: the process exited).
+#[doc(hidden)]
+pub fn readable(fd: std::os::fd::BorrowedFd<'_>, timeout: std::time::Duration) -> bool {
+    let mut fds = [libc::pollfd {
+        fd: fd.as_raw_fd(),
+        events: libc::POLLIN,
+        revents: 0,
+    }];
+    poll_ready(&mut fds, timeout).is_ok_and(|ready| ready > 0)
+}
+
+/// The raw wait status, only when the kernel returned the `PIDFD_INFO_EXIT`
+/// bit (Linux >= 6.15); never a zero-initialized field without it.
+#[doc(hidden)]
+pub fn pidfd_exit_status(pidfd: std::os::fd::BorrowedFd<'_>) -> io::Result<Option<i32>> {
+    let exit = u64::from(libc::PIDFD_INFO_EXIT);
+    // SAFETY: `pidfd_info` is plain integers, so all-zero is a valid value;
+    // PIDFD_GET_INFO then reads and writes exactly that one struct through a
+    // valid, exclusively borrowed pointer.
+    let (result, info) = unsafe {
+        let mut info: libc::pidfd_info = std::mem::zeroed();
+        info.mask = exit;
+        let result = libc::ioctl(pidfd.as_raw_fd(), libc::PIDFD_GET_INFO, &mut info);
+        (result, info)
+    };
+    if result < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok((info.mask & exit != 0).then_some(info.exit_code))
+}

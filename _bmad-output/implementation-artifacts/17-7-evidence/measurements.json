@@ -1,0 +1,134 @@
+{
+  "story": "17-7-t3-worker-retained-lifecycle-and-terminal-facts",
+  "date": "2026-10-13",
+  "base_head": "37c34be4",
+  "method": "Created /tmp/maos-17-7-proto from git archive at base_head and initialized/committed the copy as base. Used CARGO_TARGET_DIR=/mnt/build/cargo-17-7-proto. Physical kernel source measurement is str.lines().count() over every .rs under crates/maos-kernel-core/src; kernel_files counts all regular files there. Tokei 14.0.0 was run from the copy root with --output json --types Rust and the exact exclusions in the story; Rust.reports[].stats.code was grouped by ./crates/<name>/. Ran cargo fmt --all and cargo build --offline --locked -p maos-kernel-core --lib for Variant B and again for Variant A. Smoke was run with cargo run --offline --locked -p maos-kernel-core --example story_17_7_probe; full output is smoke.log. No production implementation files were changed.",
+  "measurements": {
+    "base": {
+      "kernel_src_lines": 25145,
+      "kernel_files": 95,
+      "maos-kernel-core": 19492,
+      "maos-domain": 9349
+    },
+    "variant_b": {
+      "kernel_src_lines": 25436,
+      "kernel_files": 95,
+      "maos-kernel-core": 19818,
+      "maos-domain": 9396
+    },
+    "variant_a": {
+      "kernel_src_lines": 25574,
+      "kernel_files": 95,
+      "maos-kernel-core": 19946,
+      "maos-domain": 9396
+    }
+  },
+  "per_file_physical_delta": {
+    "variant_b": {
+      "crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs": 1,
+      "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs": 22,
+      "crates/maos-kernel-core/src/security/sandbox/t3/argv.rs": 2,
+      "crates/maos-kernel-core/src/security/sandbox/t3/child.rs": 156,
+      "crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs": 15,
+      "crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs": 95,
+      "crates/maos-domain/src/sandbox.rs": 51,
+      "crates/maos-domain/src/supervision.rs": 7
+    },
+    "variant_a_increment": {
+      "crates/maos-kernel-core/src/security/sandbox/linux.rs": 96,
+      "crates/maos-kernel-core/src/security/sandbox/t3/child.rs": 26,
+      "crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs": 16,
+      "crates/maos-kernel-core/examples/story_17_7_probe.rs": 212
+    },
+    "variant_a": {
+      "crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs": 1,
+      "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs": 22,
+      "crates/maos-kernel-core/src/security/sandbox/linux.rs": 96,
+      "crates/maos-kernel-core/src/security/sandbox/t3/argv.rs": 2,
+      "crates/maos-kernel-core/src/security/sandbox/t3/child.rs": 182,
+      "crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs": 15,
+      "crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs": 111,
+      "crates/maos-domain/src/sandbox.rs": 51,
+      "crates/maos-domain/src/supervision.rs": 7,
+      "crates/maos-kernel-core/examples/story_17_7_probe.rs": 212
+    },
+    "kernel_delta": {
+      "variant_b": { "physical": 291, "tokei": 326 },
+      "variant_a_increment": { "physical": 138, "tokei": 128 },
+      "variant_a": { "physical": 429, "tokei": 454 }
+    }
+  },
+  "unsafe": {
+    "variant_b": { "count": 0, "sites": [] },
+    "variant_a": {
+      "count": 4,
+      "sites": [
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs:543 (pidfd_open syscall)",
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs:548 (OwnedFd construction)",
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs:580 (bounded poll)",
+        "crates/maos-kernel-core/src/security/sandbox/linux.rs:614 (PIDFD_GET_INFO ioctl)"
+      ]
+    }
+  },
+  "builds": {
+    "variant_b": { "command": "cargo build --offline --locked -p maos-kernel-core --lib", "result": "success", "kernel_core_warnings": 42, "new_warnings": 0 },
+    "variant_a": { "command": "cargo build --offline --locked -p maos-kernel-core --lib", "result": "success", "kernel_core_warnings": 42, "new_warnings": 0 }
+  },
+  "prototype_smoke": {
+    "exit_code": 0,
+    "observed": [
+      "create argv has create, --restart=no, --pidfile=<state_dir>/init.pid; no run or --rm; names-only environment and no secret value: PASS",
+      "CID accepts 64 lowercase hexadecimal and refuses uppercase, wrong length, and invalid character: PASS",
+      "PID file reader refuses missing, symlink, non-regular, non-numeric, and zero files: PASS",
+      "state-dir validation accepts fresh private 0700 directory and refuses stale pidfile and wrong-mode directory: PASS",
+      "Podman-shaped state JSON parses exited 0, exited 137 OOMKilled=false, exited 137 OOMKilled=true; malformed input yields Unavailable: PASS",
+      "Host kernel 7.2.9-1-cachyos; non-child process raw wait status decoded as Exited(137): PASS",
+      "Separate kill -KILL case raw wait status decoded as Signaled(9): PASS",
+      "Opening pidfd after the process was reaped returns ESRCH and is classified by smoke as Unknown: PASS"
+    ],
+    "log": "smoke.log"
+  },
+  "environment": {
+    "rustc": "1.98.1 (48a229cea 2026-09-01)",
+    "tokei": "14.0.0",
+    "kernel": "7.2.9-1-cachyos",
+    "cargo_target_dir": "/mnt/build/cargo-17-7-proto",
+    "container_runtime": "Not available on this host; real runtime lifecycle not exercised"
+  },
+  "downstream_breakage": [
+    {
+      "file": "crates/maos-bin/src/worker_spawn.rs",
+      "line": 927,
+      "error_count": 1,
+      "error": "missing state_dir in T3Launch initializer (cargo check -p maos-bin --offline)"
+    }
+  ],
+  "not_proven": [
+    "Real podman create/init/start --attach behavior on Podman 4.9.3 and 5.7.0",
+    "Pidfile timing for immediate-exit workloads under real runtimes",
+    "OOM marker behavior on CI runners",
+    "maos-bin observer/lease/unload wiring",
+    "Test migration",
+    "Documentation updates",
+    "CI behavior",
+    "Typed cleanup residue reports; current remove path returns a string error rather than a status-rich residue enum",
+    "Detailed create failure classification; the bounded create helper currently reports unavailable as Option rather than distinct SpawnFailed/TimedOut results",
+    "RAII cleanup between CID parsing and final start; pre-start failures after create do not yet have a dedicated CID guard",
+    "Cross-platform compilation"
+  ],
+  "provenance": {
+    "isolated_repo": "/tmp/maos-17-7-proto (throwaway git repo initialised from git archive 37c34be4; removed after archival)",
+    "base_commit": "20530588637a200e022c6c6d98c77c8dbb02d800",
+    "variant_b_commit": "cab9a7e818cfb4bc3f36903ce6bc2cea83bed382",
+    "variant_a": "working tree on top of variant_b_commit (uncommitted; the probe example staged)",
+    "diffs": {
+      "prototype-variant-b.diff": "git diff base_commit variant_b_commit; sha256 0874c1b6e6bf7627f9f56667f089550a2be8c4b73a00f2b0c84cf33d859c7d6c",
+      "prototype-variant-a-increment.diff": "git diff variant_b_commit (working tree); sha256 d059123ce66a7b4d824ed950e216ca4ffd9a17faca5553fd067927026d989fa2",
+      "prototype-variant-a.diff": "git diff base_commit (working tree); sha256 dc3b078d250ab1d882134ee3c5dd76d825a4554b2df64edf4f6994953b9a1399",
+      "smoke.log": "sha256 a80567f225e35c8daddf4090939c303c51e6fa0551624dc6bd1448f0e4220b13"
+    },
+    "correction_2026-10-13": "The first archived prototype-variant-b.diff was generated from the variant-A working tree and wrongly contained the linux.rs pidfd code (found by the non-author validation, finding C-01). It was regenerated from the variant_b_commit. Re-measured independently from git worktrees of each revision with the same instruments: base 25145 physical / 95 files / kernel tokei 19492 / domain 9349; variant B 25436 / 95 / 19818 / 9396; variant A 25574 / 95 / 19946 / 9396; `unsafe {` blocks in linux.rs 1 / 1 / 5. The figures above are unchanged.",
+    "variant_a_increment_runtime_rs": "net 0 physical lines: the increment also fixes a variant-B prototype defect where the exit row read the CID through container_terminal() after self.child = None (always null)."
+  },
+  "scope": "Sizing prototype, not implementation, not a grant."
+}

@@ -22,8 +22,8 @@ _FORBIDDEN = ("cpu", "memory", "pids")
 _DENIED = {errno.EPERM, errno.EACCES, errno.EROFS}
 
 
-def check_test_output(text, exit_code, expected_counts):
-    """Reject unsuccessful, skipped, vacuous, malformed, or reordered suites."""
+def check_test_output(text, exit_code, expected_counts, required_tests=()):
+    """Reject unsuccessful, skipped, vacuous, incomplete, or substituted suites."""
     if exit_code != 0:
         raise ValueError(f"test command exited with status {exit_code}")
     # Serial libtest flushes `test <name> ... ` before the body runs, so a
@@ -43,6 +43,10 @@ def check_test_output(text, exit_code, expected_counts):
                 f"suite {index} expected {count} passed, zero failed/ignored; "
                 f"got {status}, {passed} passed, {failed} failed, {ignored} ignored"
             )
+    executed = set(re.findall(r"^test (\S+) \.\.\.(?: |$)", text, re.MULTILINE))
+    missing = set(required_tests) - executed
+    if missing:
+        raise ValueError(f"required tests did not execute: {', '.join(sorted(missing))}")
 
 
 def _membership():
@@ -285,8 +289,10 @@ def _environment(mode):
 def _systemd_run(args):
     if os.geteuid() == 0:
         raise ValueError("invoke the harness as the non-root CI user; sudo is used only for systemd setup")
-    if not re.fullmatch(r"maos-17-2-[A-Za-z0-9_-]+", args.unit):
-        raise ValueError("unit must be a named maos-17-2-* service without a unit-type suffix")
+    # Story 17-7 exit line 4 runs in the same delegated envelope under its own
+    # `maos-17-7-*` units; both namespaces stay named services only.
+    if not re.fullmatch(r"maos-17-[27]-[A-Za-z0-9_-]+", args.unit):
+        raise ValueError("unit must be a named maos-17-2-* or maos-17-7-* service without a unit-type suffix")
     if args.timeout <= 0:
         raise ValueError("timeout must be positive seconds")
     if args.rootless_canary and args.mode != "delegated":
@@ -378,6 +384,7 @@ def main(argv=None):
     check = subparsers.add_parser("check-log", help="require exact successful Rust test-suite counts")
     check.add_argument("--exit-code", type=int, required=True)
     check.add_argument("--expected-count", type=int, action="append", required=True)
+    check.add_argument("--required-test", action="append", default=[])
     check.add_argument("log", type=Path)
     inside = subparsers.add_parser("_inside", help=argparse.SUPPRESS)
     inside.add_argument("--mode", choices=("delegated", "undelegated"), required=True)
@@ -388,7 +395,7 @@ def main(argv=None):
     if args.action == "check-log":
         try:
             text = args.log.read_text(errors="replace")
-            check_test_output(text, args.exit_code, args.expected_count)
+            check_test_output(text, args.exit_code, args.expected_count, args.required_test)
         except (OSError, ValueError) as error:
             print(f"cgroup-ceiling check-log: {error}", file=sys.stderr)
             return 1

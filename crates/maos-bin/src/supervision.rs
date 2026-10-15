@@ -139,6 +139,7 @@ impl UnloadAllReport {
 pub async fn unload_all_loaded(
     scheduler: &SpiritSchedulerAdapter,
     halt_registry: &HaltRegistry,
+    post_unload: Option<&(dyn Fn(u32) + Send + Sync)>,
 ) -> UnloadAllReport {
     let mut report = UnloadAllReport::default();
     let pids: Vec<u32> = {
@@ -153,7 +154,11 @@ pub async fn unload_all_loaded(
     };
     for pid in pids {
         let pending_before = halt_registry.drain_for_spirit_dry_run(pid);
-        if let Err(error) = scheduler.unload(pid).await {
+        let result = scheduler.unload(pid).await;
+        if let Some(stop) = post_unload {
+            stop(pid);
+        }
+        if let Err(error) = result {
             report.failed.push((pid, error.to_string()));
             continue;
         }
@@ -173,19 +178,22 @@ pub async fn unload_all_loaded(
 #[cfg(feature = "network")]
 mod worker {
     use std::path::PathBuf;
-    use std::process::{Command, Stdio};
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
+    use std::sync::{Arc, Mutex, Weak};
+    use std::time::{Duration, Instant};
 
     use maos_domain::invariants::i1::{IntentClass, TokenId};
     use maos_domain::ports::task::TaskAssignmentRecord;
+    use maos_domain::sandbox::{ContainerResidue, ContainerTerminalFacts};
     use maos_domain::supervision::{CrashCause, FaultCause, OnCrashAction};
     use maos_kernel_core::halt::HaltRegistry;
     use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind, TransparencyLogAdapter};
+    use maos_kernel_core::journal::JournalAdapter;
     use maos_kernel_core::lifecycle::cli_wrapper::runtime::ExitCause;
-    use maos_kernel_core::scheduler::control_block::SpiritManifestBundle;
-    use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
+    use maos_kernel_core::lifecycle::cli_wrapper::{
+        ContainerLaunchCustody, ContainerTerminal, TEARDOWN_BUDGET,
+    };
+    use maos_kernel_core::scheduler::{SpiritManifestBundle, SpiritSchedulerAdapter};
     use maos_kernel_core::supervision::CrashDetector;
     use maos_spirit_abi::ctx::Ctx;
     use maos_spirit_abi::lifecycle::Spirit;
@@ -315,27 +323,26 @@ mod worker {
     pub enum BindingAction {
         /// Nothing to do.
         Nothing,
-        /// Signal the runtime-client pidfd and stop any attached container name.
+        /// Signal the runtime-client pidfd and tear down the attached CID, if any.
         Signal,
-        /// In-lock exception: `Handle::spawn(handle_crash)`, storing the handle
-        /// so no reader ever sees `CrashHandled` without one.
+        /// The sole in-lock exception: spawn `handle_crash` and retain its
+        /// handle, so no reader observes `CrashHandled` without an owner.
         SpawnCrashHandler(CrashCause),
-        /// `block_on(handle_crash)` bounded, then disposition only if the
-        /// handler reported `NotLoaded`.
+        /// Run `handle_crash` bounded, then disposition only if the SCB was
+        /// already unloaded by a concurrent action.
         RunCrashHandlerThenMaybeDisposition(CrashCause),
-        /// Join the stored handler bounded, then disposition only if it
-        /// reported `NotLoaded`.
+        /// Join the stored handler bounded, then disposition only if the SCB
+        /// was already unloaded by a concurrent action.
         JoinHandlerThenMaybeDisposition,
-        /// As above, then `unload`.
+        /// As above, then unload the SCB.
         JoinHandlerThenMaybeDispositionThenUnload,
-        /// Disposition from the kept record, then `unload`.
+        /// Disposition from the kept record, then unload the SCB.
         DispositionAndUnload,
-        /// Signal the runtime-client pidfd and named container WHILE THE BRIDGE
-        /// IS STILL ALIVE, then disposition and unload. `abandon(Running)` uses
-        /// this so bridge cleanup is not the only evidence of the stop.
+        /// Signal the runtime-client pidfd and tear down the CID while the
+        /// bridge remains alive, then disposition and unload.
         SignalThenDispositionAndUnload,
-        /// Take the record out of the ledger WITHOUT disposition (the verdict
-        /// row is the record), then `unload`.
+        /// Retire a successful task's ledger record without crash disposition,
+        /// then unload its SCB.
         UnloadClean,
     }
 
@@ -464,11 +471,20 @@ mod worker {
     /// [`BindingCore`] can hold it without an `Arc` cycle back to the
     /// supervisor, and so a test double can record actions without a kernel.
     pub trait BindingExecutor: Send + Sync {
-        /// Classify a child exit into a [`CrashCause`], reading the Worker's
-        /// journaled stderr tail. Called OUTSIDE the binding lock.
+        /// Classify a native child exit from the runtime-client status.
         fn classify_exit(&self, spirit_pid: u32, facts: ExitFacts) -> CrashCause;
-        /// `Handle::spawn(handle_crash)`. The one act performed under the lock:
-        /// it does not block.
+        /// Classify a T3 child exit from its immutable payload/container evidence.
+        fn classify_exit_with_container(
+            &self,
+            spirit_pid: u32,
+            facts: ExitFacts,
+            container: Option<&ContainerTerminalFacts>,
+        ) -> CrashCause {
+            let _ = container;
+            self.classify_exit(spirit_pid, facts)
+        }
+        /// Spawn `handle_crash` on the executor's runtime. The returned handle
+        /// is owned by the binding; spawning does not block.
         fn spawn_crash_handler(&self, spirit_pid: u32, cause: CrashCause) -> CrashHandlerHandle;
         /// Join a spawned handler within `budget`. `Err` returns the handle so
         /// the caller can park it for `join_outstanding`.
@@ -578,53 +594,85 @@ mod worker {
     /// integration tests in `crates/maos-bin/tests/` are separate crates and
     /// cannot see a `cfg(test)` item, and inline test code is kloc-charged.
     #[doc(hidden)]
-    #[derive(Default, Clone)]
-    pub struct SupervisorSeams {
-        /// Called between the mint and the pre-spawn phase check.
-        pub after_mint: Option<Arc<dyn Fn() + Send + Sync>>,
-        /// Held by the observer thread after the pidfd is stored and BEFORE its
-        /// `waitid` CALL.
-        pub observer_gate: Option<Arc<ObserverGate>>,
-        /// Called synchronously after the exit observer has been installed
-        /// and before the owning session can publish readiness.
-        pub after_watch: Option<Arc<dyn Fn(u32) + Send + Sync>>,
-        /// AC3's injected-`?` point, PINNED after
-        /// [`ExitObservation::watch`](exit_observation::ExitObservation::watch)
-        /// has stored the child handle and started the observer, and BEFORE
-        /// `pump_to_journal`.
-        ///
-        /// The position is load-bearing: injected between `spawn_and_bridge`
-        /// and `watch`, even a correct build has no child handle to signal, so
-        /// the vector would pass for the wrong reason.
-        pub error_after_watch: Option<String>,
+    #[derive(Clone)]
+    pub enum OnUnloadFault {
+        /// Panic before the hook's own stop call.
+        Panic,
+        /// Block the hook for this finite duration before its own stop call.
+        Sleep(Duration),
     }
 
-    // ── The binding's shared core (Observer's subscriber) ───────────────
+    #[doc(hidden)]
+    #[derive(Clone)]
+    pub struct SupervisorSeams {
+        /// Run after capability minting and before the pre-spawn phase check.
+        pub after_mint: Option<Arc<dyn Fn() + Send + Sync>>,
+        /// Gate the observer between pidfd storage and its `waitid` call.
+        pub observer_gate: Option<Arc<ObserverGate>>,
+        /// Observe the runtime-client pid immediately after watch starts.
+        pub after_watch: Option<Arc<dyn Fn(u32) + Send + Sync>>,
+        /// Inject a post-watch early-return error to exercise RAII cleanup.
+        pub error_after_watch: Option<String>,
+        /// Inject a panic or finite sleep before `WorkerSpirit::on_unload` stops.
+        pub on_unload_fault: Option<OnUnloadFault>,
+        /// Override the Worker bundle's hook time cap for deterministic tests.
+        pub hook_cap_override: Option<u32>,
+        /// Request payload pidfd evidence; false forces the runtime fallback.
+        pub payload_pidfd: bool,
+    }
 
-    struct ContainerStopIdentity {
-        runtime_path: PathBuf,
-        container_name: String,
+    impl Default for SupervisorSeams {
+        fn default() -> Self {
+            Self {
+                after_mint: None,
+                observer_gate: None,
+                after_watch: None,
+                error_after_watch: None,
+                on_unload_fault: None,
+                hook_cap_override: None,
+                payload_pidfd: true,
+            }
+        }
     }
 
     struct BindingState {
+        /// Monotonic lifecycle phase; planned stop wins later exit evidence.
         phase: BindingPhase,
+        /// Runtime-client pidfd, retained only while the binding is active.
         child: Option<ObservedChild>,
+        /// Runtime-client OS pid, never the payload's historical pid.
         child_pid: Option<u32>,
-        container_stop: Option<ContainerStopIdentity>,
+        /// Shared CID terminal handle, retained for the binding's full life.
+        container_terminal: Option<Arc<ContainerTerminal>>,
+        /// Launch coordinator available before the runtime can create a CID.
+        container_launch: Option<Arc<ContainerLaunchCustody>>,
+        /// Teardown returned success: removal and its existence check completed.
+        container_teardown_confirmed: bool,
+        /// First typed teardown failure, if any.
+        container_residue: Option<ContainerResidue>,
+        /// Prevent duplicate stderr reporting across finish/drop/root cleanup.
+        container_residue_reported: bool,
+        /// Fail-closed bearer revocation for a stop left unconfirmed (AC4.5).
+        lease_revoke: Option<Arc<dyn Fn() + Send + Sync>>,
+        /// Whether the successful stop signal has already contributed once.
+        signal_counted: bool,
+        /// At most one crash handler per binding.
         handler: Option<CrashHandlerHandle>,
+        /// Kept task record used if the SCB ledger is concurrently removed.
         record: TaskAssignmentRecord,
+        /// Disposition selected when this binding was created.
         on_crash_action: OnCrashAction,
+        /// Disposition has already been written.
         dispositioned: bool,
-        /// True exactly while the kept task belongs to the SCB's active ledger.
+        /// A live scheduler ledger entry belongs to this binding.
         record_active: bool,
-        /// True for an adopted spawned session: its ledger record exists only
-        /// while a mailbox turn is active, so a record still active at exit
-        /// is an abandoned task, never a completed one.
+        /// This binding owns one short-lived task rather than a persistent record.
         turn_scoped: bool,
-        /// A turn-scoped session's runner has announced `Ready`. Before that,
-        /// a typed runner refusal exit (2/3/5) is a launch refusal, not a crash.
+        /// The runner completed its readiness handshake.
         ready: bool,
     }
+
+    // ── The binding's shared core (Observer's subscriber) ───────────────
 
     /// The lock-guarded state the observer thread and the Worker's call stack
     /// both reach — the Observer pattern's single subscriber.
@@ -661,33 +709,61 @@ mod worker {
                 .expect("scheduler PID is already bound");
         }
 
-        /// Attach the actual runtime and name that own this Worker's T3
-        /// container. If shutdown already won the race, stop it immediately.
-        pub fn attach_container_stop(&self, runtime_path: PathBuf, container_name: String) {
-            let identity = ContainerStopIdentity {
-                runtime_path,
-                container_name,
-            };
-            let (late, replaced) = {
+        /// Register launch custody before entering any runtime call that can create a CID.
+        pub fn attach_launch_custody(&self, custody: Arc<ContainerLaunchCustody>) {
+            let (late, duplicate) = {
                 let mut state = self.lock();
-                if state.phase == BindingPhase::Running {
-                    (None, state.container_stop.replace(identity))
-                } else {
-                    (Some(identity), state.container_stop.take())
+                match &state.container_launch {
+                    Some(existing) => (
+                        state.phase != BindingPhase::Running,
+                        !Arc::ptr_eq(existing, &custody),
+                    ),
+                    None => {
+                        state.container_launch = Some(Arc::clone(&custody));
+                        (state.phase != BindingPhase::Running, false)
+                    }
                 }
             };
-            if let Some(replaced) = replaced {
-                self.stop_named_container(replaced);
-            }
-            if let Some(late) = late {
-                self.stop_named_container(late);
+            if duplicate || late {
+                let _ = custody.cancel_and_teardown(Instant::now() + TEARDOWN_BUDGET);
             }
         }
 
-        /// A session timeout/error marks the kill as planned before signalling.
+        /// Retain the T3 terminal handle for the binding's whole life.
+        pub fn attach_container(&self, terminal: Arc<ContainerTerminal>) {
+            let (late, duplicate, launch_registered) = {
+                let mut state = self.lock();
+                let launch_registered = state.container_launch.is_some();
+                match &state.container_terminal {
+                    Some(existing) => (
+                        state.phase != BindingPhase::Running,
+                        !Arc::ptr_eq(existing, &terminal),
+                        launch_registered,
+                    ),
+                    None => {
+                        state.container_terminal = Some(Arc::clone(&terminal));
+                        (
+                            state.phase != BindingPhase::Running,
+                            false,
+                            launch_registered,
+                        )
+                    }
+                }
+            };
+            if duplicate {
+                // A second terminal is never adopted; remove it by its own CID.
+                let _ = terminal.teardown(Instant::now() + TEARDOWN_BUDGET);
+            } else if late && !launch_registered {
+                self.signal(Instant::now() + TEARDOWN_BUDGET);
+            }
+        }
+
+        /// A session timeout/error marks the kill as planned before signalling;
+        /// a binding already past `Running` still gets its CID cleaned up.
         pub fn stop_session(&self) {
             let action = self.begin_stop();
             self.execute(action);
+            self.cleanup_container(Instant::now() + TEARDOWN_BUDGET);
         }
 
         /// The current phase.
@@ -733,10 +809,13 @@ mod worker {
         /// the documented non-blocking exception.
         pub(super) fn on_child_exit(&self, facts: ExitFacts) {
             let pid = self.spirit_pid();
+            let terminal = { self.lock().container_terminal.clone() };
+            let terminal_facts = terminal.map(|terminal| terminal.facts());
             let cause = if self.is_typed_refusal(&facts) {
                 CrashCause::Voluntary
             } else {
-                self.exec.classify_exit(pid, facts)
+                self.exec
+                    .classify_exit_with_container(pid, facts, terminal_facts.as_deref())
             };
             let mut state = self.lock();
             let (next, action) = state.phase.on_exit(&cause);
@@ -780,7 +859,9 @@ mod worker {
 
         fn begin_stop(&self) -> BindingAction {
             let mut state = self.lock();
-            let has_stop_target = state.child.is_some() || state.container_stop.is_some();
+            let has_stop_target = state.child.is_some()
+                || state.container_terminal.is_some()
+                || state.container_launch.is_some();
             let (next, action) = state.phase.begin_stop(has_stop_target);
             state.phase = next;
             action
@@ -803,7 +884,6 @@ mod worker {
         fn retire_view(&self) -> WorkerBindingView {
             let mut state = self.lock();
             state.child = None;
-            state.container_stop = None;
             WorkerBindingView {
                 spirit_id: self.spirit_id.clone(),
                 spirit_pid: self.spirit_pid(),
@@ -813,26 +893,19 @@ mod worker {
             }
         }
 
-        /// Execute a decided action. The lock is NOT held here: the executor
-        /// calls `unload`, which fires `WorkerSpirit::on_unload`, which takes
-        /// this very lock. Holding it across `unload` blocks to the 30 s hook
-        /// cap, after which `check_hook_outcome?` returns before the receipt,
-        /// the revoke and the map removal — leaving an `Unloaded` SCB every
-        /// later `unload` skips (Trap 6b).
+        /// Execute outside the binding lock. Scheduler mechanism (x) releases
+        /// the SCB, receipt, and capabilities before entering the hook.
         fn execute(&self, action: BindingAction) {
+            self.execute_until(action, Instant::now() + TEARDOWN_BUDGET);
+        }
+
+        fn execute_until(&self, action: BindingAction, deadline: Instant) {
             let pid = self.spirit_pid();
             match action {
-                BindingAction::Nothing => {}
-                BindingAction::SpawnCrashHandler(_) => {
-                    // Already executed inside `on_child_exit`'s lock: it is the
-                    // documented non-blocking exception, and re-running it here
-                    // would spawn a second handler.
-                }
-                BindingAction::Signal => {
-                    self.signal();
-                }
+                BindingAction::Nothing | BindingAction::SpawnCrashHandler(_) => {}
+                BindingAction::Signal => self.signal(deadline),
                 BindingAction::SignalThenDispositionAndUnload => {
-                    self.signal();
+                    self.signal(deadline);
                     self.disposition();
                     self.exec.unload(pid);
                 }
@@ -841,10 +914,6 @@ mod worker {
                     self.exec.unload(pid);
                 }
                 BindingAction::UnloadClean => {
-                    // A turn-scoped session that exits with its turn record still
-                    // active abandoned that task: it gets the FR50 disposition.
-                    // Any other clean exit completed its task: take the record
-                    // out WITHOUT one. The lock is released before the executor.
                     let (turn_scoped, record_active, task_id) = {
                         let state = self.lock();
                         (
@@ -884,71 +953,141 @@ mod worker {
             }
         }
 
-        pub(super) fn signal(&self) {
-            let container = self.lock().container_stop.take();
+        pub fn container_terminal(&self) -> Option<Arc<ContainerTerminal>> {
+            self.lock().container_terminal.clone()
+        }
+
+        pub fn termination_confirmed(&self) -> bool {
+            let (custody, terminal) = {
+                let state = self.lock();
+                (
+                    state.container_launch.clone(),
+                    state.container_terminal.clone(),
+                )
+            };
+            custody
+                .map(|custody| custody.termination_confirmed())
+                .or_else(|| terminal.map(|terminal| terminal.termination_confirmed()))
+                .unwrap_or(true)
+        }
+
+        /// Record the one CID verdict. The kernel already reported residue on
+        /// root stderr, so this only marks it reported and, fail-closed,
+        /// revokes the Worker's bearer while termination is unconfirmed.
+        fn note_container_teardown(&self, result: Result<(), ContainerResidue>) {
+            let revoke = {
+                let mut state = self.lock();
+                state.container_teardown_confirmed = result.is_ok();
+                state.container_residue = result.err();
+                state.container_residue_reported |= result.is_err();
+                result
+                    .is_err()
+                    .then(|| state.lease_revoke.clone())
+                    .flatten()
+            };
+            if let Some(revoke) = revoke {
+                if !self.termination_confirmed() {
+                    revoke();
+                }
+            }
+        }
+
+        /// Mechanical CID cleanup for every stop path, whatever the phase: a
+        /// crash-handled binding still owns a container (fault cleanup never
+        /// latches `PlannedStop` and never rewrites the frozen snapshot).
+        fn cleanup_container(&self, deadline: Instant) {
+            let (custody, terminal) = {
+                let state = self.lock();
+                (
+                    state.container_launch.clone(),
+                    state.container_terminal.clone(),
+                )
+            };
+            let result = custody
+                .map(|custody| custody.cancel_and_teardown(deadline))
+                .or_else(|| terminal.map(|terminal| terminal.teardown(deadline)));
+            if let Some(result) = result {
+                self.note_container_teardown(result);
+            }
+        }
+
+        fn unresolved_container(&self) -> Option<(String, String, ContainerResidue, bool)> {
+            let (terminal, teardown_confirmed, residue, reported) = {
+                let state = self.lock();
+                (
+                    state.container_terminal.clone(),
+                    state.container_teardown_confirmed,
+                    state.container_residue,
+                    state.container_residue_reported,
+                )
+            };
+            let terminal = terminal?;
+            if teardown_confirmed && residue.is_none() {
+                return None;
+            }
+            Some((
+                self.spirit_id.clone(),
+                terminal.container_id().to_owned(),
+                residue.unwrap_or(ContainerResidue::TerminationUnconfirmed),
+                reported,
+            ))
+        }
+
+        fn take_unreported_container(&self) -> Option<(String, String, ContainerResidue)> {
+            let mut state = self.lock();
+            if state.container_residue_reported
+                || (state.container_teardown_confirmed && state.container_residue.is_none())
+            {
+                return None;
+            }
+            let terminal = state.container_terminal.clone()?;
+            state.container_residue_reported = true;
+            Some((
+                self.spirit_id.clone(),
+                terminal.container_id().to_owned(),
+                state
+                    .container_residue
+                    .unwrap_or(ContainerResidue::TerminationUnconfirmed),
+            ))
+        }
+
+        pub(super) fn signal(&self, deadline: Instant) {
+            let (custody, terminal) = {
+                let state = self.lock();
+                (
+                    state.container_launch.clone(),
+                    state.container_terminal.clone(),
+                )
+            };
             let pidfd_outcome = self.strategy.signal_kill(self);
-            let container_stopped =
-                container.is_none_or(|container| self.stop_named_container(container));
-            match pidfd_outcome {
-                SignalOutcome::Signalled if container_stopped => {
+            let teardown = custody
+                .as_ref()
+                .map(|custody| custody.cancel_and_teardown(deadline))
+                .or_else(|| {
+                    terminal
+                        .as_ref()
+                        .map(|terminal| terminal.teardown(deadline))
+                });
+            if let Some(result) = teardown.as_ref() {
+                self.note_container_teardown(*result);
+            }
+            let delivered = pidfd_outcome == SignalOutcome::Signalled;
+            let container_ok = teardown.as_ref().is_none_or(|result| result.is_ok())
+                && custody.as_ref().map_or_else(
+                    || {
+                        terminal
+                            .as_ref()
+                            .is_none_or(|terminal| terminal.kill_succeeded())
+                    },
+                    |custody| custody.kill_succeeded(),
+                );
+            if delivered && container_ok {
+                let mut state = self.lock();
+                if !state.signal_counted {
                     self.counters.signals_sent.fetch_add(1, Ordering::Relaxed);
-                }
-                SignalOutcome::Signalled => {
-                    eprintln!(
-                        "maos: worker {} container kill failed; stop is incomplete",
-                        self.spirit_id
-                    );
-                }
-                SignalOutcome::AlreadyReaped | SignalOutcome::NotSignalled => {}
-            }
-        }
-
-        fn stop_named_container(&self, identity: ContainerStopIdentity) -> bool {
-            let mut command = Command::new(identity.runtime_path);
-            command.env_clear();
-            for key in [
-                "PATH",
-                "HOME",
-                "XDG_RUNTIME_DIR",
-                "DBUS_SESSION_BUS_ADDRESS",
-            ] {
-                if let Some(value) = std::env::var_os(key) {
-                    command.env(key, value);
+                    state.signal_counted = true;
                 }
             }
-            let result = command
-                .args(["kill", &identity.container_name])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-            match result {
-                Ok(status) if status.success() => true,
-                Ok(status) => {
-                    eprintln!(
-                        "maos: worker {} runtime refused container kill (status {status})",
-                        self.spirit_id
-                    );
-                    false
-                }
-                Err(error) => {
-                    eprintln!(
-                        "maos: worker {} could not run container kill: {error}",
-                        self.spirit_id
-                    );
-                    false
-                }
-            }
-        }
-
-        fn stop_attached_container(&self) {
-            let container = { self.lock().container_stop.take() };
-            if let Some(container) = container {
-                self.stop_named_container(container);
-            }
-        }
-
-        fn discard_attached_container(&self) {
-            self.lock().container_stop = None;
         }
 
         /// Join the stored handler. Returns `true` when the record still needs
@@ -1016,6 +1155,7 @@ mod worker {
     struct BindingRegistryState {
         active: Vec<Arc<BindingCore>>,
         completed: Vec<WorkerBindingView>,
+        unresolved: Vec<(String, String, ContainerResidue, bool)>,
     }
 
     #[derive(Default)]
@@ -1031,12 +1171,18 @@ mod worker {
         }
 
         fn retire(&self, core: &Arc<BindingCore>) {
+            // Registry→binding is the shared lock order used by `views` and
+            // unresolved reporting; no caller reaches the registry while
+            // holding the binding state lock.
+            let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            state
+                .active
+                .retain(|candidate| !Arc::ptr_eq(candidate, core));
             let view = core.retire_view();
-            if let Ok(mut state) = self.state.lock() {
-                state
-                    .active
-                    .retain(|candidate| !Arc::ptr_eq(candidate, core));
-                state.completed.push(view);
+            let unresolved = core.unresolved_container();
+            state.completed.push(view);
+            if let Some(unresolved) = unresolved {
+                state.unresolved.push(unresolved);
             }
         }
 
@@ -1061,6 +1207,36 @@ mod worker {
                 .map(|state| state.active.clone())
                 .unwrap_or_default()
         }
+
+        fn by_pid(&self, spirit_pid: u32) -> Option<Arc<BindingCore>> {
+            self.state
+                .lock()
+                .ok()?
+                .active
+                .iter()
+                .find(|core| core.spirit_pid() == spirit_pid)
+                .cloned()
+        }
+
+        fn take_unreported(&self) -> Vec<(String, String, ContainerResidue)> {
+            let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            let mut pending = Vec::new();
+            for (spirit_id, cid, residue, reported) in &mut state.unresolved {
+                if !*reported {
+                    *reported = true;
+                    pending.push((spirit_id.clone(), cid.clone(), *residue));
+                }
+            }
+            // Claim active residues while the registry lock still excludes
+            // retirement, so a concurrent retire cannot enqueue a stale
+            // `reported=false` duplicate for this CID.
+            for core in &state.active {
+                if let Some(residue) = core.take_unreported_container() {
+                    pending.push(residue);
+                }
+            }
+            pending
+        }
     }
 
     // ── The RAII guard (D-16-3-Q (6)) ───────────────────────────────────
@@ -1084,6 +1260,7 @@ mod worker {
     impl WorkerBinding {
         #[cfg(unix)]
         pub fn attach_egress(&mut self, egress: crate::egress::WorkerEgress) {
+            self.core.lock().lease_revoke = Some(egress.revoker());
             self.egress = Some(egress);
         }
 
@@ -1108,25 +1285,36 @@ mod worker {
             self.core.spirit_id()
         }
 
-        /// The run reached its end. Consumes the guard and DISARMS it before
-        /// executing, so `Drop` never runs `abandon` after `finish`.
-        pub fn finish(mut self, bridge_exit: &ExitCause) {
+        /// Classify from the runtime-client status and retained T3 facts.
+        /// This consumes the guard's responsibility: it disarms before any
+        /// fallible work so Drop cannot repeat abandon after this path begins.
+        /// Returns whether the run may complete: `false` when an intentional
+        /// stop was latched, decided under the same lock as the transition.
+        pub fn finish(
+            mut self,
+            bridge_exit: &maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit,
+        ) -> bool {
             self.armed = false;
+            if let Some((_, verdict)) = bridge_exit.container.as_ref() {
+                self.core.note_container_teardown(*verdict);
+            }
+            let cause = crash_cause_from_exit(&self.core, bridge_exit);
             #[cfg(unix)]
             if let Some(mut egress) = self.egress.take() {
-                if let Err(error) = egress.finish() {
+                if let Err(error) = egress.finish(self.core.termination_confirmed()) {
                     eprintln!("maos: Worker egress cleanup failed: {error}");
                 }
             }
-            let cause = crash_cause_from_exit(&self.core, bridge_exit);
-            let action = {
+            let (action, may_complete) = {
                 let mut state = self.core.lock();
+                let may_complete = state.phase != BindingPhase::PlannedStop;
                 let (next, action) = state.phase.finish(cause.as_ref());
                 state.phase = next;
-                action
+                (action, may_complete)
             };
             self.core.execute(action);
             self.registry.retire(&self.core);
+            may_complete
         }
     }
 
@@ -1144,6 +1332,20 @@ mod worker {
                 action
             };
             self.core.execute(action);
+            // Abandon from any phase (incl. crash-handled) still removes the CID
+            // before the lease decision.
+            self.core
+                .cleanup_container(Instant::now() + TEARDOWN_BUDGET);
+            #[cfg(unix)]
+            if let Some(mut egress) = self.egress.take() {
+                if let Err(error) = egress.finish(self.core.termination_confirmed()) {
+                    use std::io::Write as _;
+                    let _ = writeln!(
+                        std::io::stderr(),
+                        "maos: Worker egress cleanup failed: {error}"
+                    );
+                }
+            }
             self.registry.retire(&self.core);
         }
     }
@@ -1161,23 +1363,20 @@ mod worker {
         pub bridge: maos_kernel_core::lifecycle::cli_wrapper::runtime::SpawnedBridge,
     }
 
-    /// Map the bridge's own `ExitCause` to a [`CrashCause`] (D-16-3-F).
+    /// Classify from the bridge's client status and immutable T3 payload facts.
     ///
-    /// `code == 0` is NOT a crash (ADR-022's false-positive rule): a clean exit
-    /// whose completion oracle says `not_completed` still leaves the run
-    /// failing, but it is not a fault. A signal the supervisor itself sent
-    /// (phase `PlannedStop`) is never a crash either.
-    ///
-    /// The classification — including the journaled `stderr_tail` — goes
-    /// through the SAME executor the observer uses, so the two paths cannot
-    /// disagree about what a status MEANS. They can still legitimately carry
-    /// DIFFERENT stderr tails: the observer reads at detection (early), this
-    /// path reads after EOF (late).
-    fn crash_cause_from_exit(core: &BindingCore, exit: &ExitCause) -> Option<CrashCause> {
+    /// ADR-022 keeps Spirit-specific interpretation outside the kernel. Keep
+    /// this on the SAME `BindingExecutor` as the pidfd observer so native
+    /// mapping cannot drift between feeds; T3 adds only the retained snapshot.
+    /// The planned-stop latch and typed launch refusals are resolved first.
+    fn crash_cause_from_exit(
+        core: &BindingCore,
+        exit: &maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit,
+    ) -> Option<CrashCause> {
         if core.phase() == BindingPhase::PlannedStop {
             return None;
         }
-        let facts = match exit {
+        let facts = match &exit.cause {
             ExitCause::Exited { code } => ExitFacts {
                 signal: None,
                 code: Some(*code),
@@ -1186,10 +1385,9 @@ mod worker {
                 signal: Some(*signal),
                 code: None,
             },
-            // Both sources lost — the executor maps this to `Truncated`, the
-            // only free-text variant, REUSED rather than adding a `FaultCause`
-            // variant: the epic ratified no kernel delta.
             ExitCause::Unknown => ExitFacts {
+                // Unknown client status stays native `Truncated`; never invent
+                // an exit code from runtime conventions or stderr.
                 signal: None,
                 code: None,
             },
@@ -1197,7 +1395,11 @@ mod worker {
         if core.is_typed_refusal(&facts) {
             return None;
         }
-        match core.exec.classify_exit(core.spirit_pid(), facts) {
+        let container_facts = exit.container.as_ref().map(|(facts, _)| facts.as_ref());
+        match core
+            .exec
+            .classify_exit_with_container(core.spirit_pid(), facts, container_facts)
+        {
             CrashCause::Voluntary => None,
             cause => Some(cause),
         }
@@ -1210,7 +1412,13 @@ mod worker {
     /// [`WorkerSupervisor`] is the kernel-backed adapter; a test double
     /// implements this so `worker_spawn` vectors run without a kernel.
     pub trait WorkerSupervision: Send + Sync {
-        /// Load + start the Worker's SCB and push its in-flight task record.
+        /// Create a fresh, private state directory for one T3 spawn.
+        fn create_t3_state_dir(&self) -> Result<PathBuf, String>;
+
+        /// Whether T3 payload pidfd evidence should be requested.
+        fn payload_pidfd(&self) -> bool {
+            true
+        }
         fn bind(
             &self,
             task: &WorkerTask,
@@ -1307,6 +1515,8 @@ mod worker {
         counters: Arc<SupervisorCounters>,
         active_paths: Arc<ActivePathCount>,
         registry: Arc<BindingRegistry>,
+        #[cfg(unix)]
+        state_root: Result<PathBuf, String>,
         next_seq: AtomicU32,
         stopping: AtomicBool,
         boot_nonce: u64,
@@ -1330,7 +1540,13 @@ mod worker {
                     phase: BindingPhase::Running,
                     child: None,
                     child_pid: None,
-                    container_stop: None,
+                    container_terminal: None,
+                    container_launch: None,
+                    container_teardown_confirmed: false,
+                    container_residue: None,
+                    container_residue_reported: false,
+                    lease_revoke: None,
+                    signal_counted: false,
                     handler: None,
                     record: TaskAssignmentRecord {
                         task_id,
@@ -1460,6 +1676,7 @@ mod worker {
             scheduler: Arc<SpiritSchedulerAdapter>,
             crash_detector: Arc<CrashDetector>,
             transparency_log: Arc<TransparencyLogAdapter>,
+            lifecycle_journal: Arc<JournalAdapter>,
             halt_registry: Arc<HaltRegistry>,
             iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
             handle: tokio::runtime::Handle,
@@ -1469,20 +1686,28 @@ mod worker {
             let counters = Arc::new(SupervisorCounters::default());
             let strategy =
                 exit_observation::choose_strategy(Arc::clone(&counters), transparency_log.as_ref());
+            let registry = Arc::new(BindingRegistry::default());
+            #[cfg(unix)]
+            let state_root = crate::egress::create_worker_state_root()
+                .map_err(|error| format!("create private T3 state root: {error}"));
             Self {
                 exec: Arc::new(KernelBindingExecutor {
                     scheduler,
                     crash_detector,
                     transparency_log,
+                    lifecycle_journal,
                     halt_registry,
                     iac,
                     handle,
+                    registry: Arc::downgrade(&registry),
                     outstanding: Mutex::new(Vec::new()),
                 }),
                 strategy,
                 counters,
                 active_paths: Arc::new(ActivePathCount::new()),
-                registry: Arc::new(BindingRegistry::default()),
+                registry,
+                #[cfg(unix)]
+                state_root,
                 next_seq: AtomicU32::new(0),
                 stopping: AtomicBool::new(false),
                 boot_nonce,
@@ -1528,18 +1753,73 @@ mod worker {
             self.registry.views()
         }
 
-        /// Stop every live Worker and latch the supervisor: a Worker that would
-        /// bind after this point is refused [`WorkerSupervisionError::WorkerStopping`].
+        /// Stop every live Worker under one absolute T3 teardown deadline.
         ///
-        /// It does NOT unload: the listener's normal path stops Workers and
-        /// nothing else, because unloading here would run before the door
-        /// shutdown and could unload a Spirit mid-topology-load.
+        /// All active bindings are latched before any CID teardown is dispatched,
+        /// and every action shares one absolute deadline. This does NOT unload
+        /// SCBs: scheduler unload owns mechanism (x), the receipt and hook.
         pub fn stop_workers(&self) {
+            let deadline = Instant::now() + TEARDOWN_BUDGET;
             self.stopping.store(true, Ordering::SeqCst);
-            let cores = self.registry.active();
-            for core in cores {
-                let action = core.begin_stop();
-                core.execute(action);
+            let jobs: Vec<_> = self
+                .registry
+                .active()
+                .into_iter()
+                .map(|core| {
+                    let action = core.begin_stop();
+                    (core, action)
+                })
+                .collect();
+            std::thread::scope(|scope| {
+                let run = |core: Arc<BindingCore>, action| {
+                    core.execute_until(action, deadline);
+                    core.cleanup_container(deadline);
+                };
+                let mut handles = Vec::new();
+                for (core, action) in jobs {
+                    // Concurrent dispatch; a failed thread spawn runs inline.
+                    let job = std::thread::Builder::new().spawn_scoped(scope, {
+                        let core = Arc::clone(&core);
+                        let action = action.clone();
+                        move || run(core, action)
+                    });
+                    match job {
+                        Ok(handle) => handles.push(handle),
+                        Err(_) => run(core, action),
+                    }
+                }
+                for handle in handles {
+                    let _ = handle.join();
+                }
+            });
+        }
+
+        /// Stop a registered binding after any scheduler unload attempt.
+        pub fn stop_binding(&self, spirit_pid: u32) {
+            if let Some(core) = self.registry.by_pid(spirit_pid) {
+                core.stop_session();
+            }
+        }
+
+        /// Report unresolved CIDs once, on the root's stderr sink.
+        pub fn report_unresolved_containers(&self) {
+            for (spirit_id, container_id, residue) in self.registry.take_unreported() {
+                eprintln!(
+                    "maos: worker {spirit_id} unresolved container {container_id} residue={residue:?}"
+                );
+            }
+        }
+        fn cleanup_state_root(&self) {
+            #[cfg(unix)]
+            if let Ok(root) = &self.state_root {
+                if let Err(error) = std::fs::remove_dir(root) {
+                    if error.kind() != std::io::ErrorKind::NotFound {
+                        eprintln!(
+                            "maos: preserving non-empty T3 state root for residue ({})",
+                            error.kind()
+                        );
+                    }
+                }
             }
         }
 
@@ -1593,17 +1873,30 @@ mod worker {
                 .collect()
         }
     }
+    impl Drop for WorkerSupervisor {
+        fn drop(&mut self) {
+            self.cleanup_state_root();
+        }
+    }
 
     impl WorkerSupervision for WorkerSupervisor {
         fn bind(
             &self,
             task: &WorkerTask,
-            bundle: SpiritManifestBundle,
+            mut bundle: SpiritManifestBundle,
         ) -> Result<WorkerBinding, WorkerSupervisionError> {
             if self.stopping.load(Ordering::SeqCst) {
                 return Err(WorkerSupervisionError::WorkerStopping);
             }
-            // Ids are per-root and never reused: the FIRST Worker of a root is
+            if let Some(cap) = self.seams.hook_cap_override {
+                let budget = bundle.budget.get_or_insert_with(|| {
+                    maos_kernel_core::security::manifest::Budget {
+                        context_window_size: 0,
+                        time_cap_seconds: cap,
+                    }
+                });
+                budget.time_cap_seconds = cap;
+            }
             // `worker`, so epic 17's `maos audit query --spirit worker`
             // resolves; later ones are `worker-2`, `worker-3`, …
             let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
@@ -1680,7 +1973,7 @@ mod worker {
         ) -> Result<(), WorkerSupervisionError> {
             maos_kernel_core::security::sandbox::t3::spawn::commit_spawn_report(
                 &self.exec.scheduler,
-                self.exec.scheduler.as_ref(),
+                self.exec.lifecycle_journal.as_ref(),
                 child,
                 core.spirit_id().to_owned(),
                 image,
@@ -1703,6 +1996,23 @@ mod worker {
             self.stopping.load(Ordering::SeqCst)
         }
 
+        fn create_t3_state_dir(&self) -> Result<PathBuf, String> {
+            #[cfg(unix)]
+            {
+                let root = self.state_root.as_ref().map_err(Clone::clone)?;
+                crate::egress::create_worker_state_dir(root)
+                    .map_err(|error| format!("create private T3 state directory: {error}"))
+            }
+            #[cfg(not(unix))]
+            {
+                Err("T3 state directories require Linux".to_string())
+            }
+        }
+
+        fn payload_pidfd(&self) -> bool {
+            self.seams.payload_pidfd
+        }
+
         fn after_mint(&self) {
             if let Some(hook) = &self.seams.after_mint {
                 hook();
@@ -1717,15 +2027,19 @@ mod worker {
         }
     }
 
-    /// The kernel side of every [`BindingAction`].
+    /// Kernel-backed implementation of binding actions and lifecycle plumbing.
+    /// The lifecycle journal is separate from the scheduler adapter because
+    /// spawn-report commits require an adapter that preserves the payload.
     struct KernelBindingExecutor {
         scheduler: Arc<SpiritSchedulerAdapter>,
         crash_detector: Arc<CrashDetector>,
         transparency_log: Arc<TransparencyLogAdapter>,
+        lifecycle_journal: Arc<JournalAdapter>,
         #[allow(dead_code)]
         halt_registry: Arc<HaltRegistry>,
         iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
         handle: tokio::runtime::Handle,
+        registry: Weak<BindingRegistry>,
         outstanding: Mutex<Vec<CrashHandlerHandle>>,
     }
 
@@ -1843,6 +2157,17 @@ mod worker {
                 }),
             }
         }
+        fn classify_exit_with_container(
+            &self,
+            spirit_pid: u32,
+            facts: ExitFacts,
+            container: Option<&ContainerTerminalFacts>,
+        ) -> CrashCause {
+            match container {
+                Some(container) => container.classify(self.stderr_tail(spirit_pid)),
+                None => self.classify_exit(spirit_pid, facts),
+            }
+        }
 
         fn spawn_crash_handler(&self, spirit_pid: u32, cause: CrashCause) -> CrashHandlerHandle {
             let detector = Arc::clone(&self.crash_detector);
@@ -1923,7 +2248,11 @@ mod worker {
         }
 
         fn unload(&self, spirit_pid: u32) {
-            if let Err(error) = self.handle.block_on(self.scheduler.unload(spirit_pid)) {
+            let result = self.handle.block_on(self.scheduler.unload(spirit_pid));
+            if let Some(core) = self.registry.upgrade().and_then(|r| r.by_pid(spirit_pid)) {
+                core.stop_session();
+            }
+            if let Err(error) = result {
                 eprintln!("maos run: worker unload failed for pid {spirit_pid}: {error}");
             }
         }
@@ -1978,18 +2307,15 @@ mod worker {
     }
 
     impl Spirit for WorkerSpirit {
-        /// Stop the runtime-client pidfd and attached container name. `on_unload`
-        /// runs inside `scheduler.unload` under a hook budget, so it must not
-        /// recurse into `unload`; the core decides under lock and executes after
-        /// releasing it.
+        /// Stop the runtime-client pidfd and owned CID. `on_unload` runs under
+        /// a hook budget and never recurses into `unload`.
         fn on_unload(&self, _ctx: &mut Ctx) {
-            let action = self.core.begin_stop();
-            self.core.execute(action);
-            if self.core.phase() == BindingPhase::ExitedClean {
-                self.core.discard_attached_container();
-            } else {
-                self.core.stop_attached_container();
+            match &self.core.seams.on_unload_fault {
+                Some(OnUnloadFault::Panic) => panic!("injected Worker on_unload panic"),
+                Some(OnUnloadFault::Sleep(duration)) => std::thread::sleep(*duration),
+                None => {}
             }
+            self.core.stop_session();
         }
     }
 
@@ -2054,6 +2380,7 @@ mod worker {
             scheduler: Arc<SpiritSchedulerAdapter>,
             crash_detector: Arc<CrashDetector>,
             transparency_log: Arc<TransparencyLogAdapter>,
+            lifecycle_journal: Arc<JournalAdapter>,
             halt_registry: Arc<HaltRegistry>,
             iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
             telemetry: Arc<maos_kernel_core::telemetry::iac_rt::IacRtMetrics>,
@@ -2066,6 +2393,7 @@ mod worker {
                 scheduler,
                 crash_detector,
                 transparency_log,
+                lifecycle_journal,
                 halt_registry,
                 iac,
                 telemetry,
@@ -2082,6 +2410,7 @@ mod worker {
             scheduler: Arc<SpiritSchedulerAdapter>,
             crash_detector: Arc<CrashDetector>,
             transparency_log: Arc<TransparencyLogAdapter>,
+            lifecycle_journal: Arc<JournalAdapter>,
             halt_registry: Arc<HaltRegistry>,
             iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
             telemetry: Arc<maos_kernel_core::telemetry::iac_rt::IacRtMetrics>,
@@ -2117,6 +2446,7 @@ mod worker {
                     Arc::clone(&scheduler),
                     crash_detector,
                     Arc::clone(&transparency_log),
+                    lifecycle_journal,
                     Arc::clone(&halt_registry),
                     iac,
                     tokio::runtime::Handle::current(),
@@ -2211,6 +2541,8 @@ mod worker {
                 }
             }
             self.supervisor.join_outstanding(ROOT_GRACE).await;
+            self.supervisor.report_unresolved_containers();
+            self.supervisor.cleanup_state_root();
         }
     }
 
@@ -2326,7 +2658,10 @@ mod worker {
             // bridge's reader-thread join will never finish and the normal
             // teardown can never run. Write the receipts straight to the
             // Transparency Log and exit, naming the loss.
-            let report = super::unload_all_loaded(&scheduler, &halt_registry).await;
+            let stop_after_unload = |pid| supervisor.stop_binding(pid);
+            let report =
+                super::unload_all_loaded(&scheduler, &halt_registry, Some(&stop_after_unload))
+                    .await;
             report.render(&mut std::io::stderr());
             for (spirit_id, has_child) in supervisor.unstopped_workers() {
                 if has_child {
@@ -2342,6 +2677,7 @@ mod worker {
                     );
                 }
             }
+            supervisor.report_unresolved_containers();
             // Stated loss: `cap.revoke` channel rows, and the completion rows
             // of door commands still running.
             std::process::exit(1);
@@ -2467,6 +2803,7 @@ pub mod exit_observation {
     mod linux {
         use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
         use std::sync::Arc;
+        use std::time::Instant;
 
         use rustix::process::{
             pidfd_open, pidfd_send_signal, waitid, Pid, PidfdFlags, Signal, WaitId, WaitIdOptions,
@@ -2474,6 +2811,7 @@ pub mod exit_observation {
 
         use super::super::worker::{BindingCore, SupervisorCounters};
         use super::{ExitFacts, ExitObservation, ObserveOutcome, SignalOutcome};
+        use maos_kernel_core::lifecycle::cli_wrapper::TEARDOWN_BUDGET;
 
         /// A pidfd on one Worker's direct child.
         ///
@@ -2541,7 +2879,7 @@ pub mod exit_observation {
                 match core.store_child(child_pid, child) {
                     Ok(action) => {
                         if matches!(action, super::super::worker::BindingAction::Signal) {
-                            core.signal();
+                            core.signal(Instant::now() + TEARDOWN_BUDGET);
                         }
                     }
                     Err(refusal) => {
@@ -2718,8 +3056,8 @@ pub mod exit_observation {
 #[cfg(feature = "network")]
 pub use worker::{
     ActivePathCount, BindingAction, BindingCore, BindingExecutor, BindingPhase, CrashHandlerHandle,
-    CrashOutcome, LiveWorker, ObserverGate, PhaseRefusal, RootSupervision, SupervisorCounters,
-    SupervisorSeams, WorkerBinding, WorkerBindingView, WorkerSpirit, WorkerSupervision,
-    WorkerSupervisionError, WorkerSupervisor, WorkerTask, ARMED_MARKER, CRASH_HANDLER_JOIN_BUDGET,
-    DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE, STAMPER_TICK,
+    CrashOutcome, LiveWorker, ObserverGate, OnUnloadFault, PhaseRefusal, RootSupervision,
+    SupervisorCounters, SupervisorSeams, WorkerBinding, WorkerBindingView, WorkerSpirit,
+    WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask, ARMED_MARKER,
+    CRASH_HANDLER_JOIN_BUDGET, DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE, STAMPER_TICK,
 };

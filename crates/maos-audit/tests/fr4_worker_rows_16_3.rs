@@ -15,7 +15,7 @@
 use std::path::Path;
 
 use maos_audit::fr4_classifier::{classify_fr4_row, Fr4RowDisposition};
-use maos_audit::{query, AuditEntry, AuditFilter};
+use maos_audit::{query, to_fr4_plain, AuditEntry, AuditError, AuditFilter};
 use rusqlite::Connection;
 
 /// The crash detector's measured `task.orphaned` payload. The 16-byte task
@@ -42,7 +42,28 @@ fn tokenless(kind: &str, intent: &str, pid: u32, payload: &str) -> AuditEntry {
     entry(kind, intent, pid, None, payload)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+#[test]
+fn malformed_five_key_exit_row_is_a_fr4_violation() {
+    let payload = r#"{"event":"cli_subprocess_exit","cli_child_pid":4243,"exit_cause":"exit","is_crash":false,"container":{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true}}"#;
+    let mut out = Vec::new();
+    let error = to_fr4_plain(
+        [tokenless(
+            "capability.invocation",
+            "cli.subprocess.exit",
+            4242,
+            payload,
+        )],
+        &mut out,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        AuditError::Fr4SchemaViolation {
+            missing_field: "capability_token",
+            ..
+        }
+    ));
+}
 // Kind 21 — the Worker's own subprocess output is never a call
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -96,6 +117,77 @@ fn tokenless_host_grant_task_orphaned_is_a_non_call() {
     assert_eq!(
         classify_fr4_row(&row),
         Fr4RowDisposition::NonCallKernelEvent
+    );
+}
+
+#[test]
+fn cli_exit_native_and_t3_finalized_rows_are_non_calls() {
+    let native = r#"{"event":"cli_subprocess_exit","cli_child_pid":4243,"exit_cause":"exit","is_crash":false}"#;
+    let records = [
+        r#"{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true,"residue":null}"#,
+        r#"{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"runtime","removed":true,"residue":null}"#,
+        r#"{"runtime_exit_code":null,"oom_marker":null,"payload_exit":"unknown","payload_exit_source":"none","removed":true,"residue":null}"#,
+        r#"{"runtime_exit_code":137,"oom_marker":true,"payload_exit":"unknown","payload_exit_source":"none","removed":false,"residue":"still_exists"}"#,
+    ];
+    let mut rows = vec![tokenless(
+        "capability.invocation",
+        "cli.subprocess.exit",
+        4242,
+        native,
+    )];
+    for record in records {
+        rows.push(tokenless(
+            "capability.invocation",
+            "cli.subprocess.exit",
+            4242,
+            &format!(r#"{{"event":"cli_subprocess_exit","cli_child_pid":4243,"exit_cause":"exit","is_crash":false,"container":{record}}}"#),
+        ));
+    }
+    for row in rows {
+        assert_eq!(
+            classify_fr4_row(&row),
+            Fr4RowDisposition::NonCallKernelEvent
+        );
+    }
+}
+
+#[test]
+fn malformed_t3_exit_rows_fail_closed() {
+    let invalid = [
+        r#"null"#,
+        r#"7"#,
+        r#"{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true}"#,
+        r#"{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true,"residue":null,"extra":1}"#,
+        r#"{"runtime_exit_code":"0","oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true,"residue":null}"#,
+        r#"{"runtime_exit_code":null,"oom_marker":null,"payload_exit":"unknown","payload_exit_source":"pidfd","removed":true,"residue":null}"#,
+        r#"{"runtime_exit_code":137,"oom_marker":false,"payload_exit":"signaled(sig=9)","payload_exit_source":"runtime","removed":true,"residue":null}"#,
+        r#"{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true,"residue":"still_exists"}"#,
+    ];
+    for container in invalid {
+        let payload = format!(
+            r#"{{"event":"cli_subprocess_exit","cli_child_pid":4243,"exit_cause":"exit","is_crash":false,"container":{container}}}"#
+        );
+        let row = tokenless(
+            "capability.invocation",
+            "cli.subprocess.exit",
+            4242,
+            &payload,
+        );
+        assert_eq!(
+            classify_fr4_row(&row),
+            Fr4RowDisposition::Call,
+            "{container}"
+        );
+    }
+    let fifth = r#"{"event":"cli_subprocess_exit","cli_child_pid":4243,"exit_cause":"exit","is_crash":false,"other":null}"#;
+    assert_eq!(
+        classify_fr4_row(&tokenless(
+            "capability.invocation",
+            "cli.subprocess.exit",
+            4242,
+            fifth
+        )),
+        Fr4RowDisposition::Call
     );
 }
 

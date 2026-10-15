@@ -486,7 +486,7 @@ pub async fn run_admitted_session(
                 .and_then(|result| result.map_err(|error| SessionError::Bridge(error.to_string()))),
             None => Ok(()),
         };
-        live.binding.finish(&exit.cause);
+        live.binding.finish(&exit);
         if let Err(error) = result {
             if matches!(error, SessionError::UnexpectedEof) {
                 if !ready {

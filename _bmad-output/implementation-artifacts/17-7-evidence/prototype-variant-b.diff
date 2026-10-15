@@ -1,0 +1,864 @@
+diff --git a/crates/maos-domain/src/sandbox.rs b/crates/maos-domain/src/sandbox.rs
+index 0a2a152..0cbcbda 100644
+--- a/crates/maos-domain/src/sandbox.rs
++++ b/crates/maos-domain/src/sandbox.rs
+@@ -290,14 +290,64 @@ pub enum T3Error {
+     Io(String),
+ }
+ 
++// ---------------------------------------------------------------------------
++// Container terminal observations
++// ---------------------------------------------------------------------------
++
++/// What the runtime reported when waiting for the container payload.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++#[non_exhaustive]
++pub enum ContainerPayloadWaitStatus {
++    Exited,
++    Signaled,
++    Unknown,
++}
++
++/// Whether terminal facts could be obtained from the container runtime.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++#[non_exhaustive]
++pub enum ContainerObservationAvailability {
++    Available,
++    Unavailable,
++}
++
++/// Terminal-state facts observed for a container payload.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct ContainerTerminalFacts {
++    pub observation: ContainerObservationAvailability,
++    pub payload_wait_status: ContainerPayloadWaitStatus,
++    pub exit_code: Option<i32>,
++    pub exit_signal: Option<i32>,
++    pub runtime_status: String,
++    pub runtime_exit_code: Option<i32>,
++    pub oom_marker: Option<bool>,
++    pub runtime_error: Option<String>,
++    pub started_at: Option<String>,
++    pub finished_at: Option<String>,
++    pub observed_pid: Option<u32>,
++    pub container_id: String,
++    pub runtime: String,
++}
++
+ // ---------------------------------------------------------------------------
+ // SandboxInspectReport
+ // ---------------------------------------------------------------------------
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++#[non_exhaustive]
++pub enum ObservedContainerPid {
++    Live { pid: u32 },
++    Historical { pid: u32 },
++}
++
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct SandboxInspectReport {
+     pub spirit_id: String,
+-    pub pid: u32,
++    pub pid: ObservedContainerPid,
++    pub container_id: String,
+     pub runtime: String,
+     pub image_sha: String,
+     pub applied_t2_protections: T2ProtectionSummary,
+@@ -488,7 +538,8 @@ mod tests {
+     fn sandbox_inspect_report_serde_roundtrip() {
+         let report = SandboxInspectReport {
+             spirit_id: "test-spirit".into(),
+-            pid: 42,
++            pid: ObservedContainerPid::Live { pid: 42 },
++            container_id: "container-123".into(),
+             runtime: "podman".into(),
+             image_sha: "abc123".into(),
+             applied_t2_protections: T2ProtectionSummary {
+diff --git a/crates/maos-domain/src/supervision.rs b/crates/maos-domain/src/supervision.rs
+index 007ae2b..95ede6e 100644
+--- a/crates/maos-domain/src/supervision.rs
++++ b/crates/maos-domain/src/supervision.rs
+@@ -62,7 +62,11 @@ impl CrashCause {
+ 
+     pub fn exit_signal(&self) -> Option<i32> {
+         match self {
+-            CrashCause::Fault(FaultCause::SignaledByKernel { signal, .. }) => Some(*signal),
++            CrashCause::Fault(FaultCause::SignaledByKernel { signal, .. })
++            | CrashCause::Fault(FaultCause::OomKilled {
++                exit_signal: Some(signal),
++                ..
++            }) => Some(*signal),
+             _ => None,
+         }
+     }
+@@ -106,7 +110,10 @@ pub enum FaultCause {
+         stderr_tail: Option<String>,
+     },
+     /// OOM killer terminated the subprocess.
+-    OomKilled { stderr_tail: Option<String> },
++    OomKilled {
++        exit_signal: Option<i32>,
++        stderr_tail: Option<String>,
++    },
+     /// Hook exceeded its budget cap.
+     Timeout { hook_name: String, cap_seconds: u64 },
+     /// CBOR or wire-format truncation.
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs
+index 1205016..0403704 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/mod.rs
+@@ -32,6 +32,7 @@ pub mod admission;
+ pub mod lifecycle;
+ pub mod runtime;
+ 
++pub use crate::security::sandbox::t3::child::{ContainerTerminal, ContainerTerminalFacts};
+ pub use admission::{
+     admit_cli_wrapper_journaled, probe_and_verify_shape, reject_respawn_with_context,
+     resolve_cli_wrapper_tier,
+diff --git a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+index a76d2d8..610ccc7 100644
+--- a/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
++++ b/crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs
+@@ -60,7 +60,7 @@ use crate::capability::cap_audit;
+ use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
+ use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
+ use crate::security::sandbox::t3::{
+-    child::SandboxedContainerChild,
++    child::{ContainerTerminal, SandboxedContainerChild},
+     image_lock::VerifiedImageAttestation,
+     spawn::{runtime_command, spawn_t3, T3SpawnContext},
+ };
+@@ -259,6 +259,7 @@ pub struct T3Launch {
+     pub boot_nonce: u64,
+     pub container_name: String,
+     pub egress_socket: Option<std::path::PathBuf>,
++    pub state_dir: std::path::PathBuf,
+ }
+ 
+ /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
+@@ -339,6 +340,7 @@ pub enum BridgePoll {
+ pub struct BridgeExit {
+     pub cause: ExitCause,
+     pub child_pid: u32,
++    pub container: Option<crate::security::sandbox::t3::child::ContainerTerminalFacts>,
+ }
+ 
+ /// Read one newline-delimited record (`NdjsonOverStdio` / `Raw`). `Raw` has no
+@@ -478,19 +480,7 @@ impl BridgeChild {
+                     Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
+                     result => result,
+                 };
+-                let runtime_result = runtime_command(&guard.runtime.path)
+-                    .args(["kill", &guard.container_name])
+-                    .stdout(Stdio::null())
+-                    .stderr(Stdio::null())
+-                    .status()
+-                    .and_then(|status| {
+-                        if status.success() {
+-                            Ok(())
+-                        } else {
+-                            Err(std::io::Error::other("container runtime refused kill"))
+-                        }
+-                    });
+-                child_result.and(runtime_result)
++                child_result.and(guard.terminal().kill())
+             }
+             Self::Plain(child) => child.kill(),
+             #[cfg(target_os = "linux")]
+@@ -570,6 +560,7 @@ fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChil
+                 boot_nonce: launch.boot_nonce,
+                 container_name: launch.container_name,
+                 egress_socket: launch.egress_socket.as_deref(),
++                state_dir: &launch.state_dir,
+                 env: &spec.env,
+             };
+             return spawn_t3(&spec.sandbox, &launch.image, argv, spawn_context)
+@@ -698,6 +689,12 @@ impl SpawnedBridge {
+     pub fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
+         self.child.as_ref().and_then(BridgeChild::container)
+     }
++    pub fn container_terminal(&self) -> Option<std::sync::Arc<ContainerTerminal>> {
++        self.child.as_ref().and_then(|child| match child {
++            BridgeChild::Container(guard, _) => Some(guard.terminal()),
++            _ => None,
++        })
++    }
+ }
+ 
+ #[cfg(target_os = "linux")]
+@@ -943,6 +940,14 @@ impl SpawnedBridge {
+             .as_ref()
+             .and_then(BridgeChild::cgroup_path)
+             .map_or(0, cgroup_oom_kills);
++        let (container, residue) = match self.child.as_ref() {
++            Some(BridgeChild::Container(guard, _)) => {
++                let facts = Some(guard.terminal().facts().clone());
++                let residue = guard.terminal().remove().err();
++                (facts, residue)
++            }
++            _ => (None, None),
++        };
+         // The child is now reaped (wait consumed it). Mark consumed so Drop does
+         // not double-wait.
+         self.child = None;
+@@ -971,11 +976,27 @@ impl SpawnedBridge {
+             );
+         }
+ 
++        let container_json = match (&container, &residue) {
++            (Some(facts), residue) => serde_json::json!({
++                "cid": self.container_terminal().map(|t| t.cid.clone()),
++                "runtime_exit_code": facts.runtime_exit_code,
++                "oom_marker": facts.oom_marker,
++                "state": facts.runtime_status,
++                "payload_status": facts.payload_wait_status,
++                "payload_exit_code": facts.exit_code,
++                "payload_exit_signal": facts.exit_signal,
++                "residue": residue,
++            }),
++            (None, residue) => {
++                serde_json::json!({ "cid": self.container_terminal().map(|t| t.cid.clone()), "state": "unavailable", "payload_status": "unknown", "residue": residue })
++            }
++        };
+         let payload = serde_json::json!({
+             "event": "cli_subprocess_exit",
+             "cli_child_pid": self.child_pid,
+             "exit_cause": cause.describe(),
+             "is_crash": cause.is_crash(),
++            "container": self.container_terminal().map(|_| container_json),
+         });
+         let _ = journal.insert_frame_event_with_sender(
+             FrameKind::CapabilityInvocation,
+@@ -993,6 +1014,7 @@ impl SpawnedBridge {
+         BridgeExit {
+             cause,
+             child_pid: self.child_pid,
++            container,
+         }
+     }
+ 
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+index fe8907e..c45da81 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/argv.rs
+@@ -33,6 +33,7 @@ pub fn build_runtime_argv(
+     spirit_id: &str,
+     boot_nonce: u64,
+     container_name: &str,
++    pidfile: &Path,
+     egress_socket: Option<&Path>,
+     env: &[(String, String)],
+ ) -> Result<Vec<String>, maos_domain::sandbox::T3Error> {
+@@ -70,8 +71,9 @@ pub fn build_runtime_argv(
+ 
+     let mut argv = vec![
+         runtime.path.to_string_lossy().to_string(),
+-        "run".to_string(),
+-        "--rm".to_string(),
++        "create".to_string(),
++        format!("--pidfile={}", pidfile.display()),
++        "--restart=no".to_string(),
+         "--cap-drop=ALL".to_string(),
+         "--security-opt=no-new-privileges".to_string(),
+         "--network=none".to_string(),
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+index 52831ac..0a2205a 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/child.rs
+@@ -1,52 +1,212 @@
+-//! `SandboxedContainerChild` — RAII guard for a T3 container child process.
+-//!
+-//! On drop, runs best-effort cleanup: SIGTERM the runtime parent,
+-//! then `stop --time=2` + `rm -f` the container.
+-
+-use std::process::Child;
+-
++//! RAII guard for the runtime client and its persistent container.
+ use super::runtime_detect::ContainerRuntime;
++pub use maos_domain::sandbox::ContainerTerminalFacts;
++use std::{
++    path::PathBuf,
++    process::Child,
++    sync::{Arc, OnceLock},
++};
++
++pub struct ContainerTerminal {
++    pub runtime: ContainerRuntime,
++    pub cid: String,
++    startup_pid: u32,
++    facts: OnceLock<ContainerTerminalFacts>,
++}
++#[doc(hidden)]
++pub fn parse_container_state(
++    bytes: &[u8],
++    runtime: &str,
++    cid: &str,
++    startup_pid: u32,
++) -> ContainerTerminalFacts {
++    let unavailable = || ContainerTerminalFacts {
++        observation: maos_domain::sandbox::ContainerObservationAvailability::Unavailable,
++        payload_wait_status: maos_domain::sandbox::ContainerPayloadWaitStatus::Unknown,
++        exit_code: None,
++        exit_signal: None,
++        runtime_status: String::new(),
++        runtime_exit_code: None,
++        oom_marker: None,
++        runtime_error: None,
++        started_at: None,
++        finished_at: None,
++        observed_pid: Some(startup_pid),
++        container_id: cid.into(),
++        runtime: runtime.into(),
++    };
++    let Ok(state) = serde_json::from_slice::<serde_json::Value>(bytes) else {
++        return unavailable();
++    };
++    let (Some(status), Some(exit_code), Some(oom_marker)) = (
++        state.get("Status").and_then(|v| v.as_str()),
++        state
++            .get("ExitCode")
++            .and_then(|v| v.as_i64())
++            .and_then(|v| i32::try_from(v).ok()),
++        state.get("OOMKilled").and_then(|v| v.as_bool()),
++    ) else {
++        return unavailable();
++    };
++    ContainerTerminalFacts {
++        observation: maos_domain::sandbox::ContainerObservationAvailability::Available,
++        payload_wait_status: maos_domain::sandbox::ContainerPayloadWaitStatus::Unknown,
++        exit_code: None,
++        exit_signal: None,
++        runtime_status: status.into(),
++        runtime_exit_code: Some(exit_code),
++        oom_marker: Some(oom_marker),
++        runtime_error: state
++            .get("Error")
++            .and_then(|v| v.as_str())
++            .filter(|s| !s.is_empty())
++            .map(str::to_owned),
++        started_at: state
++            .get("StartedAt")
++            .and_then(|v| v.as_str())
++            .map(str::to_owned),
++        finished_at: state
++            .get("FinishedAt")
++            .and_then(|v| v.as_str())
++            .map(str::to_owned),
++        observed_pid: state
++            .get("Pid")
++            .and_then(|v| v.as_u64())
++            .and_then(|v| u32::try_from(v).ok()),
++        container_id: cid.into(),
++        runtime: runtime.into(),
++    }
++}
++impl ContainerTerminal {
++    pub(crate) fn new(runtime: ContainerRuntime, cid: String, startup_pid: u32) -> Self {
++        Self {
++            runtime,
++            cid,
++            startup_pid,
++            facts: OnceLock::new(),
++        }
++    }
++    pub fn facts(&self) -> &ContainerTerminalFacts {
++        self.facts.get_or_init(|| {
++            let unavailable = || ContainerTerminalFacts {
++                observation: maos_domain::sandbox::ContainerObservationAvailability::Unavailable,
++                payload_wait_status: maos_domain::sandbox::ContainerPayloadWaitStatus::Unknown,
++                exit_code: None,
++                exit_signal: None,
++                runtime_status: String::new(),
++                runtime_exit_code: None,
++                oom_marker: None,
++                runtime_error: None,
++                started_at: None,
++                finished_at: None,
++                observed_pid: Some(self.startup_pid),
++                container_id: self.cid.clone(),
++                runtime: self.runtime.kind.as_str().to_owned(),
++            };
++            let out = match super::spawn::runtime_call_bounded_for(
++                &self.runtime.path,
++                &["inspect", "--format", "{{json .State}}", &self.cid],
++                std::time::Duration::from_secs(2),
++            ) {
++                Some(out) if out.status.success() => out,
++                _ => return unavailable(),
++            };
++            let Ok(state) = serde_json::from_slice::<serde_json::Value>(&out.stdout) else {
++                return unavailable();
++            };
++            let (status, runtime_code, oom, error, started, finished, pid) = match (
++                state.get("Status").and_then(|v| v.as_str()),
++                state
++                    .get("ExitCode")
++                    .and_then(|v| v.as_i64())
++                    .and_then(|v| i32::try_from(v).ok()),
++                state.get("OOMKilled").and_then(|v| v.as_bool()),
++                state.get("Error").and_then(|v| v.as_str()),
++                state.get("StartedAt").and_then(|v| v.as_str()),
++                state.get("FinishedAt").and_then(|v| v.as_str()),
++                state
++                    .get("Pid")
++                    .and_then(|v| v.as_u64())
++                    .and_then(|v| u32::try_from(v).ok()),
++            ) {
++                (Some(a), Some(b), Some(c), d, e, f, Some(g)) => (
++                    a.to_owned(),
++                    b,
++                    c,
++                    d.map(str::to_owned),
++                    e.map(str::to_owned),
++                    f.map(str::to_owned),
++                    g,
++                ),
++                _ => return unavailable(),
++            };
++            ContainerTerminalFacts {
++                observation: maos_domain::sandbox::ContainerObservationAvailability::Available,
++                payload_wait_status: maos_domain::sandbox::ContainerPayloadWaitStatus::Unknown,
++                exit_code: None,
++                exit_signal: None,
++                runtime_status: status,
++                runtime_exit_code: Some(runtime_code),
++                oom_marker: Some(oom),
++                runtime_error: error,
++                started_at: started,
++                finished_at: finished,
++                observed_pid: Some(pid),
++                container_id: self.cid.clone(),
++                runtime: self.runtime.kind.as_str().to_owned(),
++            }
++        })
++    }
++    pub fn kill(&self) -> std::io::Result<()> {
++        let out = super::spawn::runtime_call_bounded(&self.runtime.path, &["kill", &self.cid])
++            .ok_or_else(|| {
++                std::io::Error::new(std::io::ErrorKind::TimedOut, "runtime kill timed out")
++            })?;
++        if out.status.success() {
++            Ok(())
++        } else {
++            Err(std::io::Error::other("runtime kill failed"))
++        }
++    }
++    pub fn remove(&self) -> Result<(), String> {
++        let out = super::spawn::runtime_call_bounded(
++            &self.runtime.path,
++            &["rm", "--force", "--volumes", "--time=0", &self.cid],
++        )
++        .ok_or_else(|| "runtime rm timed out".to_owned())?;
++        if out.status.success() {
++            Ok(())
++        } else {
++            Err(String::from_utf8_lossy(&out.stderr).into_owned())
++        }
++    }
++}
+ 
+-/// RAII guard for a T3 container-launched child.
+-///
+-/// `child` is the runtime parent process (the `podman run` / `docker run`
+-/// command). `host_pid` is the host-namespace PID of the in-container
+-/// process, captured via `<runtime> inspect`.
+-///
+-/// On drop:
+-/// 1. Kills the runtime parent (`Child::kill`)
+-/// 2. Reaps with `Child::wait`
+-/// 3. Stops the container (`<runtime> stop --time=2 <container_name>`)
+-/// 4. Removes the container (`<runtime> rm -f <container_name>`)
+ pub struct SandboxedContainerChild {
+     pub child: Option<Child>,
+-    pub host_pid: u32,
++    pub startup_pid: u32,
+     pub container_name: String,
++    pub cid: String,
++    pub state_dir: PathBuf,
+     pub runtime: ContainerRuntime,
++    pub(super) terminal: Arc<ContainerTerminal>,
+ }
+-
+ impl SandboxedContainerChild {
+-    /// Wait for the child to exit and collect its output.
+-    /// This consumes the child handle — only call once.
+     pub fn wait_with_output(&mut self) -> Result<std::process::Output, std::io::Error> {
+         self.child
+             .take()
+-            .ok_or_else(|| {
+-                std::io::Error::new(std::io::ErrorKind::Other, "child already consumed")
+-            })?
++            .ok_or_else(|| std::io::Error::other("child already consumed"))?
+             .wait_with_output()
+     }
+-
+-    /// Try to wait for the child without blocking.
+     pub fn try_wait(&mut self) -> Result<Option<std::process::ExitStatus>, std::io::Error> {
+         match &mut self.child {
+             Some(child) => child.try_wait(),
+             None => Ok(None),
+         }
+     }
+-
+-    /// Project the data observed at successful runtime spawn into the live
+-    /// operator report shape.  The caller commits it to the owning SCB.
++    pub fn terminal(&self) -> Arc<ContainerTerminal> {
++        self.terminal.clone()
++    }
+     pub fn inspect_report(
+         &self,
+         spirit_id: String,
+@@ -54,7 +214,10 @@ impl SandboxedContainerChild {
+     ) -> maos_domain::sandbox::SandboxInspectReport {
+         maos_domain::sandbox::SandboxInspectReport {
+             spirit_id,
+-            pid: self.host_pid,
++            pid: maos_domain::sandbox::ObservedContainerPid::Historical {
++                pid: self.startup_pid,
++            },
++            container_id: self.cid.clone(),
+             runtime: self.runtime.kind.as_str().to_owned(),
+             image_sha: hex::encode(image.entry().image_sha256),
+             applied_t2_protections: maos_domain::sandbox::T2ProtectionSummary {
+@@ -72,28 +235,21 @@ impl SandboxedContainerChild {
+         }
+     }
+ }
+-
+ impl Drop for SandboxedContainerChild {
+     fn drop(&mut self) {
+-        // Step 1: kill the runtime parent
+-        if let Some(ref mut child) = self.child {
++        if let Some(mut child) = self.child.take() {
+             let _ = child.kill();
+             let _ = child.wait();
+         }
+-
+-        // Step 2: stop the container (best-effort, 2s timeout mirrors
+-        // the existing Child::kill + wait pattern at sandbox/mod.rs:108-118).
+-        // Bounded: a stuck runtime client is killed at the deadline instead
+-        // of hanging daemon teardown on an unbounded `.status()` wait.
+-        let _ = super::spawn::runtime_call_bounded(
+-            &self.runtime.path,
+-            &["stop", "--time=2", &self.container_name],
+-        );
+-
+-        // Step 3: remove the container (best-effort; --rm would also handle this)
+-        let _ = super::spawn::runtime_call_bounded(
+-            &self.runtime.path,
+-            &["rm", "-f", &self.container_name],
+-        );
++        let _ = self.terminal.facts();
++        if let Err(e) = self.terminal.remove() {
++            eprintln!("container cleanup residue {}: {e}", self.cid);
++        }
++        if let Err(e) = std::fs::remove_dir_all(&self.state_dir) {
++            eprintln!(
++                "container state cleanup residue {}: {e}",
++                self.state_dir.display()
++            );
++        }
+     }
+ }
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs b/crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs
+index 5845c1e..e21836b 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs
+@@ -45,6 +45,21 @@ impl VerifiedImageAttestation {
+     pub(crate) fn for_test(attestation: T3ImageAttestation, entry: T3ImageEntry) -> Self {
+         Self { attestation, entry }
+     }
++    #[doc(hidden)]
++    pub fn for_probe(image_uri: String, image_sha256: [u8; 32]) -> Self {
++        let entry = T3ImageEntry::new(image_uri, image_sha256, "probe", true)
++            .expect("probe image entry is valid");
++        let attestation = T3ImageAttestation::new(
++            maos_domain::sandbox::ImageAttestationId([1; 32]),
++            1,
++            0,
++            vec![entry.clone()],
++            [1; 64],
++            [1; 32],
++        )
++        .expect("probe attestation shape is valid");
++        Self { attestation, entry }
++    }
+ }
+ 
+ /// Loaded T3 image lock file. This is parse-only and must not reach spawning.
+diff --git a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+index 63c3d2f..43d759a 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs
+@@ -39,6 +39,8 @@ pub struct T3SpawnContext<'a> {
+     pub container_name: String,
+     /// Optional daemon-owned proxy socket.
+     pub egress_socket: Option<&'a Path>,
++    /// Private per-spawn directory for the OCI pidfile.
++    pub state_dir: &'a Path,
+     /// Explicit environment passed to the container (never as argument values).
+     pub env: &'a [(String, String)],
+ }
+@@ -68,19 +70,55 @@ pub(crate) fn runtime_call_bounded(
+     runtime: &Path,
+     arguments: &[&str],
+ ) -> Option<std::process::Output> {
+-    const CLIENT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
++    runtime_call_bounded_for(runtime, arguments, std::time::Duration::from_secs(10))
++}
++
++pub(crate) fn runtime_call_bounded_for(
++    runtime: &Path,
++    arguments: &[&str],
++    deadline: std::time::Duration,
++) -> Option<std::process::Output> {
++    let mut child = runtime_command(runtime)
++        .args(arguments)
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()
++        .ok()?;
++    let end = std::time::Instant::now() + deadline;
++    loop {
++        match child.try_wait() {
++            Ok(Some(_)) => return child.wait_with_output().ok(),
++            Ok(None) if std::time::Instant::now() < end => {
++                std::thread::sleep(std::time::Duration::from_millis(10))
++            }
++            _ => {
++                let _ = child.kill();
++                let _ = child.wait();
++                return None;
++            }
++        }
++    }
++}
++
++fn runtime_call_bounded_env(
++    runtime: &Path,
++    arguments: &[String],
++    env: &[(String, String)],
++    deadline: std::time::Duration,
++) -> Option<std::process::Output> {
+     let mut child = runtime_command(runtime)
+         .args(arguments)
++        .envs(env.iter().map(|(k, v)| (k, v)))
+         .stdout(Stdio::piped())
+-        .stderr(Stdio::null())
++        .stderr(Stdio::piped())
+         .spawn()
+         .ok()?;
+-    let deadline = std::time::Instant::now() + CLIENT_DEADLINE;
++    let end = std::time::Instant::now() + deadline;
+     loop {
+         match child.try_wait() {
+             Ok(Some(_)) => return child.wait_with_output().ok(),
+-            Ok(None) if std::time::Instant::now() < deadline => {
+-                std::thread::sleep(std::time::Duration::from_millis(20));
++            Ok(None) if std::time::Instant::now() < end => {
++                std::thread::sleep(std::time::Duration::from_millis(10))
+             }
+             _ => {
+                 let _ = child.kill();
+@@ -91,6 +129,64 @@ pub(crate) fn runtime_call_bounded(
+     }
+ }
+ 
++#[doc(hidden)]
++pub fn valid_cid(cid: &str) -> bool {
++    cid.len() == 64
++        && cid
++            .bytes()
++            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
++}
++
++#[doc(hidden)]
++pub fn validate_state_dir(path: &Path) -> std::io::Result<()> {
++    use std::os::unix::fs::{MetadataExt, PermissionsExt};
++    let meta = std::fs::symlink_metadata(path)?;
++    let effective_uid = std::fs::metadata("/proc/self")?.uid();
++    if !meta.is_dir() || meta.uid() != effective_uid || meta.permissions().mode() & 0o777 != 0o700 {
++        return Err(std::io::Error::new(
++            std::io::ErrorKind::PermissionDenied,
++            "state dir must be euid-owned mode 0700",
++        ));
++    }
++    if path.join("init.pid").exists() || std::fs::symlink_metadata(path.join("init.pid")).is_ok() {
++        return Err(std::io::Error::new(
++            std::io::ErrorKind::AlreadyExists,
++            "pidfile already exists",
++        ));
++    }
++    Ok(())
++}
++
++#[doc(hidden)]
++pub fn read_pidfile(path: &Path) -> std::io::Result<u32> {
++    use std::os::unix::fs::OpenOptionsExt;
++    let file = std::fs::OpenOptions::new()
++        .read(true)
++        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
++        .open(path)?;
++    let meta = file.metadata()?;
++    if !meta.is_file() {
++        return Err(std::io::Error::new(
++            std::io::ErrorKind::InvalidData,
++            "pidfile is not regular",
++        ));
++    }
++    let mut text = String::new();
++    use std::io::Read;
++    (&file).take(64).read_to_string(&mut text)?;
++    let pid = text
++        .trim()
++        .parse::<u32>()
++        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid pidfile"))?;
++    if pid == 0 {
++        return Err(std::io::Error::new(
++            std::io::ErrorKind::InvalidData,
++            "zero pid",
++        ));
++    }
++    Ok(pid)
++}
++
+ /// The runtime must self-report rootless operation before it may carry a T3
+ /// spawn. `podman info` is the attestation surface; docker and rootful podman
+ /// do not report rootless and are refused.
+@@ -165,6 +261,8 @@ pub fn spawn_t3(
+             });
+         }
+ 
++        validate_state_dir(parent.state_dir).map_err(SpawnError::Io)?;
++        let pidfile = parent.state_dir.join("init.pid");
+         let argv = super::argv::build_runtime_argv(
+             &runtime,
+             image,
+@@ -174,34 +272,66 @@ pub fn spawn_t3(
+             &spec.spirit_id,
+             parent.boot_nonce,
+             &parent.container_name,
++            &pidfile,
+             parent.egress_socket,
+             parent.env,
+         )
+         .map_err(|error| SpawnError::T3ImageInspect {
+             reason: error.to_string(),
+         })?;
+-
+-        let mut cmd = runtime_command(&argv[0]);
+-        cmd.args(&argv[1..])
+-            .envs(parent.env.iter().map(|(name, value)| (name, value)))
++        let create = runtime_call_bounded_env(
++            &runtime.path,
++            &argv[1..],
++            parent.env,
++            std::time::Duration::from_secs(10),
++        )
++        .ok_or(T3Error::RuntimeUnavailable)
++        .map_err(|e| SpawnError::T3RuntimeUnavailable {
++            reason: e.to_string(),
++        })?;
++        if !create.status.success() {
++            return Err(SpawnError::T3RuntimeUnavailable {
++                reason: String::from_utf8_lossy(&create.stderr).into_owned(),
++            });
++        }
++        let cid = String::from_utf8_lossy(&create.stdout).trim().to_owned();
++        if !valid_cid(&cid) {
++            return Err(SpawnError::T3RuntimeUnavailable {
++                reason: "runtime returned invalid container id".into(),
++            });
++        }
++        let init = runtime_call_bounded(&runtime.path, &["init", &cid]).ok_or_else(|| {
++            SpawnError::T3RuntimeUnavailable {
++                reason: "runtime init timed out".into(),
++            }
++        })?;
++        if !init.status.success() {
++            return Err(SpawnError::T3RuntimeUnavailable {
++                reason: String::from_utf8_lossy(&init.stderr).into_owned(),
++            });
++        }
++        let startup_pid = read_pidfile(&pidfile).map_err(SpawnError::Io)?;
++        let terminal = std::sync::Arc::new(super::child::ContainerTerminal::new(
++            runtime.clone(),
++            cid.clone(),
++            startup_pid,
++        ));
++        let start = runtime_command(&runtime.path)
++            .args(["start", "--attach", &cid])
+             .stdin(Stdio::piped())
+             .stdout(Stdio::piped())
+-            .stderr(Stdio::piped());
+-        let child = cmd.spawn().map_err(SpawnError::Io)?;
+-        let mut guard = SandboxedContainerChild {
+-            child: Some(child),
+-            host_pid: 0,
++            .stderr(Stdio::piped())
++            .spawn()
++            .map_err(SpawnError::Io)?;
++        Ok(SandboxedContainerChild {
++            child: Some(start),
++            startup_pid,
+             container_name: parent.container_name,
++            cid,
++            state_dir: parent.state_dir.to_path_buf(),
+             runtime,
+-        };
+-        guard.host_pid = inspect_container_host_pid(&guard.runtime, &guard.container_name)
+-            .map_err(|e| {
+-                SpawnError::Io(std::io::Error::new(
+-                    std::io::ErrorKind::Other,
+-                    e.to_string(),
+-                ))
+-            })?;
+-        Ok(guard)
++            terminal,
++        })
+     }
+ }
+ 
+@@ -221,38 +351,3 @@ pub fn commit_spawn_report(
+         .record_sandbox_application(child.inspect_report(spirit_id, image), journal)
+         .map_err(|reason| SpawnError::T3ReportCommit { reason })
+ }
+-
+-/// Inspect the host-namespace PID of a container.
+-///
+-/// Runs `<runtime> inspect --format '{{.State.Pid}}' <container_name>`
+-/// and parses the output as a u32.
+-fn inspect_container_host_pid(
+-    runtime: &super::runtime_detect::ContainerRuntime,
+-    container_name: &str,
+-) -> Result<u32, T3Error> {
+-    let max_attempts = 10u32;
+-    for attempt in 1..=max_attempts {
+-        let output = runtime_call_bounded(
+-            &runtime.path,
+-            &["inspect", "--format", "{{.State.Pid}}", container_name],
+-        )
+-        .ok_or_else(|| T3Error::Inspect("inspect container pid failed".into()))?;
+-
+-        if output.status.success() {
+-            let pid_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+-            if let Ok(pid) = pid_str.parse::<u32>() {
+-                if pid > 0 {
+-                    return Ok(pid);
+-                }
+-            }
+-        }
+-
+-        if attempt < max_attempts {
+-            std::thread::sleep(std::time::Duration::from_millis(50 * attempt as u64));
+-        }
+-    }
+-
+-    Err(T3Error::Inspect(format!(
+-        "container {container_name}: PID not available after {max_attempts} attempts"
+-    )))
+-}

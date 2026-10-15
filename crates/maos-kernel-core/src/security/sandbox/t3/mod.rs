@@ -39,7 +39,10 @@
 //! **DR-5.5a-6:** `--network=none` default; MCP outbound routed through parent.
 //! Trigger: Story 5.5c.
 //!
-//! **DR-5.5a-7:** PID identity = host-namespace PID (NOT in-container PID 1).
+//! **DR-5.5a-7 (Story 17-7):** identity = the CID in the private `--cidfile`
+//! receipt, owned before `init`. The `--pidfile` PID is a historical startup
+//! observation and never a kill target; the kill authorities are the CID and
+//! the cgroup-verified payload pidfd.
 //!
 //! **DR-5.5a-8:** T2-inside-T3 layering = ABI-side `t2_apply()` at Epic 6;
 //! v0.5-α relies on container boundary alone.

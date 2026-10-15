@@ -277,6 +277,14 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "cli runtime",
         ),
         (
+            "capability.invocation",
+            None,
+            "cli.subprocess.exit",
+            r#"{"event":"cli_subprocess_exit","cli_child_pid":4242,"exit_cause":"exit","is_crash":false,"container":{"runtime_exit_code":0,"oom_marker":false,"payload_exit":"exited(code=0)","payload_exit_source":"pidfd","removed":true,"residue":null}}"#,
+            1,
+            "cli runtime T3",
+        ),
+        (
             // AC2(b) — the resolver's structured orphan row at pid 0.
             "task.complete",
             None,

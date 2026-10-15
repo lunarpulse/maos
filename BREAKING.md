@@ -16,6 +16,40 @@ The ABI Stability Triple and the compatibility window live in
 [`STABILITY.md`](./STABILITY.md) (generated from workspace state). This file is
 the human-authored change ledger that complements it.
 
+## 2026-10-14 — T3 retained container lifecycle and terminal facts (Story 17-7)
+
+The sandbox inspect report replaces `pid: u32` with `payload_pid: {"historical": N}`
+and adds `container_id` (64 lowercase hexadecimal characters). The PID is a
+historical startup observation and does not claim liveness. T3 `cli.subprocess.exit`
+rows gain a fifth outer key, `container`, an object with six nested keys; native
+rows retain their existing four-key shape. T3 classification now reports external
+SIGKILL as `fault.signaled`, OOM as `fault.oom_killed`, and unavailable terminal
+facts as `fault.truncated`.
+
+- **Migration:** Update sandbox-inspect readers to consume tagged historical
+  `payload_pid` and `container_id`; never treat the historical PID as live or as a
+  kill target.
+- **Migration:** Update T3 exit-row readers to accept the exact fifth `container`
+  object and its six nested keys. Keep native rows at four keys.
+- **Migration:** Handle `fault.signaled`, `fault.oom_killed`, and
+  `fault.truncated` as distinct T3 outcomes; do not infer SIGKILL from runtime
+  code 137 when payload evidence is unavailable.
+- **Migration:** Low-level `T3Launch` and `T3SpawnContext` constructors now carry
+  optional `launch_custody`. Root-managed Workers register `ContainerLaunchCustody`
+  before creation and retain it through initialization and teardown; standalone
+  low-level callers without a root coordinator pass `None`.
+- **Migration:** `Invocation::Exited` includes `stdout_complete` and
+  `stderr_complete`. Preserve those flags when consuming bounded runtime output;
+  incomplete inspect output cannot establish terminal facts, and incomplete
+  removal diagnostics cannot certify volume cleanup.
+
+Review repairs preserve the wire schema above. Cleanup now fails closed when
+removal diagnostics are incomplete, keeps failed CID-kill reporting independent
+of eventual removal, and shares launch cancellation and teardown deadlines across
+the binding and bridge. Temporary state fallback parents are effective-UID-scoped.
+The `i9_exempt` attribute now preserves generic parameters and where clauses,
+including the borrowed launch-custody context.
+
 ## 2026-10-12 — Worker resource-ceiling admission and scheduler API cutover (Story 17-2)
 
 Worker manifests now use schema 5 for the optional `resources.pids_max` positive
@@ -50,8 +84,7 @@ independent; in particular, migrate any caller that used `fd_max` as a process
 count to explicit `pids_max`. Native T2 callers must arrange delegated writable
 cgroup-v2 placement for explicit CPU/PID caps; T3 uses the supported Linux
 rootless-container route. Do not treat a memory-only downgrade event as a state
-transition or a durability guarantee. T3 OOM/SIGKILL ambiguity and short-lived
-worker PID-inspection refusal remain owned by Story 17-7.
+transition or a durability guarantee.
 
 ## 2026-05-31 — v0.x → v1.0 ABI stability commitments activated (Story 7.5a)
 

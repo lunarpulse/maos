@@ -23,6 +23,29 @@ use maos_domain::ports::{scope_action_key, PolicyVerdict};
 use maos_kernel_core::api::CapabilityRegistryAdapter;
 use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
 
+/// Map a finalized bridge result to the worker CLI's completion input.
+///
+/// The binding's lifecycle decision takes precedence over retained exit facts;
+/// unavailable T3 facts never become a successful completion marker.
+pub fn worker_exit_from_finalized_bridge(
+    may_complete: bool,
+    exit: &maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit,
+) -> worker_cli::WorkerExit {
+    if !may_complete {
+        worker_cli::WorkerExit::Crashed
+    } else if let Some((facts, _)) = exit.container.as_ref() {
+        facts
+            .completion_exit_code()
+            .map(worker_cli::WorkerExit::Exited)
+            .unwrap_or(worker_cli::WorkerExit::Crashed)
+    } else {
+        match exit.cause.exit_code() {
+            Some(code) => worker_cli::WorkerExit::Exited(code),
+            None => worker_cli::WorkerExit::Crashed,
+        }
+    }
+}
+
 #[cfg(feature = "network")]
 /// Parsed `maos run` invocation. `None` (from [`parse_run_args`]) means no `run`
 /// subcommand was given → preserve the existing `MAOS_ONE_SHOT` / Spirit-less
@@ -904,6 +927,22 @@ pub fn run_cli_wrapper_manifest(
 
     let boot_nonce = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
     let container_name = format!("maos-{worker_spirit_id}-{boot_nonce}");
+    let state_dir = supervision
+        .create_t3_state_dir()
+        .map_err(crate::supervision::WorkerSupervisionError::Start)?;
+    let payload_pidfd = supervision.payload_pidfd();
+    let core = Arc::downgrade(binding.core());
+    let launch_custody = maos_kernel_core::lifecycle::cli_wrapper::ContainerLaunchCustody::new(
+        state_dir.clone(),
+        move |terminal| {
+            if let Some(core) = core.upgrade() {
+                core.attach_container(terminal);
+            }
+        },
+    );
+    binding
+        .core()
+        .attach_launch_custody(Arc::clone(&launch_custody));
     proxy_args.extend(task_args);
     let spec = BridgeSpawnSpec {
         program: resolved,
@@ -929,6 +968,9 @@ pub fn run_cli_wrapper_manifest(
             boot_nonce,
             container_name,
             egress_socket,
+            state_dir: state_dir.clone(),
+            payload_pidfd,
+            launch_custody: Some(Arc::clone(&launch_custody)),
         }),
     };
     // Bound the completion read-back to THIS run's journaled CliSubprocessOutput
@@ -937,7 +979,11 @@ pub fn run_cli_wrapper_manifest(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let bridge = spawn_and_bridge(spec)?;
+    let bridge_result = spawn_and_bridge(spec);
+    if bridge_result.is_err() {
+        launch_custody.remove_state_dir_if_unowned();
+    }
+    let bridge = bridge_result?;
     // Story 16-3 (D-16-3-Q (6)) — guard FIRST. `SpawnedBridge::drop` kills and
     // reaps the child, and struct fields drop in declaration order, so two
     // separate locals would let the bridge kill the child before the guard
@@ -949,9 +995,13 @@ pub fn run_cli_wrapper_manifest(
             "Worker spawn did not produce a T3 container".into(),
         )
     })?;
-    live.binding
-        .core()
-        .attach_container_stop(child.runtime.path.clone(), child.container_name.clone());
+    let terminal = live.bridge.container_terminal().ok_or_else(|| {
+        maos_kernel_core::lifecycle::cli_wrapper::BridgeError::SandboxRefused(
+            "Worker spawn did not produce a T3 terminal handle".into(),
+        )
+    })?;
+    let container_id = terminal.container_id().to_owned();
+    live.binding.core().attach_container(terminal);
     supervision.commit_container_spawn(live.binding.core(), child, image)?;
     println!(
         "{}",
@@ -974,6 +1024,7 @@ pub fn run_cli_wrapper_manifest(
             "spirit_pid": spirit_pid,
             "granted_tier": format!("{granted_tier:?}"),
             "child_pid": child_pid,
+            "container_id": container_id,
             "live": run.live,
         })
     );
@@ -1012,11 +1063,15 @@ pub fn run_cli_wrapper_manifest(
         },
     );
 
-    // 8c. FINISH — the guard's terminal act, immediately after the exit cause
-    //     is known. On Linux the observer usually got there first and this
-    //     joins its handler; when it lost the reap race (`ECHILD`, measured
-    //     106/200 on fast exits) this IS the crash path.
-    live.binding.finish(&exit.cause);
+    // 8c. Both the completion oracle and classifier consume this finalized
+    // bridge exit. T3 completion follows the payload's retained terminal facts:
+    // only an available, voluntary payload exit (including exit 0) completes;
+    // an intentional PlannedStop cannot complete even if the client exits 0.
+    // T2/T1/native completion keeps its historical runtime-client exit mapping.
+    // Eligibility is decided under the binding lock by `finish`, so an
+    // unload/root stop racing this point can never yield a completion.
+    let may_complete = live.binding.finish(&exit);
+    let worker_exit = worker_exit_from_finalized_bridge(may_complete, &exit);
 
     println!(
         "{}",
@@ -1035,16 +1090,6 @@ pub fn run_cli_wrapper_manifest(
         exit.cause,
         pump.stdout_lines + pump.stderr_lines
     );
-
-    // T2/T1 — completion is decided by the adapter over the JOURNALED Worker
-    // output (redacted at insert), never by the raw exit code. Reconstruct the
-    // Worker's stdout/stderr from the CliSubprocessOutput rows this run wrote,
-    // then let the adapter's per-CLI oracle rule. The last stdout frame is the
-    // Worker-produced Transparency Log reference a digest would cite.
-    let worker_exit = match exit.cause.exit_code() {
-        Some(code) => worker_cli::WorkerExit::Exited(code),
-        None => worker_cli::WorkerExit::Crashed,
-    };
     let mut wc_stdout: Vec<String> = Vec::new();
     let mut wc_stderr: Vec<String> = Vec::new();
     // j1-crosshost-2a AC1.6 — NAMED for what it is. This is the last stdout

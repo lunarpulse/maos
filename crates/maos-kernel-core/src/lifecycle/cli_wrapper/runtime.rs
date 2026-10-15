@@ -60,9 +60,9 @@ use crate::capability::cap_audit;
 use crate::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use crate::security::manifest::{CliWrapperControlChannel, CliWrapperStdioShape};
 use crate::security::sandbox::t3::{
-    child::SandboxedContainerChild,
+    child::{ContainerLaunchCustody, ContainerTerminal, SandboxedContainerChild, TEARDOWN_BUDGET},
     image_lock::VerifiedImageAttestation,
-    spawn::{runtime_command, spawn_t3, T3SpawnContext},
+    spawn::{spawn_t3, T3SpawnContext},
 };
 use crate::security::sandbox::SandboxSpec;
 #[cfg(target_os = "linux")]
@@ -259,6 +259,12 @@ pub struct T3Launch {
     pub boot_nonce: u64,
     pub container_name: String,
     pub egress_socket: Option<std::path::PathBuf>,
+    /// Fresh private per-spawn directory (pidfile + CID receipt).
+    pub state_dir: std::path::PathBuf,
+    /// `false` forces the runtime-evidence fallback (test seam).
+    pub payload_pidfd: bool,
+    /// Shared launch/root custody, published before initialization begins.
+    pub launch_custody: Option<std::sync::Arc<ContainerLaunchCustody>>,
 }
 
 /// A message handed from an OS reader thread to the kernel over the bounded mpsc.
@@ -334,11 +340,17 @@ pub enum BridgePoll {
     Idle,
     Closed,
 }
-/// Result of waiting for and finalizing a subprocess (ADR-022).
+/// Result of waiting for and finalizing a subprocess (ADR-022). For T3,
+/// `container` carries the one terminal snapshot and the removal verdict.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BridgeExit {
     pub cause: ExitCause,
     pub child_pid: u32,
+    #[allow(clippy::type_complexity)]
+    pub container: Option<(
+        std::sync::Arc<maos_domain::sandbox::ContainerTerminalFacts>,
+        Result<(), maos_domain::sandbox::ContainerResidue>,
+    )>,
 }
 
 /// Read one newline-delimited record (`NdjsonOverStdio` / `Raw`). `Raw` has no
@@ -471,26 +483,16 @@ impl BridgeChild {
         }
     }
 
-    fn kill(&mut self) -> std::io::Result<()> {
+    fn kill(&mut self, deadline: std::time::Instant) -> std::io::Result<()> {
         match self {
             Self::Container(guard, _) => {
                 let child_result = match guard.child.as_mut().map_or(Ok(()), Child::kill) {
                     Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
                     result => result,
                 };
-                let runtime_result = runtime_command(&guard.runtime.path)
-                    .args(["kill", &guard.container_name])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .and_then(|status| {
-                        if status.success() {
-                            Ok(())
-                        } else {
-                            Err(std::io::Error::other("container runtime refused kill"))
-                        }
-                    });
-                child_result.and(runtime_result)
+                child_result.and(guard.teardown(deadline).map_err(|residue| {
+                    std::io::Error::other(format!("container teardown: {residue:?}"))
+                }))
             }
             Self::Plain(child) => child.kill(),
             #[cfg(target_os = "linux")]
@@ -570,7 +572,10 @@ fn spawn_child(spec: &mut BridgeSpawnSpec, argv: &[String]) -> Result<BridgeChil
                 boot_nonce: launch.boot_nonce,
                 container_name: launch.container_name,
                 egress_socket: launch.egress_socket.as_deref(),
+                state_dir: &launch.state_dir,
+                payload_pidfd: launch.payload_pidfd,
                 env: &spec.env,
+                launch_custody: launch.launch_custody.as_ref(),
             };
             return spawn_t3(&spec.sandbox, &launch.image, argv, spawn_context)
                 .map(|child| BridgeChild::Container(child, launch.image))
@@ -612,6 +617,46 @@ pub fn spawn_and_bridge(mut spec: BridgeSpawnSpec) -> Result<SpawnedBridge, Brid
     let mut argv = std::mem::take(&mut spec.argv_prefix);
     argv.extend(std::mem::take(&mut spec.task_args));
     let mut child = spawn_child(&mut spec, &argv)?;
+    assemble_bridge(spec, child)
+}
+
+/// Attach a real T3-owned child to the production bridge/finalizer path.
+/// Used by stub-runtime integration coverage; production spawning remains
+/// `spawn_and_bridge`, which validates the cap before it starts the child.
+#[doc(hidden)]
+pub fn bridge_container(
+    spec: BridgeSpawnSpec,
+    child: SandboxedContainerChild,
+    image: VerifiedImageAttestation,
+) -> Result<SpawnedBridge, BridgeError> {
+    if spec.sandbox.tier != SandboxTier::T3 {
+        return Err(BridgeError::SandboxRefused(
+            "adopted container requires T3 sandbox tier".into(),
+        ));
+    }
+    if spec.control_channel != CliWrapperControlChannel::Signals
+        || spec.stdio_shape == CliWrapperStdioShape::JsonRpcOverStdio
+    {
+        return Err(BridgeError::ControlUnsupported(
+            spec.control_channel,
+            "T3 does not support stdin-keeping postures".into(),
+        ));
+    }
+    if spec.t3.is_some() {
+        return Err(BridgeError::SandboxRefused(
+            "adopted container cannot include a second T3 launch context".into(),
+        ));
+    }
+    if argv_prefix_hash(&spec.argv_prefix) != spec.expected_argv_prefix_hash {
+        return Err(BridgeError::CapBindingMismatch);
+    }
+    assemble_bridge(spec, BridgeChild::Container(child, image))
+}
+
+fn assemble_bridge(
+    spec: BridgeSpawnSpec,
+    mut child: BridgeChild,
+) -> Result<SpawnedBridge, BridgeError> {
     let child_pid = child.get().id();
     // Argv-driven T0/T2 CLIs receive EOF immediately; T3 only permits this posture.
     let stdin = match (spec.control_channel, spec.stdio_shape) {
@@ -671,8 +716,7 @@ pub fn spawn_and_bridge(mut spec: BridgeSpawnSpec) -> Result<SpawnedBridge, Brid
         }) {
         Ok(handle) => handle,
         Err(error) => {
-            drop(rx);
-            let _ = child.kill();
+            let _ = child.kill(std::time::Instant::now() + TEARDOWN_BUDGET);
             let _ = child.get().wait();
             return Err(BridgeError::Io(format!("spawn stderr reader: {error}")));
         }
@@ -697,6 +741,12 @@ impl SpawnedBridge {
     /// Container and attested image retained for the composition-root report.
     pub fn container(&self) -> Option<(&SandboxedContainerChild, &VerifiedImageAttestation)> {
         self.child.as_ref().and_then(BridgeChild::container)
+    }
+
+    /// The shared T3 terminal handle, for the binding's life.
+    pub fn container_terminal(&self) -> Option<std::sync::Arc<ContainerTerminal>> {
+        self.container()
+            .map(|(guard, _)| std::sync::Arc::clone(guard.terminal()))
     }
 }
 
@@ -734,10 +784,11 @@ impl SpawnedBridge {
             .map_err(|error| BridgeError::Io(error.to_string()))
     }
 
-    /// SIGKILL a not-yet-reaped child. `Ok` when it already exited or was
-    /// finalized. Does not reap: [`Self::wait_and_finalize`] still does.
+    /// Kill a not-yet-reaped child through the shared T3 teardown coordinator.
+    /// Does not reap: [`Self::wait_and_finalize`] still does.
     pub fn kill(&mut self) -> Result<(), BridgeError> {
-        match self.child.as_mut().map(BridgeChild::kill) {
+        let deadline = std::time::Instant::now() + TEARDOWN_BUDGET;
+        match self.child.as_mut().map(|child| child.kill(deadline)) {
             None | Some(Ok(())) => Ok(()),
             Some(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(()),
             Some(Err(error)) => Err(BridgeError::Io(format!("kill: {error}"))),
@@ -943,6 +994,26 @@ impl SpawnedBridge {
             .as_ref()
             .and_then(BridgeChild::cgroup_path)
             .map_or(0, cgroup_oom_kills);
+        // T3: one absolute deadline covers the pre-removal snapshot and CID
+        // teardown. A capped follower records unavailable locally without
+        // freezing or extending the shared snapshot.
+        let terminal_deadline = std::time::Instant::now() + TEARDOWN_BUDGET;
+        let container = self.child.as_ref().and_then(|child| match child {
+            BridgeChild::Container(guard, _) => {
+                let terminal = guard.terminal();
+                let facts = terminal
+                    .facts_by(terminal_deadline, true)
+                    .unwrap_or_else(|| {
+                        std::sync::Arc::new(maos_domain::sandbox::ContainerTerminalFacts::new(
+                            Err(maos_domain::sandbox::TerminalUnavailable::DeadlineExpired),
+                            None,
+                        ))
+                    });
+                let verdict = guard.teardown(terminal_deadline);
+                Some((facts, verdict))
+            }
+            _ => None,
+        });
         // The child is now reaped (wait consumed it). Mark consumed so Drop does
         // not double-wait.
         self.child = None;
@@ -971,12 +1042,17 @@ impl SpawnedBridge {
             );
         }
 
-        let payload = serde_json::json!({
+        let mut payload = serde_json::json!({
             "event": "cli_subprocess_exit",
             "cli_child_pid": self.child_pid,
             "exit_cause": cause.describe(),
             "is_crash": cause.is_crash(),
         });
+        if let Some((facts, verdict)) = &container {
+            payload["container"] = serde_json::json!(
+                maos_domain::sandbox::ContainerExitRecord::new(facts, *verdict)
+            );
+        }
         let _ = journal.insert_frame_event_with_sender(
             FrameKind::CapabilityInvocation,
             spirit_pid,
@@ -993,6 +1069,7 @@ impl SpawnedBridge {
         BridgeExit {
             cause,
             child_pid: self.child_pid,
+            container,
         }
     }
 
@@ -1092,8 +1169,9 @@ impl SpawnedBridge {
         // Close stdin before routing termination through the child abstraction.
         let _ = self.shutdown_signal;
         self.stdin = None;
+        let deadline = std::time::Instant::now() + TEARDOWN_BUDGET;
         if let Some(child) = self.child.as_mut() {
-            let _ = child.kill();
+            let _ = child.kill(deadline);
             let _ = child.get().wait();
         }
         self.child = None;
@@ -1106,8 +1184,9 @@ impl Drop for SpawnedBridge {
         // the child (no `<defunct>` zombie), then drop the receiver (unblocking
         // any `Block`ed reader), then join the readers (no orphaned threads).
         self.stdin = None;
+        let deadline = std::time::Instant::now() + TEARDOWN_BUDGET;
         if let Some(mut child) = self.child.take() {
-            let _ = child.kill();
+            let _ = child.kill(deadline);
             let _ = child.get().wait();
         }
         // Drop the receiver first so any `Block`ed reader send returns Err and

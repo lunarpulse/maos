@@ -763,7 +763,7 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         Arc::clone(&capability),
         Arc::clone(&iac),
         Arc::clone(&metrics),
-        journal,
+        Arc::clone(&journal),
     ));
     // Before any clone: `set_crash_detector` needs strong count 1.
     Arc::get_mut(&mut scheduler)
@@ -773,6 +773,7 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         Arc::clone(&scheduler),
         crash_detector,
         Arc::clone(&log),
+        journal,
         Arc::clone(&halt_registry),
         Arc::clone(&iac),
         tokio::runtime::Handle::current(),

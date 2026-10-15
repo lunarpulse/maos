@@ -38,7 +38,8 @@ impl SandboxReportSource for Source {
     fn sandbox_report(&self, spirit_id: &str) -> Option<SandboxInspectReport> {
         (spirit_id == "live").then(|| SandboxInspectReport {
             spirit_id: "live".into(),
-            pid: 42,
+            payload_pid: maos_domain::sandbox::ObservedPid::Historical(42),
+            container_id: "a".repeat(64),
             runtime: "podman".into(),
             image_sha: "a".repeat(64),
             applied_t2_protections: maos_domain::sandbox::T2ProtectionSummary {
@@ -929,7 +930,9 @@ fn loopback_server_requires_bearer_and_returns_exact_live_report() {
     );
     let response = request(&server, "GET", "/v1/spirits/live/sandbox", TOKEN);
     assert!(
-        response.contains(r#""spirit_id":"live","pid":42,"runtime":"podman""#),
+        response.contains(
+            r#""spirit_id":"live","payload_pid":{"historical":42},"container_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","runtime":"podman""#
+        ),
         "{response}"
     );
 }

@@ -77,6 +77,9 @@ fn execute(arguments: &[&str], egress_socket: Option<&Path>) -> Execution {
         .expect("clock after epoch")
         .as_nanos();
     let prefix = vec![arguments[0].to_owned()];
+    let state_dir = tempfile::tempdir().expect("fresh private T3 state directory");
+    std::fs::set_permissions(state_dir.path(), std::fs::Permissions::from_mode(0o700))
+        .expect("restrict T3 state directory");
     let spec = BridgeSpawnSpec {
         program: probe.display().to_string(),
         sandbox: SandboxSpec::new_for_test(SandboxTier::T3),
@@ -95,6 +98,9 @@ fn execute(arguments: &[&str], egress_socket: Option<&Path>) -> Execution {
             boot_nonce: 17_12,
             container_name: format!("maos-t3-escape-{}-{nonce}", std::process::id()),
             egress_socket: egress_socket.map(Path::to_path_buf),
+            state_dir: state_dir.path().to_path_buf(),
+            payload_pidfd: true,
+            launch_custody: None,
         }),
     };
     let mut bridge = spawn_and_bridge(spec)

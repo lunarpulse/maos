@@ -158,6 +158,50 @@ covered_changes = [
 ]
 ratified_at = "2026-10-12"
 
+# Story 17-7 — T3 retained lifecycle and terminal facts (operator charter
+# D-17-7-FW-01..09, re-pins approved 2026-10-14). Breaking wire change for the
+# sandbox inspect report (`BREAKING.md` 2026-10-14); new additive domain types.
+[[ratification]]
+proposal_id = "17-7-sandbox-report-observed-pid"
+summary = "SandboxInspectReport.pid: u32 replaced by payload_pid: ObservedPid ({\"historical\":N}) plus container_id (64 lowercase hex); nothing in the report claims liveness or is a kill target"
+adr_ref = "ADR-061"
+status = "ratified"
+covered_changes = ["SandboxInspectReport", "ObservedPid"]
+ratified_at = "2026-10-14"
+
+[[ratification]]
+proposal_id = "17-7-container-terminal-facts"
+summary = "Additive T3 terminal-facts types: one immutable snapshot, decoding rule, typed residue, exact six-key exit record; FaultCause::OomKilled gains an optional payload-proven signal; T3Error gains typed launch refusals"
+adr_ref = "ADR-061"
+status = "ratified"
+covered_changes = [
+  "ContainerTerminalFacts",
+  "ContainerState",
+  "PayloadExit",
+  "PayloadExitSource",
+  "TerminalUnavailable",
+  "ContainerResidue",
+  "ContainerExitRecord",
+  "FaultCause",
+  "T3Error",
+]
+ratified_at = "2026-10-14"
+
+[[ratification]]
+proposal_id = "17-7-kernel-t3-lifecycle"
+summary = "CID-owned T3 lifecycle: T3SpawnContext/T3Launch gain state_dir and payload_pidfd; SandboxedContainerChild owns a shared ContainerTerminal; BridgeExit carries the snapshot and removal verdict; build_runtime_argv emits create with pidfile/cidfile"
+adr_ref = "ADR-061"
+status = "ratified"
+covered_changes = [
+  "maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext",
+  "maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild",
+  "maos_kernel_core::security::sandbox::t3::child::ContainerTerminal",
+  "maos_kernel_core::security::sandbox::t3::argv::build_runtime_argv",
+  "maos_kernel_core::lifecycle::cli_wrapper::runtime::T3Launch",
+  "maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit",
+]
+ratified_at = "2026-10-14"
+
 # Story 17-1 — field-level forward strictness; no schema version exists on cli_wrapper.
 # Operator ruling 2026-10-09 (Lunarpulse): ratified at the 17-1 close, text per D-5.
 [[ratification]]
@@ -167,3 +211,22 @@ adr_ref = "ADR-061"
 status = "ratified"
 covered_changes = ["CliWrapperConfig", "CliWrapperPosture", "EgressDestination"]
 ratified_at = "2026-10-09"
+
+# Story 17-7 review repairs — exact source/surface refresh approved by Lunarpulse
+# after formatted measurement on 2026-10-15; wire schemas remain unchanged.
+[[ratification]]
+proposal_id = "17-7-review-launch-custody-and-bounded-evidence"
+summary = "Pre-create launch custody shared with root cancellation; T3 launch contexts carry the optional coordinator; bounded invocation reports stream completeness; deterministic bridge and held-receipt test seams"
+adr_ref = "ADR-061"
+status = "ratified"
+covered_changes = [
+  "maos_kernel_core::security::sandbox::t3::child::ContainerLaunchCustody",
+  "maos_kernel_core::security::sandbox::t3::child::ContainerTerminal",
+  "maos_kernel_core::security::sandbox::t3::child::SandboxedContainerChild",
+  "maos_kernel_core::security::sandbox::t3::spawn::T3SpawnContext",
+  "maos_kernel_core::security::sandbox::t3::spawn::Invocation",
+  "maos_kernel_core::security::sandbox::t3::spawn::read_receipt_after_hold",
+  "maos_kernel_core::lifecycle::cli_wrapper::runtime::T3Launch",
+  "maos_kernel_core::lifecycle::cli_wrapper::runtime::bridge_container",
+]
+ratified_at = "2026-10-15"

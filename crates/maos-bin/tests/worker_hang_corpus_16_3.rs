@@ -129,6 +129,7 @@ struct World {
     scheduler: Arc<maos_kernel_core::scheduler::SpiritSchedulerAdapter>,
     halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
     crash_detector: Arc<maos_kernel_core::supervision::CrashDetector>,
+    journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     iac: Arc<maos_kernel_core::iac::IacBusAdapter>,
     telemetry: Arc<maos_kernel_core::telemetry::iac_rt::IacRtMetrics>,
     notification_dispatcher: Arc<maos_director_surface::notification::NotificationDispatcher>,
@@ -199,7 +200,7 @@ impl World {
             Arc::clone(&capability),
             Arc::clone(&iac),
             Arc::clone(&telemetry),
-            journal,
+            Arc::clone(&journal),
         ));
         // Before any clone of the scheduler Arc: `set_crash_detector` needs the
         // strong count at 1 (`Arc::get_mut`).
@@ -213,6 +214,7 @@ impl World {
             scheduler,
             halt_registry,
             crash_detector,
+            journal,
             iac,
             telemetry,
             notification_dispatcher: Arc::new(
@@ -421,6 +423,7 @@ async fn sixty_workers_stall_by_silence_and_crash_by_signal() {
         Arc::clone(&world.scheduler),
         Arc::clone(&world.crash_detector),
         Arc::clone(&world.tl),
+        Arc::clone(&world.journal),
         Arc::clone(&world.halt_registry),
         Arc::clone(&world.iac),
         Arc::clone(&world.telemetry),

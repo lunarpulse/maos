@@ -7,7 +7,7 @@ use maos_egress::{
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use parking_lot::Mutex;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io,
     os::unix::fs::DirBuilderExt,
     path::{Path, PathBuf},
@@ -21,8 +21,9 @@ type Proxy = Arc<Mutex<ProxyGuard>>;
 struct OwnerState {
     closed: bool,
     proxies: HashMap<u32, Proxy>,
+    unconfirmed: HashSet<u32>,
+    reported: HashSet<u32>,
 }
-
 struct Shared {
     run_dir: PathBuf,
     table: Arc<BearerTable>,
@@ -32,22 +33,44 @@ struct Shared {
 }
 
 impl Shared {
+    /// Stop a root's proxies without holding the owner registry lock over
+    /// revocation, joins or filesystem operations.
     fn stop_and_join(&self) -> io::Result<()> {
-        let proxies = {
+        let (proxies, unreported) = {
             let mut state = self.state.lock();
             state.closed = true;
-            std::mem::take(&mut state.proxies)
+            let unreported = state
+                .unconfirmed
+                .difference(&state.reported)
+                .copied()
+                .collect::<Vec<_>>();
+            state.reported.extend(unreported.iter().copied());
+            (
+                state
+                    .proxies
+                    .iter()
+                    .map(|(pid, proxy)| (*pid, Arc::clone(proxy)))
+                    .collect::<Vec<_>>(),
+                unreported,
+            )
         };
+        for pid in unreported {
+            eprintln!(
+                "maos: Worker egress lease for pid {pid} remains termination_unconfirmed residue"
+            );
+        }
         let mut failure = None;
-        // Keep every proxy until its join completes, including one a binding
-        // is concurrently finishing. Never hold the registry lock while joining.
-        for proxy in proxies.into_values() {
+        // Keep every proxy in the owner map until its container termination
+        // has been confirmed; root cancellation must not erase lease residue.
+        // Never hold the registry lock while a proxy is stopped or joined.
+        for (pid, proxy) in proxies {
             if let Err(error) = proxy.lock().stop_and_join() {
+                eprintln!("maos: Worker egress proxy cleanup failed for pid {pid}: {error}");
                 failure.get_or_insert(error);
             }
         }
-        // Proxies remove their own Worker directories; an empty root directory
-        // is now inert. A failed proxy leaves it non-empty for inspection.
+        // Proxies remove their own Worker directories. A non-empty root is
+        // intentionally left for inspection rather than making shutdown fail.
         let _ = std::fs::remove_dir(&self.run_dir);
         failure.map_or(Ok(()), Err)
     }
@@ -71,6 +94,8 @@ impl EgressHandle {
             state: Mutex::new(OwnerState {
                 closed: false,
                 proxies: HashMap::new(),
+                unconfirmed: HashSet::new(),
+                reported: HashSet::new(),
             }),
         });
         let task_owner = Arc::clone(&shared);
@@ -157,13 +182,24 @@ impl WorkerEgress {
         &self.socket
     }
 
-    pub fn finish(&mut self) -> io::Result<()> {
+    /// A fail-closed hook for a stop whose termination stays unconfirmed:
+    /// revoke the bearer now and mark the lease root-owned residue, before
+    /// the binding (blocked on a held pipe) can ever reach `finish`.
+    pub fn revoker(&self) -> Arc<dyn Fn() + Send + Sync> {
+        let (owner, pid) = (Arc::clone(&self.owner), self.pid);
+        Arc::new(move || retain_unconfirmed(&owner, pid))
+    }
+
+    pub fn finish(&mut self, termination_confirmed: bool) -> io::Result<()> {
         if self.finished {
             return Ok(());
         }
         self.finished = true;
+        if !termination_confirmed {
+            retain_unconfirmed(&self.owner, self.pid);
+        }
         let result = self.proxy.lock().stop_and_join();
-        if result.is_ok() {
+        if result.is_ok() && termination_confirmed {
             let mut state = self.owner.state.lock();
             if state
                 .proxies
@@ -173,36 +209,85 @@ impl WorkerEgress {
                 state.proxies.remove(&self.pid);
             }
         }
-        // A failed confirmation remains root-owned so root teardown reports it.
         result
+    }
+}
+
+fn retain_unconfirmed(owner: &Shared, pid: u32) {
+    use std::io::Write as _;
+    owner.table.revoke(pid);
+    let report = {
+        let mut state = owner.state.lock();
+        state.unconfirmed.insert(pid);
+        state.reported.insert(pid)
+    };
+    if report {
+        let _ = writeln!(
+            std::io::stderr(),
+            "maos: Worker egress lease for pid {pid} retained as termination_unconfirmed residue"
+        );
     }
 }
 
 impl Drop for WorkerEgress {
     fn drop(&mut self) {
-        if let Err(error) = self.finish() {
+        if let Err(error) = self.finish(false) {
             eprintln!("maos: Worker egress cleanup failed: {error}");
         }
     }
 }
 
-/// Scheduler pids restart at 1 in every root, and roots may share one data
-/// home. Each root therefore binds Worker sockets beneath its own exclusively
-/// created private directory; a crashed root's leftovers cannot collide.
-fn create_root_dir(parent: &Path) -> io::Result<PathBuf> {
-    use std::os::unix::fs::PermissionsExt as _;
+/// T3 state is volatile root-owned custody, not durable user data: this keeps
+/// private pid/CID receipts outside MAOS_HOME and ADR-067's purge inventory.
+pub fn create_worker_state_root() -> io::Result<PathBuf> {
+    if let Some(runtime_dir) = std::env::var_os("XDG_RUNTIME_DIR") {
+        let runtime_dir = PathBuf::from(runtime_dir);
+        if !runtime_dir.as_os_str().is_empty() && validate_private_dir(&runtime_dir).is_ok() {
+            if let Ok(root) = create_root_dir(&runtime_dir.join("maos-worker-state")) {
+                return Ok(root);
+            }
+        }
+    }
+    create_root_dir(&std::env::temp_dir().join(format!(
+        "maos-worker-state-{}",
+        rustix::process::geteuid().as_raw()
+    )))
+}
+/// Allocate one fresh state directory beneath this process root.
+pub fn create_worker_state_dir(root: &Path) -> io::Result<PathBuf> {
+    validate_private_dir(root)?;
+    create_private_child_dir(root)
+}
 
+/// Create a private root below `parent`, then allocate its fresh process-owned
+/// child. Non-empty children are retained as evidence during cleanup.
+fn create_root_dir(parent: &Path) -> io::Result<PathBuf> {
     std::fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(parent)?;
-    let metadata = std::fs::symlink_metadata(parent)?;
-    if !metadata.file_type().is_dir() || metadata.permissions().mode() & 0o777 != 0o700 {
+    validate_private_dir(parent)?;
+    create_private_child_dir(parent)
+}
+
+fn validate_private_dir(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+
+    let metadata = std::fs::symlink_metadata(path)?;
+    let effective_uid = rustix::process::geteuid().as_raw();
+    if !metadata.file_type().is_dir()
+        || metadata.uid() != effective_uid
+        || metadata.permissions().mode() & 0o7777 != 0o700
+    {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "egress directory must be a private directory",
+            "directory must be owned by the effective uid and mode 0700",
         ));
     }
+    Ok(())
+}
+
+fn create_private_child_dir(parent: &Path) -> io::Result<PathBuf> {
     for _ in 0..8 {
         let mut nonce = [0u8; 4];
         getrandom::fill(&mut nonce).map_err(io::Error::other)?;
@@ -215,7 +300,7 @@ fn create_root_dir(parent: &Path) -> io::Result<PathBuf> {
     }
     Err(io::Error::new(
         io::ErrorKind::AlreadyExists,
-        "no unique egress root directory",
+        "no unique private directory",
     ))
 }
 

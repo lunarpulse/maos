@@ -201,6 +201,7 @@ impl World {
             Arc::clone(&scheduler),
             crash,
             Arc::clone(&tl),
+            Arc::clone(&journal),
             Arc::clone(&halt),
             Arc::clone(&iac),
             metrics,
@@ -785,7 +786,7 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                     "session unload removes its only SCB"
                 );
                 let cleanup =
-                    unload_all_loaded(world.scheduler.as_ref(), world.halt.as_ref()).await;
+                    unload_all_loaded(world.scheduler.as_ref(), world.halt.as_ref(), None).await;
                 assert!(!cleanup.had_failures());
                 drop(peer_core);
                 world.drain().await;
@@ -1893,7 +1894,13 @@ async fn a_new_turn_after_idle_restarts_the_progress_window() {
     // `finish` unloads through the scheduler's blocking executor.
     tokio::task::block_in_place(|| {
         binding.finish(
-            &maos_kernel_core::lifecycle::cli_wrapper::runtime::ExitCause::Exited { code: 0 },
+            &maos_kernel_core::lifecycle::cli_wrapper::runtime::BridgeExit {
+                cause: maos_kernel_core::lifecycle::cli_wrapper::runtime::ExitCause::Exited {
+                    code: 0,
+                },
+                child_pid: 0,
+                container: None,
+            },
         )
     });
     drop(scb);

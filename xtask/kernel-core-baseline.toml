@@ -502,7 +502,22 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 25145
+src_lines = 26311
+# HISTORY: Story 17-7 review repairs (2026-10-15), exact measured re-pins
+#          explicitly approved by Lunarpulse: physical 25775 -> 26311 (+536),
+#          tokei 20050 -> 20545 (+495), zero headroom. Driver: launch custody
+#          registered before init, shared cancellation/teardown, complete-output
+#          evidence and cap-limited snapshot followers. Only cli_wrapper/{mod,
+#          runtime}.rs and t3/{child,spawn}.rs changed; all 95 files retained.
+# HISTORY: Story 17-7 retained T3 lifecycle (2026-10-14), operator-approved measured re-pin:
+#          25145 -> 25775 physical lines (+630); tokei 19492 -> 20050 (+558).
+#          Driver: retained create/init/pidfile/start with private CID receipt,
+#          shared terminal snapshot, bounded CID teardown verdict, payload pidfd
+#          PIDFD_INFO_EXIT, typed residue and deadline caps. No kernel files added
+#          or removed; seven chartered kernel files changed. Re-pinned again the
+#          same day for the operator-ruled SNAPSHOT_BUDGET 2 s -> 10 s and
+#          TEARDOWN_BUDGET 17 s -> 25 s (podman 5.7 post-exit lock hold, CI run
+#          38645560812); t3/child.rs content only, line counts unchanged.
 # HISTORY: Story 17-2 FW-01/FW-02 (2026-10-12), operator-ratified location charter:
 #          25267 -> 25149 physical lines (-118); exact formatted tokei 19553 ->
 #          19495 (-58), no kernel raise. Driver: native PID containment/strict
@@ -726,7 +741,7 @@ src_lines = 25145
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "3bc957230ea9245198bf53e9d395f0db3f968d003821319aaeb354711011f6aa"
+set_hash = "de63c136acda9cbac7c86362a904939732144df448d3a26c25abbaec800c1aa5"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -762,8 +777,8 @@ set_hash = "3bc957230ea9245198bf53e9d395f0db3f968d003821319aaeb354711011f6aa"
 "lib.rs" = "a4c3708400196b1c97ac614ead31645d77cc5124bfbd30f4b13139bf4c7f9100"
 "lifecycle/cli_wrapper/admission.rs" = "5d1c1222faa082614f101d91cb343d4b9f636d23c340d4863bbb12008c3e41e5"
 "lifecycle/cli_wrapper/lifecycle.rs" = "87d3d77b8c646090341890990e634d71a62e72d0e032d892d23aee5e5cba950b"
-"lifecycle/cli_wrapper/mod.rs" = "c8fb7558651655cde31d3ef0044c5ee682eb00405bdacdad429fc2ef7434f6bb"
-"lifecycle/cli_wrapper/runtime.rs" = "a8c07adf9fd0f0976022da2e60a6392d3aed80e282fdae91a2491ab1a64cd964"
+"lifecycle/cli_wrapper/mod.rs" = "048746e1d08c93a64aba4745a532883a96899526bf825ff7f67eb3d2ee2270d5"
+"lifecycle/cli_wrapper/runtime.rs" = "67276beb65b22dd8a74437819d30420807fbdff81fce39ef19fcd843f6f5d63a"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "443465480afedca6948e3fcfc0f39504a1409849074411e56e0a50f0f1f42cf7"
 "mcp/mod.rs" = "65689d1501791c3fdd2f413666d7fc0ab0562136bd78e3903eb2972a87b5c233"
@@ -802,17 +817,17 @@ set_hash = "3bc957230ea9245198bf53e9d395f0db3f968d003821319aaeb354711011f6aa"
 "security/mod.rs" = "f4a7d47aa5a2c5c7b392f161b6b4e29161748dc945cc16afe6c8297b4051aee7"
 "security/operator_config.rs" = "513a8bb167fa2180893ac27877dc95e858ac2d8dadc5b7e88c5039ab68ca5fff"
 "security/posture.rs" = "59f09376bb92d00419b26435135f72b2bdc05c8c550c78b85a53ee2339c85fac"
-"security/sandbox/linux.rs" = "1bcdb87d664221fd2886c85566a786120f47ccb1ff2323eed65e46f3e4d6b349"
+"security/sandbox/linux.rs" = "54d0125650e886fe6dc3aee42cbc8575c8c9ab36d5f8604ed486438e01ce1096"
 "security/sandbox/macos.rs" = "0f28edf3b08fe7ced345fd8553202ea1287d102047500392a5acc51fbe684bed"
 "security/sandbox/mod.rs" = "6fa0db148e19013423b8bcf67e95d657cbd48aeaf3fe6aa7f61ef34ccbf4bbd3"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
-"security/sandbox/t3/argv.rs" = "c95605db39866e77bedcc1552f3be919a61a948a03659b249c5fc651a23069eb"
-"security/sandbox/t3/child.rs" = "d91f8d061e6a4b3bb2340857148ec8d590e62cd8f5be8556a930a29900397de7"
+"security/sandbox/t3/argv.rs" = "e2b860e0695db06012ff7a1da3795f067b8d91b47b7963bcba2678b1e3f326cb"
+"security/sandbox/t3/child.rs" = "9da4c6b6e4b958567ebbeef32521ee3e4e7c12b20e479cd6208fc1f6bac22648"
 "security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
 "security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"
-"security/sandbox/t3/mod.rs" = "76adcc7683f44da32742939bafebef527b49b7831f28f25cd80aadce1f9a0f31"
+"security/sandbox/t3/mod.rs" = "ec392fc9de34dcabbe3c3bb63697df32d5f373986f11b2ae79841975deaaec2d"
 "security/sandbox/t3/runtime_detect.rs" = "8f1a9beab532f033bf7a65a7519beab0b2b100e78348a4869770522d2f92a361"
-"security/sandbox/t3/spawn.rs" = "833395de6e9720e02b063fef525dc53949a017be4848c1b734fdbf213f20414b"
+"security/sandbox/t3/spawn.rs" = "d2a2adf02ab08c822c90efa4c760c686123597a1e39f5c09d42ed126dfaab25b"
 "security/sandbox/unsupported.rs" = "124e2d5baa3a64757cde10dcf7014bd7a77a77312c3ab76609140d060e515894"
 "security/sandbox/windows.rs" = "5f8ff06185984f9f5eb18a457b6f4329d0baf2ced8662db20ea70f5b7f5f2935"
 "supervision/cold_restart.rs" = "2977944d24dc54c28dba02c1d3395fc16225f45a3994b0a53f1a27aca20149b7"

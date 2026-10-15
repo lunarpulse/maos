@@ -24,8 +24,6 @@ use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
 const IO_TIMEOUT: Duration = Duration::from_secs(2);
-/// Longer than the kernel's bounded post-launch PID inspection (about 2.25 s).
-const INSPECTION_HOLD: Duration = Duration::from_secs(3);
 const EGRESS_SOCKET: &str = "/proxy/egress.sock";
 /// A routable public resolver: unreachable from `--network=none`.
 const PUBLIC_RESOLVER: IpAddr = IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8));
@@ -40,7 +38,6 @@ fn main() {
         [mode] if mode == "--maos-socket-reach" => socket_reach(),
         _ => Err("usage: --maos-escape <attempted_syscall_substring> | --maos-socket-reach".into()),
     };
-    std::thread::sleep(INSPECTION_HOLD);
     if let Err(error) = outcome {
         eprintln!("t3-network-escape-probe: {error}");
         std::process::exit(1);

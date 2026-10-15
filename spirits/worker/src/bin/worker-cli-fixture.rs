@@ -22,8 +22,8 @@
 //! shape MISMATCH against a stable binary (no write-then-exec race).
 //!
 //! Hermetic by construction: no network, no filesystem writes, deterministic
-//! stdout. Launched as T3's mounted payload, every self-terminating scene first
-//! stays alive through bounded PID inspection; native execution is unchanged.
+//! stdout. Self-terminating T3 scenes exit immediately; native execution is
+//! unchanged.
 
 use std::io::Write as _;
 use std::time::Duration;
@@ -40,12 +40,6 @@ const HANG_POLL: Duration = Duration::from_secs(3600);
 /// Exit code for an unrecognized `--maos-fixture-mode=<v>` value (D-16-3-L).
 const UNKNOWN_MODE_EXIT: i32 = 2;
 
-/// Longer than the kernel's bounded post-launch PID inspection (about 2.25 s).
-const OCI_INSPECTION_HOLD: Duration = Duration::from_secs(3);
-
-/// The kernel's read-only T3 payload mount, executed as argv[0].
-const T3_PAYLOAD_PATH: &str = "/maos/spirit";
-
 /// Exit code when the `kill` binary cannot be run at all in `sigkill-self` —
 /// distinct from every other exit so AC1's `signaled(sig=9)` expectation reds
 /// loudly instead of passing on a non-signal exit.
@@ -57,7 +51,6 @@ const GRANDCHILD_SPAWN_FAILURE_EXIT: i32 = 98;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let t3_payload = args.first().is_some_and(|arg| arg == T3_PAYLOAD_PATH);
     let version = std::env::var("MAOS_FIXTURE_SHAPE_VERSION")
         .unwrap_or_else(|_| worker::OUTPUT_SHAPE_VERSION.to_string());
 
@@ -88,15 +81,18 @@ fn main() {
             "sigkill-self" => sigkill_self(),
             // The sanctioned non-crash failure: a clean `fault.non-zero-exit`
             // with `exit_code: 3`.
-            "exit-nonzero" => {
-                hold_for_oci_inspection(t3_payload);
-                std::process::exit(3)
+            "exit-nonzero" => std::process::exit(3),
+            "exit-137" => {
+                flush_stdout();
+                let _ = std::io::stderr().flush();
+                std::process::exit(137)
             }
+            "oom" => oom(),
             unknown => {
                 eprintln!(
                     "worker-fixture: unknown fixture mode `{unknown}` (expected resource-probe, \
-                     hang, line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self \
-                     or exit-nonzero)"
+                     hang, line-then-hang, hang-chatty, hang-with-grandchild, sigkill-self, \
+                     exit-nonzero, exit-137 or oom)"
                 );
                 std::process::exit(UNKNOWN_MODE_EXIT);
             }
@@ -118,19 +114,35 @@ fn main() {
     println!("{}", worker::CANNED_OUTPUT_LINES[1]);
     println!("{}", worker::CANNED_OUTPUT_LINES[2]);
     flush_stdout();
-    hold_for_oci_inspection(t3_payload);
 }
 
-/// Flushes stdout so a mode's line is in the pipe before the mode sleeps or
-/// dies (the mode contract demands the flush explicitly).
 fn flush_stdout() {
     let _ = std::io::stdout().flush();
 }
 
-fn hold_for_oci_inspection(t3_payload: bool) {
-    if t3_payload {
-        std::thread::sleep(OCI_INSPECTION_HOLD);
+/// OOM positive control: emit cgroup limits first, then retain touched pages
+/// until the runtime kills the payload or the fixed 1 GiB cap is reached.
+fn oom() -> ! {
+    use std::io::Write;
+    let memory_max =
+        std::fs::read_to_string("/sys/fs/cgroup/memory.max").unwrap_or_else(|_| "unknown".into());
+    let swap_max = std::fs::read_to_string("/sys/fs/cgroup/memory.swap.max")
+        .unwrap_or_else(|_| "unknown".into());
+    eprintln!("{}", memory_max.trim());
+    eprintln!("{}", swap_max.trim());
+    let _ = std::io::stderr().flush();
+    let mut pages = Vec::<Box<[u8; 1024 * 1024]>>::new();
+    for total in (1..=1024).map(|n| n * 1024 * 1024usize) {
+        let mut page = Box::new([0u8; 1024 * 1024]);
+        for byte in page.iter_mut().step_by(4096) {
+            *byte = 1;
+        }
+        pages.push(page);
+        eprintln!("{total}");
+        let _ = std::io::stderr().flush();
     }
+    std::hint::black_box(pages);
+    std::process::exit(0)
 }
 
 /// Sleeps effectively forever, in a loop — the harness SIGKILLs the process.

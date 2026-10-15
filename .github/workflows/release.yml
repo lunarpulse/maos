@@ -39,6 +39,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Operator hold 2026-10-15: Windows is not release-supported.
+        # Do not add Windows build/package/publish targets until an explicit
+        # operator command reopens docs/release/windows-deferral.md.
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest

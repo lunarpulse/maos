@@ -60,18 +60,28 @@ class CheckedExecutionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check(suite(22) + suite(4), 0, [4, 22])
 
+    def test_passing_replacement_cannot_substitute_for_a_required_scene(self):
+        output = "test s1 ... fixture diagnostic\nok\ntest s2 ... ok\n" + suite(2)
+        self.check(output, 0, [2], ["s1", "s2"])
+        replacement = output.replace("test s2 ...", "test unrelated ...")
+        with self.assertRaisesRegex(ValueError, "s2"):
+            self.check(replacement, 0, [2], ["s1", "s2"])
+        with self.assertRaisesRegex(ValueError, "s2"):
+            self.check(output.replace("test s2 ... ok\n", ""), 0, [2], ["s1", "s2"])
+
 
 class UnitNameTests(unittest.TestCase):
     def test_unit_type_suffixed_names_are_refused_before_launch(self):
         helper = load_helper()
-        for unit in ("maos-17-2-x.service", "maos-17-2-x.scope", "maos-17-2-x@y"):
+        for unit in ("maos-17-2-x.service", "maos-17-2-x.scope", "maos-17-2-x@y",
+                     "maos-17-7-terminal.service", "maos-17-5-terminal", "other-17-7-x"):
             args = argparse.Namespace(
                 unit=unit, mode="delegated", timeout=5, rootless_canary=False, command=["true"],
             )
             with self.subTest(unit=unit), \
                     mock.patch.object(helper.os, "geteuid", return_value=1000), \
                     mock.patch.object(helper.subprocess, "Popen") as popen, \
-                    self.assertRaisesRegex(ValueError, "unit-type suffix"):
+                    self.assertRaisesRegex(ValueError, "unit"):
                 helper._systemd_run(args)
             popen.assert_not_called()
 

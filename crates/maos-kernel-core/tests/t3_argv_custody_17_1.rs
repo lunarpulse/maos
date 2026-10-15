@@ -15,7 +15,15 @@ use maos_kernel_core::security::{
     },
 };
 use ring::signature::{Ed25519KeyPair, KeyPair};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use tempfile::TempDir;
+
+/// The pure builder only needs a path; it never inspects the directory.
+fn state_dir() -> (TempDir, PathBuf) {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("state");
+    (temp, path)
+}
 
 fn verified_image() -> VerifiedImageAttestation {
     // Public deterministic test seed, following security::crypto's convention.
@@ -58,6 +66,7 @@ fn resource_argv(
         path: "/usr/bin/podman".into(),
         version: "unit".into(),
     };
+    let (_temp, directory) = state_dir();
     build_runtime_argv(
         &runtime,
         &verified_image(),
@@ -67,6 +76,7 @@ fn resource_argv(
         "worker",
         1,
         "worker-unit",
+        &directory,
         Some(Path::new("/run/egress.sock")),
         env,
     )
