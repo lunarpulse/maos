@@ -217,3 +217,57 @@ fn _types_resolve() {
     fn _assert_send_sync<T: Send + Sync>() {}
     _assert_send_sync::<TcpA2ATransport>();
 }
+
+/// Story 20-3a AC6.4 — an unreadable `/proc/self/limits` is named locally and
+/// fails on a declared Linux CI runner (re-runs this binary's own child test
+/// with `CI=1`). Lives here, not in `support`, so it runs once rather than in
+/// all 21 binaries that include the support module.
+#[cfg(target_os = "linux")]
+#[test]
+fn unreadable_fd_limits_are_not_ci_passes() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "unreadable_fd_limits_child", "--nocapture"])
+        .env("CI", "1")
+        .env("MAOS_FD_REFUSAL_CHILD", "1")
+        .output()
+        .expect("run actual fd probe under declared CI");
+    eprintln!(
+        "fd limits refusal control: CI=1, exit={}\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !output.status.success(),
+        "unreadable limits were silently accepted"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("SKIP (assert_fd_headroom): cannot read"),
+        "{output:?}"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn unreadable_fd_limits_child() {
+    // No global environment mutation; the parent invokes this exact test in CI.
+    if std::env::var_os("MAOS_FD_REFUSAL_CHILD").is_none() {
+        return;
+    }
+    let absent = std::env::temp_dir()
+        .join(format!("maos-absent-limits-{}", std::process::id()))
+        .join("limits");
+    assert!(!absent.exists(), "refusal control must really be absent");
+    assert_fd_headroom_at(1, &absent);
+}
+
+#[test]
+fn unlimited_fd_limits_remain_sufficient() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("limits");
+    std::fs::write(
+        &path,
+        "Max open files            unlimited            unlimited            files\n",
+    )
+    .unwrap();
+    assert_fd_headroom_at(u64::MAX, &path);
+}

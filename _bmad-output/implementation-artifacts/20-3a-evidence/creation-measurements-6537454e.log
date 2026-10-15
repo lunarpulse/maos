@@ -1,0 +1,55 @@
+# 20-3a creation measurements — HEAD 6537454e4e2f5d21361b48c95638876051529e2f, 2026-10-15, dev host (no CI/GITHUB_ACTIONS set)
+# Binary: target/debug/xtask built from HEAD. JSON below is truncated to the first 600 bytes per gate by the creation harness.
+
+## Gate batch
+# for g in <gates>; do target/debug/xtask $g --json; echo rc=$?; done
+check-pentest-gate           rc=0  {"passed":true,"advisory":true,"reason":"summary.toml absent — pen-test engagement pending"}   ::warning::Pen-test engagement pending — summary.toml absent
+check-red-team-gate          rc=0  {"passed":true,"advisory":true,"reason":"red-team-results.toml absent — engagement pending"}   ::warning::Red-team engagement pending — results.toml absent
+check-skill-conformance      rc=0  {"passed":true,"advisory":false,"adapter_name":"anthropic_adapter",...}   (results file present)
+check-third-party-trial      rc=0  {"passed":true,"advisory":true,"reason":"trial-results.toml absent — third-party trial pending"}
+check-fuzz-floor             rc=0  {"passed":true,"advisory":true,"failures":[],"summary":["manifest_parser: 0 s / 259200 s (90d window)",...,"ADVISORY: ledger spans < 90 days — floor accumulating, not yet enforced"]}
+check-migration-merkle       rc=0  {"skipped":true,"passed":false,"reason":"corpus absent at tests/corpora/migration-corpus-1e6.sqlite ...","phase":"v1.0-advisory / v1.5-blocking"}
+check-rto-gate               rc=0  {"passed":false,"skipped":true,"threshold_secs":14400,"latest_drill":null,"verdict":"skipped — no RTO drill evidence yet (weekly cadence not run)"}
+check-trial-attestation      rc=0  {"passed":true,"oracle_green":true,"advisory":false,"blocking_now":false,"ship_phase":"v1_5",...}
+check-wasm-form-equiv        rc=0  {"passed":true,"oracle_green":true,"blocking_now":false,"base_passed":19,"fault_inject_passed":22,...}
+check-enterprise-pdp         rc=0  {"passed":true,"oracle_green":true,"blocking_now":false,...}
+check-enterprise-identity    rc=0  {"passed":true,"oracle_green":true,"blocking_now":false,...}
+check-escape-detector        rc=0  {"passed":true,"oracle_green":true,"blocking_now":false,...}
+check-fkcs                   rc=0  {"passed":true,"oracle_green":true,"advisory":false,"blocking_now":false,...}
+check-cross-region-consensus rc=0  {"passed":true,"oracle_green":false,"advisory":true,"ledger_enforced":false,"product_claim":"NOT_PROVEN(... 4 x ABSENT)",...}
+check-multi-region-slo       rc=0  {"passed":true,"oracle_green":false,"advisory":true,"ledger_enforced":false,"product_claim":"NOT_PROVEN(... ABSENT, INDETERMINATE)",...}
+check-multi-tenant-loom      rc=1  {"passed":false,"oracle_green":false,"advisory":false,"ledger_enforced":false,...}
+                                   ::error::check-multi-tenant-loom RED: maos-bin-whole-package-parallel-isolation [INDETERMINATE]
+                                   (inner run: test founder_loop_once_drains_capability_audit_writer ... FAILED) — unattributed, see story T0
+check-reza-production-path   rc=0  {"passed":true,"oracle_green":false,"advisory":true,"ledger_enforced":false,...}
+check-export-control         rc=0  {"passed":true,"failures":[],...}
+check-fuzz-targets           rc=0  {"passed":true,"failures":[]}
+check-loom-substrate-drift   rc=0  {"gate":"check-loom-substrate-drift","passed":true,"oracle_green":true,...}
+check-env-contract           rc=0  {"passed":true,"registered_count":97,"violations":[]}
+check-decision-register      rc=0  {"rows":23,"open_rows":11,"resolved_targets":26,"findings":[],"passed":true}   (before the D1/D9 re-anchor)
+check-model-currency         rc=0  {"passed":true,"files_scanned":17,"pins_checked":11,"findings":[]}
+check-exit-commands          rc=0  {"passed":true,"epics_in_roster":5,"tokens_resolved":16,...}
+
+## CLI name of the ADR-040 gate (15-5 "registry name != CLI name" premise)
+# target/debug/xtask --help | grep -i adr
+  check-adr040-accepted                Story 5.5e — v0.5 release-block: ADR-040 must be committed with status `accepted`
+# => equals gate-registry.toml:34; only the banner at check_adr_040_accepted.rs:43 says check-adr-040-accepted
+
+## fuzz-cadence.yml:150 jq defect
+$ echo '{"records":[]}' > l.json; echo '{"target":"x","cpu_seconds":1}' > r.json
+$ jq --slurpfile rec r.json '.records += $rec[0]' l.json; echo rc=$?
+Error: cannot calculate [] + {"target":"x","cpu_seconds":1}
+rc=5
+$ jq -c --slurpfile rec r.json '.records += $rec' l.json; echo rc=$?
+{"records":[{"target":"x","cpu_seconds":1}]}
+rc=0
+
+## discipline.yml:3669 (check-j4-latency "D3 verified" step)
+$ cargo tree -p maos-bench -e features --release >/dev/null; echo rc=$?
+error: unexpected argument '--release' found
+rc=1
+# => `| grep -q bench-fault-inject` sees nothing; the step prints "D3 verified" regardless.
+
+## kloc (cargo run -q -p xtask -- kloc-check --json)
+passed=true alarm=true aggregate=175372 over_budget=[]
+xtask 44370 (ceiling 44370)   maos-audit 7267 (ceiling 7267)   maos-bin 25939 (ceiling 25939)   _aggregate_hardfail 175373 (strict measured+1)

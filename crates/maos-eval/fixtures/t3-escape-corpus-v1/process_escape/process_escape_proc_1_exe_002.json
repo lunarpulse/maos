@@ -1,0 +1,37 @@
+{
+  "scenario_id": "process_escape_proc_1_exe_002",
+  "category": "process_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.process.proc_1_exe",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "Listing the container init executable is allowed; attempt the live host executor proc-exe instead."
+  },
+  "attack_surface": "host binary path disclosure via /proc/1/exe symlink",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.process.proc_1_exe"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "Listing the container init executable is allowed; attempt the live host executor proc-exe instead.",
+    "v0_command": [
+      "ls",
+      "-la",
+      "/proc/1/exe"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 
 //! Story 10.2 AC1 — xtask CI gate: parse `docs/third-party-trial/results/trial-results.toml`
-//! via typed serde deserialization. If present, assert participant-count, stratification,
-//! and per-participant success thresholds for a valid third-party trial. If absent, emit an
-//! advisory annotation and pass (conditional — the trial may still be pending). Malformed TOML
-//! or missing required fields → hard fail. The Wilson 95% CI on the success rate is computed
-//! and logged as advisory only (never asserts; F5→A-prime distinguishes advisory from blocking).
+//! via typed serde deserialization. Integrity failures are fatal at every N.
+//! Validated N<12 is preliminary (INDETERMINATE); missing input is ABSENT.
+//! Registry disposition decides whether either blocks, never whether it passed.
+//! At N>=12 all sampling floors block. Wilson 95% CI remains advisory only.
 
 use serde::Deserialize;
 use std::path::Path;
@@ -57,7 +56,9 @@ fn validate_dates(start: &str, end: &str) -> Result<(), String> {
 }
 
 // #33: emit_command + validate_dates extracted to gate_common (shared across all gate modules).
-use crate::gate_common::{emit_command, validate_dates as validate_dates_shared};
+use crate::gate_common::{
+    emit_command, validate_dates as validate_dates_shared, Observation, OutOfLedgerVerdict,
+};
 
 /// Wilson score interval (95% CI, z = 1.96) for `successes` out of `n`.
 /// At N=12, successes=10 this returns approximately (0.552, 0.953).
@@ -196,45 +197,27 @@ fn load_signed_attestations(
 /// could see it. An argument cannot be set without editing a reviewed file.
 pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
     let require_derivation_provenance = is_v2_blocking_phase(ship_phase)?;
+    let ship_phase = if ship_phase.trim().eq_ignore_ascii_case("v2.0") {
+        "v2_0"
+    } else {
+        crate::gate_common::PHASE_ORDER
+            .iter()
+            .copied()
+            .find(|phase| phase.eq_ignore_ascii_case(ship_phase.trim()))
+            .expect("ship phase validated above")
+    };
     let path = resolve_workspace_path(RESULTS_PATH)
         .unwrap_or_else(|| Path::new(RESULTS_PATH).to_path_buf());
 
     if !path.exists() {
-        // Advisory: trial-results.toml absent — third-party trial still pending.
-        emit_command(
-            json,
-            "warning",
-            "Third-party trial pending — trial-results.toml absent",
-        );
-        if let Ok(summary_path) = std::env::var("GITHUB_STEP_SUMMARY") {
-            let summary = "## ⚠️ Third-Party Trial Gate: ADVISORY\n\
-                Trial has not yet been executed. \
-                This gate is structural infrastructure only.\n\
-                The gate will activate automatically when \
-                `docs/third-party-trial/results/trial-results.toml` is committed.\n";
-            let _ = std::fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(&summary_path)
-                .and_then(|mut f| {
-                    use std::io::Write;
-                    f.write_all(summary.as_bytes())
-                });
-        }
-
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "passed": true,
-                    "advisory": true,
-                    "reason": "trial-results.toml absent — third-party trial pending"
-                })
-            );
-        } else {
-            eprintln!("check-third-party-trial: PASS (advisory — trial-results.toml absent)");
-        }
-        return Ok(());
+        return OutOfLedgerVerdict::judge_registered(
+            "check-third-party-trial",
+            Observation::NotRun,
+            false,
+            ship_phase,
+            "trial-results.toml absent — third-party trial pending",
+        )?
+        .finish(json, serde_json::json!({"trial_status": "absent"}));
     }
 
     // trial-results.toml exists — parse it.
@@ -283,6 +266,12 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
     ];
     for (name, val) in counts {
         validate_non_negative(name, val)?;
+        if val > t.participants_total {
+            return Err(format!(
+                "{name}={val} > participants_total={}",
+                t.participants_total
+            ));
+        }
     }
     validate_dates(&t.trial_start, &t.trial_end)?;
 
@@ -319,14 +308,6 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
                 ));
             }
         }
-    }
-
-    // AC-1 cohort floor (participants_total is now integrity-verified against participant.len()).
-    if t.participants_total < 12 {
-        return Err(format!(
-            "check-third-party-trial: FAIL — participants_total={} (< 12 floor)",
-            t.participants_total
-        ));
     }
 
     // ── Per-participant validation (F6→C): validate EVERY participant unconditionally ─
@@ -379,12 +360,12 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
 
         // halt_recall must be a finite probability in [0,1] (on the EFFECTIVE value).
         if !halt_recall.is_finite() {
-            failures.push(format!(
+            return Err(format!(
                 "participant {} halt_recall={:.3} (not finite)",
                 p.id, halt_recall
             ));
         } else if !(0.0..=1.0).contains(&halt_recall) {
-            failures.push(format!(
+            return Err(format!(
                 "participant {} halt_recall={:.3} (out of [0,1])",
                 p.id, halt_recall
             ));
@@ -433,10 +414,9 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
 
     // #1: reconcile derived vs reported successes — self-reported count is NOT trusted.
     if derived_successes != t.successes {
-        failures.push(format!(
-            "successes={}: self-reported successes={} does not match participant records \
-             satisfying the success conjunction (derived={})",
-            t.successes, t.successes, derived_successes
+        return Err(format!(
+            "check-third-party-trial: FAIL — successes={} does not match participant records (derived={derived_successes}); {}",
+            t.successes, failures.join("; ")
         ));
     }
     if derived_successes < 10 {
@@ -446,8 +426,8 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
     }
 
     // ── D4: stratification counts derived from participant[].stratum, reconciled ────
-    // (derive-from-detail — same integrity principle as successes above). Strata are
-    // mutually exclusive (partition model); participant.stratum is a single canonical name.
+    // Counts derive from detail, just like successes. Strata may overlap, but each
+    // participant must list unique canonical names.
     let mut derived_strata: std::collections::HashMap<&str, i64> = std::collections::HashMap::new();
     let canonical_strata = [
         "no_prior_contribution",
@@ -465,7 +445,11 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
         }
         // Spec Task 1.2: stratum is a list — a participant can belong to multiple strata
         // (e.g. no_prior_contribution AND non_english). Each stratum label is counted.
+        let mut seen_strata = std::collections::HashSet::new();
         for s in &p.stratum {
+            if !seen_strata.insert(s.as_str()) {
+                return Err(format!("participant {} has duplicate stratum '{s}'", p.id));
+            }
             if !canonical_strata.contains(&s.as_str()) {
                 return Err(format!(
                     "check-third-party-trial: FAIL — participant {} has unknown stratum '{}' (not one of {:?})",
@@ -486,8 +470,8 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
         let derived = derived_strata.get(name).copied().unwrap_or(0);
         // Integrity: derived count must reconcile with the reported [trial] count.
         if derived != reported {
-            failures.push(format!(
-                "stratum '{name}': self-reported={reported} does not match participant records (derived={derived})"
+            return Err(format!(
+                "check-third-party-trial: FAIL — stratum '{name}': self-reported={reported} does not match participant records (derived={derived})"
             ));
         }
         // AC-1 minimum coverage.
@@ -520,43 +504,57 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
             });
     }
 
-    let passed = failures.is_empty();
-
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "passed": passed,
-                "advisory": false,
-                "participants_total": t.participants_total,
-                "successes_reported": t.successes,
-                "successes_derived": derived_successes,
-                "trial_start": t.trial_start,
-                "trial_end": t.trial_end,
-                "methodology_version": t.methodology_version,
-                "wilson_ci_lower": ci_lower,
-                "wilson_ci_upper": ci_upper,
-                "ship_phase": ship_phase,
-                "provenance_required": require_derivation_provenance,
-                "failures": failures,
-            })
-        );
+    let preliminary = t.participants_total < 12;
+    if preliminary {
+        failures.push(format!(
+            "participants_total={} (< 12 floor)",
+            t.participants_total
+        ));
     }
-
-    if passed {
-        if !json {
-            eprintln!(
-                "check-third-party-trial: PASS (participants={}, successes={}/{} derived/reported)",
-                t.participants_total, derived_successes, t.successes
-            );
-        }
-        Ok(())
+    let observation = if preliminary {
+        Observation::Insufficient
+    } else if failures.is_empty() {
+        Observation::Green
     } else {
-        let msg = format!("check-third-party-trial: FAIL — {}", failures.join("; "));
-        if !json {
-            eprintln!("{msg}");
-        }
-        emit_command(json, "error", &msg);
-        Err(msg)
-    }
+        Observation::Red
+    };
+    let strata: Vec<_> = strat_floors
+        .iter()
+        .map(|(name, floor, _)| {
+            serde_json::json!({
+                "name": name,
+                "count": derived_strata.get(name).copied().unwrap_or(0),
+                "floor": floor,
+            })
+        })
+        .collect();
+    let reason = if failures.is_empty() {
+        "all trial sampling floors met".to_owned()
+    } else {
+        failures.join("; ")
+    };
+    OutOfLedgerVerdict::judge_registered(
+        "check-third-party-trial",
+        observation,
+        true,
+        ship_phase,
+        reason,
+    )?
+    .finish(
+        json,
+        serde_json::json!({
+            "trial_status": if preliminary { "preliminary" } else { "complete" },
+            "participants_total": t.participants_total,
+            "successes_reported": t.successes,
+            "successes_derived": derived_successes,
+            "strata": strata,
+            "trial_start": t.trial_start,
+            "trial_end": t.trial_end,
+            "methodology_version": t.methodology_version,
+            "wilson_ci_lower": ci_lower,
+            "wilson_ci_upper": ci_upper,
+            "provenance_required": require_derivation_provenance,
+            "failures": failures,
+        }),
+    )
 }

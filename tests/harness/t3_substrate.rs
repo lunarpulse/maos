@@ -3,14 +3,16 @@
 //! Test-only T3 prerequisite. Local absence is named; declared CI capability
 //! never becomes a green skip. Production Worker routing is not bypassed.
 
+#[path = "ci.rs"]
+mod ci;
+
 pub fn require_t3(subject: &str) -> bool {
     if !cfg!(target_os = "linux") {
         eprintln!("SKIP T3 {subject}: OCI Worker execution is Linux-only");
         return false;
     }
     let configured = std::env::var("MAOS_T3_RUNTIME").ok();
-    let declared_ci = std::env::var("CI").as_deref() == Ok("true");
-    if configured.is_none() && !declared_ci {
+    if configured.is_none() && !ci::declared_ci() {
         eprintln!("SKIP T3 {subject}: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env");
         return false;
     }

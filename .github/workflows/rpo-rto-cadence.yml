@@ -96,68 +96,38 @@ jobs:
     needs: rto-drill-t1
     if: always()
     steps:
-      # Checkout is REQUIRED before the git append below — without a working
-      # tree the branch-fetch/create logic dies with "fatal: not a git
-      # repository" (Epic-12 retro fix 2026-07-14). fetch-depth: 0 so the
-      # `origin/main` fallback that seeds the ledger branch resolves.
+      # The source checkout supplies the collector; only operators create ledgers.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          token: ${{ secrets.RTO_LEDGER_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
       - name: Download evidence artifact from this run
         uses: actions/download-artifact@v4
         with:
           name: rto-evidence-${{ github.run_id }}
           path: evidence
       - name: Append evidence to rto-evidence.toml on the rto-ledger branch
-        env:
-          GH_TOKEN: ${{ secrets.RTO_LEDGER_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin rto-ledger || git checkout -b rto-ledger
-          git checkout rto-ledger 2>/dev/null || git checkout -B rto-ledger origin/main
-          [ -f rto-evidence.toml ] || echo -e '[[evidence]]\ndrill_date = "1970-01-01"\nrto_seconds = 0\ndrill_success = false\nnotes = "seed entry — no drill run yet"\n' > rto-evidence.toml
-          # Append the new entry from the drill artifact.
-          if [ -f evidence/rto-evidence-entry.toml ]; then
-            cat evidence/rto-evidence-entry.toml >> rto-evidence.toml
-          fi
-          git add rto-evidence.toml
-          if git diff --cached --quiet; then
-            echo "no new evidence to append"
-          else
-            git commit -m "rpo-rto-cadence: append RTO drill evidence (run ${{ github.run_id }})"
-            if git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:rto-ledger; then
-              echo "ledger updated on rto-ledger branch"
-            else
-              echo "::warning::rto-ledger push failed — evidence artifact remains available for manual backfill (run ${{ github.run_id }})"
-            fi
-          fi
+        run: bash scripts/collect-ledger.sh rto evidence
 
   # RTO gate — reads the accumulated evidence and gates on the ≤ 4h threshold.
-  # Advisory (pass) until the first weekly drill has run and produced evidence.
+  # ABSENT evidence is not a pass; the gate decides its disposition.
   check-rto-gate:
     runs-on: ubuntu-latest
     needs: rto-ledger-collect
     if: always()
     steps:
-      # Check out main (always present), then try to switch to the rto-ledger
-      # branch the collector seeds. If it is not present yet (first run before
-      # the collector's initial push, or a skipped push), skip the gate with a
-      # warning instead of hard-failing on a missing ref — the gate is advisory
-      # until the first weekly drill produces evidence (Epic-12 retro fix
-      # 2026-07-14).
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Switch to rto-ledger branch (skip gate if not yet seeded)
-        id: ledger
+      - name: Read ledger without replacing current gate code
         run: |
-          if git fetch origin rto-ledger 2>/dev/null && git checkout rto-ledger 2>/dev/null; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
+          rm -f rto-evidence.toml
+          if git fetch origin refs/heads/rto-ledger; then
+            if git cat-file -e FETCH_HEAD:rto-evidence.toml; then
+              git show FETCH_HEAD:rto-evidence.toml > rto-evidence.toml
+            fi
           else
-            echo "::warning::rto-ledger branch not present yet — RTO gate skipped (advisory until the first weekly drill seeds evidence)"
-            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo '::warning::rto-ledger unavailable; gate will report ABSENT (not a pass)'
           fi
       - uses: dtolnay/rust-toolchain@v1
         with:
@@ -166,5 +136,4 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: RTO ≤ 4h gate (evidence-based)
-        if: steps.ledger.outputs.present == 'true'
         run: cargo run -p xtask -- check-rto-gate --evidence rto-evidence.toml --json

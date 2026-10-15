@@ -1,0 +1,37 @@
+{
+  "scenario_id": "network_escape_ipv6_outbound_005",
+  "category": "network_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.network.ipv6_outbound",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "IPv6 loopback is not outbound; attempt a public IPv6 endpoint."
+  },
+  "attack_surface": "IPv6 loopback connectivity to host network",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.network.ipv6_outbound"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "IPv6 loopback is not outbound; attempt a public IPv6 endpoint.",
+    "v0_command": [
+      "sh",
+      "-c",
+      "ping6 -c1 ::1"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

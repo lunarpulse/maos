@@ -1,0 +1,311 @@
+# T3 pre-release: PRD NFR-Sec-5/6, >=24h measured fuzzing per target, zero crashes.
+# Four <=6h links cannot hold 24h plus setup under the hosted 6h job cap.
+# Operator ruling: link COUNT yields to 24h; five 5h soaks leave setup headroom.
+# The final assertion checks libFuzzer-measured seconds, never configured time.
+# The rc release precondition is owned by 20-5, not implemented here.
+name: fuzz-prerelease
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*-rc*']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  fuzz-link-1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: T3 link 1 (5h, runner-core workers, zero crashes)
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 1 '${{ matrix.rss_flag }}'
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save one measured record per target and link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-record-${{ matrix.target }}-1-${{ github.run_id }}
+          path: out/record-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve worker logs and crashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-logs-${{ matrix.target }}-1-${{ github.run_id }}
+          path: out/
+          retention-days: 90
+  fuzz-link-2:
+    needs: fuzz-link-1
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resume previous link corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: T3 link 2 (5h, runner-core workers, zero crashes)
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 2 '${{ matrix.rss_flag }}'
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save one measured record per target and link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-record-${{ matrix.target }}-2-${{ github.run_id }}
+          path: out/record-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve worker logs and crashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-logs-${{ matrix.target }}-2-${{ github.run_id }}
+          path: out/
+          retention-days: 90
+  fuzz-link-3:
+    needs: fuzz-link-2
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resume previous link corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: T3 link 3 (5h, runner-core workers, zero crashes)
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 3 '${{ matrix.rss_flag }}'
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save one measured record per target and link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-record-${{ matrix.target }}-3-${{ github.run_id }}
+          path: out/record-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve worker logs and crashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-logs-${{ matrix.target }}-3-${{ github.run_id }}
+          path: out/
+          retention-days: 90
+  fuzz-link-4:
+    needs: fuzz-link-3
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resume previous link corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: T3 link 4 (5h, runner-core workers, zero crashes)
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 4 '${{ matrix.rss_flag }}'
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save one measured record per target and link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-record-${{ matrix.target }}-4-${{ github.run_id }}
+          path: out/record-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve worker logs and crashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-logs-${{ matrix.target }}-4-${{ github.run_id }}
+          path: out/
+          retention-days: 90
+  fuzz-link-5:
+    needs: fuzz-link-4
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resume previous link corpus
+        uses: actions/download-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: T3 link 5 (5h, runner-core workers, zero crashes)
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/run-fuzz-link.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' 18000 T3 5 '${{ matrix.rss_flag }}'
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-corpus-${{ matrix.target }}-5-${{ github.run_id }}
+          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Save one measured record per target and link
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-record-${{ matrix.target }}-5-${{ github.run_id }}
+          path: out/record-*.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve worker logs and crashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-logs-${{ matrix.target }}-5-${{ github.run_id }}
+          path: out/
+          retention-days: 90
+  t3-ledger-collect:
+    needs: [fuzz-link-1, fuzz-link-2, fuzz-link-3, fuzz-link-4, fuzz-link-5]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.FUZZ_LEDGER_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: t3-record-*-${{ github.run_id }}
+          merge-multiple: true
+          path: records
+      - name: Append completed links (never fabricate failed-link evidence)
+        run: bash scripts/collect-ledger.sh fuzz records
+      - name: Require all five links and at least 24h per target
+        env:
+          LINK_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          results = json.loads(os.environ['LINK_RESULTS'])
+          assert all(job['result'] == 'success' for job in results.values()), 'T3 link failed or did not run'
+          records = [json.loads(path.read_text()) for path in pathlib.Path('records').glob('record-*.json')]
+          for target in ['manifest_parser', 'frame_deser', 'fuzz_exec_deps_parse_elf']:
+              links = [row for row in records if row['target'] == target]
+              assert len(links) == 5, f'{target}: expected five measured link records'
+              assert all(row['tier'] == 'T3' and row['commit'] == os.environ['GITHUB_SHA'] for row in links), 'tier/SHA mismatch'
+              seconds = sum(row['cpu_seconds'] for row in links)
+              assert seconds >= 86400, f'{target}: only {seconds} measured seconds (<24h)'
+              print(f'{target}: {seconds} libFuzzer seconds; five links, zero crashes')
+          PY

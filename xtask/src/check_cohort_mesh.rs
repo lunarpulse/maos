@@ -68,7 +68,7 @@ pub fn run(json: bool) -> Result<(), String> {
     // turned a sanctioned phase advance into a runtime panic — a tripwire
     // against the operation it is meant to permit, in the very crate that
     // consolidates the phase source.
-    build_journey_daemon()?;
+    build_journey_daemon().inspect_err(|error| emit_error(json, error))?;
     let legs = [
         Leg {
             name: "unpinned-authority",
@@ -681,6 +681,7 @@ pub fn run(json: bool) -> Result<(), String> {
     for leg in &legs {
         if let Err(red) = run_leg(leg) {
             if dev_enforced_red_blocks(BINDING, true) {
+                emit_error(json, &red);
                 return Err(red);
             }
             // Unreachable while [`BINDING`] is `Blocking`, and deliberately not
@@ -739,4 +740,17 @@ pub fn run(json: bool) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+/// Early infrastructure/leg failures need the same JSON boundary as pin reds.
+fn emit_error(json: bool, error: &str) {
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "gate": GATE_NAME, "oracle_green": false,
+                "ship_phase": CURRENT_PHASE, "error": error,
+            })
+        );
+    }
 }

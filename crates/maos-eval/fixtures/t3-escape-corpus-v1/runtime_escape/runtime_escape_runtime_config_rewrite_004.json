@@ -1,0 +1,37 @@
+{
+  "scenario_id": "runtime_escape_runtime_config_rewrite_004",
+  "category": "runtime_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.runtime.runtime_config_rewrite",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "cat is not a rewrite; attempt write-open of a host-created unique containers.conf sentinel and check unchanged."
+  },
+  "attack_surface": "container runtime configuration disclosure via /etc/containers/containers.conf",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.runtime.runtime_config_rewrite"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "cat is not a rewrite; attempt write-open of a host-created unique containers.conf sentinel and check unchanged.",
+    "v0_command": [
+      "sh",
+      "-c",
+      "cat /etc/containers/containers.conf"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

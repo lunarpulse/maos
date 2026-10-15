@@ -1,0 +1,31 @@
+{
+  "root": "/tmp/maos-endpoint-20-3a-7veyzwwu",
+  "endpoint": "tcp://127.0.0.1:42751",
+  "holder_pid": 396702,
+  "holder_exit_status": -15,
+  "init_exit_status": 0,
+  "held_boot_exit_status": 78,
+  "released_boot_exit_status": 0,
+  "listener_rows": [
+    "   3: 0100007F:A6FF 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 1417552653 1 0000000000000000 100 0 0 10 0                "
+  ],
+  "fd_links": [
+    [
+      "0",
+      "/dev/null"
+    ],
+    [
+      "1",
+      "pipe:[1417552650]"
+    ],
+    [
+      "2",
+      "pipe:[1417552651]"
+    ],
+    [
+      "3",
+      "socket:[1417552653]"
+    ]
+  ],
+  "mechanism": "Confirmed: init records an endpoint but holds no socket; an unrelated process can bind before boot."
+}

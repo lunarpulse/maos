@@ -5,6 +5,9 @@
 //! Each gate has a passing test AND a proven-red companion that
 //! demonstrates the gate can fail (D8 / M4).
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -101,13 +104,23 @@ fn source_tree_contains_literal(root: &Path, needle: &str) -> bool {
     false
 }
 
-fn network_syscalls(binary: &Path, args: &[&str]) -> Result<Vec<String>, String> {
+#[derive(Debug)]
+enum TraceFailure {
+    ToolUnavailable(String),
+    TargetFailed(String),
+    LogUnreadable(String),
+}
+
+fn network_syscalls(binary: &Path, args: &[&str]) -> Result<Vec<String>, TraceFailure> {
     let strace = Command::new("strace")
         .arg("-V")
         .output()
-        .map_err(|err| format!("strace unavailable: {err}"))?;
+        .map_err(|err| TraceFailure::ToolUnavailable(format!("strace unavailable: {err}")))?;
     if !strace.status.success() {
-        return Err("strace -V failed".into());
+        return Err(TraceFailure::ToolUnavailable(format!(
+            "strace -V failed: {}",
+            String::from_utf8_lossy(&strace.stderr)
+        )));
     }
 
     let log_path = std::env::temp_dir().join(format!(
@@ -115,6 +128,8 @@ fn network_syscalls(binary: &Path, args: &[&str]) -> Result<Vec<String>, String>
         std::process::id(),
         std::thread::current().name().unwrap_or("test")
     ));
+    // Never let an earlier run's log stand in for this execution's evidence.
+    let _ = fs::remove_file(&log_path);
     let output = Command::new("strace")
         .arg("-e")
         .arg("trace=network")
@@ -123,15 +138,21 @@ fn network_syscalls(binary: &Path, args: &[&str]) -> Result<Vec<String>, String>
         .arg(binary)
         .args(args)
         .output()
-        .map_err(|err| format!("failed to run strace: {err}"))?;
+        .map_err(|err| TraceFailure::TargetFailed(format!("failed to run traced target: {err}")))?;
     if !output.status.success() {
-        return Err(format!(
-            "strace target failed: {}",
+        let _ = fs::remove_file(&log_path);
+        return Err(TraceFailure::TargetFailed(format!(
+            "strace target failed ({}): {}",
+            output.status,
             String::from_utf8_lossy(&output.stderr)
-        ));
+        )));
     }
-    let log = fs::read_to_string(&log_path)
-        .map_err(|err| format!("failed to read strace log {}: {err}", log_path.display()))?;
+    let log = fs::read_to_string(&log_path).map_err(|err| {
+        TraceFailure::LogUnreadable(format!(
+            "failed to read strace log {}: {err}",
+            log_path.display()
+        ))
+    })?;
     let _ = fs::remove_file(&log_path);
     Ok(log
         .lines()
@@ -140,11 +161,25 @@ fn network_syscalls(binary: &Path, args: &[&str]) -> Result<Vec<String>, String>
         .collect())
 }
 
+fn airgap_syscalls(test: &str, binary: &Path, args: &[&str]) -> Option<Vec<String>> {
+    match network_syscalls(binary, args) {
+        Ok(syscalls) => Some(syscalls),
+        Err(TraceFailure::ToolUnavailable(reason)) if !ci::declared_ci() => {
+            eprintln!("SKIP ({test}): {reason}");
+            None
+        }
+        Err(TraceFailure::ToolUnavailable(reason)) => {
+            panic!("{test}: tool unavailable on declared CI: {reason}")
+        }
+        Err(TraceFailure::TargetFailed(reason)) => panic!("{test}: traced target failed: {reason}"),
+        Err(TraceFailure::LogUnreadable(reason)) => {
+            panic!("{test}: trace log unreadable: {reason}")
+        }
+    }
+}
+
 fn fixture_binary() -> PathBuf {
-    PathBuf::from(
-        std::env::var("CARGO_BIN_EXE_otel-airgap-fixture")
-            .expect("fixture binary path must be set by cargo"),
-    )
+    PathBuf::from(env!("CARGO_BIN_EXE_otel-airgap-fixture"))
 }
 
 fn frame_id_fixture() -> [u8; 16] {
@@ -492,14 +527,15 @@ fn gate_otel_zero_when_off_kernel_core_tree_has_no_otel() {
 
 #[test]
 fn gate_otel_airgap_default_off_no_connects() {
-    let Ok(syscalls) = network_syscalls(&fixture_binary(), &["off"]) else {
-        eprintln!("SKIP: strace unavailable");
+    let test = "gate_otel_airgap_default_off_no_connects";
+    let Some(syscalls) = airgap_syscalls(test, &fixture_binary(), &["off"]) else {
         return;
     };
     assert!(
         syscalls.is_empty(),
         "default-off fixture must issue zero network syscalls, got: {syscalls:?}"
     );
+    eprintln!("OTEL_AIRGAP_RAN {test}");
 }
 
 #[test]
@@ -508,32 +544,92 @@ fn gate_otel_airgap_enabled_no_endpoint_no_connects() {
         !source_tree_contains_literal(&crate_root().join("src"), "4317"),
         "crate source must not contain the default OTLP endpoint literal 4317"
     );
-    let Ok(syscalls) = network_syscalls(&fixture_binary(), &["on"]) else {
-        eprintln!("SKIP: strace unavailable");
+    let test = "gate_otel_airgap_enabled_no_endpoint_no_connects";
+    let Some(syscalls) = airgap_syscalls(test, &fixture_binary(), &["on"]) else {
         return;
     };
     assert!(
         syscalls.is_empty(),
         "enabled sink without endpoint config must issue zero network syscalls, got: {syscalls:?}"
     );
+    eprintln!("OTEL_AIRGAP_RAN {test}");
 }
 
 #[test]
 fn gate_otel_airgap_enabled_proven_red_network_canary_detected() {
-    let Ok(syscalls) = network_syscalls(
+    let test = "gate_otel_airgap_enabled_proven_red_network_canary_detected";
+    let Some(syscalls) = airgap_syscalls(
+        test,
         Path::new("python3"),
         &[
             "-c",
             "import socket\ns=socket.socket()\ntry:\n    s.connect(('127.0.0.1', 1))\nexcept OSError:\n    pass\n",
         ],
     ) else {
-        eprintln!("SKIP: strace unavailable");
+        // Only unavailable tooling on a non-CI host may be skipped.
         return;
     };
     assert!(
         !syscalls.is_empty(),
         "network canary must produce connect/socket syscalls so the gate proves red"
     );
+    eprintln!("OTEL_AIRGAP_RAN {test}");
+}
+
+/// Run the real gate in fresh processes; never mutate the parent test's PATH/CI.
+#[cfg(unix)]
+#[test]
+fn airgap_failure_causes_are_not_skips() {
+    use std::os::unix::fs::PermissionsExt;
+    let gate = "gate_otel_airgap_default_off_no_connects";
+    for (cause, body, diagnostic) in [
+        ("tool", "exit 1", "tool unavailable on declared CI"),
+        (
+            "target",
+            "if [ \"$1\" = -V ]; then exit 0; fi; echo planted-target-failure >&2; exit 17",
+            "traced target failed",
+        ),
+        ("log", "exit 0", "trace log unreadable"),
+    ] {
+        let dir =
+            std::env::temp_dir().join(format!("maos-strace-proof-{}-{cause}", std::process::id()));
+        fs::create_dir_all(&dir).expect("create PATH shadow");
+        let strace = dir.join("strace");
+        fs::write(&strace, format!("#!/bin/sh\n{body}\n")).expect("write PATH shadow");
+        fs::set_permissions(&strace, fs::Permissions::from_mode(0o700)).unwrap();
+        for declared_ci in [false, true] {
+            let mut command = Command::new(std::env::current_exe().unwrap());
+            command
+                .args(["--exact", gate, "--nocapture"])
+                .env("PATH", &dir)
+                .env_remove("CI")
+                .env_remove("GITHUB_ACTIONS");
+            if declared_ci {
+                command.env("CI", "1");
+            }
+            let output = command.output().expect("run real airgap gate");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let local_tool_skip = cause == "tool" && !declared_ci;
+            eprintln!(
+                "airgap refusal control: cause={cause}, CI={declared_ci}, exit={}\n{stderr}",
+                output.status
+            );
+            assert_eq!(
+                output.status.success(),
+                local_tool_skip,
+                "cause={cause}, CI={declared_ci}: {stderr}"
+            );
+            assert!(
+                stderr.contains(if local_tool_skip {
+                    "SKIP (gate_otel_airgap_default_off_no_connects)"
+                } else {
+                    diagnostic
+                }),
+                "{stderr}"
+            );
+        }
+        fs::remove_dir_all(dir).expect("remove PATH shadow");
+    }
 }
 
 /// gate:otel-zero-when-off — PROVEN-RED: noop guard → 0 spans.

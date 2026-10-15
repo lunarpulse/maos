@@ -70,6 +70,7 @@ pub struct Violation {
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Report {
+    pub gate: &'static str,
     pub passed: bool,
     pub epics_checked: usize,
     pub authoritative_src_lines: u64,
@@ -82,7 +83,21 @@ pub fn run(json: bool) -> Result<(), String> {
         Path::new(EPICS_INDEX),
         Path::new(EPICS_DIR),
         Path::new(KERNEL_BASELINE),
-    )?;
+    )
+    .inspect_err(|error| {
+        // Both check's input failure and read_pinned's I/O/parse failure must
+        // leave a gate-named machine-readable report before propagation.
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "gate": "check-epic-close-coherence",
+                    "passed": false,
+                    "error": error,
+                })
+            );
+        }
+    })?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
@@ -203,6 +218,7 @@ fn check(
     }
 
     Ok(Report {
+        gate: "check-epic-close-coherence",
         passed: violations.is_empty(),
         epics_checked: epics.len(),
         authoritative_src_lines: pin,

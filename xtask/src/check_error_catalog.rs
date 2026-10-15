@@ -4,7 +4,8 @@
 //!
 //! FR63 typed error catalog: CI-enforced bijection between the
 //! `xtask/error-catalog.toml` registry and the E\*-prefixed enum variants
-//! (and E\*-prefixed error enums) discovered by AST scan.
+//! (and E\*-prefixed error enums) discovered by AST scan, plus byte equality
+//! between the generated catalog and its committed JSON artifact.
 //!
 //! ## Discovery rules
 //!
@@ -18,7 +19,8 @@
 //!
 //! - **Un-catalogued**: E\* item found in source but absent from registry → FAIL.
 //! - **Stale**: registry entry whose `rust_path` not found in source → FAIL.
-//! - **Missing field**: any of the 6 metadata fields missing → FAIL.
+//! - **Missing field**: any required metadata or teaching field missing → FAIL.
+//! - **Artifact drift**: committed JSON differs from generated output → FAIL.
 //!
 //! Preflight mandate (Murat): the check is a real oracle — enum enumeration
 //! derives from AST/macro, not a hand-maintained list.
@@ -29,6 +31,8 @@ use std::path::{Path, PathBuf};
 const REQUIRED_FIELDS: &[&str] = &[
     "code",
     "description",
+    "cause",
+    "remediation",
     "severity",
     "recovery_class",
     "owner",
@@ -73,6 +77,8 @@ struct ErrorEntry {
     rust_path: String,
     source_file: String,
     description: String,
+    cause: String,
+    remediation: String,
     severity: String,
     recovery_class: String,
     owner: String,
@@ -289,6 +295,7 @@ enum ViolationKind {
     MissingField,
     InvalidValue,
     MinCount,
+    ArtifactDrift,
 }
 
 impl std::fmt::Display for ViolationKind {
@@ -299,6 +306,7 @@ impl std::fmt::Display for ViolationKind {
             Self::MissingField => write!(f, "missing-field"),
             Self::InvalidValue => write!(f, "invalid-value"),
             Self::MinCount => write!(f, "min-count"),
+            Self::ArtifactDrift => write!(f, "artifact-drift"),
         }
     }
 }
@@ -367,6 +375,8 @@ fn validate(catalog: &Catalog, discovered: &BTreeSet<DiscoveredItem>) -> Vec<Vio
             let value = match field {
                 "code" => &entry.code,
                 "description" => &entry.description,
+                "cause" => &entry.cause,
+                "remediation" => &entry.remediation,
                 "severity" => &entry.severity,
                 "recovery_class" => &entry.recovery_class,
                 "owner" => &entry.owner,
@@ -375,7 +385,7 @@ fn validate(catalog: &Catalog, discovered: &BTreeSet<DiscoveredItem>) -> Vec<Vio
                 "source_file" => &entry.source_file,
                 _ => continue,
             };
-            if value.is_empty() {
+            if value.trim().is_empty() {
                 violations.push(Violation {
                     kind: ViolationKind::MissingField,
                     detail: format!("{}: required field `{}` is empty", entry.code, field),
@@ -494,6 +504,8 @@ fn generate_catalog_artifact(catalog: &Catalog) -> String {
                 "since_version": entry.since_version,
                 "version_stability": "stable within LTS cycle — no breaking error-code changes",
                 "description": entry.description,
+                "cause": entry.cause,
+                "remediation": entry.remediation,
                 "docs_url": format!("https://docs.maos.dev/errors/{}", entry.code),
             }),
         );
@@ -524,7 +536,29 @@ pub fn run(catalog_path: &str, json: bool) -> Result<(), String> {
     let discovered = discover_e_star_items(&workspace_root, &catalog.meta.scan_dirs)?;
 
     // Validate
-    let violations = validate(&catalog, &discovered);
+    let mut violations = validate(&catalog, &discovered);
+    if violations.is_empty() {
+        let artifact_path = workspace_root.join("docs/errors/error-catalog.json");
+        let expected = generate_catalog_artifact(&catalog);
+        let detail = match std::fs::read(&artifact_path) {
+            Ok(actual) if actual == expected.as_bytes() => None,
+            Ok(_) => Some(format!(
+                "{} differs from generated output; run `cargo xtask error-catalog-generate`",
+                artifact_path.display()
+            )),
+            Err(error) => Some(format!(
+                "could not read {}: {}; run `cargo xtask error-catalog-generate`",
+                artifact_path.display(),
+                error
+            )),
+        };
+        if let Some(detail) = detail {
+            violations.push(Violation {
+                kind: ViolationKind::ArtifactDrift,
+                detail,
+            });
+        }
+    }
 
     if json {
         let payload = serde_json::json!({
@@ -741,6 +775,8 @@ mod tests {
             rust_path = "TestEnum::ETest"
             source_file = "test.rs"
             description = "test error"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "user"
             recovery_class = ""
             owner = "test"
@@ -782,6 +818,8 @@ mod tests {
             rust_path = "TestEnum::EKnown"
             source_file = "test.rs"
             description = "known error"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "user"
             recovery_class = "retry"
             owner = "test"
@@ -828,6 +866,8 @@ mod tests {
             rust_path = "TestEnum::EGone"
             source_file = "test.rs"
             description = "gone error"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "user"
             recovery_class = "retry"
             owner = "test"
@@ -865,6 +905,8 @@ mod tests {
             rust_path = "MyEnum::EFoo"
             source_file = "test.rs"
             description = "foo"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "user"
             recovery_class = "retry"
             owner = "test"
@@ -899,6 +941,8 @@ mod tests {
             rust_path = "MyEnum::EFoo"
             source_file = "test.rs"
             description = "foo"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "bogus"
             recovery_class = "retry"
             owner = "test"
@@ -939,6 +983,8 @@ mod tests {
             rust_path = "X::EBeta"
             source_file = "a.rs"
             description = "beta"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "user"
             recovery_class = "retry"
             owner = "test"
@@ -950,6 +996,8 @@ mod tests {
             rust_path = "X::EAlpha"
             source_file = "a.rs"
             description = "alpha"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "policy"
             recovery_class = "reject"
             owner = "test"
@@ -988,6 +1036,8 @@ mod tests {
             rust_path = "X::EFoo"
             source_file = "a.rs"
             description = "foo"
+            cause = "test trigger"
+            remediation = "correct the test input"
             severity = "user"
             recovery_class = "retry"
             owner = "test"
@@ -1044,7 +1094,7 @@ mod tests {
     }
 
     #[test]
-    fn live_catalog_golden_file_determinism() {
+    fn live_catalog_matches_committed_artifact() {
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
@@ -1056,12 +1106,12 @@ mod tests {
         let catalog: Catalog =
             toml::from_str(&catalog_content).expect("error-catalog.toml must parse");
 
-        let run1 = generate_catalog_artifact(&catalog);
-        let run2 = generate_catalog_artifact(&catalog);
-        assert_eq!(
-            run1.as_bytes(),
-            run2.as_bytes(),
-            "golden-file determinism: two runs must produce byte-identical output"
+        let generated = generate_catalog_artifact(&catalog);
+        let committed = std::fs::read(workspace_root.join("docs/errors/error-catalog.json"))
+            .expect("committed error catalog must exist");
+        assert!(
+            generated.as_bytes() == committed,
+            "committed JSON must equal generated catalog; run `cargo xtask error-catalog-generate`"
         );
     }
 

@@ -188,11 +188,30 @@ pub fn is_blocking_at(disposition: &HashMap<String, String>, phase: &str) -> boo
     )
 }
 
+/// The registry a gate reads: the working directory's own copy when it holds one
+/// (the workspace root, or an isolated test tree), else the nearest ancestor
+/// workspace root's — so a gate invoked from a subdirectory reads the same file
+/// instead of failing on a cwd-relative path.
+fn registry_path() -> std::path::PathBuf {
+    let relative = Path::new("xtask/gate-registry.toml");
+    if relative.exists() {
+        return relative.to_path_buf();
+    }
+    std::env::current_dir()
+        .ok()
+        .and_then(|cwd| {
+            cwd.ancestors()
+                .find(|dir| dir.join("Cargo.toml").exists() && dir.join(relative).exists())
+                .map(|dir| dir.join(relative))
+        })
+        .unwrap_or_else(|| relative.to_path_buf())
+}
+
 /// Read a gate's phase disposition map from `xtask/gate-registry.toml`.
 /// Errors if the gate is absent or its disposition is empty (a registry defect).
 pub fn read_disposition(gate_name: &str) -> Result<HashMap<String, String>, String> {
     let registry: crate::corpus_types::ShipGateRegistry =
-        crate::corpus_types::load_toml(Path::new("xtask/gate-registry.toml"))
+        crate::corpus_types::load_toml(&registry_path())
             .map_err(|e| format!("cannot read gate-registry.toml: {e}"))?;
     for entry in &registry.ship_gates {
         if entry.name == gate_name {
@@ -203,6 +222,48 @@ pub fn read_disposition(gate_name: &str) -> Result<HashMap<String, String>, Stri
         }
     }
     Err(format!("{gate_name} not found in gate-registry.toml"))
+}
+
+/// A `[[ship_gate]]` row's dev-time binding (Story 20-3a AC4.1). The registry is
+/// the ONLY class home for names that have no module (workflow-only jobs and the
+/// structural aggregates), so every row carries one, and the loader refuses a
+/// row whose value is missing or unknown — a gate with no stated class is the
+/// unstated-posture defect this field exists to end.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GateBinding {
+    /// One class for the whole gate: [`BindingClass::Blocking`].
+    Blocking,
+    /// One class for the whole gate: [`BindingClass::AdvisorySubstrate`].
+    AdvisorySubstrate,
+    /// Per-leg classes; the gate's legs carry their own [`BindingClass`].
+    Mixed,
+}
+
+impl GateBinding {
+    /// The whole-gate class, or `None` for a per-leg (`mixed`) gate.
+    pub fn class(self) -> Option<BindingClass> {
+        match self {
+            GateBinding::Blocking => Some(BindingClass::Blocking),
+            GateBinding::AdvisorySubstrate => Some(BindingClass::AdvisorySubstrate),
+            GateBinding::Mixed => None,
+        }
+    }
+}
+
+/// Read a gate's dev-time binding from `xtask/gate-registry.toml`. Errors if
+/// the gate is absent; a missing or unknown `binding` value already fails the
+/// registry load itself.
+pub fn read_binding(gate_name: &str) -> Result<GateBinding, String> {
+    let registry: crate::corpus_types::ShipGateRegistry =
+        crate::corpus_types::load_toml(&registry_path())
+            .map_err(|e| format!("cannot read gate-registry.toml: {e}"))?;
+    registry
+        .ship_gates
+        .iter()
+        .find(|entry| entry.name == gate_name)
+        .map(|entry| entry.binding)
+        .ok_or_else(|| format!("{gate_name} not found in gate-registry.toml"))
 }
 
 /// Dev-time enforcement class for a gate's oracle, decoupled from [`CURRENT_PHASE`].
@@ -361,6 +422,27 @@ impl EvidenceState {
             EvidenceState::ProvenBlocking | EvidenceState::ProvenLiveSigned
         )
     }
+
+    /// The gate-level roll-up: the WORST state among `states` names the gate
+    /// (Story 20-3a AC1.2 — `finish_ledger_gate`'s top-level field, so every
+    /// gate shares one top-level vocabulary). Ordering, best → worst:
+    /// `PROVEN_BLOCKING` < `PROVEN_LIVE_SIGNED` < `ABSENT` < `INDETERMINATE`.
+    /// A leg that ran and did not hold outranks a leg that never ran, because it
+    /// is the one carrying a finding. An empty set proves nothing: `ABSENT`.
+    pub fn worst(states: impl IntoIterator<Item = EvidenceState>) -> EvidenceState {
+        fn rank(state: EvidenceState) -> u8 {
+            match state {
+                EvidenceState::ProvenBlocking => 0,
+                EvidenceState::ProvenLiveSigned => 1,
+                EvidenceState::Absent => 2,
+                EvidenceState::Indeterminate => 3,
+            }
+        }
+        states
+            .into_iter()
+            .max_by_key(|state| rank(*state))
+            .unwrap_or(EvidenceState::Absent)
+    }
 }
 
 impl serde::Serialize for EvidenceState {
@@ -426,6 +508,238 @@ impl EvidenceVerdict {
 impl serde::Serialize for EvidenceVerdict {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.serialize(serializer)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Story 20-3a AC1.1 — D1's out-of-ledger evidence contract, in ONE home.
+//
+// Seven gates read evidence that lives outside the four-contract ledger (a
+// committed engagement summary, a cadence-collected ledger, a generated
+// corpus). Before this story four of them printed `"passed": true` over a file
+// that did not exist. The rule, stated once:
+//
+//   * the state is projected by `EvidenceVerdict::project` and nothing else;
+//   * `passed` means PROVEN — `ABSENT`/`INDETERMINATE` never pass;
+//   * a RED finding exits by binding class (`dev_enforced_red_blocks`);
+//   * evidence that was not measured, or measured too thinly to decide, exits
+//     by the registry disposition at the ship phase: plain `blocking` exits 1,
+//     anything else exits 0 with a visible warning. Never a gate-local copy.
+// ---------------------------------------------------------------------------
+
+/// What an out-of-ledger gate observed about its evidence this run. An
+/// observation, not a fifth evidence state: the state is still projected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Observation {
+    /// The evidence input is missing or unreadable — nothing was measured.
+    NotRun,
+    /// Measured, but too thinly to decide either way (e.g. a preliminary cohort
+    /// below the sampling minima). Not a RED finding; the disposition decides.
+    Insufficient,
+    /// Measured inside a RATIFIED bootstrap window in which the verdict is not
+    /// yet defined (the fuzz floor's first 90 days, `check_fuzz_floor.rs`): never
+    /// a pass and never a block, always visible. Distinct from `Insufficient`,
+    /// whose exit the registry disposition governs.
+    Accumulating,
+    /// Measured and RED — a finding.
+    Red,
+    /// Measured and green.
+    Green,
+}
+
+/// One out-of-ledger gate's verdict. Fields are private: a gate obtains one
+/// only from [`OutOfLedgerVerdict::judge`], so `passed`, `evidence_state` and
+/// the exit can never be assembled by hand.
+#[derive(Clone, Debug)]
+pub struct OutOfLedgerVerdict {
+    gate: &'static str,
+    class: BindingClass,
+    observation: Observation,
+    verdict: EvidenceVerdict,
+    blocks: bool,
+    phase: String,
+    disposition_at_phase: Option<String>,
+    reason: String,
+}
+
+/// The JSON keys only [`OutOfLedgerVerdict`] may write.
+const DERIVED_KEYS: &[&str] = &[
+    "gate",
+    "evidence_state",
+    "passed",
+    "advisory",
+    "reason",
+    "binding",
+    "ship_phase",
+    "disposition_at_phase",
+];
+
+impl OutOfLedgerVerdict {
+    /// Judge one gate's evidence. Pure: everything it reads is an argument.
+    pub fn judge(
+        gate: &'static str,
+        observation: Observation,
+        class: BindingClass,
+        substrate_present: bool,
+        disposition: &HashMap<String, String>,
+        phase: &str,
+        reason: impl Into<String>,
+    ) -> Self {
+        let verdict = EvidenceVerdict::project(LegOutcome {
+            class,
+            attempted: observation != Observation::NotRun,
+            green: observation == Observation::Green,
+            // No out-of-ledger evidence carries a harness signature.
+            signature_verified: false,
+        });
+        let disposition_at_phase = phase_disposition(disposition, phase).map(str::to_owned);
+        let blocks = match observation {
+            Observation::Red => dev_enforced_red_blocks(class, substrate_present),
+            Observation::NotRun | Observation::Insufficient => {
+                disposition_at_phase.as_deref() == Some("blocking")
+            }
+            Observation::Accumulating | Observation::Green => false,
+        };
+        Self {
+            gate,
+            class,
+            observation,
+            verdict,
+            blocks,
+            phase: phase.to_owned(),
+            disposition_at_phase,
+            reason: reason.into(),
+        }
+    }
+
+    /// [`Self::judge`] with the class and disposition read from the registry
+    /// row for `gate` (a `mixed` row has no whole-gate class and is refused).
+    pub fn judge_registered(
+        gate: &'static str,
+        observation: Observation,
+        substrate_present: bool,
+        phase: &str,
+        reason: impl Into<String>,
+    ) -> Result<Self, String> {
+        let class = read_binding(gate)?.class().ok_or_else(|| {
+            format!("{gate}: registry binding is `mixed`; an out-of-ledger verdict needs one class")
+        })?;
+        let disposition = read_disposition(gate)?;
+        Ok(Self::judge(
+            gate,
+            observation,
+            class,
+            substrate_present,
+            &disposition,
+            phase,
+            reason,
+        ))
+    }
+
+    pub fn state(&self) -> EvidenceState {
+        self.verdict.state()
+    }
+
+    /// PROVEN and no blocking finding — the only meaning `passed` has.
+    pub fn passed(&self) -> bool {
+        self.state().is_proven() && !self.blocks
+    }
+
+    /// Does this verdict fail the run?
+    pub fn blocks(&self) -> bool {
+        self.blocks
+    }
+
+    /// Not a pass, and not failing the run: CI proceeds, visibly.
+    pub fn advisory(&self) -> bool {
+        !self.passed() && !self.blocks
+    }
+
+    /// The gate's one JSON object: the derived fields plus gate-specific
+    /// `extra` fields. `extra` must be an object and may not carry a derived
+    /// key — a gate that tries to write its own `passed` is a defect, and it
+    /// panics rather than being silently overruled.
+    pub fn to_json(&self, extra: serde_json::Value) -> serde_json::Value {
+        let serde_json::Value::Object(mut map) = extra else {
+            panic!(
+                "{}: out-of-ledger extra fields must be a JSON object",
+                self.gate
+            );
+        };
+        for key in DERIVED_KEYS {
+            assert!(
+                !map.contains_key(*key),
+                "{}: `{key}` is derived by OutOfLedgerVerdict and may not be written by the gate",
+                self.gate
+            );
+        }
+        map.insert("gate".into(), self.gate.into());
+        map.insert("evidence_state".into(), self.state().as_str().into());
+        map.insert("passed".into(), self.passed().into());
+        map.insert("advisory".into(), self.advisory().into());
+        map.insert("reason".into(), self.reason.clone().into());
+        map.insert(
+            "binding".into(),
+            match self.class {
+                BindingClass::Blocking => "blocking",
+                BindingClass::AdvisorySubstrate => "advisory-substrate",
+            }
+            .into(),
+        );
+        map.insert("ship_phase".into(), self.phase.clone().into());
+        map.insert(
+            "disposition_at_phase".into(),
+            self.disposition_at_phase.clone().into(),
+        );
+        serde_json::Value::Object(map)
+    }
+
+    /// The one-line verdict the workflow command and the human output carry.
+    pub fn headline(&self) -> String {
+        let state = self.state().as_str();
+        let gate = self.gate;
+        let reason = &self.reason;
+        let disposition = self.disposition_at_phase.as_deref().unwrap_or("none");
+        match (self.observation, self.blocks) {
+            (Observation::Green, _) if self.passed() => format!("{gate}: PASSED — {reason}"),
+            (Observation::Green, _) => {
+                format!("{gate}: {state} — {reason} (unsigned live evidence; not a pass)")
+            }
+            (Observation::Red, true) => format!("{gate}: RED — {reason}"),
+            (Observation::Red, false) => {
+                format!("{gate}: {state} — {reason} (RED with its substrate absent; not a pass)")
+            }
+            (Observation::Accumulating, _) => format!(
+                "{gate}: {state} — {reason} (accumulating inside its bootstrap window; not a pass)"
+            ),
+            (_, true) => format!(
+                "{gate}: {state} — {reason} (disposition `{disposition}` at {}: unmeasured evidence blocks)",
+                self.phase
+            ),
+            (_, false) => format!("{gate}: {state} — {reason} (not a pass)"),
+        }
+    }
+
+    /// Print the JSON (or the human line), emit the workflow command, and
+    /// return the exit: `Err` exactly when [`Self::blocks`].
+    pub fn finish(&self, json: bool, extra: serde_json::Value) -> Result<(), String> {
+        let report = self.to_json(extra);
+        let headline = self.headline();
+        if self.blocks {
+            emit_command(json, "error", &headline);
+        } else if !self.passed() {
+            emit_command(json, "warning", &headline);
+        }
+        if json {
+            println!("{report}");
+        } else {
+            eprintln!("{headline}");
+        }
+        if self.blocks {
+            Err(headline)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -558,6 +872,160 @@ mod evidence_projection_tests {
         );
         assert_eq!(EvidenceState::Absent.as_str(), "ABSENT");
         assert_eq!(EvidenceState::Indeterminate.as_str(), "INDETERMINATE");
+    }
+}
+
+#[cfg(test)]
+mod out_of_ledger_tests {
+    use super::*;
+
+    const OBSERVATIONS: [Observation; 5] = [
+        Observation::NotRun,
+        Observation::Insufficient,
+        Observation::Accumulating,
+        Observation::Red,
+        Observation::Green,
+    ];
+
+    fn disposition(at_v1_5: &str) -> HashMap<String, String> {
+        HashMap::from([
+            ("v1_0".to_string(), "advisory".to_string()),
+            ("v1_5".to_string(), at_v1_5.to_string()),
+        ])
+    }
+
+    /// AC1.1's truth table, EXHAUSTIVELY: 5 observations × 2 classes × 2
+    /// substrate postures × 3 dispositions. Every row asserts the state, `passed`,
+    /// the exit and the advisory flag against the rule as written in the story,
+    /// not against the implementation's own expressions.
+    #[test]
+    fn out_of_ledger_truth_table_is_exhaustive() {
+        for observation in OBSERVATIONS {
+            for class in [BindingClass::Blocking, BindingClass::AdvisorySubstrate] {
+                for substrate in [false, true] {
+                    for at_phase in ["advisory", "blocking-when-present", "blocking"] {
+                        let v = OutOfLedgerVerdict::judge(
+                            "check-x",
+                            observation,
+                            class,
+                            substrate,
+                            &disposition(at_phase),
+                            "v1_5",
+                            "r",
+                        );
+                        let row = format!("{observation:?}/{class:?}/{substrate}/{at_phase}");
+                        let expected_state = match (observation, class) {
+                            (Observation::NotRun, _) => EvidenceState::Absent,
+                            (Observation::Green, BindingClass::Blocking) => {
+                                EvidenceState::ProvenBlocking
+                            }
+                            // Unsigned live green, insufficient, accumulating and
+                            // RED are all attempted-but-unproven.
+                            _ => EvidenceState::Indeterminate,
+                        };
+                        assert_eq!(v.state(), expected_state, "{row}");
+                        let expected_blocks = match observation {
+                            Observation::Red => class == BindingClass::Blocking || substrate,
+                            Observation::NotRun | Observation::Insufficient => {
+                                at_phase == "blocking"
+                            }
+                            Observation::Accumulating | Observation::Green => false,
+                        };
+                        assert_eq!(v.blocks(), expected_blocks, "{row}");
+                        // ABSENT / INDETERMINATE never pass, at any disposition.
+                        assert_eq!(v.passed(), expected_state.is_proven(), "{row}");
+                        assert_eq!(v.advisory(), !v.passed() && !expected_blocks, "{row}");
+                        let json = v.to_json(serde_json::json!({}));
+                        assert_eq!(json["passed"], v.passed(), "{row}");
+                        assert_eq!(json["evidence_state"], expected_state.as_str(), "{row}");
+                        assert_eq!(
+                            v.finish(true, serde_json::json!({})).is_err(),
+                            expected_blocks
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The disposition is read at the REQUESTED phase with ladder inheritance:
+    /// `blocking-when-present` at v1_5 does not block absent evidence; the
+    /// inherited plain `blocking` at v2_2 does.
+    #[test]
+    fn absent_evidence_follows_the_disposition_at_the_requested_phase() {
+        let d = HashMap::from([
+            ("v1_5".to_string(), "blocking-when-present".to_string()),
+            ("v2_0".to_string(), "blocking".to_string()),
+        ]);
+        let at = |phase: &str| {
+            OutOfLedgerVerdict::judge(
+                "check-x",
+                Observation::NotRun,
+                BindingClass::Blocking,
+                false,
+                &d,
+                phase,
+                "absent",
+            )
+        };
+        assert!(!at("v1_5").blocks());
+        assert!(at("v2_0").blocks());
+        assert!(at("v2_2").blocks(), "v2_2 inherits v2_0's plain blocking");
+        // No disposition at all (v1_0 precedes every rung) never blocks.
+        assert!(!at("v1_0").blocks());
+    }
+
+    #[test]
+    #[should_panic(expected = "`passed` is derived")]
+    fn a_gate_cannot_write_its_own_passed_field() {
+        OutOfLedgerVerdict::judge(
+            "check-x",
+            Observation::NotRun,
+            BindingClass::Blocking,
+            false,
+            &disposition("advisory"),
+            "v1_5",
+            "absent",
+        )
+        .to_json(serde_json::json!({ "passed": true }));
+    }
+
+    #[test]
+    fn worst_state_names_the_gate() {
+        use EvidenceState::*;
+        assert_eq!(EvidenceState::worst([]), Absent);
+        assert_eq!(EvidenceState::worst([ProvenBlocking]), ProvenBlocking);
+        assert_eq!(
+            EvidenceState::worst([ProvenBlocking, ProvenLiveSigned]),
+            ProvenLiveSigned
+        );
+        assert_eq!(EvidenceState::worst([ProvenLiveSigned, Absent]), Absent);
+        assert_eq!(
+            EvidenceState::worst([Absent, Indeterminate, ProvenBlocking]),
+            Indeterminate
+        );
+    }
+
+    /// AC4.1: the loader refuses a row with a missing or unknown `binding`.
+    #[test]
+    fn registry_rows_without_a_known_binding_are_refused() {
+        let parse = |row: &str| {
+            toml::from_str::<crate::corpus_types::ShipGateRegistry>(&format!(
+                "gates = []\n[[ship_gate]]\nname = \"g\"\ndisposition = {{ v1_0 = \"blocking\" }}\n{row}"
+            ))
+        };
+        let missing = parse("").unwrap_err().to_string();
+        assert!(missing.contains("missing field `binding`"), "{missing}");
+        let unknown = parse("binding = \"advisory\"").unwrap_err().to_string();
+        assert!(unknown.contains("unknown variant"), "{unknown}");
+        for (value, class) in [
+            ("blocking", Some(BindingClass::Blocking)),
+            ("advisory-substrate", Some(BindingClass::AdvisorySubstrate)),
+            ("mixed", None),
+        ] {
+            let registry = parse(&format!("binding = \"{value}\"")).unwrap();
+            assert_eq!(registry.ship_gates[0].binding.class(), class, "{value}");
+        }
     }
 }
 

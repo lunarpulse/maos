@@ -256,7 +256,7 @@
     }
   ],
   "error_routes_pattern": "/errors/{ERR_NAME}",
-  "expected_distinct_pages": 126,
+  "expected_distinct_pages": 136,
   "error_codes": [
     "EAbiTooNew",
     "EAbiTooOld",
@@ -269,6 +269,7 @@
     "EComplianceRejection::ExpiredClaim",
     "EComplianceRejection::MalformedClaim",
     "EComplianceRejection::SignatureInvalid",
+    "ECrossWallRecallDenied",
     "EEgressNotGranted",
     "EEgressProxyUnavailable",
     "EHaltContinuityViolation",
@@ -276,12 +277,17 @@
     "EManifestSchemaConflict",
     "EMigratorMissing",
     "EMigratorMissing_PrecheckOutcome",
+    "EModelProvenanceMissing",
+    "EModelProvenanceStale",
     "EOrchestratorDispatchRawOutput",
     "EOutputShapeAdapterMismatch",
     "EOutputShapeAdapterNotRegistered",
+    "EPinMismatch::FingerprintCollision",
     "EPinMismatch::Invalidated",
     "EPinMismatch::Mismatch",
     "EPinMismatch::NotPinned",
+    "ERegionTagInvalid",
+    "ERegionViolation",
     "ERespawnWithContextUnsupported",
     "ESkillProposal::EmptyDiff",
     "ESkillProposal::EmptyTargetId",
@@ -296,7 +302,11 @@
     "ESkillSchema::MissingFence",
     "ESkillSchema::TomlParse",
     "ESkillSchema::UnknownField",
-    "ESubstrateTooOld"
+    "ESkillStore::Io",
+    "ESkillStore::Json",
+    "ESkillStore::UnknownSchemaVersion",
+    "ESubstrateTooOld",
+    "ETeamIdInvalid"
   ],
   "redirects": [
     {

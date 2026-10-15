@@ -16,6 +16,12 @@ fn run_in_tempdir(
 ) -> std::process::Output {
     let dir = tempfile::tempdir().unwrap();
     fixture_setup(dir.path());
+    if matches!(
+        subcommand,
+        "check-third-party-trial" | "check-red-team-gate"
+    ) {
+        write_trial_registry(dir.path());
+    }
     std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args([subcommand, "--json"])
         .current_dir(dir.path())
@@ -23,7 +29,19 @@ fn run_in_tempdir(
         .expect("failed to run xtask")
 }
 
+fn write_trial_registry(root: &std::path::Path) {
+    let registry = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml"),
+    )
+    .unwrap();
+    std::fs::create_dir_all(root.join("xtask")).unwrap();
+    std::fs::write(root.join("xtask/gate-registry.toml"), registry).unwrap();
+}
+
 fn write_file(root: &std::path::Path, rel: &str, content: &str) {
+    if rel == "docs/third-party-trial/results/trial-results.toml" {
+        write_trial_registry(root);
+    }
     let path = root.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let mut f = std::fs::File::create(path).unwrap();
@@ -300,6 +318,25 @@ fn trial_gate_passes_on_valid_results() {
     );
 }
 
+#[test]
+fn trial_gate_absent_follows_ship_disposition() {
+    let dir = tempfile::tempdir().unwrap();
+    write_trial_registry(dir.path());
+    for (phase, succeeds) in [("v1_0", true), ("v1_5", true), ("v2_0", false)] {
+        let out = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .args(["check-third-party-trial", "--json", "--ship-phase", phase])
+            .env_remove("CI")
+            .env_remove("GITHUB_ACTIONS")
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(out.status.success(), succeeds, "{out:?}");
+        let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(report["passed"], false);
+        assert_eq!(report["evidence_state"], "ABSENT");
+    }
+}
+
 /// Story 11.7 consumer graduation (D1): a perfect hand-authored file with NO
 /// producer-signed derived attestations is rejected at v2.0 — a coordinator
 /// cannot `vim` their way to green (the bare provenance stamp no longer suffices).
@@ -559,6 +596,93 @@ fn trial_gate_passes_advisory_when_absent() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["advisory"], true, "should be advisory");
+    assert_eq!(json["passed"], false);
+    assert_eq!(json["evidence_state"], "ABSENT");
+}
+
+fn run_small_trial(content: &str, phase: &str) -> std::process::Output {
+    let dir = tempfile::tempdir().unwrap();
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/trial-results.toml",
+        content,
+    );
+    write_file(
+        dir.path(),
+        "docs/third-party-trial/results/derived-attestations.json",
+        &cohort_signed_attestations_json(None, &TEST_PRODUCER_SEED),
+    );
+    std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(["check-third-party-trial", "--json", "--ship-phase", phase])
+        .env_remove("CI")
+        .env_remove("GITHUB_ACTIONS")
+        .env("MAOS_TRIAL_PRODUCER_PUBKEY", test_producer_pubkey_hex())
+        .current_dir(dir.path())
+        .output()
+        .unwrap()
+}
+
+fn small_trial() -> String {
+    let participants = (1..=3).map(|id| format!(
+        "\n[[participant]]\nid = \"P{id:03}\"\nstratum = [\"no_prior_contribution\"]\nproduced_binary = true\nbinary_loads = true\nframes_run = 1000\nhalt_recall = 0.9\nsbom_verified = true\nsigning_chain_verified = true\n"
+    )).collect::<String>();
+    make_trial(3, [3, 0, 0, 0, 0], &participants)
+        .replace("participants_total = 12", "participants_total = 3")
+}
+
+#[test]
+fn trial_gate_small_consistent_cohort_is_preliminary() {
+    let out = run_small_trial(&small_trial(), "v1_5");
+    assert!(out.status.success(), "{out:?}");
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["trial_status"], "preliminary");
+    assert_eq!(report["evidence_state"], "INDETERMINATE");
+    assert_eq!(report["passed"], false);
+    assert_eq!(report["advisory"], true);
+    assert_eq!(report["successes_derived"], 3);
+    let out = run_small_trial(&small_trial(), "v2_0");
+    assert!(!out.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["trial_status"], "preliminary");
+    assert_eq!(report["evidence_state"], "INDETERMINATE");
+}
+
+#[test]
+fn trial_gate_small_duplicate_id_is_fatal() {
+    let out = run_small_trial(&small_trial().replace("P003", "P002"), "v1_5");
+    assert!(!out.status.success(), "{out:?}");
+}
+
+#[test]
+fn trial_gate_small_inconsistent_n_is_fatal() {
+    let out = run_small_trial(
+        &small_trial().replace("participants_total = 3", "participants_total = 4"),
+        "v1_5",
+    );
+    assert!(!out.status.success(), "{out:?}");
+}
+
+#[test]
+fn trial_gate_small_inflated_successes_is_fatal() {
+    let out = run_small_trial(
+        &small_trial().replace("successes = 3", "successes = 4"),
+        "v1_5",
+    );
+    assert!(!out.status.success(), "{out:?}");
+}
+
+#[test]
+fn trial_gate_twelve_with_validated_stratum_shortfall_is_red() {
+    let participants = VALID_PARTICIPANTS.replace(
+        "stratum = [\"offline_only\"]",
+        "stratum = [\"no_prior_contribution\"]",
+    );
+    let out = run_small_trial(&make_trial(10, [5, 3, 2, 2, 0], &participants), "v1_5");
+    assert!(!out.status.success(), "{out:?}");
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["trial_status"], "complete");
+    assert_eq!(report["passed"], false);
+    assert_eq!(report["advisory"], false);
 }
 
 /// Vector (e): malformed TOML → hard-fail.
@@ -756,7 +880,7 @@ fn all_classes() -> Vec<(&'static str, i64)> {
     ]
 }
 
-/// Vector (a): one class detected_blocked = 7 (below ≥9/10 floor) → advisory "WOULD HAVE BLOCKED SHIP".
+/// Vector (a): one class below floor blocks at HEAD.
 #[test]
 fn red_team_gate_logs_would_block_on_low_class() {
     let mut classes = all_classes();
@@ -769,17 +893,13 @@ fn red_team_gate_logs_would_block_on_low_class() {
             &make_red_team(&classes, 77, 0),
         );
     });
-    // Gate is advisory — should still pass
-    assert!(
-        out.status.success(),
-        "advisory gate should pass even with threshold failure"
-    );
+    assert!(!out.status.success(), "findings must block at HEAD");
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["threshold_met"], false, "threshold should not be met");
 }
 
-/// Vector (b): one class detected_blocked = 0 (unmitigated category) → advisory "WOULD HAVE BLOCKED SHIP".
+/// Vector (b): an unmitigated category blocks at HEAD.
 #[test]
 fn red_team_gate_logs_would_block_on_unmitigated() {
     let mut classes = all_classes();
@@ -792,13 +912,13 @@ fn red_team_gate_logs_would_block_on_unmitigated() {
             &make_red_team(&classes, 70, 1),
         );
     });
-    assert!(out.status.success(), "advisory gate should pass");
+    assert!(!out.status.success(), "findings must block at HEAD");
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["threshold_met"], false, "threshold should not be met");
 }
 
-/// Vector (c): 5 classes below per-class floor (8/10) → advisory "WOULD HAVE BLOCKED SHIP".
+/// Vector (c): five classes below floor block at HEAD.
 /// Note: aggregate floor (72) = 8 × per-class floor (9), so the two are mathematically
 /// coupled — they cannot fail independently. This vector exercises per-class threshold
 /// failure + aggregate cross-validation (sum(detected) must match aggregate.total_detected).
@@ -819,7 +939,7 @@ fn red_team_gate_logs_would_block_on_low_classes() {
             &make_red_team(&classes, 70, 0),
         );
     });
-    assert!(out.status.success(), "advisory gate should pass");
+    assert!(!out.status.success(), "findings must block at HEAD");
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["threshold_met"], false, "threshold should not be met");
@@ -858,6 +978,8 @@ fn red_team_gate_passes_advisory_when_absent() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
     assert_eq!(json["advisory"], true, "should be advisory");
+    assert_eq!(json["passed"], false);
+    assert_eq!(json["evidence_state"], "ABSENT");
 }
 
 // ═══════════════════════════════════════════════════════════════════

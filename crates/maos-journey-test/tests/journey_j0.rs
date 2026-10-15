@@ -12,6 +12,9 @@
 //! Every bounded wait lives in the harness (`wait_for_screen`,
 //! `wait_until`, `run_bounded`) per the JB-7 / H4 no-wallclock guard.
 
+#[path = "support/binaries.rs"]
+mod binaries;
+
 use maos_journey_test::{wait_until, AuditDb, JourneyWorld, Pty};
 
 fn workspace_root() -> std::path::PathBuf {
@@ -21,23 +24,53 @@ fn workspace_root() -> std::path::PathBuf {
 }
 
 fn maos_bin() -> String {
-    if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
-        return bin.to_string();
-    }
-    let debug_bin = workspace_root().join("target/debug/maos");
-    if debug_bin.exists() {
-        return debug_bin.to_string_lossy().into_owned();
-    }
-    panic!("maos binary not found — run `cargo build -p maos-bin` first");
+    binaries::resolve("maos", option_env!("CARGO_BIN_EXE_maos"))
 }
 
-/// `target/debug/maosctl` — built by `journey-hermetic-tier-1` and the
-/// `j0-scene` job before this suite runs.
+/// Resolve the current maosctl from the same selected target directory.
 fn maosctl_bin() -> String {
-    workspace_root()
-        .join("target/debug/maosctl")
-        .to_string_lossy()
-        .into_owned()
+    binaries::resolve("maosctl", option_env!("CARGO_BIN_EXE_maosctl"))
+}
+
+/// Story 20-3a AC8.6 — a source touched after the build refuses the binary by
+/// name. Exercised on a COPY of the real sources (never the checkout), once
+/// here rather than in every journey file that includes the resolver.
+#[test]
+fn journey_binary_freshness_refuses_newer_source() {
+    let root = workspace_root();
+    let binary = std::path::PathBuf::from(binaries::resolve("maos", None));
+    let built = std::fs::metadata(&binary).unwrap().modified().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    for tree in ["crates/maos-bin/src", "crates/maos-cli/src"] {
+        std::fs::create_dir_all(source.path().join(tree)).unwrap();
+        let copy = source.path().join(tree).join("main.rs");
+        std::fs::copy(root.join(tree).join("main.rs"), &copy).unwrap();
+        std::fs::File::open(&copy)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(built))
+            .unwrap();
+    }
+    for tree in ["crates/maos-bin/src", "crates/maos-cli/src"] {
+        let copy = source.path().join(tree).join("main.rs");
+        let file = std::fs::File::open(&copy).unwrap();
+        file.set_times(
+            std::fs::FileTimes::new().set_modified(built + std::time::Duration::from_secs(1)),
+        )
+        .unwrap();
+        let refusal = std::panic::catch_unwind(|| {
+            binaries::resolve_at("maos", binary.to_str(), source.path())
+        })
+        .expect_err("a source touch without rebuilding must refuse the journey binary");
+        let reason = refusal
+            .downcast_ref::<String>()
+            .expect("named freshness refusal");
+        assert!(
+            reason.contains("stale journey binary") && reason.contains(binaries::REBUILD),
+            "{reason}"
+        );
+        file.set_times(std::fs::FileTimes::new().set_modified(built))
+            .unwrap();
+    }
 }
 
 fn j0_cassette_source() -> std::path::PathBuf {

@@ -9,7 +9,7 @@
 //! "region-key destruction = crypto-shredding" does **not** literally hold for
 //! these artifacts: destroying a *signing* key provides no confidentiality.
 //!
-//! This module implements the behaviourally-correct model:
+//! This module models the two required phases:
 //!   - **Phase (a)** — the forget cascade over the region-scoped PLAINTEXT rows
 //!     IS the actual GDPR erasure (rows are deleted/redacted at rest). Reuses
 //!     the Story 9.2 cascade via a jurisdiction-label filter (NOT re-authored).
@@ -18,7 +18,10 @@
 //!     under it. (Not "crypto-shredding" — honest naming under Option A.)
 //!
 //! Both phases are required; if EITHER did not complete the receipt build
-//! **fails closed** and never reports success (AC-14).
+//! **fails closed** and never reports success (AC-14). No region-key revocation
+//! mechanism is wired: deriving the public key does not complete phase (b).
+//! The retained base seed can regenerate the signing key, so regional uninstall
+//! records a signed coverage gap instead of issuing a teardown receipt.
 //!
 //! The receipt is signed with the **HOME / control-plane key** and is therefore
 //! **region-NEUTRAL** (AC-10/AC-15): decommissioning the region does NOT destroy
@@ -137,7 +140,7 @@ impl ForgetCascadeAttestation {
 /// than rendering existing data unreadable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyDecommissionAttestation {
-    /// The region-derived public key that is now revoked (proves WHICH key).
+    /// The region-derived public key targeted for revocation (identifies WHICH key).
     pub decommissioned_region_pubkey: String,
     /// Decommission method (honest naming under Option A).
     pub method: String,
@@ -145,9 +148,11 @@ pub struct KeyDecommissionAttestation {
     pub completed: bool,
 }
 
-/// Derive the phase-(b) attestation: which region signing key is being revoked.
-/// Pure — names the region-derived pubkey (from [`derive_region_pubkey`]) so a
-/// verifier can bind the receipt to the exact decommissioned key.
+/// Identify the phase-(b) target without claiming an unwired revocation.
+///
+/// This pure operation only derives the public key; it cannot revoke signing
+/// capability. The base seed is retained for HOME receipts and can still derive
+/// the same region key, so `completed` is false.
 pub fn decommission_region_key(
     base_seed: &[u8; 32],
     region: &Region,
@@ -155,7 +160,7 @@ pub fn decommission_region_key(
     KeyDecommissionAttestation {
         decommissioned_region_pubkey: hex::encode(derive_region_pubkey(base_seed, region)),
         method: KEY_DECOMMISSION_METHOD.to_string(),
-        completed: true,
+        completed: false,
     }
 }
 
@@ -424,8 +429,11 @@ mod tests {
     #[test]
     fn ac14_fail_closed_when_key_decommission_incomplete() {
         let home = [7u8; 32];
-        let mut key = decommission_region_key(&[9u8; 32], &region("eu"));
-        key.completed = false; // phase (b) did not complete
+        let key = decommission_region_key(&[9u8; 32], &region("eu"));
+        assert!(
+            !key.completed,
+            "deriving a public key does not revoke signing capability"
+        );
         let err =
             build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
                 .unwrap_err();
@@ -436,98 +444,65 @@ mod tests {
     }
 
     #[test]
-    fn ac14_both_phases_complete_builds_verifiable_receipt() {
-        let home = [7u8; 32];
-        let key = decommission_region_key(&[9u8; 32], &region("eu"));
-        let receipt =
-            build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
-                .unwrap();
-        // AC-15: two-part receipt.
-        assert!(receipt.forget_cascade.completed);
-        assert!(receipt.key_decommission.completed);
-        assert_eq!(receipt.key_decommission.method, KEY_DECOMMISSION_METHOD);
-        // Verifies under the HOME pubkey.
-        let home_pub = derive_pubkey(&home);
-        assert!(verify_regional_teardown_receipt(&receipt, &home_pub).is_ok());
-    }
-
-    #[test]
-    fn ac15_receipt_is_home_key_bound_region_neutral() {
-        // The receipt is signed by the HOME key, NOT the region key.
-        let home = [7u8; 32];
+    fn retained_seed_still_derives_region_key_after_decommission_attempt() {
         let base = [9u8; 32];
-        let key = decommission_region_key(&base, &region("eu"));
-        let receipt =
-            build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
-                .unwrap();
-        let home_pub = derive_pubkey(&home);
-        let region_pub = derive_region_pubkey(&base, &region("eu"));
-        assert!(verify_regional_teardown_receipt(&receipt, &home_pub).is_ok());
-        // Region-NEUTRAL: it does NOT verify under the region-derived key.
-        assert!(verify_regional_teardown_receipt(&receipt, &region_pub).is_err());
+        let eu = region("eu");
+        let before = derive_region_pubkey(&base, &eu);
+        let key = decommission_region_key(&base, &eu);
+        assert!(!key.completed);
+        assert_eq!(key.decommissioned_region_pubkey, hex::encode(before));
+        assert_eq!(derive_region_pubkey(&base, &eu), before);
+        assert_eq!(base, [9u8; 32], "the HOME signing seed must be retained");
     }
 
     #[test]
-    fn ac10_region_key_destruction_then_receipt_still_verifies() {
-        // Build the receipt while the region key still exists...
+    fn verifier_rejects_home_signed_receipt_with_incomplete_key_phase() {
         let home = [7u8; 32];
-        let mut base = [9u8; 32];
-        let key = decommission_region_key(&base, &region("eu"));
-        let receipt =
-            build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
-                .unwrap();
-        let home_pub = derive_pubkey(&home);
-        // ...then "destroy" the region key material (zeroize the base seed)...
-        base = [0u8; 32];
-        let _ = base; // region key is now unrecoverable
-                      // ...the home-key-bound receipt STILL verifies (AC-10).
-        assert!(verify_regional_teardown_receipt(&receipt, &home_pub).is_ok());
-    }
-
-    #[test]
-    fn tampering_region_breaks_verification() {
-        let home = [7u8; 32];
-        let key = decommission_region_key(&[9u8; 32], &region("eu"));
-        let mut receipt =
-            build_regional_teardown_receipt(&home, &region("eu"), 100, complete_cascade(), key)
-                .unwrap();
-        let home_pub = derive_pubkey(&home);
-        assert!(verify_regional_teardown_receipt(&receipt, &home_pub).is_ok());
-        // Mutate the signed region field post-signing → verification fails.
-        receipt.region = "us".to_string();
-        assert!(verify_regional_teardown_receipt(&receipt, &home_pub).is_err());
+        let forget = complete_cascade();
+        let mut key = decommission_region_key(&[9u8; 32], &region("eu"));
+        // An untrusted producer may sign an incomplete attestation anyway.
+        key.completed = false;
+        let canonical = canonicalize(&ReceiptForSigning {
+            schema_version: REGIONAL_TEARDOWN_SCHEMA_VERSION,
+            region: "eu",
+            torn_down_at_ns: 100,
+            forget_cascade: &forget,
+            key_decommission: &key,
+        })
+        .unwrap();
+        let signature = SigningKey::from_bytes(&home).sign(&Sha256::digest(canonical));
+        let receipt = RegionalTeardownReceipt {
+            schema_version: REGIONAL_TEARDOWN_SCHEMA_VERSION.into(),
+            region: "eu".into(),
+            torn_down_at_ns: 100,
+            forget_cascade: forget,
+            key_decommission: key,
+            signature_block: SignatureBlock {
+                algorithm: "Ed25519".into(),
+                attester_pubkey: hex::encode(derive_pubkey(&home)),
+                signature: hex::encode(signature.to_bytes()),
+            },
+        };
+        let json = serde_json::to_string(&receipt).unwrap();
+        let back: RegionalTeardownReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(receipt, back);
+        let err = verify_regional_teardown_receipt(&back, &derive_pubkey(&home)).unwrap_err();
+        assert!(matches!(
+            err,
+            RegionalTeardownError::IncompletePhase { ref phase } if phase == "key_decommission"
+        ));
     }
 
     #[test]
     fn ac13_placement_is_region_specific_not_assumed() {
-        // The decommissioned key is region-SPECIFIC: a teardown targeting `eu`
-        // names a different revoked key than one targeting `us`, so placement is
-        // explicit and verifiable (tested, not assumed).
+        // The attempted decommission names the region-specific key even though
+        // no revocation mechanism exists.
         let base = [9u8; 32];
         let eu = decommission_region_key(&base, &region("eu"));
         let us = decommission_region_key(&base, &region("us"));
         assert_ne!(
             eu.decommissioned_region_pubkey, us.decommissioned_region_pubkey,
-            "AC-13: each region's decommissioned key must be distinct"
+            "AC-13: each region's signing key must be distinct"
         );
-    }
-
-    #[test]
-    fn receipt_round_trips_through_json() {
-        let home = [7u8; 32];
-        let key = decommission_region_key(&[9u8; 32], &region("ap-northeast-1"));
-        let receipt = build_regional_teardown_receipt(
-            &home,
-            &region("ap-northeast-1"),
-            42,
-            complete_cascade(),
-            key,
-        )
-        .unwrap();
-        let json = serde_json::to_string(&receipt).unwrap();
-        let back: RegionalTeardownReceipt = serde_json::from_str(&json).unwrap();
-        assert_eq!(receipt, back);
-        let home_pub = derive_pubkey(&home);
-        assert!(verify_regional_teardown_receipt(&back, &home_pub).is_ok());
     }
 }

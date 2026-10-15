@@ -1,22 +1,19 @@
 #![forbid(unsafe_code)]
 
-//! Story 10.1a AC4 + Story 10.2 D3 — xtask CI lint with three checks:
-//! 1. Asserts expected gate job names are present in the `v1.0-ship-gate` aggregate
-//!    job's `needs:` array in `discipline.yml`.
-//! 2. D3/F3→B: validates that every ship gate has a `[[ship_gate]]` entry in
-//!    `gate-registry.toml` with an explicit phase disposition — mechanizing the
-//!    advisory→blocking graduation so the "WILL block at v1.5" promise is testable.
-//! 3. Story 13.6e AC5: consumes the ledger-set gates' published `product_claim`
+//! Story 20-3a AC4 — ship-gate enrolment and binding drift:
+//! 1. The 44 expected names and required-binding registry rows are one set.
+//! 2. Each name resolves exactly once: a per-commit `v1-0-ship-gate.needs`
+//!    entry or an explicitly mapped cadence job key.
+//! 3. `aggregate.needs` reaches `v1-0-ship-gate` directly.
+//! 4. Story 13.6e AC5: consumes the ledger-set gates' published `product_claim`
 //!    artifacts and refuses a ship badge asserted over `NOT_PROVEN` evidence.
 //!    Before this story the gate read only `discipline.yml` text and registry
 //!    text — it never validated anything CI actually produced.
 
 use std::path::Path;
 
-/// The authoritative list of known gate jobs. Per-commit gates MUST appear in
-/// the `v1.0-ship-gate` aggregate `needs:` array (check #1); weekly-cadence
-/// gates enumerated in `WEEKLY_ONLY_GATES` are exempt from that check but
-/// still require a `[[ship_gate]]` disposition entry (check #2).
+/// The authoritative ship-gate set, reconciled in both directions with the
+/// registry. Only explicitly mapped cadence jobs may omit the per-commit edge.
 const EXPECTED_GATES: &[&str] = &[
     "ccac-n600-ship-gate",
     "nfr-rel-3-hsis-95pct",
@@ -35,6 +32,10 @@ const EXPECTED_GATES: &[&str] = &[
     // (clap exits 2) rather than reding this gate.
     "check-export-control",
     "check-fuzz-targets",
+    // Measured per-commit build prerequisite, not a cadence exemption.
+    "fuzz-build",
+    // Release/cadence measurement; resolved by job key in fuzz-cadence.yml.
+    "check-fuzz-floor",
     "check-ko-coverage",
     // Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
     "windows-check",
@@ -119,32 +120,13 @@ const EXPECTED_GATES: &[&str] = &[
     "check-model-currency",
 ];
 
-/// Weekly-cadence gates (rpo-rto-cadence.yml), not per-commit CI jobs.
-///
-/// These gates run on the Sunday 04:00 UTC schedule, so they do NOT appear in
-/// discipline.yml's `v1.0-ship-gate` `needs:` array and are skipped by the
-/// per-commit needs check. They DO require an explicit `[[ship_gate]]`
-/// disposition entry in gate-registry.toml (validated alongside the
-/// Story-10.x ship gates), mechanizing their advisory→blocking graduation.
-const WEEKLY_ONLY_GATES: &[&str] = &["rto-drill", "check-rto-gate"];
-
-/// The four v1.0 infrastructure gates that predate the disposition registry.
-///
-/// Story 13.6e trap 8: this replaces a hand-maintained ALLOWLIST of gates that
-/// DO require a `[[ship_gate]]` row. That allowlist silently omitted six gates
-/// that were in `EXPECTED_GATES` — `check-multi-tenant-loom`, `check-fkcs`,
-/// `check-vetting-attestation`, `check-escape-detector`,
-/// `check-enterprise-identity`, `check-trial-attestation` — so their
-/// disposition was never validated. Inverting it to this four-name legacy
-/// denylist makes the requirement the DEFAULT: a gate added tomorrow is
-/// checked unless someone deliberately declares it pre-registry. Verified safe
-/// at `b568a052` — these four are the only `EXPECTED_GATES` entries with no
-/// `[[ship_gate]]` row, so nothing new reds.
-const LEGACY_PRE_REGISTRY_GATES: &[&str] = &[
-    "ccac-n600-ship-gate",
-    "nfr-rel-3-hsis-95pct",
-    "check-stability-matrix",
-    "check-breaking-md",
+/// Explicit cadence enrolments: (registry name, workflow filename, job key).
+/// These are not unchecked exemptions: every mapped job must actually exist,
+/// and a simultaneous per-commit enrolment is refused.
+const CADENCE_GATES: &[(&str, &str, &str)] = &[
+    ("rto-drill", "rpo-rto-cadence.yml", "rto-drill-t1"),
+    ("check-rto-gate", "rpo-rto-cadence.yml", "check-rto-gate"),
+    ("check-fuzz-floor", "fuzz-cadence.yml", "check-fuzz-floor"),
 ];
 
 /// Is this invocation the one that DOWNLOADED the ledger artifacts?
@@ -204,23 +186,40 @@ fn ledger_ship_badge_problems(
 }
 
 pub fn run(json: bool) -> Result<(), String> {
-    let workflow_path = Path::new(".github/workflows/discipline.yml");
-    let content = std::fs::read_to_string(workflow_path)
-        .map_err(|e| format!("cannot read {}: {e}", workflow_path.display()))?;
-
-    // Find the v1.0-ship-gate job and extract its needs: block.
-    let needs = extract_ship_gate_needs(&content)?;
-
-    let mut missing: Vec<&str> = Vec::new();
+    let workflow = load_workflow("discipline.yml")?;
+    let needs = extract_job_needs(&workflow, "v1-0-ship-gate")?;
+    let cadence = [
+        ("rpo-rto-cadence.yml", load_workflow("rpo-rto-cadence.yml")?),
+        ("fuzz-cadence.yml", load_workflow("fuzz-cadence.yml")?),
+    ];
+    let mut missing = Vec::new();
+    let mut enrolment_problems = Vec::new();
     for gate in EXPECTED_GATES {
-        if WEEKLY_ONLY_GATES.contains(gate) {
-            continue; // weekly-cadence gate (rpo-rto-cadence.yml) — not a per-commit needs entry
+        let mut enrolments = needs.iter().filter(|name| name.as_str() == *gate).count();
+        if let Some((_, filename, job)) = CADENCE_GATES.iter().find(|(name, _, _)| name == gate) {
+            let (_, workflow) = cadence
+                .iter()
+                .find(|(name, _)| name == filename)
+                .expect("declared cadence workflow is loaded");
+            if workflow["jobs"][*job].is_mapping() {
+                enrolments += 1;
+            } else {
+                enrolment_problems.push(format!("{gate}: cadence job {filename}:{job} not found"));
+            }
         }
-        if !needs.contains(&gate.to_string()) {
-            missing.push(gate);
+        if enrolments != 1 {
+            enrolment_problems.push(format!(
+                "{gate}: expected exactly one ship enrolment, found {enrolments}"
+            ));
+            if enrolments == 0 {
+                missing.push(*gate);
+            }
         }
     }
-
+    let aggregate_needs = extract_job_needs(&workflow, "aggregate")?;
+    if !aggregate_needs.iter().any(|name| name == "v1-0-ship-gate") {
+        enrolment_problems.push("aggregate.needs must contain v1-0-ship-gate".to_string());
+    }
     // D3/F3→B: validate that every ship gate has a [[ship_gate]] disposition entry
     // in gate-registry.toml. This mechanizes the advisory→blocking graduation.
     let registry_path = Path::new("xtask/gate-registry.toml");
@@ -232,27 +231,23 @@ pub fn run(json: bool) -> Result<(), String> {
         .iter()
         .map(|e| e.name.as_str())
         .collect();
-    let mut missing_disposition: Vec<&str> = Vec::new();
     for gate in EXPECTED_GATES {
-        // Story 13.6e trap 8: DERIVED, not allowlisted. Every expected gate
-        // requires a `[[ship_gate]]` disposition unless it is one of the four
-        // v1.0 infrastructure gates that predate the registry.
-        if LEGACY_PRE_REGISTRY_GATES.contains(gate) {
-            continue;
-        }
         if !registry_names.contains(gate) {
-            missing_disposition.push(gate);
+            enrolment_problems.push(format!(
+                "{gate}: missing [[ship_gate]] disposition in gate-registry.toml"
+            ));
         }
     }
-    if !missing_disposition.is_empty() {
-        let msg = format!(
-            "ship-gate completeness check FAILED: gates missing [[ship_gate]] disposition in gate-registry.toml: [{}]",
-            missing_disposition.join(", ")
-        );
-        if !json {
-            eprintln!("{msg}");
+    for entry in &registry.ship_gates {
+        if !EXPECTED_GATES.contains(&entry.name.as_str()) {
+            enrolment_problems.push(format!(
+                "{}: registry row has no EXPECTED_GATES enrolment",
+                entry.name
+            ));
         }
-        return Err(msg);
+    }
+    if registry_names.len() != registry.ship_gates.len() {
+        enrolment_problems.push("duplicate [[ship_gate]] names in gate-registry.toml".to_string());
     }
 
     // Story 13.6e AC5: the verdict travels. Consume the ledger-set gates'
@@ -299,7 +294,7 @@ pub fn run(json: bool) -> Result<(), String> {
         ));
     }
 
-    let passed = missing.is_empty() && ledger_problems.is_empty();
+    let passed = enrolment_problems.is_empty() && ledger_problems.is_empty();
 
     if json {
         println!(
@@ -310,6 +305,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "found_count": needs.len(),
                 "missing": missing,
                 "found": needs,
+                "enrolment_problems": enrolment_problems,
                 "ledger_set": crate::evidence_ledger::ledger_gates(),
                 // Never silently skipped: when false, the ledger legs did not
                 // run because this invocation is not the artifact-consuming job.
@@ -332,10 +328,10 @@ pub fn run(json: bool) -> Result<(), String> {
         );
     }
 
-    if !missing.is_empty() {
+    if !enrolment_problems.is_empty() {
         let msg = format!(
-            "v1.0-ship-gate completeness check FAILED: missing gates in needs: [{}]",
-            missing.join(", ")
+            "ship-gate completeness check FAILED:\n- {}",
+            enrolment_problems.join("\n- ")
         );
         if !json {
             eprintln!("{msg}");
@@ -365,72 +361,31 @@ pub fn run(json: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Parse the `v1.0-ship-gate` job's `needs:` array from the YAML content.
-///
-/// Uses line-level parsing rather than a YAML library to avoid adding a
-/// dependency. The structure is predictable:
-///
-/// ```yaml
-///   v1-0-ship-gate:
-///     ...
-///     needs:
-///       - job-name-1
-///       - job-name-2
-/// ```
-fn extract_ship_gate_needs(content: &str) -> Result<Vec<String>, String> {
-    let lines: Vec<&str> = content.lines().collect();
+fn load_workflow(filename: &str) -> Result<serde_yaml::Value, String> {
+    let path = Path::new(".github/workflows").join(filename);
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    serde_yaml::from_str(&content).map_err(|e| format!("cannot parse {}: {e}", path.display()))
+}
 
-    // Find the v1-0-ship-gate job line (2-space indent at job level).
-    let job_line = lines
+/// Resolve job keys, never display names or shell text. YAML parsing also
+/// accepts inline/scalar needs and cannot mistake a step list for job edges.
+fn extract_job_needs(workflow: &serde_yaml::Value, job: &str) -> Result<Vec<String>, String> {
+    let needs = &workflow["jobs"][job]["needs"];
+    if let Some(name) = needs.as_str() {
+        return Ok(vec![name.to_string()]);
+    }
+    let entries = needs
+        .as_sequence()
+        .ok_or_else(|| format!("{job}.needs: expected a job name or array"))?;
+    entries
         .iter()
-        .position(|l| {
-            let trimmed = l.trim();
-            trimmed == "v1-0-ship-gate:" || trimmed.starts_with("v1-0-ship-gate:")
+        .map(|name| {
+            name.as_str()
+                .map(str::to_string)
+                .ok_or_else(|| format!("{job}.needs: expected a job name"))
         })
-        .ok_or("v1-0-ship-gate job not found in discipline.yml")?;
-
-    // Find the `needs:` line within this job (indented deeper).
-    let mut needs_line = None;
-    for i in (job_line + 1)..lines.len() {
-        let line = lines[i];
-        let trimmed = line.trim();
-        // Stop if we hit another job at the same indent level.
-        if !line.starts_with(' ') && !line.is_empty() {
-            break;
-        }
-        // Detect another top-level job (2-space indent, ends with ':')
-        if line.starts_with("  ") && !line.starts_with("    ") && trimmed.ends_with(':') {
-            break;
-        }
-        if trimmed == "needs:" || trimmed.starts_with("needs:") {
-            needs_line = Some(i);
-            break;
-        }
-    }
-
-    let needs_idx = needs_line.ok_or("needs: block not found in v1-0-ship-gate job")?;
-
-    // Collect the `- item` entries after needs:.
-    let mut needs = Vec::new();
-    for i in (needs_idx + 1)..lines.len() {
-        let line = lines[i];
-        let trimmed = line.trim();
-        if trimmed.starts_with("- ") {
-            let job_name = trimmed.strip_prefix("- ").unwrap().trim();
-            needs.push(job_name.to_string());
-        } else if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        } else {
-            // End of needs array.
-            break;
-        }
-    }
-
-    if needs.is_empty() {
-        return Err("v1-0-ship-gate needs: array is empty".into());
-    }
-
-    Ok(needs)
+        .collect()
 }
 
 #[cfg(test)]
@@ -463,6 +418,7 @@ mod tests {
     #[test]
     fn extracts_needs_from_sample_yaml() {
         let yaml = r#"
+jobs:
   v1-0-ship-gate:
     runs-on: ubuntu-latest
     needs:
@@ -475,7 +431,8 @@ mod tests {
       - name: Check results
         run: echo "done"
 "#;
-        let needs = extract_ship_gate_needs(yaml).unwrap();
+        let workflow = serde_yaml::from_str(yaml).unwrap();
+        let needs = extract_job_needs(&workflow, "v1-0-ship-gate").unwrap();
         assert_eq!(needs.len(), 4);
         assert!(needs.contains(&"ccac-n600-ship-gate".to_string()));
         assert!(needs.contains(&"nfr-rel-3-hsis-95pct".to_string()));
@@ -486,6 +443,7 @@ mod tests {
     #[test]
     fn detects_missing_gate() {
         let yaml = r#"
+jobs:
   v1-0-ship-gate:
     runs-on: ubuntu-latest
     needs:
@@ -494,7 +452,8 @@ mod tests {
       - check-stability-matrix
     if: always()
 "#;
-        let needs = extract_ship_gate_needs(yaml).unwrap();
+        let workflow = serde_yaml::from_str(yaml).unwrap();
+        let needs = extract_job_needs(&workflow, "v1-0-ship-gate").unwrap();
         assert_eq!(needs.len(), 3);
         // check-breaking-md is missing — the run() would fail.
         assert!(!needs.contains(&"check-breaking-md".to_string()));
@@ -587,11 +546,10 @@ mod tests {
         assert!(problems.is_empty(), "{problems:?}");
     }
 
-    /// Trap 8: the six gates the old `is_story10_ship_gate` allowlist silently
-    /// omitted are now checked by default — and all of them already carry a
-    /// `[[ship_gate]]` row, so fixing the hole reds nothing at HEAD.
+    /// Real-tree reconciliation includes the formerly exempt infrastructure
+    /// gates and the previously registry-only fuzz gates, with no legacy list.
     #[test]
-    fn every_expected_gate_but_the_four_legacy_ones_has_a_disposition() {
+    fn expected_gates_and_registry_are_one_set_of_44() {
         // Unit tests run with CWD = the crate root, not the workspace root.
         let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
         let registry: crate::corpus_types::ShipGateRegistry =
@@ -601,23 +559,10 @@ mod tests {
             .iter()
             .map(|e| e.name.as_str())
             .collect();
-        let missing: Vec<&str> = EXPECTED_GATES
-            .iter()
-            .filter(|gate| !LEGACY_PRE_REGISTRY_GATES.contains(gate))
-            .filter(|gate| !names.contains(*gate))
-            .copied()
-            .collect();
-        assert!(
-            missing.is_empty(),
-            "missing [[ship_gate]] rows: {missing:?}"
-        );
-        // And the legacy denylist really is the pre-registry set — none of the
-        // four has a row, so the exemption is not laundering a real gap.
-        for legacy in LEGACY_PRE_REGISTRY_GATES {
-            assert!(
-                !names.contains(legacy),
-                "{legacy} now HAS a disposition row — take it off the legacy list"
-            );
-        }
+        let expected: std::collections::HashSet<&str> = EXPECTED_GATES.iter().copied().collect();
+        assert_eq!(EXPECTED_GATES.len(), 44);
+        assert_eq!(expected.len(), 44, "duplicate expected gate");
+        assert_eq!(registry.ship_gates.len(), 44, "duplicate registry gate");
+        assert_eq!(names, expected);
     }
 }

@@ -23,19 +23,19 @@ than inherited from planning prose.
 | `CI_EVIDENCE_AUDIT_KEY` | `.github/workflows/discipline.yml` `check-multi-tenant-loom` step "Install the CI-only evidence audit key" | hard fail for the gate: without it the required `reza-three-team-three-region-journey` leg is `ABSENT`, `check-multi-tenant-loom` is red, and through `v1-0-ship-gate` so is `aggregate` (the tag precondition). The step warns and writes nothing | `ops-provisioning-secrets-and-accounts` | `present` |
 | `DOCKERHUB_TOKEN` | `.github/workflows/container.yml:44` | hard fail: Docker Hub login cannot authenticate | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `DOCKERHUB_USERNAME` | `.github/workflows/container.yml:43,52,80` | hard fail: Docker Hub login/image name cannot resolve | `ops-provisioning-secrets-and-accounts` | `absent` |
-| `FUZZ_LEDGER_WRITE_TOKEN` | `.github/workflows/fuzz-cadence.yml:124` | skip-by-design: expression falls back to auto-provided `GITHUB_TOKEN` | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN fallback is sufficient; fuzz branch is blocked by a code bug)` |
+| `FUZZ_LEDGER_WRITE_TOKEN` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (dedicated token optional; operator must provision branch and write permission)` |
 | `MAOS_ANTHROPIC_API_KEY` | `.github/workflows/journey-nightly.yml:88` | hard fail for the paid live re-record leg; hermetic replay is unaffected | `ops-nightly-cassette-rerecord` | `absent` |
 | `MAOS_RELEASE_PUBKEY` | `.github/workflows/release.yml:41-46,90-110` | hard fail: an absent/empty key fails the exact lowercase parser; the shipped `maosctl` also refuses the bundled development key | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:93,95` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `present` |
-| `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml:113` | skip-by-design: expression falls back to auto-provided `GITHUB_TOKEN` | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
+| `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
 | `GitHub OIDC for cosign` | `.github/workflows/container.yml:23-26,74-80` | invalid-ref only if workflow `id-token: write` is removed; no operator secret is required | `ops-provisioning-secrets-and-accounts` | `present` |
 | `macOS/aarch64 release build` | `.github/workflows/release.yml:10-60`; `.github/workflows/discipline.yml` `release-dry-run` | partial: Linux aarch64 is blocking per commit; macOS arm64 remains a required manual pre-tag dispatch and tagged-release leg | `ops-provisioning-secrets-and-accounts` | `present` |
 | `lunarpulse/homebrew-maos` | `packaging/homebrew/maos.rb` | hard fail for publication: repository does not exist and formula hashes remain placeholders | `ops-brew-tap-and-aur-publication` | `absent` |
 | `AUR account and package publication` | `packaging/aur/PKGBUILD` | hard fail for publication: package was not submitted and hashes/version remain scaffold values | `ops-brew-tap-and-aur-publication` | `absent` |
-| `rto-ledger branch permission` | `.github/workflows/rpo-rto-cadence.yml:111-135` | hard fail only if the existing `GITHUB_TOKEN` branch permission is removed | `ops-provisioning-secrets-and-accounts` | `present` |
-| `fuzz-ledger branch permission` | `.github/workflows/fuzz-cadence.yml:122-158` | skip-by-design at HEAD: malformed jq array-plus-object update leaves nothing staged before push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (blocked by fuzz-cadence.yml:146 code bug filed to 20-3)` |
-| `self-hosted fuzz runner` | `.github/workflows/fuzz-cadence.yml` | skip-by-design: workflow uses GitHub-hosted runners and has no self-hosted selector | `ops-provisioning-secrets-and-accounts` | `absent` |
-| `24-hour fuzz execution` | `.github/workflows/fuzz-cadence.yml:81-82` | skip-by-design: configured run is 600 seconds across four workers, not 24 hours | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (no 24-hour workflow leg exists)` |
+| `rto-ledger branch permission` | `.github/workflows/rpo-rto-cadence.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; collectors never create a branch | `ops-provisioning-secrets-and-accounts` | `present` |
+| `fuzz-ledger branch permission` | `.github/workflows/fuzz-cadence.yml`, `fuzz-prerelease.yml`, `scripts/collect-ledger.sh` | hard fail if branch/file is missing or push is rejected; operators must provision the branch, initial ledger, and write access | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `self-hosted fuzz runner` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml` | not required: both workflows use GitHub-hosted Ubuntu runners | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (hosted runners execute both fuzz tiers)` |
+| `24-hour fuzz execution` | `.github/workflows/fuzz-prerelease.yml` | chain fails on a crash, missing link/counter, or measured total below 86,400 libFuzzer seconds per target; five 5h links fit the hosted job cap | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (workflow implemented by 20-3a; actual run evidence accrues in CI, rc precondition belongs to 20-5)` |
 | `external third-party authors` | `xtask/src/check_third_party_trial.rs:325` | hard fail below the gate's honest denominator; the current gate requires 12 rather than the former prose's 3 | `ops-external-cohort-and-pen-test` | `absent` |
 | `external penetration test` | `RELEASE-HOLDS.md:24` | status and ship effect are authoritative only in Hold 1 | `ops-external-cohort-and-pen-test` | `not-a-provisioning-item (tracked by RELEASE-HOLDS.md Hold 1)` |
 | `Google Calendar OAuth` | `ops-google-calendar-oauth-mcp` | skip-by-design: CI uses the conformant fixture; no credential name exists in the tree | `ops-google-calendar-oauth-mcp` | `absent` |
@@ -52,11 +52,14 @@ than inherited from planning prose.
 - `rto-ledger` is present and operational: eight weekly appends existed since
   2026-07-19 when measured. Its success proves the default `GITHUB_TOKEN`
   permission; a dedicated write token is optional, not missing provisioning.
-- `fuzz-ledger` is not a provisioning task. At
-  `.github/workflows/fuzz-cadence.yml:146`, `.records` is an array while
-  `$rec[0]` is an object, so jq refuses the addition. The failed command is left
-  of `&&`; execution continues, nothing is staged, and the push is never
-  attempted. Story 20-3 owns the code repair.
+- Story 20-3a repairs the jq array/object append as a standalone failing command
+  in `scripts/collect-ledger.sh`. Missing branches/files and rejected pushes now
+  fail rather than seed/no-op/warn. `fuzz-ledger` was absent at the story baseline;
+  **ops-provisioning-secrets-and-accounts** must provision it and its write access.
+  The existing `rto-ledger` remains operator-owned; collectors never create it.
+- `fuzz-prerelease.yml` implements the ≥24h T3 chain on hosted runners, via five
+  5h links (four 6h links leave no setup time under the hosted cap). Completed
+  links produce measured evidence; implementation alone is not a green T3 run.
 - Provisioning `MAOS_RELEASE_PUBKEY` is required at binary build time. The
   compile-time parser rejects an absent secret (GitHub supplies an empty value),
   non-lowercase input, and any length other than 64 hex characters. The release

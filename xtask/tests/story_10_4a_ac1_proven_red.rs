@@ -103,6 +103,11 @@ fn live_researcher_collective_method_body<'a>(source: &'a str, method: &str) -> 
 fn run_xtask(args: &[&str]) -> std::process::Output {
     std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(args)
+        .current_dir(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap(),
+        )
         .output()
         .expect("failed to spawn the xtask binary")
 }

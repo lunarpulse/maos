@@ -84,6 +84,8 @@ pub struct GateRegistry {
 pub struct ShipGateEntry {
     pub name: String,
     pub disposition: std::collections::HashMap<String, String>,
+    /// Story 20-3a AC4.1 — required; an unknown value is refused by serde.
+    pub binding: crate::gate_common::GateBinding,
 }
 
 /// Extended registry shape: the flat `gates` list (for coverage-matrix validation)

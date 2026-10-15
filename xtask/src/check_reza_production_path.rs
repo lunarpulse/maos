@@ -617,10 +617,11 @@ const SPECS: &[TestLeg] = &[
                 "--exact",
             ],
         },
-        // D1 (review consensus), re-pointed by Story 13.5h: a region-pinned Host
-        // erases and says `erased`, with the Shared tier now attested
-        // `VerifiedEmpty` — earned by counting principal-namespaced rows, not
-        // asserted. Removing `"shared"` from REQUIRED_STORES reds this leg.
+        // D1 (review consensus), re-pointed by Story 13.5h and again by 20-3a
+        // AC9: a region-pinned Host signs the Shared tier `VerifiedEmpty` —
+        // earned by counting principal-namespaced rows, not asserted — beside
+        // the signed `region_signing_key` CoverageGap, and emits no successful
+        // regional teardown receipt.
         TestLeg {
             name: "gdpr-regional-shared-verified-empty",
             class: BindingClass::Blocking,
@@ -630,7 +631,7 @@ const SPECS: &[TestLeg] = &[
                 "maos-bin",
                 "--test",
                 "erasure_uninstall_13_5b",
-                "regional_uninstall_attests_shared_tier_verified_empty",
+                "regional_uninstall_signs_key_coverage_gap",
                 "--",
                 "--exact",
             ],

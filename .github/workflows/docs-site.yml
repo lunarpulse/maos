@@ -8,6 +8,7 @@ on:
     paths:
       - 'docs-site/**'
       - 'docs/errors/error-catalog.json'
+      - 'xtask/error-catalog.toml'
       - 'LOCALES.md'
       - 'BREAKING.md'
       - 'GOVERNANCE.md'
@@ -19,6 +20,7 @@ on:
     paths:
       - 'docs-site/**'
       - 'docs/errors/error-catalog.json'
+      - 'xtask/error-catalog.toml'
       - 'LOCALES.md'
       - 'BREAKING.md'
       - 'GOVERNANCE.md'

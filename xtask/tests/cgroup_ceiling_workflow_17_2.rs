@@ -25,44 +25,12 @@ fn named<'a>(job: &'a Value, name: &str) -> &'a Value {
         .unwrap_or_else(|| panic!("missing step {name}"))
 }
 
-// Evaluate only the predicates accepted in the aggregate result-disposition
-// condition. This intentionally is not a general GitHub Actions expression engine.
-fn evaluate(expr: &str, needs: &BTreeMap<String, String>) -> bool {
-    let e = expr
-        .trim()
-        .trim_start_matches("${{")
-        .trim_end_matches("}}")
-        .trim();
-    e.split("||").any(|term| {
-        let term = term.trim().trim_matches(|c| c == '(' || c == ')').trim();
-        if term.starts_with("contains(needs.*.result,") {
-            let state = term.split('\'').nth(1).expect("contains state");
-            return needs.values().any(|v| v == state);
-        }
-        let start = term.find("needs['").expect("needs bracket result") + 7;
-        let end = term[start..].find("']").expect("needs closing bracket") + start;
-        let name = &term[start..end];
-        let state = needs.get(name).map(String::as_str).unwrap_or("");
-        assert!(
-            term[end + 2..].trim().starts_with(".result != 'success'"),
-            "unsupported required-job result predicate: {term}"
-        );
-        state != "success"
-    })
-}
-fn render_run(script: &str, needs: &BTreeMap<String, String>) -> String {
-    let start = script.find("${{").expect("GHA expression in status script");
-    let end = script[start..].find("}}").expect("expression end") + start + 2;
-    let condition = &script[start..end];
-    script.replacen(
-        condition,
-        if evaluate(condition, needs) {
-            "true"
-        } else {
-            "false"
-        },
-        1,
-    )
+fn failure_selected(predicate: &str, status_output: &str) -> bool {
+    assert_eq!(
+        predicate, "${{ steps.status.outputs.overall == 'failure' }}",
+        "failure step must consume the executed status step's output"
+    );
+    status_output.lines().any(|line| line == "overall=failure")
 }
 fn fresh_dir(prefix: &str) -> PathBuf {
     let nonce = std::time::SystemTime::now()
@@ -73,14 +41,22 @@ fn fresh_dir(prefix: &str) -> PathBuf {
     fs::create_dir(&path).expect("fresh temp dir");
     path
 }
-fn output(script: &str) -> String {
+fn output(script: &str, needs: &BTreeMap<String, String>) -> String {
     let dir = fresh_dir("maos-cgroup-workflow");
     let file = dir.join("output");
+    let needs: BTreeMap<_, _> = needs
+        .iter()
+        .map(|(name, result)| (name, serde_json::json!({ "result": result })))
+        .collect();
     let status = Command::new("bash")
         .arg("-e")
         .arg("-c")
         .arg(script)
         .env("GITHUB_OUTPUT", &file)
+        .env(
+            "NEEDS_JSON",
+            serde_json::to_string(&needs).expect("needs JSON"),
+        )
         .status()
         .expect("bash status script");
     let value = fs::read_to_string(&file).expect("GITHUB_OUTPUT");
@@ -127,25 +103,26 @@ fn aggregate_reports_every_required_job_non_success_as_failure() {
             if let Some(result) = needs.get_mut(failed) {
                 *result = state.to_owned();
             }
-            assert_eq!(
-                output(&render_run(script, &needs)).trim(),
-                "overall=failure",
-                "{failed}={state}"
-            );
             assert!(
-                evaluate(failure_if, &needs),
-                "failure step did not select {failed}={state}"
+                needs.contains_key(failed),
+                "{failed} must remain an aggregate need"
             );
+            let observed = output(script, &needs);
+            println!("{failed}={state}: {}", observed.trim());
+            assert_eq!(observed.trim(), "overall=failure", "{failed}={state}");
+            let selected = failure_selected(failure_if, &observed);
+            assert!(selected, "failure step did not select {failed}={state}");
             assert!(
                 !run_successful(failure_run),
                 "failure step exited successfully with {failed}={state}"
             );
         }
     }
-    let all = successful_dependencies;
-    assert_eq!(output(&render_run(script, &all)).trim(), "overall=success");
+    let observed = output(script, &successful_dependencies);
+    println!("all-success control: {}", observed.trim());
+    assert_eq!(observed.trim(), "overall=success");
     assert!(
-        !evaluate(failure_if, &all),
+        !failure_selected(failure_if, &observed),
         "failure step selected all-success control"
     );
 }

@@ -61,7 +61,7 @@ pass. A gate that governs nothing passes for the wrong reason, and
 
 | ID | Residual (retro §4) | Decision required | Target story | Deadline (mechanical) | Owner |
 |---|---|---|---|---|---|
-| **D1** · OPEN | Eight Family-B gates sit outside the four-contract evidence ledger; `check-vetting-attestation` and `check-wasm-form-equiv` cannot represent `ABSENT` at all. | Does the ledger expand to Family-B, or do Family-B gates get a separate evidence contract? The ledger is deliberately derived from four journey contracts and must not silently expand. | `20-3a-gate-honesty` — RESTATED by 14-0 (see the ruling below). Its former target was retro action C3, which is not a vehicle. | Before `20-3a-gate-honesty` leaves `backlog` | Murat + Winston |
+| **D1** · CLOSED | Seven gates outside the four-contract evidence ledger reported `passed: true` over absent evidence, or exited on the phase instead of their class (row text corrected 2026-10-15 to the ruling's subject set: pentest, red-team, third-party-trial, fuzz-floor and skill-conformance over absent evidence; escape-detector over a substrate-absent RED; trial-attestation exiting on `blocking_now`; migration-merkle and rto-gate as the `skipped` prior art). The original text — "eight Family-B gates; vetting-attestation and wasm-form-equiv cannot represent `ABSENT`" — was measured close to inverted by 14-0. | Does the ledger expand to Family-B, or do Family-B gates get a separate evidence contract? The ledger is deliberately derived from four journey contracts and must not silently expand. **CLOSED 2026-10-15 by `20-3a-gate-honesty` AC1**: one out-of-ledger contract, `gate_common::OutOfLedgerVerdict`, projects every state through `EvidenceVerdict::project`; `passed` means PROVEN; a RED exits by binding class; unmeasured evidence exits by the registry disposition at the ship phase (operator ruling 2026-10-15: plain `blocking` exits 1). The ledger did not expand; its gates gained only a top-level `evidence_state`. Evidence: `xtask/tests/gate_honesty_20_3a.rs`, `story_10_2_proven_red.rs` (`trial_gate_*`), the gate_common truth table. | `20-3a-gate-honesty` — RESTATED by 14-0 (see the ruling below). Its former target was retro action C3, which is not a vehicle. | Before `20-3a-gate-honesty` reaches `done` (RE-ANCHORED 2026-10-15 by Story 20-3a's creation at `6537454e` — the backlog-exit clause is REPLACED, not supplemented, per the D3/D7 precedent D-16-5-H. Reason: the decision is RULED (out-of-ledger evidence contract, no ledger expansion, ruling below) and its implementation is 20-3a AC1, so the row is OPEN-with-ruling until that lands. Subject set re-measured: pentest, red-team, third-party-trial, fuzz-floor and skill-conformance still report `passed: true` over absent evidence, escape-detector over a substrate-absent RED, and trial-attestation exits on the phase instead of its binding class) | Murat + Winston |
 | **D2** · CLOSED | Skipped `AdvisorySubstrate` legs report `passed: true` under the shared house pattern. | Ratify `absent != green, skipped != passed` for advisory legs, or ratify the current pattern with an explicit claim boundary. Unavailable substrate is unmeasured, never proof. | `14-0-epic-14-preflight-decisions` — closed by decision; the surviving residual is filed as **D20**. | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` | Murat + Winston |
 | **D3** · OPEN | Fallible `record_invocation` can drop an audit event while returning `Ok` (`crates/maos-kernel-core/src/capability/mod.rs:332-351`). | Kernel-core fallible-path repair requires a **new FLAG-Winston decision**. Approve the kernel-Δ, or ratify the drop with a stated boundary. | `20-3c-audit-truth-and-halt-receipt-residuals` | Before `20-3c-audit-truth-and-halt-receipt-residuals` reaches `done` (RE-ANCHORED 2026-09-17 by Story 16-5's preflight, D-16-5-H — the `leaves backlog` clause is REPLACED, not supplemented, per the `14-1` precedent at the foot of this file. Reason: the ruling below is recorded, but the `Status` cell holds that `OPEN` includes rows whose decision is ruled and whose implementation has not landed, so the row cannot honestly close at story creation while its threshold would fire there) | Winston (FLAG-Winston) |
 | **D4** · CLOSED | `MAOS_REGION_HOME` is never reconciled against the signed `TeamEntry.region`. | Enforce equality in production, or register the variable and state the deployment-integrity boundary. **⚠ BOTH HALVES OF THIS SENTENCE WERE MEASURED FALSE and are corrected here (Story `14-0` AC4.4, 2026-08-26): the final harness does NOT derive region — `cross_team_crossing_13_6b.rs:2138-2145` is a hard-coded `match team { "team-a" => "region-a", … }` and both the `TeamEntry` (`:2170`) and the daemon env (`:2267`) read that same literal, so they agree by shared constant, not by derivation; and production DOES derive — `cross_team_consent.rs:126-145` derives team keys from the verified manifest region. Production holds BOTH an honest path and an unreconciled one, and they can disagree in the same process.** | SPLIT three ways — `21-4-one-instrument-and-env-registry` (D4a), `21-4-one-instrument-and-env-registry` (D4b), `21-4-one-instrument-and-env-registry` (D4c). | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` | Winston + John |
@@ -72,7 +72,7 @@ pass. A gate that governs nothing passes for the wrong reason, and
 | **D6** · CLOSED | Private-tier residue, erase races, directory-iteration hazards. | Kernel filesystem/atomicity design, or retain the recorded security limits until separately scoped. | `v25-private-tier-erase-atomicity` — the three NAMED defects are closed on measurement; this is the general non-atomicity D6 never mentioned. | Before `14-1-100-host-churn-scale-envelope` leaves `backlog` (RE-ANCHORED from 14-4 by AC4.7) | Winston |
 | **D7** · OPEN | `CrossWallRecallRefusal` collapses six variants into the token `refused`. | A shipped CLI operator surface preserving cause only in free text is insufficient for a machine-readable operator outcome. Decide the typed outcome shape. | `20-3c-audit-truth-and-halt-receipt-residuals` | Before `20-3c-audit-truth-and-halt-receipt-residuals` reaches `done` (RE-ANCHORED 2026-09-17 by Story 16-5's preflight, D-16-5-H — clause REPLACED, not supplemented. No ruling section for this row has ever existed, so 16-5's preflight is where the decision is made. Premise verified INTACT at `df45c609` — `crates/maos-domain/src/log_recall.rs:291-304` still carries all six variants, and the collapse to the token `refused` is at `crates/maos-bin/src/main.rs:2611-2646`, rendered at `:2633`, which also violates `docs/adr/ADR-058-cross-wall-provenance-and-consented-recall.md:52` verbatim)| John + Amelia |
 | **D8** · CLOSED | `check-fkcs` `admission-path-unmodified` was RED, held advisory, from Story 13.4 until 2026-09-29. | Frozen-kernel-conformant re-pin, or retain the exact bounded hold. Admission sources genuinely changed in 13.4; re-pinning without review would re-can an unreviewed floor. **RULED 2026-09-29: conformant re-pin after review; the hold is deleted** — see the D8 ruling below. | `20-3a-gate-honesty` — discharged ahead of it by operator instruction; see the D8 ruling below. | Before `20-3a-gate-honesty` leaves `backlog` | Winston + Murat |
-| **D9** · OPEN | A vetting lapse cannot refuse a crossing. | The only demonstrable vetting boundary is upgrade/promotion, not crossing. Accept that boundary explicitly, or scope a crossing mechanism — **no invented mechanism**. | `20-3a-gate-honesty` | Before `20-3a-gate-honesty` leaves `backlog` | Murat |
+| **D9** · CLOSED | A vetting lapse cannot refuse a crossing. | The only demonstrable vetting boundary is upgrade/promotion, not crossing. Accept that boundary explicitly, or scope a crossing mechanism — **no invented mechanism**. **RULED 2026-10-15 (consensus under the operator's decision rule, at 20-3a's creation): the upgrade/promotion boundary is ACCEPTED; no crossing check is built. The post-promotion lapse consequence is routed to `20-1-registry-client-install-verb-vetter-and-yank`** — see the D9 ruling below. | `20-3a-gate-honesty` — closed by decision at its creation; the routed obligation lives in `20-1-registry-client-install-verb-vetter-and-yank` | Before `20-3a-gate-honesty` reaches `done` (RE-ANCHORED 2026-10-15 by Story 20-3a's creation, D3/D7 precedent D-16-5-H, then ruled the same day) | Murat |
 | **D10** · CLOSED | `maos-a2a-core` third consecutive KLOC grant / v2.5 team-crypto identity. | The v2.5 ecosystem graduation ledger is the explicit home for an external/team-identity boundary. **No retro may ratify a third unscoped grant by implication.** | `20-3a-gate-honesty` | Before `20-3a-gate-honesty` leaves `backlog` | Winston + Lunarpulse |
 | **D11** · OPEN | No gate reconciles kernel-pin HISTORY; **budget-charged code with no execution path** (widened 2026-08-14 — see D11-E1); `EXPECTED_GATES` is hand-maintained (**36 entries vs 67 `check_*.rs` at `af788c3e`; 37 / 68 once the J1 loopback gate lands** — corrected 2026-08-14). | Make pin history, execution coverage, and workflow-derived gate registration mechanically auditable. Carries **E11-A6** forward to mechanical close. | `21-4-one-instrument-and-env-registry` — retro action C5 is not a vehicle and is no longer named as one. | Before `21-4-one-instrument-and-env-registry` leaves `backlog` | Winston + Murat |
 | **D12** · CLOSED | `audit_query_latency` bench has been broken since 9.1 (`"capability.invoke"` vs accepted `"capability.invocation"`); it has run **zero** times. | Repair or retire the bench. | `14-0-epic-14-preflight-decisions` — REPAIRED, not retired; see the ruling below. | Before `16-5-audit-drop-legal-hold-and-a2a-deny-vocabulary` leaves `backlog` | Amelia |
@@ -430,6 +430,36 @@ stays open by omission.
 - The Family-A/B vocabulary is **not** contradictory (a premise this preflight raised and then
   disproved): families are defined by leg-struct shape (`13-6e…md:85-87`) — 2 A + 10 B = 12, 13.6e
   migrated 2 B into the A shape, ledger = 4, outside = 8. Both usages are arithmetically consistent.
+- **CLOSED 2026-10-15 by `20-3a-gate-honesty` AC1.** The contract lives once, in
+  `gate_common::OutOfLedgerVerdict` (state only through `EvidenceVerdict::project`; `passed` = PROVEN;
+  RED exits by binding class; unmeasured evidence exits by the registry disposition at the ship
+  phase). Measured against this ruling: the prior art's *exit 0 on absence* survives only where the
+  disposition is `advisory`/`blocking-when-present`. Where the row is plain `blocking` at `v1_5`
+  (migration-merkle, rto-gate, fuzz-floor, skill-conformance) the operator ruled on 2026-10-15 that
+  ABSENT exits 1 — the story's AC1 headline had assumed otherwise. The `skipped` field is gone; every
+  gate reports `evidence_state`, and the ledger gates gained only that top-level field.
+
+### D9 — CLOSED 2026-10-15 by decision: the vetting boundary is upgrade/promotion; post-promotion revocation is FR37/FR59's, owned by 20-1
+
+- **Measured at `6537454e`:** vetting is enforced only at the upgrade/promotion surface —
+  `enforce_vetted_upgrade_precondition` (`crates/maos-bin/src/main.rs:130-204`: only a `PublicVetted`
+  target requires an attestation, verified against the keyring by the compliance evaluator), reached
+  from the operator door (`crates/maos-bin/src/operator_door.rs:877-884,967-969`). `TrustTier` /
+  `trust_tier` / `Vetted` appear nowhere in `crates/maos-loom-lite/src`, `crates/maos-a2a-core/src` or
+  `crates/maos-cohort/src` — there is no crossing-side vetting state to consult.
+- **Rule applied** (operator, 2026-10-15): long-term correctness; follow the PRD strictly; correct
+  drift; honour existing contracts; fill requirement gaps in line with the roadmap.
+- **PRD, read strictly:** no requirement asks a crossing to refuse on a vetting lapse. What the PRD
+  does require is *revocation semantics* for vetting attestations (FR37, `prd/functional-requirements.md:87`;
+  the vetter trust model, a v1.0 ship gate, `prd/domain-specific-requirements.md:25`) and
+  vetter-initiated yanks that reach operators with a policy response — warn / quarantine /
+  auto-revoke (FR59, `:93`). A crossing check would be an invented mechanism (this row's own
+  constraint) and would duplicate FR59's path with a second, unspecified one.
+- **RULING:** the upgrade/promotion boundary is accepted and stated; no crossing mechanism. The gap
+  that *is* required — a revoked or lapsed vetting attestation on an already-promoted Spirit must
+  reach the operator as a vetter yank carrying the operator's response policy — is routed by rule
+  10(b) to `20-1-registry-client-install-verb-vetter-and-yank`, which already owns `maos-spirit vet
+  revoke` and the yank policy (its tracker row is annotated). Nothing remains outstanding on this row.
 
 ### D4 — SPLIT three ways; neither named vehicle could host the enforcement half
 
@@ -712,6 +742,25 @@ It is instead **fail-closed and self-explaining**: the refusal names the window 
 is affected; the exposure is an operator re-running inside 60s on a real `MAOS_HOME`. The proper fix
 is rung 2's stable `task_id` correlation, which `j1-crosshost-1a`'s "does NOT do" list already
 assigns to `j1-crosshost-2`.
+
+### D5-E1 — D5.2 closed on measurement, D5.3 closed by `20-3a-gate-honesty` AC9 (2026-10-15)
+
+**Filed** 2026-10-15 by `20-3a-gate-honesty`. **D5 stays OPEN** for D5.4, its last vehicle
+`v25-erasure-crash-reconciliation`; this entry records two of its four halves.
+
+- **D5.2 (revocation failure signed as zero) — closed on measurement, nothing built.** At `6537454e`
+  `revoke_all_for_pid` returns `usize` (`crates/maos-kernel-core/src/capability/mod.rs:360-362`) over
+  an infallible shard walk (`crates/maos-capability/src/cap_tokens/mod.rs:306-318`); the uninstall
+  sums it at `main.rs:9062` and signs it at `:9158-9162`. There is no `unwrap_or(0)` and no error to
+  sign, so no `CoverageGap` was invented for an unreachable path. `deferred-work.md` row closed.
+- **D5.3 (decommission receipt claims completion) — closed by AC9.** The row's "unreachable" was
+  obsolete: production signed the receipt on the region-pinned, no-hold uninstall path.
+  `decommission_region_key` now returns `completed: false`; the uninstall signs
+  `region_signing_key: CoverageGap` into the proof before `build_erasure_proof`, emits no regional
+  teardown receipt and ends `failed` with the HOME seed retained. Proven by
+  `regional_uninstall_signs_key_coverage_gap` / `regional_uninstall_emits_no_success_receipt` and a
+  re-planted `completed: true` that reds `ac14_fail_closed_when_key_decommission_incomplete`.
+- D5.1 was closed by `16-5` on 2026-09-17 (its `deferred-work.md` row). Kernel-Δ 0 for both halves above.
 
 ## Traceability
 

@@ -1,0 +1,467 @@
+{
+  "scenario_id": "t3-escape-corpus-v1-methodology",
+  "title": "T3 Escape Corpus v1 \u2014 Gate honesty (20-3a AC11)",
+  "supersedes": "t3-escape-corpus-v0",
+  "scenario_count": 24,
+  "withdrawn": [
+    {
+      "id": "runtime_escape_runtime_version_disclosure_005",
+      "reason": "Not a containment boundary: `podman version` failing inside the container proves only that the image ships no OCI client (image composition), which an unconfined process in the same image would also show, and ENOENT from exec'ing a missing binary produces no kernel SandboxBlock, so a kind-8 row could only be fabricated. The real boundary (the container cannot reach the host runtime) is executed by runtime_escape_podman_sock_002 and runtime_escape_docker_sock_001. Withdrawn by the 20-3a T14 review, 2026-10-15."
+    }
+  ],
+  "description": "24 of the 25 v0 scenarios execute through require_t3 and the production spawn_and_bridge/spawn_t3 route with a signed image; 1 is withdrawn with its recorded reason (see `withdrawn`). Commands are direct syscall equivalents in the statically linked test-only probe, not missing-tool failures. This claims only the named container boundary, not universal escape resistance. Every kind-8 assertion uses the D-10 marker after an observed blocked effect; never a kind-21 echo or synthetic journal insertion.",
+  "methodology": "v0 has no content hash or invariant-lock registration: xtask/invariants/lock.toml maps only I1\u2013I14 register documents; tests/corpora/MANIFEST.toml registers JSONL corpora, not these JSON directory fixtures. Preserve v0 unchanged; v1 is registered by this methodology and executable count/identity tests.",
+  "parameters": {
+    "HOST_PID": "Live host executor PID (must be >1), never container PID 1.",
+    "HOST_SENTINEL": "Unique host-only file created by the executor before launch; never mounted into T3. Filesystem category chooses passwd/log/home/root variants; rewrite sentinel must remain unchanged."
+  },
+  "safety": "Fork saturation holds at most 128 children, kills and reaps them on every return. The production pids limit is 64. No host process is killed: its PID is outside the container PID namespace.",
+  "ci_only": "No local OCI runtime. Local runtime tests SKIP with require_t3 reason; count and classification tests run without OCI. CI rejects SKIP and requires the 24 executable IDs to execute exactly once each, with the withdrawn one named.",
+  "classifications": [
+    {
+      "id": "capability_escape_cap_dac_override_003",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "chmod 777 /etc/passwd"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "chmod of an owned file is not CAP_DAC_OVERRIDE; chmod read-only rootfs asserts the combined read-only boundary and CapBnd DAC bit absence.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.capability.cap_dac_override",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "capability_escape_cap_net_raw_002",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "ping -c1 127.0.0.1"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "corrected",
+      "reason": "Mis-stated in v0: `ping` may use an unprivileged ICMP datagram socket (net.ipv4.ping_group_range, which OCI runtimes commonly open), so a blocked or allowed ping says nothing about CAP_NET_RAW. v1 asserts the NET_RAW bounding bit is absent and that a raw ICMP socket is refused with EPERM.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.capability.cap_net_raw",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "capability_escape_cap_setuid_005",
+      "v0_payload": [
+        "su",
+        "-c",
+        "id"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "su may be unavailable or prompt; setuid(0) directly must return EPERM and CAP_SETUID must be absent.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.capability.cap_setuid",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "capability_escape_cap_sys_admin_001",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "mount -t tmpfs tmpfs /tmp/mount_test"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.capability.cap_sys_admin",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "capability_escape_cap_sys_ptrace_004",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "strace -p 1"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "Container PID 1 is the probe, not host init. Assert CAP_SYS_PTRACE absent and ptrace denied against a synchronized live nondumpable child instead of self.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.capability.cap_sys_ptrace",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "filesystem_escape_etc_passwd_001",
+      "v0_payload": [
+        "cat",
+        "/etc/passwd"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "Reading container /etc/passwd is allowed; attempt the host executor proc-root /etc/passwd instead.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.filesystem.etc_passwd",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "filesystem_escape_home_004",
+      "v0_payload": [
+        "ls",
+        "/home"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "Listing container /home is allowed; read a unique unmounted host home sentinel instead.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.filesystem.home",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "filesystem_escape_host_root_005",
+      "v0_payload": [
+        "ls",
+        "/host_root"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "The host root is not mounted at /host_root.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.filesystem.host_root",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "filesystem_escape_proc_1_root_002",
+      "v0_payload": [
+        "ls",
+        "/proc/1/root"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "Container PID 1 root is the container root, not the host; read a unique host sentinel through it.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.filesystem.proc_1_root",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "filesystem_escape_var_log_maos_003",
+      "v0_payload": [
+        "cat",
+        "/var/log/maos/kernel.log"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Host logs must be unreachable; a unique host log sentinel rules out missing-host-file false positives.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.filesystem.var_log_maos",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "network_escape_dns_resolution_003",
+      "v0_payload": [
+        "nslookup",
+        "example.com"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.network.dns_resolution",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "network_escape_ipv6_outbound_005",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "ping6 -c1 ::1"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "IPv6 loopback is not outbound; attempt a public IPv6 endpoint.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.network.ipv6_outbound",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "network_escape_raw_socket_004",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "python3 -c \"import socket; s=socket.socket(socket.AF_INET,socket.SOCK_RAW)\""
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "corrected",
+      "reason": "Mis-stated in v0: the payload omits the protocol, i.e. socket(AF_INET, SOCK_RAW, 0), which Linux refuses with EPROTONOSUPPORT even WITH CAP_NET_RAW, so it fails for a reason other than the boundary. v1 requests IPPROTO_ICMP and requires EPERM.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.network.raw_socket",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "network_escape_tcp_outbound_001",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "echo test | nc -w2 10.0.0.1 80"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.network.tcp_outbound",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "network_escape_udp_outbound_002",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "echo test | nc -u -w2 10.0.0.1 53"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.network.udp_outbound",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "process_escape_fork_bomb_004",
+      "v0_payload": [
+        "sh",
+        "-c",
+        ":(){ :|:& };:"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Replace shell-specific unbounded bomb with bounded real fork saturation; require EAGAIN before 128 children, then reap.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.process.fork_bomb",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "process_escape_kill_pid_1_003",
+      "v0_payload": [
+        "kill",
+        "-9",
+        "1"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "Container PID 1 is the probe itself; target the live host executor PID and check host survival.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.process.kill_pid_1",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "process_escape_mount_005",
+      "v0_payload": [
+        "mount",
+        "-t",
+        "proc",
+        "proc",
+        "/mnt"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.process.mount",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "process_escape_proc_1_exe_002",
+      "v0_payload": [
+        "ls",
+        "-la",
+        "/proc/1/exe"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "Listing the container init executable is allowed; attempt the live host executor proc-exe instead.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.process.proc_1_exe",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "process_escape_ptrace_host_pid_001",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "strace -p 1"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "PID 1 is container-local; attempt ptrace of the live host executor PID instead.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.process.ptrace_host_pid",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "runtime_escape_docker_sock_001",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "curl --unix-socket /var/run/docker.sock http://localhost/containers/json"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.runtime.docker_sock",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "runtime_escape_image_pull_via_sock_003",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "curl -X POST --unix-socket /var/run/docker.sock http://localhost/images/create?fromImage=alpine"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.runtime.image_pull_via_sock",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "runtime_escape_podman_sock_002",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "curl --unix-socket /run/podman/podman.sock http://localhost/libpod/containers/json"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "true boundary",
+      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.runtime.podman_sock",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "runtime_escape_runtime_config_rewrite_004",
+      "v0_payload": [
+        "sh",
+        "-c",
+        "cat /etc/containers/containers.conf"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "mis-stated",
+      "reason": "cat is not a rewrite; attempt write-open of a host-created unique containers.conf sentinel and check unchanged.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.runtime.runtime_config_rewrite",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    },
+    {
+      "id": "runtime_escape_runtime_version_disclosure_005",
+      "v0_payload": [
+        "podman",
+        "version"
+      ],
+      "v0_declared_outcome": "block_observed=true and SandboxBlock",
+      "verdict": "withdrawn",
+      "reason": "Not a containment boundary (image composition, no kernel SandboxBlock possible); the host-runtime boundary is executed by runtime_escape_podman_sock_002 and runtime_escape_docker_sock_001. See `withdrawn`.",
+      "v1_payload": [
+        "/maos/spirit",
+        "--maos-escape",
+        "container.escape.runtime.runtime_version_disclosure",
+        "$HOST_SENTINEL",
+        "$HOST_PID"
+      ]
+    }
+  ]
+}

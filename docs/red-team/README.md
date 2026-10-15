@@ -44,10 +44,10 @@ v1.5.**
 The v1.5 ship gate (`check-red-team-gate`) activates automatically when
 `docs/red-team/results/red-team-results.toml` is committed: it passes only when every
 attack class clears the ≥9/10 floor, the aggregate clears ≥72/80, and there are **zero**
-unmitigated categories (no class scores 0). Until the engagement concludes, the gate
-reports advisory status (`advisory-until-engagement`) and emits a **"WOULD HAVE BLOCKED
-SHIP"** banner to `GITHUB_STEP_SUMMARY` when thresholds would have failed — it does not
-block development at v1.0, and graduates to ship-blocking at v1.5.
+unmitigated categories (no class scores 0). Absent or unreadable engagement results
+report `evidence_state: "ABSENT"`, `passed: false`, `advisory: true`, and exit 0
+at `v1_5` under the registry's blocking-when-present disposition. Present findings
+block at HEAD; they are not an advisory pass. The step summary states the outcome.
 
 ## 3. Engagement Objective
 

@@ -28,7 +28,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::gate_common::emit_command;
+use crate::gate_common::{Observation, OutOfLedgerVerdict, CURRENT_PHASE};
 
 const FUZZ_LEDGER: &str = "fuzz-ledger.json";
 /// >= 72 CPU-hours per target (NFR-Sec-5/6 pre-GA floor).
@@ -43,10 +43,14 @@ const REQUIRED_TARGETS: &[&str] = &["manifest_parser", "frame_deser", "fuzz_exec
 pub struct Report {
     pub passed: bool,
     /// `true` when the ledger has < 90 days of history — the floor is still
-    /// accumulating and not yet enforceable. The gate passes (warn-only).
+    /// accumulating and not yet enforceable, but not proven.
     pub advisory: bool,
     pub failures: Vec<String>,
     pub summary: Vec<String>,
+    pub not_run: bool,
+    pub malformed: bool,
+    pub per_target_seconds: std::collections::HashMap<String, i64>,
+    pub aggregate_seconds: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,14 +78,14 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
         Ok(s) => s,
         Err(e) => {
             // No ledger yet → the nightly job has not produced evidence.
-            // Advisory: the floor is accumulating, not enforceable.
+            // No measurement: the registry decides whether absence blocks.
             return Report {
-                passed: true,
-                advisory: true,
+                passed: false,
+                advisory: false,
                 failures: Vec::new(),
-                summary: vec![format!(
-                    "{FUZZ_LEDGER} not found — floor accumulating ({e})"
-                )],
+                summary: vec![format!("{FUZZ_LEDGER} absent or unreadable ({e})")],
+                not_run: true,
+                ..Report::default()
             };
         }
     };
@@ -93,10 +97,19 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
                 advisory: false,
                 failures: vec![format!("{FUZZ_LEDGER} is not valid JSON: {e}")],
                 summary: Vec::new(),
+                malformed: true,
+                ..Report::default()
             };
         }
     };
 
+    if ledger.records.is_empty() {
+        return Report {
+            not_run: true,
+            summary: vec!["ledger contains zero records".into()],
+            ..Report::default()
+        };
+    }
     let cutoff = now - chrono::Duration::days(WINDOW_DAYS);
     let mut per_target: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut earliest: Option<chrono::DateTime<chrono::Utc>> = None;
@@ -161,6 +174,7 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
         }
     }
 
+    let malformed = !failures.is_empty();
     // Bootstrap promotion: advisory until the ledger spans >= 90 days.
     let advisory = match earliest {
         None => true,
@@ -168,11 +182,11 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
     };
 
     for target in REQUIRED_TARGETS {
-        let secs = per_target.get(*target).copied().unwrap_or(0);
+        let secs = *per_target.entry((*target).to_owned()).or_insert(0);
         summary.push(format!(
             "{target}: {secs} s / {PER_TARGET_FLOOR_S} s (90d window)"
         ));
-        if !advisory && secs < PER_TARGET_FLOOR_S {
+        if secs < PER_TARGET_FLOOR_S {
             failures.push(format!(
                 "target '{target}' below floor: {secs} s < {PER_TARGET_FLOOR_S} s (72 CPU-hr / 90d)"
             ));
@@ -181,7 +195,7 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
     summary.push(format!(
         "aggregate: {aggregate_in_window} s / {AGGREGATE_FLOOR_S} s (90d window)"
     ));
-    if !advisory && aggregate_in_window < AGGREGATE_FLOOR_S {
+    if aggregate_in_window < AGGREGATE_FLOOR_S {
         failures.push(format!(
             "aggregate below floor: {aggregate_in_window} s < {AGGREGATE_FLOOR_S} s (1000 CPU-hr / 90d)"
         ));
@@ -197,6 +211,10 @@ pub fn check_fuzz_floor(workspace_root: &Path, now: chrono::DateTime<chrono::Utc
         advisory,
         failures,
         summary,
+        not_run: false,
+        malformed,
+        per_target_seconds: per_target,
+        aggregate_seconds: aggregate_in_window,
     }
 }
 
@@ -204,50 +222,41 @@ pub fn run(json: bool) -> Result<(), String> {
     let workspace_root = std::env::current_dir().expect("failed to get current dir");
     let report = check_fuzz_floor(&workspace_root, chrono::Utc::now());
 
-    // Advisory warnings go to stderr in JSON mode (#33) — stdout stays clean.
-    if report.advisory {
-        for line in &report.summary {
-            emit_command(json, "warning", &format!("check-fuzz-floor: {line}"));
-        }
-    }
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "passed": report.passed,
-                "advisory": report.advisory,
-                "failures": report.failures,
-                "summary": report.summary,
-            })
-        );
+    // A corrupt ledger is a finding (RED, with its report), not missing evidence;
+    // inside the ratified 90-day bootstrap window the floor is not yet defined,
+    // so the verdict accumulates — never a pass, never a block. After it, the
+    // oracle is a hermetic re-derivation over the collected ledger.
+    let observation = if report.not_run {
+        Observation::NotRun
+    } else if report.malformed {
+        Observation::Red
+    } else if report.advisory {
+        Observation::Accumulating
     } else if report.passed {
-        let label = if report.advisory {
-            "PASS (advisory — floor accumulating, < 90d history)"
-        } else {
-            "PASS (floor met)"
-        };
-        eprintln!("check-fuzz-floor: {label}");
-        for line in &report.summary {
-            eprintln!("  {line}");
-        }
+        Observation::Green
     } else {
-        for f in &report.failures {
-            emit_command(json, "error", &format!("check-fuzz-floor: {f}"));
-        }
-        eprintln!(
-            "check-fuzz-floor: FAIL — {} issue(s)",
-            report.failures.len()
-        );
-    }
-
-    if report.passed {
-        Ok(())
+        Observation::Red
+    };
+    let reason = if report.malformed {
+        format!("malformed evidence: {}", report.failures.join("; "))
     } else {
-        Err(format!(
-            "check-fuzz-floor: {} issue(s) — see annotations",
-            report.failures.len()
-        ))
-    }
+        report.summary.join("; ")
+    };
+    OutOfLedgerVerdict::judge_registered(
+        "check-fuzz-floor",
+        observation,
+        true,
+        CURRENT_PHASE,
+        reason,
+    )?
+    .finish(
+        json,
+        serde_json::json!({
+            "failures": report.failures, "summary": report.summary,
+            "per_target_seconds": report.per_target_seconds,
+            "aggregate_seconds": report.aggregate_seconds,
+        }),
+    )
 }
 
 #[cfg(test)]
@@ -284,20 +293,20 @@ mod tests {
     }
 
     #[test]
-    fn advisory_when_ledger_absent() {
+    fn absent_when_ledger_absent() {
         let tmp = TempDir::new().unwrap();
         let r = check_fuzz_floor(tmp.path(), now());
-        assert!(r.passed, "no ledger must not block: {:?}", r.failures);
-        assert!(r.advisory, "no ledger must be advisory");
+        assert!(!r.passed);
+        assert!(r.not_run);
     }
 
     #[test]
-    fn advisory_when_ledger_empty() {
+    fn absent_when_ledger_empty() {
         let tmp = TempDir::new().unwrap();
         write_ledger(tmp.path(), "[]");
         let r = check_fuzz_floor(tmp.path(), now());
-        assert!(r.passed);
-        assert!(r.advisory, "empty ledger must be advisory");
+        assert!(!r.passed);
+        assert!(r.not_run);
     }
 
     #[test]
@@ -313,11 +322,7 @@ mod tests {
             ),
         );
         let r = check_fuzz_floor(tmp.path(), now());
-        assert!(
-            r.passed,
-            "must not hard-fail during bootstrap: {:?}",
-            r.failures
-        );
+        assert!(!r.passed, "the floor is unmet even during bootstrap");
         assert!(r.advisory);
     }
 

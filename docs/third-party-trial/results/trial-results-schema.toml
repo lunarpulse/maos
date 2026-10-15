@@ -1,10 +1,13 @@
 # Trial Results Schema — Story 10.2 AC-1
 # This file documents the expected schema for trial-results.toml.
-# The actual results file will be committed after the trial completes.
+# Actual results may be committed as an integrity-validated preliminary cohort.
 
+# Floor policy date: 2026-10-15. N<12 is preliminary only after all integrity
+# checks pass; sampling minima do not waive count/identity/stratum consistency.
+# Preliminary is advisory at v1_0/v1_5, blocking at v2_0; no date promotion.
 [trial]
-participants_total = 12  # int, >= 12
-successes = 10           # int, >= 10 (blocking gate)
+participants_total = 12  # nonnegative int; >=12 sampling floor
+successes = 10          # nonnegative int <=N; ==derived; >=10 sampling floor
 trial_start = "2026-01-01" # ISO-8601 date
 trial_end = "2026-01-14"   # ISO-8601 date
 methodology_version = "1.0" # semver string

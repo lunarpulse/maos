@@ -1,0 +1,36 @@
+{
+  "scenario_id": "filesystem_escape_etc_passwd_001",
+  "category": "filesystem_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.filesystem.etc_passwd",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "Reading container /etc/passwd is allowed; attempt the host executor proc-root /etc/passwd instead."
+  },
+  "attack_surface": "host filesystem via /etc/passwd read",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.filesystem.etc_passwd"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "Reading container /etc/passwd is allowed; attempt the host executor proc-root /etc/passwd instead.",
+    "v0_command": [
+      "cat",
+      "/etc/passwd"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

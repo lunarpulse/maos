@@ -55,7 +55,7 @@ gates = [
     "check-pentest-gate",
     # Story 10.1b AC3 — v1.0 NFR coverage-matrix completeness (no empty gates).
     "check-coverage-matrix-completeness",
-    # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+    # Trial: absent/preliminary are advisory at v1.0/v1.5; validated N>=12 shortfalls block.
     "check-third-party-trial",
     # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (advisory per ADR-040).
     "check-cross-form-equiv",
@@ -184,13 +184,60 @@ gates = [
 # `check-ship-gate-completeness` lint and the `v1.5-ship-gate` aggregate job
 # consume this to enforce that a gate's phase disposition is explicit and that
 # the "WILL block at v1.5" promise is testable, not aspirational.
+#
+# Story 20-3a AC4.1 — every row also carries a REQUIRED `binding`, the gate's
+# dev-time enforcement class, separate from the GA ladder above:
+#   "blocking"           — the oracle is hermetic over what the checkout holds
+#                          (committed sources, committed or collected evidence);
+#                          a RED always fails the run.
+#   "advisory-substrate" — the verdict needs a substrate CI cannot always have
+#                          (the ADR-068 stable perf runner); a RED fails the
+#                          run only when that substrate was present.
+#   "mixed"              — per-leg classes, carried by the gate's own legs.
+# Unmeasured evidence (ABSENT / too thin to decide) is governed by the
+# disposition instead: plain `blocking` at the ship phase fails the run, every
+# other disposition passes it advisory with a warning and `passed: false`
+# (`gate_common::OutOfLedgerVerdict`). The loader refuses a missing or unknown
+# value; this field is the only class home for names with no module.
+# Story 20-3a AC4 — measured discipline.yml jobs, all required by
+# v1-0-ship-gate.needs with no continue-on-error or substrate skip:
+# ccac-n600-ship-gate runs the committed CCAC corpus (P0 ship-blocker);
+# nfr-rel-3-hsis-95pct runs the committed HSIS per-class pass-rate oracle;
+# check-stability-matrix checks generated workspace metadata for drift;
+# check-breaking-md checks committed dated entries and Migration taxonomy.
+# These hermetic oracles already hard-fail CI, so both phase dispositions
+# and their dev-time binding are blocking (not an advisory graduation).
+[[ship_gate]]
+name = "ccac-n600-ship-gate"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
+
+[[ship_gate]]
+name = "nfr-rel-3-hsis-95pct"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
+
+[[ship_gate]]
+name = "check-stability-matrix"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
+
+[[ship_gate]]
+name = "check-breaking-md"
+disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
+
 [[ship_gate]]
 name = "check-pentest-gate"
 disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present" }
+binding = "blocking"
 
+# Absent or integrity-validated preliminary N<12: not a pass, advisory at v1_0/v1_5;
+# blocking at v2_0. At N>=12, sampling shortfalls block at every phase.
 [[ship_gate]]
 name = "check-third-party-trial"
 disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present", v2_0 = "blocking" }
+binding = "blocking"
 
 # Story 11.1b (D10) — RELABELED: CLI-wrapper distributional; advisory.
 # NOT the equivalence-binding gate. The authoritative binding row is
@@ -203,6 +250,7 @@ disposition = { v1_0 = "blocking-when-present", v1_5 = "blocking-when-present", 
 [[ship_gate]]
 name = "check-cross-form-equiv"
 disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+binding = "advisory-substrate"
 
 # Story 11.1b AC3 (D9/D10/D15a) — NEW tiered behavioral-oracle cross-form
 # equivalence gate. THE authoritative equivalence-binding row for ADR-031.
@@ -215,18 +263,22 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory" }
 [[ship_gate]]
 name = "check-wasm-form-equiv"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "blocking"
 
 [[ship_gate]]
 name = "check-red-team-gate"
 disposition = { v1_0 = "advisory", v1_5 = "blocking-when-present" }
+binding = "blocking"
 
 [[ship_gate]]
 name = "check-export-control"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 [[ship_gate]]
 name = "check-fuzz-targets"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 # RETIRED 2026-09-07 by Story 15-3 per ADR-065: the `check-cna-registration`
 # stanza stood here. Its `blocking-when-present` disposition was never the arm
@@ -236,11 +288,13 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-ko-coverage"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 
 [[ship_gate]]
 name = "windows-check"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.3 AC-2/AC-3 (NFR-Sec-5/6) — pre-merge fuzz BUILD prerequisite.
 # `fuzz-build` runs the fuzz build for both targets under the nightly toolchain
@@ -250,24 +304,30 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 [[ship_gate]]
 name = "fuzz-build"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.3 NFR-Sec-5/6 — fuzz CPU-hour floor gate (release-time, NOT per-merge).
 # `check-fuzz-floor` sums fuzz-ledger cpu_seconds over the trailing 90-day
 # window and blocks the v1.0 GA release if the per-target (>=72 CPU-hr) or
-# aggregate (>=1000 CPU-hr) floor is unmet. Advisory (warn-only) until the
-# ledger spans >= 90 days of history — the bootstrap window in which the floor
-# is logically unsatisfiable. Run via workflow_dispatch at release time; not a
-# `v1-0-ship-gate` per-merge `needs:` entry (a merge must not block on nightly
-# fuzz cadence).
+# aggregate (>=1000 CPU-hr) floor is unmet. Missing ledger is ABSENT and blocks
+# at v1_5; a <90-day ledger is INDETERMINATE and ACCUMULATING (the ratified
+# bootstrap window: never a pass, never a block); a corrupt ledger is RED. The
+# oracle re-derives the floor from the collected ledger, hence `blocking`.
+# S1 nightly sizing (floor unchanged): 4 workers × 90 nightly runs × 4h
+# ≈ 1,440 CPU-h/target >= 72 and ≈ 4,320 aggregate >= 1,000.
+# Recorded seconds are libFuzzer counters, not these planning estimates.
+# Cadence-only, not a `v1-0-ship-gate` per-merge `needs:` entry.
 [[ship_gate]]
 name = "check-fuzz-floor"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
 # Advisory at v1.0 (results absent → advisory pass); blocking at v1.5.
 [[ship_gate]]
 name = "check-migration-merkle"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 # Story 10.4a (NFR-Ops-2) — RTO ≤ 4h drilled gate. The drill (`rto-drill`)
 # performs a cold-restore + timing and writes evidence; the gate
 # (`check-rto-gate`) reads the accumulated evidence and gates on the ≤ 4h
@@ -278,16 +338,19 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 [[ship_gate]]
 name = "rto-drill"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 
 [[ship_gate]]
 name = "check-rto-gate"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.4b (NFR-Sec-13 / NFR-Rel-9) — live bilateral A2A consent gate.
 # Advisory at v1.0 (gate GREEN now); blocking at v1.5.
 [[ship_gate]]
 name = "check-live-bilateral-consent"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.4b / 14-2 — rotation real-timing gate. (Mislabel corrected by
 # 14-2: the 30s/90s propagation floors are NFR-Sec-13's rotation-chaos
@@ -298,6 +361,7 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-rotation-real-timing"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
 # Story 14-2a AC6.3 — the rotation TRIGGER gate (distinct from
 # `check-rotation-real-timing`, which measures 14-2's floors: this one proves
@@ -307,6 +371,7 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "check-cert-rotation-trigger"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
 # Story 15-3 AC5 — the exit-command check. `v1_5 = "blocking"` is the key that
 # binds at today's `CURRENT_PHASE`, following the 14-2a precedent above rather
@@ -318,6 +383,7 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "check-exit-commands"
 disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
 # Story 15-1 AC7 / D-3 — the full workspace test suite as a Blocking control.
 # At HEAD before this story NO CI job ran `cargo test --workspace` unscoped
@@ -331,6 +397,7 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "workspace-test-suite"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
 # Story 17-5 — the model-pin currency gate. Blocking at every phase, hermetic,
 # no private `CURRENT_PHASE`: the lane it closes slipped three times (E14-A3 →
@@ -339,14 +406,14 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "check-model-currency"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
-# Story 10.4c — J4 §13.1 Mira-Nash colocation-latency gate (real in-kernel
-# scalar.tap measurement). Advisory at v1.0; blocking at v1.5 (the §13.1
-# <10ms P95 obligation is a v1.5 binding AC per epic-10…md:189). Replaces
-# the 10.4b proven-RED placeholder `check-j4-placeholder-red`.
+# Story 20-3a — J4 budget advisory at v1.5; binding gate = 20-7 / ADR-068 stable runner.
+# The job's sample-count, integrity and mutation checks remain blocking.
 [[ship_gate]]
 name = "check-j4-latency"
-disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+disposition = { v1_0 = "advisory", v1_5 = "advisory" }
+binding = "advisory-substrate"
 
 # j1-crosshost-1a AC4.1 — `BindingClass::Blocking` from the day it lands, not
 # "advisory now, blocking later". The gate is hermetic (it reads committed sources),
@@ -356,6 +423,7 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-j1-loopback-delegation"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 # j1-crosshost-2c AC5.1/AC5.2 — the two-host signed-run judge. `blocking` at v1.0,
 # not "advisory now": the gate is hermetic (it reads committed sources plus any
@@ -371,6 +439,7 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-j1-two-host-signed-run"
 disposition = { v1_0 = "blocking", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.4b — mobile push fires on Mira halt over the real MobilePushHttp
 # transport (operator-facing halt wire). Advisory at v1.0 (feature ships at
@@ -378,6 +447,7 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-mobile-push-on-halt"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 
 # Story 10.1b AC2 — OWASP Risk Rating Methodology freeze hash.
 # Stored in the invariant-locked registry so any edit to the OWASP doc
@@ -387,16 +457,19 @@ disposition = { v1_0 = "advisory", v1_5 = "blocking" }
 [[ship_gate]]
 name = "check-skill-conformance"
 disposition = { v1_0 = "advisory", v1_5 = "blocking" }
+binding = "blocking"
 # Story 11.2a (AC5, D10) — cross-region convergent replication gate.
 # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-cross-region-consensus"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "mixed"
 # Story 11.2b (AC5, D5) — multi-region SLO gate (3-region Cortex pilot).
 # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-multi-region-slo"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "mixed"
 # Story 11.3 (AC5, D8) + Story 14.1 (AC6.4) — scale-envelope 25/30/100-host
 # churn gate. Advisory at v1.0/v1.5 (dev-time enforcement is BindingClass
 # Blocking, decoupled from this ladder); blocking at v2.0; the v2_2 rung
@@ -414,28 +487,33 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-scale-churn"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 # Story 12.1 — N=3/N=8 legs are hard-fail per-commit inside the gate; this
 # disposition controls the v2.2 ship-gate ladder without advancing global phase.
 [[ship_gate]]
 name = "check-cohort-mesh"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+binding = "blocking"
 # Story 13.1 — physical tenant wall. Hermetic legs hard-fail at HEAD; live
 # two-datname legs block when the Postgres substrate is present and emit a
 # WOULD-HAVE-BLOCKED advisory when absent.
 [[ship_gate]]
 name = "check-multi-tenant-loom"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+binding = "mixed"
 # Story 13.5d — Reza's mediated production collective route. Hermetic legs
 # hard-fail at HEAD; the live route blocks when Postgres is present and emits a
 # WOULD-HAVE-BLOCKED advisory when absent.
 [[ship_gate]]
 name = "check-reza-production-path"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+binding = "mixed"
 # Story 11.4a (AC5, F6/D6) — enterprise PDP integration gate (Cedar
 # in-process). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-enterprise-pdp"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "blocking"
 # Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate
 # (out-of-kernel). Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking
 # at v2.0. The `live-seccomp-proven-red` leg is advisory on hosts whose kernel
@@ -444,38 +522,45 @@ disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
 [[ship_gate]]
 name = "check-escape-detector"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "mixed"
 # Story 11.4c (AC6) — enterprise identity + at-rest + SIEM. Advisory at
 # v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-enterprise-identity"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "blocking"
 # Story 11.5 (AC4/D7) — FKCS infrastructure gate. Advisory at v1.0/v1.5
 # (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-fkcs"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "blocking"
 # Story 11.7 (AC4/D2) — v2.0 third-party trial attestation producer gate.
 # Advisory at v1.0/v1.5 (WOULD-HAVE-BLOCKED banner); blocking at v2.0.
 [[ship_gate]]
 name = "check-trial-attestation"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "blocking" }
+binding = "blocking"
 
 # Story 12.6 — blocking only for maos-bin/src; Story 12.7 expands the contract workspace-wide.
 [[ship_gate]]
 name = "check-env-contract"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 # Story 13.4 (FR37 / ADR-056) — vetting-attestation gate. All 7 legs are
 # hermetic (in-process crypto + registry admission, no live substrate) and
 # hard-fail per-commit at HEAD; this disposition governs the ship-gate ladder.
 [[ship_gate]]
 name = "check-vetting-attestation"
 disposition = { v1_0 = "advisory", v1_5 = "advisory", v2_0 = "advisory", v2_2 = "blocking" }
+binding = "blocking"
 
 # Story 13.6c — three-team/three-region CI substrate drift controls (AC5).
 # Structural (no Postgres); a substrate-config drift blocks at every phase.
 [[ship_gate]]
 name = "check-loom-substrate-drift"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
 # Story 14-0 AC1 — the decision register's reader. Blocking at every phase and
 # deliberately so: every finding it raises is a governance control that has
@@ -484,6 +569,7 @@ disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = 
 [[ship_gate]]
 name = "check-decision-register"
 disposition = { v1_0 = "blocking", v1_5 = "blocking", v2_0 = "blocking", v2_2 = "blocking" }
+binding = "blocking"
 
 
 

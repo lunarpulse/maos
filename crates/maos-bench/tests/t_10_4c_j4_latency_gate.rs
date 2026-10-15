@@ -5,11 +5,11 @@
 //! measurement runs with the `kernel_measurement` feature ON — it produces a
 //! REAL latency distribution, not canned smoke samples.
 //!
-//! Gate scalar: cross-task delivery latency P95 ≤ 10ms (10000µs).
+//! Gate scalar: cross-task delivery latency P95 ≤ 10ms (10000µs), advisory until 20-7 / ADR-068.
 //!
 //! ## Tests
 //!
-//! - `t_10_4c_j4_latency_gate_green` — the §13.1 gate: P95 within budget.
+//! - `t_10_4c_j4_latency_gate_green` — sample floor is blocking; budget is advisory.
 //! - `t_10_4c_j4_real_measurement_no_warning` — anti-regression: the real
 //!   path must NOT emit the "NOT real measurements" placeholder marker.
 
@@ -59,12 +59,8 @@ fn run_j4_in_subprocess() -> (JourneyResult, String) {
     (result, stderr)
 }
 
-/// §13.1 gate: the real J4 P95 is within the 10ms (10000µs) budget.
-///
-/// This is the GREEN gate that replaces the 10.4b proven-RED placeholder.
-/// When `kernel_measurement` is ON, `run_j4_measurement` runs the real
-/// in-kernel scalar.tap loop. The P95 must be within budget for the gate
-/// to pass.
+/// §13.1 measurement: the sample floor blocks; the 10ms budget is advisory.
+/// Stable-runner budget enforcement belongs to 20-7 / ADR-068.
 // These gate tests assert REAL-path invariants (no placeholder marker; real P95)
 // and are only meaningful under `kernel_measurement`. Under the default smoke
 // path the harness legitimately emits the placeholder marker, so they are
@@ -73,13 +69,8 @@ fn run_j4_in_subprocess() -> (JourneyResult, String) {
 #[test]
 fn t_10_4c_j4_latency_gate_green() {
     let (result, _stderr) = run_j4_in_subprocess();
-    // AC3/D5 (review D1): advisory at v1.0. The gate does NOT panic on
-    // over-budget — it emits a loud "WOULD BLOCK at v1.5" banner (never a silent
-    // pass) and passes. v1_0=advisory ⇒ a v1.0 latency flake warns, not blocks;
-    // graduation to v1_5=blocking is a disposition flip (no phase-aware release
-    // enforcer exists — out of scope per AC3). The load-bearing falsifier is the
-    // separate mutation test (AC2), which still hard-fails when injection cannot
-    // move the number.
+    // Budget advisory at v1.5: binding gate = 20-7 / ADR-068 stable runner.
+    // Sample-count, integrity and the separate mutation falsifier remain blocking.
     assert!(
         result.invocation_count >= 200,
         "J4 invocation count ({}) below the N=200 post-warmup floor (D2)",
@@ -92,9 +83,8 @@ fn t_10_4c_j4_latency_gate_green() {
         );
     } else {
         eprintln!(
-            "⚠️  WOULD BLOCK at v1.5: J4 §13.1 latency gate OVER BUDGET — \
-             P95={}µs exceeds 10000µs (N={}). ADVISORY at v1.0 (gate passes); \
-             becomes BLOCKING at v1.5 GA. Investigate the real kernel latency \
+            "⚠️  ADVISORY over budget (binding: 20-7): J4 §13.1 latency — \
+             P95={}µs exceeds 10000µs (N={}). Investigate the real kernel latency \
              before adjusting the budget.",
             result.p95_us, result.invocation_count,
         );

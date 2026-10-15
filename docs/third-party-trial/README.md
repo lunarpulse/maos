@@ -8,13 +8,15 @@ results schema, the Wilson-CI rationale, the SBOM/signing runbook, and the
 `check-third-party-trial` CI gate. **No part of Story 10.2 recruits participants
 or runs the 14-day trial.**
 
-The gate is **advisory-if-absent**: until
-`docs/third-party-trial/results/trial-results.toml` is committed it PASSes with a
-warning annotation and a step-summary notice, exactly like
-`check-pentest-gate`. Once the results file lands, the gate activates and
-asserts the blocking floors below.
+The gate reports missing results as **ABSENT**, never a pass. A fully
+integrity-validated cohort below N=12 is **preliminary / INDETERMINATE**, also
+not a pass. Both exit 0 with a warning at v1.0/v1.5 and exit 1 at v2.0.
+Integrity failures are fatal at every N. At N≥12, sampling shortfalls block.
 
 ## 1. Cohort target & stratification floor
+
+**Floor policy date: 2026-10-15.** Sampling minima are unchanged;
+no calendar date automatically promotes a preliminary trial.
 
 The cohort is **N = 12** participants minimum. The cohort is PASS-eligible only
 if it meets every stratum floor below (enforced by `check-third-party-trial`,
@@ -131,14 +133,16 @@ non-binding placeholder and no participant may be enrolled against it.]*
 
 ## 7. Gate behavior
 
-- **Results absent** → `check-third-party-trial` PASSes with an advisory
-  `warning` annotation and a step-summary notice. The gate is structural
-  infrastructure only.
-- **Results present** → the gate parses `trial-results.toml` against the typed
-  schema, rejects negative counts and malformed ISO-8601 dates, then asserts the
-  §1 stratification floors, `successes ≥ 10`, and the per-participant success
-  conjunction from §4. Any deficiency FAILs the gate with the failing field
-  named.
+- **Results absent** → `passed:false`, `evidence_state:ABSENT`; warning and exit
+  0 at v1.0/v1.5, exit 1 at v2.0.
+- **Results present** → validate dates, nonnegative counts bounded by N, complete
+  enumeration, unique IDs, canonical strata, and declared/derived count equality
+  before classifying sampling shortfalls. Invalid evidence always fails.
+- **Validated N<12** → `trial_status:preliminary`, `passed:false`,
+  `evidence_state:INDETERMINATE`; sampling minima are advisory at v1.0/v1.5,
+  blocking at v2.0. The v2.0 production-key requirement is unchanged.
+- **N≥12** → success and stratum floors block; a full pass is proven. The report
+  includes N, derived successes, and each stratum count versus its floor.
 - **Wilson 95% CI** on the success rate is computed and written to the
   step-summary as **advisory only** (F5→A-prime) — it is logged, never asserted.
   See `wilson-ci.md`.

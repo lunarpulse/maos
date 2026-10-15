@@ -10,6 +10,9 @@
 //! JB-6: capability denied on out-of-grant figma:write (RED — driver dependency).
 //! JB-8: posture-shift (RED — Epic 9).
 
+#[path = "support/binaries.rs"]
+mod binaries;
+
 use maos_journey_test::{AuditDb, JourneyWorld, MockMcp, Pty};
 
 fn workspace_root() -> std::path::PathBuf {
@@ -19,14 +22,7 @@ fn workspace_root() -> std::path::PathBuf {
 }
 
 fn maos_bin() -> String {
-    if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
-        return bin.to_string();
-    }
-    let debug_bin = workspace_root().join("target/debug/maos");
-    if debug_bin.exists() {
-        return debug_bin.to_string_lossy().into_owned();
-    }
-    panic!("maos binary not found — run `cargo build -p maos-bin` first");
+    binaries::resolve("maos", option_env!("CARGO_BIN_EXE_maos"))
 }
 
 #[test]

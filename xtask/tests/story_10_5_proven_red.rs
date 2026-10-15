@@ -31,6 +31,12 @@ fn run_in_tempdir(
     fixture_setup: impl FnOnce(&std::path::Path),
 ) -> std::process::Output {
     let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("xtask")).unwrap();
+    std::fs::copy(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml"),
+        dir.path().join("xtask/gate-registry.toml"),
+    )
+    .unwrap();
     fixture_setup(dir.path());
     std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args([subcommand, "--json"])
@@ -137,14 +143,14 @@ fn skill_conformance_fails_on_malformed_toml() {
 //
 // The fixture the gate trusts as the valid conformance input is structurally
 // corrupt (no YAML frontmatter fence → `ESkillSchema::MissingFence`). The
-// adapter must reject it and the gate must error before it ever reaches the
-// journaled-results branch.
+// adapter must reject it and the gate must error before reporting a proven pass.
 // ═══════════════════════════════════════════════════════════════════
 
 #[test]
 fn skill_conformance_fails_on_corrupt_valid_fixture() {
     let out = run_in_tempdir("check-skill-conformance", |root| {
         lay_fixtures(root);
+        write_file(root, RESULTS_PATH, &make_results(true, true));
         // Overwrite the valid fixture with a fence-less (corrupt) document.
         write_file(
             root,
@@ -171,6 +177,7 @@ fn skill_conformance_fails_on_corrupt_valid_fixture() {
 fn skill_conformance_fails_when_invalid_fixture_is_accepted() {
     let out = run_in_tempdir("check-skill-conformance", |root| {
         lay_fixtures(root);
+        write_file(root, RESULTS_PATH, &make_results(true, true));
         // Overwrite the invalid fixture with a fully-valid skill.
         write_file(
             root,
@@ -194,27 +201,26 @@ fn skill_conformance_fails_when_invalid_fixture_is_accepted() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Vector (f): absent journaled results → advisory PASS.
-//
-// Fixtures present and well-formed, but no results TOML → the gate passes with
-// `advisory: true` (the conformance run may still be pending).
+// Vector (f): absent journaled results → ABSENT, blocking at v1_5.
 // ═══════════════════════════════════════════════════════════════════
 
 #[test]
-fn skill_conformance_passes_advisory_when_results_absent() {
+fn skill_conformance_blocks_when_results_absent() {
     let out = run_in_tempdir("check-skill-conformance", |root| {
         lay_fixtures(root);
         // No results TOML written.
     });
     assert!(
-        out.status.success(),
-        "gate should advisory-PASS when results are absent: {}",
+        !out.status.success(),
+        "gate should block when results are absent at v1_5: {}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout)
         .unwrap_or_else(|e| panic!("gate must emit JSON on --json: {e}; stdout was: {stdout}"));
-    assert_eq!(json["advisory"], true, "absent results should be advisory");
+    assert_eq!(json["passed"], false);
+    assert_eq!(json["evidence_state"], "ABSENT");
+    assert_eq!(json["advisory"], false);
 }
 
 // ═══════════════════════════════════════════════════════════════════

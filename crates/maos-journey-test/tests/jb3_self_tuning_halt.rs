@@ -6,6 +6,9 @@
 //! asserts the halt event, its render-string (shared constant oracle), and
 //! stderr visibility. No PTY, no JourneyWorld — pure subprocess.
 
+#[path = "support/binaries.rs"]
+mod binaries;
+
 use std::process::Command;
 
 #[path = "../../../tests/harness/doorless_home.rs"]
@@ -38,19 +41,7 @@ fn isolated_data_home(tag: &str) -> IsolatedDataHome {
 }
 
 fn maos_cmd() -> Command {
-    let cmd = if let Some(bin) = option_env!("CARGO_BIN_EXE_maos") {
-        Command::new(bin)
-    } else {
-        let debug_bin = std::path::Path::new(workspace_root()).join("target/debug/maos");
-        if debug_bin.exists() {
-            Command::new(debug_bin)
-        } else {
-            let mut c = Command::new("cargo");
-            c.args(["run", "-p", "maos-bin", "--"]);
-            c
-        }
-    };
-    let mut cmd = cmd;
+    let mut cmd = Command::new(binaries::resolve("maos", option_env!("CARGO_BIN_EXE_maos")));
     // 15-6 §A6 review P1: cassette-free child; never inherit a job-level
     // MAOS_INFERENCE_MODE (nightly rerecord leg).
     cmd.env_remove("MAOS_INFERENCE_MODE");

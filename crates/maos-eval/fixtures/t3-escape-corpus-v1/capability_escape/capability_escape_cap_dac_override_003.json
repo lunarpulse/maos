@@ -1,0 +1,37 @@
+{
+  "scenario_id": "capability_escape_cap_dac_override_003",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.capability.cap_dac_override",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "chmod of an owned file is not CAP_DAC_OVERRIDE; chmod read-only rootfs asserts the combined read-only boundary and CapBnd DAC bit absence."
+  },
+  "attack_surface": "CAP_DAC_OVERRIDE file permission bypass on host files",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_dac_override"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "chmod of an owned file is not CAP_DAC_OVERRIDE; chmod read-only rootfs asserts the combined read-only boundary and CapBnd DAC bit absence.",
+    "v0_command": [
+      "sh",
+      "-c",
+      "chmod 777 /etc/passwd"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

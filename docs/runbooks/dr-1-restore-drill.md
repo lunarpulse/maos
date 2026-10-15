@@ -118,20 +118,20 @@ principal-global rows.
 
 ## Reading an erasure artifact
 
-A GDPR uninstall can emit two artifacts, and they answer different questions.
-Do not submit either one alone as a complete Article 17 response.
+A GDPR uninstall emits an erasure proof. Do not submit it alone as a complete
+Article 17 response without reading its `CoverageGap` entries.
 
 | Artifact | What it attests |
 |---|---|
 | `<spirit>-<ns>-<root>.bundle` (erasure proof) | Per-category outcome for this run: `Removed { count }`, `VerifiedEmpty`, or `CoverageGap { reason }`. This is the authoritative record of what was and was not erased. |
-| `regional-teardown-<region>-<ns>.json` | Signed attestation that the cascade completed **over the stores named in `forget_cascade.stores_covered`** — currently `private`, `principal_index` and `shared`. It is scoped, not all-tier. |
+| `regional-teardown-<region>-<ns>.json` | **Not emitted** (Story 20-3a AC9, ADR-059 amendment 2026-10-15). No region signing-key revocation is wired, so a region-pinned run instead signs `region_signing_key` as a `CoverageGap` in the proof and exits `5` (failed) with the partial proof and the HOME seed retained. |
 
 Rules:
 
-- Always read the receipt beside the proof bundle from the same run. A receipt
-  verifying `Ok` does **not** mean every backend was erased; stores listed in
-  `UNCOVERED_STORES` are excluded by construction and appear in the proof as a
-  `CoverageGap`. `UNCOVERED_STORES` is empty after the Shared-tier partition.
+- A region-pinned uninstall cannot complete today: its proof carries the
+  `region_signing_key` gap ("derivable from the retained base seed"). Treat
+  exit `5` there as the honest outcome, not a flake, and read the proof's other
+  categories for what WAS erased.
 - The Shared tier is no longer a gap. The principal partition excludes
   `MemoryNamespace::Principal` at its write, read and scan entry
   points, so it is principal-empty by construction and normally attests
@@ -140,14 +140,14 @@ Rules:
   `CoverageGap` reporting a non-zero row count, the Host is carrying
   pre-partition residue:** rows written before the guard existed. They are
   unreachable but NOT erased, and there is no delete path. Every uninstall
-  exits non-zero after writing a partial proof; a region-pinned run also refuses
-  to sign a teardown receipt until the residue is removed out of band. Treat
-  that as an escalation, not a flake.
+  exits non-zero after writing a partial proof until the residue is removed
+  out of band. Treat that as an escalation, not a flake.
 - A `held` terminal (exit 3) may still carry a proof path. That proof is
   **partial**: it records the principals this run erased and lists the held
   principals as a legal-hold `CoverageGap`. It is never a complete-erasure
   submission. Releasing a hold changes eligibility only — it does not erase.
-- A held run writes no regional teardown receipt. A held run is not a teardown.
+- A held run is not a teardown attempt; its proof carries no
+  `region_signing_key` category.
 - Terminal exit codes: `0` erased, `3` held, `4` not-found, `5` failed. The
   JSON terminal on stdout and the exit code are one contract; if they ever
   disagree, treat the run as failed and escalate.

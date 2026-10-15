@@ -1,0 +1,37 @@
+{
+  "scenario_id": "capability_escape_cap_sys_ptrace_004",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.capability.cap_sys_ptrace",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "--cap-drop=ALL"
+  },
+  "attack_surface": "CAP_SYS_PTRACE tracing of a live nondumpable child",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_sys_ptrace"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "Container PID 1 is the probe, not host init. Assert CAP_SYS_PTRACE absent and ptrace denied against a synchronized live nondumpable child instead of self.",
+    "v0_command": [
+      "sh",
+      "-c",
+      "strace -p 1"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

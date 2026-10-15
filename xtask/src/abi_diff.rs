@@ -84,21 +84,38 @@ fn diff_git(base: &str, json: bool) -> Result<(), String> {
             "changed",
         ])
         .output()
-        .map_err(|e| format!("cargo-public-api not installed: {e}"))?;
+        .map_err(|e| format!("abi-diff: could not run: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
     let passed = out.status.success();
+    // cargo-public-api 0.51.0 uses exit 1 for BOTH tool errors and denied
+    // diffs. Only its explicit DiffDenied diagnostic proves an ABI break.
+    let denied = !passed
+        && stderr
+            .lines()
+            .any(|line| line.starts_with("Error: The API diff is not allowed as per --deny:"));
     if json {
         println!(
             "{}",
-            serde_json::json!({"passed": passed, "output": stdout.trim()})
+            serde_json::json!({
+                "gate": "abi-diff", "passed": passed,
+                "stdout": stdout, "stderr": stderr,
+                "exit_code": out.status.code(), "exit_status": out.status.to_string(),
+            })
         );
     } else if passed {
         println!("abi-diff: PASSED");
-    } else {
-        eprintln!("abi-diff: breaking change detected\n{stdout}");
     }
     if !passed {
-        Err("abi-diff failed".into())
+        Err(if denied {
+            format!("abi-diff: breaking change detected\n{stdout}\n{stderr}")
+        } else {
+            format!(
+                "abi-diff: could not run: {} ({})\n{stdout}",
+                stderr.trim(),
+                out.status
+            )
+        })
     } else {
         Ok(())
     }

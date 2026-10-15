@@ -1,5 +1,8 @@
 #![cfg(target_os = "linux")]
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 use maos_domain::invariants::i9::SandboxTier;
 use maos_domain::ports::crypto::CryptoProvider;
 use maos_domain::sandbox::{
@@ -270,7 +273,7 @@ fn require_pidfd_exit() -> bool {
     }
     let version = Command::new("uname").arg("-r").output().unwrap();
     let kernel = String::from_utf8_lossy(&version.stdout).trim().to_owned();
-    if std::env::var_os("CI").is_some() {
+    if ci::declared_ci() {
         panic!("PIDFD_INFO_EXIT requires Linux >= 6.15; CI kernel is {kernel}");
     }
     eprintln!("SKIP t3_terminal_helpers_17_7: kernel {kernel} predates Linux 6.15 PIDFD_INFO_EXIT");

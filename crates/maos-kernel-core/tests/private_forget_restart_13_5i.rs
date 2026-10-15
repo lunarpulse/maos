@@ -2,6 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -298,10 +301,9 @@ fn forget_fails_closed_when_pid_directory_is_unreadable() {
         if std::fs::read_dir(&pid_dir).is_ok() {
             std::fs::set_permissions(&pid_dir, std::fs::Permissions::from_mode(0o700))
                 .expect("restore pid directory permissions");
-            eprintln!(
-                "skipped: this process bypasses directory mode bits (root?), so the \
-                 fail-closed path cannot be provoked here"
-            );
+            let reason = "SKIP (forget_fails_closed_when_pid_directory_is_unreadable): running with CAP_DAC_OVERRIDE — permission control unobservable";
+            eprintln!("{reason}");
+            assert!(!ci::declared_ci(), "{reason}");
             return;
         }
 

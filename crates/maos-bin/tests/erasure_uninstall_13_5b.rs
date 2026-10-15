@@ -283,98 +283,92 @@ fn terminal(output: &Output) -> serde_json::Value {
     })
 }
 
-/// Story 13.5h — replaces 13.5b's `..._with_shared_coverage_gap` contract.
-///
-/// Proven-red contract: a region-pinned Host that erases everything it can
-/// erase reports `erased`/exit 0, writes BOTH the proof bundle and the regional
-/// teardown receipt, and now records the Shared tier as `VerifiedEmpty` with
-/// `"shared"` named in the receipt's `stores_covered`.
-///
-/// That status is EARNED, not asserted: the producer counts
-/// principal-namespaced rows in `shared_memory` (filtering on the namespace
-/// column) and only then attests. 13.5h Trap 4 is what makes the count
-/// load-bearing rather than decorative — the partition stops NEW principal
-/// rows entering the tier, but a Host upgraded from a pre-partition build
-/// could still hold rows written before the guard existed, and those are
-/// unreachable rather than erased. Emitting `VerifiedEmpty` unconditionally
-/// would be a fresh null control of exactly the kind 13.5h exists to remove,
-/// so a non-zero count must degrade to `CoverageGap` and withhold `"shared"`
-/// from `stores_covered`, driving `completed` false.
-///
-/// History: 13.5b's version asserted a `CoverageGap` naming this story as the
-/// still-open owner of the Shared-tier hole; it in
-/// turn replaced `regional_uninstall_refuses_to_attest_uncovered_shared_store`,
-/// which asserted only `!status.success()` and was green for the wrong reason
-/// (`completed` was structurally false, so a fully successful erasure
-/// terminated `failed`/exit 5 after its proof was already on disk).
+/// AC9 / D5.3 — plaintext erasure does not revoke a derivable signing key.
+/// The real region-pinned uninstall must sign the coverage gap, retain its
+/// HOME seed, and never emit a successful two-phase regional receipt.
 #[test]
-fn regional_uninstall_attests_shared_tier_verified_empty() {
+fn regional_uninstall_signs_key_coverage_gap() {
     let fixture = Fixture::new();
     fixture.seed_unheld_principal();
     let output = fixture.run_uninstall(Some("eu-west"));
 
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "region-pinned uninstall must succeed; stdout={} stderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
     let terminal = terminal(&output);
-    assert_eq!(terminal["outcome"], "erased");
 
-    // The regional teardown receipt is produced.
-    let receipts: Vec<_> = std::fs::read_dir(fixture.proof_dir())
+    // Read the actual signed artifact before checking the terminal: the gap
+    // must be covered by the signature, not appended after proof construction.
+    let bundles: Vec<_> = std::fs::read_dir(fixture.proof_dir())
         .expect("read proof dir")
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|name| name.starts_with("regional-teardown-eu-west-"))
-        })
+        .map(|entry| entry.expect("read proof entry").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "bundle"))
         .collect();
-    assert_eq!(
-        receipts.len(),
-        1,
-        "exactly one regional teardown receipt expected, found {receipts:?}"
-    );
-
-    // Story 13.5h: `"shared"` is now a REQUIRED store and must appear in the
-    // attested coverage set, with the cascade reporting completion.
-    let receipt: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&receipts[0]).expect("read teardown receipt"))
-            .expect("decode teardown receipt");
-    let covered = receipt["forget_cascade"]["stores_covered"]
-        .as_array()
-        .expect("stores_covered array");
-    assert!(
-        covered.iter().any(|s| s == "shared"),
-        "the shared tier must be attested as covered: {covered:?}"
-    );
-    assert_eq!(
-        receipt["forget_cascade"]["completed"], true,
-        "cascade must complete once every required store is covered"
-    );
-
-    // The Shared tier is attested as verified-empty in the proof bundle.
-    let proof_path = terminal["proof_path"].as_str().expect("proof_path");
-    let proof: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(proof_path).expect("read proof bundle"))
-            .expect("decode proof bundle");
-    let shared = proof["categories"]
-        .as_array()
-        .expect("categories array")
+    assert_eq!(bundles.len(), 1, "one signed partial proof expected");
+    let proof: maos_audit::erasure::proof::ErasureProof =
+        serde_json::from_slice(&std::fs::read(&bundles[0]).expect("read proof"))
+            .expect("decode proof");
+    let key = proof
+        .categories
         .iter()
-        .find(|category| category["name"] == "shared")
+        .find(|category| category.name == "region_signing_key")
+        .expect("region signing key category must be signed into the proof");
+    assert_eq!(
+        key.status,
+        maos_audit::erasure::proof::CategoryStatus::CoverageGap {
+            reason: "region signing key not decommissioned — derivable from the retained base seed"
+                .into()
+        }
+    );
+    maos_audit::erasure::proof::verify_erasure_proof(
+        &proof,
+        &maos_audit::sealed_export::derive_pubkey(&[0x5bu8; 32]),
+    )
+    .expect("the coverage gap must be authenticated by the HOME signature");
+
+    assert_eq!(output.status.code(), Some(5), "terminal={terminal}");
+    assert_eq!(terminal["outcome"], "failed");
+    assert!(terminal["error"]
+        .as_str()
+        .expect("failure reason")
+        .contains("region signing key not decommissioned"));
+
+    assert_eq!(
+        std::fs::read_to_string(&fixture.key_path).expect("HOME seed must survive"),
+        hex::encode([0x5bu8; 32])
+    );
+    let shared = proof
+        .categories
+        .iter()
+        .find(|category| category.name == "shared")
         .expect("shared category present");
     assert_eq!(
-        shared["status"]["status"], "VerifiedEmpty",
-        "shared must be verified-empty after the 13.5h partition: {shared}"
+        shared.status,
+        maos_audit::erasure::proof::CategoryStatus::VerifiedEmpty,
+        "the shared-tier observation must remain independent of key revocation"
     );
+}
+
+#[test]
+fn regional_uninstall_emits_no_success_receipt() {
+    let fixture = Fixture::new();
+    fixture.seed_unheld_principal();
+    let output = fixture.run_uninstall(Some("eu-west"));
+    let receipts: Vec<_> = std::fs::read_dir(fixture.proof_dir())
+        .expect("read proof dir")
+        .map(|entry| entry.expect("read proof entry").path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("regional-teardown-"))
+        })
+        .collect();
     assert!(
-        shared["status"]["reason"].is_null(),
-        "VerifiedEmpty carries no reason payload: {shared}"
+        receipts.is_empty(),
+        "no successful regional teardown receipt may be emitted: {receipts:?}"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "terminal={}",
+        terminal(&output)
     );
 }
 
@@ -383,16 +377,8 @@ fn regional_uninstall_attests_shared_tier_verified_empty() {
 ///
 /// Pins the fail-closed response for a Host upgraded from a pre-partition
 /// build: the `shared` category degrades from `VerifiedEmpty` to a
-/// `CoverageGap` naming the residue, `"shared"` is withheld from
-/// `stores_covered`, and the region-pinned run refuses to attest a completed
-/// teardown rather than signing a success that did not happen.
-///
-/// This test is also what proves its sibling
-/// `regional_uninstall_attests_shared_tier_verified_empty` is not vacuous:
-/// hard-code `CategoryStatus::VerifiedEmpty` in `run_uninstall_cascade_inner`
-/// instead of counting principal-namespaced rows, and THIS test reds while the
-/// sibling stays green. A `VerifiedEmpty` that is asserted rather than measured
-/// is precisely the null control Story 13.5h exists to remove.
+/// `CoverageGap` naming the residue. This remains independently required even
+/// when key decommission also prevents a successful regional teardown.
 #[test]
 fn regional_uninstall_refuses_to_attest_pre_partition_shared_residue() {
     let fixture = Fixture::new();

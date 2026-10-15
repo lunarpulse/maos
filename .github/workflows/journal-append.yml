@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   emit-journal-entry:
@@ -64,19 +65,26 @@ jobs:
         run: |
           msg=$(git log -1 --pretty=%s ${{ steps.sha.outputs.merge_sha }})
           # Extract trailing (#NNNN) — GitHub's default merge-commit format.
-          pr=$(echo "$msg" | grep -oE '\(#[0-9]+\)' | tail -1 | tr -d '(#)' )
-          if [ -n "$pr" ]; then
-            echo "pr_number=$pr" >> $GITHUB_OUTPUT
+          # No trailer is an allowed absence, not a failed PR-body fetch.
+          if [[ "$msg" =~ .*\(\#([0-9]+)\) ]]; then
+            echo "pr_number=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
           fi
 
-      # Resolve the PR body for revert detection — best-effort. Use the gh CLI
-      # to fetch the PR body if a number is available; otherwise skip.
+      # A known PR must have a fetched body: revert pairing consumes it.
       - name: Fetch PR body for revert detection
-        if: steps.pr.outputs.pr_number != ''
+        id: body
+        # ADVISORY — owner: Winston; reason: merges without a PR cannot verify revert detection.
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
-          gh pr view ${{ steps.pr.outputs.pr_number }} --json body --jq .body > /tmp/pr-body.txt || echo "" > /tmp/pr-body.txt
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr view "$PR_NUMBER" --json body --jq .body > /tmp/pr-body.txt
+            echo "revert_detection=verified" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::ADVISORY: no PR number; revert detection unverified."
+            echo "revert_detection=unverified" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Compute changed files
         run: |
@@ -105,8 +113,15 @@ jobs:
             --write-journal \
             --journal-output /tmp/journal-output/entry.jsonl \
             --json > /tmp/journal-output/report.json
+          # Persist the evidence boundary on every emitted journal row.
+          if [ -f /tmp/journal-output/entry.jsonl ]; then
+            jq -c --arg status "${{ steps.body.outputs.revert_detection }}" \
+              '. + {revert_detection: $status}' /tmp/journal-output/entry.jsonl > /tmp/journal-output/entry-marked.jsonl
+            mv /tmp/journal-output/entry-marked.jsonl /tmp/journal-output/entry.jsonl
+          fi
           echo "---"
           echo "Journal entry (if any):"
+          # rule-11 benign: display only; an invariant-free merge emits no entry.
           cat /tmp/journal-output/entry.jsonl 2>/dev/null || echo "(no journal entry — no invariants touched, or gate did not pass)"
 
       # Only upload if there's actually a journal entry. Most merges touch zero

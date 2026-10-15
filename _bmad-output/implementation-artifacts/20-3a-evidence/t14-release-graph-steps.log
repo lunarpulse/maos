@@ -1,0 +1,35 @@
+# 20-3a landing verification — AC7.2's defect class in two sibling steps
+# Found while writing the T13 J4 recipe: `discipline.yml` D7 (check-wasm-form-equiv,
+# "Verify equiv-fault-inject absent from release graph (D7)") and F7
+# (check-multi-region-slo, "slo-fault-inject absent from release feature graph")
+# used the same `cargo tree ... --release 2>&1 | grep -q` idiom AC7.2 removed from J4.
+
+$ cargo tree -p maos-bench -e features --release
+error: unexpected argument '--release' found
+rc=1
+
+# OLD step text, executed against a planted crate whose DEFAULT features include the fault feature:
+$ bash -e -c 'if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "slo-fault-inject"; then echo "FAIL: leaked"; exit 1; fi; echo "OK: ..."'
+OK: slo-fault-inject absent (OLD step, planted default present)
+old_step_rc=0          <- vacuous green: the guard could never fire
+
+# NEW step text (graph=$(cargo tree -p <pkg> -e features --invert <pkg>); grep <<< "$graph"),
+# executed by xtask/tests/workflow_honesty_20_3a.rs::cargo_tree_failure_and_default_fault_feature_are_blocking
+# against the real workflow step for all three jobs:
+check-j4-latency: clean graph: rc=exit status: 0
+check-j4-latency: cargo tree failure (must RED): rc=exit status: 101
+check-j4-latency: default fault feature (must RED): rc=exit status: 1
+planted non-inverted graph (oracle rejects rc=0): rc=exit status: 0
+check-wasm-form-equiv: clean graph: rc=exit status: 0
+check-wasm-form-equiv: cargo tree failure (must RED): rc=exit status: 101
+check-wasm-form-equiv: default fault feature (must RED): rc=exit status: 1
+planted non-inverted graph (oracle rejects rc=0): rc=exit status: 0
+check-multi-region-slo: clean graph: rc=exit status: 0
+check-multi-region-slo: cargo tree failure (must RED): rc=exit status: 101
+check-multi-region-slo: default fault feature (must RED): rc=exit status: 1
+planted non-inverted graph (oracle rejects rc=0): rc=exit status: 0
+test result: ok. 1 passed; 0 failed
+
+# Real tree, inverted graphs (no fault feature in either root's defaults):
+$ graph=$(cargo tree -p maos-wasm-host -e features --invert maos-wasm-host)   -> rc=0, equiv-fault-inject hits=0
+$ graph=$(cargo tree -p maos-bench -e features --invert maos-bench)           -> rc=0, slo-fault-inject hits=0

@@ -78,6 +78,7 @@ struct LegResult {
     failed: u32,
     /// Did the test binary report a `test result:` line at all?
     ran: bool,
+    exit_success: bool,
     green: bool,
 }
 
@@ -134,6 +135,7 @@ fn run_oracle_leg(label: &'static str, features: &[&str]) -> Result<LegResult, S
         passed,
         failed,
         ran,
+        exit_success: output.status.success(),
         green,
     })
 }
@@ -212,11 +214,19 @@ pub fn run(json: bool) -> Result<(), String> {
     let base = run_oracle_leg("base", &[])?;
     let fault_inject = run_oracle_leg("anti-canned", &["equiv-fault-inject"])?;
 
-    // 3. Axis-1 structural guard: a leg that compiled to ZERO tests (or never
-    //    reported results) means the oracle/falsifier has vanished — a vacuous
-    //    green. Hard-fail at every phase (this is the J4 `≥1 passed` guard).
+    // 3. Missing results are a harness failure, not proof of a zero-test run.
+    // Both structural failures remain fail-closed at every ship phase.
     for leg in [&base, &fault_inject] {
-        if !leg.ran || (leg.passed == 0 && leg.failed == 0) {
+        if !leg.ran {
+            let msg = format!(
+                "check-wasm-form-equiv: FAIL — {} leg harness failed to build/run \
+                 (exit_success={}): no test summary was produced; see captured output above.",
+                leg.label, leg.exit_success,
+            );
+            emit_command(json, "error", &msg);
+            return Err(msg);
+        }
+        if leg.passed == 0 && leg.failed == 0 {
             let msg = format!(
                 "check-wasm-form-equiv: FAIL — {} leg is vacuous (ran={}, passed={}, failed={}). \
                  The live oracle or the equiv-fault-inject falsifier produced no tests — a \

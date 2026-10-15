@@ -1533,6 +1533,11 @@ pub fn finish_ledger_gate(
     let report = LedgerReport::build(gate, verifier, &legs);
     let claim = report.product_claim.clone();
     let advisory = successful_gate_is_advisory(blockers.is_empty(), oracle_green, &claim);
+    let evidence_state = EvidenceState::worst(
+        legs.iter()
+            .filter(|leg| leg.required)
+            .map(EvidenceLeg::state),
+    );
     let absent = report.absent_successors.clone();
     let artifact = report.write()?.display().to_string();
 
@@ -1566,6 +1571,7 @@ pub fn finish_ledger_gate(
             "{}",
             serde_json::json!({
                 "gate": gate,
+                "evidence_state": evidence_state,
                 "passed": blockers.is_empty(),
                 "oracle_green": oracle_green,
                 "advisory": advisory,

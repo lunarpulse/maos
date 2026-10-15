@@ -500,11 +500,243 @@ fn wait_for_grandchild_pid(db: &Path, timeout: Duration) -> u32 {
 // The run-root harness — one fresh root per vector (16-1's shape)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Own the root from `spawn`, before any Worker or grandchild discovery can
+/// panic. Native descendants inherit its private process group; T3 cleanup
+/// uses only CIDs published by this root, never a guessed name or payload PID.
+struct OwnedRoot {
+    child: Child,
+    /// The root was reaped by a wait below, so its pid — and with it the group
+    /// id — may since have been recycled.
+    reaped: bool,
+    stdout_text: Arc<Mutex<String>>,
+    stdout_reader: Option<std::thread::JoinHandle<()>>,
+    runtime: Option<std::ffi::OsString>,
+    environment: Vec<(std::ffi::OsString, Option<std::ffi::OsString>)>,
+}
+
+impl OwnedRoot {
+    fn spawn(command: &mut Command) -> Self {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        let environment: Vec<_> = command
+            .get_envs()
+            .map(|(key, value)| (key.to_owned(), value.map(std::ffi::OsStr::to_os_string)))
+            .collect();
+        let runtime = environment
+            .iter()
+            .find(|(key, _)| key == "MAOS_T3_RUNTIME")
+            .and_then(|(_, value)| value.clone())
+            .or_else(|| std::env::var_os("MAOS_T3_RUNTIME"));
+        Self {
+            child: command.spawn().expect("spawn owned root"),
+            reaped: false,
+            stdout_text: Arc::new(Mutex::new(String::new())),
+            stdout_reader: None,
+            runtime,
+            environment,
+        }
+    }
+
+    fn capture_stdout(&mut self) -> Arc<Mutex<String>> {
+        let stdout = self.child.stdout.take().expect("root stdout piped");
+        let capture = Arc::clone(&self.stdout_text);
+        self.stdout_reader = Some(std::thread::spawn(move || {
+            for line in std::io::BufReader::new(stdout).lines() {
+                let Ok(line) = line else { break };
+                let mut sink = capture.lock().expect("stdout capture lock poisoned");
+                sink.push_str(&line);
+                sink.push('\n');
+            }
+        }));
+        Arc::clone(&self.stdout_text)
+    }
+
+    /// Shadows `Child::try_wait` so a reap is recorded for the group cleanup.
+    fn try_wait(&mut self) -> std::io::Result<Option<std::process::ExitStatus>> {
+        let status = self.child.try_wait()?;
+        self.reaped |= status.is_some();
+        Ok(status)
+    }
+
+    /// Shadows `Child::wait`; see [`Self::try_wait`].
+    fn wait(&mut self) -> std::io::Result<std::process::ExitStatus> {
+        let status = self.child.wait()?;
+        self.reaped = true;
+        Ok(status)
+    }
+}
+
+impl std::ops::Deref for OwnedRoot {
+    type Target = Child;
+
+    fn deref(&self) -> &Child {
+        &self.child
+    }
+}
+
+impl std::ops::DerefMut for OwnedRoot {
+    fn deref_mut(&mut self) -> &mut Child {
+        &mut self.child
+    }
+}
+
+impl Drop for OwnedRoot {
+    fn drop(&mut self) {
+        // Signal the group only while its id provably still belongs to it:
+        // an unreaped root (even a zombie) holds its pid, and a reaped root's
+        // group stays reserved while any member lives. A reaped root whose pid
+        // now names a live process means the id was recycled — never signal it.
+        #[cfg(unix)]
+        if let Some(group) = rustix::process::Pid::from_raw(self.child.id() as i32) {
+            let recycled = self.reaped && Path::new(&format!("/proc/{}", self.child.id())).exists();
+            if !recycled {
+                let _ = rustix::process::kill_process_group(group, rustix::process::Signal::KILL);
+            }
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        if let Some(reader) = self.stdout_reader.take() {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while !reader.is_finished() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            if reader.is_finished() {
+                let _ = reader.join();
+            }
+        }
+        let Some(runtime) = &self.runtime else {
+            return;
+        };
+        let stdout = self
+            .stdout_text
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for line in stdout.lines() {
+            let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+                continue;
+            };
+            if event["event"] != "cli_wrapper_loaded" {
+                continue;
+            }
+            let Some(cid) = event["container_id"].as_str() else {
+                continue;
+            };
+            if cid.len() != 64 || !cid.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                eprintln!("owned-root cleanup refused invalid published CID {cid:?}");
+                continue;
+            }
+            let mut cleanup = Command::new("timeout");
+            cleanup.arg("8s").arg(runtime).args(["rm", "-f", "--", cid]);
+            for (key, value) in &self.environment {
+                if let Some(value) = value {
+                    cleanup.env(key, value);
+                } else {
+                    cleanup.env_remove(key);
+                }
+            }
+            match cleanup.output() {
+                Ok(output) if output.status.success() => {}
+                result => eprintln!("owned-root cleanup of published CID {cid}: {result:?}"),
+            }
+        }
+    }
+}
+
+/// This is a real fixture process, not a mock of the ownership oracle. Only
+/// after the planted unwind do we discover its grandchild and measure it.
+#[cfg(target_os = "linux")]
+#[test]
+fn harness_owns_grandchildren_before_discovery_even_when_startup_panics() {
+    let fixture = maos().with_file_name("worker-cli-fixture");
+    assert!(
+        fixture.is_file(),
+        "build the real fixture with cargo build -p worker --bin worker-cli-fixture"
+    );
+    let captured = Arc::new(Mutex::new(None));
+    let result = std::panic::catch_unwind({
+        let captured = Arc::clone(&captured);
+        move || {
+            let mut command = Command::new(fixture);
+            command
+                .arg("--maos-fixture-mode=hang-with-grandchild")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null());
+            let mut root = OwnedRoot::spawn(&mut command);
+            let stdout = root.capture_stdout();
+            *captured.lock().expect("capture slot") = Some(Arc::clone(&stdout));
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !stdout
+                .lock()
+                .expect("fixture stdout")
+                .contains("grandchild pid ")
+            {
+                assert!(
+                    Instant::now() < deadline,
+                    "fixture did not spawn its grandchild"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            panic!("planted panic after spawn, before grandchild discovery");
+        }
+    });
+    let panic = result.expect_err("the planted startup panic must execute");
+    assert_eq!(
+        panic.downcast_ref::<&str>().copied(),
+        Some("planted panic after spawn, before grandchild discovery")
+    );
+    let stdout = captured
+        .lock()
+        .expect("capture slot")
+        .take()
+        .expect("fixture ran");
+    let text = stdout.lock().expect("fixture stdout").clone();
+    let grandchild: u32 = text
+        .split_once("grandchild pid ")
+        .expect("real fixture announcement")
+        .1
+        .trim()
+        .parse()
+        .expect("announced grandchild pid");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let live = loop {
+        let live = proc_cmdline_args(grandchild)
+            .is_some_and(|args| args.iter().any(|arg| arg == "--maos-fixture-mode=hang"));
+        if !live || Instant::now() >= deadline {
+            break live;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    };
+    let ps = Command::new("ps")
+        .args(["-eo", "pid,ppid,etimes,args"])
+        .output()
+        .expect("measure fixture processes after unwind");
+    println!("planted-panic grandchild pid={grandchild}; live after unwind={live}");
+    for line in String::from_utf8_lossy(&ps.stdout).lines() {
+        if line.contains("worker-cli-fixture") {
+            println!("{line}");
+        }
+    }
+    if live {
+        let status = Command::new("kill")
+            .args(["-KILL", &grandchild.to_string()])
+            .status()
+            .expect("clean up planted leak");
+        println!("cleaned planted leak pid={grandchild}: {status}");
+    }
+    assert!(
+        !live,
+        "pre-discovery panic leaked fixture grandchild {grandchild}"
+    );
+}
+
 struct RunRoot {
     scratch: PathBuf,
     home: PathBuf,
     db: PathBuf,
-    child: Option<Child>,
+    child: Option<OwnedRoot>,
     stdout_text: Arc<Mutex<String>>,
     stderr_text: Arc<Mutex<String>>,
     stderr_lines: mpsc::Receiver<String>,
@@ -568,24 +800,11 @@ impl RunRoot {
         for (key, value) in extra_env {
             command.env(key, value);
         }
-        let mut child = command.spawn().expect("spawn maos run");
-
-        let stdout = child.stdout.take().expect("stdout piped");
+        let mut child = OwnedRoot::spawn(&mut command);
+        let stdout_text = child.capture_stdout();
         let stderr = child.stderr.take().expect("stderr piped");
-        let stdout_text = Arc::new(Mutex::new(String::new()));
         let stderr_text = Arc::new(Mutex::new(String::new()));
         let (tx, rx) = mpsc::channel::<String>();
-        {
-            let capture = Arc::clone(&stdout_text);
-            std::thread::spawn(move || {
-                for line in std::io::BufReader::new(stdout).lines() {
-                    let Ok(line) = line else { break };
-                    let mut sink = capture.lock().expect("stdout capture lock poisoned");
-                    sink.push_str(&line);
-                    sink.push('\n');
-                }
-            });
-        }
         {
             let capture = Arc::clone(&stderr_text);
             std::thread::spawn(move || {
@@ -687,7 +906,9 @@ impl RunRoot {
     /// the regression several vectors exist to catch, so the timeout message
     /// carries the whole stderr.
     fn wait_exit(&mut self, bound: Duration) -> (std::process::ExitStatus, Duration) {
-        let mut child = self.child.take().expect("root not already reaped");
+        // Keep spawn ownership until all shutdown assertions have measured the
+        // production teardown; dropping it here would clean up the regression.
+        let child = self.child.as_mut().expect("root still owned");
         let started = Instant::now();
         loop {
             match child.try_wait().expect("poll root status") {
@@ -725,10 +946,7 @@ impl RunRoot {
 
 impl Drop for RunRoot {
     fn drop(&mut self) {
-        if let Some(mut child) = self.child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        drop(self.child.take());
         let _ = std::fs::remove_dir_all(&self.scratch);
     }
 }
@@ -1551,16 +1769,8 @@ mod cohort {
         }
     }
 
-    /// A daemon has no graceful one-shot exit. Dropping the guard reaps it
-    /// even when an assertion before the explicit teardown unwinds the test.
-    struct RunningDaemon(Child);
-
-    impl Drop for RunningDaemon {
-        fn drop(&mut self) {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
-    }
+    /// Spawn ownership stays armed during startup and through the assertions.
+    struct RunningDaemon(OwnedRoot);
 
     fn signing_key() -> SigningKey {
         SigningKey::from_bytes(&[0x16; 32])
@@ -1810,28 +2020,16 @@ mod cohort {
     fn boot_until_listening(
         mut command: Command,
     ) -> (RunningDaemon, u16, Arc<Mutex<String>>, Arc<Mutex<String>>) {
-        let mut child = command.spawn().expect("spawn cohort daemon");
+        let mut child = OwnedRoot::spawn(&mut command);
+        let stdout_text = child.capture_stdout();
         let stderr = child.stderr.take().expect("daemon stderr piped");
-        let stdout = child.stdout.take().expect("daemon stdout piped");
         let stderr_text = Arc::new(Mutex::new(String::new()));
-        let stdout_text = Arc::new(Mutex::new(String::new()));
         {
             let capture = Arc::clone(&stderr_text);
             std::thread::spawn(move || {
                 for line in std::io::BufReader::new(stderr).lines() {
                     let Ok(line) = line else { break };
                     let mut sink = capture.lock().expect("stderr capture lock poisoned");
-                    sink.push_str(&line);
-                    sink.push('\n');
-                }
-            });
-        }
-        {
-            let capture = Arc::clone(&stdout_text);
-            std::thread::spawn(move || {
-                for line in std::io::BufReader::new(stdout).lines() {
-                    let Ok(line) = line else { break };
-                    let mut sink = capture.lock().expect("stdout capture lock poisoned");
                     sink.push_str(&line);
                     sink.push('\n');
                 }

@@ -5,19 +5,17 @@
 //! Validates that at least one third-party skill format (Anthropic Skills)
 //! executes via a Spirit-form adapter without kernel modification.
 //!
-//! If `docs/skill-conformance/results/skill-conformance-results.toml` is present,
-//! parses and validates the conformance result.  If absent, emits an advisory
-//! annotation and passes (conditional — the conformance run may still be pending).
-//! Malformed TOML or invalid results → hard fail.
+//! Journaled results and live adapter validation are required for a proven pass.
+//! Absent/unreadable results report ABSENT; disposition decides the exit code.
+//! Malformed TOML or invalid results fail.
 //!
 //! Proven-red: the real Anthropic fixture under `tests/fixtures/anthropic-skill/`
 //! is parsed through the adapter and validated.  The invalid fixture under
 //! `tests/fixtures/anthropic-skill-invalid/` must fail.
 
 use serde::Deserialize;
-use std::path::Path;
 
-use crate::gate_common::emit_command;
+use crate::gate_common::{Observation, OutOfLedgerVerdict, CURRENT_PHASE};
 
 /// Root of `docs/skill-conformance/results/skill-conformance-results.toml`.
 #[derive(Debug, Deserialize)]
@@ -102,6 +100,19 @@ fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
+    let content = match std::fs::read_to_string(RESULTS_PATH) {
+        Ok(content) => content,
+        Err(error) => {
+            return OutOfLedgerVerdict::judge_registered(
+                "check-skill-conformance",
+                Observation::NotRun,
+                false,
+                CURRENT_PHASE,
+                format!("results absent or unreadable: {error}"),
+            )?
+            .finish(json, serde_json::json!({}))
+        }
+    };
     // --- Live adapter validation (the real conformance test) ---
     // Parse the valid fixture through the Anthropic adapter, then execute the
     // adapted skill through the existing CliWrapper subprocess bridge.
@@ -136,59 +147,35 @@ pub fn run(json: bool) -> Result<(), String> {
     }
     eprintln!("check-skill-conformance: proven-red PASS — invalid fixture correctly rejected");
 
-    // --- Journaled results (conditional) ---
-    let results_path = Path::new(RESULTS_PATH);
-    if !results_path.exists() {
-        emit_command(
-            json,
-            "warning",
-            "check-skill-conformance: conformance results file absent — advisory PASS (conformance run pending)",
-        );
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "passed": true,
-                    "advisory": true,
-                    "reason": "results file absent; live adapter validation passed"
-                })
-            );
-        }
-        return Ok(());
-    }
-
-    let content = std::fs::read_to_string(results_path)
-        .map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
-
+    // Journaled results and live validation are both required for a proven pass.
     let results: ConformanceResults =
         toml::from_str(&content).map_err(|e| format!("malformed {RESULTS_PATH}: {e}"))?;
 
     let c = &results.conformance;
 
-    if !c.executed_without_kernel_modification {
-        return Err("conformance FAIL: executed_without_kernel_modification is false".into());
-    }
-    if !c.abi_unchanged {
-        return Err("conformance FAIL: abi_unchanged is false".into());
-    }
-
-    eprintln!(
-        "check-skill-conformance: PASS — adapter='{}', source='{}' → target='{}', kernel-mod=false, abi-unchanged=true",
-        c.adapter_name, c.source_format, c.target_format
-    );
-
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "passed": true,
-                "advisory": false,
-                "adapter_name": c.adapter_name,
-                "source_format": c.source_format,
-                "target_format": c.target_format,
-            })
-        );
-    }
-
-    Ok(())
+    let green = c.executed_without_kernel_modification && c.abi_unchanged;
+    OutOfLedgerVerdict::judge_registered(
+        "check-skill-conformance",
+        if green {
+            Observation::Green
+        } else {
+            Observation::Red
+        },
+        true,
+        CURRENT_PHASE,
+        if green {
+            "conformance validated"
+        } else {
+            "conformance findings"
+        },
+    )?
+    .finish(
+        json,
+        serde_json::json!({
+            "adapter_name": c.adapter_name,
+            "source_format": c.source_format,
+            "target_format": c.target_format,
+            "conformance_date": c.conformance_date,
+        }),
+    )
 }

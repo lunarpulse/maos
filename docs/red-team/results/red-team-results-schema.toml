@@ -1,8 +1,8 @@
 # Red-Team Results Schema — Story 10.2 AC-3
 # This file documents the expected structure of red-team-results.toml.
 # red-team-results.toml is committed by the external pen-tester after engagement
-# completion. Gate: check-red-team-gate (advisory-until-engagement at v1.0;
-# ship-blocking at v1.5).
+# completion. Gate: check-red-team-gate (ABSENT is advisory at v1_5;
+# present findings block at HEAD).
 
 [gate]
 # SHA-256 of the committed red-team-640 corpus (line-by-line hash, as recorded

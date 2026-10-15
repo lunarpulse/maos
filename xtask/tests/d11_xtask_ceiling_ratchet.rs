@@ -130,52 +130,77 @@ fn ceiling_raise_after_every_numbered_epic_is_done_reds() {
     );
 }
 
-/// The `xtask = NNNNN` ceiling and every story key its grant block cites.
-///
-/// The row is the tree's own ledger: the value on the assignment line, and the
-/// `Story <key>`/`15-4`-style citations in the comment block that funds it.
-fn real_xtask_row() -> (u64, Vec<String>) {
-    let kloc = std::fs::read_to_string(workspace_root().join("xtask/kloc.toml"))
-        .expect("read xtask/kloc.toml");
-    let mut citations = Vec::new();
-    let mut ceiling = None;
-    for line in kloc.lines() {
-        let trimmed = line.trim_start();
-        if let Some(rest) = trimmed.strip_prefix("xtask") {
-            if let Some(value) = rest.trim_start().strip_prefix('=') {
-                let digits: String = value
-                    .trim_start()
-                    .chars()
-                    .take_while(char::is_ascii_digit)
-                    .collect();
-                if let Ok(parsed) = digits.parse::<u64>() {
-                    ceiling = Some(parsed);
-                }
-            }
-        }
-        if trimmed.starts_with('#') {
-            citations.extend(story_keys(trimmed));
-        }
-    }
-    (ceiling.expect("xtask ceiling row"), citations)
+/// Last authorized ceiling before this policy became live. Existing grants are
+/// historical; only a raise beyond this value is re-judged against live status.
+const PRE_HONESTY_CEILING: u64 = 44_370;
+
+/// Read ONLY the current assignment's own inline grant, before its PRIOR ledger.
+/// Accepted landing shape: `xtask = N # Story 20-3a-gate-honesty EXACT MEASURED
+/// GRANT; DRIVER: ... | PRIOR: ...`. A citation elsewhere cannot fund this row.
+fn xtask_row(kloc: &str) -> (u64, Vec<String>) {
+    let row = kloc
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once('=')?;
+            (key.trim() == "xtask").then_some(value)
+        })
+        .expect("xtask ceiling row");
+    let (value, comment) = row.split_once('#').unwrap_or((row, ""));
+    let current_grant = comment.split('|').next().unwrap_or("");
+    (
+        value.trim().parse().expect("xtask ceiling"),
+        story_keys(current_grant),
+    )
 }
 
-/// `NN-M…` sprint-key prefixes mentioned in a ledger comment (`15-4`, `21-2`).
+/// Keep the complete sprint key, including letter suffixes and descriptive tail.
 fn story_keys(comment: &str) -> Vec<String> {
     comment
-        .split(|c: char| !c.is_ascii_digit() && c != '-')
+        .split(|c: char| !c.is_ascii_alphanumeric() && c != '-')
+        .map(|token| token.trim_matches('-'))
         .filter(|token| {
             let mut parts = token.split('-');
-            matches!(
-                (parts.next(), parts.next(), parts.next()),
-                (Some(epic), Some(story), None)
-                    if !epic.is_empty() && !story.is_empty()
-                        && epic.chars().all(|c| c.is_ascii_digit())
-                        && story.chars().all(|c| c.is_ascii_digit())
-            )
+            matches!((parts.next(), parts.next(), parts.next()),
+                (Some(epic), Some(story), Some(_))
+                    if !epic.is_empty() && epic.chars().all(|c| c.is_ascii_digit())
+                        && story.starts_with(|c: char| c.is_ascii_digit()))
         })
-        .map(str::to_string)
+        .map(str::to_owned)
         .collect()
+}
+
+/// Judge the live row. A `done` citation is HISTORICAL — not re-judged — only
+/// when that story's own file records the row's figure (`xtask` and `N` on one
+/// line): a story that funded the raise while open documented it, and closing
+/// it must not red the suite. A `done` story that never recorded the figure is
+/// being BORROWED, and refuses as `DoneStory`.
+fn authorize_row(kloc: &str, status: &str, stories: &Path) -> Result<(), Refusal> {
+    let (ceiling, citations) = xtask_row(kloc);
+    let yaml: Value = serde_yaml::from_str(status).expect("sprint status parses");
+    let statuses = yaml["development_status"].as_mapping().expect("statuses");
+    let citation = citations
+        .iter()
+        .find(|key| statuses.contains_key(Value::from(key.as_str())));
+    match authorize_xtask_raise(
+        PRE_HONESTY_CEILING,
+        ceiling,
+        citation.map(String::as_str),
+        status,
+    ) {
+        Err(Refusal::DoneStory) if records_figure(stories, citation.unwrap(), ceiling) => Ok(()),
+        verdict => verdict,
+    }
+}
+
+fn records_figure(stories: &Path, key: &str, ceiling: u64) -> bool {
+    std::fs::read_to_string(stories.join(format!("{key}.md"))).is_ok_and(|text| {
+        text.lines()
+            .any(|line| line.contains("xtask") && line.contains(&ceiling.to_string()))
+    })
+}
+
+fn stories_dir() -> PathBuf {
+    workspace_root().join("_bmad-output/implementation-artifacts")
 }
 
 fn real_statuses() -> std::collections::HashMap<String, String> {
@@ -189,26 +214,89 @@ fn real_statuses() -> std::collections::HashMap<String, String> {
     statuses
 }
 
-/// Rule (i), against the tree: the live ceiling must be funded by a grant that
-/// names a real sprint story. A bump whose comment cites nothing that exists in
-/// `sprint-status.yaml` is drift, and this is the assertion that catches it.
+/// Only a raise beyond the pre-policy ceiling is judged: it must cite a live
+/// story, or a completed one that recorded this exact figure.
 #[test]
 fn the_live_xtask_ceiling_cites_a_real_sprint_story() {
-    let (ceiling, citations) = real_xtask_row();
-    assert!(ceiling > 0, "ceiling must parse");
-    let statuses = real_statuses();
-    let resolved: Vec<&String> = citations
-        .iter()
-        .filter(|cited| {
-            statuses
-                .keys()
-                .any(|key| key.starts_with(&format!("{cited}-")) || key == *cited)
+    let root = workspace_root();
+    let kloc = std::fs::read_to_string(root.join("xtask/kloc.toml")).unwrap();
+    let status = std::fs::read_to_string(stories_dir().join("sprint-status.yaml")).unwrap();
+    assert_eq!(
+        authorize_row(&kloc, &status, &stories_dir()),
+        Ok(()),
+        "current xtask grant is unauthorized"
+    );
+}
+
+#[test]
+fn planted_current_row_raises_cannot_borrow_historical_or_done_grants() {
+    let root = workspace_root();
+    let kloc = std::fs::read_to_string(root.join("xtask/kloc.toml")).unwrap();
+    let status = std::fs::read_to_string(stories_dir().join("sprint-status.yaml")).unwrap();
+    let yaml: Value = serde_yaml::from_str(&status).unwrap();
+    let statuses = yaml["development_status"].as_mapping().unwrap();
+    let original = kloc
+        .lines()
+        .find(|line| {
+            line.split_once('=')
+                .is_some_and(|(key, _)| key.trim() == "xtask")
         })
-        .collect();
-    assert!(
-        !resolved.is_empty(),
-        "the xtask ceiling row ({ceiling}) cites no story key present in sprint-status.yaml; \
-         citations found: {citations:?}"
+        .unwrap();
+    let (ceiling, _) = xtask_row(&kloc);
+    // An odd offset no story file records, so a `done` citation cannot be
+    // accidentally historical.
+    let raised = ceiling.max(PRE_HONESTY_CEILING) + 7919;
+    let story = |done: bool| {
+        statuses
+            .iter()
+            .find_map(|(key, value)| {
+                let key = key.as_str()?;
+                ((value.as_str() == Some("done")) == done
+                    && !story_keys(key).is_empty()
+                    && !records_figure(&stories_dir(), key, raised))
+                .then_some(key)
+            })
+            .expect("a real story with that status")
+    };
+    let (done, open) = (story(true), story(false));
+    for (row, refusal) in [
+        (format!("xtask = {raised}"), Refusal::MissingStory),
+        (
+            format!("xtask = {raised}\n# unrelated Story {open}"),
+            Refusal::MissingStory,
+        ),
+        (
+            format!("xtask = {raised} # Story {done} EXACT MEASURED GRANT"),
+            Refusal::DoneStory,
+        ),
+    ] {
+        let planted = kloc.replacen(original, &row, 1);
+        assert_eq!(
+            authorize_row(&planted, &status, &stories_dir()),
+            Err(refusal),
+            "{row}"
+        );
+        eprintln!("planted {row}: RED (unauthorized)");
+    }
+    let grant = |key: &str| {
+        kloc.replacen(
+            original,
+            &format!("xtask = {raised} # Story {key} EXACT MEASURED GRANT; DRIVER: d | PRIOR: Story {done}"),
+            1,
+        )
+    };
+    // A live story funds the raise.
+    assert_eq!(authorize_row(&grant(open), &status, &stories_dir()), Ok(()));
+    // The same `done` story becomes historical once its own file records the figure.
+    let recorded = tempfile::tempdir().unwrap();
+    std::fs::write(
+        recorded.path().join(format!("{done}.md")),
+        format!("kloc grant: xtask {ceiling} -> {raised}\n"),
+    )
+    .unwrap();
+    assert_eq!(
+        authorize_row(&grant(done), &status, recorded.path()),
+        Ok(())
     );
 }
 

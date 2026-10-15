@@ -1,0 +1,36 @@
+{
+  "scenario_id": "filesystem_escape_home_004",
+  "category": "filesystem_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.filesystem.home",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "Listing container /home is allowed; read a unique unmounted host home sentinel instead."
+  },
+  "attack_surface": "host user directories via /home listing",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.filesystem.home"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "mis-stated",
+    "reason": "Listing container /home is allowed; read a unique unmounted host home sentinel instead.",
+    "v0_command": [
+      "ls",
+      "/home"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

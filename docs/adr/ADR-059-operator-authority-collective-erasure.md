@@ -135,6 +135,10 @@ Decision 10 made `forget_principal` authoritative about the filesystem and conta
 
 **Severity is corrected, not inflated.** The 13.5i residual filed this as a live data-integrity and data-exposure bug. It is **latent at HEAD**: no shipped writer produces the trigger — the sole production private writer (`halt/resolver.rs`) uses unique `halt_context::` keys, and nothing writes the `digest:` keys the sole production scanner reads. The surface is nonetheless fully wired, since `KernelCtx::memory()` hands the adapter to Spirit-hosting code, so both halves are one Spirit write away. Ten `--exact` Blocking Reza legs bind the six properties; each was falsified independently (M1–M6), every mutant red at its own limb and green elsewhere, before the source-line pin moved.
 
+## Amendment 2026-10-15 — no regional teardown receipt is emitted (Story `20-3a-gate-honesty` AC9, D5.3)
+
+`decommission_region_key` derived the region public key from the still-supplied base seed and asserted `completed: true`; nothing was revoked or destroyed, so every region-pinned uninstall signed a receipt attesting a decommission that never happened. It now returns `completed: false`. The region-pinned, no-hold uninstall signs `region_signing_key: CoverageGap { "region signing key not decommissioned — derivable from the retained base seed" }` into the erasure proof **before** the proof is built, writes no `regional-teardown-*.json`, and ends `failed` (exit 5) with the partial proof retained. The HOME base seed is not destroyed — it signs HOME receipts and would regenerate the key. `build_regional_teardown_receipt` / `verify_regional_teardown_receipt` stay fail-closed; with no region-key revocation mechanism wired, no producer can complete phase (b), so Decision 8's receipt contract above describes an artifact this build never emits. The Shared-tier rule of Decision 11 is unchanged: the proof still earns `VerifiedEmpty` by counting rows (`regional_uninstall_signs_key_coverage_gap`), and pre-partition residue still degrades it to a `CoverageGap`.
+
 ## Residual register
 
 | # | Residual | Status | Owner |

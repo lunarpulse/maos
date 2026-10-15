@@ -2,6 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+#[path = "../../../tests/harness/ci.rs"]
+mod ci;
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -1414,10 +1417,13 @@ fn purge_refuses_an_unopenable_store_directory_as_lock_unavailable() {
     std::fs::write(memory.join("kept.bin"), b"survive").expect("seed memory content");
     std::fs::set_permissions(&memory, std::fs::Permissions::from_mode(0o000))
         .expect("close the store directory");
-    // uid 0 can open anything: the fixture is not constructible there.
+    // CAP_DAC_OVERRIDE makes this permission control unobservable.
     if std::fs::File::open(&memory).is_ok() {
         std::fs::set_permissions(&memory, std::fs::Permissions::from_mode(0o700))
             .expect("restore store directory");
+        let reason = "SKIP (purge_refuses_an_unopenable_store_directory_as_lock_unavailable): running with CAP_DAC_OVERRIDE — permission control unobservable";
+        eprintln!("{reason}");
+        assert!(!ci::declared_ci(), "{reason}");
         return;
     }
 
@@ -1660,7 +1666,10 @@ fn purge_failure_mid_deletion_leaves_an_in_progress_receipt() {
         let _ = std::fs::remove_file(locked_dir.join(".probe"));
         std::fs::set_permissions(&locked_dir, std::fs::Permissions::from_mode(0o0700))
             .expect("restore subdirectory");
-        return; // uid 0: the permission failure is not constructible.
+        let reason = "SKIP (purge_failure_mid_deletion_leaves_an_in_progress_receipt): running with CAP_DAC_OVERRIDE — permission control unobservable";
+        eprintln!("{reason}");
+        assert!(!ci::declared_ci(), "{reason}");
+        return;
     }
 
     let receipt = root.join("mid-deletion-receipt.json");

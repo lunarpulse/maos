@@ -60,6 +60,7 @@ jobs:
   reproducible-build:
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    # ADVISORY — owner: Winston; reason: byte identity needs a pinned deterministic build substrate.
     # ADVISORY gate (2026-06-12). Cargo/rustc does not guarantee byte-identical
     # debug artifacts across consecutive builds because incremental metadata,
     # crate hashes and path-prefix data can vary depending on cargo/rustc
@@ -117,12 +118,14 @@ jobs:
           echo "Byte-identity verified: artifacts match across two consecutive builds."
       - name: Grep for nightly-only features
         run: |
-          set +e
           violations=0
           # Check for #![feature(...)] gates in Rust source.
           if grep -rn '#!\[feature(' crates/ xtask/ --include='*.rs'; then
             echo "NFR-Test-2 / reproducible-build violation: nightly feature referenced at listed locations"
             violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
           fi
           # Check for cargo +nightly references in code/config/scripts only.
           # Excludes:
@@ -134,11 +137,17 @@ jobs:
           if grep -rn --exclude-dir=.github 'cargo +nightly' . --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.toml'; then
             echo "NFR-Test-2 / reproducible-build violation: cargo +nightly referenced at listed locations"
             violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
           fi
           # Check for RUSTC_BOOTSTRAP. Same scope rationale as above.
           if grep -rn --exclude-dir=.github 'RUSTC_BOOTSTRAP' . --include='*.rs' --include='*.toml' --include='*.yml' --include='*.yaml' --include='*.sh'; then
             echo "NFR-Test-2 / reproducible-build violation: RUSTC_BOOTSTRAP referenced at listed locations"
             violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
           fi
           if [ "$violations" -ne 0 ]; then
             exit 1
@@ -589,11 +598,13 @@ jobs:
       - uses: actions/checkout@v5
       - name: Grep for write-open patterns in maos-audit
         run: |
-          set +e
           violations=0
           if grep -R -E 'OPEN_READ_WRITE|SQLITE_OPEN_CREATE|SQLITE_OPEN_READ_WRITE' crates/maos-audit/ --include='*.rs'; then
             echo "Story 9.2 / Decision A.2 violation: maos-audit contains a write-open pattern"
             violations=1
+          else
+            rc=$?
+            if [ "$rc" -ge 2 ]; then exit "$rc"; fi
           fi
           if [ "$violations" -ne 0 ]; then
             exit 1
@@ -1042,14 +1053,12 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run §13.1 J1 founder-loop CliWrapper IPC benchmark (Story 8.4, AC7)
-        # Regression guard (mirrors researcher-bench --test). J1_P95_BUDGET_US=25_000.
-        # A budget breach at HEAD is the §13.1 / E5-5.5 rust-inproc-evaluation
-        # trigger, NOT a hard fail; the job fails on a regression vs. the baseline.
+        # correctness smoke (`--test`, one iteration);
+        # no timing baseline exists — 20-7 owns regression.
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
 
-  # Story 8.5 AC3/AC6 — J4 (Mira-Nash colocation <10ms) + J6 (Diego cold-start
-  # <500ms) §13.1 latency regression guard. Activates the J4 bench's v1.5 budget
-  # that Observer 8.3 deliberately left unwired, and the NEW J6 cold-start bench.
+  # Story 8.5 AC3/AC6 — J4 (Mira-Nash) + J6 (Diego) correctness smoke.
+  # Timing regression enforcement belongs to 20-7 / ADR-068.
   mira-nash-bench:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1062,10 +1071,8 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run §13.1 J4 + J6 Criterion benchmarks (Story 8.5, AC3/AC6)
-        # Regression guard (mirrors founder-loop-bench --test). J4_P95_BUDGET_US=10_000,
-        # J6_P95_BUDGET_US=500_000. A budget breach at HEAD is a §13.1 measurement
-        # RECORDED ("fix our code first; do not mask"), NOT a hard fail; the job
-        # fails on a regression vs. the baseline.
+        # correctness smoke (`--test`, one iteration);
+        # no timing baseline exists — 20-7 owns regression.
         run: cargo bench -p maos-bench --bench section_13_1 -- --test
 
   # Story 8.5 AC5 — safety-critical corpus + Cohen's κ (N≥150/Spirit, κ≥0.7).
@@ -1671,6 +1678,7 @@ jobs:
   determinism-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # ADVISORY — owner: Winston; reason: DF6 determinism signal is not binding evidence pending NFR-Sec-4.
     outputs:
       test_result: ${{ steps.surface.outputs.result }}
     steps:
@@ -1696,13 +1704,15 @@ jobs:
             echo "result=success" >> $GITHUB_OUTPUT
           fi
 
-  # Story 5.5a, unmasked by Story 17-1 AC4(c)/D-12 — the T3 escape corpus.
-  # Shape checks for all 25 fixtures, plus a real execution of the five
-  # `--network=none` scenarios inside the verified container (each must leave
-  # one confirmed kind-8 row) and the M3 socket custody pair (0600 refused,
-  # 0666 connects). The twenty unexecuted scenarios are listed by id with their
-  # owner (`20-3a-gate-honesty`). No continue-on-error, no `|| echo`, no skip:
-  # this runner is declared capable (rule 11(b)).
+  # Story 20-3a AC11 — t3-escape-corpus-v1 runs in verified T3: 25 v0 scenarios =
+  # 24 executed + 1 withdrawn by name with its recorded reason
+  # (runtime_escape_runtime_version_disclosure_005: image composition, not a
+  # containment boundary — methodology-attestation.json `withdrawn`).
+  # Claims: host files/PIDs and OCI sockets unreachable, rootfs read-only,
+  # dropped capabilities, bounded PIDs, outbound IPv4/IPv6/DNS blocked; NOT
+  # universal escape resistance or a T2 claim. Every kind-8 assertion uses
+  # D-10's confirmed-write observed-effect marker. M3 additionally checks socket
+  # custody (0600 refused / 0666 reachable). A SKIP on this capable runner fails.
   t3-escape-corpus:
     strategy:
       fail-fast: false
@@ -1719,34 +1729,37 @@ jobs:
         with:
           key: t3-escape-corpus-${{ matrix.image }}-${{ hashFiles('**/Cargo.lock') }}
       - uses: ./.github/actions/provision-t3-test-substrate
-      - name: Build the static network-escape probe
+      - name: Build the static containment probe (all executable vectors)
         run: >-
           RUSTFLAGS='-C target-feature=+crt-static'
           cargo build --locked --release --target x86_64-unknown-linux-gnu
           --manifest-path crates/maos-eval/test-fixtures/t3-network-escape-probe/Cargo.toml
-      - name: Run the T3 escape corpus and the network executor
+      - name: Run the T3 escape corpus and every executable scenario
         shell: bash
         run: |
           set +e
-          cargo test --locked -p maos-eval --test t3_escape_corpus --test t3_network_escape_executor --release -- --nocapture 2>&1 | tee t3-escape.log
+          cargo test --locked -p maos-eval --test t3_escape_corpus --test t3_network_escape_executor --test t3_escape_workflow --release -- --nocapture 2>&1 | tee t3-escape.log
           rc=${PIPESTATUS[0]}
-          executed=$(grep -c '^T3-ESCAPE-EXECUTED ' t3-escape.log)
-          labelled=$(grep -c '^T3-ESCAPE-UNEXECUTED .* owner=20-3a-gate-honesty$' t3-escape.log)
-          grep '^T3-ESCAPE-EXECUTED ' t3-escape.log | while IFS= read -r line; do
-            echo "::notice title=T3 escape corpus (${{ matrix.image }})::${line#T3-ESCAPE-EXECUTED }"
-          done
-          grep '^T3-NETWORK-MATRIX ' t3-escape.log | while IFS= read -r line; do
-            echo "::notice title=T3 escape corpus (${{ matrix.image }})::${line}"
-          done
-          grep -E 'panicked at' t3-escape.log | head -3 | while IFS= read -r line; do
-            echo "::error title=T3 escape corpus (${{ matrix.image }})::${line}"
-          done
-          if grep -q '^SKIP ' t3-escape.log; then rc=1; echo "::error title=T3 escape corpus (${{ matrix.image }})::a SKIP line was printed"; fi
-          if [ "$executed" -ne 5 ] || [ "$labelled" -ne 20 ]; then
-            rc=1
-            echo "::error title=T3 escape corpus (${{ matrix.image }})::executed=$executed (want 5) labelled=$labelled (want 20)"
-          fi
-          echo "::notice title=T3 escape corpus (${{ matrix.image }})::rc=${rc} executed=${executed}/25 unexecuted=${labelled} owner=20-3a-gate-honesty"
+          set -e
+          python3 - <<'PY'
+          import collections, json, pathlib, re
+          root = pathlib.Path("crates/maos-eval/fixtures/t3-escape-corpus-v1")
+          expected = {json.loads(p.read_text())["scenario_id"] for p in root.glob("*/*.json")}
+          withdrawn = {row["id"] for row in json.loads((root / "methodology-attestation.json").read_text())["withdrawn"]}
+          declared = {json.loads(p.read_text())["scenario_id"] for p in pathlib.Path("crates/maos-eval/fixtures/t3-escape-corpus-v0").glob("*/*.json")}
+          log = pathlib.Path("t3-escape.log").read_text()
+          executed = re.findall(r"^T3-ESCAPE-EXECUTED (\S+) block_observed=true kind8=1 ", log, re.M)
+          counts = collections.Counter(executed)
+          if expected | withdrawn != declared or expected & withdrawn:
+              raise SystemExit(f"T3 accounting failed: executable+withdrawn must equal the {len(declared)} declared v0 scenarios")
+          if set(counts) != expected or any(n != 1 for n in counts.values()):
+              raise SystemExit(f"T3 accounting failed: executed={len(executed)}/{len(expected)} missing={sorted(expected-set(counts))} extra={sorted(set(counts)-expected)} duplicates={dict(counts)}")
+          if re.search(r"^SKIP |^T3-ESCAPE-UNEXECUTED ", log, re.M):
+              raise SystemExit("T3 capable runner printed SKIP or an unexecuted scenario")
+          if "T3-NETWORK-MATRIX socket0600=refused socket0666=reachable" not in log:
+              raise SystemExit("T3 socket custody matrix did not execute")
+          print(f"T3-ESCAPE-ACCOUNTING executed={len(counts)}/{len(expected)} withdrawn={len(withdrawn)} {sorted(withdrawn)} unexecuted=0")
+          PY
           exit "$rc"
 
   # Story 5.5a — T3 image signature verification corpus
@@ -2036,7 +2049,7 @@ jobs:
   nfr-perf-1-iac-routing-budget:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
+    continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (Story 8.16 §A5 triage 2026-06-12): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Hard NFR-Perf-1 verification is the maos-bench measurement track, not this CI smoke. Not masking a regression.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2088,7 +2101,7 @@ jobs:
   nfr-perf-j4-latency:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true  # ADVISORY (review D3): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Mirrors nfr-perf-1/8. Not masking a regression.
+    continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (review D3): perf bench, wall-clock-sensitive on shared GH runners — reports, does not gate. Mirrors nfr-perf-1/8. Not masking a regression.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -2106,7 +2119,7 @@ jobs:
   nfr-perf-8-orchestrator-fanout:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true  # ADVISORY (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
+    continue-on-error: true  # ADVISORY — owner: Murat — retired by 20-7 (ADR-068); reason: (Story 8.16 §A5 triage 2026-06-12; supersedes the stale "flip before Epic 6" note): NFR-Perf-8 fan-out bench is wall-clock-sensitive on shared GH runners — reports, does not gate. Hard verification is the maos-bench track. Not masking a regression.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -3047,7 +3060,7 @@ jobs:
 
   # Story 10.1b AC1 — Pen-test gate: conditional per calibrate-per-commit pattern.
   # When summary.toml exists, parse and assert p0_open == 0 && p1_open == 0.
-  # When absent, pass with advisory annotation (pen-test engagement pending).
+  # When absent, report ABSENT (not a pass), advisory at v1_5.
   check-pentest-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -3118,13 +3131,7 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Check third-party trial results
         run: |
-          if [ -f docs/third-party-trial/results/trial-results.toml ]; then
-            cargo run -p xtask -- check-third-party-trial
-          else
-            echo "::warning::Third-party trial pending — trial-results.toml absent"
-            echo "## ⚠️ Third-Party Trial Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
-            echo "Trial has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          cargo run -p xtask -- check-third-party-trial
 
   # Story 10.2 AC2 — CLI-wrapper cross-form distributional equivalence gate (ADVISORY per ADR-040).
   check-cross-form-equiv:
@@ -3161,17 +3168,10 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Check red-team gate results
-        run: |
-          if [ -f docs/red-team/results/red-team-results.toml ]; then
-            cargo run -p xtask -- check-red-team-gate
-          else
-            echo "::warning::Red-team engagement pending — red-team-results.toml absent"
-            echo "## ⚠️ Red-Team Gate: ADVISORY" >> "$GITHUB_STEP_SUMMARY"
-            echo "Red-team engagement has not yet been executed." >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: cargo run -p xtask -- check-red-team-gate --json
 
   # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate
-  # (v1.5 phase, advisory-until-engagement).
+  # ABSENT now blocks at v1_5 per registry disposition; CI stays red until a corpus exists.
   check-migration-merkle:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -3184,13 +3184,7 @@ jobs:
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Check migration Merkle gate results
-        run: |
-          if [ -f tests/corpora/migration-corpus-1e6.sqlite ] || [ -n "${MAOS_TEST_POSTGRES:-}" ]; then
-            cargo run -p xtask -- check-migration-merkle
-          else
-            echo "::warning::Migration corpus absent — generate via 'cargo run --release -p maos-loom-lite --example generate_migration_corpus -- --out tests/corpora/migration-corpus-1e6.sqlite'"
-            echo "## ⚠️ Migration Gate: ADVISORY (corpus absent)" >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: cargo run -p xtask -- check-migration-merkle --json
   # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
   # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
   check-export-control:
@@ -3647,8 +3641,9 @@ jobs:
       - name: Run check-j4-latency (real measurement)
         run: |
           # Real in-kernel scalar.tap measurement with kernel_measurement feature.
+          # Budget advisory until 20-7 / ADR-068; sample-count/integrity/mutation stay blocking.
           cargo test -p maos-bench --features kernel_measurement --test t_10_4c_j4_latency_gate -- --nocapture
-          echo "check-j4-latency: PASSED (real in-kernel scalar.tap measurement; Story 10.4c)."
+          echo "check-j4-latency: measurement completed; budget ADVISORY (binding: 20-7)."
       - name: Run Gate 1 integrity tests
         run: |
           cargo test -p maos-bench --features kernel_measurement --test t_10_4c_j4_gate_integrity -- --nocapture
@@ -3666,7 +3661,9 @@ jobs:
           echo "check-j4-latency: mutation test PASSED (injection moves the number → RED)."
       - name: Verify bench-fault-inject absent from release graph (D3)
         run: |
-          if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "bench-fault-inject"; then
+          # Invert to expose the root package's enabled default features as well.
+          graph=$(cargo tree -p maos-bench -e features --invert maos-bench)
+          if grep -q "bench-fault-inject" <<< "$graph"; then
             echo "FAIL: bench-fault-inject present in release feature graph"
             exit 1
           fi
@@ -3887,7 +3884,12 @@ jobs:
       # release feature graph so it can never weaken a shipped build.
       - name: Verify equiv-fault-inject absent from release graph (D7)
         run: |
-          if cargo tree -p maos-wasm-host -e features --release 2>&1 | grep -q "equiv-fault-inject"; then
+          # `cargo tree` has no `--release`; the old flag errored into `grep -q`
+          # and the step passed on cargo's usage text (20-3a, AC7.2's defect
+          # class). A failing `cargo tree` now fails the assignment, and the
+          # inversion exposes the root package's own default features.
+          graph=$(cargo tree -p maos-wasm-host -e features --invert maos-wasm-host)
+          if grep -q "equiv-fault-inject" <<< "$graph"; then
             echo "FAIL: equiv-fault-inject present in release feature graph"
             exit 1
           fi
@@ -4032,7 +4034,9 @@ jobs:
       # j4-latency / wasm-form-equiv cargo-tree absence idiom.
       - name: slo-fault-inject absent from release feature graph
         run: |
-          if cargo tree -p maos-bench -e features --release 2>&1 | grep -q "slo-fault-inject"; then
+          # Same fix as the D7/D3 steps (20-3a): no invalid `--release`, failure propagates, root defaults visible.
+          graph=$(cargo tree -p maos-bench -e features --invert maos-bench)
+          if grep -q "slo-fault-inject" <<< "$graph"; then
             echo "FAIL: slo-fault-inject leaked into the maos-bench release feature graph (Story 11.2b ship-blocker)"
             exit 1
           fi
@@ -4662,11 +4666,13 @@ jobs:
     # AND `tokei` from source, builds four fixture binaries, then builds and
     # runs the ENTIRE workspace with `--no-fail-fast` (which by design does not
     # stop early). The four prerequisite builds added below make it longer
-    # still. 90 is deliberately generous rather than tight: the useful signal
-    # from this job is "the suite ran to completion and here is what failed",
-    # and a suite killed mid-run yields no signal at all. Re-measure from the
-    # first run that completes and tighten with a number.
-    timeout-minutes: 90
+    # still. 90 was deliberately generous rather than tight: the useful signal
+    # is "the suite ran to completion and here is what failed", not a suite
+    # killed mid-run. Completed GREEN measurements:
+    # 21.6 min — job 112870642845, run 37644181760 @d371b5a4;
+    # 21.2 min — job 112918351555, run 37658103096 @8f6869b8.
+    # Header rule max(30, 3× measured), rounded up to 5 minutes: 65.
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@v5
         with:
@@ -4687,6 +4693,23 @@ jobs:
       - uses: ./.github/actions/provision-t3-test-substrate
       - name: Install nightly toolchain for cargo-public-api integration tests
         run: rustup toolchain install nightly --profile minimal
+      - name: Install strace for the three telemetry air-gap controls
+        run: sudo apt-get update && sudo apt-get install -y strace
+      - name: Observe all three telemetry air-gap controls (no green skips)
+        run: |
+          set -euo pipefail
+          cargo test -p maos-telemetry --test otel_gates gate_otel_airgap_ -- --nocapture 2>&1 | tee otel-airgap.log
+          python3 - <<'PY'
+          from pathlib import Path
+          expected = {
+              "gate_otel_airgap_default_off_no_connects",
+              "gate_otel_airgap_enabled_no_endpoint_no_connects",
+              "gate_otel_airgap_enabled_proven_red_network_canary_detected",
+          }
+          observed = [line.removeprefix("OTEL_AIRGAP_RAN ") for line in Path("otel-airgap.log").read_text().splitlines() if line.startswith("OTEL_AIRGAP_RAN ")]
+          assert len(observed) == 3 and set(observed) == expected, f"telemetry air-gap controls NOT RUN: expected={expected}, observed={observed}"
+          print("telemetry air-gap controls observed: 3/3")
+          PY
       - name: Install cargo-public-api for workspace integration tests
         run: cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
       # ⚠ The suite claims to run EVERYTHING, so it must install everything the
@@ -5152,6 +5175,8 @@ jobs:
     steps:
       - name: Build results table
         id: results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
           echo "rb=${{ needs.reproducible-build.result }}" >> $GITHUB_OUTPUT
           echo "cu=${{ needs.check-unsafe.result }}" >> $GITHUB_OUTPUT
@@ -5207,6 +5232,10 @@ jobs:
           echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
           echo "| cgroup-ceiling-delegated | ${{ needs.cgroup-ceiling-delegated.result }} | 4-image real cgroup-v2 enforcement; x64 rootless T3 checks |" >> "$GITHUB_STEP_SUMMARY"
           echo "| cgroup-ceiling-undelegated | ${{ needs.cgroup-ceiling-undelegated.result }} | 4-image Delegate=no refusal/fallback proof |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Discipline prerequisite | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          jq -r 'to_entries[] | "| \(.key) | \(if .value.result == "skipped" then "NOT RUN — skipped" elif .key == "determinism-tests" then (if .value.outputs.test_result == "success" then "✅ success (advisory)" elif .value.outputs.test_result == "failure" then "⚠️ failure (advisory)" else "NOT RUN — advisory outcome absent" end) else .value.result end) |"' \
+            <<< "$NEEDS_JSON" >> "$GITHUB_STEP_SUMMARY"
       # Story 20-6 AC3 — a skipped macOS guard is NOT-APPLICABLE, said out loud.
       # `needs.*.result == 'skipped'` is not a failure, so without this step a
       # filtered-out guard would read as an unremarkable green and the
@@ -5241,8 +5270,12 @@ jobs:
           echo "$line" >> "$GITHUB_STEP_SUMMARY"
       - name: Check for failures
         id: status
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' || needs['epic-17-exit'].result != 'success' }}" == "true" ]]; then
+          # macos-check is the ONLY skipped-job exemption; its 20-6 disposition step owns applicability.
+          failed=$(jq -r 'to_entries | any(.value.result == "failure" or .value.result == "cancelled" or (.key != "macos-check" and .value.result == "skipped"))' <<< "$NEEDS_JSON")
+          if [[ "$failed" == "true" ]]; then
             echo "overall=failure" >> $GITHUB_OUTPUT
           else
             echo "overall=success" >> $GITHUB_OUTPUT
@@ -5311,9 +5344,9 @@ jobs:
             // `dt` is used in the advisory determinism-tests table row but was never declared, so the
             // github-script threw ReferenceError on every `pull_request` event (this step is PR-only,
             // and all prior CI ran on `push`, where it is skipped).
-            const dt = '${{ needs.determinism-tests.result }}';
-            const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '⏭️' : '❌');
-            const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '⏭️');
+            const dt = '${{ needs.determinism-tests.outputs.test_result }}';
+            const icon = (r) => r === 'success' ? '✅' : (r === 'skipped' ? '❌ NOT RUN —' : '❌');
+            const advisoryIcon = (r) => r === 'success' ? '✅' : (r === 'failure' ? '⚠️' : '❌ NOT RUN —');
             // A skip is "not applicable" ONLY when the filter ran and said so; a skip behind a failed
             // filter, or behind `applicable=true`, is a guard that did not run — never a green-looking cell.
             // Declared AFTER `icon`: reading a `const` above its declaration throws (TDZ) and reds aggregate.
@@ -5409,7 +5442,7 @@ jobs:
               });
             }
       - name: Fail if any gate failed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || needs['cgroup-ceiling-delegated'].result != 'success' || needs['cgroup-ceiling-undelegated'].result != 'success' || needs['epic-17-exit'].result != 'success' }}
+        if: ${{ steps.status.outputs.overall == 'failure' }}
         run: |
           echo "One or more discipline gates failed."
           exit 1

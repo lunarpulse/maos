@@ -1,0 +1,37 @@
+{
+  "scenario_id": "capability_escape_cap_net_raw_002",
+  "category": "capability_escape",
+  "attack_payload": {
+    "command": [
+      "/maos/spirit",
+      "--maos-escape",
+      "container.escape.capability.cap_net_raw",
+      "$HOST_SENTINEL",
+      "$HOST_PID"
+    ],
+    "expected_runtime_blocker": "--cap-drop=ALL + --network=none"
+  },
+  "attack_surface": "CAP_NET_RAW ICMP socket creation for network probing",
+  "expected_outcome": {
+    "block_observed": true,
+    "audit_event_emitted": "CapAuditEvent::SandboxBlock",
+    "frame_kind": "SandboxBlock",
+    "attempted_syscall_substring": "container.escape.capability.cap_net_raw"
+  },
+  "tier_target": "T3",
+  "split": "sec-14a",
+  "preconditions": {
+    "linux": true,
+    "container_runtime_available": true
+  },
+  "classification": {
+    "v0_verdict": "corrected",
+    "reason": "Mis-stated in v0: `ping` may use an unprivileged ICMP datagram socket (net.ipv4.ping_group_range), so it says nothing about CAP_NET_RAW. v1 asserts the NET_RAW bounding bit is absent and a raw ICMP socket is refused with EPERM.",
+    "v0_command": [
+      "sh",
+      "-c",
+      "ping -c1 127.0.0.1"
+    ]
+  },
+  "executor_assertion": "Real blocked syscall/effect, probe exit 0, exactly one Kernel-origin SandboxBlock via D-10 confirmed-write marker; host sentinels unchanged."
+}

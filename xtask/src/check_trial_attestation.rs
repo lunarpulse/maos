@@ -100,7 +100,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "gate": GATE_NAME,
                 "passed": gate_passed,
                 "oracle_green": oracle_green,
-                "advisory": !oracle_green && !blocking_now,
+                "advisory": !oracle_green && !dev_blocks,
                 "blocking_now": blocking_now,
                 "ship_phase": CURRENT_PHASE,
                 "disposition": disposition,
@@ -118,7 +118,12 @@ pub fn run(json: bool) -> Result<(), String> {
         eprintln!("{GATE_NAME}: PASSED — oracle green ({} legs)", legs.len());
     } else {
         eprintln!(
-            "{GATE_NAME}: PASS (advisory — oracle RED, would block at v2.0); {}",
+            "{GATE_NAME}: {} — oracle RED; {}",
+            if dev_blocks {
+                "BLOCKING"
+            } else {
+                "INDETERMINATE (advisory, not a pass)"
+            },
             legs.iter()
                 .map(|leg| format!("{}={}", leg.label, leg.status_word()))
                 .collect::<Vec<_>>()
@@ -132,7 +137,7 @@ pub fn run(json: bool) -> Result<(), String> {
             leg.label, leg.ran, leg.passed, leg.failed
         ));
     }
-    if !oracle_green && blocking_now {
+    if !oracle_green && dev_blocks {
         return Err(format!("{GATE_NAME}: BLOCKING — oracle RED"));
     }
     Ok(())

@@ -14,6 +14,9 @@
 
 #![allow(dead_code)]
 
+#[path = "../../../../tests/harness/ci.rs"]
+mod ci;
+
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::router::{A2APeerRouter, A2ATransport};
 use maos_a2a_core::{
@@ -811,12 +814,28 @@ pub fn dead_endpoint() -> String {
 /// discovered mid-drill at 3am is not a measurement. An `unlimited` soft
 /// limit (`RLIM_INFINITY`) is unbounded capacity — sufficient for any
 /// `required`, so it returns without asserting; any OTHER unparseable value
-/// fails CLOSED (soft = 0). No-op on hosts without `/proc` (the gate runs on
-/// Linux CI); a READABLE limits file with no `Max open files` row fails
-/// closed by name (round-2 P2: unmeasured must fail, not pass).
+/// fails CLOSED (soft = 0). An unreadable limits file is named locally and
+/// fails on a declared Linux CI runner; a readable file without the row
+/// always fails closed.
 pub fn assert_fd_headroom(required: u64) {
-    let Ok(text) = std::fs::read_to_string("/proc/self/limits") else {
-        return;
+    assert_fd_headroom_at(required, std::path::Path::new("/proc/self/limits"));
+}
+
+pub fn assert_fd_headroom_at(required: u64, path: &std::path::Path) {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) => {
+            let reason = format!(
+                "SKIP (assert_fd_headroom): cannot read {}: {error}",
+                path.display()
+            );
+            eprintln!("{reason}");
+            assert!(
+                !(cfg!(target_os = "linux") && ci::declared_ci()),
+                "{reason}"
+            );
+            return;
+        }
     };
     for line in text.lines() {
         if let Some(rest) = line.strip_prefix("Max open files") {

@@ -1,0 +1,33 @@
+# 20-3a T14 review patch — t3-escape-corpus-v1 withdrawal + accounting (AC11.2/11.3/11.4 local leg)
+# host: dev workstation, no OCI runtime (operator ruling R3: T3 execution is CI-only)
+# tree: 20-3a/integration eb86dc52 (landed unchanged in the 20-3a landing commit)
+# env: env -u CI -u GITHUB_ACTIONS, CARGO_TARGET_DIR=/home/lunarpulse/wt-20-3a/target-integration
+
+$ cargo test -q -p maos-eval --test t3_network_escape_executor --test t3_escape_workflow --test t3_escape_corpus -- --nocapture
+test result: ok. 4 passed; 0 failed   (t3_escape_corpus, v0 unchanged: 25 scenarios)
+T3-JOB-PLANT omit=true duplicate=false skip=false cargo_rc=0 observed_exit=Some(1)
+T3-JOB-PLANT omit=false duplicate=true skip=false cargo_rc=0 observed_exit=Some(1)
+T3-JOB-PLANT omit=false duplicate=false skip=true cargo_rc=0 observed_exit=Some(1)
+T3-JOB-PLANT omit=false duplicate=false skip=false cargo_rc=7 observed_exit=Some(7)
+test result: ok. 2 passed; 0 failed   (t3_escape_workflow: the real job shell; green line
+  "executed=24/24 withdrawn=1 ['runtime_escape_runtime_version_disclosure_005'] unexecuted=0")
+SKIP T3 every executable escape-corpus-v1 scenario: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+SKIP T3 t3 egress socket custody: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+T3-ESCAPE-ACCOUNTED executors=24 classified=25 withdrawn=1
+test result: ok. 3 passed; 0 failed
+
+$ (cd crates/maos-eval/test-fixtures/t3-network-escape-probe && cargo build -q --release)
+probe_build_rc=0   (withdrawn vector's dispatch arm removed; no warnings)
+
+# Plant 1 — remove one executor (`process_escape_mount_005`) from EXECUTORS
+$ cargo test -q -p maos-eval --test t3_network_escape_executor executor_accounting
+thread 'executor_accounting_covers_every_versioned_scenario_without_a_runtime' panicked at crates/maos-eval/tests/t3_network_escape_executor.rs:176:5:
+assertion `left == right` failed: each scenario needs its own executor
+=> RED. Restored from backup.
+
+# Plant 2 — un-withdraw 005: restore its v1 scenario file without an executor
+$ git show 00de8bf1:crates/maos-eval/fixtures/t3-escape-corpus-v1/runtime_escape/runtime_escape_runtime_version_disclosure_005.json > (v1 path)
+$ cargo test -q -p maos-eval --test t3_network_escape_executor executor_accounting
+thread 'executor_accounting_covers_every_versioned_scenario_without_a_runtime' panicked at crates/maos-eval/tests/t3_network_escape_executor.rs:177:5:
+=> RED at :177, `assert_eq!(actual, expected, "each scenario needs its own executor")` (the panic message line was cut by the output filter; the site is the
+   line number). File removed again; the same test then reports: test result: ok. 1 passed.

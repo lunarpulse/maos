@@ -8996,7 +8996,6 @@ fn run_uninstall_cascade_inner(
     let mut all_principal_ids: Vec<String> = Vec::new();
     let mut erased_distillate_frame_ids: Vec<[u8; 16]> = Vec::new();
     let mut erased_principal_frame_ids: Vec<[u8; 16]> = Vec::new();
-    let mut stores_covered = std::collections::BTreeSet::<String>::new();
     let mut held_principal_ids: Vec<String> = Vec::new();
 
     for (_boot_nonce, spirit_pid) in &incarnations {
@@ -9021,8 +9020,6 @@ fn run_uninstall_cascade_inner(
                     total_deleted_entries += receipt.deleted_entries;
                     total_deleted_index_rows += receipt.deleted_index_rows;
                     all_principal_ids.push(principal_id.clone());
-                    stores_covered.insert("private".into());
-                    stores_covered.insert("principal_index".into());
                     // Collect the scrubbed distillate frames for the proof.
                     for hex_id in redacted_distillate_frame_ids {
                         if let Ok(bytes) = hex::decode(&hex_id) {
@@ -9107,7 +9104,6 @@ fn run_uninstall_cascade_inner(
         maos_audit::private_tier_principal_row_count(&memory_root)
             .map_err(|e| format!("failed to verify post-erasure private tier: {e}"))?;
     let (private_status, private_failure) = if remaining_private_principal_rows == 0 {
-        stores_covered.insert("private".into());
         (CategoryStatus::VerifiedEmpty, None)
     } else {
         let reason = format!(
@@ -9126,7 +9122,6 @@ fn run_uninstall_cascade_inner(
     // preflight count distinguishes that future guarantee from pre-existing
     // residue, which is unreachable but not erased.
     let (shared_status, shared_failure) = if shared_principal_rows == 0 {
-        stores_covered.insert("shared".into());
         (CategoryStatus::VerifiedEmpty, None)
     } else {
         let reason = format!(
@@ -9207,6 +9202,25 @@ fn run_uninstall_cascade_inner(
         });
     }
 
+    // AC9 / D5.3: no region signing-key revocation mechanism is wired. The
+    // retained HOME seed can regenerate that key, so record the gap BEFORE
+    // signing the proof. A held run is not a regional teardown attempt.
+    let regional_failure =
+        maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
+            .home_region
+            .filter(|_| held_principal_ids.is_empty())
+            .map(|_| {
+                let reason =
+                    "region signing key not decommissioned — derivable from the retained base seed";
+                categories.push(ErasureCategory {
+                    name: "region_signing_key".into(),
+                    status: CategoryStatus::CoverageGap {
+                        reason: reason.into(),
+                    },
+                });
+                reason.to_string()
+            });
+
     // P23: stamp the proof with the LATEST incarnation's pid (the current
     // boot).  `resolve_spirit_name(all_boots=false)` returns only the latest
     // boot, so this is the single current incarnation.
@@ -9229,10 +9243,11 @@ fn run_uninstall_cascade_inner(
     let proof_path = write_proof_bundle(&proof, &proof_dir)
         .map_err(|e| format!("failed to write erasure proof: {e}"))?;
 
-    // Residue in either memory tier is an incomplete uninstall on every
-    // deployment shape. The signed partial proof remains available for recovery.
-    if shared_failure.is_some() || private_failure.is_some() {
-        let reason = [shared_failure, private_failure]
+    // Memory residue or an undecommissioned regional key is an incomplete
+    // uninstall. Retain the HOME seed and signed partial proof for recovery;
+    // do not issue a successful two-phase regional receipt.
+    if shared_failure.is_some() || private_failure.is_some() || regional_failure.is_some() {
+        let reason = [shared_failure, private_failure, regional_failure]
             .into_iter()
             .flatten()
             .collect::<Vec<_>>()
@@ -9241,54 +9256,6 @@ fn run_uninstall_cascade_inner(
             spirit_id: spirit_id.to_string(),
             error: format!("{reason}; partial erasure proof: {}", proof_path.display()),
         });
-    }
-
-    // Story 9.4b AC-13/AC-14/AC-15 — when the deployment is region-pinned, emit
-    // the two-phase regional teardown receipt alongside the proof:
-    //   (a) the forget cascade just completed IS the real erasure over the
-    //       region-scoped plaintext rows (under Option A + AC-13 the node is
-    //       provably single-jurisdiction, so the spirit's rows on this node ARE
-    //       the home-region set — no separate jurisdiction filter needed);
-    //   (b) decommission the region's signing key (Option A — signed, not
-    //       encrypted; see `regional_teardown` for the honest framing).
-    // Fail-closed: a teardown that cannot attest BOTH phases is an error, never
-    // a silent success (AC-14). The receipt is HOME-key-signed, hence
-    // region-NEUTRAL — it survives the region decommission (AC-10/AC-15).
-    //
-    // 13.5b review: a held run is NOT a teardown. It leaves principal rows
-    // deliberately in place, so it must never emit a regional teardown receipt
-    // — the partial proof above is its only artifact.
-    if let Some(region) =
-        maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
-            .home_region
-            .filter(|_| held_principal_ids.is_empty())
-    {
-        use maos_audit::erasure::regional_teardown::{
-            build_regional_teardown_receipt, decommission_region_key, ForgetCascadeAttestation,
-        };
-        let forget = ForgetCascadeAttestation::from_outcome(
-            stores_covered.iter().cloned().collect(),
-            all_principal_ids.len() as u64,
-        )
-        .map_err(|e| format!("regional teardown failed (fail-closed): {e}"))?;
-        let key = decommission_region_key(&signing_seed, &region);
-        let receipt = build_regional_teardown_receipt(
-            &signing_seed, // HOME / control-plane key — region-NEUTRAL receipt
-            &region,
-            uninstalled_at_ns,
-            forget,
-            key,
-        )
-        .map_err(|e| format!("regional teardown failed (fail-closed): {e}"))?;
-        let receipt_json = serde_json::to_string_pretty(&receipt)
-            .map_err(|e| format!("failed to serialize teardown receipt: {e}"))?;
-        let receipt_path = proof_dir.join(format!(
-            "regional-teardown-{}-{}.json",
-            region.as_str(),
-            uninstalled_at_ns
-        ));
-        std::fs::write(&receipt_path, receipt_json)
-            .map_err(|e| format!("failed to write teardown receipt: {e}"))?;
     }
 
     if !held_principal_ids.is_empty() {

@@ -1,0 +1,43 @@
+# 20-3a T0 baseline — HEAD 6537454e, 2026-10-15, dev host. Shell env: CI=true exported (see drain_once_audit_writer below).
+# Gates invoked as: cargo run -q -p xtask -- <gate> --json ; first 400 bytes of stdout
+
+## Gate batch
+check-pentest-gate             rc=0 {"passed":true,"advisory":true,"reason":"summary.toml absent — pen-test engagement pending"}
+check-red-team-gate            rc=0 {"passed":true,"advisory":true,"reason":"red-team-results.toml absent — engagement pending"}
+check-skill-conformance        rc=0 {"passed":true,"advisory":false,"adapter_name":"anthropic_adapter","source_format":"anthropic-skills-yaml-frontmatter","target_format":"maos.skill.v1"}
+check-third-party-trial        rc=0 {"passed":true,"advisory":true,"reason":"trial-results.toml absent — third-party trial pending"}
+check-fuzz-floor               rc=0 {"passed":true,"advisory":true,"failures":[],"summary":["manifest_parser: 0 s / 259200 s (90d window)","frame_deser: 0 s / 259200 s (90d window)","fuzz_exec_deps_parse_elf: 0 s / 259200 s (90d window)","aggregate: 0 s / 3600000 s (90d window)","ADVISORY: ledger spans < 90 days — floor accumulating, not yet enforced"]}
+check-migration-merkle         rc=0 {"skipped":true,"passed":false,"reason":"corpus absent at tests/corpora/migration-corpus-1e6.sqlite — generate via `cargo run --release -p maos-loom-lite --example generate_migration_corpus -- --out tests/corpora/migration-corpus-1e6.sqlite` and (optionally) set MAOS_TEST_POSTGRES for the live cross-backend check","phase":"v1.0-advisory / v1.5-blocking"}
+check-rto-gate                 rc=0 {  "passed": false,  "skipped": true,  "threshold_secs": 14400,  "latest_drill": null,  "verdict": "skipped — no RTO drill evidence yet (weekly cadence not run)"}
+check-trial-attestation        rc=0 {"gate":"check-trial-attestation","passed":true,"oracle_green":true,"advisory":false,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v1_5":"advisory","v2_0":"blocking"},"provenance_stamp":"maos-trial-attestation-v2","legs":[{"label":"reload-derives-load-and-frames","passed":1,"failed":0,"ran":true,"attempted":true,"green":true},{"label":"hermetic-environment-enforced","p
+check-wasm-form-equiv          rc=0 {"gate":"check-wasm-form-equiv","passed":true,"oracle_green":true,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v2_0":"blocking","v1_5":"advisory"},"base_passed":19,"base_failed":0,"fault_inject_passed":22,"fault_inject_failed":0,"oracle":"tiered-behavioral-deterministic"}
+check-enterprise-pdp           rc=0 {"gate":"check-enterprise-pdp","passed":true,"oracle_green":true,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v1_5":"advisory","v2_0":"blocking"},"legs":[{"label":"real-evaluation","passed":5,"failed":0,"ran":true,"attempted":true,"green":true,"status":"green"},{"label":"deny-proven-red","passed":3,"failed":0,"ran":true,"attempted":true,"green":true,"status":"green"},
+check-enterprise-identity      rc=0 {"gate":"check-enterprise-identity","passed":true,"oracle_green":true,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v1_5":"advisory","v2_0":"blocking"},"legs":[{"label":"oidc-verify","passed":11,"failed":0,"ran":true,"attempted":true,"green":true,"status":"green"},{"label":"principal-provenance","passed":5,"failed":0,"ran":true,"attempted":true,"green":true,"status":"g
+check-escape-detector          rc=0 {"gate":"check-escape-detector","passed":true,"oracle_green":true,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_5":"advisory","v2_0":"blocking","v1_0":"advisory"},"legs":[{"label":"no-verdict-invariant","class":"blocking","substrate_present":true,"blocks":false,"passed":2,"failed":0,"ran":true,"attempted":true,"green":true,"status":"green"},{"label":"out-of-kernel-boundary","class":"
+check-fkcs                     rc=0 {"gate":"check-fkcs","passed":true,"oracle_green":true,"advisory":false,"blocking_now":false,"ship_phase":"v1_5","disposition":{"v1_0":"advisory","v1_5":"advisory","v2_0":"blocking"},"legs":[{"label":"frozen-tag-consistency","passed":1,"failed":0,"ran":true,"attempted":true,"green":true},{"label":"diff-oracle-derives","passed":1,"failed":0,"ran":true,"attempted":true,"green":true},{"label":"negati
+check-export-control           rc=0 {"passed":true,"failures":[],"wasm_host_leak":{"passed":true,"violations":[]}}
+check-fuzz-targets             rc=0 {"passed":true,"failures":[]}
+check-loom-substrate-drift     rc=0 {"gate":"check-loom-substrate-drift","passed":true,"oracle_green":true,"legs":[{"name":"env-consistency","green":true,"gates":[{"job":"check-cross-region-consensus","green":true,"exported":["MAOS_TEST_POSTGRES","MAOS_TEST_POSTGRES_A","MAOS_TEST_POSTGRES_B","MAOS_TEST_POSTGRES_C","MAOS_TEST_POSTGRES_TEAM_A","MAOS_TEST_POSTGRES_TEAM_B","MAOS_TEST_POSTGRES_TEAM_C"],"required":["MAOS_TEST_POSTGRES","M
+check-env-contract             rc=0 {"passed":true,"registered_count":97,"violations":[]}
+check-decision-register        rc=0 {"gate":"check-decision-register","register":"_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md","rows":23,"open_rows":10,"resolved_targets":27,"unqueryable_deadlines":[{"row":"D19","deadline":"UNQUERYABLE — \"before the next `j1-*` story leaves `ready-for-dev`\" was SELF-VOIDING: 2c is the lane closer and there is no next `j1-*` story. It bound at the round-table or never."}]
+check-model-currency           rc=0 {"gate":"check-model-currency","passed":true,"files_scanned":17,"pins_checked":11,"findings":[]}
+check-exit-commands            rc=0 {"gate":"check-exit-commands","passed":true,"epics_in_roster":5,"blocks_read":5,"tokens_resolved":16,"owed":[{"token":"eval","epic":18,"owner_story":"18-2-eval-halt-verb-and-corpus-numbers","owner_status":"backlog","claimed_in":"epic-18 AC text"},{"token":"maos-registry-server","epic":20,"owner_story":"20-1-registry-client-install-verb-vetter-and-yank","owner_status":"backlog","claimed_in":"epic-2
+check-ship-gate-completeness   rc=0 {"passed":true,"expected_count":42,"found_count":51,"missing":[],"found":["ccac-n600-ship-gate","nfr-rel-3-hsis-95pct","check-stability-matrix","check-breaking-md","check-ship-gate-completeness","check-pentest-gate","check-coverage-matrix-completeness","check-owasp-freeze-hash","check-third-party-trial","check-cross-form-equiv","check-red-team-gate","check-export-control","check-host-surface","che
+check-dev-record-completeness  rc=0 {"passed":true,"violation_count":0,"violations":[],"done_stories_checked":169,"deferred_owner_assertions":84,"owned_but_deferred":[],"not_a_vehicle":[],"ownerless_undispositioned":[],"ownerless_dispositioned":["deferred-work.md:6: ownerless and open, with a recorded disposition","deferred-work.md:7: ownerless and open, with a recorded disposition","deferred-work.md:8: ownerless and open, with a re
+check-epic-close-coherence     rc=0 {  "passed": true,  "epics-checked": 21,  "authoritative-src-lines": 26311,  "violations": []}
+
+## kloc (cargo run -q -p xtask -- kloc-check --json)
+passed=True alarm=True aggregate=175372 over_budget=[]
+xtask 44370  maos-audit 7267  maos-bin 25939  maos-eval 3802
+
+## T0: cargo test -q -p maos-bin --test drain_once_audit_writer -- --nocapture (CI=true in env)
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+thread 'founder_loop_once_drains_capability_audit_writer' (163828) panicked at crates/maos-bin/tests/../../../tests/harness/t3_substrate.rs:17:5:
+declared-capable T3 founder-loop audit-drain Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+rc=101
+# ATTRIBUTED: the dev-host shell exports CI=true; tests/harness/t3_substrate.rs:12-19 treats CI=="true" as a declared-capable runner and asserts MAOS_T3_RUNTIME is set (rule 11(b): declared capability never becomes a green skip). check-multi-tenant-loom's whole-package leg inherited the env. Not a product defect; nothing filed.
+## Control: env -u CI -u GITHUB_ACTIONS cargo test -q -p maos-bin --test drain_once_audit_writer -- --nocapture
+SKIP T3 founder-loop audit-drain Worker: signed test substrate not provisioned; run scripts/provision_t3_tests.py and source its t3.env
+test result: ok. 1 passed; 0 failed; rc=0  => the red is the CI=true env on this host, confirmed.

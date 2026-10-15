@@ -17,11 +17,10 @@
 //!    SQLite-source and Postgres-target oracles independently.  A mismatch
 //!    fails the gate.
 //!
-//! When the corpus is absent AND no Postgres is configured, the gate is
-//! **Skipped** (clearly labeled — never a silent PASS; Winston 10.2 verdict
-//! axis).  F3→B disposition: advisory at v1.0, blocking at v1.5 (registry).
+//! Missing or unreadable corpus reports ABSENT; the registry's plain blocking
+//! disposition at v1_5 makes this fail until the corpus exists.
 
-use crate::gate_common::emit_command;
+use crate::gate_common::{Observation, OutOfLedgerVerdict, CURRENT_PHASE};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::Path;
@@ -159,40 +158,25 @@ fn write_step_summary(text: &str) {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
-    // B4: a real GREEN requires all pin fields present + valid.
-    let pinned = load_corpus_entry()?;
-
     let corpus_path =
         std::env::var("MAOS_MIGRATION_CORPUS").unwrap_or_else(|_| DEFAULT_CORPUS_PATH.to_string());
     let path = Path::new(&corpus_path);
 
-    if !path.exists() {
-        // SKIPPED — cannot measure without the artifact (NOT a silent PASS).
-        let reason = format!(
-            "corpus absent at {corpus_path} — generate via `cargo run --release -p maos-loom-lite \
-             --example generate_migration_corpus -- --out {DEFAULT_CORPUS_PATH}` and (optionally) \
-             set MAOS_TEST_POSTGRES for the live cross-backend check"
-        );
-        emit_command(
-            json,
-            "notice",
-            &format!("check-migration-merkle: SKIPPED — {reason}"),
-        );
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "skipped": true,
-                    "passed": false,
-                    "reason": reason,
-                    "phase": "v1.0-advisory / v1.5-blocking",
-                })
-            );
-        } else {
-            eprintln!("check-migration-merkle: SKIPPED — {reason}");
-        }
-        return Ok(());
+    if std::fs::File::open(path).is_err() {
+        let reason = format!("corpus absent or unreadable at {corpus_path}");
+        write_step_summary(&format!(
+            "## Migration Gate: ABSENT (not a pass)\n{reason}\n"
+        ));
+        return OutOfLedgerVerdict::judge_registered(
+            "check-migration-merkle",
+            Observation::NotRun,
+            false,
+            CURRENT_PHASE,
+            reason,
+        )?
+        .finish(json, serde_json::json!({ "corpus": CORPUS_KEY }));
     }
+    let pinned = load_corpus_entry()?;
 
     // MEASURED — re-derive every oracle from the actual artifact.
     let (sha, root, payload, count) = rederive_corpus_oracles(path)?;
@@ -237,62 +221,39 @@ pub fn run(json: bool) -> Result<(), String> {
         }
     }
 
-    if !failures.is_empty() {
-        let detail = failures
-            .iter()
-            .map(|f| format!("- {f}\n"))
-            .collect::<String>();
-        let msg = format!(
-            "check-migration-merkle: FAIL — re-derived oracles mismatch manifest\n{detail}"
-        );
-        emit_command(json, "error", &msg);
-        write_step_summary(&format!("## ❌ Migration Gate: RED\n{detail}"));
-        return Err(msg);
-    }
-
-    // GREEN — measured.
-    emit_command(
+    let green = failures.is_empty();
+    write_step_summary(&format!(
+        "## Migration Gate: {}\n{}\n",
+        if green {
+            "PROVEN_BLOCKING"
+        } else {
+            "RED (not a pass)"
+        },
+        failures.join("\n"),
+    ));
+    OutOfLedgerVerdict::judge_registered(
+        "check-migration-merkle",
+        if green {
+            Observation::Green
+        } else {
+            Observation::Red
+        },
+        true,
+        CURRENT_PHASE,
+        if green {
+            "corpus oracles verified"
+        } else {
+            "corpus oracle mismatch"
+        },
+    )?
+    .finish(
         json,
-        "notice",
-        &format!(
-            "check-migration-merkle: PASS — corpus provenance re-derived ({} rows){}",
-            count,
-            if live_checked {
-                " + live Postgres cross-check GREEN"
-            } else {
-                ""
-            }
-        ),
-    );
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "skipped": false,
-                "passed": true,
-                // P20: a corpus-only PASS (no live Postgres cross-check) is
-                // flagged `partial` so downstream consumers can distinguish a
-                // full PASS from a provenance-only PASS.
-                "partial": !live_checked,
-                "corpus": CORPUS_KEY,
-                "row_count": count,
-                "merkle_root": root,
-                "payload_oracle": payload,
-                "live_postgres_cross_check": live_checked,
-            })
-        );
-    } else {
-        eprintln!(
-            "check-migration-merkle: PASS — corpus provenance re-derived ({} rows){}",
-            count,
-            if live_checked {
-                " + live Postgres cross-check GREEN"
-            } else {
-                ""
-            }
-        );
-    }
-    Ok(())
+        serde_json::json!({
+            "partial": !live_checked, "corpus": CORPUS_KEY, "row_count": count,
+            "merkle_root": root, "payload_oracle": payload,
+            "live_postgres_cross_check": live_checked, "failures": failures,
+        }),
+    )
 }
 
 #[cfg(test)]

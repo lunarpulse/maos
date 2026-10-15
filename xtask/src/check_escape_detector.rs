@@ -715,6 +715,15 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     let oracle_green = legs.iter().all(|l| l.green);
+    let evidence_state = crate::gate_common::EvidenceState::worst(legs.iter().map(|leg| {
+        crate::gate_common::EvidenceVerdict::project(crate::gate_common::LegOutcome {
+            class: leg.class,
+            attempted: leg.attempted,
+            green: leg.green,
+            signature_verified: false,
+        })
+        .state()
+    }));
 
     // 4. Dev-time enforcement is decided PER LEG by its binding class (F3),
     //    never by the ship ladder. `blocking_now` is the GA disposition and is
@@ -729,6 +738,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "{}",
                 serde_json::json!({
                     "gate": GATE_NAME,
+                    "evidence_state": evidence_state,
                     "passed": true,
                     "oracle_green": true,
                     "blocking_now": blocking_now,
@@ -779,6 +789,7 @@ pub fn run(json: bool) -> Result<(), String> {
                 "{}",
                 serde_json::json!({
                     "gate": GATE_NAME,
+                    "evidence_state": evidence_state,
                     "passed": false,
                     "oracle_green": false,
                     "advisory": false,
@@ -823,7 +834,8 @@ pub fn run(json: bool) -> Result<(), String> {
             "{}",
             serde_json::json!({
                 "gate": GATE_NAME,
-                "passed": true,
+                "passed": false,
+                "evidence_state": evidence_state,
                 "oracle_green": false,
                 "advisory": true,
                 "blocking_now": false,
@@ -836,7 +848,7 @@ pub fn run(json: bool) -> Result<(), String> {
         );
     } else {
         eprintln!(
-            "{GATE_NAME}: PASS (advisory — RED legs' substrate absent, would block on a \
+            "{GATE_NAME}: INDETERMINATE (advisory — RED legs' substrate absent, would block on a \
              seccomp-capable host); {}",
             legs.iter()
                 .map(|l| format!("{}={}", l.label, l.status_word()))

@@ -75,7 +75,7 @@ The v0.1-alpha `discipline.yml` runs the following gates:
 
 | Gate | Story | Status |
 |------|-------|--------|
-| reproducible-build | 0.1 | required |
+| reproducible-build | 0.1 / 20-3a | advisory — owner: Winston; byte identity needs a pinned deterministic build substrate; not proof |
 | check-unsafe | 0.1 | required |
 | check-empty-kernel | 0.2 | required |
 | check-loom | 0.2 | required |
@@ -89,7 +89,7 @@ The v0.1-alpha `discipline.yml` runs the following gates:
 | corpus-staleness | 0.3 | required |
 | corpus-rebaseline | 0.3 | scheduled, not per-commit |
 | calibrate | 0.4 | per-commit, populated by Story 0.4 corpus |
-| determinism-tests | 0.5 / E0-retro | advisory at v0.1-α (per DF6); blocking when NFR-Sec-4 ships |
+| determinism-tests | 0.5 / E0-retro / 20-3a | advisory — owner: Winston; DF6 signal pending NFR-Sec-4; not proof |
 
 **Any green gate going red is a merge-block** — except gates explicitly marked
 "advisory," which surface warnings without flipping overall workflow status.

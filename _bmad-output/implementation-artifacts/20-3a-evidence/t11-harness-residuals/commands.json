@@ -1,0 +1,31 @@
+{
+  "baseline": "9b2c04d",
+  "commands_env": {
+    "CI": "unset",
+    "GITHUB_ACTIONS": "unset",
+    "CARGO_TARGET_DIR": "/home/lunarpulse/wt-20-3a/target-harness-residuals",
+    "CARGO_BUILD_JOBS": "4"
+  },
+  "baseline_fixture_scan": {
+    "command": "ps -eo pid,ppid,etimes,args | grep worker-cli-fixture",
+    "exit_status": 1,
+    "stdout": "",
+    "attribution": "No fixture processes present before the first package run."
+  },
+  "initial_package_attempt": {
+    "command": "env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/home/lunarpulse/wt-20-3a/target-harness-residuals CARGO_BUILD_JOBS=4 cargo test -p maos-bin",
+    "outcome": "FAILED: cargo stopped at maosctl_load_16_6 because sibling maosctl was not built in the isolated target directory.",
+    "last_summary": "test result: FAILED. 0 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+    "orphan_scan_command": "ps -eo pid,ppid,etimes,args | grep worker-cli-fixture",
+    "orphan_scan_stdout": "",
+    "live_fixture_orphans": 0,
+    "counts_raw": {
+      "passed_in_reported_summaries": 209,
+      "failed_in_reported_summaries": 9,
+      "ignored_in_reported_summaries": 7,
+      "summary_count": 31,
+      "caveat": "Includes subprocess libtest summaries from maos_uninstall; top-level counts are recorded separately below."
+    },
+    "prerequisite_resolution": "env -u CI -u GITHUB_ACTIONS CARGO_TARGET_DIR=/home/lunarpulse/wt-20-3a/target-harness-residuals CARGO_BUILD_JOBS=4 cargo build -p maos-cli --bin maosctl -p worker --bin worker-cli-fixture"
+  }
+}

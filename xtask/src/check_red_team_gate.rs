@@ -5,9 +5,8 @@
 //! Parses `docs/red-team/results/red-team-results.toml` via typed serde, checks
 //! corpus provenance against `tests/corpora/MANIFEST.toml`, and asserts
 //! per-class (≥9/10) and aggregate (≥72/80) floors across 8 §8.1 classes.
-//! F3→B: advisory at v1.0 (below-threshold emits a "WOULD HAVE BLOCKED SHIP"
-//! banner but still `Ok`), blocking at v1.5. Absent → advisory pass. Malformed
-//! TOML, SHA mismatch, negative counts, or bad dates hard-fail in any phase.
+//! Absent/unreadable results report ABSENT (not a pass). Present findings block
+//! at HEAD; malformed TOML, SHA mismatch, negative counts, or bad dates fail.
 
 use serde::Deserialize;
 use std::path::Path;
@@ -87,7 +86,10 @@ fn validate_dates(start: &str, end: &str) -> Result<(), String> {
 }
 
 // #33: emit_command + validate_dates extracted to gate_common (shared across all gate modules).
-use crate::gate_common::{emit_command, validate_dates as validate_dates_shared};
+use crate::gate_common::{
+    emit_command, validate_dates as validate_dates_shared, Observation, OutOfLedgerVerdict,
+    CURRENT_PHASE,
+};
 
 /// Append a block to the GitHub Actions step summary (no-op if unset).
 fn write_step_summary(text: &str) {
@@ -106,38 +108,23 @@ fn write_step_summary(text: &str) {
 pub fn run(json: bool) -> Result<(), String> {
     let path = Path::new(RESULTS_PATH);
 
-    if !path.exists() {
-        // Advisory: results absent — red-team engagement pending (v1.5 phase).
-        emit_command(
-            json,
-            "warning",
-            "Red-team engagement pending — results.toml absent",
-        );
-        write_step_summary(
-            "## ⚠️ Red-Team Gate: ADVISORY\n\
-             Red-team engagement has not yet been executed. \
-             This gate is advisory at v1.0 and WILL block at v1.5.\n\
-             The gate activates when \
-             `docs/red-team/results/red-team-results.toml` is committed.\n",
-        );
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "passed": true,
-                    "advisory": true,
-                    "reason": "red-team-results.toml absent — engagement pending"
-                })
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) => {
+            write_step_summary(
+                "## Red-Team Gate: ABSENT (not a pass)\n\
+             Red-team engagement has not yet been executed or cannot be read.\n",
             );
-        } else {
-            eprintln!("check-red-team-gate: PASS (advisory — results absent)");
+            return OutOfLedgerVerdict::judge_registered(
+                "check-red-team-gate",
+                Observation::NotRun,
+                false,
+                CURRENT_PHASE,
+                format!("red-team-results.toml absent or unreadable: {error}"),
+            )?
+            .finish(json, serde_json::json!({}));
         }
-        return Ok(());
-    }
-
-    // Results exist — parse via typed serde.
-    let content =
-        std::fs::read_to_string(path).map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
+    };
     let results: RedTeamResults = match toml::from_str(&content) {
         Ok(r) => r,
         Err(e) => {
@@ -287,51 +274,39 @@ pub fn run(json: bool) -> Result<(), String> {
     }
 
     let threshold_met = failures.is_empty();
-    if !threshold_met {
-        // F3→B: advisory at v1.0 — surface loudly but do not block.
-        let detail = failures
-            .iter()
-            .map(|f| format!("- {f}\n"))
-            .collect::<String>();
-        let banner = format!(
-            "## ⚠️ Red-Team Gate: WOULD HAVE BLOCKED SHIP (v1.5)\n\
-             {detail}- This gate is advisory at v1.0. It WILL block at v1.5.\n"
-        );
-        emit_command(
-            json,
-            "warning",
-            "Red-team thresholds NOT met — would block ship at v1.5",
-        );
-        write_step_summary(&banner);
-    }
-
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "passed": threshold_met,
-                "advisory": !threshold_met,
-                "threshold_met": threshold_met,
-                "phase": "v1.0-advisory",
-                "failures": failures,
-                "corpus_sha256": results.gate.corpus_sha256,
-                "total_detected": agg.total_detected,
-                "total_scenarios": agg.total_scenarios,
-                "total_unmitigated_categories": agg.total_unmitigated_categories,
-            })
-        );
-    } else if threshold_met {
-        eprintln!(
-            "check-red-team-gate: PASS — thresholds met ({}/{} detected, 0 unmitigated)",
-            agg.total_detected, agg.total_scenarios
-        );
-    } else {
-        eprintln!(
-            "check-red-team-gate: PASS (advisory) — {} threshold failure(s), would block at v1.5",
-            failures.len()
-        );
-    }
-
-    // Always Ok: advisory at v1.0 (would block at v1.5).
-    Ok(())
+    write_step_summary(&format!(
+        "## Red-Team Gate: {}\n{}\n",
+        if threshold_met {
+            "PROVEN_BLOCKING"
+        } else {
+            "INDETERMINATE — findings (not a pass)"
+        },
+        failures.join("\n"),
+    ));
+    OutOfLedgerVerdict::judge_registered(
+        "check-red-team-gate",
+        if threshold_met {
+            Observation::Green
+        } else {
+            Observation::Red
+        },
+        true,
+        CURRENT_PHASE,
+        if threshold_met {
+            "thresholds met"
+        } else {
+            "thresholds not met"
+        },
+    )?
+    .finish(
+        json,
+        serde_json::json!({
+            "threshold_met": threshold_met,
+            "failures": failures,
+            "corpus_sha256": results.gate.corpus_sha256,
+            "total_detected": agg.total_detected,
+            "total_scenarios": agg.total_scenarios,
+            "total_unmitigated_categories": agg.total_unmitigated_categories,
+        }),
+    )
 }

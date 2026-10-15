@@ -24,28 +24,22 @@ fn named<'a>(job: &'a Value, name: &str) -> &'a Value {
         .find(|step| step["name"].as_str() == Some(name))
         .unwrap_or_else(|| panic!("missing step {name}"))
 }
-// Remove only the new required-job predicate from a scratch workflow copy.
-fn workflow_with_predicate(predicate: bool) -> Value {
+// Replant the old skip-ignoring predicate into a copy of the real workflow.
+fn workflow_ignoring_skips() -> Value {
     let mut value = workflow();
-    if !predicate {
-        for step in value["jobs"]["aggregate"]["steps"]
-            .as_sequence_mut()
-            .expect("aggregate steps")
-        {
-            if step["name"].as_str() == Some("Check for failures") {
-                let script = step["run"]
-                    .as_str()
-                    .expect("status script")
-                    .replace(" || needs['epic-17-exit'].result != 'success'", "");
-                step["run"] = Value::String(script);
-            }
-            if step["name"].as_str() == Some("Fail if any gate failed") {
-                let predicate = " || needs['epic-17-exit'].result != 'success'";
-                let condition = step["if"].as_str().expect("failure predicate");
-                step["if"] = Value::String(condition.replace(predicate, ""));
-            }
-        }
-    }
+    let step = value["jobs"]["aggregate"]["steps"]
+        .as_sequence_mut()
+        .expect("aggregate steps")
+        .iter_mut()
+        .find(|step| step["name"].as_str() == Some("Check for failures"))
+        .expect("status step");
+    let script = step["run"].as_str().expect("status script");
+    let clause = " or (.key != \"macos-check\" and .value.result == \"skipped\")";
+    assert!(
+        script.contains(clause),
+        "skip clause must exist before mutation"
+    );
+    step["run"] = Value::String(script.replace(clause, ""));
     value
 }
 
@@ -63,43 +57,12 @@ fn dependencies(aggregate: &Value) -> BTreeMap<String, String> {
         .collect()
 }
 
-fn evaluate(expr: &str, needs: &BTreeMap<String, String>) -> bool {
-    let e = expr
-        .trim()
-        .trim_start_matches("${{")
-        .trim_end_matches("}}")
-        .trim();
-    e.split("||").any(|term| {
-        let term = term.trim().trim_matches(|c| c == '(' || c == ')').trim();
-        if term.starts_with("contains(needs.*.result,") {
-            let state = term.split('\'').nth(1).expect("contains state");
-            return needs.values().any(|value| value == state);
-        }
-        let start = term.find("needs['").expect("needs bracket result") + 7;
-        let end = term[start..].find("']").expect("needs closing bracket") + start;
-        let name = &term[start..end];
-        let state = needs.get(name).map(String::as_str).unwrap_or("");
-        assert_eq!(
-            term[end + 2..].trim(),
-            ".result != 'success'",
-            "unsupported required-job predicate: {term}"
-        );
-        state != "success"
-    })
-}
-
-fn render_run(script: &str, needs: &BTreeMap<String, String>) -> String {
-    let start = script.find("${{").expect("GHA expression in status script");
-    let end = script[start..].find("}}").expect("expression end") + start + 2;
-    script.replacen(
-        &script[start..end],
-        if evaluate(&script[start..end], needs) {
-            "true"
-        } else {
-            "false"
-        },
-        1,
-    )
+fn failure_selected(predicate: &str, status_output: &str) -> bool {
+    assert_eq!(
+        predicate, "${{ steps.status.outputs.overall == 'failure' }}",
+        "failure step must consume the executed status step's output"
+    );
+    status_output.lines().any(|line| line == "overall=failure")
 }
 
 fn fresh_dir(prefix: &str) -> PathBuf {
@@ -112,14 +75,22 @@ fn fresh_dir(prefix: &str) -> PathBuf {
     path
 }
 
-fn output(script: &str) -> String {
+fn output(script: &str, needs: &BTreeMap<String, String>) -> String {
     let dir = fresh_dir("maos-terminal-workflow");
     let file = dir.join("output");
+    let needs: BTreeMap<_, _> = needs
+        .iter()
+        .map(|(name, result)| (name, serde_json::json!({ "result": result })))
+        .collect();
     let status = std::process::Command::new("bash")
         .arg("-e")
         .arg("-c")
         .arg(script)
         .env("GITHUB_OUTPUT", &file)
+        .env(
+            "NEEDS_JSON",
+            serde_json::to_string(&needs).expect("needs JSON"),
+        )
         .status()
         .expect("bash status script");
     let value = fs::read_to_string(&file).expect("GITHUB_OUTPUT");
@@ -165,13 +136,11 @@ fn aggregate_workflow_executes_non_success_handling_and_failure_step() {
         let job = "epic-17-exit";
         let mut needs = dependencies.clone();
         needs.insert(job.to_owned(), state.to_owned());
-        assert_eq!(
-            output(&render_run(script, &needs)).trim(),
-            "overall=failure",
-            "{job}={state}"
-        );
+        let observed = output(script, &needs);
+        println!("{job}={state}: {}", observed.trim());
+        assert_eq!(observed.trim(), "overall=failure", "{job}={state}");
         assert!(
-            evaluate(failure_if, &needs),
+            failure_selected(failure_if, &observed),
             "failure step must run for {job}={state}"
         );
         assert!(
@@ -180,35 +149,34 @@ fn aggregate_workflow_executes_non_success_handling_and_failure_step() {
         );
     }
 
-    assert_eq!(
-        output(&render_run(script, &dependencies)).trim(),
-        "overall=success"
-    );
+    let observed = output(script, &dependencies);
+    println!("all-success control: {}", observed.trim());
+    assert_eq!(observed.trim(), "overall=success");
     assert!(
-        !evaluate(failure_if, &dependencies),
+        !failure_selected(failure_if, &observed),
         "failure step selected all-success control"
     );
 
-    // Removing the target predicate makes the status condition false for a
-    // skipped dependency. Its shell would not run, leaving the default
-    // successful output; the failure-step condition must catch this case.
-    let without = workflow_with_predicate(false);
+    // The same executed vector exposes the old skip-ignoring predicate as a false green.
+    let without = workflow_ignoring_skips();
     let omitted = &without["jobs"]["aggregate"];
     let omitted_script = named(omitted, "Check for failures")["run"]
         .as_str()
         .expect("status script without target predicate");
     let mut needs = dependencies.clone();
     needs.insert("epic-17-exit".into(), "skipped".into());
-    assert_eq!(
-        output(&render_run(omitted_script, &needs)).trim(),
-        "overall=success"
+    let observed = output(omitted_script, &needs);
+    println!(
+        "planted skip-ignoring predicate, epic-17-exit=skipped: {}",
+        observed.trim()
     );
+    assert_eq!(observed.trim(), "overall=success");
     assert!(
-        !evaluate(
+        !failure_selected(
             named(omitted, "Fail if any gate failed")["if"]
                 .as_str()
                 .expect("failure predicate"),
-            &needs
+            &observed
         ),
         "predicate removal must expose skipped job as missed failure"
     );

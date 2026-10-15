@@ -1,0 +1,5 @@
+planted-panic grandchild pid=508898; live after unwind=true
+ 508898       1       7 /home/lunarpulse/wt-20-3a/target-harness-residuals/debug/worker-cli-fixture --maos-fixture-mode=hang
+cleaned planted leak pid=508898: exit status: 0
+pre-discovery panic leaked fixture grandchild 508898
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 7.28s

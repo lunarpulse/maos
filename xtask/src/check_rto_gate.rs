@@ -11,6 +11,7 @@
 //! the weekly drill.  If the latest drill's `rto_seconds` exceeds the
 //! threshold, the gate fails.
 
+use crate::gate_common::{EvidenceState, Observation, OutOfLedgerVerdict, CURRENT_PHASE};
 use std::path::Path;
 
 /// 4 hours in seconds.
@@ -38,9 +39,7 @@ pub struct RtoLedger {
 #[derive(Debug, serde::Serialize)]
 pub struct Report {
     pub passed: bool,
-    /// True when the gate could not measure (no evidence / not run).  Distinct
-    /// from `passed` so a Skipped gate is never reported as a silent PASS.
-    pub skipped: bool,
+    pub evidence_state: EvidenceState,
     pub threshold_secs: u64,
     pub latest_drill: Option<RtoEvidence>,
     pub verdict: String,
@@ -49,43 +48,43 @@ pub struct Report {
 pub fn run(evidence_path: &str, json: bool) -> Result<(), String> {
     let report = check_rto(Path::new(evidence_path))?;
 
-    if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&report).map_err(|e| format!("json: {e}"))?
-        );
-    } else if report.skipped {
-        // SKIPPED — cannot measure (no drill evidence).  Non-blocking but
-        // clearly labeled, never a silent PASS (Winston 10.2 verdict axis).
-        println!("check-rto-gate: SKIPPED — {}", report.verdict);
+    let observation = if report.evidence_state == EvidenceState::Absent {
+        Observation::NotRun
     } else if report.passed {
-        println!("check-rto-gate: PASSED — {}", report.verdict);
+        Observation::Green
     } else {
-        eprintln!("check-rto-gate: FAILED — {}", report.verdict);
-    }
-
-    // Skipped is non-blocking (Ok); only a measured FAIL blocks.
-    if !report.skipped && !report.passed {
-        return Err("check-rto-gate failed".into());
-    }
-
-    Ok(())
+        Observation::Red
+    };
+    OutOfLedgerVerdict::judge_registered(
+        "check-rto-gate",
+        observation,
+        report.latest_drill.is_some(),
+        CURRENT_PHASE,
+        &report.verdict,
+    )?
+    .finish(
+        json,
+        serde_json::json!({
+            "threshold_secs": report.threshold_secs,
+            "latest_drill": report.latest_drill,
+            "verdict": report.verdict,
+        }),
+    )
 }
 
 fn check_rto(evidence_path: &Path) -> Result<Report, String> {
-    if !evidence_path.exists() {
-        // No evidence — SKIPPED (not a silent PASS).
-        return Ok(Report {
-            passed: false,
-            skipped: true,
-            threshold_secs: RTO_THRESHOLD_SECS,
-            latest_drill: None,
-            verdict: "skipped — no RTO drill evidence yet (weekly cadence not run)".into(),
-        });
-    }
-
-    let content =
-        std::fs::read_to_string(evidence_path).map_err(|e| format!("read evidence: {e}"))?;
+    let content = match std::fs::read_to_string(evidence_path) {
+        Ok(content) => content,
+        Err(_) => {
+            return Ok(Report {
+                passed: false,
+                evidence_state: EvidenceState::Absent,
+                threshold_secs: RTO_THRESHOLD_SECS,
+                latest_drill: None,
+                verdict: "ABSENT — no readable RTO drill evidence (weekly cadence not run)".into(),
+            });
+        }
+    };
     let ledger: RtoLedger = toml::from_str(&content).map_err(|e| format!("parse evidence: {e}"))?;
 
     // Pick the MOST RECENT drill by date (not just ledger.last()), so a stale
@@ -106,7 +105,7 @@ fn check_rto(evidence_path: &Path) -> Result<Report, String> {
         Err(_) => {
             return Ok(Report {
                 passed: false,
-                skipped: false,
+                evidence_state: EvidenceState::Indeterminate,
                 threshold_secs: RTO_THRESHOLD_SECS,
                 latest_drill: Some(latest.clone()),
                 verdict: format!(
@@ -147,7 +146,11 @@ fn check_rto(evidence_path: &Path) -> Result<Report, String> {
 
     Ok(Report {
         passed,
-        skipped: false,
+        evidence_state: if passed {
+            EvidenceState::ProvenBlocking
+        } else {
+            EvidenceState::Indeterminate
+        },
         threshold_secs: RTO_THRESHOLD_SECS,
         latest_drill: Some(latest.clone()),
         verdict,
@@ -184,7 +187,7 @@ drill_success = true
         .unwrap();
         let report = check_rto(&path).unwrap();
         assert!(
-            report.passed && !report.skipped,
+            report.passed && report.evidence_state.is_proven(),
             "verdict: {}",
             report.verdict
         );
@@ -207,17 +210,17 @@ drill_success = true
         )
         .unwrap();
         let report = check_rto(&path).unwrap();
-        assert!(!report.passed && !report.skipped);
+        assert!(!report.passed && report.evidence_state == EvidenceState::Indeterminate);
     }
 
     #[test]
-    fn rto_no_evidence_is_skipped_not_silent_pass() {
+    fn rto_no_evidence_is_absent_not_silent_pass() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nonexistent.toml");
         let report = check_rto(&path).unwrap();
-        assert!(report.skipped);
+        assert_eq!(report.evidence_state, EvidenceState::Absent);
         assert!(!report.passed);
-        assert!(report.verdict.contains("skipped"));
+        assert!(report.verdict.contains("ABSENT"));
     }
 
     #[test]

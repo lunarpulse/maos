@@ -13,44 +13,54 @@ All three targets are standalone `cargo-fuzz` projects (`[package.metadata] carg
 
 ## Tiered cadence
 
-### T1 — nightly scheduled (wired in CI)
+### T1 — per-commit build only
+
+`discipline.yml`'s `fuzz-build` compiles all three targets. It does not claim
+runtime fuzz evidence.
+
+### T2 — nightly scheduled
 
 | Field | Value |
 |-------|-------|
-| Trigger | Nightly cron (03:00 UTC) via the `fuzz-cadence.yml` workflow (`.github/workflows/fuzz-cadence.yml`), plus a manual `workflow_dispatch` trigger for backfill / release close-out. It is a SEPARATE workflow from `discipline.yml` so the nightly timer does not re-run the entire v1.0 ship-gate suite. **Nightly is the floor-accrual driver**: one run per target ≈ 0.67 CPU-hr (600 s × 4 workers), so the ≥72 CPU-hr/target/90-day floor needs ~108 runs/target/quarter — only a nightly cadence reaches it. |
-| Duration | 10 minutes per target |
-| Workers | 4 (`-workers=4`) |
-| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=600 -workers=4` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=600 -workers=4 -rss_limit_mb=0` <br> exec-deps: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf -- -max_total_time=600 -workers=4` |
-| Ledger-append | The job uploads a per-target record as a workflow artifact; the separate `fuzz-ledger-collect` job appends to `fuzz-ledger.json` on the dedicated `fuzz-ledger` branch (see [Ledger append](#ledger-append-format)). Decoupled from `main` to serialize appends and avoid protected-branch write races. |
+| Trigger | `fuzz-cadence.yml`, 03:00 UTC daily; `workflow_dispatch` for backfill |
+| Duration | 4 hours per target (`-max_total_time=14400`) |
+| Workers | Runner cores (`nproc`), each with an independent libFuzzer log |
+| Runner | GitHub-hosted Ubuntu; 355-minute job timeout includes setup |
+| Command | `bash scripts/run-fuzz-link.sh <fuzz-dir> <target> 14400 T2 nightly [rss-flag]` |
+| Ledger append | One measured record per target; separate collector on `fuzz-ledger` |
 
-T1 is **non-blocking** — it never fails a merge. A crash in T1 files a bug
-against the owning crate; the build-only `fuzz-build` job remains the
-pre-merge compile gate.
+S1 (operator, 2026-10-15) reverses the Epic-12 weekly downgrade: architecture
+`5-spirit-abi.md:185-197` and PRD NFR-Sec-5/6 require the non-negotiable floor.
+At four cores, 90 nightly runs × 4h × 4 workers yields approximately 1,440
+CPU-h/target and 4,320 aggregate, above the unchanged 72/1,000 CPU-h floors.
+These are capacity estimates, not ledger values. Crashes fail the cadence;
+the separate workflow does not replace the per-commit compile gate.
 
-### T2 — nightly cron
-
-| Field | Value |
-|-------|-------|
-| Trigger | Scheduled cron, once per day |
-| Duration | 4 hours per target |
-| Workers | 8 (`-workers=8`) |
-| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=14400 -workers=8` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=14400 -workers=8 -rss_limit_mb=0` <br> exec-deps: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf -- -max_total_time=14400 -workers=8` |
-| Ledger-append | One record per target after the run |
-
-### T3 — pre-release (manual)
+### T3 — pre-release chain
 
 | Field | Value |
 |-------|-------|
-| Trigger | Manual, before tagging a release |
-| Duration | 24 hours per target |
-| Workers | 8 (`-workers=8`) |
-| Command | manifest: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-manifest/fuzz manifest_parser -- -max_total_time=86400 -workers=8` <br> frame_deser: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-domain/fuzz frame_deser -- -max_total_time=86400 -workers=8 -rss_limit_mb=0` <br> exec-deps: `ASAN_OPTIONS=allocator_may_return_null=1:detect_leaks=0 cargo +nightly fuzz run --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf -- -max_total_time=86400 -workers=8` |
-| Ledger-append | One record per target after the run; verify floors (see [Floor assertions](#floor-assertions)) before GA |
+| Trigger | `fuzz-prerelease.yml`: `workflow_dispatch` or a `v*-rc*` tag |
+| Duration | Five sequential 5h links per target; final assertion requires ≥86,400 measured libFuzzer seconds per target |
+| Workers | Runner cores; independent worker counters, zero crashes |
+| Resume | Each link downloads the previous link's target-specific corpus artifact |
+| Ledger append | One `tier:\"T3\"` record per completed target/link, with the triggering SHA |
+
+Four ≤6h links cannot hold 24h of measured fuzzing plus setup under the hosted
+6h job cap. The operator ruled that link **count** yields to the ≥24h requirement
+(PRD NFR-Sec-5/6): five 5h links, each with a 355-minute job timeout. Any failed
+worker, crash artifact, missing counter, missing link, or measured total below
+24h fails the chain. Completed-link evidence remains collectible even if a later
+link fails. No self-hosted runner is required. On a tag, all links record that
+tagged SHA; on a manual run, they record the dispatched SHA. The release-candidate
+precondition belongs to **20-5** and is not implemented here.
 
 ## Toolchain & invocation
 
-cargo-fuzz needs the **nightly** toolchain (`-Zsanitizer=address` etc.), so all
-commands use `cargo +nightly fuzz …`. cargo-fuzz 0.13.2 takes the fuzz project
+cargo-fuzz needs the **nightly** toolchain (`-Zsanitizer=address` etc.). Cadence
+workflows select `nightly-2026-09-25` through `RUSTUP_TOOLCHAIN`, keeping shell
+scripts free of inline toolchain overrides. Local `cargo +nightly fuzz …` examples
+require an equivalent toolchain. cargo-fuzz takes the fuzz project
 via `--fuzz-dir <dir>` (NOT `--manifest-path`); each fuzz crate is its own
 standalone workspace root (empty `[workspace]` table in its `Cargo.toml`).
 Build-only pre-merge gate: `cargo +nightly fuzz build --fuzz-dir <dir> <target>`.
@@ -77,10 +87,10 @@ flags are also harmless for `manifest_parser`, which does not amplify.)
 
 ## Ledger append format
 
-`fuzz-ledger.json` (repo root) is a **schema-versioned, append-only** ledger. CI
-post-merge T1 jobs (and T2/T3 operators) append one record per completed run.
+`fuzz-ledger.json` (repo root) is a **schema-versioned, append-only** ledger.
+T2/T3 jobs upload records; `scripts/collect-ledger.sh` appends them.
 
-Initial content:
+Operator-provisioned initial content (the collector never creates a branch/file):
 
 ```json
 {"schema_version":1,"records":[]}
@@ -92,18 +102,38 @@ Append contract — each record is:
 {
   "target": "manifest_parser",
   "commit": "<40-char git SHA>",
-  "cpu_seconds": 2400,
+  "cpu_seconds": 14403,
   "corpus_size": 10,
-  "timestamp": "2026-06-22T00:00:00Z"
+  "timestamp": "2026-10-15T00:00:00Z",
+  "tier": "T2",
+  "workers": 1,
+  "run_id": "<workflow-run-id>-nightly"
 }
 ```
 
 - `target` — one of `manifest_parser`, `frame_deser`, or `fuzz_exec_deps_parse_elf`.
 - `commit` — the git SHA the fuzzed binary was built from.
-- `cpu_seconds` — `duration_seconds * workers` (wall time × worker count =
-  CPU time). T1 10min×4 = 2400; T2 4h×8 = 115200; T3 24h×8 = 691200.
+- `cpu_seconds` — sum of each worker's libFuzzer `Done <N> runs in <S> second(s)`
+  counter. `scripts/record-fuzz.py` refuses a record if any worker's counter is
+  missing/ambiguous or its log is unreadable. Never configured duration × workers.
 - `corpus_size` — number of corpus entries after the run (seed + discovered). Intentional superset of the spec's "corpus delta" field: the delta between runs is derivable as the difference of consecutive `corpus_size` values for the same target, while the absolute count is the more useful primary record.
 - `timestamp` — RFC 3339 UTC.
+- `tier`, `workers`, `run_id` — collection provenance; the floor gate reads
+  only `target`, `cpu_seconds`, and `timestamp`, ignoring extra fields.
+
+The operator lane **ops-provisioning-secrets-and-accounts** must provision the
+`fuzz-ledger` branch and `fuzz-ledger.json` and grant the workflow write access.
+A missing branch/file or rejected push fails the collector. It never seeds a
+branch, invents records, or treats an artifact upload as a successful append.
+Checkout's persisted credentials use `FUZZ_LEDGER_WRITE_TOKEN` when configured,
+otherwise `GITHUB_TOKEN`. Soaks run independently; no workflow-wide concurrency
+group can cancel a queued release chain. On Git's porcelain `[rejected] (fetch
+first)` or `[rejected] (non-fast-forward)` status only, collectors refetch and
+reapply artifacts with deduplication, bounded to five push attempts. Hook/policy/
+authentication rejections fail immediately. Malformed or multi-value JSON
+record files fail before commit; an existing identical fuzz record is not
+appended twice. Records are applied in a detached temporary worktree so the gate
+always executes the current source checkout, not historical ledger-branch code.
 
 Append-only: never mutate or delete existing records. The ledger grows
 monotonically; floor assertions sum `cpu_seconds` over the trailing 90-day
@@ -111,12 +141,16 @@ window per target and in aggregate.
 
 ## Floor assertions
 
-Enforced at release time by `cargo run -p xtask -- check-fuzz-floor` (a
-ship-gate job). The gate is **advisory** (warn-only, exit 0) until the ledger
-spans ≥90 days of history, then auto-promotes to **hard-fail** if the floor is
-unmet — closing the bootstrap hole (the floor is logically unsatisfiable for
-the first 90 days after wiring). The equivalent manual `jq` (for T3 close-out
-or local verification):
+Enforced by `cargo run -p xtask -- check-fuzz-floor --json` (a ship-gate job).
+Missing, unreadable, or zero-record ledgers report `evidence_state:"ABSENT"`,
+`passed: false`, and exit 1 at `v1_5` under the registry's blocking disposition.
+A nonempty ledger spanning <90 days reports `INDETERMINATE`, `passed: false`,
+`advisory: true`, and exits 0; its accumulated `per_target_seconds` and
+`aggregate_seconds` are still reported. At ≥90 days the floor is enforceable.
+Malformed JSON or records always fail. Downstream jobs always invoke the gate,
+even when collection failed; they load only the evidence file, never switch gate
+code to the ledger branch. The following manual `jq` summaries do not replace the
+gate:
 
 ```bash
 # 90-day cutoff (RFC 3339 UTC). `tonumber` rejects string-typed cpu_seconds
