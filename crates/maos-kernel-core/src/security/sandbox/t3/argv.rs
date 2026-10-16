@@ -74,7 +74,6 @@ pub fn build_runtime_argv(
         format!("--pidfile={}", state_dir.join("pid").display()),
         format!("--cidfile={}", state_dir.join("cid").display()),
         "--entrypoint=/maos/spirit".to_string(),
-        "--cap-drop=ALL".to_string(),
         "--security-opt=no-new-privileges".to_string(),
         "--network=none".to_string(),
         "--http-proxy=false".to_string(),

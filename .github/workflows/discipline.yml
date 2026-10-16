@@ -166,6 +166,7 @@ jobs:
         run: cargo deny check
 
   check-unsafe:
+    if: false # 20-3a T13 PLANT (AC5.1): skipped required job must red aggregate as NOT RUN — never merge
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -3692,7 +3693,7 @@ jobs:
       - name: Verify bench-fault-inject absent from release graph (D3)
         run: |
           # Invert to expose the root package's enabled default features as well.
-          graph=$(cargo tree -p maos-bench -e features --invert maos-bench)
+          graph=$(cargo tree -p maos-bench -e features --invert maos-bench --release) # 20-3a T13 PLANT (AC7.2): invalid flag must red this step
           if grep -q "bench-fault-inject" <<< "$graph"; then
             echo "FAIL: bench-fault-inject present in release feature graph"
             exit 1
@@ -4727,8 +4728,8 @@ jobs:
       - uses: ./.github/actions/provision-t3-test-substrate
       - name: Install nightly toolchain for cargo-public-api integration tests
         run: rustup toolchain install nightly --profile minimal
-      - name: Install strace for the three telemetry air-gap controls
-        run: sudo apt-get update && sudo apt-get install -y strace
+      - name: 20-3a T13 PLANT (AC6.2) — make strace unavailable on the declared-CI runner
+        run: if command -v strace; then sudo mv "$(command -v strace)" /tmp/strace.planted-away; fi; ! command -v strace
       - name: Observe all three telemetry air-gap controls (no green skips)
         run: |
           set -euo pipefail
