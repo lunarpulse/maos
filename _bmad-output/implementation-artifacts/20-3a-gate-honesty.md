@@ -454,6 +454,7 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - `_bmad-output/implementation-artifacts/20-3a-evidence/t14-t3-accounting-plants.log` (new)
 - `_bmad-output/implementation-artifacts/20-3a-gate-honesty.md` (new)
 - `_bmad-output/implementation-artifacts/20-3a-evidence/t13-ac6-6-root-sites.log` (new)
+- `_bmad-output/implementation-artifacts/20-3a-evidence/t13-ci-plants.log` (new)
 - `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md`
