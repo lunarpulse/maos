@@ -3179,25 +3179,15 @@ jobs:
   # `generator` + `seed`; ~2.8 GB, ~25 s locally) and runs the gate against it:
   # the gate re-derives sha256, Merkle root, payload oracle and row count and
   # compares them with the manifest pins, so generator or schema drift reds it.
-  # The Postgres service makes the live cross-backend migration run too
-  # (`partial: false`). Locally: PROVEN_BLOCKING, 1m40s with a live Postgres 17.
+  # It runs without a Postgres service: the loom-substrate drift gate requires
+  # every `services.postgres` gate job to be a registered substrate contract,
+  # and those contracts define the evidence-ledger set, so the gate reports
+  # `partial: true` (live cross-backend run skipped) rather than widening that
+  # set. One CI run with a Postgres 16 service (job 117059607470, PR #9)
+  # measured PROVEN_BLOCKING, partial=false; follow-up recorded in deferred-work.
   check-migration-merkle:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: maos_migration
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d maos_migration"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -3213,7 +3203,6 @@ jobs:
       - name: Check migration Merkle gate results
         env:
           MAOS_MIGRATION_CORPUS: ${{ runner.temp }}/migration-corpus-1e6.sqlite
-          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_migration
         run: cargo run -p xtask -- check-migration-merkle --json
   # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
   # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
