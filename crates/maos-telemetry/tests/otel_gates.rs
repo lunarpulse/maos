@@ -552,7 +552,7 @@ fn gate_otel_airgap_enabled_no_endpoint_no_connects() {
         syscalls.is_empty(),
         "enabled sink without endpoint config must issue zero network syscalls, got: {syscalls:?}"
     );
-    eprintln!("OTEL_AIRGAP_RAN {test}");
+    // 20-3a T13 PLANT (AC6.2): marker print deleted — the CI marker assertion must red. Never merge.
 }
 
 #[test]
