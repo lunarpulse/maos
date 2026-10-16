@@ -1,0 +1,60 @@
+# 20-3a T13 AC6.6 — root-capable permission sites driven under their actual refusal (local, 2026-10-16T15:18:01Z)
+# host: dev container with passwordless sudo; uid=1000 as user, uid=0 under sudo (CAP_DAC_OVERRIDE)
+# commit under test: ef3cb4f7; exit = the test binary's own exit status
+
+## maos-bin :: purge_refuses_an_unopenable_store_directory_as_lock_unavailable :: user
+$ env -u CI -u GITHUB_ACTIONS /mnt/build/cargo/debug/deps/maos_uninstall_16_4-1d51c1ef5a3bf81d --exact purge_refuses_an_unopenable_store_directory_as_lock_unavailable --nocapture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.23s
+exit=0
+
+## maos-bin :: purge_refuses_an_unopenable_store_directory_as_lock_unavailable :: root-local
+$ sudo -n env -u CI -u GITHUB_ACTIONS /mnt/build/cargo/debug/deps/maos_uninstall_16_4-1d51c1ef5a3bf81d --exact purge_refuses_an_unopenable_store_directory_as_lock_unavailable --nocapture
+SKIP (purge_refuses_an_unopenable_store_directory_as_lock_unavailable): running with CAP_DAC_OVERRIDE — permission control unobservable
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.21s
+exit=0
+
+## maos-bin :: purge_refuses_an_unopenable_store_directory_as_lock_unavailable :: root-ci
+$ sudo -n env CI=1 /mnt/build/cargo/debug/deps/maos_uninstall_16_4-1d51c1ef5a3bf81d --exact purge_refuses_an_unopenable_store_directory_as_lock_unavailable --nocapture
+SKIP (purge_refuses_an_unopenable_store_directory_as_lock_unavailable): running with CAP_DAC_OVERRIDE — permission control unobservable
+thread 'purge_refuses_an_unopenable_store_directory_as_lock_unavailable' (1157947) panicked at crates/maos-bin/tests/maos_uninstall_16_4.rs:1426:9:
+SKIP (purge_refuses_an_unopenable_store_directory_as_lock_unavailable): running with CAP_DAC_OVERRIDE — permission control unobservable
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.22s
+exit=101
+
+## maos-bin :: purge_failure_mid_deletion_leaves_an_in_progress_receipt :: user
+$ env -u CI -u GITHUB_ACTIONS /mnt/build/cargo/debug/deps/maos_uninstall_16_4-1d51c1ef5a3bf81d --exact purge_failure_mid_deletion_leaves_an_in_progress_receipt --nocapture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.35s
+exit=0
+
+## maos-bin :: purge_failure_mid_deletion_leaves_an_in_progress_receipt :: root-local
+$ sudo -n env -u CI -u GITHUB_ACTIONS /mnt/build/cargo/debug/deps/maos_uninstall_16_4-1d51c1ef5a3bf81d --exact purge_failure_mid_deletion_leaves_an_in_progress_receipt --nocapture
+SKIP (purge_failure_mid_deletion_leaves_an_in_progress_receipt): running with CAP_DAC_OVERRIDE — permission control unobservable
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.22s
+exit=0
+
+## maos-bin :: purge_failure_mid_deletion_leaves_an_in_progress_receipt :: root-ci
+$ sudo -n env CI=1 /mnt/build/cargo/debug/deps/maos_uninstall_16_4-1d51c1ef5a3bf81d --exact purge_failure_mid_deletion_leaves_an_in_progress_receipt --nocapture
+SKIP (purge_failure_mid_deletion_leaves_an_in_progress_receipt): running with CAP_DAC_OVERRIDE — permission control unobservable
+thread 'purge_failure_mid_deletion_leaves_an_in_progress_receipt' (1158328) panicked at crates/maos-bin/tests/maos_uninstall_16_4.rs:1671:9:
+SKIP (purge_failure_mid_deletion_leaves_an_in_progress_receipt): running with CAP_DAC_OVERRIDE — permission control unobservable
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.22s
+exit=101
+
+## maos-kernel-core :: forget_fails_closed_when_pid_directory_is_unreadable :: user
+$ env -u CI -u GITHUB_ACTIONS /mnt/build/cargo/debug/deps/private_forget_restart_13_5i-73c9e503f21fa1d9 --exact forget_fails_closed_when_pid_directory_is_unreadable --nocapture
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+exit=0
+
+## maos-kernel-core :: forget_fails_closed_when_pid_directory_is_unreadable :: root-local
+$ sudo -n env -u CI -u GITHUB_ACTIONS /mnt/build/cargo/debug/deps/private_forget_restart_13_5i-73c9e503f21fa1d9 --exact forget_fails_closed_when_pid_directory_is_unreadable --nocapture
+SKIP (forget_fails_closed_when_pid_directory_is_unreadable): running with CAP_DAC_OVERRIDE — permission control unobservable
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+exit=0
+
+## maos-kernel-core :: forget_fails_closed_when_pid_directory_is_unreadable :: root-ci
+$ sudo -n env CI=1 /mnt/build/cargo/debug/deps/private_forget_restart_13_5i-73c9e503f21fa1d9 --exact forget_fails_closed_when_pid_directory_is_unreadable --nocapture
+SKIP (forget_fails_closed_when_pid_directory_is_unreadable): running with CAP_DAC_OVERRIDE — permission control unobservable
+thread 'forget_fails_closed_when_pid_directory_is_unreadable' (1158448) panicked at crates/maos-kernel-core/tests/private_forget_restart_13_5i.rs:306:13:
+SKIP (forget_fails_closed_when_pid_directory_is_unreadable): running with CAP_DAC_OVERRIDE — permission control unobservable
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+exit=101

@@ -3172,11 +3172,32 @@ jobs:
       - name: Check red-team gate results
         run: cargo run -p xtask -- check-red-team-gate --json
 
-  # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate
-  # ABSENT now blocks at v1_5 per registry disposition; CI stays red until a corpus exists.
+  # Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
+  # ABSENT blocks at v1_5 (20-3a R1), so the job does not wait for a corpus to
+  # appear (20-3a R1 option A, operator ruling 2026-10-16). It regenerates the
+  # pinned 10⁶-row corpus with its deterministic generator (`MANIFEST.toml`
+  # `generator` + `seed`; ~2.8 GB, ~25 s locally) and runs the gate against it:
+  # the gate re-derives sha256, Merkle root, payload oracle and row count and
+  # compares them with the manifest pins, so generator or schema drift reds it.
+  # The Postgres service makes the live cross-backend migration run too
+  # (`partial: false`). Locally: PROVEN_BLOCKING, 1m40s with a live Postgres 17.
   check-migration-merkle:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: maos_migration
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d maos_migration"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -3185,7 +3206,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Generate the pinned migration corpus (deterministic generator)
+        run: >-
+          cargo run --locked --release -p maos-loom-lite --example generate_migration_corpus --
+          --out "$RUNNER_TEMP/migration-corpus-1e6.sqlite"
       - name: Check migration Merkle gate results
+        env:
+          MAOS_MIGRATION_CORPUS: ${{ runner.temp }}/migration-corpus-1e6.sqlite
+          MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_migration
         run: cargo run -p xtask -- check-migration-merkle --json
   # Story 10.3 AC-1 (NFR-Comp-1) — export-control classification gate.
   # ECCN doc present + STABILITY.md §Export non-stub + crypto enumeration.
