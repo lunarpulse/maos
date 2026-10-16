@@ -1,0 +1,51 @@
+# 20-3a T13 — CI plant evidence (throwaway ci/20-3a-* branches, never merged). Extracted with: gh run view <run> --log[-failed] --job <job>
+# PRs: #9 verify (ci/20-3a-verify), #10 plants-a, #11 plant-marker; dispatches on ci/20-3a-plant-collector-absent and ci/20-3a-plant-fuzz-crash
+
+## AC11.4 — --cap-drop=ALL removed (run 38926602107, PR #10)
+### pa-t3-2404
+    raise SystemExit(f"T3 accounting failed: executed={len(executed)}/{len(expected)} missing={sorted(expected-set(counts))} extra={sorted(set(counts)-expected)} duplicates={dict(counts)}")
+thread 'all_executable_scenarios_are_blocked_inside_verified_t3' (5681) panicked at crates/maos-eval/tests/t3_network_escape_executor.rs:307:9:
+assertion `left == right` failed: capability_escape_cap_dac_override_003: the attempt escaped or failed unexpectedly; stdout []
+  left: Exited { code: 1 }
+ right: Exited { code: 0 }
+### pa-t3-2604
+    raise SystemExit(f"T3 accounting failed: executed={len(executed)}/{len(expected)} missing={sorted(expected-set(counts))} extra={sorted(set(counts)-expected)} duplicates={dict(counts)}")
+thread 'all_executable_scenarios_are_blocked_inside_verified_t3' (5389) panicked at crates/maos-eval/tests/t3_network_escape_executor.rs:307:9:
+assertion `left == right` failed: capability_escape_cap_dac_override_003: the attempt escaped or failed unexpectedly; stdout []
+  left: Exited { code: 1 }
+ right: Exited { code: 0 }
+
+## AC6.2 — strace made unavailable (run 38926602107 job 117059641919, step 'Observe all three telemetry air-gap controls')
+gate_otel_airgap_default_off_no_connects: tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)
+gate_otel_airgap_enabled_proven_red_network_canary_detected: tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)
+gate_otel_airgap_enabled_no_endpoint_no_connects: tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)
+/usr/bin/strace
+
+## AC6.2 — one OTEL_AIRGAP_RAN marker deleted (run 38926608301 job 117059661990, PR #11)
+OTEL_AIRGAP_RAN gate_otel_airgap_default_off_no_connects
+OTEL_AIRGAP_RAN gate_otel_airgap_enabled_proven_red_network_canary_detected
+AssertionError: telemetry air-gap controls NOT RUN: expected={'gate_otel_airgap_enabled_proven_red_network_canary_detected', 'gate_otel_airgap_default_off_no_connects', 'gate_otel_airgap_enabled_no_endpoint_no_connects'}, observed=['gate_otel_airgap_default_off_no_connects', 'gate_otel_airgap_enable
+
+## AC7.2 — invalid cargo tree flag (run 38926602107 job 117059642044, step 'Verify bench-fault-inject absent from release graph (D3)')
+error: unexpected argument '--release' found
+
+## AC3.2 — collectors with a missing operator branch
+### fuzz-cadence run 38926617566 (fuzz-ledger-collect job 117095675348, check-fuzz-floor job 117097429799)
+fatal: couldn't find remote ref refs/heads/fuzz-ledger-20-3a-proof-absent
+##[error]fuzz-ledger-20-3a-proof-absent unavailable — ops-provisioning-secrets-and-accounts must provision the ledger branch and write access
+##[error]check-fuzz-floor: ABSENT — fuzz-ledger.json absent or unreadable (No such file or directory (os error 2)) (disposition `blocking` at v1_5: unmeasured evidence blocks)
+### rpo-rto-cadence run 38926622364 (rto-ledger-collect job 117095245426; check-rto-gate job 117096487203 reads the real rto-ledger: PROVEN_BLOCKING, RTO 2s, drill 2026-10-11)
+fatal: couldn't find remote ref refs/heads/rto-ledger-20-3a-proof-absent
+##[error]rto-ledger-20-3a-proof-absent unavailable — ops-provisioning-secrets-and-accounts must provision the ledger branch and write access
+
+## AC3.5 — planted crash input (fuzz-prerelease run 38926626626)
+fuzz-link-1 (manifest_parser) job 117059709128: failure; fuzz-link-1 frame_deser / fuzz_exec_deps_parse_elf: success; links 2-5 skipped
+##[error]T3 manifest_parser link 1 crashed or a worker failed; refusing evidence
+control: the same 30 s manifest_parser link without the plant passed in fuzz-cadence run 38926617566 (job 117059684811)
+
+## AC5.1 — check-unsafe if:false (run 38926602107, aggregate job 117121016741)
+ "check-unsafe": {
+   "result": "skipped",
+aggregate: failure (confounded by the other plants in PR #10; the isolated proof needs a run whose only non-success need is the skip)
+
+## AC8.2 — TOML-only push triggers docs-site: run 38923215324 on 37c03bfb (green; gate:behavioral 3m18s)
