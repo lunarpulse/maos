@@ -26,19 +26,21 @@ rows retain their existing four-key shape. T3 classification now reports externa
 SIGKILL as `fault.signaled`, OOM as `fault.oom_killed`, and unavailable terminal
 facts as `fault.truncated`.
 
-- **Migration:** Update sandbox-inspect readers to consume tagged historical
+**Migration:**
+
+- Update sandbox-inspect readers to consume tagged historical
   `payload_pid` and `container_id`; never treat the historical PID as live or as a
   kill target.
-- **Migration:** Update T3 exit-row readers to accept the exact fifth `container`
+- Update T3 exit-row readers to accept the exact fifth `container`
   object and its six nested keys. Keep native rows at four keys.
-- **Migration:** Handle `fault.signaled`, `fault.oom_killed`, and
+- Handle `fault.signaled`, `fault.oom_killed`, and
   `fault.truncated` as distinct T3 outcomes; do not infer SIGKILL from runtime
   code 137 when payload evidence is unavailable.
-- **Migration:** Low-level `T3Launch` and `T3SpawnContext` constructors now carry
+- Low-level `T3Launch` and `T3SpawnContext` constructors now carry
   optional `launch_custody`. Root-managed Workers register `ContainerLaunchCustody`
   before creation and retain it through initialization and teardown; standalone
   low-level callers without a root coordinator pass `None`.
-- **Migration:** `Invocation::Exited` includes `stdout_complete` and
+- `Invocation::Exited` includes `stdout_complete` and
   `stderr_complete`. Preserve those flags when consuming bounded runtime output;
   incomplete inspect output cannot establish terminal facts, and incomplete
   removal diagnostics cannot certify volume cleanup.

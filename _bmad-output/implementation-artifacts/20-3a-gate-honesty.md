@@ -350,19 +350,19 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 ### Completion Notes List
 
 - Story created 2026-10-15 by `bmad-create-story` (five scouts + direct gate runs at `6537454e`). Ultimate context engine analysis completed - comprehensive developer guide created.
-- **HALTED for T13; Status stays `in-progress`.** Everything else is landed in one local commit. Per R2 nothing is pushed: T13 needs the operator's push and CI run ids. T11 also stays unchecked because AC10.1 and AC10.3 close only on that CI evidence. Two deferred-work rows stay open with this key as owner: line 1036 (the refusal-is-not-`ok` class; §Owned residuals `:1037`) and line 1128 (T3 corpus; §Owned residuals `:1129`), both IMPLEMENTED. E16-A2 is annotated IMPLEMENTED. All three flip with T13's run ids, and every other owned row is closed or re-routed. A simulated `done` flip leaves exactly those two STALE in `check-dev-record-completeness`.
+- **HALTED for T13; Status stays `in-progress`.** The landing commit `389a07e9` was pushed by the operator on 2026-10-15, giving discipline run 38807569588 and docs-site run 38807569253 (§T13 CI evidence below). T11 stays unchecked because AC10.1 and AC10.3 close only on CI evidence. Deferred-work line 1036 (the refusal-is-not-`ok` class; §Owned residuals `:1037`) is now **CLOSED** by that run's air-gap step. Line 1128 (T3 corpus; §Owned residuals `:1129`) is executed 24/24 on both images and still owes the `--cap-drop=ALL` plant. E16-A2 still owes the aggregate NOT RUN plant. Every other owned row is closed or re-routed.
 - **T12 kloc** (after `cargo fmt --all`, `kloc-check --json`, tokei 14.0.0; per-file drivers in each `kloc.toml` row):
 
   | Row | Before | After | Δ | Note |
   |---|---|---|---|---|
-  | xtask | 44370 | 44803 | +433 | raise |
+  | xtask | 44370 | 44812 | +442 | raise (+433 landing, +9 CI follow-up) |
   | maos-eval | 3802 | 4038 | +236 | test-only T3 probe |
   | maos-audit | 7267 | 7248 | −19 | exact lower re-pin |
   | maos-bin | 25939 | 25917 | −22 | exact lower re-pin |
   | maos-kernel-core | 20545 | 20545 | 0 | kernel-Δ 0 |
-  | `_aggregate_hardfail` | 175373 | 176001 | | measured 176000 + 1 (S3) |
+  | `_aggregate_hardfail` | 175373 | 176010 | | measured 176009 + 1 (S3) |
 
-  Grant record for the D11 ratchet: xtask ceiling 44803 granted by 20-3a-gate-honesty.
+  Grant record for the D11 ratchet: xtask ceiling 44812 granted by 20-3a-gate-honesty (landing 44803, CI follow-up 44812).
 - **AC1** — `gate_common` gained `Observation`, `OutOfLedgerVerdict` (judge, judge_registered, finish), `GateBinding`/`read_binding` and `EvidenceState::worst`. Converted: the 7 out-of-ledger gates, trial-attestation's exit, escape-detector's substrate-absent RED, and `finish_ledger_gate`'s `evidence_state`. `skipped` is gone from migration-merkle and rto-gate, with every consumer migrated. Workflows always invoke the gates.
   - R1: skill-conformance, fuzz-floor, migration-merkle and rto-gate exit 1 on ABSENT at v1_5. Accepted consequence: migration-merkle reds `aggregate`/`v1-0-ship-gate` until CI has a corpus, and the cadence gates red until evidence exists.
   - Deviation: `Observation::Accumulating` covers the < 90 d fuzz window (AC1.2 text; see Review Findings).
@@ -385,15 +385,34 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - **AC11** — `t3-escape-corpus-v1` (v0 unchanged) classifies all 25: 11 true boundary, 13 corrected, 1 withdrawn by name. The 24 executable scenarios have executors on the `require_t3` route, with kind-8 assertions only via D-10 markers. The runtime-free accounting and the real job shell are tested. Execution is CI-only (R3).
 - **Kernel-Δ 0**: nothing under `crates/maos-kernel-core/src` changed. `check-cross-form-equiv`, `check-adr040-accepted` and the ADR-040 Status line are untouched.
 - **§T13 recipes** (operator-run; throwaway branches `ci/20-3a-*`, never merged; record each run id here):
-  1. *Landing push* — `workspace-test-suite` must log `OTEL_AIRGAP_RAN` for all 3 air-gap tests (AC6.2). `t3-escape-corpus` must print `T3-ESCAPE-ACCOUNTING executed=24/24 withdrawn=1 ['runtime_escape_runtime_version_disclosure_005'] unexecuted=0` on both `ubuntu-24.04` and `ubuntu-26.04` (AC11.1/11.3). `aggregate` must be green apart from the R1 ABSENT reds (migration-merkle).
+  1. *Landing push* — `workspace-test-suite` must log `OTEL_AIRGAP_RAN` for all 3 air-gap tests (AC6.2). `t3-escape-corpus` must print `T3-ESCAPE-ACCOUNTING executed=24/24 withdrawn=1 ['runtime_escape_runtime_version_disclosure_005'] unexecuted=0` on both `ubuntu-24.04` and `ubuntu-26.04` (AC11.1/11.3). `aggregate` must be green apart from the R1 ABSENT reds (migration-merkle). **Observed in run 38807569588: AC6.2 and AC11.1/11.3 green; `aggregate` red (§T13 CI evidence).**
   2. *AC5.1* — add `if: false` to job `check-unsafe` (`discipline.yml:168`) → `aggregate` red, summary row `check-unsafe … NOT RUN`.
   3. *AC6.2 plants* — (a) delete the `Install strace` step → the air-gap step red with `tool unavailable on declared CI`; (b) delete one `OTEL_AIRGAP_RAN` print in `crates/maos-telemetry/tests/otel_gates.rs` → the marker assertion red.
   4. *AC3.2/3.5 collectors* — in `scripts/collect-ledger.sh`, set `fuzz) branch=fuzz-ledger-20-3a-proof-absent`, then `gh workflow run fuzz-cadence.yml --ref ci/20-3a-collector-absent`. For speed, cut the link duration `14400` in `fuzz-cadence.yml:44` to `30`. Expect `fuzz-ledger-collect` red with the operator-lane diagnostic and `check-fuzz-floor` ABSENT. Then the same with `rto) branch=rto-ledger-20-3a-proof-absent` and `gh workflow run rpo-rto-cadence.yml`.
   5. *AC3.5 crash* — in `crates/maos-manifest/fuzz/fuzz_targets/manifest_parser.rs`, add `assert!(data != b"20-3a-planted-crash");` at the top of the fuzz body. Commit the seed `crates/maos-manifest/fuzz/corpus/manifest_parser/planted` containing exactly `20-3a-planted-crash` (no newline). Set the five `18000` link durations in `fuzz-prerelease.yml` to `30`, and redirect `fuzz)` in `collect-ledger.sh` as in step 4 so no planted record reaches the real ledger. Then `gh workflow run fuzz-prerelease.yml --ref ci/20-3a-fuzz-crash`. Expect `fuzz-link-1 (manifest_parser)` red with `T3 manifest_parser link 1 crashed or a worker failed; refusing evidence`.
   6. *AC11.4* — delete `"--cap-drop=ALL".to_string(),` (`crates/maos-kernel-core/src/security/sandbox/t3/argv.rs:77`); this branch only, so kernel-Δ stays 0 at landing. Expect `t3-escape-corpus` red on ≥ 1 `capability_escape_*` bounding-bit assertion. [INFERENCE] podman's default set still holds DAC_OVERRIDE and SETUID, so `_003`/`_005` should red; if podman clears them anyway, run with docker.
-  7. *AC7.2* — re-add `--release` to the J4 `cargo tree` (`discipline.yml:3665`) → step red with cargo's `unexpected argument` error. Or plant `default = ["bench-fault-inject"]` in `crates/maos-bench/Cargo.toml` → `FAIL: bench-fault-inject present`.
+  7. *AC7.2* — re-add `--release` to the J4 `cargo tree` (`discipline.yml:3667`) → step red with cargo's `unexpected argument` error. Or plant `default = ["bench-fault-inject"]` in `crates/maos-bench/Cargo.toml` → `FAIL: bench-fault-inject present`.
   8. *AC6.6 root sites* (local, root) — for each test: build its binary with `cargo test -p maos-bin --test maos_uninstall_16_4 --no-run` or `cargo test -p maos-kernel-core --test private_forget_restart_13_5i --no-run`, then run `sudo env CI=1 <binary> --exact <test>`. Tests: `purge_refuses_an_unopenable_store_directory_as_lock_unavailable`, `purge_failure_mid_deletion_leaves_an_in_progress_receipt`, `forget_fails_closed_when_pid_directory_is_unreadable`. Expect exit 101 with the named-capability panic each time. Save the output under `20-3a-evidence/`.
   9. *docs-site* — a change to `xtask/error-catalog.toml` alone must trigger `docs-site.yml`.
+
+- **§T13 CI evidence — discipline run 38807569588 and docs-site run 38807569253** (push of `389a07e9` to `main`, 2026-10-15; read through the public Actions REST API, since `gh` is not installed on the dev host and job logs need authentication). The previous full discipline run on `main` was green run 37658103096 @ `8f6869b8` (2026-10-07). The 17-1, 17-2 and 17-7 landings never ran full discipline on `main`, so some reds below predate 20-3a.
+
+  | Job | Result | Cause | Action |
+  |---|---|---|---|
+  | `t3-escape-corpus` (24.04 / 26.04) | ✅ jobs 116672290227 / 116672290266 | — | AC11.1/11.3 proof: accounting step green on both images |
+  | `workspace-test-suite` step 8 (air-gap) | ✅ job 116672297542 | — | AC6.2 proof; closes deferred-work line 1036 |
+  | `docs-site` `gate:behavioral` | ❌ 10-min timeout | **20-3a**: `expected_distinct_pages` 136 assumed +10 pages. Every `Family::Variant` route renders its family's first page (React Router reads `:Variant` as a param), so the new pages add only +7. The a11y test failed and CI's 2 retries ran past 10 min. Reproduced locally with the CI Playwright suite: baseline 126 = 126, landing 133 | → 133. Local behavioral 131/132 in 2.1 min; the one fail (`fallback.spec`) fails identically on the baseline build (host fonts). Route defect filed to `20-5` |
+  | `nfr-rel-11-halt-receipt-999pct` | ❌ "Assert the two halves still sum" | **20-3a**: the harness-ownership control made `root_shutdown_unload_16_3` 9 + 3 = 12 tests; the guard hard-codes 11 | guard and step name → 12 / 9 |
+  | `check-trial-attestation` | ❌ | predates 20-3a (since 17-1): the job runs all of `maos-eval`, including the T3 executor, which panics by design on declared CI without T3. Reproduced with `CI=true GITHUB_ACTIONS=true` | scoped to `--lib --test trial_attestation` (50 + 11 pass under CI env) |
+  | `check-breaking-md` | ❌ | predates 20-3a (17-7): the entry used `- **Migration:**` bullets; the gate needs a `**Migration:**` line | operator ruling 2026-10-16: one `**Migration:**` line over the same bullets |
+  | `check-dev-model-tier` | ❌ | predates 20-3a (17-2): the record names `openai-codex/gpt-6-astra`, absent from the frontier allowlist | operator ruling 2026-10-16: `gpt-6-astra` allowlisted (xtask +9 from rustfmt layout, re-pinned) |
+  | `reproducible-build` `cargo deny check` | ❌ | advisory DB, not code: rustls 0.23.45 (RUSTSEC-2026-0346…0349), wasmtime/wasmtime-wasi 48.0.5 (0352…0364), unsafe-libyaml unmaintained (2024-0449) | operator ruling 2026-10-16: rustls → 0.23.46 and wasmtime → 48.0.6 (patch bumps); unsafe-libyaml documented ignore + deferred migration row. `cargo deny check` now reports advisories/bans/licenses/sources all `ok`; `cargo check --workspace --all-targets` ok; maos-wasm-host 92 and maos-a2a-tcp 64 tests pass |
+  | `check-migration-merkle` | ❌ ABSENT rc 1 | R1 accepted consequence (no 1e6 corpus in CI) | none (ruled) |
+  | `workspace-test-suite` step 14 (full suite) | ❌ exit 101 after 16 min | **unknown**: the annotation keeps only the last 2.8 kB (doc-tests), and job logs need authentication | needs the failing-test list from the job log |
+  | `check-multi-tenant-loom` | ❌ | leg `maos-bin-whole-package-parallel-isolation` (`cargo test -p maos-bin`, T3 provisioned) failed; the annotation cuts the transcript | needs the job log; likely the same maos-bin failure as `workspace-test-suite` [INFERENCE] |
+  | `v1-0-ship-gate`, `v1-5-ship-gate`, `aggregate` | ❌ | downstream of the above | — |
+
+  All other 173 discipline jobs passed, including `check-reza-production-path`, `check-escape-detector`, `check-j4-latency`, `check-wasm-form-equiv`, `check-multi-region-slo` (the D7/F7 steps), `check-fuzz-targets` and `check-unsafe`. `journal-append` and `multi-provider` passed.
 
 ### File List
 
@@ -403,6 +422,8 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - `.github/workflows/fuzz-prerelease.yml` (new)
 - `.github/workflows/journal-append.yml`
 - `.github/workflows/rpo-rto-cadence.yml`
+- `BREAKING.md`
+- `Cargo.lock`
 - `_bmad-output/implementation-artifacts/20-3a-evidence/creation-measurements-6537454e.log` (new)
 - `_bmad-output/implementation-artifacts/20-3a-evidence/t0-baseline-6537454e.log` (new)
 - `_bmad-output/implementation-artifacts/20-3a-evidence/t11-harness-residuals/commands.json` (new)
@@ -474,6 +495,7 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - `crates/maos-kernel-core/tests/private_forget_restart_13_5i.rs`
 - `crates/maos-kernel-core/tests/t3_terminal_helpers_17_7.rs`
 - `crates/maos-telemetry/tests/otel_gates.rs`
+- `deny.toml`
 - `docs-site/docs/errors/ECrossWallRecallDenied.md` (new)
 - `docs-site/docs/errors/EModelProvenanceMissing.md` (new)
 - `docs-site/docs/errors/EModelProvenanceStale.md` (new)
@@ -506,6 +528,7 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - `xtask/kloc.toml`
 - `xtask/src/abi_diff.rs`
 - `xtask/src/check_cohort_mesh.rs`
+- `xtask/src/check_dev_model_tier.rs`
 - `xtask/src/check_epic_close_coherence.rs`
 - `xtask/src/check_error_catalog.rs`
 - `xtask/src/check_escape_detector.rs`
@@ -544,3 +567,4 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - 2026-10-15 — Q1–Q5 ruled by consensus under the operator's decision rule (long-term correctness, PRD-strict, correct drift, honour contracts, fill roadmap gaps): AC3.4–3.5 widened (libFuzzer-counter records, T2 nightly, T3 24 h chain), AC11 added (all 25 T3 scenarios executed), D9 CLOSED by decision, `:1029` production fix routed to 20-3c, rc-tag T3 precondition routed to 20-5, D9's post-promotion lapse consequence routed to 20-1.
 - 2026-10-15 — operator sign-off S1–S3 given (Lunarpulse). No open decision remains. Status: `ready-for-dev`.
 - 2026-10-15 — dev (`bmad-dev-story`): T0–T10b, T12 and T14 done, with operator rulings R1–R4 taken during dev (Debug Log). Slices were built in worktrees and merged on `20-3a/integration`. T14 ran nine review layers; every finding is patched or dismissed with grounds (§Review Findings). At landing, AC7.2's defect class was also fixed in D7/F7. kloc granted at the exact measured figures, aggregate measured + 1 (S3). One local landing commit, nothing pushed (R2). **HALTED**: T13 (CI proofs, recipes in Completion Notes) and T11's three CI-dependent closures remain. Status: `in-progress`.
+- 2026-10-16 — T13 CI reading of the operator's push (discipline 38807569588, docs-site 38807569253). Fixed the two reds 20-3a caused: the docs-site `expected_distinct_pages` (136 → 133, measured) and the nfr-rel-11 split guard (11 → 12). Scoped `check-trial-attestation` to its own targets (red since 17-1). Per operator rulings: reformatted the 17-7 BREAKING.md Migration block, allowlisted `gpt-6-astra`, bumped rustls 0.23.46 and wasmtime 48.0.6, and documented the unsafe-libyaml ignore. Deferred-work line 1036 CLOSED with CI evidence; line 1128 records 24/24 on both images; two rows filed (colon-slug routes → 20-5; serde_yaml migration, ownerless-dispositioned). kloc: xtask 44812, aggregate 176010. Still HALTED: `workspace-test-suite` and `check-multi-tenant-loom` need their job logs, plus the remaining T13 plants.

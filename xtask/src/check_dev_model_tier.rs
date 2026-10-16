@@ -47,9 +47,23 @@ const ENFORCE_FROM_EPIC: u32 = 12;
 /// the operator rules `openai-codex/gpt-6.1-sol` a frontier model of the
 /// `opus-5` class and the successor of the allowlisted `gpt-5.6` family — the
 /// same documented A1 maintenance, not a waiver. The §A6 net stays mandatory.
+///
+/// `gpt-6-astra` added 2026-10-16 (20-3a CI follow-up, operator ruling): the
+/// operator rules `openai-codex/gpt-6-astra` frontier-class (the 17-2 record
+/// names it). Same documented A1 maintenance, not a waiver; the §A6 net stays
+/// mandatory.
 const FRONTIER_FAMILIES: &[&str] = &[
-    "opus-4-6", "opus-4-7", "opus-4-8", "opus-5", "gpt-5.5", "gpt-5.6", "gpt-6.1", "glm-5.1",
-    "glm-5.2", "glm-5.3",
+    "opus-4-6",
+    "opus-4-7",
+    "opus-4-8",
+    "opus-5",
+    "gpt-5.5",
+    "gpt-5.6",
+    "gpt-6.1",
+    "gpt-6-astra",
+    "glm-5.1",
+    "glm-5.2",
+    "glm-5.3",
 ];
 /// §A6 review-net markers — a story that ran the multi-layer adversarial review
 /// names at least one of these somewhere in its record.

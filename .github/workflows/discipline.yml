@@ -1599,7 +1599,7 @@ jobs:
       # as siblings of the running `maos`, so a release test needs release
       # siblings and a debug test needs debug siblings. Both hold below.
       # ───────────────────────────────────────────────────────────────────────
-      - name: Run root shutdown unload suite (release — 8 vectors)
+      - name: Run root shutdown unload suite (release — 9 vectors)
         run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort
       # The debug siblings, for the debug half. Same sibling-consistency rule.
       - name: Build debug binaries for the cohort vectors
@@ -1609,17 +1609,19 @@ jobs:
           cargo build -p worker --bin worker-cli-fixture
       - name: Run root shutdown unload cohort vectors (debug — boot-nonce override live)
         run: cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort
-      # Coverage guard: the split MUST NOT silently drop a vector. 8 + 3 = 11.
+      # Coverage guard: the split MUST NOT silently drop a vector. 9 + 3 = 12
+      # (20-3a added the harness-ownership control
+      # `harness_owns_grandchildren_before_discovery_even_when_startup_panics`).
       # A renamed module makes `--skip cohort` match nothing, the release run
-      # then executes all 11 and fails LOUD on the cohort three — never silent.
+      # then executes all 12 and fails LOUD on the cohort three — never silent.
       - name: Assert the two halves still sum to the whole suite
         run: |
           set -euo pipefail
           rel=$(cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
           dbg=$(cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' | tail -1)
           echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
-          if [ "$(( rel + dbg ))" -ne 11 ]; then
-            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 11"
+          if [ "$(( rel + dbg ))" -ne 12 ]; then
+            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 12"
             exit 1
           fi
 
@@ -4372,8 +4374,12 @@ jobs:
       # these, not just the green gate JSON, or the §A6 "watch each leg red" guarantee
       # is not delivered.
       - name: Run trial-attestation proven-red + real-harness tests
+        # Scoped to the trial-attestation targets: the whole maos-eval package
+        # also holds the T3 escape executor, which panics by design on a declared
+        # CI runner without the T3 substrate (rule 11(b)). This job provisions
+        # none; the executor runs in `t3-escape-corpus` and `workspace-test-suite`.
         run: |
-          cargo test -p maos-eval --features trial-attestation
+          cargo test -p maos-eval --features trial-attestation --lib --test trial_attestation
           cargo test -p xtask --test trial_attestation_proven_red -- --test-threads=1
           cargo test -p xtask --test story_10_2_proven_red -- trial_gate --test-threads=1
   # Story 11.4b (AC5) — ADR-024 sandbox-escape structural detector gate

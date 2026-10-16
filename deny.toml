@@ -30,6 +30,14 @@ ignore = [
     # thin wrapper over rustls-pki-types' PemObject). Migration = swap to
     # rustls-pki-types' PemObject API; deferred to an A2A-TLS hardening follow-up.
     "RUSTSEC-2025-0134",
+    # unsafe-libyaml 0.2.11 — unmaintained (RUSTSEC-2024-0449, archived
+    # 2024-03-25; first failed this repo's `cargo deny check` in run 38807569588
+    # on 2026-10-15, not in green run 37658103096 on 2026-10-07; no patched release). Pulled only by
+    # `serde_yaml 0.9.34+deprecated`, which maos-skill (SKILL.md frontmatter) and
+    # xtask (workflow/registry YAML gates and their tests) use. Not a
+    # vulnerability advisory. Migration = move both crates to a maintained YAML
+    # parser; tracked in deferred-work.md, not done as a CI-green patch.
+    "RUSTSEC-2024-0449",
 ]
 
 [licenses]
