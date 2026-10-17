@@ -4085,7 +4085,7 @@ jobs:
   # substrate: every one of its legs is hermetic (synthetic frames only).
   check-multi-tenant-loom:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -4144,13 +4144,21 @@ jobs:
         uses: ./.github/actions/install-ci-evidence-key
         with:
           key: ${{ secrets.CI_EVIDENCE_AUDIT_KEY }}
+      # 20-3a CI follow-up: the gate's last leg runs the whole maos-bin package,
+      # whose 17-2/17-7 live-T3 tests need the 17-2 delegated cgroup that
+      # workspace-test-suite already provides. Outside it they red on every run
+      # (run 38985809156); inside it the full gate is PROVEN_LIVE_SIGNED
+      # (run 38987395150, two of two). Same envelope, same rootless T3.
       - name: Run check-multi-tenant-loom gate
         env:
           MAOS_TEST_POSTGRES_TEAM_A: postgresql://postgres:postgres@localhost:5432/maos_team_a
           MAOS_TEST_POSTGRES_TEAM_B: postgresql://postgres:postgres@localhost:5432/maos_team_b
           MAOS_TEST_POSTGRES_TEAM_C: postgresql://postgres:postgres@localhost:5432/maos_team_c
           MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_team_b
-        run: cargo run -p xtask -- check-multi-tenant-loom --json
+        run: >-
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated
+          --unit maos-17-2-multi-tenant-loom --timeout 1500 --
+          cargo run -p xtask -- check-multi-tenant-loom --json
       # Story 13.6e (AC5) — publish the evidence ledger (see the reza job).
       - name: Publish evidence ledger
         if: always()

@@ -276,6 +276,13 @@ def _environment(mode):
     }
     names.update(("RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
     names.update(("CI", "GITHUB_ACTIONS", "MAOS_SECRETS_BACKEND"))
+    # 20-3a CI follow-up: check-multi-tenant-loom runs its whole-package maos-bin
+    # leg inside this delegated envelope. Outside it the 17-2/17-7 live-T3 tests
+    # fail deterministically: run 38985809156 (bin-plain red 6/6 variants)
+    # against run 38986836808 (bin-delegated green 2/2). So its live substrate
+    # and its evidence binding pass through.
+    names.update(key for key in os.environ if key.startswith("MAOS_TEST_POSTGRES"))
+    names.update(("MAOS_AUDIT_KEY", "GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_STEP_SUMMARY"))
     names.update((
         "MAOS_T3_RUNTIME", "MAOS_T3_IMAGE_LOCK_PATH",
         "MAOS_T3_IMAGE_TRUST_ANCHOR_PUB_HEX", "XDG_RUNTIME_DIR",
