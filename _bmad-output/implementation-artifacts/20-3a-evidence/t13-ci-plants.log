@@ -49,3 +49,18 @@ control: the same 30 s manifest_parser link without the plant passed in fuzz-cad
 aggregate: failure (confounded by the other plants in PR #10; the isolated proof needs a run whose only non-success need is the skip)
 
 ## AC8.2 — TOML-only push triggers docs-site: run 38923215324 on 37c03bfb (green; gate:behavioral 3m18s)
+
+## AC5.1 — isolated (run 38988216897 attempt 3, PR #12, a2fd627e = 84944db4 + the plant only)
+jobs: 182 success, 1 skipped (check-unsafe), 1 failure (aggregate job 117318317677)
+105:  "check-unsafe": {
+106-    "result": "skipped",
+non-success needs in aggregate NEEDS_JSON: "failure" x0; "skipped" only check-unsafe
+##[error]Process completed with exit code 1.
+PR #12 aggregate summary comment 6227142213 (updated 2026-10-17T05:21:08Z): | check-unsafe | ❌ NOT RUN — skipped |
+
+## Final verify — run 38988216311 (PR #9 @ 84944db4): 184/184 success incl. aggregate (attempt 2; attempt 1 failed only workspace-test-suite on the 16-3 ac4_v3b 5 s orphan-bound flake)
+
+## Loom leg diagnosis (throwaway ci/20-3a-loom-diag, never merged)
+run 38985809156: cargo test -p maos-bin in the loom job setup, outside the 17-2 envelope — 6/6 red (real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion; root_crash_retains_stopped_container_and_purge_reports_it), with or without MAOS_TEST_POSTGRES*
+run 38986836808: same command inside run_cgroup_ceiling_17_2.py --mode delegated — 2/2 green; gate-delegated failed: 'GITHUB_SHA is required to bind evidence' (wrapper env allowlist)
+run 38987395150: wrapper passes GITHUB_SHA/RUN_ID/RUN_ATTEMPT — gate-delegated 2/2 PROVEN_LIVE_SIGNED passed; bin-delegated 1/2 (17-7 S3 took 10.04 s vs 5 s — the routed flake)
