@@ -6,34 +6,6 @@
 #[path = "ci.rs"]
 mod ci;
 
-/// One live-T3 scene at a time per test binary (20-3a CI follow-up, operator
-/// ruling 2026-10-16). Rootless podman serialises container operations on one
-/// lock. Scenes running in parallel inside one binary pushed teardown past the
-/// scenes' own wall-clock bounds: three CI runs, three different reds
-/// (38807569588, 38926594989, 38926608301). The lease lives in the calling
-/// test's thread and is released when that thread ends — libtest runs every
-/// test on its own thread — so no call site changes. A second call on the same
-/// thread reuses the lease; a panicking holder cannot poison the next scene.
-static T3_SCENES: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-thread_local! {
-    static T3_LEASE: std::cell::RefCell<Option<std::sync::MutexGuard<'static, ()>>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-fn hold_t3_lease() {
-    T3_LEASE.with(|lease| {
-        let mut lease = lease.borrow_mut();
-        if lease.is_none() {
-            *lease = Some(
-                T3_SCENES
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner),
-            );
-        }
-    });
-}
-
 pub fn require_t3(subject: &str) -> bool {
     if !cfg!(target_os = "linux") {
         eprintln!("SKIP T3 {subject}: OCI Worker execution is Linux-only");
@@ -56,7 +28,6 @@ pub fn require_t3(subject: &str) -> bool {
     )
     .and_then(|lock| lock.default_entry())
     .unwrap_or_else(|error| panic!("declared-capable T3 {subject}: {error}"));
-    hold_t3_lease();
     true
 }
 
