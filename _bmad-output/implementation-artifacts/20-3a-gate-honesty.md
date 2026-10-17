@@ -13,7 +13,7 @@ blocks: "`20-3b-gate-retirement-and-coverage-generator` (epic: a gate must be ho
 
 # Story 20.3a: Gate honesty
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -228,7 +228,10 @@ T14 §A6, 2026-10-15, on `20-3a/integration`. Nine non-author layers ran as fres
 - AC10.5 gates, all green: `check-decision-register`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands` (after `cargo build -p maos-bin -p maos-cli`), `check-ship-gate-completeness`, `error-catalog-check`.
 - kloc: `kloc-check` passes after exact measured grants (xtask 44812→44930, maos-audit 7248→7351, maos-eval 4038→4041, `_aggregate_hardfail` 176010→176234 = measured 176233 + 1 under S3).
 - Clippy (`--no-deps`, per package): no finding in any changed file.
-- **Not proven locally:** this host has no podman, so `all_executable_scenarios_are_blocked_inside_verified_t3` and the egress custody scene skipped. The witness-socket, ENOENT-only and witness-child behaviour needs a CI run on a T3-provisioned runner after the operator's push.
+- **CI proof (2026-10-17, push `1606a0a1`):**
+  - discipline run 39026092698 attempt 2 is **184/184 green**, `aggregate` included. `t3-escape-corpus` passed on ubuntu-24.04 and ubuntu-26.04 in both attempts (attempt 1 jobs 117377256526 / 117377256545), proving the witness-socket, ENOENT-only sentinel and owned-witness-child changes on a provisioned T3 runner.
+  - docs-site 39026092677, journal-append 39026092771 and multi-provider 39026092733 are green.
+  - Attempt 1 failed only `nfr-rel-11-halt-receipt-999pct` step 11, the split guard's re-execution, which is the known intermittent root-shutdown cohort bound. Nothing in `1606a0a1` reaches that suite. Root cause, history and fix are recorded on the `20-7` row in `deferred-work.md` ("Also open: the root-shutdown 5 s orphan bounds").
 
 ## Dev Notes
 
@@ -633,3 +636,7 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
   - **kloc:** exact measured grants — xtask 44930, maos-audit 7351, maos-eval 4041, aggregate 176234 (measured + 1, S3).
   - **Local verification:** 1414/1414 tests, mutation plants red, AC10.5 gates green.
   - **Status → `in-progress`:** the T3 executor changes (witness socket, ENOENT-only sentinels, owned witness child) and the workflow `overwrite: true` edits are proven only in CI. This host has no T3 runtime. A CI run on the operator's push, with `t3-escape-corpus` 24/24 on both images and `aggregate` green, returns the story to `review`/`done`.
+- 2026-10-17 — CI proof of the review patches on push `1606a0a1`:
+  - discipline 39026092698 attempt 2 is 184/184 green. `t3-escape-corpus` passed on both images in both attempts; docs-site, journal-append and multi-provider are green.
+  - Attempt 1's only red was the known `nfr-rel-11` cohort flake, hit during the split guard's re-execution. The root-cause analysis is added to the `20-7` deferred-work row: 3/8 failure history; the guard re-run doubles exposure; fix via `--list` counting, `::error::` annotations and pinned images.
+  - Status → `done`.
