@@ -46,7 +46,19 @@ pub struct Report {
 }
 
 pub fn run(evidence_path: &str, json: bool) -> Result<(), String> {
-    let report = check_rto(Path::new(evidence_path))?;
+    let report = match check_rto(Path::new(evidence_path)) {
+        Ok(report) => report,
+        Err(error) => {
+            return OutOfLedgerVerdict::judge_registered(
+                "check-rto-gate",
+                Observation::Red,
+                true,
+                CURRENT_PHASE,
+                &error,
+            )?
+            .finish(json, serde_json::json!({"error": error}));
+        }
+    };
 
     let observation = if report.evidence_state == EvidenceState::Absent {
         Observation::NotRun
@@ -75,7 +87,7 @@ pub fn run(evidence_path: &str, json: bool) -> Result<(), String> {
 fn check_rto(evidence_path: &Path) -> Result<Report, String> {
     let content = match std::fs::read_to_string(evidence_path) {
         Ok(content) => content,
-        Err(_) => {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return Ok(Report {
                 passed: false,
                 evidence_state: EvidenceState::Absent,
@@ -84,16 +96,25 @@ fn check_rto(evidence_path: &Path) -> Result<Report, String> {
                 verdict: "ABSENT — no readable RTO drill evidence (weekly cadence not run)".into(),
             });
         }
+        Err(error) => return Err(format!("cannot read RTO evidence: {error}")),
     };
     let ledger: RtoLedger = toml::from_str(&content).map_err(|e| format!("parse evidence: {e}"))?;
 
     // Pick the MOST RECENT drill by date (not just ledger.last()), so a stale
     // or cherry-picked ordering cannot satisfy the gate.
-    let latest = ledger
+    let Some(latest) = ledger
         .evidence
         .iter()
-        .max_by_key(|e| e.drill_date.clone())
-        .ok_or("evidence file exists but has no entries")?;
+        .max_by(|a, b| a.drill_date.cmp(&b.drill_date))
+    else {
+        return Ok(Report {
+            passed: false,
+            evidence_state: EvidenceState::Absent,
+            threshold_secs: RTO_THRESHOLD_SECS,
+            latest_drill: None,
+            verdict: "ABSENT — RTO evidence ledger contains no entries".into(),
+        });
+    };
 
     // Recency: the latest drill must be within 7 days (weekly cadence).  A
     // stale entry (too old) OR a future-dated entry (clock skew / a manipulated

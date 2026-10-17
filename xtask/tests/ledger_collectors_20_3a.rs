@@ -218,17 +218,13 @@ fn collector_appends_exactly_one_element() {
     for kind in ["fuzz", "rto"] {
         let repo = Repo::new(kind, true);
         success(repo.collect(kind));
+        let replay = success(repo.collect(kind));
+        assert!(String::from_utf8_lossy(&replay.stdout).contains("record already present"));
         let ledger = repo.ledger(kind);
         if kind == "fuzz" {
             let value: serde_json::Value = serde_json::from_str(&ledger).unwrap();
             assert_eq!(value["records"].as_array().unwrap().len(), 1);
             assert_eq!(value["records"][0]["cpu_seconds"], 37);
-            success(repo.collect(kind));
-            assert_eq!(
-                repo.ledger(kind),
-                ledger,
-                "replaying a fuzz record must not duplicate it"
-            );
         } else {
             let value: toml::Value = toml::from_str(&ledger).unwrap();
             assert_eq!(value["evidence"].as_array().unwrap().len(), 1);
@@ -599,5 +595,48 @@ fn concurrent_collectors_refetch_and_preserve_both_records_exactly_once() {
             workflow.get("concurrency").is_none(),
             "soaks must not cancel pending release chains"
         );
+    }
+}
+
+#[test]
+fn rto_collector_preserves_distinct_measurements_on_the_same_date() {
+    let repo = Repo::new("rto", true);
+    success(repo.collect("rto"));
+    fs::write(
+        repo.work.join("records/rto-evidence-entry.toml"),
+        "[[evidence]]\ndrill_date = \"2026-10-15\"\nrto_seconds = 38\ndrill_success = true\n",
+    )
+    .unwrap();
+    success(repo.collect("rto"));
+    let value: toml::Value = toml::from_str(&repo.ledger("rto")).unwrap();
+    assert_eq!(value["evidence"].as_array().unwrap().len(), 2);
+    assert_eq!(value["evidence"][1]["rto_seconds"].as_integer(), Some(38));
+}
+
+#[test]
+fn ledger_workflow_uploads_overwrite_artifacts_on_rerun() {
+    for (file, expected) in [
+        ("fuzz-prerelease.yml", 15),
+        ("fuzz-cadence.yml", 2),
+        ("rpo-rto-cadence.yml", 1),
+    ] {
+        let workflow: serde_yaml::Value = serde_yaml::from_str(
+            &fs::read_to_string(root().join(".github/workflows").join(file)).unwrap(),
+        )
+        .unwrap();
+        let mut uploads = 0;
+        for (_, job) in workflow["jobs"].as_mapping().unwrap() {
+            for step in job["steps"].as_sequence().unwrap() {
+                if step["uses"].as_str() == Some("actions/upload-artifact@v4") {
+                    uploads += 1;
+                    assert_eq!(
+                        step["with"]["overwrite"].as_bool(),
+                        Some(true),
+                        "{file}: {step:?}"
+                    );
+                }
+            }
+        }
+        assert_eq!(uploads, expected, "{file}: all uploads must be checked");
     }
 }

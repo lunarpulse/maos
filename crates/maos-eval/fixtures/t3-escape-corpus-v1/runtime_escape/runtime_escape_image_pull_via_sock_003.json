@@ -11,7 +11,7 @@
     ],
     "expected_runtime_blocker": "no socket mount"
   },
-  "attack_surface": "Docker image pull via daemon socket API",
+  "attack_surface": "Host container-runtime API socket is not mounted into T3; proven against an owned host witness socket; literal /var/run/docker.sock additionally probed, without claiming an image-pull API request.",
   "expected_outcome": {
     "block_observed": true,
     "audit_event_emitted": "CapAuditEvent::SandboxBlock",
@@ -26,7 +26,7 @@
   },
   "classification": {
     "v0_verdict": "true boundary",
-    "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+    "reason": "An owned host witness socket is connectable before and after launch but must return exactly ENOENT inside T3; literal daemon paths are additionally probed.",
     "v0_command": [
       "sh",
       "-c",

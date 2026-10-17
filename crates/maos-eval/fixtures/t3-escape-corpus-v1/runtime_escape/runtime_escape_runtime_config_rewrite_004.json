@@ -11,7 +11,7 @@
     ],
     "expected_runtime_blocker": "cat is not a rewrite; attempt write-open of a host-created unique containers.conf sentinel and check unchanged."
   },
-  "attack_surface": "container runtime configuration disclosure via /etc/containers/containers.conf",
+  "attack_surface": "Write-open of an unmounted unique host containers.conf sentinel; no claim about the literal /etc/containers directory.",
   "expected_outcome": {
     "block_observed": true,
     "audit_event_emitted": "CapAuditEvent::SandboxBlock",

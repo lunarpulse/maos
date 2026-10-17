@@ -6,7 +6,7 @@
 //! executes via a Spirit-form adapter without kernel modification.
 //!
 //! Journaled results and live adapter validation are required for a proven pass.
-//! Absent/unreadable results report ABSENT; disposition decides the exit code.
+//! Missing results report ABSENT; unreadable or corrupt evidence reports RED.
 //! Malformed TOML or invalid results fail.
 //!
 //! Proven-red: the real Anthropic fixture under `tests/fixtures/anthropic-skill/`
@@ -100,19 +100,42 @@ fn execute_fixture_via_cli_wrapper(skill_name: &str) -> Result<(), String> {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
+    let (verdict, details) = match check() {
+        Ok(report) => report,
+        Err(error) => (
+            OutOfLedgerVerdict::judge_registered(
+                "check-skill-conformance",
+                Observation::Red,
+                true,
+                CURRENT_PHASE,
+                &error,
+            )?,
+            serde_json::json!({"error": error}),
+        ),
+    };
+    verdict.finish(json, details)
+}
+
+fn check() -> Result<(OutOfLedgerVerdict, serde_json::Value), String> {
     let content = match std::fs::read_to_string(RESULTS_PATH) {
         Ok(content) => content,
-        Err(error) => {
-            return OutOfLedgerVerdict::judge_registered(
-                "check-skill-conformance",
-                Observation::NotRun,
-                false,
-                CURRENT_PHASE,
-                format!("results absent or unreadable: {error}"),
-            )?
-            .finish(json, serde_json::json!({}))
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok((
+                OutOfLedgerVerdict::judge_registered(
+                    "check-skill-conformance",
+                    Observation::NotRun,
+                    false,
+                    CURRENT_PHASE,
+                    format!("results absent or unreadable: {error}"),
+                )?,
+                serde_json::json!({}),
+            ));
         }
+        Err(error) => return Err(format!("cannot read {RESULTS_PATH}: {error}")),
     };
+    // Journaled results and live validation are both required for a proven pass.
+    let results: ConformanceResults =
+        toml::from_str(&content).map_err(|e| format!("malformed {RESULTS_PATH}: {e}"))?;
     // --- Live adapter validation (the real conformance test) ---
     // Parse the valid fixture through the Anthropic adapter, then execute the
     // adapted skill through the existing CliWrapper subprocess bridge.
@@ -147,35 +170,30 @@ pub fn run(json: bool) -> Result<(), String> {
     }
     eprintln!("check-skill-conformance: proven-red PASS — invalid fixture correctly rejected");
 
-    // Journaled results and live validation are both required for a proven pass.
-    let results: ConformanceResults =
-        toml::from_str(&content).map_err(|e| format!("malformed {RESULTS_PATH}: {e}"))?;
-
     let c = &results.conformance;
 
     let green = c.executed_without_kernel_modification && c.abi_unchanged;
-    OutOfLedgerVerdict::judge_registered(
-        "check-skill-conformance",
-        if green {
-            Observation::Green
-        } else {
-            Observation::Red
-        },
-        true,
-        CURRENT_PHASE,
-        if green {
-            "conformance validated"
-        } else {
-            "conformance findings"
-        },
-    )?
-    .finish(
-        json,
+    Ok((
+        OutOfLedgerVerdict::judge_registered(
+            "check-skill-conformance",
+            if green {
+                Observation::Green
+            } else {
+                Observation::Red
+            },
+            true,
+            CURRENT_PHASE,
+            if green {
+                "conformance validated"
+            } else {
+                "conformance findings"
+            },
+        )?,
         serde_json::json!({
             "adapter_name": c.adapter_name,
             "source_format": c.source_format,
             "target_format": c.target_format,
             "conformance_date": c.conformance_date,
         }),
-    )
+    ))
 }

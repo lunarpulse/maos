@@ -1,0 +1,52 @@
+Story 20-3a review P16 / AC6.6 — hot-swap missing-corpus proven red
+Date: 2026-10-17
+HEAD: 83e98999bccc5be43b4f558e0f44e777305e879c
+Working directory: /home/lunarpulse/dev_ws
+Corpus: crates/maos-eval/fixtures/halt-continuity-corpus-v0
+Site: crates/maos-kernel-core/tests/hot_swap_halt_continuity_test.rs:13-24
+Output below is trimmed to the test-target execution; compilation output is omitted.
+
+Restoration guard: the hidden-corpus run was executed inside Python try/finally;
+the finally block ran `mv` back before the status check and restored run.
+
+$ mv crates/maos-eval/fixtures/halt-continuity-corpus-v0 crates/maos-eval/fixtures/halt-continuity-corpus-v0.review-hidden
+exit status: 0
+
+$ CI=1 cargo test -p maos-kernel-core --test hot_swap_halt_continuity_test 2>&1
+     Running tests/hot_swap_halt_continuity_test.rs (target/debug/deps/hot_swap_halt_continuity_test-7a86bf336c4cabdd)
+
+running 1 test
+test halt_continuity_corpus_loads ... FAILED
+
+failures:
+
+---- halt_continuity_corpus_loads stdout ----
+
+thread 'halt_continuity_corpus_loads' (1422160) panicked at crates/maos-kernel-core/tests/hot_swap_halt_continuity_test.rs:15:5:
+missing halt-continuity corpus: /home/lunarpulse/dev_ws/crates/maos-kernel-core/../maos-eval/fixtures/halt-continuity-corpus-v0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    halt_continuity_corpus_loads
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p maos-kernel-core --test hot_swap_halt_continuity_test`
+exit status: 101
+
+$ mv crates/maos-eval/fixtures/halt-continuity-corpus-v0.review-hidden crates/maos-eval/fixtures/halt-continuity-corpus-v0
+exit status: 0
+
+$ git status --porcelain -- crates/maos-eval/fixtures/halt-continuity-corpus-v0
+(no output; corpus tree restored and clean)
+exit status: 0
+
+$ CI=1 cargo test -p maos-kernel-core --test hot_swap_halt_continuity_test 2>&1
+     Running tests/hot_swap_halt_continuity_test.rs (target/debug/deps/hot_swap_halt_continuity_test-7a86bf336c4cabdd)
+
+running 1 test
+test halt_continuity_corpus_loads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit status: 0

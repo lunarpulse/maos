@@ -45,21 +45,23 @@ fn escape(vector: &str, sentinel: &str, host_pid: &str) -> Result<(), String> {
         "container.escape.capability.cap_net_raw" => raw_icmp()?,
         "container.escape.network.raw_socket" => raw_icmp()?,
         "container.escape.filesystem.etc_passwd" => {
-            denied_read(&format!("/proc/{host_pid}/root/etc/passwd"))?
+            denied_read(&format!("/proc/{host_pid}/root/etc/passwd"), &[libc::ENOENT, libc::EACCES, libc::EPERM])?
         }
         "container.escape.filesystem.proc_1_root" => {
-            denied_read(&format!("/proc/1/root{sentinel}"))?
+            denied_read(&format!("/proc/1/root{sentinel}"), &[libc::ENOENT, libc::EACCES, libc::EPERM])?
         }
         "container.escape.filesystem.home" | "container.escape.filesystem.var_log_maos" => {
-            denied_read(sentinel)?
+            denied_read(sentinel, &[libc::ENOENT])?
         }
-        "container.escape.filesystem.host_root" => denied_read(&format!("/host_root{sentinel}"))?,
+        "container.escape.filesystem.host_root" => {
+            denied_read(&format!("/host_root{sentinel}"), &[libc::ENOENT])?
+        }
         "container.escape.process.proc_1_exe" => denied_result(
             std::fs::read_link(format!("/proc/{host_pid}/exe")),
             &[libc::ENOENT, libc::EACCES],
         )?,
         "container.escape.process.kill_pid_1" => {
-            // SAFETY: host PID is not PID 1 in this private PID namespace.
+            // SAFETY: the executor supplies only its owned host witness child's PID.
             denied_syscall(
                 unsafe { libc::kill(host_pid, libc::SIGKILL) } as i64,
                 &[libc::ESRCH, libc::EPERM],
@@ -91,18 +93,22 @@ fn escape(vector: &str, sentinel: &str, host_pid: &str) -> Result<(), String> {
             )?
         }
         "container.escape.runtime.docker_sock" | "container.escape.runtime.image_pull_via_sock" => {
+            denied_result(UnixStream::connect(sentinel), &[libc::ENOENT])?;
             denied_result(
                 UnixStream::connect("/var/run/docker.sock"),
                 &[libc::ENOENT, libc::EACCES],
             )?
         }
-        "container.escape.runtime.podman_sock" => denied_result(
-            UnixStream::connect("/run/podman/podman.sock"),
-            &[libc::ENOENT, libc::EACCES],
-        )?,
+        "container.escape.runtime.podman_sock" => {
+            denied_result(UnixStream::connect(sentinel), &[libc::ENOENT])?;
+            denied_result(
+                UnixStream::connect("/run/podman/podman.sock"),
+                &[libc::ENOENT, libc::EACCES],
+            )?
+        }
         "container.escape.runtime.runtime_config_rewrite" => denied_result(
             std::fs::OpenOptions::new().write(true).open(sentinel),
-            &[libc::ENOENT, libc::EACCES, libc::EROFS],
+            &[libc::ENOENT],
         )?,
         other => return Err(format!("unknown scenario vector {other}")),
     };
@@ -201,11 +207,8 @@ fn dns_query() -> Vec<u8> {
     query
 }
 
-fn denied_read(path: &str) -> Result<i32, String> {
-    denied_result(
-        std::fs::read(path),
-        &[libc::ENOENT, libc::EACCES, libc::EPERM],
-    )
+fn denied_read(path: &str, allowed: &[i32]) -> Result<i32, String> {
+    denied_result(std::fs::read(path), allowed)
 }
 
 fn denied_result<T>(result: std::io::Result<T>, allowed: &[i32]) -> Result<i32, String> {

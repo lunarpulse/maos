@@ -9,9 +9,9 @@
       "$HOST_SENTINEL",
       "$HOST_PID"
     ],
-    "expected_runtime_blocker": "Listing container /home is allowed; read a unique unmounted host home sentinel instead."
+    "expected_runtime_blocker": "Read a unique unmounted home-secret sentinel in a 0755 tempdir under the host $HOME, requiring exactly ENOENT."
   },
-  "attack_surface": "host user directories via /home listing",
+  "attack_surface": "Read of an unmounted unique home-secret sentinel under the host $HOME; no claim about listing literal host user directories.",
   "expected_outcome": {
     "block_observed": true,
     "audit_event_emitted": "CapAuditEvent::SandboxBlock",
@@ -26,7 +26,7 @@
   },
   "classification": {
     "v0_verdict": "mis-stated",
-    "reason": "Listing container /home is allowed; read a unique unmounted host home sentinel instead.",
+    "reason": "Listing container /home is allowed; read a unique unmounted home-secret sentinel in a traversable tempdir under the host $HOME instead, requiring exactly ENOENT.",
     "v0_command": [
       "ls",
       "/home"

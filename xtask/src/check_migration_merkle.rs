@@ -17,7 +17,7 @@
 //!    SQLite-source and Postgres-target oracles independently.  A mismatch
 //!    fails the gate.
 //!
-//! Missing or unreadable corpus reports ABSENT; the registry's plain blocking
+//! Missing corpus reports ABSENT; unreadable or corrupt evidence reports RED. The registry's plain blocking
 //! disposition at v1_5 makes this fail until the corpus exists.
 
 use crate::gate_common::{Observation, OutOfLedgerVerdict, CURRENT_PHASE};
@@ -158,23 +158,46 @@ fn write_step_summary(text: &str) {
 }
 
 pub fn run(json: bool) -> Result<(), String> {
+    let (verdict, details) = match check() {
+        Ok(report) => report,
+        Err(error) => (
+            OutOfLedgerVerdict::judge_registered(
+                "check-migration-merkle",
+                Observation::Red,
+                true,
+                CURRENT_PHASE,
+                &error,
+            )?,
+            serde_json::json!({"error": error}),
+        ),
+    };
+    verdict.finish(json, details)
+}
+
+fn check() -> Result<(OutOfLedgerVerdict, serde_json::Value), String> {
     let corpus_path =
         std::env::var("MAOS_MIGRATION_CORPUS").unwrap_or_else(|_| DEFAULT_CORPUS_PATH.to_string());
     let path = Path::new(&corpus_path);
 
-    if std::fs::File::open(path).is_err() {
-        let reason = format!("corpus absent or unreadable at {corpus_path}");
-        write_step_summary(&format!(
-            "## Migration Gate: ABSENT (not a pass)\n{reason}\n"
-        ));
-        return OutOfLedgerVerdict::judge_registered(
-            "check-migration-merkle",
-            Observation::NotRun,
-            false,
-            CURRENT_PHASE,
-            reason,
-        )?
-        .finish(json, serde_json::json!({ "corpus": CORPUS_KEY }));
+    match std::fs::File::open(path) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let reason = format!("corpus absent at {corpus_path}");
+            write_step_summary(&format!(
+                "## Migration Gate: ABSENT (not a pass)\n{reason}\n"
+            ));
+            return Ok((
+                OutOfLedgerVerdict::judge_registered(
+                    "check-migration-merkle",
+                    Observation::NotRun,
+                    false,
+                    CURRENT_PHASE,
+                    reason,
+                )?,
+                serde_json::json!({ "corpus": CORPUS_KEY }),
+            ));
+        }
+        Err(error) => return Err(format!("cannot read corpus at {corpus_path}: {error}")),
     }
     let pinned = load_corpus_entry()?;
 
@@ -231,29 +254,28 @@ pub fn run(json: bool) -> Result<(), String> {
         },
         failures.join("\n"),
     ));
-    OutOfLedgerVerdict::judge_registered(
-        "check-migration-merkle",
-        if green {
-            Observation::Green
-        } else {
-            Observation::Red
-        },
-        true,
-        CURRENT_PHASE,
-        if green {
-            "corpus oracles verified"
-        } else {
-            "corpus oracle mismatch"
-        },
-    )?
-    .finish(
-        json,
+    Ok((
+        OutOfLedgerVerdict::judge_registered(
+            "check-migration-merkle",
+            if green {
+                Observation::Green
+            } else {
+                Observation::Red
+            },
+            true,
+            CURRENT_PHASE,
+            if green {
+                "corpus oracles verified"
+            } else {
+                "corpus oracle mismatch"
+            },
+        )?,
         serde_json::json!({
             "partial": !live_checked, "corpus": CORPUS_KEY, "row_count": count,
             "merkle_root": root, "payload_oracle": payload,
             "live_postgres_cross_check": live_checked, "failures": failures,
         }),
-    )
+    ))
 }
 
 #[cfg(test)]

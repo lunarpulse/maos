@@ -82,6 +82,7 @@ jobs:
       - name: Upload evidence artifact
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: rto-evidence-${{ github.run_id }}
           path: |
             out/rto-evidence-entry.toml

@@ -42,6 +42,7 @@ jobs:
       - name: Save corpus for next link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
           path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
           if-no-files-found: error
@@ -49,6 +50,7 @@ jobs:
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-record-${{ matrix.target }}-1-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
@@ -57,6 +59,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-logs-${{ matrix.target }}-1-${{ github.run_id }}
           path: out/
           retention-days: 90
@@ -96,6 +99,7 @@ jobs:
       - name: Save corpus for next link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
           path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
           if-no-files-found: error
@@ -103,6 +107,7 @@ jobs:
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-record-${{ matrix.target }}-2-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
@@ -111,6 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-logs-${{ matrix.target }}-2-${{ github.run_id }}
           path: out/
           retention-days: 90
@@ -150,6 +156,7 @@ jobs:
       - name: Save corpus for next link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
           path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
           if-no-files-found: error
@@ -157,6 +164,7 @@ jobs:
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-record-${{ matrix.target }}-3-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
@@ -165,6 +173,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-logs-${{ matrix.target }}-3-${{ github.run_id }}
           path: out/
           retention-days: 90
@@ -204,6 +213,7 @@ jobs:
       - name: Save corpus for next link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
           path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
           if-no-files-found: error
@@ -211,6 +221,7 @@ jobs:
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-record-${{ matrix.target }}-4-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
@@ -219,6 +230,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-logs-${{ matrix.target }}-4-${{ github.run_id }}
           path: out/
           retention-days: 90
@@ -258,6 +270,7 @@ jobs:
       - name: Save corpus for next link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-corpus-${{ matrix.target }}-5-${{ github.run_id }}
           path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
           if-no-files-found: error
@@ -265,6 +278,7 @@ jobs:
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-record-${{ matrix.target }}-5-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
@@ -273,6 +287,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: t3-logs-${{ matrix.target }}-5-${{ github.run_id }}
           path: out/
           retention-days: 90

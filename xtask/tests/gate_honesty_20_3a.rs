@@ -193,6 +193,175 @@ fn escape_substrate_refusal_never_passes() {
     assert!(out.status.success(), "{out:?}");
 }
 
+#[test]
+fn unreadable_security_evidence_is_red_with_a_report() {
+    for (gate, path) in [
+        ("check-pentest-gate", "docs/pen-test/findings/summary.toml"),
+        (
+            "check-red-team-gate",
+            "docs/red-team/results/red-team-results.toml",
+        ),
+    ] {
+        let tree = tree();
+        let path = tree.path().join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, [0xff, 0xfe]).unwrap();
+        let out = run(tree.path(), gate);
+        let value = report(&out);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        assert_eq!(value["gate"], gate);
+        assert_eq!(value["passed"], false);
+        assert_ne!(value["evidence_state"], "ABSENT");
+        assert!(value["error"].as_str().unwrap().contains("cannot read"));
+    }
+}
+
+#[test]
+fn malformed_pentest_toml_is_red_with_a_report() {
+    let tree = tree();
+    let path = tree.path().join("docs/pen-test/findings/summary.toml");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, "[gate\n").unwrap();
+    let out = run(tree.path(), "check-pentest-gate");
+    let value = report(&out);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert_eq!(value["gate"], "check-pentest-gate");
+    assert_eq!(value["passed"], false);
+    assert_ne!(value["evidence_state"], "ABSENT");
+    assert!(value["error"].as_str().unwrap().contains("malformed"));
+}
+
+#[test]
+fn empty_rto_ledger_is_absent_with_a_report() {
+    let tree = tree();
+    fs::write(
+        tree.path().join("xtask/rto-evidence.toml"),
+        "evidence = []\n",
+    )
+    .unwrap();
+    let out = run(tree.path(), "check-rto-gate");
+    let value = report(&out);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert_eq!(value["gate"], "check-rto-gate");
+    assert_eq!(value["evidence_state"], "ABSENT");
+    assert_eq!(value["passed"], false);
+}
+
+#[test]
+fn malformed_evidence_gates_emit_named_red_reports() {
+    for (gate, path) in [
+        (
+            "check-red-team-gate",
+            "docs/red-team/results/red-team-results.toml",
+        ),
+        ("check-rto-gate", "xtask/rto-evidence.toml"),
+        (
+            "check-skill-conformance",
+            "docs/skill-conformance/results/skill-conformance-results.toml",
+        ),
+    ] {
+        let tree = tree();
+        let path = tree.path().join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "[invalid\n").unwrap();
+        let out = run(tree.path(), gate);
+        let value = report(&out);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        assert_eq!(value["gate"], gate);
+        assert_eq!(value["passed"], false);
+        assert_ne!(value["evidence_state"], "ABSENT");
+        assert!(value["error"].as_str().is_some(), "{value}");
+    }
+}
+
+#[test]
+fn migration_manifest_and_corpus_errors_emit_named_red_reports() {
+    for valid_manifest in [false, true] {
+        let tree = tree();
+        let corpus = tree
+            .path()
+            .join("tests/corpora/migration-corpus-1e6.sqlite");
+        fs::create_dir_all(corpus.parent().unwrap()).unwrap();
+        fs::write(corpus, b"not a SQLite database").unwrap();
+        let manifest = tree.path().join("tests/corpora/MANIFEST.toml");
+        if valid_manifest {
+            fs::copy(root().join("tests/corpora/MANIFEST.toml"), manifest).unwrap();
+        } else {
+            fs::write(manifest, "[invalid\n").unwrap();
+        }
+        let out = run(tree.path(), "check-migration-merkle");
+        let value = report(&out);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        assert_eq!(value["gate"], "check-migration-merkle");
+        assert_eq!(value["passed"], false);
+        assert_ne!(value["evidence_state"], "ABSENT");
+        assert!(value["error"].as_str().is_some(), "{value}");
+    }
+}
+
+fn check_gate_workflow(workflow: &serde_yaml::Value) -> Result<Vec<(&'static str, &str)>, String> {
+    let mut scripts = Vec::new();
+    for (gate, name) in [
+        ("check-pentest-gate", "Check pen-test results"),
+        ("check-third-party-trial", "Check third-party trial results"),
+        ("check-red-team-gate", "Check red-team gate results"),
+        (
+            "check-migration-merkle",
+            "Check migration Merkle gate results",
+        ),
+    ] {
+        let job = workflow["jobs"][gate]
+            .as_mapping()
+            .ok_or_else(|| format!("missing job {gate}"))?;
+        for key in ["if", "continue-on-error"] {
+            if job.contains_key(&serde_yaml::Value::from(key)) {
+                return Err(format!("{gate}: job has {key}"));
+            }
+        }
+        let steps = workflow["jobs"][gate]["steps"]
+            .as_sequence()
+            .ok_or_else(|| format!("{gate}: missing steps"))?;
+        let step = steps
+            .iter()
+            .find(|step| step["name"].as_str() == Some(name))
+            .ok_or_else(|| format!("{gate}: missing named gate step {name}"))?;
+        let mapping = step
+            .as_mapping()
+            .ok_or_else(|| format!("{gate}: invalid step"))?;
+        for key in ["if", "continue-on-error"] {
+            if mapping.contains_key(&serde_yaml::Value::from(key)) {
+                return Err(format!("{gate}: step has {key}"));
+            }
+        }
+        let script = step["run"]
+            .as_str()
+            .ok_or_else(|| format!("{gate}: missing run"))?;
+        if !script.split_whitespace().any(|word| word == gate) {
+            return Err(format!("{gate}: named step does not invoke gate"));
+        }
+        scripts.push((gate, script));
+    }
+    Ok(scripts)
+}
+
+#[test]
+fn workflow_checker_rejects_evidence_condition_plant() {
+    let mut workflow: serde_yaml::Value = serde_yaml::from_str(
+        &fs::read_to_string(root().join(".github/workflows/discipline.yml")).unwrap(),
+    )
+    .unwrap();
+    let steps = workflow["jobs"]["check-pentest-gate"]["steps"]
+        .as_sequence_mut()
+        .unwrap();
+    let step = steps
+        .iter_mut()
+        .find(|step| step["name"] == "Check pen-test results")
+        .unwrap();
+    step["if"] = serde_yaml::Value::from("hashFiles('docs/pen-test/findings/summary.toml') != ''");
+    let error = check_gate_workflow(&workflow).unwrap_err();
+    assert!(error.contains("check-pentest-gate: step has if"), "{error}");
+}
+
 #[cfg(unix)]
 #[test]
 fn workflow_always_invokes_gates_on_absence() {
@@ -201,11 +370,7 @@ fn workflow_always_invokes_gates_on_absence() {
         &fs::read_to_string(root().join(".github/workflows/discipline.yml")).unwrap(),
     )
     .unwrap();
-    for gate in [
-        "check-pentest-gate",
-        "check-red-team-gate",
-        "check-migration-merkle",
-    ] {
+    for (gate, script) in check_gate_workflow(&workflow).unwrap() {
         let tree = tree();
         let cargo = tree.path().join("cargo");
         fs::write(
@@ -214,12 +379,6 @@ fn workflow_always_invokes_gates_on_absence() {
         )
         .unwrap();
         fs::set_permissions(&cargo, fs::Permissions::from_mode(0o755)).unwrap();
-        let steps = workflow["jobs"][gate]["steps"].as_sequence().unwrap();
-        let script = steps
-            .iter()
-            .filter_map(|step| step["run"].as_str())
-            .next_back()
-            .unwrap();
         let output = Command::new("bash")
             .args(["-e", "-c", script])
             .current_dir(tree.path())

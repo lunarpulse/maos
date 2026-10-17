@@ -13,9 +13,15 @@ fn workflow() -> Value {
 }
 
 fn check(workflow: &Value) -> Result<(), &'static str> {
-    let steps = workflow["jobs"]["check-kernel-baseline"]["steps"]
-        .as_sequence()
-        .ok_or("missing steps")?;
+    let job = &workflow["jobs"]["check-kernel-baseline"];
+    let job_fields = job.as_mapping().ok_or("missing kernel baseline job")?;
+    if ["if", "continue-on-error"]
+        .iter()
+        .any(|field| job_fields.contains_key(Value::from(*field)))
+    {
+        return Err("kernel baseline job must be unconditional and blocking");
+    }
+    let steps = job["steps"].as_sequence().ok_or("missing steps")?;
     if !steps.iter().any(|step| {
         step["uses"]
             .as_str()
@@ -36,11 +42,23 @@ fn check(workflow: &Value) -> Result<(), &'static str> {
     }
     if !steps.iter().any(|step| {
         step["name"].as_str() == Some("Run the Story 16-0 kernel-pin content-hash suite")
+            && step.as_mapping().is_some_and(|fields| {
+                ["if", "continue-on-error"]
+                    .iter()
+                    .all(|field| !fields.contains_key(Value::from(*field)))
+            })
             && step["run"].as_str().is_some_and(|run| {
-                run.split_whitespace()
-                    .collect::<Vec<_>>()
-                    .windows(2)
-                    .any(|pair| pair == ["--test", "kernel_pin_content_hash_16_0"])
+                let line = run
+                    .lines()
+                    .find(|line| !line.trim().is_empty())
+                    .unwrap_or("");
+                let mut tokens = line.split_whitespace();
+                tokens.next() == Some("cargo")
+                    && tokens.next() == Some("test")
+                    && tokens
+                        .collect::<Vec<_>>()
+                        .windows(2)
+                        .any(|pair| pair == ["--test", "kernel_pin_content_hash_16_0"])
             })
     }) {
         return Err("missing named kernel-pin suite step");
@@ -91,5 +109,39 @@ fn each_required_kernel_pin_wiring_deletion_reds() {
             "deleting {field} must red the real-tree checker"
         );
         eprintln!("planted deletion {field}: RED ({expected})");
+    }
+}
+
+#[test]
+fn kernel_pin_suite_cannot_be_impostor_skipped_or_nonblocking() {
+    let real = workflow();
+    for (job_level, field, value) in [
+        (
+            false,
+            "run",
+            Value::from("echo cargo test --test kernel_pin_content_hash_16_0"),
+        ),
+        (false, "if", Value::Bool(false)),
+        (false, "continue-on-error", Value::Bool(true)),
+        (true, "if", Value::from("${{ false }}")),
+        (true, "continue-on-error", Value::Bool(true)),
+    ] {
+        let mut planted = real.clone();
+        let job = &mut planted["jobs"]["check-kernel-baseline"];
+        if job_level {
+            job[field] = value;
+        } else {
+            let suite = job["steps"]
+                .as_sequence_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|step| {
+                    step["name"].as_str()
+                        == Some("Run the Story 16-0 kernel-pin content-hash suite")
+                })
+                .unwrap();
+            suite[field] = value;
+        }
+        assert!(check(&planted).is_err(), "job_level={job_level}, {field}");
     }
 }

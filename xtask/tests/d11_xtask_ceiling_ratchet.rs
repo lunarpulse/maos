@@ -137,7 +137,7 @@ const PRE_HONESTY_CEILING: u64 = 44_370;
 /// Read ONLY the current assignment's own inline grant, before its PRIOR ledger.
 /// Accepted landing shape: `xtask = N # Story 20-3a-gate-honesty EXACT MEASURED
 /// GRANT; DRIVER: ... | PRIOR: ...`. A citation elsewhere cannot fund this row.
-fn xtask_row(kloc: &str) -> (u64, Vec<String>) {
+fn xtask_row(kloc: &str) -> (u64, Vec<String>, Option<(u64, u64)>) {
     let row = kloc
         .lines()
         .find_map(|line| {
@@ -150,6 +150,7 @@ fn xtask_row(kloc: &str) -> (u64, Vec<String>) {
     (
         value.trim().parse().expect("xtask ceiling"),
         story_keys(current_grant),
+        arrow_grants(current_grant).into_iter().next(),
     )
 }
 
@@ -169,13 +170,9 @@ fn story_keys(comment: &str) -> Vec<String> {
         .collect()
 }
 
-/// Judge the live row. A `done` citation is HISTORICAL — not re-judged — only
-/// when that story's own file records the row's figure (`xtask` and `N` on one
-/// line): a story that funded the raise while open documented it, and closing
-/// it must not red the suite. A `done` story that never recorded the figure is
-/// being BORROWED, and refuses as `DoneStory`.
+/// A done story authorizes only the exact arrow grant recorded by this row.
 fn authorize_row(kloc: &str, status: &str, stories: &Path) -> Result<(), Refusal> {
-    let (ceiling, citations) = xtask_row(kloc);
+    let (ceiling, citations, grant) = xtask_row(kloc);
     let yaml: Value = serde_yaml::from_str(status).expect("sprint status parses");
     let statuses = yaml["development_status"].as_mapping().expect("statuses");
     let citation = citations
@@ -187,15 +184,29 @@ fn authorize_row(kloc: &str, status: &str, stories: &Path) -> Result<(), Refusal
         citation.map(String::as_str),
         status,
     ) {
-        Err(Refusal::DoneStory) if records_figure(stories, citation.unwrap(), ceiling) => Ok(()),
+        Err(Refusal::DoneStory)
+            if grant.is_some_and(|grant| {
+                grant.1 == ceiling && records_grant(stories, citation.unwrap(), grant)
+            }) =>
+        {
+            Ok(())
+        }
         verdict => verdict,
     }
 }
 
-fn records_figure(stories: &Path, key: &str, ceiling: u64) -> bool {
+fn arrow_grants(text: &str) -> Vec<(u64, u64)> {
+    let arrow = regex::Regex::new(r"\b([0-9]+)\s*(?:→|->)\s*([0-9]+)\b").unwrap();
+    arrow
+        .captures_iter(text)
+        .filter_map(|caps| Some((caps[1].parse().ok()?, caps[2].parse().ok()?)))
+        .collect()
+}
+
+fn records_grant(stories: &Path, key: &str, grant: (u64, u64)) -> bool {
     std::fs::read_to_string(stories.join(format!("{key}.md"))).is_ok_and(|text| {
         text.lines()
-            .any(|line| line.contains("xtask") && line.contains(&ceiling.to_string()))
+            .any(|line| line.contains("xtask") && arrow_grants(line).contains(&grant))
     })
 }
 
@@ -214,8 +225,7 @@ fn real_statuses() -> std::collections::HashMap<String, String> {
     statuses
 }
 
-/// Only a raise beyond the pre-policy ceiling is judged: it must cite a live
-/// story, or a completed one that recorded this exact figure.
+/// Only a raise beyond the pre-policy ceiling needs a live story or an exact historical grant.
 #[test]
 fn the_live_xtask_ceiling_cites_a_real_sprint_story() {
     let root = workspace_root();
@@ -242,19 +252,15 @@ fn planted_current_row_raises_cannot_borrow_historical_or_done_grants() {
                 .is_some_and(|(key, _)| key.trim() == "xtask")
         })
         .unwrap();
-    let (ceiling, _) = xtask_row(&kloc);
-    // An odd offset no story file records, so a `done` citation cannot be
-    // accidentally historical.
+    let (ceiling, _, _) = xtask_row(&kloc);
     let raised = ceiling.max(PRE_HONESTY_CEILING) + 7919;
     let story = |done: bool| {
         statuses
             .iter()
             .find_map(|(key, value)| {
                 let key = key.as_str()?;
-                ((value.as_str() == Some("done")) == done
-                    && !story_keys(key).is_empty()
-                    && !records_figure(&stories_dir(), key, raised))
-                .then_some(key)
+                ((value.as_str() == Some("done")) == done && !story_keys(key).is_empty())
+                    .then_some(key)
             })
             .expect("a real story with that status")
     };
@@ -281,22 +287,46 @@ fn planted_current_row_raises_cannot_borrow_historical_or_done_grants() {
     let grant = |key: &str| {
         kloc.replacen(
             original,
-            &format!("xtask = {raised} # Story {key} EXACT MEASURED GRANT; DRIVER: d | PRIOR: Story {done}"),
+            &format!("xtask = {raised} # Story {key} EXACT MEASURED GRANT {ceiling} -> {raised}; DRIVER: d | PRIOR: Story {done}"),
             1,
         )
     };
     // A live story funds the raise.
     assert_eq!(authorize_row(&grant(open), &status, &stories_dir()), Ok(()));
-    // The same `done` story becomes historical once its own file records the figure.
     let recorded = tempfile::tempdir().unwrap();
-    std::fs::write(
-        recorded.path().join(format!("{done}.md")),
-        format!("kloc grant: xtask {ceiling} -> {raised}\n"),
-    )
-    .unwrap();
+    let story_path = recorded.path().join(format!("{done}.md"));
+    for line in [
+        format!("xtask measured figure: {raised}\n"),
+        format!("xtask {ceiling} -> 9{raised}\n"),
+        format!("xtask 9{ceiling} -> {raised}\n"),
+        format!("xtask {} -> {raised}\n", ceiling + 1),
+    ] {
+        std::fs::write(&story_path, &line).unwrap();
+        assert_eq!(
+            authorize_row(&grant(done), &status, recorded.path()),
+            Err(Refusal::DoneStory),
+            "borrowed grant: {line}"
+        );
+    }
+    for arrow in ["->", "→"] {
+        std::fs::write(
+            &story_path,
+            format!("kloc grant: xtask {ceiling} {arrow} {raised}\n"),
+        )
+        .unwrap();
+        assert_eq!(
+            authorize_row(&grant(done), &status, recorded.path()),
+            Ok(())
+        );
+    }
+    let mismatched_row = grant(done).replacen(
+        &format!("{ceiling} -> {raised}"),
+        &format!("{ceiling} -> {}", raised + 1),
+        1,
+    );
     assert_eq!(
-        authorize_row(&grant(done), &status, recorded.path()),
-        Ok(())
+        authorize_row(&mismatched_row, &status, recorded.path()),
+        Err(Refusal::DoneStory)
     );
 }
 

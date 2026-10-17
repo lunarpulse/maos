@@ -10,12 +10,12 @@
     }
   ],
   "description": "24 of the 25 v0 scenarios execute through require_t3 and the production spawn_and_bridge/spawn_t3 route with a signed image; 1 is withdrawn with its recorded reason (see `withdrawn`). Commands are direct syscall equivalents in the statically linked test-only probe, not missing-tool failures. This claims only the named container boundary, not universal escape resistance. Every kind-8 assertion uses the D-10 marker after an observed blocked effect; never a kind-21 echo or synthetic journal insertion.",
-  "methodology": "v0 has no content hash or invariant-lock registration: xtask/invariants/lock.toml maps only I1\u2013I14 register documents; tests/corpora/MANIFEST.toml registers JSONL corpora, not these JSON directory fixtures. Preserve v0 unchanged; v1 is registered by this methodology and executable count/identity tests.",
+  "methodology": "Neither v0 nor v1 has a content hash or invariant-lock registration: xtask/invariants/lock.toml maps only I1\u2013I14 register documents; tests/corpora/MANIFEST.toml registers JSONL corpora, not these JSON directory fixtures. Preserve v0 unchanged; v1 is registered by this methodology and executable count/identity tests.",
   "parameters": {
-    "HOST_PID": "Live host executor PID (must be >1), never container PID 1.",
-    "HOST_SENTINEL": "Unique host-only file created by the executor before launch; never mounted into T3. Filesystem category chooses passwd/log/home/root variants; rewrite sentinel must remain unchanged."
+    "HOST_PID": "Live owned host witness child PID (must be >1), never the executor or container PID 1. Command spawn synchronizes successful exec; liveness and /proc stat non-stopped state are checked before and after each run.",
+    "HOST_SENTINEL": "Unique host-only file in a 0755 tempdir, mode 0644, created and read back before launch, never mounted into T3; rewrite sentinel must remain unchanged. Runtime socket scenarios instead use an owned UnixListener with mode 0666 in that directory, host-connectable before and after execution."
   },
-  "safety": "Fork saturation holds at most 128 children, kills and reaps them on every return. The production pids limit is 64. No host process is killed: its PID is outside the container PID namespace.",
+  "safety": "Fork saturation holds at most 128 children, kills and reaps them on every return. The production pids limit is 64. Host kill/ptrace targets only an owned sleep child, never the executor; after every run it must be alive and not stopped. A Drop guard kills and reaps it even on assertion failure.",
   "ci_only": "No local OCI runtime. Local runtime tests SKIP with require_t3 reason; count and classification tests run without OCI. CI rejects SKIP and requires the 24 executable IDs to execute exactly once each, with the withdrawn one named.",
   "classifications": [
     {
@@ -116,7 +116,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "Reading container /etc/passwd is allowed; attempt the host executor proc-root /etc/passwd instead.",
+      "reason": "Reading container /etc/passwd is allowed; attempt the owned host witness proc-root /etc/passwd instead. ENOENT or kernel procfs permission denial is accepted.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -133,7 +133,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "Listing container /home is allowed; read a unique unmounted host home sentinel instead.",
+      "reason": "Listing container /home is allowed; read a unique unmounted home-secret sentinel in a traversable tempdir under the host $HOME instead, requiring exactly ENOENT.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -167,7 +167,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "Container PID 1 root is the container root, not the host; read a unique host sentinel through it.",
+      "reason": "Container PID 1 root is the container root, not the host; read a unique host sentinel through it. ENOENT or kernel procfs permission denial is accepted.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -184,7 +184,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "true boundary",
-      "reason": "Host logs must be unreachable; a unique host log sentinel rules out missing-host-file false positives.",
+      "reason": "Read a unique host kernel.log sentinel, requiring exactly ENOENT; this does not probe the literal /var/log/maos directory.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -309,7 +309,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "Container PID 1 is the probe itself; target the live host executor PID and check host survival.",
+      "reason": "Container PID 1 is the probe itself; target only the live owned host witness child and check it remains alive and not stopped. Always kill and reap the child on cleanup.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -347,7 +347,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "Listing the container init executable is allowed; attempt the live host executor proc-exe instead.",
+      "reason": "Listing the container init executable is allowed; attempt the live owned host witness proc-exe instead.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -365,7 +365,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "PID 1 is container-local; attempt ptrace of the live host executor PID instead.",
+      "reason": "PID 1 is container-local; attempt ptrace only of the live owned host witness child, then check it remains alive and not stopped. Always kill and reap the child on cleanup.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -383,7 +383,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "true boundary",
-      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "reason": "Host container-runtime API socket is not mounted into T3; proven against an owned host witness socket, host-connectable before and after launch and exactly ENOENT inside T3; literal /var/run/docker.sock additionally probed with ENOENT/EACCES accepted.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -401,7 +401,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "true boundary",
-      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "reason": "Host container-runtime API socket is not mounted into T3; proven against an owned host witness socket, host-connectable before and after launch and exactly ENOENT inside T3; literal /var/run/docker.sock additionally probed with ENOENT/EACCES accepted. No image-pull API request is claimed.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -419,7 +419,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "true boundary",
-      "reason": "Use direct syscall equivalent of the declared attack; do not treat a missing shell tool as containment.",
+      "reason": "Host container-runtime API socket is not mounted into T3; proven against an owned host witness socket, host-connectable before and after launch and exactly ENOENT inside T3; literal /run/podman/podman.sock additionally probed with ENOENT/EACCES accepted.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",
@@ -437,7 +437,7 @@
       ],
       "v0_declared_outcome": "block_observed=true and SandboxBlock",
       "verdict": "mis-stated",
-      "reason": "cat is not a rewrite; attempt write-open of a host-created unique containers.conf sentinel and check unchanged.",
+      "reason": "cat is not a rewrite; attempt write-open of a host-created unique containers.conf sentinel, requiring exactly ENOENT, and check unchanged. No claim about the literal /etc/containers directory.",
       "v1_payload": [
         "/maos/spirit",
         "--maos-escape",

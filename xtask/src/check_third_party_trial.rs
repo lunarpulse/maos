@@ -2,7 +2,7 @@
 
 //! Story 10.2 AC1 — xtask CI gate: parse `docs/third-party-trial/results/trial-results.toml`
 //! via typed serde deserialization. Integrity failures are fatal at every N.
-//! Validated N<12 is preliminary (INDETERMINATE); missing input is ABSENT.
+//! Validated sampling-only N<12 is preliminary; substantive findings stay RED.
 //! Registry disposition decides whether either blocks, never whether it passed.
 //! At N>=12 all sampling floors block. Wilson 95% CI remains advisory only.
 
@@ -57,7 +57,7 @@ fn validate_dates(start: &str, end: &str) -> Result<(), String> {
 
 // #33: emit_command + validate_dates extracted to gate_common (shared across all gate modules).
 use crate::gate_common::{
-    emit_command, validate_dates as validate_dates_shared, Observation, OutOfLedgerVerdict,
+    validate_dates as validate_dates_shared, Observation, OutOfLedgerVerdict,
 };
 
 /// Wilson score interval (95% CI, z = 1.96) for `successes` out of `n`.
@@ -206,29 +206,47 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
             .find(|phase| phase.eq_ignore_ascii_case(ship_phase.trim()))
             .expect("ship phase validated above")
     };
+    let (verdict, details) = match check(ship_phase, require_derivation_provenance) {
+        Ok(report) => report,
+        Err(error) => (
+            OutOfLedgerVerdict::judge_registered(
+                "check-third-party-trial",
+                Observation::Red,
+                true,
+                ship_phase,
+                &error,
+            )?,
+            serde_json::json!({"error": error}),
+        ),
+    };
+    verdict.finish(json, details)
+}
+
+fn check(
+    ship_phase: &str,
+    require_derivation_provenance: bool,
+) -> Result<(OutOfLedgerVerdict, serde_json::Value), String> {
     let path = resolve_workspace_path(RESULTS_PATH)
         .unwrap_or_else(|| Path::new(RESULTS_PATH).to_path_buf());
 
-    if !path.exists() {
-        return OutOfLedgerVerdict::judge_registered(
-            "check-third-party-trial",
-            Observation::NotRun,
-            false,
-            ship_phase,
-            "trial-results.toml absent — third-party trial pending",
-        )?
-        .finish(json, serde_json::json!({"trial_status": "absent"}));
-    }
-
-    // trial-results.toml exists — parse it.
-    let content =
-        std::fs::read_to_string(path).map_err(|e| format!("cannot read {RESULTS_PATH}: {e}"))?;
-
-    let results: TrialResults = toml::from_str(&content).map_err(|e| {
-        let msg = format!("check-third-party-trial: FAIL — malformed trial-results.toml: {e}");
-        emit_command(json, "error", &msg);
-        msg
-    })?;
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok((
+                OutOfLedgerVerdict::judge_registered(
+                    "check-third-party-trial",
+                    Observation::NotRun,
+                    false,
+                    ship_phase,
+                    "trial-results.toml absent — third-party trial pending",
+                )?,
+                serde_json::json!({"trial_status": "absent"}),
+            ));
+        }
+        Err(error) => return Err(format!("cannot read {RESULTS_PATH}: {error}")),
+    };
+    let results: TrialResults =
+        toml::from_str(&content).map_err(|e| format!("malformed trial-results.toml: {e}"))?;
 
     let t = &results.trial;
     // D1: at v2.0 provenance is a producer-SIGNED per-participant derived
@@ -316,6 +334,12 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
     let mut failures: Vec<String> = Vec::new();
     let mut derived_successes: i64 = 0;
     for p in &results.participant {
+        if p.frames_run < 0 {
+            return Err(format!(
+                "participant {} frames_run is negative ({}) — invalid input",
+                p.id, p.frames_run
+            ));
+        }
         // D1: at v2.0 the EFFECTIVE fields come from the producer-SIGNED derived
         // attestation (a coordinator cannot forge it without the producer private
         // key). The self-reported TOML fields are probes the derived value
@@ -357,6 +381,12 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
                 p.signing_chain_verified,
             )
         };
+        if frames_run < 0 {
+            return Err(format!(
+                "participant {} effective frames_run is negative ({frames_run}) — invalid input",
+                p.id
+            ));
+        }
 
         // halt_recall must be a finite probability in [0,1] (on the EFFECTIVE value).
         if !halt_recall.is_finite() {
@@ -419,6 +449,7 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
             t.successes, failures.join("; ")
         ));
     }
+    let substantive_findings = !failures.is_empty();
     if derived_successes < 10 {
         failures.push(format!(
             "derived_successes={derived_successes} (< 10 floor)"
@@ -511,7 +542,9 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
             t.participants_total
         ));
     }
-    let observation = if preliminary {
+    let observation = if substantive_findings {
+        Observation::Red
+    } else if preliminary {
         Observation::Insufficient
     } else if failures.is_empty() {
         Observation::Green
@@ -533,15 +566,14 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
     } else {
         failures.join("; ")
     };
-    OutOfLedgerVerdict::judge_registered(
-        "check-third-party-trial",
-        observation,
-        true,
-        ship_phase,
-        reason,
-    )?
-    .finish(
-        json,
+    Ok((
+        OutOfLedgerVerdict::judge_registered(
+            "check-third-party-trial",
+            observation,
+            true,
+            ship_phase,
+            reason,
+        )?,
         serde_json::json!({
             "trial_status": if preliminary { "preliminary" } else { "complete" },
             "participants_total": t.participants_total,
@@ -556,5 +588,5 @@ pub fn run(json: bool, ship_phase: &str) -> Result<(), String> {
             "provenance_required": require_derivation_provenance,
             "failures": failures,
         }),
-    )
+    ))
 }

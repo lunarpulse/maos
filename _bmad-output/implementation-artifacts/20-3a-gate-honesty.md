@@ -13,7 +13,7 @@ blocks: "`20-3b-gate-retirement-and-coverage-generator` (epic: a gate must be ho
 
 # Story 20.3a: Gate honesty
 
-Status: review
+Status: in-progress
 
 ## Story
 
@@ -200,6 +200,35 @@ T14 §A6, 2026-10-15, on `20-3a/integration`. Nine non-author layers ran as fres
 - [x] [Review][Dismiss] Freshness checks only the two binaries' `src` trees (Blind-crates) — AC8.6 scopes the check to source mtimes plus the rebuild command.
 - [x] [Review][Dismiss] Successful-receipt test coverage was removed (Test-infra) — AC9 deletes the success path; deliberate cutover.
 - [x] [Review][Dismiss] The top-level `evidence_state` from `finish_ledger_gate` has no end-to-end assertion (Test-infra) — accepted coverage limitation; the roll-up is unit-tested (`worst_state_names_the_gate`).
+
+**Post-T13 `bmad-code-review`, 2026-10-17, on `main` @ `83e98999` (diff `6537454e..83e98999`, two chunks: A production+CI, B tests+probe+fixtures).** Eight fresh-context layers ran: Blind Hunter, Edge Case Hunter, Acceptance Auditor and Test-Infrastructure, one of each per chunk. Four read-only scouts verified reachability. A runtime layer ran 7 story suites (52/52 green), `error-catalog-check` (49/49), and nine converted gates live; their exit codes match AC1.1 dispositions. 13 raw findings were dismissed: D2 ledger `passed` (`:213`); escape-detector green (`:198`); `cpu_seconds` = libFuzzer run time (AC3.4(a)); latent AdvisorySubstrate Green, which has no caller; cadence mapping enrolment, where `check-epic-close-green` rejects `if: false`; registry↔module class, where AC4.2 is met through `judge_registered`; debug fallback, where CI journeys are debug; freshness scope (AC8.6, `:200`); job-wide ADVISORY comment (AC5.2); J4 banner wording (AC7.1 literal, registry asserted).
+
+- [x] [Review][Decision→Patch] T3 runtime-socket scenarios counted a missing host socket as containment. **Operator ruling 2026-10-17: owned witness socket.** The executor binds an owned `UnixListener` (0666, in a 0755 tempdir) and proves a host-side connect before and after launch. It passes the socket as `$HOST_SENTINEL`, and the probe must get exactly ENOENT on it; the literal daemon paths are still probed. The three scenario JSONs and the methodology now say "proven against an owned host witness socket". The `var_log_maos_003` / `runtime_config_rewrite_004` / `home_004` wording now claims only the unique-sentinel boundary that is actually executed.
+- [x] [Review][Decision→Patch] D11 done-story exception authorized on a substring. **Operator ruling 2026-10-17: exact grant token.** A done citation is accepted only when that story records the row's own arrow grant (`<prior> -> <ceiling>` or `→`) as whole-number tokens on an `xtask` line, with the ceiling equal to the row. A bare figure, a figure embedded in a larger number, a different prior, or a mismatched row each refuse with `DoneStory`. The +7919 vector is now a refusal case; positive ASCII/Unicode historical vectors were added.
+- [x] [Review][Patch] Preliminary (N<12) trial masked participant-quality findings; negative `frames_run` unvalidated (AC2) [`xtask/src/check_third_party_trial.rs`] — substantive findings are RED at any N, and only sampling shortfalls are INDETERMINATE. Negative frames get a RED report. Vectors: `trial_gate_small_cohort_quality_shortfall_blocks`, `trial_gate_small_negative_frames_is_fatal_with_report`, `trial_gate_small_success_mismatch_is_fatal_with_report`. Plant "preliminary masks substantive" → red.
+- [x] [Review][Patch] Unreadable existing pen-test/red-team evidence became ABSENT [`check_pentest_gate.rs`, `check_red_team_gate.rs`] — only `NotFound` is ABSENT. Any other read error is RED with substrate present, and the report names the error. Vector: `unreadable_security_evidence_is_red_with_a_report` (invalid UTF-8, both gates). Plant "any error → ABSENT" → red.
+- [x] [Review][Patch] J4 budget still blocked through the integrity step (AC7.1) [`crates/maos-bench/tests/t_10_4c_j4_gate_integrity.rs`] — the budget-only `t_10_4c_no_injection_green` is deleted. Sample-count, anti-canned, liveness and mutation tests are unchanged, and the mutation target does not depend on it. No workflow, gate or doc references it (grep).
+- [x] [Review][Patch] Empty RTO ledger errored instead of reporting ABSENT (AC1) [`check_rto_gate.rs`] — routed to the ABSENT report; it still exits 1 at v1_5 (`blocking`). Vector: `empty_rto_ledger_is_absent_with_a_report`.
+- [x] [Review][Patch] Malformed-evidence paths exited before the gate-named JSON [pen-test, RTO, merkle, trial, skill-conformance] — each is now a RED observation whose report carries the error, emitted through `finish`; exit 1 is unchanged. This follows the `check_fuzz_floor` malformed-ledger pattern. Vectors: `malformed_pentest_toml_is_red_with_a_report`, `malformed_evidence_gates_emit_named_red_reports`, `migration_manifest_and_corpus_errors_emit_named_red_reports`.
+- [x] [Review][Patch] DAC could mask a mount exposure [`t3_network_escape_executor.rs`, probe] — sentinel dirs are 0755 and files 0644, read back on the host. `home` / `var_log_maos` / `host_root` and the runtime-config write require exactly ENOENT. `etc_passwd` (host proc-root) and `proc_1_root` keep ENOENT/EACCES/EPERM, because procfs enforces that boundary. The home witness stays under the host `$HOME`, so a mounted but non-traversable home fails as EACCES.
+- [x] [Review][Patch] `kill_pid_1` / host-PID ptrace targeted the executor's PID — they now target an owned `sleep 600` witness child. The executor checks it is alive and not stopped before and after each scenario, and a Drop guard kills and reaps it.
+- [x] [Review][Patch] AC1.3 vector ignored `if:` and omitted third-party-trial [`xtask/tests/gate_honesty_20_3a.rs`] — `check(&yaml)` locates each gate's invocation step, refuses a job/step `if` or `continue-on-error`, then executes it. Plant: `workflow_checker_rejects_evidence_condition_plant`.
+- [x] [Review][Patch] Kernel-pin wiring pin accepted impostors (AC8.4) — it now requires a `cargo test … --test kernel_pin_content_hash_16_0` first command with no job/step `if` or `continue-on-error`. Plants (`kernel_pin_suite_cannot_be_impostor_skipped_or_nonblocking`): echo impostor, step `if: false`, step `continue-on-error`, job `if: ${{ false }}`, job non-blocking.
+- [x] [Review][Patch] Regional receipt verifier crypto path uncovered [`regional_teardown.rs` tests] — synthetic completed-key tests restored: `synthetic_complete_receipt_verifies_with_home_key`, `…_rejects_region_and_wrong_home_keys`, `…_rejects_signed_payload_tampering`, `…_round_trips_through_json`. Production `decommission_region_key` still returns `completed: false`. Plant "skip Ed25519 verify" → 2 red.
+- [x] [Review][Patch] `upload-artifact@v4` reruns could collide — `overwrite: true` on all 18 upload steps; names are unchanged. Pin: `ledger_workflow_uploads_overwrite_artifacts_on_rerun`.
+- [x] [Review][Patch] RTO collector re-appended a replayed record — an exact-entry replay exits 0 without writing. `collector_appends_exactly_one_element` now replays both kinds, and `rto_collector_preserves_distinct_measurements_on_the_same_date` guards against date-only dedupe.
+- [x] [Review][Patch] Probe-dispatch accounting matched quoted literals anywhere — it now extracts the `escape` `match vector` arm patterns, handling alternations and comments and stopping at the match end. Plants: `dispatch_accounting_rejects_removed_arm_retained_in_comment`, `dispatch_accounting_handles_alternations_and_stops_at_match_end`.
+- [x] [Review][Patch] Workflow expander defaulted every unknown expression to `success` — the default now applies only to `needs.<job>.result`, and anything else panics naming the expression (`expansion_defaults_only_job_results`).
+- [x] [Review][Patch] Escape-hatch inventory read only `.yml` — it now reads `.yml` and `.yaml`.
+- [x] [Review][Patch] AC6.6 hot-swap missing-corpus proof unrecorded — `20-3a-evidence/review-2026-10-17-hot-swap-missing-corpus.log`: corpus hidden under `CI=1` gives rc 101 with the named `halt_continuity_corpus_loads` panic; restored gives rc 0. The tree was restored.
+
+**Verification at the patched tree (2026-10-17, local; `CI`/`GITHUB_ACTIONS` unset for T3 skips):**
+- Tests: `cargo test -p xtask -p maos-eval -p maos-audit --no-fail-fast` passed 91 binaries, 1414 tests, 0 failed. `t_10_4c_j4_gate_integrity` (with `kernel_measurement`) passed 5/5.
+- Plants: the pentest/trial/verifier mutations above each went red and were restored exactly; the file hashes match the originals.
+- AC10.5 gates, all green: `check-decision-register`, `check-dev-record-completeness`, `check-epic-close-coherence`, `check-exit-commands` (after `cargo build -p maos-bin -p maos-cli`), `check-ship-gate-completeness`, `error-catalog-check`.
+- kloc: `kloc-check` passes after exact measured grants (xtask 44812→44930, maos-audit 7248→7351, maos-eval 4038→4041, `_aggregate_hardfail` 176010→176234 = measured 176233 + 1 under S3).
+- Clippy (`--no-deps`, per package): no finding in any changed file.
+- **Not proven locally:** this host has no podman, so `all_executable_scenarios_are_blocked_inside_verified_t3` and the egress custody scene skipped. The witness-socket, ENOENT-only and witness-child behaviour needs a CI run on a T3-provisioned runner after the operator's push.
 
 ## Dev Notes
 
@@ -465,6 +494,7 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
 - `_bmad-output/implementation-artifacts/20-3a-gate-honesty.md` (new)
 - `_bmad-output/implementation-artifacts/20-3a-evidence/t13-ac6-6-root-sites.log` (new)
 - `_bmad-output/implementation-artifacts/20-3a-evidence/t13-ci-plants.log` (new)
+- `_bmad-output/implementation-artifacts/20-3a-evidence/review-2026-10-17-hot-swap-missing-corpus.log` (new)
 - `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md`
@@ -598,3 +628,8 @@ anthropic/claude-opus-5-5 is the dev of record and integrator. Slices T2–T10b 
   - **Ledgers:** deferred-work lines 1036 and 1128 CLOSED; E16-A2 `done`. Rows filed: T3 wall-clock bounds → `20-7`; ledger re-run binding and the migration live substrate, both ownerless-dispositioned.
   - **Verify:** run 38988216311 is 184/184 green.
   - Status → `review`.
+- 2026-10-17 — post-T13 `bmad-code-review` (two chunks; Blind / Edge / Acceptance / Test-Infra per chunk, scout-verified, runtime layer).
+  - **Outcome:** 2 decisions ruled by the operator (owned witness socket; exact grant token) and 16 patches, all applied. 13 raw findings dismissed with grounds, nothing deferred (§Review Findings, 2026-10-17 block).
+  - **kloc:** exact measured grants — xtask 44930, maos-audit 7351, maos-eval 4041, aggregate 176234 (measured + 1, S3).
+  - **Local verification:** 1414/1414 tests, mutation plants red, AC10.5 gates green.
+  - **Status → `in-progress`:** the T3 executor changes (witness socket, ENOENT-only sentinels, owned witness child) and the workflow `overwrite: true` edits are proven only in CI. This host has no T3 runtime. A CI run on the operator's push, with `t3-escape-corpus` 24/24 on both images and `aggregate` green, returns the story to `review`/`done`.

@@ -53,6 +53,9 @@ entry = new["evidence"][0]
 datetime.date.fromisoformat(entry["drill_date"])
 assert type(entry["rto_seconds"]) is int and entry["rto_seconds"] >= 0, "invalid RTO seconds"
 assert type(entry["drill_success"]) is bool, "invalid drill success"
+if entry in old["evidence"]:
+    print(f"record already present: {record}")
+    sys.exit(0)
 if not old["evidence"]:
     ledger.write_text(record.read_text() + "\n")
 else:

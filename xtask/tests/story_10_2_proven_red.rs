@@ -648,6 +648,53 @@ fn trial_gate_small_consistent_cohort_is_preliminary() {
 }
 
 #[test]
+fn trial_gate_small_cohort_quality_shortfall_blocks() {
+    let content = small_trial()
+        .replacen("frames_run = 1000", "frames_run = 999", 1)
+        .replace("successes = 3", "successes = 2");
+    let out = run_small_trial(&content, "v1_5");
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert_eq!(report["gate"], "check-third-party-trial");
+    assert_eq!(report["passed"], false);
+    assert_eq!(report["successes_derived"], 2);
+    assert!(report["reason"].as_str().unwrap().contains("999 frames"));
+}
+
+#[test]
+fn trial_gate_small_negative_frames_is_fatal_with_report() {
+    let content = small_trial()
+        .replacen("frames_run = 1000", "frames_run = -1", 1)
+        .replace("successes = 3", "successes = 2");
+    let out = run_small_trial(&content, "v1_5");
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert_eq!(report["gate"], "check-third-party-trial");
+    assert_eq!(report["passed"], false);
+    assert_ne!(report["evidence_state"], "ABSENT");
+    assert!(report["error"]
+        .as_str()
+        .unwrap()
+        .contains("frames_run is negative"));
+}
+
+#[test]
+fn trial_gate_small_success_mismatch_is_fatal_with_report() {
+    let out = run_small_trial(
+        &small_trial().replace("successes = 3", "successes = 2"),
+        "v1_5",
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert_eq!(report["gate"], "check-third-party-trial");
+    assert_eq!(report["passed"], false);
+    assert!(report["error"]
+        .as_str()
+        .unwrap()
+        .contains("does not match participant records"));
+}
+
+#[test]
 fn trial_gate_small_duplicate_id_is_fatal() {
     let out = run_small_trial(&small_trial().replace("P003", "P002"), "v1_5");
     assert!(!out.status.success(), "{out:?}");

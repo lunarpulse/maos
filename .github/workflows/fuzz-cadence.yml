@@ -45,6 +45,7 @@ jobs:
       - name: Upload measured record
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: fuzz-record-${{ matrix.target }}-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
@@ -53,6 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: fuzz-logs-${{ matrix.target }}-${{ github.run_id }}
           path: out/
           retention-days: 90

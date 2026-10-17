@@ -339,6 +339,15 @@ mod tests {
         .unwrap()
     }
 
+    // Synthetic completion exercises receipt crypto, not production revocation.
+    fn synthetic_complete_key_attestation(region: &Region) -> KeyDecommissionAttestation {
+        KeyDecommissionAttestation {
+            decommissioned_region_pubkey: hex::encode(derive_region_pubkey(&[9u8; 32], region)),
+            method: KEY_DECOMMISSION_METHOD.to_string(),
+            completed: true,
+        }
+    }
+
     /// Story 13.5b invariant: the required and uncovered sets partition the
     /// known set. Moving a store between `REQUIRED_STORES` and
     /// `UNCOVERED_STORES` without removing it from the other reds here, so the
@@ -453,6 +462,107 @@ mod tests {
         assert_eq!(key.decommissioned_region_pubkey, hex::encode(before));
         assert_eq!(derive_region_pubkey(&base, &eu), before);
         assert_eq!(base, [9u8; 32], "the HOME signing seed must be retained");
+    }
+
+    #[test]
+    fn synthetic_complete_receipt_verifies_with_home_key() {
+        let home = [7u8; 32];
+        let eu = region("eu");
+        let receipt = build_regional_teardown_receipt(
+            &home,
+            &eu,
+            100,
+            complete_cascade(),
+            synthetic_complete_key_attestation(&eu),
+        )
+        .unwrap();
+        assert!(receipt.forget_cascade.completed);
+        assert!(receipt.key_decommission.completed);
+        assert_eq!(receipt.key_decommission.method, KEY_DECOMMISSION_METHOD);
+        assert_eq!(
+            receipt.signature_block.attester_pubkey,
+            hex::encode(derive_pubkey(&home))
+        );
+        verify_regional_teardown_receipt(&receipt, &derive_pubkey(&home)).unwrap();
+    }
+
+    #[test]
+    fn synthetic_complete_receipt_rejects_region_and_wrong_home_keys() {
+        let home = [7u8; 32];
+        let eu = region("eu");
+        let receipt = build_regional_teardown_receipt(
+            &home,
+            &eu,
+            100,
+            complete_cascade(),
+            synthetic_complete_key_attestation(&eu),
+        )
+        .unwrap();
+        verify_regional_teardown_receipt(&receipt, &derive_pubkey(&home)).unwrap();
+        for wrong_key in [
+            derive_region_pubkey(&[9u8; 32], &eu),
+            derive_pubkey(&[8u8; 32]),
+        ] {
+            assert!(matches!(
+                verify_regional_teardown_receipt(&receipt, &wrong_key),
+                Err(RegionalTeardownError::VerificationFailed(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn synthetic_complete_receipt_rejects_signed_payload_tampering() {
+        let home = [7u8; 32];
+        let eu = region("eu");
+        let receipt = build_regional_teardown_receipt(
+            &home,
+            &eu,
+            100,
+            complete_cascade(),
+            synthetic_complete_key_attestation(&eu),
+        )
+        .unwrap();
+        let home_pubkey = derive_pubkey(&home);
+        verify_regional_teardown_receipt(&receipt, &home_pubkey).unwrap();
+
+        let mut changed_region = receipt.clone();
+        changed_region.region = "us".to_string();
+        let mut changed_cascade = receipt.clone();
+        changed_cascade.forget_cascade.erased_principal_count += 1;
+        let mut changed_key = receipt.clone();
+        changed_key.key_decommission.decommissioned_region_pubkey =
+            hex::encode(derive_region_pubkey(&[9u8; 32], &region("us")));
+        let mut changed_timestamp = receipt;
+        changed_timestamp.torn_down_at_ns += 1;
+        for tampered in [
+            changed_region,
+            changed_cascade,
+            changed_key,
+            changed_timestamp,
+        ] {
+            assert!(matches!(
+                verify_regional_teardown_receipt(&tampered, &home_pubkey),
+                Err(RegionalTeardownError::VerificationFailed(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn synthetic_complete_receipt_round_trips_through_json() {
+        let home = [7u8; 32];
+        let target = region("ap-northeast-1");
+        let receipt = build_regional_teardown_receipt(
+            &home,
+            &target,
+            42,
+            complete_cascade(),
+            synthetic_complete_key_attestation(&target),
+        )
+        .unwrap();
+        let json = serde_json::to_string(&receipt).unwrap();
+        let back: RegionalTeardownReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(receipt, back);
+        verify_regional_teardown_receipt(&back, &derive_pubkey(&home)).unwrap();
     }
 
     #[test]

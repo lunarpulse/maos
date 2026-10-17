@@ -11,7 +11,7 @@
     ],
     "expected_runtime_blocker": "Host logs must be unreachable; a unique host log sentinel rules out missing-host-file false positives."
   },
-  "attack_surface": "host log files via /var/log/maos/kernel.log read",
+  "attack_surface": "Read of an unmounted unique host kernel.log sentinel; no claim about the literal /var/log/maos directory.",
   "expected_outcome": {
     "block_observed": true,
     "audit_event_emitted": "CapAuditEvent::SandboxBlock",

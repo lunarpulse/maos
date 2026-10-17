@@ -52,15 +52,46 @@ fn show(label: &str, output: &Output) {
 }
 fn expand(script: &str, values: &[(&str, &str)]) -> String {
     let re = regex::Regex::new(r"\$\{\{\s*(.*?)\s*\}\}").unwrap();
+    let needs_result = regex::Regex::new(r"^needs\.[A-Za-z0-9_-]+\.result$").unwrap();
     re.replace_all(script, |caps: &regex::Captures<'_>| {
+        let expression = caps[1].trim();
         values
             .iter()
-            .find(|(k, _)| *k == caps[1].trim())
+            .find(|(k, _)| *k == expression)
             .map(|(_, v)| *v)
-            .unwrap_or("success")
+            .unwrap_or_else(|| {
+                // Unspecified job results model the successful baseline, not arbitrary outputs.
+                assert!(
+                    needs_result.is_match(expression),
+                    "unmatched workflow expression: {expression}"
+                );
+                "success"
+            })
             .to_owned()
     })
     .into_owned()
+}
+
+#[test]
+fn expansion_defaults_only_job_results() {
+    assert_eq!(expand("${{ needs.check-unsafe.result }}", &[]), "success");
+    assert_eq!(
+        expand(
+            "${{ steps.body.outputs.status }}",
+            &[("steps.body.outputs.status", "absent")]
+        ),
+        "absent"
+    );
+    for expression in [
+        "needs.check.outputs.result",
+        "github.sha",
+        "needs.check.result || true",
+    ] {
+        let panic = std::panic::catch_unwind(|| expand(&format!("${{{{ {expression} }}}}"), &[]))
+            .expect_err("unknown expressions must refuse");
+        let message = panic.downcast_ref::<String>().unwrap();
+        assert!(message.contains(expression));
+    }
 }
 
 fn inventory(source: &str) -> Vec<String> {
@@ -110,7 +141,10 @@ fn every_workflow_escape_hatch_has_an_owner_or_benign_classification() {
     let mut errors = Vec::new();
     for entry in fs::read_dir(root().join(".github/workflows")).unwrap() {
         let path = entry.unwrap().path();
-        if path.extension().and_then(|s| s.to_str()) != Some("yml") {
+        if !matches!(
+            path.extension().and_then(|s| s.to_str()),
+            Some("yml" | "yaml")
+        ) {
             continue;
         }
         let source = fs::read_to_string(&path).unwrap();
