@@ -870,7 +870,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::hook_dispatch::HookDispatcher",
-      "signature_hash": "4d133b636440c966683974e7f0ed75d9cc40e67442b75b30e259463bf1563795"
+      "signature_hash": "05a400449937b5ff91a410582b67202a5a8b6f7f9eeb0871a33cfb59fe1c4053"
     },
     {
       "kind": "struct",
@@ -880,7 +880,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::scheduler::kernel_ctx::KernelCtx",
-      "signature_hash": "49a21b4c287daa1a86497443979557d62adf7f4ee270aee73db06d1e6965a0ac"
+      "signature_hash": "97131185ba8c7ffc1ab1c7bc443670c89c2f525e7af308cdf34c5881488811e6"
     },
     {
       "kind": "struct",

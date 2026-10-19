@@ -11,6 +11,7 @@
 # blob bytes and source bytes are pinned per commit; the toolchain is recorded;
 # reproduction is a manual recipe (story 17-3b §Dev Notes), not a CI control.
 
+# Re-issued for maos:spirit@2.1.0 on 2026-10-18; the pinned toolchain is unchanged.
 [toolchain]
 rustc = "rustc 1.98.1 (48a229cea 2026-09-01)"
 wit_bindgen = "0.44.0"
@@ -19,8 +20,8 @@ wasi_imports = "wasi:*@0.2.9"
 
 [[fixture]]
 component = "echo_spirit_component.wasm"
-wasm_sha256 = "221260bc014e54af8880a6d041d7f9be6158ebf4e3f4dda3ab0960130e938c74"
-source_sha256 = "b78a43fcca3ed5d5fe94f3518fb7cf7a8744dd2188798e954eca1dbb1ab99418"
+wasm_sha256 = "36ff30298eee24c25abfcf1dde2c6e8992aeaa77641c22c789605d17673f2894"
+source_sha256 = "96885af49d16059a570e4dd4b1035bc01fd500183e4cfc1e968703fc23e8beb7"
 source = [
     "crates/maos-wasm-host/guests/echo-spirit/Cargo.toml",
     "crates/maos-wasm-host/guests/echo-spirit/src/lib.rs",
@@ -29,8 +30,8 @@ source = [
 
 [[fixture]]
 component = "equiv_identity_spirit_component.wasm"
-wasm_sha256 = "84bdf818cc3a4f08b8a3c3315bcb7210a817af71804962f18ca6d472dafd1d4e"
-source_sha256 = "94a5d9e5feab35ff142bf7f9f3b0eb28f1f9c9b010aa88c78b225834559b2c71"
+wasm_sha256 = "0f220aef0b512dde9285b4a7d8e3b2a23148d3a4b06efe7bc76cda6fc50d8508"
+source_sha256 = "adb08013d88c1934ffdb3bd6d2c6fb11267b9b95c032ce28ac5b08ac489c6512"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/logic/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/logic/src/lib.rs",
@@ -41,8 +42,8 @@ source = [
 
 [[fixture]]
 component = "equiv_divergent_spirit_component.wasm"
-wasm_sha256 = "0eb8cbdb707907f75fe5067422bba360467d0c9d9f17cd58ee9407f783897c2a"
-source_sha256 = "9815436c2ecd989a03bf972f1816dc2bd0f1c328635e23fa781bb7c9e6f05aea"
+wasm_sha256 = "77e2bc9029e7779a4a4e53f3a3b7bb8dbd2530d15459232c499a7f2e5e3c8b9b"
+source_sha256 = "1d47ce22a1491340e8d0258eb4596281680669d0bb901f958737ba8d0bb690bb"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/src/lib.rs",
@@ -53,8 +54,8 @@ source = [
 
 [[fixture]]
 component = "equiv_cosmetic_spirit_component.wasm"
-wasm_sha256 = "c204ef359b9473cc2ef3256e0f92efcf48d49df922087f4ea6d5edd3a078e3c2"
-source_sha256 = "f0acf5fe3d892122a63156257406ea1a14c0694c451a0003fc5199358b899437"
+wasm_sha256 = "5369a0527490b7cec43e15e1f69502757625597cf589f462f47a3103f7e80a30"
+source_sha256 = "2ca1e43dcf609132f35e3d50de53eed479454642ce090ff5c398db0dc55fb2fa"
 source = [
     "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml",
     "crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/src/lib.rs",

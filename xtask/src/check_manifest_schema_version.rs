@@ -43,6 +43,7 @@ const RATIFIED_POST_V1_SCHEMA_SECTIONS: &[&str] = &[
     // 17-3c FR4 iac.send mediation (operator ruling 2026-10-06; ABI ratification
     // `17-3c-iac-send-capability`, xtask/abi-ratifications.toml), on schema 5.
     "capabilities.required.iac",
+    "capabilities.required.log",
 ];
 
 /// Parse `pub const NAME: u32 = N;` (or an alias to another such const) from a

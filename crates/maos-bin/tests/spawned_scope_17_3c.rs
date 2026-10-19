@@ -180,7 +180,6 @@ impl World {
             None,
             None,
             None,
-            None,
         ));
         let journal = Arc::new(
             maos_kernel_core::journal::JournalAdapter::open(&dir.join("lifecycle.ndjson")).unwrap(),
@@ -246,6 +245,9 @@ impl World {
             security: Arc::clone(&self.security),
             iac: Arc::clone(&self.iac),
             journal: Arc::clone(&self.tl),
+            log_recall: Arc::new(maos_iac::adapter::log_recall::LogRecallAdapter::new(
+                Arc::clone(&self.tl),
+            )),
             lifecycle_journal: Arc::clone(&self.journal),
             pid_by_spirit_id: Arc::clone(&self.lookup),
             enterprise: None,

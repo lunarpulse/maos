@@ -921,7 +921,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 17-3c — 24 → 25: `spirit_session.rs` joins it (CI repair
     // 2026-10-06: 17-3c added the file without ringing this doorbell).
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 26] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 27] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("egress.rs", include_str!("../src/egress.rs")),
         // Story 16-6 — the extracted `load → admit → start` path. Enrolled
@@ -1021,6 +1021,13 @@ fn composition_root_does_not_seed_manifest_scopes() {
         (
             "spirit_session.rs",
             include_str!("../src/spirit_session.rs"),
+        ),
+        // Story 17-3d — the one governed recall path (native port and in-band
+        // WASM service). It mints through the enterprise-governed issuer at the
+        // bound pid and must never seed the manifest-derived policy table.
+        (
+            "recall_mediation.rs",
+            include_str!("../src/recall_mediation.rs"),
         ),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");

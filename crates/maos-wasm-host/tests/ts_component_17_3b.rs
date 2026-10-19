@@ -4,7 +4,7 @@
 //! test intentionally remains ignored in ordinary host test runs, but an
 //! explicit `--ignored` run fails loudly if that CI input is absent.
 
-use std::io::{BufReader, BufWriter, Read};
+use std::io::{BufReader, BufWriter, Read, Write};
 
 use maos_domain::frame::{
     ConsentEnvelope, FrameAddress, FramePayload, HaltPolicyOverride, IacFrame, PostureHint,
@@ -18,6 +18,9 @@ use maos_spirit_abi::identity::{FrameKind, HostId, SpiritId, SpiritRole};
 use smallvec::smallvec;
 
 use maos_wasm_host::codec;
+use maos_wasm_host::recall_wire::{
+    self, RecallReply, RecallRequest, WireBytes, WireError, WireFilter,
+};
 
 fn runner_binary_path() -> std::path::PathBuf {
     let mut path = std::env::current_exe()
@@ -26,7 +29,10 @@ fn runner_binary_path() -> std::path::PathBuf {
         .expect("deps directory")
         .parent()
         .expect("profile directory")
+        .parent()
+        .expect("target directory")
         .to_path_buf();
+    path.push("release");
     path.push("maos-wasm-runner");
     path
 }
@@ -152,7 +158,7 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
     let runner = runner_binary_path();
     assert!(
         runner.is_file(),
-        "AC1 requires the release maos-wasm-runner beside this test binary: {}",
+        "AC1 requires maos-wasm-runner in the target's release directory: {}",
         runner.display()
     );
 
@@ -172,7 +178,7 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
     let stdin = child.stdin.take().expect("runner stdin");
     let mut writer = BufWriter::new(stdin);
     maos_frame_codec::write_frame(&mut writer, &input_bytes).expect("write one ADR-032 frame");
-    drop(writer);
+    writer.flush().expect("flush inbound frame");
 
     let stdout = child.stdout.take().expect("runner stdout");
     let stderr = child.stderr.take().expect("runner stderr");
@@ -182,6 +188,43 @@ fn typescript_component_round_trips_a_fully_populated_frame() {
         Some(Vec::new()),
         "Ready"
     );
+    let request = maos_frame_codec::read_frame(&mut reader)
+        .expect("read recall request")
+        .expect("guest must recall before emitting");
+    assert_eq!(
+        recall_wire::decode_request(&request).expect("tagged recall request"),
+        RecallRequest::Recall {
+            filter: WireFilter {
+                limit: 16,
+                kind: None,
+                since_ns: None,
+                until_ns: None,
+                cursor: None,
+                intent_filter: None,
+            },
+        },
+    );
+    let reply = recall_wire::encode_reply(&RecallReply::Page {
+        entries: Vec::new(),
+        next_cursor: None,
+    })
+    .expect("encode empty page");
+    maos_frame_codec::write_frame(&mut writer, &reply).expect("reply to recall");
+    writer.flush().expect("flush recall reply");
+    let request = maos_frame_codec::read_frame(&mut reader)
+        .expect("read fetch request")
+        .expect("guest must fetch before emitting");
+    assert_eq!(
+        recall_wire::decode_request(&request).expect("tagged fetch request"),
+        RecallRequest::Fetch {
+            frame_id: WireBytes(input.frame_id.to_vec()),
+        },
+    );
+    let reply = recall_wire::encode_reply(&RecallReply::Error(WireError::ScopeViolation))
+        .expect("encode scope-violation");
+    maos_frame_codec::write_frame(&mut writer, &reply).expect("reply to fetch");
+    writer.flush().expect("flush fetch reply");
+    drop(writer);
     let output_bytes = match maos_frame_codec::read_frame(&mut reader) {
         Ok(Some(frame)) => frame,
         Ok(None) => {

@@ -32,6 +32,12 @@ pub struct LogRecallFilter {
     #[doc = "Construct via [`LogRecallFilter::new`] to enforce validation; struct literals bypass cursor-ordering / pid-range / limit-cap checks."]
     pub cursor: Option<LogRecallCursor>,
 
+    /// Native polling may resume after the cursor's frame in append order,
+    /// independent of wall-clock adjustments. The anchor frame must still exist.
+    /// WASM retains timestamp ordering; this option is not part of its WIT.
+    #[serde(default)]
+    pub order_by_insertion: bool,
+
     /// Optional intent-class filter.
     #[doc = "Construct via [`LogRecallFilter::new`] to enforce validation; struct literals bypass cursor-ordering / pid-range / limit-cap checks."]
     pub intent_filter: Option<String>,
@@ -111,6 +117,7 @@ impl LogRecallFilter {
             limit: limit.min(Self::MAX_LIMIT),
             cursor,
             intent_filter,
+            order_by_insertion: false,
         }
     }
 }
@@ -124,6 +131,7 @@ impl Default for LogRecallFilter {
             limit: Self::MAX_LIMIT,
             cursor: None,
             intent_filter: None,
+            order_by_insertion: false,
         }
     }
 }
@@ -330,6 +338,9 @@ impl CrossWallRecallRefusal {
 /// Typed error for log-recall operations.
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum LogRecallError {
+    /// The caller could not obtain the required recall or fetch capability.
+    #[error("E_CAPABILITY_DENIED — log recall capability not granted")]
+    CapabilityDenied,
     /// Directional cross-wall consent was absent or could not be proven fresh.
     #[error("ECrossWallRecallDenied — recall from team {team} refused: {reason}")]
     ECrossWallRecallDenied {
@@ -360,6 +371,18 @@ pub enum LogRecallError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capability_denial_is_typed_and_contains_no_caller_identity() {
+        assert_eq!(
+            LogRecallError::CapabilityDenied.to_string(),
+            "E_CAPABILITY_DENIED — log recall capability not granted",
+        );
+        assert_ne!(
+            LogRecallError::CapabilityDenied,
+            LogRecallError::Storage("denied".into())
+        );
+    }
 
     #[test]
     fn filter_new_clamps_limit() {

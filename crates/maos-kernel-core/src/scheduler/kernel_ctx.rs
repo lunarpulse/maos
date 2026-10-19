@@ -24,7 +24,6 @@ pub struct KernelCtx<'a> {
         Option<Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>>,
     pub iac: Option<Arc<crate::iac::IacBusAdapter>>,
     pub halt_registry: Option<Arc<crate::halt::HaltRegistry>>,
-    pub log_recall: Option<Arc<crate::iac::log_recall::LogRecallAdapter>>,
     pub distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
     pub self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
     pub transparency_log: Option<Arc<crate::iac::transparency_log::TransparencyLogAdapter>>,
@@ -45,7 +44,6 @@ impl<'a> KernelCtx<'a> {
             working_memory_orchestrator: None,
             iac: None,
             halt_registry: None,
-            log_recall: None,
             distillate_writer: None,
             self_telemetry: None,
             transparency_log: None,
@@ -79,11 +77,6 @@ impl<'a> KernelCtx<'a> {
 
     pub fn with_halt_registry(mut self, h: Arc<crate::halt::HaltRegistry>) -> Self {
         self.halt_registry = Some(h);
-        self
-    }
-
-    pub fn with_log_recall(mut self, l: Arc<crate::iac::log_recall::LogRecallAdapter>) -> Self {
-        self.log_recall = Some(l);
         self
     }
 

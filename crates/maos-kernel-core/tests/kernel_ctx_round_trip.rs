@@ -73,7 +73,6 @@ fn kernel_ctx_default_builder_has_none() {
     assert!(kctx.capability.is_none());
     assert!(kctx.iac.is_none());
     assert!(kctx.halt_registry.is_none());
-    assert!(kctx.log_recall.is_none());
     assert!(kctx.distillate_writer.is_none());
     assert!(kctx.self_telemetry.is_none());
     assert!(kctx.working_memory_orchestrator.is_none());

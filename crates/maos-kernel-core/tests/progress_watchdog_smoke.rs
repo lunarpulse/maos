@@ -65,7 +65,6 @@ async fn progress_watchdog_emits_task_stalled() {
         None,
         None,
         None,
-        None,
     ));
 
     let manifest = SpiritManifestBundle::default();

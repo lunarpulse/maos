@@ -16,3 +16,13 @@ Revisits: §5.2
 **Alternatives considered.** Newline-delimited JSON (rejected: large payloads break easily on partial newline encoding). Raw JSON-RPC without length prefix (rejected: parser ambiguity on partial frames).
 
 **What would force a revisit.** A use case emerges where Content-Length framing cannot represent the message structure cleanly.
+
+## Implementation note — Story 17-3d
+
+WASM recall records share the runner's existing Content-Length-framed stdio
+channel. Their bodies are single tagged CBOR items (major type 6): private,
+unregistered tag 60000 for runner-to-daemon requests and 60001 for replies.
+The daemon dispatches tagged records before decoding frames. Frame records
+remain unchanged, untagged CBOR maps; empty bodies remain transport controls.
+Recall request/reply records alternate only inside `handle-frame`, with no
+additional descriptor, socket, or syscall (ADR-060's 2026-10-18 amendment).

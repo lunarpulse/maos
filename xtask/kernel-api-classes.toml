@@ -59,6 +59,15 @@
 "maos_kernel_core::halt::resolver::KernelHaltResolver"                = "supervision"
 "maos_kernel_core::security::operator_config::PostureSection"         = "supervision"
 
+# Story 17-3d (D-17-3d-PF-R2) — deletion of the dormant `log_recall` field
+# re-hashes both structs (private-field reshape, not a public removal), so the
+# gate sees them as new. Classes inherited from their module's scheduler
+# siblings (line 33 / line 58): lifecycle control over Spirit hooks =
+# supervision. Their public shape is unchanged apart from the two deleted
+# `with_log_recall` builders.
+"maos_kernel_core::scheduler::kernel_ctx::KernelCtx"                  = "supervision"
+"maos_kernel_core::scheduler::hook_dispatch::HookDispatcher"          = "supervision"
+
 # Story 1a.3 — CryptoProvider port + RingCryptoProvider adapter.
 "maos_kernel_core::security::crypto::RingCryptoProvider"              = "data-movement"
 "maos_kernel_core::api::security::RingCryptoProvider"          = "data-movement"

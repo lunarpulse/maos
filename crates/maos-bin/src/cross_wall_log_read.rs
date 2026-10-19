@@ -65,6 +65,6 @@ impl CrossWallLogReadPort for CrossWallLogReadAdapter {
         }
 
         let reader = TransparencyLogAdapter::from_read_only_connection(conn);
-        LogRecallAdapter::query_page(&reader, spirit_pid, filter)
+        LogRecallAdapter::query_page(&reader, spirit_pid, None, filter)
     }
 }

@@ -508,7 +508,6 @@ fn scheduler_with_hello(world: &KernelWorld, boot_nonce: u64) -> Arc<SpiritSched
         None,
         None,
         None,
-        None,
     ));
     let bundle = maos_kernel_core::scheduler::SpiritManifestBundle::default();
     let rt = tokio::runtime::Builder::new_current_thread()

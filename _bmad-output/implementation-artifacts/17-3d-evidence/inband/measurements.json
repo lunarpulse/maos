@@ -1,0 +1,182 @@
+{
+  "source_head": "39cd7966",
+  "isolated_copy": "/tmp/maos-17-3d-inband",
+  "target_dir": "/mnt/build/cargo-17-3d-inband",
+  "guest_target_dir": "/mnt/build/cargo-17-3d-inband-guest",
+  "base_commit": "5f24e89f09b98cda3f4345a73cb92b74d2524fea",
+  "base_tree": "7bee47d2724f5292025463188deb39c8d4314175",
+  "proto_commit": "d3d08fa86f6e20e013020e6f8f6ccecf353344c1",
+  "proto_tree": "fe9bf2304920486551512eb3f0a5024900e4fd17",
+  "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "kernel_src_lines": {
+    "base": 26311,
+    "proto": 26311,
+    "baseline_base_result": "PASS",
+    "baseline_proto_result": "PASS",
+    "kernel_files_changed": 0
+  },
+  "tokei": {
+    "base": {
+      "maos-kernel-core": 20545,
+      "maos-wasm-host": 1525,
+      "maos-bin": 25917
+    },
+    "proto": {
+      "maos-kernel-core": 20545,
+      "maos-wasm-host": 1811,
+      "maos-bin": 25931
+    },
+    "base_gate_exit": 0,
+    "proto_gate_exit": 1,
+    "base_aggregate": 176233,
+    "proto_aggregate": 176533,
+    "proto_over_budget": [
+      "aggregate 176533 >= 176234",
+      "maos-bin 25931 > 25917",
+      "maos-wasm-host 1811 > 1577"
+    ],
+    "guest_excluded": false,
+    "new_guest_code_lines_included": 50,
+    "test_excluded": true,
+    "scope_note": "Contrary to assignment expectation, kloc_check.rs excludes tests but not guests; raw measured host row includes recall-probe (50 code lines). No budgets or rules modified."
+  },
+  "unsafe_added": 0,
+  "deps_changed": false,
+  "deps_scope": "Existing workspace manifests and Cargo.lock unchanged; only new standalone recall-probe/Cargo.toml and reused guest lock were added. Raw requested git diff base -- Cargo.lock **/Cargo.toml is nonempty solely for the new standalone guest manifest.",
+  "diff_stats": {
+    "files": 11,
+    "insertions": 1195,
+    "deletions": 29
+  },
+  "file_line_counts": {
+    "wit/spirit.wit": 353,
+    "crates/maos-wasm-host/src/recall_wire.rs": 127,
+    "crates/maos-wasm-host/src/host_state.rs": 170,
+    "crates/maos-wasm-host/src/runner.rs": 430,
+    "crates/maos-wasm-host/src/lib.rs": 39,
+    "crates/maos-wasm-host/src/wit_guest.rs": 11,
+    "crates/maos-wasm-host/guests/recall-probe/Cargo.toml": 18,
+    "crates/maos-wasm-host/guests/recall-probe/Cargo.lock": 442,
+    "crates/maos-wasm-host/guests/recall-probe/src/lib.rs": 59,
+    "crates/maos-wasm-host/tests/inband_recall_proto.rs": 316,
+    "crates/maos-bin/src/spirit_session.rs": 994
+  },
+  "scenarios": [
+    {
+      "name": "happy_path_t2",
+      "result": "PASS",
+      "exit_code": 0,
+      "seccomp": 2,
+      "assertion": "TaskComplete.result == recall=ok:2;fetch=err:scope-violation; 2 tagged requests; 1 fetch for seed frame_id; one output before one TurnComplete"
+    },
+    {
+      "name": "happy_path_t0",
+      "result": "PASS",
+      "exit_code": 0,
+      "assertion": "TaskComplete.result == recall=ok:2;fetch=err:scope-violation; 2 tagged requests; one output before one TurnComplete"
+    },
+    {
+      "name": "hostile_reply",
+      "result": "PASS",
+      "exit_code": 6,
+      "seccomp": 2,
+      "assertion": "TaskComplete.result == recall=err:unavailable;fetch=err:unavailable; exactly 1 tagged request, 0 fetch requests; desync diagnostic; exits with stdin still open"
+    },
+    {
+      "name": "eof",
+      "result": "PASS",
+      "exit_code": 0,
+      "seccomp": 2,
+      "assertion": "TaskComplete.result == recall=err:unavailable;fetch=err:unavailable; exactly 1 tagged request; 0 fetch requests; no trap diagnostic; TurnComplete"
+    },
+    {
+      "name": "compat_2_0_t2",
+      "result": "PASS",
+      "exit_code": 0,
+      "seccomp": 2,
+      "assertion": "encoded emitted body == encoded seed body AND decoded emitted frame == seed; 0 tagged records"
+    },
+    {
+      "name": "reply_budget",
+      "result": "PASS",
+      "fetched_bytes": 1048694,
+      "payload_bytes": 1048576,
+      "plain_vec_error": "CBOR encode bound: container expansion budget exceeded",
+      "realistic1024": {
+        "entries": 1024,
+        "bytes": 104482,
+        "trimmed": false
+      },
+      "oversized1024": {
+        "entries": 858,
+        "bytes": 7111196,
+        "trimmed": true,
+        "next_larger_prefix_rejected": true,
+        "cursor_is_last_included_entry": true
+      }
+    }
+  ],
+  "harness": {
+    "passed": 6,
+    "failed": 0,
+    "exit_code": 0,
+    "skipped": 0
+  },
+  "t2_sandbox_kill": {
+    "passed": 5,
+    "failed": 0,
+    "exit_code": 0,
+    "forbidden_ptrace": "SIGSYS signal 31; classified_violation_tier=T2",
+    "skipped": 0,
+    "allow_list_changed": false
+  },
+  "stretch": {
+    "implemented": true,
+    "check_exit_code": 0,
+    "initial_test_exit_code": 101,
+    "initial_passed": 15,
+    "initial_failed": 7,
+    "initial_failure": "MAOS_17_2_CGROUP_MODE required but unset",
+    "resolved_mode": "undelegated",
+    "mode_evidence": "/proc/self/cgroup = 0::/; /sys/fs/cgroup mounted ro",
+    "final_test_exit_code": 0,
+    "final_passed": 22,
+    "final_failed": 0
+  },
+  "not_run": [
+    {
+      "item": "delegated-cgroup lane",
+      "reason": "Host cgroup mount read-only; undelegated lane executed successfully."
+    },
+    {
+      "item": "wrong-tag and undecodable-reply negative scenarios",
+      "reason": "Not separate requested executable scenarios; handled by Required-tag decoder and permanent latch, not independently injected."
+    },
+    {
+      "item": "outside-export recall import call",
+      "reason": "Host guard implemented; probe invokes imports only during handle-frame."
+    },
+    {
+      "item": "full WIT corpus/equivalence suites and template copies",
+      "reason": "Explicit prototype non-goals; committed @2.0 fixture compatibility was executed instead."
+    }
+  ],
+  "contract_refinements": [
+    "Store<HostState> owns one BufReader<Stdin> and BufWriter<Stdout>; import borrows state synchronously; pump reacquires state around exports. No new descriptor or syscall policy required.",
+    "write_frame already flushes; recall client also explicitly flushes. Persistent BufReader prevents dropping buffered bytes between import and frame pump.",
+    "Generated recall Host trait returns Result<WitValue, RecallError> directly, no outer wasmtime Result; linker registration uses HasSelf<HostState>. Import-walk now recognizes both frames and recall major 2.",
+    "Guest encodes errors into a TaskComplete payload. For a latched malformed record, runner emits guest output and TurnComplete, then typed desync exit6 without reading stdin again.",
+    "EOF sets a separate closed latch, preventing subsequent fetch I/O while permitting clean frame-loop EOF exit0. This follows requested EOF scenario but refines ADR amendment wording that any EOF during export is a protocol error.",
+    "@2.0 guest instantiated on @2.1 runner without alias bindings; byte-identical echo under actual T2.",
+    "Byte-string encoding is necessary: plain Vec<u8> spends 1KiB node budget per byte. Realistic1024 fits; oversized1024 trims to858 with last-included cursor and rejects859.",
+    "Longest-prefix helper searches descending, not binary: arbitrary wire cursor lengths need not make candidate encoded sizes monotonic.",
+    "KLOC rules exclude tests but do not exclude guests; prototype KLOC gate fails existing host/bin and aggregate ceilings; kernel pinned baseline still passes unchanged.",
+    "Existing t2_sandbox_kill harness internally builds its native fixture with an explicit copy-local target dir and removes CARGO_TARGET_DIR. All top-level cargo commands override the inherited global target; no command builds in source repo."
+  ],
+  "evidence": {
+    "diff": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/17-3d-evidence/inband/prototype-inband.diff",
+    "diff_sha256": "14e292fbe7300eb101b56468e63622cfd665d6408620cf4e4347c1b3bf8480c5",
+    "smoke_log": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/17-3d-evidence/inband/smoke.log",
+    "measurements": "/home/lunarpulse/dev_ws/_bmad-output/implementation-artifacts/17-3d-evidence/inband/measurements.json"
+  }
+}

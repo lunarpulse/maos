@@ -2728,7 +2728,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&halt_registry),
         Arc::clone(&telemetry),
         Some(Arc::clone(&orchestrator)),
-        Some(Arc::clone(&log_recall_adapter)),
         Some(Arc::clone(&distillate_writer)),
         Some(Arc::clone(&self_telemetry)),
         None, // security_manager — constructed per-one-shot arm at v0.3-β
@@ -5347,7 +5346,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .with_mcp_port(Arc::clone(&live_mcp)
                                         as Arc<dyn researcher::ResearcherMcpPort>)
                                     .with_log_recall_port(
-                                        Arc::clone(&log_recall_adapter) as Arc<dyn LogRecallPort>,
+                                        Arc::new(
+                                            maos_bin::recall_mediation::MediatedLogRecall::new(
+                                                Arc::clone(&log_recall_adapter),
+                                                Arc::clone(&capability),
+                                                Arc::clone(&security),
+                                                Arc::clone(&transparency_log),
+                                                enterprise_runtime.clone(),
+                                                enterprise_pdp_runtime.clone(),
+                                                spirit_id.clone(),
+                                            ),
+                                        )
+                                            as Arc<dyn LogRecallPort>,
                                         Arc::clone(&researcher_pid_binding),
                                     );
                                 researcher_mcp_ref = Some(live_mcp);
@@ -5603,6 +5613,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 security: Arc::clone(&security),
                                 iac: Arc::clone(&iac),
                                 journal: Arc::clone(&transparency_log),
+                                log_recall: Arc::clone(&log_recall_adapter),
                                 lifecycle_journal: Arc::clone(&shared_journal),
                                 pid_by_spirit_id: Arc::clone(&pid_by_spirit_id),
                                 enterprise: enterprise_runtime.clone(),
@@ -6891,6 +6902,7 @@ description = "smoke test spirit successor"
                 },
                 loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
                 iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
+                log: maos_manifest::LogCapabilities::default(),
             };
             let smoke_class = maos_kernel_core::security::manifest::ClassSection {
                 name: "smoke-spirit".into(),
@@ -13180,6 +13192,7 @@ async fn smoke_abi_7_5a() -> Result<(), Box<dyn std::error::Error>> {
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
         loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
         iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
+        log: maos_manifest::LogCapabilities::default(),
     };
     let posture =
         PostureSection::from_toml_str("default = \"assistive\"\nallowed_max = \"assistive\"")?;

@@ -117,7 +117,7 @@ async fn researcher_distillate_is_consumable_in_the_fr17_digest_pattern() {
     // that resolves to a real frame). No butler crate involved.
     let tl = Arc::new(TransparencyLogAdapter::open_in_memory(0x_F17_DE5));
     let _ = tl.insert_frame_event(
-        FrameKind::InferenceCall,
+        FrameKind::McpInvocation,
         10,
         None,
         "inform",

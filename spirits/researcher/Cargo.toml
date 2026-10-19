@@ -36,3 +36,4 @@ tokio = { version = "1", features = ["macros", "rt", "time", "sync"] }
 tempfile = "3"
 sha2 = "0.10"
 toml = "0.8"
+rusqlite = { version = "0.31", features = ["bundled"] }

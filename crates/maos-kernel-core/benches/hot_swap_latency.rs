@@ -130,7 +130,6 @@ impl TestKernel {
             None,
             None,
             None,
-            None,
         ));
 
         let journal_path = tmp.path().join("journal.ndjson");

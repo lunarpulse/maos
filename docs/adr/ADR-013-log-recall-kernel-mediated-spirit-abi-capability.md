@@ -21,3 +21,37 @@ Source: _bmad-output/archives/architecture-maos.md:1506-1514
 This text is ported verbatim from the archived architecture generation. A newer registry reassigned **ADR-013** to the unrelated two-level `task.assign` decision; that is an ADR-number collision, not evidence that the `log.recall` decision was absent. ADR-058 is the new ADR explicitly anticipated by this record's cross-host revisit clause and narrowly amends the no-cross-Spirit-recall sentence through a separate, directional, manifest-consented capability.
 
 The archived `log.recall` authority is the intended target of citations in `prd/user-journeys.md`, `prd/domain-specific-requirements.md`, `prd/project-scoping-phased-development.md`, `prd/developer-tool-specific-requirements.md`, `epic-4`, `maos-kernel-implementation-guide.md`, `spirit-development-and-sharing.md`, and `archives/architecture-maos-minimal-ds.md`. Those citations resolve to this port; they do not resolve to the later `task.assign` use of the same number.
+
+## Note — local recall is incarnation-bound (ratified 2026-10-18)
+
+Ratified by the operator (Lunarpulse) on 2026-10-18 at Story 17-3d's preflight (epic-17 §R14, R17-163; charter D-17-3d-FW-04). Local `log.recall` and `log.fetch` are scoped to the caller's **incarnation**: the daemon run's Transparency Log boot nonce plus the scheduler pid, enforced in storage before any limit. The log persists across runs while scheduler pids restart at 1, so a pid alone names different Spirits in different runs. Recalling frames from an earlier incarnation is a **non-goal by design**: a Spirit carries what it needs across restarts through the memory tiers (FR28) and its distillates (FR30). A Spirit name is not proof of identity across packages; revisit only once a verified Spirit identity (package digest or signing key) exists. Story 17-3d implements the incarnation bound; participant scope (sender, receiver, addressed by role) and consent envelopes are delivered by Story `17-8-participant-recall-and-consent-envelopes`. The cross-wall extension (ADR-058) is unchanged.
+
+## Implementation note — Story 17-3d
+
+Local recall currently implements **emitter scope**, for both native and WASM
+Spirits: only the caller's emitted bus frames (raw kinds 0–6) and MCP
+invocations (18) in the current daemon run are disclosable. The ratified
+incarnation bound above is enforced with the Transparency Log boot nonce
+and scheduler pid; previous daemon runs are not recallable by design.
+Received frames and audit rows are omitted from recall and yield
+`scope-violation` on fetch. An inbound consent-bearing frame is withheld
+by emitter scope, not by consent evaluation; guest-asserted envelopes confer
+no recall permission.
+
+The participant and consent portion of the decision remains owned by
+`17-8-participant-recall-and-consent-envelopes`: sender/receiver/role
+participation, persisted consent envelopes, their evaluation, and header-only
+elision for both forms. `consent-withheld` is reserved in the
+`maos:spirit/recall@2.1.0` error variant for that implementation.
+The capability issuance quota window is owned by
+`17-9-capability-issuance-quota-window`; Story 17-3d reports exhaustion as
+`capability-denied` rather than changing quota-window policy.
+
+Native incremental polling may set `LogRecallFilter.order_by_insertion`.
+Its cursor frame id resolves to the retained frame's SQLite rowid, and the
+next page selects later appends before applying the limit. The Researcher
+uses this mode across idle ticks: wall-clock timestamps can move backward
+and cannot serve as an append watermark. Boot, emitter and disclosure
+predicates still apply; the metadata query does not load payloads. Cursor
+anchors must remain in the log. The WASM `@2.1.0` filter and its timestamp
+ordering are unchanged.

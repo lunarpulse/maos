@@ -30,6 +30,7 @@ use sha2::{Digest, Sha256};
 use crate::admission::Admitted;
 use crate::enterprise_identity::EnterpriseRuntime;
 use crate::enterprise_pdp_runtime::EnterprisePdpRuntime;
+use crate::recall_mediation::MediatedLogRecall;
 use crate::supervision::{BindingCore, LiveWorker, WorkerSupervision, WorkerSupervisor};
 use crate::worker_spawn::{issue_enterprise_governed_capability, GovernedMintError};
 #[cfg(target_os = "linux")]
@@ -41,6 +42,8 @@ use maos_kernel_core::capability::cap_tokens::monotonic_now_ns;
 
 /// Guest frames one turn may emit before the session is a protocol violation.
 pub const MAX_FRAMES_PER_TURN: usize = 64;
+/// Recall requests one active export may issue before the channel is closed.
+pub const MAX_RECALLS_PER_TURN: usize = 64;
 /// `TaskAssign` scopes one guest frame may request; more is a journaled denial.
 pub const MAX_SCOPES_PER_FRAME: usize = 16;
 /// Guest stderr rows journaled per session; the rest are dropped and counted.
@@ -59,6 +62,7 @@ pub struct SessionDeps {
     pub security: Arc<SecurityManagerAdapter>,
     pub iac: Arc<IacBusAdapter>,
     pub journal: Arc<TransparencyLogAdapter>,
+    pub log_recall: Arc<maos_iac::adapter::log_recall::LogRecallAdapter>,
     pub lifecycle_journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     pub pid_by_spirit_id: Arc<RwLock<BTreeMap<String, u32>>>,
     pub enterprise: Option<Arc<EnterpriseRuntime>>,
@@ -223,6 +227,7 @@ struct TurnState {
     lineage: IntentLineage,
     inbound_clock: u64,
     frames: usize,
+    recalls: usize,
     clock: u64,
 }
 
@@ -344,6 +349,11 @@ pub async fn run_admitted_session(
             let mut seed_id = None;
             let mut turn = TurnState::default();
             let mut diagnostics = DiagnosticBudget::default();
+            let recall = MediatedLogRecall::new(
+                Arc::clone(&deps.log_recall), Arc::clone(&deps.capability),
+                Arc::clone(&deps.security), Arc::clone(&deps.journal),
+                deps.enterprise.clone(), deps.pdp.clone(), admitted.spirit_id.clone(),
+            );
             let mut deadline = Some((Instant::now() + launch.turn_budget, "startup"));
             let runtime = tokio::runtime::Handle::current();
             loop {
@@ -382,6 +392,7 @@ pub async fn run_admitted_session(
                                     turn.lineage = frame.intent_lineage;
                                     turn.inbound_clock = frame.logical_clock;
                                     turn.frames = 0;
+                                    turn.recalls = 0;
                                     deadline = Some((Instant::now() + launch.turn_budget, "active turn"));
                                     tx.as_ref()
                                         .ok_or(SessionError::Protocol("session stdin already closed"))?
@@ -434,6 +445,27 @@ pub async fn run_admitted_session(
                         }
                     }
                     BridgePoll::Data(SubStream::Stdout, bytes) => {
+                        if maos_wasm_host::recall_wire::is_tagged(&bytes) {
+                            let reply = if !ready || !active {
+                                Err(crate::recall_mediation::ProtocolViolation("recall outside an active export"))
+                            } else if turn.recalls >= MAX_RECALLS_PER_TURN {
+                                Err(crate::recall_mediation::ProtocolViolation("recall budget exceeded"))
+                            } else {
+                                turn.recalls += 1;
+                                recall.serve_wire(admitted.pid, &bytes)
+                            };
+                            match reply {
+                                Err(error) => {
+                                    recall.channel_closed(admitted.pid, error.0);
+                                    return Err(SessionError::Protocol(error.0));
+                                }
+                                Ok(body) => tx.as_ref()
+                                    .ok_or(SessionError::Protocol("session stdin already closed"))?
+                                    .send(body)
+                                    .map_err(|error| SessionError::Bridge(error.to_string()))?,
+                            }
+                            continue;
+                        }
                         if !ready || !active {
                             return Err(SessionError::Protocol("data outside an active export"));
                         }

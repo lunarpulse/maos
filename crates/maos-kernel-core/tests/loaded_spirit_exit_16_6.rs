@@ -106,7 +106,6 @@ fn harness() -> Harness {
         None,
         None,
         None,
-        None,
     ));
     Harness {
         scheduler,

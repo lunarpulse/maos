@@ -230,3 +230,28 @@ covered_changes = [
   "maos_kernel_core::lifecycle::cli_wrapper::runtime::bridge_container",
 ]
 ratified_at = "2026-10-15"
+
+[[ratification]]
+proposal_id = "17-3d-log-capability"
+summary = "[capabilities.required.log] independent recall and fetch grants on manifest schema 5"
+adr_ref = "ADR-045,ADR-060,ADR-013"
+status = "ratified"
+covered_changes = ["LogCapabilities", "RawLogCapabilities", "CapabilitiesRequired", "RawCapabilitiesRequired"]
+ratified_at = "2026-10-18"
+
+[[ratification]]
+proposal_id = "17-3d-AC2-wit-spirit-2.1.0"
+summary = "Additive maos:spirit recall host import; lossless frame interface unchanged, emitter-scoped pages and fetch, final 2.x error vocabulary"
+adr_ref = "ADR-013,ADR-031,ADR-060"
+status = "ratified"
+covered_changes = [
+  "maos:spirit@2.1.0",
+  "recall",
+  "recall-cursor",
+  "recall-filter",
+  "recall-entry",
+  "recall-page",
+  "fetch-response",
+  "recall-error",
+]
+ratified_at = "2026-10-18"

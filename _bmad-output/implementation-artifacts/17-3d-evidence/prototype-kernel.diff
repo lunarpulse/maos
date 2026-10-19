@@ -1,0 +1,71 @@
+diff --git a/crates/maos-kernel-core/src/security/mod.rs b/crates/maos-kernel-core/src/security/mod.rs
+index e27b168..8e138bc 100644
+--- a/crates/maos-kernel-core/src/security/mod.rs
++++ b/crates/maos-kernel-core/src/security/mod.rs
+@@ -497,6 +497,7 @@ impl SecurityManagerAdapter {
+             declared_scopes,
+             spirit_id: spirit_id.into(),
+             output_shape_predicate: predicate,
++            inherited_recall_fd: None,
+         })
+     }
+ 
+diff --git a/crates/maos-kernel-core/src/security/sandbox/linux.rs b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+index 7a91acc..681cd2a 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/linux.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/linux.rs
+@@ -42,6 +42,7 @@ pub fn spawn_sandboxed(
+     let scopes = spec.declared_scopes.clone();
+     let mem_limit = spec.resolved_caps.memory_max_mb;
+     let fd_limit = spec.resolved_caps.fd_max;
++    let inherited_recall_fd = spec.inherited_recall_fd;
+ 
+     // --- Parent-side pre-computation (all allocation happens here) ---
+ 
+@@ -100,6 +101,14 @@ pub fn spawn_sandboxed(
+     // If any sandbox step fails, we return `Err` which aborts the exec.
+     unsafe {
+         command.pre_exec(move || {
++            if let Some(fd) = inherited_recall_fd {
++                // SAFETY: fcntl is async-signal-safe; fd stays open through spawn.
++                // Preserve descriptor flags except CLOEXEC, only in this child.
++                let flags = libc::fcntl(fd, libc::F_GETFD);
++                if flags == -1 || libc::fcntl(fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
++                    return Err(io::Error::last_os_error());
++                }
++            }
+             // Writing zero joins this process before guest code can execute.
+             if let Some(procs) = cgroup_procs.as_ref() {
+                 let rc = libc::write(procs.as_raw_fd(), b"0".as_ptr().cast(), 1);
+@@ -329,6 +338,9 @@ fn build_seccomp_filters(tier: SandboxTier) -> Result<Vec<seccompiler::BpfProgra
+         libc::SYS_clone3,
+         // Wasmtime's executable-memory backing, proven by the 17-3c omission probe.
+         libc::SYS_memfd_create,
++        // Recall uses the inherited connected socket on both supported arches.
++        libc::SYS_sendto,
++        libc::SYS_recvfrom,
+     ];
+ 
+     for &syscall in basic_syscalls.iter().chain(ARCH_SYSCALLS) {
+diff --git a/crates/maos-kernel-core/src/security/sandbox/mod.rs b/crates/maos-kernel-core/src/security/sandbox/mod.rs
+index 28e697a..60c0954 100644
+--- a/crates/maos-kernel-core/src/security/sandbox/mod.rs
++++ b/crates/maos-kernel-core/src/security/sandbox/mod.rs
+@@ -38,6 +38,9 @@ pub struct SandboxSpec {
+     /// Defaults to `None`; populated when admission receives a parsed manifest
+     /// with the `[output_shape]` section.
+     pub output_shape_predicate: Option<crate::security::manifest::OutputShapePredicate>,
++    /// Connected recall socket; the caller keeps it open until spawn returns.
++    /// Linux clears CLOEXEC only in the child; pass its number in runner argv.
++    pub inherited_recall_fd: Option<i32>,
+ }
+ 
+ impl SandboxSpec {
+@@ -49,6 +52,7 @@ impl SandboxSpec {
+             declared_scopes: vec![],
+             spirit_id: String::new(),
+             output_shape_predicate: None,
++            inherited_recall_fd: None,
+         }
+     }
+ }

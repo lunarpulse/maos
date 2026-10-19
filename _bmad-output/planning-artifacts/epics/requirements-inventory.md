@@ -554,7 +554,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR21/FR25/FR52 real Workers (PARTIAL) | 19-1, 19-3 |
 | FR23b clock skew, partition, revocation (PARTIAL) | 21-3 |
 | FR28 kernel quota enforcement (PARTIAL) | 21-4 |
-| FR29 `log.recall` for a non-Rust form (PARTIAL: in-proc only) | 17-3d (inherited-descriptor side channel, ADR-060 §Amendment) |
+| FR29 `log.recall` for a non-Rust form (PARTIAL: in-proc only) | 17-3d (in-band on the runner's stdio, ADR-060 §Amendment 2026-10-18): form parity — emitter-scoped, incarnation-bound, mediated recall for WASM; FR29's participant scope and consent-envelope evaluation for both forms → `17-8-participant-recall-and-consent-envelopes` (epic-17 R17-156, operator ruling 2026-10-18); recalling an earlier incarnation is a non-goal by design (ADR-013 note, ruled 2026-10-18, R17-163) |
 | FR33 per-language templates (PARTIAL: Rust + TS harness) | 17-3b (`templates/spirit-ts` → `wasm-component` via componentize-js); Python later via componentize-py |
 | FR35/FR36 publish to a real registry, verified install (PARTIAL) | 20-1 |
 | FR37 vetter-side issuance (PARTIAL: zero callers) | 20-1 |

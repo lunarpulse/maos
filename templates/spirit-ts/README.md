@@ -1,7 +1,7 @@
 # {{crate_name}}
 
 A TypeScript MAOS Spirit scaffold that builds a `wasm-component` implementing
-`maos:spirit@2.0.0`.
+`maos:spirit@2.1.0`.
 
 ## Requirements
 
@@ -58,3 +58,19 @@ runner's stderr and journaled as `spirit.diagnostic` rows, separate from framed
 output. Diagnostics are untrusted guest text, bounded per session (256 rows /
 64 KiB; overflow counted in `dropped_diagnostics`); over-long lines are
 truncated with a marker.
+
+## Recall demo
+
+The schema-5 manifest grants `[capabilities.required.log]` with `recall = true`
+and `fetch = true`. During `handleFrame`, the guest imports
+`maos:spirit/recall@2.1.0`, recalls up to 16 entries, then fetches the inbound
+frame id before echoing the frame. These imports are available only during
+`handleFrame`, not lifecycle hooks.
+
+Recall is emitter-only within this daemon run today. The operator seed was
+emitted by pid 0, so its fetch returns `scope-violation`; this is an expected
+outcome, not a failed demo. Received frames become fetchable with
+`17-8-participant-recall-and-consent-envelopes`, so a successful fetch is also
+accepted. Imported result errors are thrown with the variant in `.payload`;
+only fetch's `scope-violation` is handled, while all recall errors and other
+fetch errors (including `capability-denied` and `unavailable`) propagate.

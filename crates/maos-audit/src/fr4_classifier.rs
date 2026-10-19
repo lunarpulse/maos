@@ -514,8 +514,8 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     // `iac.send` token, so they are token-bearing sites; a row a caller left
     // tokenless still classifies `Call` (the default) and reds the view.
     WriterShapeEntry::call("log_recall.rs", "journal_cross_wall_recall", 0),
-    WriterShapeEntry::call("log_recall.rs", "recall", 0),
-    WriterShapeEntry::call("log_recall.rs", "fetch", 0),
+    WriterShapeEntry::call("log_recall.rs", "recall_inner", 0),
+    WriterShapeEntry::call("log_recall.rs", "fetch_inner", 0),
     WriterShapeEntry::call("distillate.rs", "write_distillate", 0),
 ];
 

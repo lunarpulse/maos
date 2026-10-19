@@ -1,0 +1,404 @@
+{
+  "run_id": 39179015200,
+  "html_url": "https://github.com/lunarpulse/maos/actions/runs/39179015200",
+  "head_sha": "344f956d976d6ac781250c9e38a142139932c0ee",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 117827603455,
+      "name": "recall-17-3d (ubuntu-24.04)",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017742",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)",
+          "success"
+        ],
+        [
+          "Install the pinned component fixture assembler",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "success"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "success"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3c gates under 17-3d (ubuntu-24.04)",
+          "rc=0 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 284.31s failed="
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-24.04)",
+          "rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 28.76s"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-24.04)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.14s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 191.41s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s"
+        ]
+      ]
+    },
+    {
+      "id": 117827603553,
+      "name": "recall-17-3d (ubuntu-26.04)",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017744",
+      "labels": [
+        "ubuntu-26.04"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)",
+          "success"
+        ],
+        [
+          "Install the pinned component fixture assembler",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "success"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "success"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3c gates under 17-3d (ubuntu-26.04)",
+          "rc=0 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 247.52s failed="
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-26.04)",
+          "rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.79s"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-26.04)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.13s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 165.97s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+        ]
+      ]
+    },
+    {
+      "id": 117827603594,
+      "name": "recall-17-3d (ubuntu-24.04-arm)",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017745",
+      "labels": [
+        "ubuntu-24.04-arm"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)",
+          "success"
+        ],
+        [
+          "Install the pinned component fixture assembler",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "success"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "success"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3c gates under 17-3d (ubuntu-24.04-arm)",
+          "rc=0 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 253.60s failed="
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.35s"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-24.04-arm)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.22s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 173.06s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+        ]
+      ]
+    },
+    {
+      "id": 117827603596,
+      "name": "recall-17-3d (ubuntu-26.04-arm)",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017743",
+      "labels": [
+        "ubuntu-26.04-arm"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Build current forbidden-syscall probes (T2 kill, auxv, Rust benign controls)",
+          "success"
+        ],
+        [
+          "Install the pinned component fixture assembler",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "success"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "success"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=spawned-17-3c.log exit=0 suites=[('ok', '22', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3c gates under 17-3d (ubuntu-26.04-arm)",
+          "rc=0 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 265.30s failed="
+        ],
+        [
+          "notice",
+          "17-2 checked execution",
+          "log=recall-17-3d.log exit=0 suites=[('ok', '16', '0', '0')]"
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "rc=0 fail=0 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.68s"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-26.04-arm)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.22s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 175.10s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+        ]
+      ]
+    }
+  ]
+}

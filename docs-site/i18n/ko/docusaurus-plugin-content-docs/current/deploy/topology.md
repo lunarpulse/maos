@@ -137,6 +137,8 @@ MAOS 바이너리가 빌드 타임에 **모든 네트워크 표면을 컴파일�
 - Linux에서 WASM-component Spirits는 seccomp allow-list, Landlock, 위임된 cgroup v2 subtree가 적용된 `T2` runner 프로세스에서 실행됩니다.
 - 각 Worker는 Linux 전용 `T3` rootless container에서 실행됩니다. 컨테이너는 `--network=none`, 읽기 전용 파일시스템을 사용하고 호스트 홈을 마운트하지 않으며, `/proxy/egress.sock`의 데몬 proxy socket을 통해서만 egress합니다.
 
+WASM log recall은 T2에 디스크립터, 소켓, 시스템 호출을 추가하지 않습니다. 요청과 응답은 runner의 기존 ADR-032 stdin/stdout 채널을 사용합니다. 데몬은 허용된 호출마다 capability를 발급하고 모든 호출과 거부를 감사 로그에 기록합니다. 새로운 배포 조건이나 T2 allow-list 변경은 없습니다.
+
 **설계상 격리되지 않는 항목:**
 
 - `rust-inproc` Spirits는 데몬 프로세스에서 실행됩니다.

@@ -73,7 +73,6 @@ impl World {
             None,
             None,
             None,
-            None,
         ));
         let journal = Arc::new(
             maos_kernel_core::journal::JournalAdapter::open(&dir.join("lifecycle.ndjson")).unwrap(),

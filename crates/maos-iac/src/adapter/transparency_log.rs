@@ -208,12 +208,30 @@ pub struct TransparencyLogEntry {
     pub origin: FrameOrigin,
 }
 
+/// Payload-free row metadata. The raw kind is deliberately not decoded through
+/// the audit reader's compatibility fallback. `payload_len` is SQLite's stored
+/// blob length, so consumers can reject oversized fetches before reading it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransparencyLogMetadata {
+    pub frame_id: [u8; 16],
+    pub timestamp_ns: u64,
+    pub spirit_pid: u32,
+    pub boot_nonce: u64,
+    pub raw_kind: i64,
+    pub intent: String,
+    pub payload_len: u64,
+}
+
 /// Filter for `query_frames` and `query_approvals`. v0.1-β supports the
 /// minimum needed by Story 1b.5b's `maosctl audit query --spirit <name>`;
 /// extensions (subject-access, posture-delta) ship in Story 9.1.
 #[derive(Debug, Clone, Default)]
 pub struct FrameFilter {
     pub spirit_pid: Option<u32>,
+    pub boot_nonce: Option<u64>,
+    /// Restrict the raw SQLite kind to Spirit-disclosable bus/MCP frames.
+    pub disclosable_kinds_only: bool,
+    pub intent: Option<String>,
     pub kind: Option<FrameKind>,
     pub correlation_id: Option<String>,
     pub since_ns: Option<u64>,
@@ -227,12 +245,16 @@ pub struct FrameFilter {
     /// Story 6.1 — filter by exact frame_id (for retract authority lookup).
     pub frame_id: Option<[u8; 16]>,
     /// Keyset-pagination cursor — exclusive lower bound on `(timestamp_ns, frame_id)`.
-    /// When both are `Some`, the query adds `WHERE (timestamp_ns, frame_id) > (?cursor_ts, ?cursor_id)`.
+    /// Both components are required unless `order_by_insertion` is set.
     pub cursor_timestamp_ns: Option<u64>,
+    /// In insertion order, resolve this frame's rowid as the exclusive anchor.
     pub cursor_frame_id: Option<[u8; 16]>,
     /// Exclusive insertion-order cursor (`rowid > cursor_insertion_id`).
     pub cursor_insertion_id: Option<i64>,
 }
+
+const FRAME_METADATA_PROJECTION: &str =
+    "frame_id, timestamp_ns, spirit_pid, boot_nonce, kind, intent, length(payload_redacted)";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PersistedLegalHold {
@@ -308,6 +330,8 @@ CREATE INDEX IF NOT EXISTS idx_tlog_spirit_pid
     ON transparency_log(spirit_pid, timestamp_ns);
 CREATE INDEX IF NOT EXISTS idx_tlog_kind
     ON transparency_log(kind, timestamp_ns);
+CREATE INDEX IF NOT EXISTS idx_tlog_boot_pid_ts
+    ON transparency_log(boot_nonce, spirit_pid, timestamp_ns, frame_id);
 
 -- Story 6.1 — retraction companion table.
 -- Per AC2: original row is APPEND-ONLY-PRESERVED.
@@ -531,7 +555,9 @@ impl TransparencyLogAdapter {
         let _ = conn.execute_batch("ALTER TABLE transparency_log ADD COLUMN correlation_id TEXT;");
         conn.execute_batch(
             "CREATE INDEX IF NOT EXISTS idx_tlog_correlation
-             ON transparency_log(correlation_id, timestamp_ns);",
+             ON transparency_log(correlation_id, timestamp_ns);
+             CREATE INDEX IF NOT EXISTS idx_tlog_boot_pid_ts
+             ON transparency_log(boot_nonce, spirit_pid, timestamp_ns, frame_id);",
         )?;
         Ok(Self {
             inner: Mutex::new(TransparencyLogInner {
@@ -590,6 +616,14 @@ impl TransparencyLogAdapter {
             redaction,
             mailbox: MailboxStub::new(),
         }
+    }
+
+    /// Boot incarnation bound to writes and local Spirit recall.
+    pub fn boot_nonce(&self) -> u64 {
+        self.inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned")
+            .boot_nonce
     }
 
     /// Generate a unique 16-byte frame ID using ULID.
@@ -1471,67 +1505,11 @@ impl TransparencyLogAdapter {
             .inner
             .lock()
             .expect("TransparencyLogAdapter inner poisoned");
-        let mut sql = String::from(
-            "SELECT rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
-                    boot_nonce, capability_token, kind, intent, correlation_id, payload_redacted,
-                    origin FROM transparency_log",
+        let (sql, params) = Self::frame_query(
+            filter,
+            "rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
+             boot_nonce, capability_token, kind, intent, correlation_id, payload_redacted, origin",
         );
-        let mut where_clauses: Vec<String> = Vec::new();
-        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-
-        if let Some(pid) = filter.spirit_pid {
-            where_clauses.push("spirit_pid = ?".to_string());
-            params.push(Box::new(pid as i64));
-        }
-        if let Some(fid) = filter.frame_id {
-            where_clauses.push("frame_id = ?".to_string());
-            params.push(Box::new(fid.to_vec()));
-        }
-        if let Some(kind) = filter.kind {
-            where_clauses.push("kind = ?".to_string());
-            params.push(Box::new(kind as i64));
-        }
-        if let Some(correlation_id) = filter.correlation_id {
-            where_clauses.push("correlation_id = ?".to_string());
-            params.push(Box::new(correlation_id));
-        }
-        if let Some(since) = filter.since_ns {
-            where_clauses.push("timestamp_ns >= ?".to_string());
-            params.push(Box::new(since as i64));
-        }
-        if let Some(until) = filter.until_ns {
-            where_clauses.push("timestamp_ns <= ?".to_string());
-            params.push(Box::new(until as i64));
-        }
-        if let (Some(cursor_ts), Some(cursor_fid)) =
-            (filter.cursor_timestamp_ns, filter.cursor_frame_id)
-        {
-            where_clauses.push("(timestamp_ns, frame_id) > (? , ?)".to_string());
-            params.push(Box::new(cursor_ts as i64));
-            params.push(Box::new(cursor_fid.to_vec()));
-        }
-        if let Some(cursor) = filter.cursor_insertion_id {
-            where_clauses.push("rowid > ?".to_string());
-            params.push(Box::new(cursor));
-        }
-
-        if !where_clauses.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&where_clauses.join(" AND "));
-        }
-        let order_key = if filter.order_by_insertion {
-            "rowid"
-        } else {
-            "timestamp_ns, frame_id"
-        };
-        if filter.descending {
-            sql.push_str(&format!(" ORDER BY {order_key} DESC"));
-        } else {
-            sql.push_str(&format!(" ORDER BY {order_key} ASC"));
-        }
-        if let Some(limit) = filter.limit {
-            sql.push_str(&format!(" LIMIT {limit}"));
-        }
 
         let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
         let params_refs: Vec<&dyn rusqlite::types::ToSql> =
@@ -1589,6 +1567,142 @@ impl TransparencyLogAdapter {
             entries.push(row.map_err(AuditError::SqliteRead)?);
         }
         Ok(entries)
+    }
+
+    /// Query metadata without selecting or materializing any payload blobs.
+    pub fn query_frame_metadata(
+        &self,
+        filter: FrameFilter,
+    ) -> Result<Vec<TransparencyLogMetadata>, AuditError> {
+        let inner = self
+            .inner
+            .lock()
+            .expect("TransparencyLogAdapter inner poisoned");
+        let (sql, params) = Self::frame_query(filter, FRAME_METADATA_PROJECTION);
+        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt
+            .query_map(params_refs.as_slice(), |row| {
+                let blob: Vec<u8> = row.get(0)?;
+                let frame_id = blob.try_into().map_err(|blob: Vec<u8>| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        0,
+                        rusqlite::types::Type::Blob,
+                        Box::new(AuditError::MalformedFrameId(blob.len())),
+                    )
+                })?;
+                Ok(TransparencyLogMetadata {
+                    frame_id,
+                    timestamp_ns: row.get::<_, i64>(1)? as u64,
+                    spirit_pid: row.get::<_, i64>(2)? as u32,
+                    boot_nonce: row.get::<_, i64>(3)? as u64,
+                    raw_kind: row.get(4)?,
+                    intent: row.get(5)?,
+                    payload_len: row.get::<_, i64>(6)? as u64,
+                })
+            })
+            .map_err(AuditError::SqliteRead)?;
+        rows.map(|row| row.map_err(AuditError::SqliteRead))
+            .collect()
+    }
+
+    /// Read raw kind and stored payload length by id, without loading the blob.
+    /// Fetch callers must scope-check this metadata and enforce their byte bound
+    /// before querying the payload.
+    pub fn query_frame_metadata_by_id(
+        &self,
+        frame_id: [u8; 16],
+    ) -> Result<Option<TransparencyLogMetadata>, AuditError> {
+        Ok(self
+            .query_frame_metadata(FrameFilter {
+                frame_id: Some(frame_id),
+                limit: Some(1),
+                ..Default::default()
+            })?
+            .pop())
+    }
+
+    fn frame_query(
+        filter: FrameFilter,
+        projection: &str,
+    ) -> (String, Vec<Box<dyn rusqlite::types::ToSql>>) {
+        let mut sql = format!("SELECT {projection} FROM transparency_log");
+        let mut where_clauses: Vec<String> = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+        if let Some(boot_nonce) = filter.boot_nonce {
+            where_clauses.push("boot_nonce = ?".to_string());
+            params.push(Box::new(boot_nonce as i64));
+        }
+        if let Some(pid) = filter.spirit_pid {
+            where_clauses.push("spirit_pid = ?".to_string());
+            params.push(Box::new(pid as i64));
+        }
+        if let Some(fid) = filter.frame_id {
+            where_clauses.push("frame_id = ?".to_string());
+            params.push(Box::new(fid.to_vec()));
+        }
+        if filter.disclosable_kinds_only {
+            where_clauses.push("kind IN (0,1,2,3,4,5,6,18)".to_string());
+        }
+        if let Some(kind) = filter.kind {
+            where_clauses.push("kind = ?".to_string());
+            params.push(Box::new(kind as i64));
+        }
+        if let Some(intent) = filter.intent {
+            where_clauses.push("intent = ?".to_string());
+            params.push(Box::new(intent));
+        }
+        if let Some(correlation_id) = filter.correlation_id {
+            where_clauses.push("correlation_id = ?".to_string());
+            params.push(Box::new(correlation_id));
+        }
+        if let Some(since) = filter.since_ns {
+            where_clauses.push("timestamp_ns >= ?".to_string());
+            params.push(Box::new(since as i64));
+        }
+        if let Some(until) = filter.until_ns {
+            where_clauses.push("timestamp_ns <= ?".to_string());
+            params.push(Box::new(until as i64));
+        }
+        if filter.order_by_insertion {
+            if let Some(cursor_fid) = filter.cursor_frame_id {
+                where_clauses.push(
+                    "rowid > (SELECT rowid FROM transparency_log WHERE frame_id = ?)".to_string(),
+                );
+                params.push(Box::new(cursor_fid.to_vec()));
+            }
+        } else if let (Some(cursor_ts), Some(cursor_fid)) =
+            (filter.cursor_timestamp_ns, filter.cursor_frame_id)
+        {
+            where_clauses.push("(timestamp_ns, frame_id) > (? , ?)".to_string());
+            params.push(Box::new(cursor_ts as i64));
+            params.push(Box::new(cursor_fid.to_vec()));
+        }
+        if let Some(cursor) = filter.cursor_insertion_id {
+            where_clauses.push("rowid > ?".to_string());
+            params.push(Box::new(cursor));
+        }
+        if !where_clauses.is_empty() {
+            sql.push_str(" WHERE ");
+            sql.push_str(&where_clauses.join(" AND "));
+        }
+        let order_key = if filter.order_by_insertion {
+            "rowid"
+        } else {
+            "timestamp_ns, frame_id"
+        };
+        if filter.descending {
+            sql.push_str(&format!(" ORDER BY {order_key} DESC"));
+        } else {
+            sql.push_str(&format!(" ORDER BY {order_key} ASC"));
+        }
+        if let Some(limit) = filter.limit {
+            sql.push_str(" LIMIT ?");
+            params.push(Box::new(limit as i64));
+        }
+        (sql, params)
     }
 
     /// Read-side: look up a single frame by its primary key.
@@ -2164,6 +2278,31 @@ impl maos_domain::halt::HaltJournal for TransparencyLogAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recall_metadata_query_projects_only_payload_length_before_limit() {
+        let (sql, params) = TransparencyLogAdapter::frame_query(
+            FrameFilter {
+                boot_nonce: Some(12),
+                spirit_pid: Some(7),
+                disclosable_kinds_only: true,
+                intent: Some("wanted".into()),
+                limit: Some(1025),
+                ..Default::default()
+            },
+            FRAME_METADATA_PROJECTION,
+        );
+        let (projection, predicates) = sql.split_once(" FROM ").unwrap();
+        assert_eq!(projection.matches("payload_redacted").count(), 1);
+        assert!(projection.ends_with("length(payload_redacted)"));
+        assert!(!projection.contains(", payload_redacted"));
+        assert!(predicates.contains("boot_nonce = ?"));
+        assert!(predicates.contains("spirit_pid = ?"));
+        assert!(predicates.contains("kind IN (0,1,2,3,4,5,6,18)"));
+        assert!(predicates.contains("intent = ?"));
+        assert!(predicates.ends_with("ORDER BY timestamp_ns, frame_id ASC LIMIT ?"));
+        assert_eq!(params.len(), 4);
+    }
 
     #[test]
     fn open_in_memory_succeeds() {

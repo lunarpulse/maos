@@ -1,4 +1,5 @@
-import type { IacFrame } from "maos:spirit/spirit@2.0.0";
+import type { IacFrame } from "maos:spirit/spirit@2.1.0";
+import { recall, fetch } from "maos:spirit/recall@2.1.0";
 
 import { halt } from "./halt.js";
 
@@ -15,6 +16,25 @@ let started = false;
 export function handleFrame(frame: IacFrame): IacFrame[] {
   if (!started) {
     halt("handleFrame called before onStart");
+  }
+
+  // Recall is emitter-only in this daemon run, not participant-scoped yet.
+  recall({ limit: 16 });
+  try {
+    // The operator seed's emitter is pid 0, so fetching it is scope-violation.
+    // Received frames become fetchable with
+    // 17-8-participant-recall-and-consent-envelopes; success is normal too.
+    fetch(frame.frameId);
+  } catch (error) {
+    // componentize-js wraps imported result errors in ComponentError.payload.
+    if (
+      typeof error !== "object" || error === null ||
+      !("payload" in error) ||
+      typeof error.payload !== "object" || error.payload === null ||
+      !("tag" in error.payload) || error.payload.tag !== "scope-violation"
+    ) {
+      throw error;
+    }
   }
 
   return [frame];

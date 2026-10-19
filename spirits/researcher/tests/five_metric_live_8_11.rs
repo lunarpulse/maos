@@ -85,7 +85,7 @@ fn seed(tl: &Arc<TransparencyLogAdapter>) {
             hedges: vec!["likely".into()],
         };
         let _ = tl.insert_frame_event(
-            FrameKind::InferenceCall,
+            FrameKind::McpInvocation,
             10,
             None,
             "inform",

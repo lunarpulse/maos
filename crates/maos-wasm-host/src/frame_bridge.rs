@@ -1,4 +1,4 @@
-//! Codec between domain `IacFrame` values and the `maos:spirit@2.0.0`
+//! Codec between domain `IacFrame` values and the `maos:spirit@2.1.0`
 //! WIT-generated `IacFrame` the wasmtime guest speaks.
 //!
 //! The runner decodes ADR-032 CBOR bytes into a domain frame, lowers it into
@@ -28,7 +28,7 @@ pub enum BridgeError {
     BadFrameIdLen(usize),
     #[error("argv-prefix-hash is not 32 bytes (was {0})")]
     BadHashLen(usize),
-    #[error("domain {ty} variant is not representable by maos:spirit@2.0.0")]
+    #[error("domain {ty} variant is not representable by maos:spirit@2.1.0")]
     Unrepresentable { ty: &'static str },
 }
 
@@ -121,6 +121,16 @@ fn origin_to_wit(o: maos_domain::invariants::i3::FrameOrigin) -> wit::FrameOrigi
         SpiritAuto => wit::FrameOrigin::SpiritAuto,
         SpiritDraftedHumanApproved => wit::FrameOrigin::SpiritDraftedHumanApproved,
         Kernel => wit::FrameOrigin::Kernel,
+    }
+}
+
+/// The exact WIT `frame-origin` case name carried by fetched recall replies.
+pub fn origin_case_name(origin: maos_domain::invariants::i3::FrameOrigin) -> &'static str {
+    match origin_to_wit(origin) {
+        wit::FrameOrigin::HumanAuthored => "human-authored",
+        wit::FrameOrigin::SpiritAuto => "spirit-auto",
+        wit::FrameOrigin::SpiritDraftedHumanApproved => "spirit-drafted-human-approved",
+        wit::FrameOrigin::Kernel => "kernel",
     }
 }
 

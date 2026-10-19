@@ -12,6 +12,10 @@ description = "A MAOS WebAssembly-component Spirit scaffolded from templates/spi
 [capabilities.required.iac]
 send = ["spirit:peer"]
 
+[capabilities.required.log]
+recall = true
+fetch = true
+
 [posture]
 default = "assistive"
 allowed_max = "assistive"

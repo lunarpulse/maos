@@ -1,0 +1,513 @@
+{
+  "story": "17-3d-wasm-log-recall",
+  "date": "2026-10-17",
+  "scope": "Sizing prototype only; not implementation, authorization, or a production grant.",
+  "provenance": {
+    "source_head": "39cd7966a354917b2a9cf805faa2462cb05c9677",
+    "isolation": "git archive 39cd7966 | tar -x -C /tmp/maos-17-3d-proto; git init and base commit; clean base worktree /tmp/maos-17-3d-base",
+    "base_commit": "387adae1324f6e9a3634e20d9fc49605e69caca3",
+    "prototype_commit": "b895d4e89980af165daa80e647b551f7668c4e8c",
+    "diff_sha256": "d372286340ea8cac8ee865ac7f1ee25780f2fbd0f1849a81aeeea7e03fd4a3f7",
+    "diff_scope": [
+      "crates/maos-kernel-core/src",
+      "crates/maos-domain/src"
+    ],
+    "smoke_sha256": "e8c2ee0b91d83a390f956f5d59d9d47985e3d8212f395711ea5387c2b7f8c7c1"
+  },
+  "instrument": {
+    "physical": "Rust str.lines().count() equivalent over each crates/<crate>/src/**/*.rs (all files are LF text), xtask/src/check_kernel_baseline.rs:470-483",
+    "tokei": "tokei --output json --types Rust -e target -e tests -e benches -e examples -e fuzz -e spirits -e crates/maos-kernel-core/src/memory/spill_test_faults.rs . ; run from isolated workspace root; group Rust.reports[].stats.code by crates/<crate> prefix",
+    "exclusion_cite": "xtask/src/kloc_check.rs:294-318",
+    "tokei_version": "14.0.0"
+  },
+  "measurements": {
+    "base": {
+      "maos-kernel-core": {
+        "physical": 26311,
+        "files": 94,
+        "tokei": 20545
+      },
+      "maos-domain": {
+        "physical": 14212,
+        "files": 67,
+        "tokei": 9615
+      },
+      "maos-exec-deps": {
+        "physical": 430,
+        "files": 1,
+        "tokei": 358
+      }
+    },
+    "prototype": {
+      "maos-kernel-core": {
+        "physical": 26328,
+        "files": 94,
+        "tokei": 20557
+      },
+      "maos-domain": {
+        "physical": 14212,
+        "files": 67,
+        "tokei": 9615
+      },
+      "maos-exec-deps": {
+        "physical": 430,
+        "files": 1,
+        "tokei": 358
+      }
+    }
+  },
+  "deltas": {
+    "maos-kernel-core": {
+      "physical": 17,
+      "tokei": 12,
+      "files": 0
+    },
+    "maos-domain": {
+      "physical": 0,
+      "tokei": 0,
+      "files": 0
+    },
+    "maos-exec-deps": {
+      "physical": 0,
+      "tokei": 0,
+      "files": 0
+    }
+  },
+  "base_pins": {
+    "kernel_physical": {
+      "pinned": 26311,
+      "measured": 26311,
+      "matches": true,
+      "cite": "xtask/kernel-core-baseline.toml:505"
+    },
+    "tokei": {
+      "maos-kernel-core": {
+        "pinned": 20545,
+        "measured": 20545,
+        "matches": true
+      },
+      "maos-domain": {
+        "pinned": 9615,
+        "measured": 9615,
+        "matches": true
+      },
+      "maos-exec-deps": {
+        "pinned": 358,
+        "measured": 358,
+        "matches": true
+      }
+    }
+  },
+  "per_file_deltas": {
+    "crates/maos-kernel-core/src/security/mod.rs": {
+      "physical_base": 671,
+      "physical_prototype": 672,
+      "physical_delta": 1,
+      "tokei_base": 452,
+      "tokei_prototype": 453,
+      "tokei_delta": 1
+    },
+    "crates/maos-kernel-core/src/security/sandbox/linux.rs": {
+      "physical_base": 597,
+      "physical_prototype": 609,
+      "physical_delta": 12,
+      "tokei_base": 470,
+      "tokei_prototype": 479,
+      "tokei_delta": 9
+    },
+    "crates/maos-kernel-core/src/security/sandbox/mod.rs": {
+      "physical_base": 262,
+      "physical_prototype": 266,
+      "physical_delta": 4,
+      "tokei_base": 202,
+      "tokei_prototype": 204,
+      "tokei_delta": 2
+    }
+  },
+  "design": {
+    "descriptor": "Option<i32> inherited_recall_fd on kernel SandboxSpec; borrowed raw descriptor, caller keeps socket open until spawn returns. Linux pre_exec copies fd and clears FD_CLOEXEC via F_GETFD/F_SETFD; parent flags unchanged. No fixed dup2 target needed because caller passes actual descriptor number in argv, matching spike --recall-fd.",
+    "syscall_tables": "sendto/recvfrom added to common basic_syscalls, which feeds both x86_64 and aarch64 filters (HEAD linux.rs:334-335,365-367); no architecture-specific duplicate needed.",
+    "prototype_sites": [
+      "crates/maos-kernel-core/src/security/sandbox/mod.rs:41-43,55",
+      "crates/maos-kernel-core/src/security/mod.rs:500",
+      "crates/maos-kernel-core/src/security/sandbox/linux.rs:45,104-111,341-343"
+    ]
+  },
+  "unsafe": {
+    "new_unsafe_blocks": 0,
+    "new_unsafe_operations": 2,
+    "sites": [
+      {
+        "path": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "line": 107,
+        "operation": "libc::fcntl(fd, F_GETFD)"
+      },
+      {
+        "path": "crates/maos-kernel-core/src/security/sandbox/linux.rs",
+        "line": 108,
+        "operation": "libc::fcntl(fd, F_SETFD, flags & !FD_CLOEXEC)"
+      }
+    ],
+    "zone": "inside existing unsafe/pre_exec block; // SAFETY comment at prototype linux.rs:105; allowed by linux.rs:13, sandbox mod.rs:3-6; runtime.rs:1 forbids unsafe.",
+    "i9": "SandboxSpec already i9_exempt at HEAD security/sandbox/mod.rs:28-30; no new exemption.",
+    "check_unsafe": "Not run. It examines the supplied path (xtask/src/check_unsafe.rs:65-71); current default is crates/maos-kernel-core/capability (xtask/src/main.rs:158-161), not the sandbox zone."
+  },
+  "builds": {
+    "commands": [
+      "cargo fmt --all",
+      "cargo build --offline --locked -p maos-kernel-core --lib",
+      "cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe"
+    ],
+    "base_exit": 0,
+    "prototype_exit": 0,
+    "fmt_exit": 0,
+    "base_kernel_warnings": 43,
+    "prototype_kernel_warnings": 43,
+    "new_warning_diagnostics": [],
+    "note": "A first dependency-warming build overlapped prototype source edits and is explicitly not used as baseline; uncontaminated base was subsequently built in the clean base worktree. No workspace-wide build/tests run."
+  },
+  "smoke": {
+    "real_kernel_spawn": "spawn_sandboxed(SandboxSpec::new_for_test(T2), Command(current_exe))",
+    "green": {
+      "child_exit": 0,
+      "signal": null,
+      "reply": "pong"
+    },
+    "omit_sendto": {
+      "child_exit": 72,
+      "signal": null,
+      "errno": 1,
+      "name": "EPERM"
+    },
+    "omit_recvfrom": {
+      "child_exit": 71,
+      "signal": null,
+      "errno": 1,
+      "name": "EPERM"
+    },
+    "omit_cloexec_clear": {
+      "child_exit": 9,
+      "signal": null,
+      "errno": 9,
+      "name": "EBADF"
+    },
+    "syscall_trace": {
+      "method": "PTRACE_SYSCALL x86_64 on the same native Rust std UnixStream child outside T2 to identify ABI; actual T2 enforcement separately established by omission probes",
+      "read_exact": "recvfrom syscall 45, flags 0, return 4",
+      "write_all": "sendto syscall 44, flags 16384 (MSG_NOSIGNAL), return 4"
+    },
+    "kernel": "7.2.9-1-cachyos",
+    "ptrace_scope": 1,
+    "strace": "not installed; custom PTRACE_SYSCALL instrumentation used",
+    "log": "smoke.log"
+  },
+  "premise_corrections": [
+    {
+      "claim": "Removing sendto/recvfrom must kill the child with SIGSYS(31)",
+      "fact": "Unknown syscalls return EPERM, not SIGSYS: HEAD security/sandbox/linux.rs:378-382. Actual probe exits 72/71 with errno1 and no signal. SIGSYS belongs to explicit hostile syscall list (linux.rs:345-363,391-400). This is an assignment/acceptance premise, not a false claim in ADR-060."
+    }
+  ],
+  "adr_060": {
+    "premise_wrong": [],
+    "observed": "Inherited descriptor + child CLOEXEC clear + sendto/recvfrom work under real T2. No measured ADR amendment premise was disproved. Same-uid descriptor theft and Yama sufficiency were not re-proven here; ptrace_scope was observed as 1."
+  },
+  "omits": [
+    "maos-bin socketpair/service and lifecycle/teardown wiring; caller pid binding and LogRecall grant enforcement",
+    "maos-wasm-host recall import/client; runner --recall-fd parser and actual WASM/TypeScript guest",
+    "WIT @2.1.0 compatibility/ratification/provenance/corpus changes",
+    "recall own/foreign frames, scope-violation audit rows, consent-gated frame vector",
+    "downstream full SandboxSpec literal migration outside kernel library, including maos-bin worker_spawn.rs:949 and existing tests; no downstream compilation performed",
+    "production owned-descriptor lifetime API; prototype borrows i32 and requires caller lifetime discipline",
+    "macOS/Windows behavior and aarch64 compilation/runtime (common filter covers both architectures by code structure only)",
+    "hostile same-uid descriptor theft/Yama enforcement; deployment documentation",
+    "full test/CI/doc changes; latency measurement intentionally absent (20-7 owns latency)"
+  ],
+  "toolchain_versions": {
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "rustfmt": "rustfmt 1.9.0-stable (48a229ceae 2026-09-01)",
+    "tokei": "tokei 14.0.0 compiled with serialization support: json",
+    "git": "git version 2.47.3",
+    "kernel": "7.2.9-1-cachyos"
+  },
+  "cargo_target_dir": "/mnt/build/cargo-17-3d-proto",
+  "variant_b": {
+    "name": "Variant B: A plus manifest log.recall/log.fetch declarations, degradation and scope conversion",
+    "provenance": {
+      "base_commit": "387adae1324f6e9a3634e20d9fc49605e69caca3",
+      "variant_a_commit": "b895d4e89980af165daa80e647b551f7668c4e8c",
+      "prototype_commit": "52af742f9c90aeebff2111f2e1180f1cda49e16a",
+      "diffs": {
+        "prototype-variant-b-increment.diff": {
+          "from": "b895d4e89980af165daa80e647b551f7668c4e8c",
+          "to": "52af742f9c90aeebff2111f2e1180f1cda49e16a",
+          "sha256": "f6343ea7882de7e96d39617a98a9ec449bdff0393cfe4957010b3a97ed15f806"
+        },
+        "prototype-variant-b.diff": {
+          "from": "387adae1324f6e9a3634e20d9fc49605e69caca3",
+          "to": "52af742f9c90aeebff2111f2e1180f1cda49e16a",
+          "sha256": "43632fc32405ee0257155e28d06ff9c59066929c32c8dec5d3bf9814eca7ae57"
+        }
+      },
+      "diff_scope": [
+        "crates/maos-kernel-core/src",
+        "crates/maos-manifest/src",
+        "crates/maos-domain/src"
+      ],
+      "variant_b_smoke_log": "variant-b-smoke.log",
+      "variant_b_smoke_sha256": "8ebab3ca7308089a510e89cdd5a62f0a05f4b1ff2fb93c1ca93b0decdbbad3e0",
+      "variant_a_artifacts": "Original top-level measurements, provenance and prototype-kernel.diff are unchanged; original smoke.log is unchanged."
+    },
+    "measurements": {
+      "base": {
+        "maos-kernel-core": {
+          "physical": 26311,
+          "files": 94,
+          "tokei": 20545
+        },
+        "maos-manifest": {
+          "physical": 5373,
+          "files": 2,
+          "tokei": 4466
+        },
+        "maos-domain": {
+          "physical": 14212,
+          "files": 67,
+          "tokei": 9615
+        },
+        "maos-exec-deps": {
+          "physical": 430,
+          "files": 1,
+          "tokei": 358
+        }
+      },
+      "A": {
+        "maos-kernel-core": {
+          "physical": 26328,
+          "files": 94,
+          "tokei": 20557
+        },
+        "maos-domain": {
+          "physical": 14212,
+          "files": 67,
+          "tokei": 9615
+        },
+        "maos-exec-deps": {
+          "physical": 430,
+          "files": 1,
+          "tokei": 358
+        },
+        "maos-manifest": {
+          "physical": 5373,
+          "files": 2,
+          "tokei": 4466
+        }
+      },
+      "B": {
+        "maos-kernel-core": {
+          "physical": 26329,
+          "files": 94,
+          "tokei": 20558
+        },
+        "maos-manifest": {
+          "physical": 5404,
+          "files": 2,
+          "tokei": 4493
+        },
+        "maos-domain": {
+          "physical": 14212,
+          "files": 67,
+          "tokei": 9615
+        },
+        "maos-exec-deps": {
+          "physical": 430,
+          "files": 1,
+          "tokei": 358
+        }
+      }
+    },
+    "delta_vs_base": {
+      "maos-kernel-core": {
+        "physical": 18,
+        "tokei": 13,
+        "files": 0
+      },
+      "maos-manifest": {
+        "physical": 31,
+        "tokei": 27,
+        "files": 0
+      },
+      "maos-domain": {
+        "physical": 0,
+        "tokei": 0,
+        "files": 0
+      },
+      "maos-exec-deps": {
+        "physical": 0,
+        "tokei": 0,
+        "files": 0
+      }
+    },
+    "delta_vs_A": {
+      "maos-kernel-core": {
+        "physical": 1,
+        "tokei": 1,
+        "files": 0
+      },
+      "maos-manifest": {
+        "physical": 31,
+        "tokei": 27,
+        "files": 0
+      },
+      "maos-domain": {
+        "physical": 0,
+        "tokei": 0,
+        "files": 0
+      },
+      "maos-exec-deps": {
+        "physical": 0,
+        "tokei": 0,
+        "files": 0
+      }
+    },
+    "per_file_delta_vs_base": {
+      "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs": {
+        "physical_base": 759,
+        "physical_B": 760,
+        "physical_delta": 1,
+        "tokei_base": 585,
+        "tokei_B": 586,
+        "tokei_delta": 1
+      },
+      "crates/maos-kernel-core/src/security/mod.rs": {
+        "physical_base": 671,
+        "physical_B": 672,
+        "physical_delta": 1,
+        "tokei_base": 452,
+        "tokei_B": 453,
+        "tokei_delta": 1
+      },
+      "crates/maos-kernel-core/src/security/sandbox/linux.rs": {
+        "physical_base": 597,
+        "physical_B": 609,
+        "physical_delta": 12,
+        "tokei_base": 470,
+        "tokei_B": 479,
+        "tokei_delta": 9
+      },
+      "crates/maos-kernel-core/src/security/sandbox/mod.rs": {
+        "physical_base": 262,
+        "physical_B": 266,
+        "physical_delta": 4,
+        "tokei_base": 202,
+        "tokei_B": 204,
+        "tokei_delta": 2
+      },
+      "crates/maos-manifest/src/manifest.rs": {
+        "physical_base": 5345,
+        "physical_B": 5376,
+        "physical_delta": 31,
+        "tokei_base": 4450,
+        "tokei_B": 4477,
+        "tokei_delta": 27
+      },
+      "crates/maos-manifest/src/lib.rs": {
+        "physical_base": 28,
+        "physical_B": 28,
+        "physical_delta": 0,
+        "tokei_base": 16,
+        "tokei_B": 16,
+        "tokei_delta": 0,
+        "note": "Modified root re-export list to expose LogCapabilities like IacCapabilities; cargo fmt kept total physical/code lines unchanged."
+      }
+    },
+    "per_file_delta_vs_A": {
+      "crates/maos-kernel-core/src/scheduler/scheduler_loop.rs": {
+        "physical_base": 759,
+        "physical_B": 760,
+        "physical_delta": 1,
+        "tokei_base": 585,
+        "tokei_B": 586,
+        "tokei_delta": 1
+      },
+      "crates/maos-manifest/src/manifest.rs": {
+        "physical_base": 5345,
+        "physical_B": 5376,
+        "physical_delta": 31,
+        "tokei_base": 4450,
+        "tokei_B": 4477,
+        "tokei_delta": 27
+      },
+      "crates/maos-manifest/src/lib.rs": {
+        "physical_base": 28,
+        "physical_B": 28,
+        "physical_delta": 0,
+        "tokei_base": 16,
+        "tokei_B": 16,
+        "tokei_delta": 0,
+        "note": "Modified root re-export list to expose LogCapabilities like IacCapabilities; cargo fmt kept total physical/code lines unchanged."
+      }
+    },
+    "manifest_ceiling": {
+      "path": "xtask/kloc.toml",
+      "line": 408,
+      "pinned": 4474,
+      "base_actual": 4466,
+      "base_headroom": 8,
+      "B_actual": 4493,
+      "B_over_ceiling": 19
+    },
+    "changes": [
+      "LogCapabilities public type with recall/fetch booleans; public root re-export following existing IAC/Loom convention",
+      "CapabilitiesRequired.log, defaulted deny_unknown_fields RawLogCapabilities and validation conversion",
+      "Schema versions below 5 drop log grants; POST_V1_SCHEMA_SECTIONS includes capabilities.required.log",
+      "Declared booleans map to existing Scope::LogRecall and Scope::LogFetch",
+      "Kernel scheduler empty-capability literal defaults log; other production/test literals intentionally not migrated in sizing prototype"
+    ],
+    "builds": {
+      "fmt_exit": 0,
+      "commands": [
+        "cargo build --offline --locked -p maos-manifest --lib",
+        "cargo build --offline --locked -p maos-kernel-core --lib"
+      ],
+      "maos_manifest_exit": 0,
+      "kernel_exit": 0,
+      "maos_manifest_warnings": 1,
+      "kernel_warnings": 43,
+      "new_warning_diagnostics": [],
+      "initial_failure": "Kernel E0433 before adding required LogCapabilities root re-export; corrected, then both final builds succeeded.",
+      "workspace_build_or_tests_run": false
+    },
+    "unsafe": {
+      "additional_vs_A_blocks": 0,
+      "additional_vs_A_operations": 0,
+      "same_sites_as_A": true
+    },
+    "smoke": {
+      "command": "cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe && /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe",
+      "process_exit": 0,
+      "child_exit": 0,
+      "child_signal": null,
+      "reply": "pong",
+      "output": "PARENT runner_fd=4 CLOEXEC=true\nRESULT status=exit status: 0 code=Some(0) signal=None write=Ok(()) read=Ok(()) reply=[112, 111, 110, 103]\nCHILD roundtrip=ok\n",
+      "log": "variant-b-smoke.log"
+    },
+    "omitted_capabilities_required_literal_migrations": {
+      "maos_bin": [
+        "crates/maos-bin/src/admission.rs:587",
+        "crates/maos-bin/src/main.rs:6885",
+        "crates/maos-bin/src/main.rs:13178"
+      ],
+      "tests": [
+        "crates/maos-kernel-core/tests/abi_stability_admit.rs:49",
+        "crates/maos-kernel-core/tests/operator_posture_ceiling_16_6.rs:85,244",
+        "crates/maos-kernel-core/tests/provider_switched_journal.rs:35",
+        "crates/maos-kernel-core/tests/sandbox_admission.rs:59"
+      ]
+    },
+    "omissions": [
+      "All variant A end-to-end recall omissions remain",
+      "No functional manifest parser/degradation tests or downstream maos-bin/test compilation; this follow-up requested library builds and transport smoke only"
+    ]
+  }
+}

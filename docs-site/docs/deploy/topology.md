@@ -136,6 +136,8 @@ One host runs the MAOS daemon, which runs the kernel and first-party `rust-inpro
 - On Linux, WASM-component Spirits run in the `T2` runner process with seccomp allow-list, Landlock, and a delegated cgroup v2 subtree.
 - Each Worker runs in a Linux-only `T3` rootless container with `--network=none`, read-only filesystem, no host home mount, and egress only through its daemon proxy socket at `/proxy/egress.sock`.
 
+WASM log recall adds no descriptor, socket, or syscall to T2. Requests and replies ride the runner's existing ADR-032 stdin/stdout channel; the daemon mints a capability for each admitted call and audits every call and refusal. This introduces no deployment condition or change to the T2 allow-list.
+
 **What stays unisolated by design:**
 
 - `rust-inproc` Spirits run in the daemon process.

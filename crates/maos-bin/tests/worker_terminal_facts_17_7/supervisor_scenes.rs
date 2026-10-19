@@ -94,7 +94,6 @@ fn world_with_log(dir: &Path, seams: SupervisorSeams, tl: Arc<TransparencyLogAda
         None,
         None,
         None,
-        None,
     ));
     let journal_path = dir.join("lifecycle.ndjson");
     let journal = Arc::new(maos_kernel_core::journal::JournalAdapter::open(&journal_path).unwrap());

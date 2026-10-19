@@ -91,7 +91,6 @@ impl UpgradeHarness {
             None,
             None,
             None,
-            None,
         ));
         let journal = Arc::new(
             JournalAdapter::open(&tmp.path().join("journal.ndjson")).expect("upgrade journal"),

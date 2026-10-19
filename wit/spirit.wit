@@ -1,4 +1,4 @@
-// `maos:spirit@2.0.0` — typed WIT projection of the ADR-032 frame set.
+// `maos:spirit@2.1.0` — lossless frames and emitter-scoped log recall.
 //
 // Story 11.1a, ADR-031 §3: this WIT is the typed face a WASM Spirit author
 // binds against (wit-bindgen, `jco guest-types`). The host serializes and
@@ -12,6 +12,8 @@
 // `lift(lower(frame)) == frame` byte-for-byte in canonical CBOR. A domain value
 // this WIT cannot name (a future `Scope`, `PostureHint` or `RuptureReason`
 // variant) is refused by the host bridge, typed — never mapped.
+// Story 17-3d (ADR-013/031/060) adds the recall import without changing
+// interface frames. The daemon binds identity and grants on the stdio channel.
 //
 // Every byte of this file feeds the four provenance-pinned components'
 // `source_sha256` (`tests/fixtures/wasm/equiv-fixtures.provenance.toml`): an
@@ -22,7 +24,7 @@
 //   FramePayload / IacFrame  — crates/maos-domain/src/frame.rs
 //   Scope                    — crates/maos-domain/src/invariants/i1.rs
 
-package maos:spirit@2.0.0;
+package maos:spirit@2.1.0;
 
 interface frames {
     // ── FrameKind (identity.rs:30-79) ──────────────────────────────────
@@ -278,15 +280,69 @@ interface frames {
     }
 }
 
+interface recall {
+    use frames.{frame-origin};
+
+    // Opaque keyset cursor returned by the host.
+    record recall-cursor { last-timestamp-ns: u64, last-frame-id: list<u8> }   // [u8; 16]
+
+    // No pid, Spirit name, recipient or team: the host binds the caller (R17-23).
+    // Callable only while the host is running `handle-frame`; otherwise `unavailable`.
+    record recall-filter {
+        kind: option<string>,          // FrameKindLabel serde name; unknown → invalid-request; non-disclosable → empty page
+        since-ns: option<u64>,         // ≤ i64::MAX, else invalid-request
+        until-ns: option<u64>,         // ≤ i64::MAX, else invalid-request
+        limit: u32,                    // 0..=1024 (LogRecallFilter::MAX_LIMIT); larger → limit-exceeded(1024)
+        cursor: option<recall-cursor>,
+        intent-filter: option<string>,
+    }
+
+    record recall-entry {
+        frame-id: list<u8>,
+        timestamp-ns: u64,
+        kind: string,
+        intent: string,
+        payload-available: bool,
+    }
+
+    // A page may hold fewer than `limit` entries when the reply budget is reached;
+    // `next-cursor` then resumes after the last returned entry.
+    record recall-page { entries: list<recall-entry>, next-cursor: option<recall-cursor> }
+
+    record fetch-response {
+        frame-id: list<u8>,
+        timestamp-ns: u64,
+        kind: string,
+        intent: string,
+        payload: list<u8>,             // stored redacted bytes, never truncated
+        origin: frame-origin,
+    }
+
+    variant recall-error {
+        scope-violation,
+        frame-not-found,
+        invalid-request(string),
+        limit-exceeded(u32),
+        capability-denied,
+        consent-withheld,
+        reply-too-large(u64),          // the reply byte bound
+        unavailable,
+    }
+
+    recall: func(filter: recall-filter) -> result<recall-page, recall-error>;
+    fetch: func(frame-id: list<u8>) -> result<fetch-response, recall-error>;
+}
+
 // The Spirit world a WASM-component author implements. The host
 // (maos-wasm-host's `maos-wasm-runner`) drives it: feeds inbound frames decoded
 // from the ADR-032 stdio stream, and writes the guest's emitted frames back to
-// the same stream. The world imports nothing. The runner runs inside ADR-031's
+// the same stream. The recall import shares those records in-band. The runner runs inside ADR-031's
 // T2 process boundary once launched by `spawn_and_bridge` — the production
 // launch is `17-3c-wasm-spirit-on-the-bus-under-t2`; the WIT capability surface
 // is defense-in-depth on top of that boundary, never a substitute for it.
 world spirit {
     use frames.{iac-frame, halt};
+    import recall;
 
     // host → guest: deliver one inbound frame, get zero-or-more emitted
     // frames. A returned `halt` ends the session (maps to the ADR-032

@@ -107,7 +107,6 @@ impl SpiritSchedulerAdapter {
         working_memory_orchestrator: Option<
             Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>,
         >,
-        log_recall: Option<Arc<crate::iac::log_recall::LogRecallAdapter>>,
         distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
         self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
         security_manager: Option<Arc<crate::security::SecurityManagerAdapter>>,
@@ -123,9 +122,6 @@ impl SpiritSchedulerAdapter {
             .with_spirits(Arc::clone(&spirits));
         if let Some(ref o) = working_memory_orchestrator {
             dispatcher = dispatcher.with_working_memory_orchestrator(Arc::clone(o));
-        }
-        if let Some(ref l) = log_recall {
-            dispatcher = dispatcher.with_log_recall(Arc::clone(l));
         }
         if let Some(ref d) = distillate_writer {
             dispatcher = dispatcher.with_distillate_writer(Arc::clone(d));
@@ -332,6 +328,7 @@ impl SpiritSchedulerAdapter {
                 mcp: McpCapabilities { servers: vec![] },
                 loom: crate::security::manifest::LoomCapabilities::default(),
                 iac: crate::security::manifest::IacCapabilities::default(),
+                log: maos_manifest::LogCapabilities::default(),
             };
             let posture = PostureSection {
                 default: Posture::Cautious,

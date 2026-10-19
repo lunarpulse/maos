@@ -1,0 +1,1615 @@
+Story 17.3d T4 reissue; one private target directory per guest.
+$ rustc --version
+rustc 1.98.1 (48a229cea 2026-09-01)
+$ wasm-tools --version
+wasm-tools 1.259.0
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-guest-echo-spirit cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/echo-spirit/Cargo.toml --target-dir /mnt/build/cargo-17-3d-guest-echo-spirit
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.228
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.1.5
+   Compiling wasmparser v0.236.1
+   Compiling hashbrown v0.15.5
+   Compiling anyhow v1.0.103
+   Compiling semver v1.0.28
+   Compiling bitflags v2.13.0
+   Compiling zmij v1.0.21
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling syn v2.0.118
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.2
+   Compiling wasm-encoder v0.236.1
+   Compiling prettyplease v0.2.37
+   Compiling log v0.4.33
+   Compiling futures-core v0.3.32
+   Compiling leb128fmt v0.1.0
+   Compiling futures-sink v0.3.32
+   Compiling id-arena v2.3.0
+   Compiling unicode-xid v0.2.6
+   Compiling futures-channel v0.3.32
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-task v0.3.32
+   Compiling futures-io v0.3.32
+   Compiling slab v0.4.12
+   Compiling wit-bindgen-rust v0.44.0
+   Compiling heck v0.5.0
+   Compiling wit-bindgen-rt v0.44.0
+   Compiling wit-bindgen-rust-macro v0.44.0
+   Compiling once_cell v1.21.4
+   Compiling indexmap v2.14.0
+   Compiling serde_derive v1.0.228
+   Compiling futures-macro v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling wit-parser v0.236.1
+   Compiling wasm-metadata v0.236.1
+   Compiling wit-bindgen-core v0.44.0
+   Compiling wit-component v0.236.1
+   Compiling wit-bindgen v0.44.0
+   Compiling echo-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/echo-spirit)
+    Finished `release` profile [optimized] target(s) in 11.77s
+$ cp /mnt/build/cargo-17-3d-guest-echo-spirit/wasm32-wasip2/release/echo_spirit.wasm tests/fixtures/wasm/echo_spirit_component.wasm
+wasm_sha256 = 36ff30298eee24c25abfcf1dde2c6e8992aeaa77641c22c789605d17673f2894
+source_sha256 (concatenated sorted source inputs) = 96885af49d16059a570e4dd4b1035bc01fd500183e4cfc1e968703fc23e8beb7
+$ wasm-tools component wit tests/fixtures/wasm/echo_spirit_component.wasm
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.1.0;
+  import wasi:io/poll@0.2.9;
+  import wasi:clocks/monotonic-clock@0.2.9;
+  import wasi:io/error@0.2.9;
+  import wasi:io/streams@0.2.9;
+  import wasi:cli/stdout@0.2.9;
+  import wasi:cli/stderr@0.2.9;
+  import wasi:cli/stdin@0.2.9;
+  import wasi:cli/environment@0.2.9;
+  import wasi:cli/exit@0.2.9;
+  import wasi:cli/terminal-input@0.2.9;
+  import wasi:cli/terminal-output@0.2.9;
+  import wasi:cli/terminal-stdin@0.2.9;
+  import wasi:cli/terminal-stdout@0.2.9;
+  import wasi:cli/terminal-stderr@0.2.9;
+  use maos:spirit/frames@2.1.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.1.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+      peer-identity-unverified,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.9 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream;
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.9 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.9.{pollable};
+
+    type duration = u64;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+}
+
+
+package wasi:cli@0.2.9 {
+  interface stdout {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface stdin {
+    use wasi:io/streams@0.2.9.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface environment {
+    get-environment: func() -> list<tuple<string, string>>;
+  }
+  interface exit {
+    exit: func(status: result);
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-guest-equiv-fixture-wasm-guest cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/wasm-guest/Cargo.toml --target-dir /mnt/build/cargo-17-3d-guest-equiv-fixture-wasm-guest
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.228
+   Compiling foldhash v0.1.5
+   Compiling wasmparser v0.236.1
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.15.5
+   Compiling zmij v1.0.21
+   Compiling anyhow v1.0.103
+   Compiling bitflags v2.13.0
+   Compiling semver v1.0.28
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.150
+   Compiling memchr v2.8.2
+   Compiling wasm-encoder v0.236.1
+   Compiling syn v2.0.118
+   Compiling itoa v1.0.18
+   Compiling prettyplease v0.2.37
+   Compiling leb128fmt v0.1.0
+   Compiling futures-sink v0.3.32
+   Compiling futures-core v0.3.32
+   Compiling log v0.4.33
+   Compiling id-arena v2.3.0
+   Compiling unicode-xid v0.2.6
+   Compiling futures-channel v0.3.32
+   Compiling slab v0.4.12
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-task v0.3.32
+   Compiling futures-io v0.3.32
+   Compiling heck v0.5.0
+   Compiling wit-bindgen-rust v0.44.0
+   Compiling wit-bindgen-rust-macro v0.44.0
+   Compiling wit-bindgen-rt v0.44.0
+   Compiling once_cell v1.21.4
+   Compiling equiv-fixture-logic v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/logic)
+   Compiling indexmap v2.14.0
+   Compiling serde_derive v1.0.228
+   Compiling futures-macro v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling wit-parser v0.236.1
+   Compiling wasm-metadata v0.236.1
+   Compiling wit-bindgen-core v0.44.0
+   Compiling wit-component v0.236.1
+   Compiling wit-bindgen v0.44.0
+   Compiling equiv-identity-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/wasm-guest)
+    Finished `release` profile [optimized] target(s) in 11.77s
+$ cp /mnt/build/cargo-17-3d-guest-equiv-fixture-wasm-guest/wasm32-wasip2/release/equiv_identity_spirit.wasm tests/fixtures/wasm/equiv_identity_spirit_component.wasm
+wasm_sha256 = 0f220aef0b512dde9285b4a7d8e3b2a23148d3a4b06efe7bc76cda6fc50d8508
+source_sha256 (concatenated sorted source inputs) = adb08013d88c1934ffdb3bd6d2c6fb11267b9b95c032ce28ac5b08ac489c6512
+$ wasm-tools component wit tests/fixtures/wasm/equiv_identity_spirit_component.wasm
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.1.0;
+  import wasi:io/poll@0.2.9;
+  import wasi:clocks/monotonic-clock@0.2.9;
+  import wasi:io/error@0.2.9;
+  import wasi:io/streams@0.2.9;
+  import wasi:cli/stdout@0.2.9;
+  import wasi:cli/stderr@0.2.9;
+  import wasi:cli/stdin@0.2.9;
+  import wasi:cli/environment@0.2.9;
+  import wasi:cli/exit@0.2.9;
+  import wasi:cli/terminal-input@0.2.9;
+  import wasi:cli/terminal-output@0.2.9;
+  import wasi:cli/terminal-stdin@0.2.9;
+  import wasi:cli/terminal-stdout@0.2.9;
+  import wasi:cli/terminal-stderr@0.2.9;
+  use maos:spirit/frames@2.1.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.1.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+      peer-identity-unverified,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.9 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream;
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.9 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.9.{pollable};
+
+    type duration = u64;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+}
+
+
+package wasi:cli@0.2.9 {
+  interface stdout {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface stdin {
+    use wasi:io/streams@0.2.9.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface environment {
+    get-environment: func() -> list<tuple<string, string>>;
+  }
+  interface exit {
+    exit: func(status: result);
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-guest-equiv-fixture-divergent-guest cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/divergent-guest/Cargo.toml --target-dir /mnt/build/cargo-17-3d-guest-equiv-fixture-divergent-guest
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.228
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.1.5
+   Compiling wasmparser v0.236.1
+   Compiling hashbrown v0.15.5
+   Compiling bitflags v2.13.0
+   Compiling zmij v1.0.21
+   Compiling semver v1.0.28
+   Compiling anyhow v1.0.103
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling syn v2.0.118
+   Compiling itoa v1.0.18
+   Compiling wasm-encoder v0.236.1
+   Compiling prettyplease v0.2.37
+   Compiling memchr v2.8.2
+   Compiling unicode-xid v0.2.6
+   Compiling leb128fmt v0.1.0
+   Compiling futures-core v0.3.32
+   Compiling log v0.4.33
+   Compiling id-arena v2.3.0
+   Compiling futures-sink v0.3.32
+   Compiling slab v0.4.12
+   Compiling futures-channel v0.3.32
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-task v0.3.32
+   Compiling futures-io v0.3.32
+   Compiling heck v0.5.0
+   Compiling wit-bindgen-rust v0.44.0
+   Compiling wit-bindgen-rust-macro v0.44.0
+   Compiling wit-bindgen-rt v0.44.0
+   Compiling once_cell v1.21.4
+   Compiling equiv-fixture-logic v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/logic)
+   Compiling indexmap v2.14.0
+   Compiling serde_derive v1.0.228
+   Compiling futures-macro v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling wit-parser v0.236.1
+   Compiling wasm-metadata v0.236.1
+   Compiling wit-component v0.236.1
+   Compiling wit-bindgen-core v0.44.0
+   Compiling wit-bindgen v0.44.0
+   Compiling equiv-divergent-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/divergent-guest)
+    Finished `release` profile [optimized] target(s) in 11.99s
+$ cp /mnt/build/cargo-17-3d-guest-equiv-fixture-divergent-guest/wasm32-wasip2/release/equiv_divergent_spirit.wasm tests/fixtures/wasm/equiv_divergent_spirit_component.wasm
+wasm_sha256 = 77e2bc9029e7779a4a4e53f3a3b7bb8dbd2530d15459232c499a7f2e5e3c8b9b
+source_sha256 (concatenated sorted source inputs) = 1d47ce22a1491340e8d0258eb4596281680669d0bb901f958737ba8d0bb690bb
+$ wasm-tools component wit tests/fixtures/wasm/equiv_divergent_spirit_component.wasm
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.1.0;
+  import wasi:io/poll@0.2.9;
+  import wasi:clocks/monotonic-clock@0.2.9;
+  import wasi:io/error@0.2.9;
+  import wasi:io/streams@0.2.9;
+  import wasi:cli/stdout@0.2.9;
+  import wasi:cli/stderr@0.2.9;
+  import wasi:cli/stdin@0.2.9;
+  import wasi:cli/environment@0.2.9;
+  import wasi:cli/exit@0.2.9;
+  import wasi:cli/terminal-input@0.2.9;
+  import wasi:cli/terminal-output@0.2.9;
+  import wasi:cli/terminal-stdin@0.2.9;
+  import wasi:cli/terminal-stdout@0.2.9;
+  import wasi:cli/terminal-stderr@0.2.9;
+  use maos:spirit/frames@2.1.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.1.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+      peer-identity-unverified,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.9 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream;
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.9 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.9.{pollable};
+
+    type duration = u64;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+}
+
+
+package wasi:cli@0.2.9 {
+  interface stdout {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface stdin {
+    use wasi:io/streams@0.2.9.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface environment {
+    get-environment: func() -> list<tuple<string, string>>;
+  }
+  interface exit {
+    exit: func(status: result);
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-guest-equiv-fixture-cosmetic-guest cargo build --locked --offline --release --target wasm32-wasip2 --manifest-path crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest/Cargo.toml --target-dir /mnt/build/cargo-17-3d-guest-equiv-fixture-cosmetic-guest
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.228
+   Compiling equivalent v1.0.2
+   Compiling wasmparser v0.236.1
+   Compiling hashbrown v0.17.1
+   Compiling foldhash v0.1.5
+   Compiling hashbrown v0.15.5
+   Compiling anyhow v1.0.103
+   Compiling semver v1.0.28
+   Compiling bitflags v2.13.0
+   Compiling zmij v1.0.21
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling syn v2.0.118
+   Compiling wasm-encoder v0.236.1
+   Compiling memchr v2.8.2
+   Compiling prettyplease v0.2.37
+   Compiling itoa v1.0.18
+   Compiling unicode-xid v0.2.6
+   Compiling id-arena v2.3.0
+   Compiling leb128fmt v0.1.0
+   Compiling futures-core v0.3.32
+   Compiling log v0.4.33
+   Compiling futures-sink v0.3.32
+   Compiling slab v0.4.12
+   Compiling futures-io v0.3.32
+   Compiling futures-channel v0.3.32
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-task v0.3.32
+   Compiling heck v0.5.0
+   Compiling wit-bindgen-rust v0.44.0
+   Compiling wit-bindgen-rust-macro v0.44.0
+   Compiling wit-bindgen-rt v0.44.0
+   Compiling once_cell v1.21.4
+   Compiling equiv-fixture-logic v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/logic)
+   Compiling indexmap v2.14.0
+   Compiling serde_derive v1.0.228
+   Compiling futures-macro v0.3.32
+   Compiling futures-util v0.3.32
+   Compiling futures-executor v0.3.32
+   Compiling futures v0.3.32
+   Compiling wit-parser v0.236.1
+   Compiling wasm-metadata v0.236.1
+   Compiling wit-bindgen-core v0.44.0
+   Compiling wit-component v0.236.1
+   Compiling wit-bindgen v0.44.0
+   Compiling equiv-cosmetic-spirit v0.1.0 (/home/lunarpulse/dev_ws/crates/maos-wasm-host/guests/equiv-fixture/cosmetic-guest)
+    Finished `release` profile [optimized] target(s) in 11.77s
+$ cp /mnt/build/cargo-17-3d-guest-equiv-fixture-cosmetic-guest/wasm32-wasip2/release/equiv_cosmetic_spirit.wasm tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+wasm_sha256 = 5369a0527490b7cec43e15e1f69502757625597cf589f462f47a3103f7e80a30
+source_sha256 (concatenated sorted source inputs) = 2ca1e43dcf609132f35e3d50de53eed479454642ce090ff5c398db0dc55fb2fa
+$ wasm-tools component wit tests/fixtures/wasm/equiv_cosmetic_spirit_component.wasm
+package root:component;
+
+world root {
+  import maos:spirit/frames@2.1.0;
+  import wasi:io/poll@0.2.9;
+  import wasi:clocks/monotonic-clock@0.2.9;
+  import wasi:io/error@0.2.9;
+  import wasi:io/streams@0.2.9;
+  import wasi:cli/stdout@0.2.9;
+  import wasi:cli/stderr@0.2.9;
+  import wasi:cli/stdin@0.2.9;
+  import wasi:cli/environment@0.2.9;
+  import wasi:cli/exit@0.2.9;
+  import wasi:cli/terminal-input@0.2.9;
+  import wasi:cli/terminal-output@0.2.9;
+  import wasi:cli/terminal-stdin@0.2.9;
+  import wasi:cli/terminal-stdout@0.2.9;
+  import wasi:cli/terminal-stderr@0.2.9;
+  use maos:spirit/frames@2.1.0.{iac-frame, halt};
+
+  export handle-frame: func(frame: iac-frame) -> result<list<iac-frame>, halt>;
+  export on-start: func() -> result<_, halt>;
+  export on-shutdown: func();
+}
+package maos:spirit@2.1.0 {
+  interface frames {
+    record frame-address {
+      spirit-id: string,
+      host-id: option<string>,
+      role: option<string>,
+    }
+
+    enum frame-kind {
+      task-assign,
+      task-complete,
+      decision-dispatch,
+      epistemic-halt,
+      telemetry-event,
+      consent-request,
+      retract,
+      capability-invocation,
+      sandbox-block,
+      inference-call,
+      budget-warning,
+      budget-exceeded,
+      cli-subprocess-output,
+      consent-rupture,
+      rate-limited,
+      gateway-inbound,
+      gateway-outbound,
+    }
+
+    enum intent-class {
+      high-privilege,
+      standard,
+      readonly,
+    }
+
+    record scope-mcp-call {
+      server: string,
+      tool: string,
+    }
+
+    record scope-cli-subprocess-spawn {
+      cli-binary-path: string,
+      argv-prefix-hash: list<u8>,
+      output-shape-version: string,
+    }
+
+    record scope-gateway-send {
+      gateway-id: string,
+      recipient: string,
+    }
+
+    variant scope {
+      fs-read(string),
+      fs-write(string),
+      net-https(string),
+      proc-exec(string),
+      sub-spirit-spawn(string),
+      provider-infer(string),
+      iac-send(string),
+      mem-read(string),
+      mem-write(string),
+      self-telemetry-read,
+      log-recall,
+      log-fetch,
+      distillate-write,
+      mcp-call(scope-mcp-call),
+      cli-subprocess-spawn(scope-cli-subprocess-spawn),
+      gateway-send(scope-gateway-send),
+      skill-author-self,
+      loom-read,
+      loom-write,
+      loom-scan,
+    }
+
+    enum posture-hint {
+      autonomous-with-halt,
+      assistive,
+      cautious,
+    }
+
+    record halt-policy-override {
+      tag: string,
+      recall-vs-precision: f32,
+    }
+
+    record posture-preferences {
+      preferred-posture: option<posture-hint>,
+      halt-policy-overrides: list<halt-policy-override>,
+    }
+
+    record prior-distillate-ref {
+      digest-frame-id: list<u8>,
+      distillation-depth: u32,
+      intent-lineage: list<string>,
+    }
+
+    record task-assign-body {
+      goal: string,
+      scope: list<scope>,
+      success-criteria: string,
+      posture-preferences: posture-preferences,
+      prior-distillate-ref: option<prior-distillate-ref>,
+    }
+
+    record task-complete-body {
+      result-text: string,
+    }
+
+    record decision-dispatch-body {
+      decision-id: u64,
+      approved: bool,
+      working-memory-digest-refs: list<string>,
+    }
+
+    record epistemic-halt-body {
+      halt-id: string,
+      tag: string,
+      value: f32,
+      threshold: option<f32>,
+      policy-id: string,
+      derived-from: string,
+    }
+
+    record telemetry-event-body {
+      event-type: string,
+      data: string,
+    }
+
+    record consent-request-body {
+      capability: string,
+    }
+
+    record retract-body {
+      original-frame-id: list<u8>,
+      reason: string,
+      original-kind: option<frame-kind>,
+    }
+
+    record budget-envelope {
+      spirit-pid: u32,
+      hook-name: string,
+      wall-ns: u64,
+      cap-seconds: u64,
+    }
+
+    enum rupture-reason {
+      intent-allowlist-mismatch,
+      posture-shifted-during-transmission,
+      token-revoked,
+      principal-revoked,
+      recipient-unloaded,
+      peer-identity-unverified,
+    }
+
+    record rupture-rejection {
+      address: frame-address,
+      reason: rupture-reason,
+    }
+
+    record consent-rupture-body {
+      rupture-id: list<u8>,
+      original-frame-id: list<u8>,
+      original-kind: frame-kind,
+      accepted: list<frame-address>,
+      rejected: list<rupture-rejection>,
+      ruptured-at-ns: u64,
+    }
+
+    record rate-limited-body {
+      provider-id: string,
+      credential-fingerprint-prefix-hex: string,
+      retry-after-ms: u64,
+      bucket-remaining: u32,
+      bucket-capacity: u32,
+      refill-per-sec: u32,
+      schedule-id: option<string>,
+    }
+
+    variant frame-payload {
+      task-assign(task-assign-body),
+      task-complete(task-complete-body),
+      decision-dispatch(decision-dispatch-body),
+      epistemic-halt(epistemic-halt-body),
+      telemetry-event(telemetry-event-body),
+      consent-request(consent-request-body),
+      retract(retract-body),
+      budget-warning(budget-envelope),
+      budget-exceeded(budget-envelope),
+      consent-rupture(consent-rupture-body),
+      rate-limited(rate-limited-body),
+    }
+
+    enum frame-origin {
+      human-authored,
+      spirit-auto,
+      spirit-drafted-human-approved,
+      kernel,
+    }
+
+    record consent-envelope {
+      consent-id: list<u8>,
+      granter: frame-address,
+      timestamp-ns: u64,
+      intent-class: option<string>,
+      valid-until-ns: option<u64>,
+    }
+
+    record iac-frame {
+      frame-id: list<u8>,
+      timestamp-ns: u64,
+      logical-clock: u64,
+      frame-from: frame-address,
+      to: list<frame-address>,
+      kind: frame-kind,
+      intent: intent-class,
+      payload: frame-payload,
+      auto-marker: frame-origin,
+      consent-envelope: option<consent-envelope>,
+      intent-lineage: list<string>,
+    }
+
+    variant halt {
+      voluntary,
+      fault(string),
+    }
+  }
+}
+
+
+package wasi:io@0.2.9 {
+  interface poll {
+    resource pollable {
+      block: func();
+    }
+
+    poll: func(in: list<borrow<pollable>>) -> list<u32>;
+  }
+  interface error {
+    resource error;
+  }
+  interface streams {
+    use error.{error};
+    use poll.{pollable};
+
+    resource input-stream;
+
+    resource output-stream {
+      check-write: func() -> result<u64, stream-error>;
+      write: func(contents: list<u8>) -> result<_, stream-error>;
+      blocking-flush: func() -> result<_, stream-error>;
+      subscribe: func() -> pollable;
+    }
+
+    variant stream-error {
+      last-operation-failed(error),
+      closed,
+    }
+  }
+}
+
+
+package wasi:clocks@0.2.9 {
+  interface monotonic-clock {
+    use wasi:io/poll@0.2.9.{pollable};
+
+    type duration = u64;
+
+    subscribe-duration: func(when: duration) -> pollable;
+  }
+}
+
+
+package wasi:cli@0.2.9 {
+  interface stdout {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stdout: func() -> output-stream;
+  }
+  interface stderr {
+    use wasi:io/streams@0.2.9.{output-stream};
+
+    get-stderr: func() -> output-stream;
+  }
+  interface stdin {
+    use wasi:io/streams@0.2.9.{input-stream};
+
+    get-stdin: func() -> input-stream;
+  }
+  interface environment {
+    get-environment: func() -> list<tuple<string, string>>;
+  }
+  interface exit {
+    exit: func(status: result);
+  }
+  interface terminal-input {
+    resource terminal-input;
+  }
+  interface terminal-output {
+    resource terminal-output;
+  }
+  interface terminal-stdin {
+    use terminal-input.{terminal-input};
+
+    get-terminal-stdin: func() -> option<terminal-input>;
+  }
+  interface terminal-stdout {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stdout: func() -> option<terminal-output>;
+  }
+  interface terminal-stderr {
+    use terminal-output.{terminal-output};
+
+    get-terminal-stderr: func() -> option<terminal-output>;
+  }
+}
+
+
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-wasm cargo run --locked --offline -p xtask -- check-equiv-fixture-provenance
+check-equiv-fixture-provenance: PASSED (4 fixtures in sync with source, WIT, and manifest)
+exit 0
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-wasm cargo run --locked --offline -p xtask -- templates-regen --check
+exit 0
+
+$ CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-wasm CI=1 cargo test --locked --offline -p maos-wasm-host --test wit_corpus --test wit_copies_17_3b --test t2_sandbox_kill --test equiv_harness --test e2e_roundtrip --test frame_bridge_roundtrip --test codec_integration --test fuel_t2_matrix -- --nocapture
+codec_integration: 10 passed, 0 failed
+e2e_roundtrip: 8 passed, 0 failed
+equiv_harness: 19 passed, 0 failed
+frame_bridge_roundtrip: 16 passed, 0 failed
+fuel_t2_matrix: 8 passed, 0 failed
+t2_sandbox_kill: 5 passed, 0 failed (no SKIP; ptrace SIGSYS 31 classified T2)
+wit_copies_17_3b: 1 passed, 0 failed
+wit_corpus: 22 passed, 0 failed
+exit 0

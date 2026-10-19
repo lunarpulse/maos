@@ -2,24 +2,9 @@
 
 //! Log-recall adapter — implements `LogRecallPort` over the Transparency Log.
 //!
-//! Provides participant-scoped (emitter-side at v0.3-β), cursor-paginated
-//! read-side access with on-demand payload fetch and A2A consent honoring.
-//!
-//! # v0.3-β scope
-//!
-//! Only the **emitter** Spirit can recall/fetch their own frames. Recipient-side
-//! participation requires a `transparency_log_recipients` companion table
-//! (deferred to v0.5+, Story 8.2 or 9.1).
-//!
-//! # A2A consent envelope
-//!
-//! When an entry's payload would carry a `ConsentEnvelope`, the adapter checks
-//! `consent_envelope.valid_until > now_ns()`. At v0.3-β with
-//! `consent_envelope == None` on every TL row, the check is structurally a
-//! no-op AND a comment block documents the v0.5 binding contract from §7.1 +
-//! Story 6.3. When Story 6.3 wires the envelope, this method gains the
-//! `consent_envelope.valid_until > now_ns()` runtime check and the v0.3
-//! scaffold-comment converts to runtime enforcement without API change.
+//! Emitter-scoped, boot-incarnation-bound metadata recall and lazy payload fetch.
+//! Participant recall and persisted consent evaluation are owned by
+//! `17-8-participant-recall-and-consent-envelopes`.
 
 use std::sync::Arc;
 
@@ -28,6 +13,7 @@ use maos_spirit_sdk::spirit_test::{AttemptResult, IsolationHookPoint, Observatio
 #[cfg(feature = "spirit_test")]
 use parking_lot::Mutex;
 
+use maos_domain::invariants::i1::TokenId;
 use maos_domain::invariants::i3::FrameOrigin;
 use maos_domain::log_recall::{
     CrossWallRecallRefusal, FrameKindLabel as DomainFrameKindLabel, LogFetchResponse,
@@ -40,7 +26,8 @@ use maos_domain::ports::{
 use maos_domain::team::TeamId;
 
 use super::transparency_log::{
-    FrameFilter, FrameKind, TransparencyLogAdapter, TransparencyLogEntry,
+    capability_token_column, FrameFilter, FrameKind, TransparencyLogAdapter,
+    TransparencyLogMetadata,
 };
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
@@ -52,6 +39,19 @@ pub const LOG_CROSS_WALL_RECALL_INTENT: &str = "log.recall.cross-wall";
 
 /// Stable intent string constant for `CapabilityInvocation` audit row.
 pub const LOG_FETCH_INTENT: &str = "log.fetch";
+
+/// Only bus frames and MCP invocations are Spirit-disclosable. Inspect the raw
+/// SQLite discriminant, never an audit reader's decoded fallback.
+pub fn is_spirit_disclosable(raw_kind: i64) -> bool {
+    matches!(raw_kind, 0..=6 | 18)
+}
+
+/// A bounded fetch refuses an oversized stored payload before loading its blob.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundedFetch {
+    Fetched(LogFetchResponse),
+    PayloadTooLarge { payload_len: u64 },
+}
 
 /// Log-recall adapter — stateless composer over `Arc<TransparencyLogAdapter>`.
 ///
@@ -190,11 +190,8 @@ impl LogRecallAdapter {
 
     /// Map domain `FrameKindLabel` → kernel-side `FrameKind`.
     ///
-    /// Returns `None` if the domain label has no kernel-side equivalent — the
-    /// caller must treat this as "no kind filter" rather than silently routing
-    /// to a default kind (Story 5.5d Finding #11 — the previous `_ =>
-    /// FrameKind::McpInvocation` catch-all silently misclassified future
-    /// `FrameKindLabel` variants in audit recall).
+    /// An unsupported label has no matches; never silently substitute a
+    /// different kind or widen the query to all kinds.
     fn to_kernel_kind(label: &DomainFrameKindLabel) -> Option<FrameKind> {
         match label {
             DomainFrameKindLabel::TaskAssign => Some(FrameKind::TaskAssign),
@@ -229,76 +226,47 @@ impl LogRecallAdapter {
             }
             DomainFrameKindLabel::GovernanceEvent => Some(FrameKind::GovernanceEvent),
             DomainFrameKindLabel::CostAttribution => Some(FrameKind::CostAttribution),
-            other => {
-                eprintln!(
-                    "maos: warning: unmapped FrameKindLabel {:?} in to_kernel_kind \
-                     — treating as no-kind-filter (returning None) to avoid \
-                     silent misclassification",
-                    other
-                );
-                None
-            }
+            _ => None,
         }
     }
 
-    /// Build a domain `LogRecallEntry` from a kernel-side `TransparencyLogEntry`.
-    fn build_entry(tl_entry: &TransparencyLogEntry) -> LogRecallEntry {
-        LogRecallEntry::new(
+    fn build_entry(tl_entry: TransparencyLogMetadata) -> Result<LogRecallEntry, LogRecallError> {
+        if !is_spirit_disclosable(tl_entry.raw_kind) {
+            return Err(LogRecallError::Storage(
+                "non-disclosable recall metadata".into(),
+            ));
+        }
+        let kind = FrameKind::from_i64(tl_entry.raw_kind)
+            .ok_or_else(|| LogRecallError::Storage("unrecognized recall kind".into()))?;
+        Ok(LogRecallEntry::new(
             tl_entry.frame_id,
             tl_entry.timestamp_ns,
-            Self::to_domain_kind(tl_entry.kind),
-            tl_entry.intent.clone(),
+            Self::to_domain_kind(kind),
+            tl_entry.intent,
             tl_entry.spirit_pid,
-            !tl_entry.payload_redacted.is_empty(),
-        )
+            tl_entry.payload_len != 0,
+        ))
     }
 
-    /// Apply cursor pagination to a sorted result set.
-    /// `entries` must be ordered by `(timestamp_ns ASC, frame_id ASC)`.
-    fn apply_cursor(
-        entries: &[TransparencyLogEntry],
-        cursor: Option<&LogRecallCursor>,
-        limit: usize,
-    ) -> (Vec<TransparencyLogEntry>, Option<LogRecallCursor>) {
-        if limit == 0 {
-            return (vec![], None);
-        }
-
-        let start_idx = match cursor {
-            Some(c) => {
-                // Skip entries until we pass the cursor position
-                entries
-                    .iter()
-                    .position(|e| {
-                        (e.timestamp_ns, &e.frame_id) > (c.last_timestamp_ns, &c.last_frame_id)
-                    })
-                    .unwrap_or(entries.len())
+    fn validate_filter(filter: &LogRecallFilter) -> Result<(), LogRecallError> {
+        for timestamp in [
+            filter.since_ns,
+            filter.until_ns,
+            filter
+                .cursor
+                .as_ref()
+                .map(|cursor| cursor.last_timestamp_ns),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if timestamp > i64::MAX as u64 {
+                return Err(LogRecallError::InvalidCursor(
+                    "timestamp exceeds SQLite's representable range".into(),
+                ));
             }
-            None => 0,
-        };
-
-        // Request limit+1 to detect whether a next_cursor is needed
-        let fetch_limit = limit.saturating_add(1);
-        let end_idx = (start_idx + fetch_limit).min(entries.len());
-
-        let selected: Vec<_> = entries[start_idx..end_idx].iter().cloned().collect();
-
-        let next_cursor = if selected.len() > limit {
-            // We fetched one extra — there IS a next page
-            let last = &selected[limit - 1];
-            Some(LogRecallCursor::new(last.timestamp_ns, last.frame_id))
-        } else {
-            None
-        };
-
-        // Return at most `limit` entries
-        let result = if selected.len() > limit {
-            selected[..limit].to_vec()
-        } else {
-            selected
-        };
-
-        (result, next_cursor)
+        }
+        Ok(())
     }
 
     /// Query one emitter-scoped page without emitting a local audit row.
@@ -308,50 +276,196 @@ impl LogRecallAdapter {
     pub fn query_page(
         transparency_log: &TransparencyLogAdapter,
         spirit_pid: u32,
+        boot_nonce: Option<u64>,
         filter: LogRecallFilter,
     ) -> Result<LogRecallPage, LogRecallError> {
+        Self::validate_filter(&filter)?;
+        let effective_limit = filter.limit.min(LogRecallFilter::MAX_LIMIT);
+        if effective_limit == 0 {
+            return Ok(LogRecallPage::new(Vec::new(), None));
+        }
+        let kind = match filter.kind.as_ref().map(Self::to_kernel_kind) {
+            Some(None) => return Ok(LogRecallPage::new(Vec::new(), None)),
+            Some(Some(kind)) => Some(kind),
+            None => None,
+        };
         let kernel_filter = FrameFilter {
             spirit_pid: Some(spirit_pid),
-            frame_id: None,
-            kind: filter.kind.as_ref().and_then(Self::to_kernel_kind),
-            correlation_id: None,
+            boot_nonce,
+            disclosable_kinds_only: true,
+            intent: filter.intent_filter,
+            kind,
             since_ns: filter.since_ns,
             until_ns: filter.until_ns,
-            limit: Some(
-                filter
-                    .limit
-                    .min(LogRecallFilter::MAX_LIMIT)
-                    .saturating_add(1),
-            ),
+            limit: Some(effective_limit.saturating_add(1)),
             cursor_timestamp_ns: filter
                 .cursor
                 .as_ref()
                 .map(|cursor| cursor.last_timestamp_ns),
             cursor_frame_id: filter.cursor.as_ref().map(|cursor| cursor.last_frame_id),
-            cursor_insertion_id: None,
-            order_by_insertion: false,
-            descending: false,
+            order_by_insertion: filter.order_by_insertion,
+            ..Default::default()
         };
-        let mut entries = transparency_log
-            .query_frames(kernel_filter)
+        let mut selected = transparency_log
+            .query_frame_metadata(kernel_filter)
             .map_err(|error| LogRecallError::Storage(error.to_string()))?;
-        entries.retain(|entry| {
-            entry.kind != FrameKind::CapabilityInvocation
-                && filter
-                    .intent_filter
-                    .as_ref()
-                    .is_none_or(|intent| entry.intent == *intent)
-        });
-        let effective_limit = filter.limit.min(LogRecallFilter::MAX_LIMIT);
-        let (selected, next_cursor) =
-            Self::apply_cursor(&entries, filter.cursor.as_ref(), effective_limit);
-        let entries = selected.iter().map(Self::build_entry).collect();
+        let next_cursor = if selected.len() > effective_limit {
+            selected.truncate(effective_limit);
+            selected
+                .last()
+                .map(|last| LogRecallCursor::new(last.timestamp_ns, last.frame_id))
+        } else {
+            None
+        };
+        let entries = selected
+            .into_iter()
+            .map(Self::build_entry)
+            .collect::<Result<_, _>>()?;
         Ok(LogRecallPage::new(entries, next_cursor))
     }
 
     /// Convert kernel origin → domain origin.
     fn to_domain_origin(origin: FrameOrigin) -> maos_domain::invariants::i3::FrameOrigin {
         origin
+    }
+
+    /// Recall with the minted capability stamped on its single invocation row.
+    pub fn recall_attributed(
+        &self,
+        spirit_pid: u32,
+        filter: LogRecallFilter,
+        token: &TokenId,
+    ) -> Result<LogRecallPage, LogRecallError> {
+        self.recall_inner(spirit_pid, filter, Some(token))
+    }
+
+    /// Fetch with the minted capability stamped on its single invocation row.
+    pub fn fetch_attributed(
+        &self,
+        spirit_pid: u32,
+        frame_id: [u8; 16],
+        token: &TokenId,
+    ) -> Result<LogFetchResponse, LogRecallError> {
+        match self.fetch_inner(spirit_pid, frame_id, Some(token), u64::MAX)? {
+            BoundedFetch::Fetched(response) => Ok(response),
+            BoundedFetch::PayloadTooLarge { .. } => unreachable!("unbounded fetch"),
+        }
+    }
+
+    /// Enforce the stored-payload byte bound before loading its blob. Scope,
+    /// incarnation and disclosure checks precede size refusal. The transport
+    /// must still check its exact encoded reply size after a successful fetch.
+    pub fn fetch_attributed_bounded(
+        &self,
+        spirit_pid: u32,
+        frame_id: [u8; 16],
+        token: &TokenId,
+        max_payload_len: u64,
+    ) -> Result<BoundedFetch, LogRecallError> {
+        self.fetch_inner(spirit_pid, frame_id, Some(token), max_payload_len)
+    }
+
+    fn recall_inner(
+        &self,
+        spirit_pid: u32,
+        filter: LogRecallFilter,
+        token: Option<&TokenId>,
+    ) -> Result<LogRecallPage, LogRecallError> {
+        Self::validate_filter(&filter)?;
+        let audit_payload = serde_json::json!({
+            "limit": filter.limit,
+            "cursor_present": filter.cursor.is_some(),
+        });
+        self.transparency_log.insert_frame_event(
+            FrameKind::CapabilityInvocation,
+            spirit_pid,
+            token.map(capability_token_column).as_ref(),
+            LOG_RECALL_INTENT,
+            audit_payload.to_string().as_bytes(),
+            FrameOrigin::SpiritAuto,
+        );
+        #[cfg(feature = "spirit_test")]
+        self.fire_isolation_hooks(&format!("log.recall:{spirit_pid}"), true);
+
+        Self::query_page(
+            &self.transparency_log,
+            spirit_pid,
+            Some(self.transparency_log.boot_nonce()),
+            filter,
+        )
+    }
+
+    fn fetch_inner(
+        &self,
+        spirit_pid: u32,
+        frame_id: [u8; 16],
+        token: Option<&TokenId>,
+        max_payload_len: u64,
+    ) -> Result<BoundedFetch, LogRecallError> {
+        let frame_id_hex: String = frame_id.iter().map(|b| format!("{b:02x}")).collect();
+        let audit_payload = serde_json::json!({ "frame_id_hex": frame_id_hex });
+        self.transparency_log.insert_frame_event(
+            FrameKind::CapabilityInvocation,
+            spirit_pid,
+            token.map(capability_token_column).as_ref(),
+            LOG_FETCH_INTENT,
+            audit_payload.to_string().as_bytes(),
+            FrameOrigin::SpiritAuto,
+        );
+        #[cfg(feature = "spirit_test")]
+        {
+            let hex_prefix: String = frame_id
+                .iter()
+                .take(4)
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            self.fire_isolation_hooks(&format!("log.fetch:{spirit_pid}:{hex_prefix}"), true);
+        }
+
+        let metadata = self
+            .transparency_log
+            .query_frame_metadata_by_id(frame_id)
+            .map_err(|error| LogRecallError::Storage(error.to_string()))?
+            .ok_or(LogRecallError::FrameNotFound { frame_id })?;
+        let boot_nonce = self.transparency_log.boot_nonce();
+        if metadata.spirit_pid != spirit_pid
+            || metadata.boot_nonce != boot_nonce
+            || !is_spirit_disclosable(metadata.raw_kind)
+        {
+            return Err(LogRecallError::ScopeViolation {
+                frame_id,
+                requested_pid: spirit_pid,
+                owner_pid: metadata.spirit_pid,
+            });
+        }
+        if metadata.payload_len > max_payload_len {
+            return Ok(BoundedFetch::PayloadTooLarge {
+                payload_len: metadata.payload_len,
+            });
+        }
+        // Consent evaluation is owned by 17-8-participant-recall-and-consent-envelopes.
+        let entry = self
+            .transparency_log
+            .query_frames(FrameFilter {
+                frame_id: Some(frame_id),
+                spirit_pid: Some(spirit_pid),
+                boot_nonce: Some(boot_nonce),
+                disclosable_kinds_only: true,
+                limit: Some(1),
+                ..Default::default()
+            })
+            .map_err(|error| LogRecallError::Storage(error.to_string()))?
+            .pop()
+            .ok_or(LogRecallError::FrameNotFound { frame_id })?;
+        Ok(BoundedFetch::Fetched(LogFetchResponse::new(
+            entry.frame_id,
+            entry.timestamp_ns,
+            Self::to_domain_kind(entry.kind),
+            entry.intent,
+            entry.payload_redacted,
+            entry.capability_token,
+            Self::to_domain_origin(entry.origin),
+        )))
     }
 }
 
@@ -361,26 +475,7 @@ impl LogRecallPort for LogRecallAdapter {
         spirit_pid: u32,
         filter: LogRecallFilter,
     ) -> Result<LogRecallPage, LogRecallError> {
-        // 1. Emit CapabilityInvocation audit row BEFORE data-movement (FR4).
-        let audit_payload = serde_json::json!({
-            "limit": filter.limit,
-            "cursor_present": filter.cursor.is_some(),
-        });
-        let audit_payload_str = audit_payload.to_string();
-        let _token = self.transparency_log.insert_frame_event(
-            FrameKind::CapabilityInvocation,
-            spirit_pid,
-            None,
-            LOG_RECALL_INTENT,
-            audit_payload_str.as_bytes(),
-            FrameOrigin::SpiritAuto,
-        );
-
-        // 1a. Spirit_test isolation hook (Story 4.4 → Story 4.5 corpus plug).
-        #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks(&format!("log.recall:{spirit_pid}"), true);
-
-        Self::query_page(&self.transparency_log, spirit_pid, filter)
+        self.recall_inner(spirit_pid, filter, None)
     }
 
     fn recall_cross_wall(
@@ -389,6 +484,7 @@ impl LogRecallPort for LogRecallAdapter {
         team: &TeamId,
         filter: LogRecallFilter,
     ) -> Result<LogRecallPage, LogRecallError> {
+        Self::validate_filter(&filter)?;
         let reason = match self.cross_wall_consent.as_ref() {
             None => Some(CrossWallRecallRefusal::NoConsentProvider),
             Some(consent) => match consent.decide(team, CROSS_WALL_RECALL_CONSENT_INTENT) {
@@ -444,72 +540,16 @@ impl LogRecallPort for LogRecallAdapter {
         spirit_pid: u32,
         frame_id: [u8; 16],
     ) -> Result<LogFetchResponse, LogRecallError> {
-        // 1. Emit CapabilityInvocation audit row BEFORE data-movement (FR4).
-        let frame_id_hex: String = frame_id.iter().map(|b| format!("{b:02x}")).collect();
-        let audit_payload = serde_json::json!({
-            "frame_id_hex": frame_id_hex,
-        });
-        let audit_payload_str = audit_payload.to_string();
-        let _token = self.transparency_log.insert_frame_event(
-            FrameKind::CapabilityInvocation,
-            spirit_pid,
-            None,
-            LOG_FETCH_INTENT,
-            audit_payload_str.as_bytes(),
-            FrameOrigin::SpiritAuto,
-        );
-
-        // 1a. Spirit_test isolation hook (Story 4.4 → Story 4.5 corpus plug).
-        #[cfg(feature = "spirit_test")]
-        {
-            let hex_prefix: String = frame_id
-                .iter()
-                .take(4)
-                .map(|b| format!("{b:02x}"))
-                .collect();
-            self.fire_isolation_hooks(&format!("log.fetch:{spirit_pid}:{hex_prefix}"), true);
+        match self.fetch_inner(spirit_pid, frame_id, None, u64::MAX)? {
+            BoundedFetch::Fetched(response) => Ok(response),
+            BoundedFetch::PayloadTooLarge { .. } => unreachable!("unbounded fetch"),
         }
-
-        // 2. Query transparency log for the specific frame by primary key.
-        let entry = self
-            .transparency_log
-            .query_frame_by_id(frame_id)
-            .map_err(|e| LogRecallError::Storage(e.to_string()))?
-            .ok_or(LogRecallError::FrameNotFound { frame_id })?;
-
-        // 3. Emitter-scope check (v0.3-β).
-        if entry.spirit_pid != spirit_pid {
-            return Err(LogRecallError::ScopeViolation {
-                frame_id,
-                requested_pid: spirit_pid,
-                owner_pid: entry.spirit_pid,
-            });
-        }
-
-        // 4. A2A consent envelope honoring.
-        // v0.3-β: ConsentEnvelope is None on every TL row today.
-        // When Story 6.3 wires the envelope, this block gains:
-        //   if let Some(envelope) = &frame.consent_envelope {
-        //       if envelope.valid_until <= wall_clock_now_ns() {
-        //           return Err(LogRecallError::InvalidCursor("consent envelope expired".into()));
-        //       }
-        //   }
-        // The I8/§7.1 forward-looking shape is a no-op pass-through at v0.3-β.
-
-        Ok(LogFetchResponse::new(
-            entry.frame_id,
-            entry.timestamp_ns,
-            Self::to_domain_kind(entry.kind),
-            entry.intent.clone(),
-            entry.payload_redacted.clone(),
-            entry.capability_token,
-            Self::to_domain_origin(entry.origin),
-        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::transparency_log::TransparencyLogEntry;
     use super::*;
     use maos_domain::ports::{
         CrossWallRecallConsentError, CrossWallRecallConsentPort, LogRecallPort,

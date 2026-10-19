@@ -39,7 +39,7 @@ fn seed(tl: &Arc<TransparencyLogAdapter>, pid: u32, intents: &[&str]) -> Vec<[u8
     let mut ids = Vec::new();
     for (i, intent) in intents.iter().enumerate() {
         let _ = tl.insert_frame_event(
-            FrameKind::InferenceCall,
+            FrameKind::McpInvocation,
             pid,
             None,
             intent,

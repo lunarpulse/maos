@@ -57,7 +57,6 @@ pub struct HookDispatcher {
         Option<Arc<crate::capability::working_memory::orchestrator::WorkingMemoryOrchestrator>>,
     iac: Option<Arc<crate::iac::IacBusAdapter>>,
     halt_registry: Option<Arc<crate::halt::HaltRegistry>>,
-    log_recall: Option<Arc<crate::iac::log_recall::LogRecallAdapter>>,
     distillate_writer: Option<Arc<crate::iac::distillate::DistillateWriter>>,
     self_telemetry: Option<Arc<crate::memory::self_telemetry::SelfTelemetryAggregator>>,
     /// Story 5.3 — shared SCB map for wiring KernelCtx::heartbeat
@@ -76,7 +75,6 @@ impl HookDispatcher {
             working_memory_orchestrator: None,
             iac: None,
             halt_registry: None,
-            log_recall: None,
             distillate_writer: None,
             self_telemetry: None,
             spirits: None,
@@ -111,11 +109,6 @@ impl HookDispatcher {
 
     pub fn with_halt_registry(mut self, h: Arc<crate::halt::HaltRegistry>) -> Self {
         self.halt_registry = Some(h);
-        self
-    }
-
-    pub fn with_log_recall(mut self, l: Arc<crate::iac::log_recall::LogRecallAdapter>) -> Self {
-        self.log_recall = Some(l);
         self
     }
 
@@ -163,9 +156,6 @@ impl HookDispatcher {
         }
         if let Some(ref h) = self.halt_registry {
             kctx = kctx.with_halt_registry(Arc::clone(h));
-        }
-        if let Some(ref l) = self.log_recall {
-            kctx = kctx.with_log_recall(Arc::clone(l));
         }
         if let Some(ref d) = self.distillate_writer {
             kctx = kctx.with_distillate_writer(Arc::clone(d));

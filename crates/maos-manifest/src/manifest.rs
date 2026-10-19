@@ -334,7 +334,7 @@ const ARTIFACT_PATH_MAX_BYTES: usize = 4096;
 /// gate reports the constant as missing. Keep the declaration on one physical
 /// line and out of doc comments above it.
 #[rustfmt::skip]
-const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac"];
+const POST_V1_SCHEMA_SECTIONS: &[&str] = &["cli_wrapper", "schedule", "gateway", "model_provenance", "capabilities.required.loom", "capabilities.required.iac", "capabilities.required.log"];
 
 /// Story 7.5a (NFR-Maint-9) — emit a WARN-level degradation note for every
 /// newer-than-declared schema section that an N-1 manifest omits (and thus
@@ -605,6 +605,7 @@ pub struct CapabilitiesRequired {
     pub mcp: McpCapabilities,
     pub loom: LoomCapabilities,
     pub iac: IacCapabilities,
+    pub log: LogCapabilities,
 }
 
 /// Story 17-3c — `[capabilities.required.iac].send`: peer classes from the
@@ -612,6 +613,13 @@ pub struct CapabilitiesRequired {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct IacCapabilities {
     pub send: Vec<String>,
+}
+
+/// Schema v5 emitter-scoped Transparency Log grants.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LogCapabilities {
+    pub recall: bool,
+    pub fetch: bool,
 }
 
 /// `"broadcast"` = frame with empty `to`; `"spirit:peer"` = frame addressed to
@@ -661,7 +669,7 @@ impl CapabilitiesRequired {
     /// Drops capability declarations introduced after the manifest's schema.
     ///
     /// Schema v4 introduced `[capabilities.required.loom]` and v5
-    /// `[capabilities.required.iac]`; older manifests degrade them rather than
+    /// `[capabilities.required.iac]` and `[capabilities.required.log]`; older manifests degrade them rather than
     /// gaining a capability their declared schema cannot express.
     pub fn degrade_for_schema_version(mut self, declared_schema: u32) -> Self {
         if declared_schema < 4 {
@@ -669,6 +677,7 @@ impl CapabilitiesRequired {
         }
         if declared_schema < 5 {
             self.iac = IacCapabilities::default();
+            self.log = LogCapabilities::default();
         }
         self
     }
@@ -685,12 +694,23 @@ struct RawCapabilitiesRequired {
     loom: RawLoomCapabilities,
     #[serde(default)]
     iac: RawIacCapabilities,
+    #[serde(default)]
+    log: RawLogCapabilities,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 struct RawIacCapabilities {
     send: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawLogCapabilities {
+    #[serde(default)]
+    recall: bool,
+    #[serde(default)]
+    fetch: bool,
 }
 
 #[maos_attrs::i9_exempt(
@@ -785,6 +805,10 @@ impl RawCapabilitiesRequired {
                 scan: self.loom.scan,
             },
             iac: IacCapabilities { send },
+            log: LogCapabilities {
+                recall: self.log.recall,
+                fetch: self.log.fetch,
+            },
         })
     }
 }
@@ -833,6 +857,12 @@ pub fn capabilities_required_to_scopes(
         scopes.push(maos_domain::invariants::i1::Scope::IacSend {
             peer_class: peer_class.clone(),
         });
+    }
+    if caps.log.recall {
+        scopes.push(maos_domain::invariants::i1::Scope::LogRecall);
+    }
+    if caps.log.fetch {
+        scopes.push(maos_domain::invariants::i1::Scope::LogFetch);
     }
     scopes
 }

@@ -43,7 +43,7 @@ fn claim_bytes(claim_id: &str, statement: &str) -> Vec<u8> {
 fn seed(tl: &Arc<TransparencyLogAdapter>, pid: u32, claims: &[(&str, &str)]) {
     for (id, statement) in claims {
         let _ = tl.insert_frame_event(
-            FrameKind::InferenceCall,
+            FrameKind::McpInvocation,
             pid,
             None,
             "inform",

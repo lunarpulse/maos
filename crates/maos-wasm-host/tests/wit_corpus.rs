@@ -115,6 +115,9 @@ mod wit_ast {
     pub fn scopes() -> Vec<String> {
         variant_case_names("scope")
     }
+    pub fn recall_errors() -> Vec<String> {
+        variant_case_names("recall-error")
+    }
     pub fn record_names() -> Vec<String> {
         all_record_names()
     }
@@ -177,12 +180,29 @@ fn corpus_covers_all_scopes() {
 }
 
 #[test]
+fn recall_errors_are_the_final_2_x_vocabulary() {
+    assert_eq!(
+        wit_ast::recall_errors(),
+        [
+            "scope-violation",
+            "frame-not-found",
+            "invalid-request",
+            "limit-exceeded",
+            "capability-denied",
+            "consent-withheld",
+            "reply-too-large",
+            "unavailable",
+        ]
+    );
+}
+
+#[test]
 fn corpus_covers_all_record_types() {
     let records = wit_ast::record_names();
     assert_eq!(
         records.len(),
-        20,
-        "must cover all 20 record types from the parsed .wit AST, got {records:?}"
+        25,
+        "must cover all 25 record types from the parsed .wit AST, got {records:?}"
     );
     // Every field is also mechanically counted — adding a field to any
     // record without updating this list of expectations trips a test.
@@ -207,6 +227,11 @@ fn corpus_covers_all_record_types() {
         ("budget-envelope", 4),
         ("consent-envelope", 5),
         ("iac-frame", 11),
+        ("recall-cursor", 2),
+        ("recall-filter", 6),
+        ("recall-entry", 5),
+        ("recall-page", 2),
+        ("fetch-response", 6),
     ];
     for (name, expected) in expected_field_counts {
         assert_eq!(

@@ -1,0 +1,137 @@
+17-3d isolated prototype evidence; real output; source base 39cd7966
+HOST 7.2.9-1-cachyos
+ptrace_scope=1
+
+GREEN: complete seam
++ /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe
+PARENT runner_fd=4 CLOEXEC=true
+RESULT status=exit status: 0 code=Some(0) signal=None write=Ok(()) read=Ok(()) reply=[112, 111, 110, 103]
+CHILD roundtrip=ok
+probe_process_rc=0
+
+RED-omit-sendto
++ cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe && /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe
+PARENT runner_fd=4 CLOEXEC=true
+RESULT status=exit status: 72 code=Some(72) signal=None write=Ok(()) read=Err(Error { kind: UnexpectedEof, message: "failed to fill whole buffer" }) reply=[0, 0, 0, 0]
+CHILD send errno=Some(1) Operation not permitted (os error 1)
+probe_process_rc=0
+
+RED-omit-recvfrom
++ cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe && /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe
+PARENT runner_fd=4 CLOEXEC=true
+RESULT status=exit status: 71 code=Some(71) signal=None write=Ok(()) read=Err(Os { code: 104, kind: ConnectionReset, message: "Connection reset by peer" }) reply=[0, 0, 0, 0]
+CHILD recv errno=Some(1) Operation not permitted (os error 1)
+probe_process_rc=0
+
+RED-omit-CLOEXEC-clear
++ cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe && /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe
+PARENT runner_fd=4 CLOEXEC=true
+RESULT status=exit status: 9 code=Some(9) signal=None write=Err(Os { code: 32, kind: BrokenPipe, message: "Broken pipe" }) read=Err(Error { kind: UnexpectedEof, message: "failed to fill whole buffer" }) reply=[0, 0, 0, 0]
+CHILD fd-check errno=Some(9)
+probe_process_rc=0
+
+GREEN-restored
++ cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe && /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe
+PARENT runner_fd=4 CLOEXEC=true
+RESULT status=exit status: 0 code=Some(0) signal=None write=Ok(()) read=Ok(()) reply=[112, 111, 110, 103]
+CHILD roundtrip=ok
+probe_process_rc=0
+
+SYSCALL TRACE
+PTRACER: Linux x86_64 PTRACE_SYSCALL on the native Rust std UnixStream child; outside T2 solely to identify actual syscall ABI. Real T2 outcomes above are separate.
+initial_stop=5
+recvfrom(fd=10,len=4,flags=0) entry syscall_nr=45
+recvfrom return=4
+sendto(fd=10,len=4,flags=16384) entry syscall_nr=44
+sendto return=4
+trace_child_exit=0
+parent_reply=b'pong'
+child_stderr=CHILD roundtrip=ok
+
+MEASUREMENT BUILD COMMANDS
+base clean worktree: cargo build --offline --locked -p maos-kernel-core --lib -> exit 0
+prototype: cargo fmt --all -> exit 0; cargo build --offline --locked -p maos-kernel-core --lib -> exit 0
+base kernel warnings=43; prototype kernel warnings=43; new warning diagnostics=[]
+
+PREMISE CORRECTION
+The requested SIGSYS(31) omission expectation is false at this HEAD: linux.rs:378-382 uses Errno(EPERM) for unknown syscalls. Only the separate hostile list uses KillProcess. No hostile rules or default policy were altered to manufacture SIGSYS.
+
+PROBE SOURCE (excluded from kernel physical and tokei instrumentation; committed only in isolated repository)
+use std::io::{Read, Write};
+use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::unix::net::UnixStream;
+use std::os::unix::process::ExitStatusExt;
+use std::process::{Command, Stdio};
+use std::time::Duration;
+
+use maos_domain::invariants::i9::SandboxTier;
+use maos_kernel_core::security::sandbox::{spawn_sandboxed, SandboxSpec};
+
+fn child(fd: i32) {
+    // SAFETY: fcntl inspects the inherited descriptor without dereferencing memory.
+    if unsafe { libc::fcntl(fd, libc::F_GETFD) } == -1 {
+        eprintln!(
+            "CHILD fd-check errno={:?}",
+            std::io::Error::last_os_error().raw_os_error()
+        );
+        std::process::exit(9);
+    }
+    // SAFETY: only this process owns the inherited endpoint after exec.
+    let mut stream = unsafe { UnixStream::from_raw_fd(fd) };
+    let mut input = [0; 4];
+    if let Err(e) = stream.read_exact(&mut input) {
+        eprintln!("CHILD recv errno={:?} {e}", e.raw_os_error());
+        std::process::exit(71);
+    }
+    assert_eq!(&input, b"ping");
+    if let Err(e) = stream.write_all(b"pong") {
+        eprintln!("CHILD send errno={:?} {e}", e.raw_os_error());
+        std::process::exit(72);
+    }
+    eprintln!("CHILD roundtrip=ok");
+}
+
+fn main() {
+    let args: Vec<_> = std::env::args().collect();
+    if args.get(1).is_some_and(|arg| arg == "--child") {
+        child(args[2].parse().unwrap());
+        return;
+    }
+    let (mut service, runner) = UnixStream::pair().unwrap();
+    service
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    let fd = runner.as_raw_fd();
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+    println!(
+        "PARENT runner_fd={fd} CLOEXEC={}",
+        flags & libc::FD_CLOEXEC != 0
+    );
+    let mut spec = SandboxSpec::new_for_test(SandboxTier::T2);
+    spec.inherited_recall_fd = Some(fd);
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args(["--child", &fd.to_string()])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    match spawn_sandboxed(&spec, &mut command) {
+        Ok(mut sandboxed) => {
+            drop(runner);
+            let write = service.write_all(b"ping");
+            let mut response = [0; 4];
+            let read = service.read_exact(&mut response);
+            let status = sandboxed.wait().unwrap();
+            let mut stderr = String::new();
+            sandboxed
+                .child_mut()
+                .stderr
+                .take()
+                .unwrap()
+                .read_to_string(&mut stderr)
+                .unwrap();
+            println!("RESULT status={status} code={:?} signal={:?} write={write:?} read={read:?} reply={response:?}", status.code(), status.signal());
+            print!("{stderr}");
+        }
+        Err(error) => println!("REFUSED {error:?}: {error}"),
+    }
+}

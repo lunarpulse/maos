@@ -65,7 +65,6 @@ async fn silent_failure_detector_emits_suspect() {
         None,
         None,
         None,
-        None,
     ));
 
     let manifest = SpiritManifestBundle::default();

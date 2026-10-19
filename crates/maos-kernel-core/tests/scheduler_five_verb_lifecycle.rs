@@ -99,7 +99,6 @@ fn make_scheduler() -> Arc<SpiritSchedulerAdapter> {
         None,
         None,
         None,
-        None,
     ))
 }
 

@@ -41,6 +41,7 @@ fn default_caps_required() -> CapabilitiesRequired {
         mcp: maos_kernel_core::security::manifest::McpCapabilities { servers: vec![] },
         loom: maos_kernel_core::security::manifest::LoomCapabilities::default(),
         iac: maos_kernel_core::security::manifest::IacCapabilities::default(),
+        log: maos_manifest::LogCapabilities::default(),
     }
 }
 

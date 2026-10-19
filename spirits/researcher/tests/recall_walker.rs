@@ -40,7 +40,7 @@ fn seed_claims(tl: &Arc<TransparencyLogAdapter>, pid: u32, count: usize) -> Vec<
     let mut ids = Vec::new();
     for i in 0..count {
         let _ = tl.insert_frame_event(
-            FrameKind::InferenceCall,
+            FrameKind::McpInvocation,
             pid,
             None,
             "inform",

@@ -52,6 +52,8 @@ pub mod inference_mode;
 pub mod operator_door;
 /// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
 pub mod purge;
+#[cfg(feature = "network")]
+pub mod recall_mediation;
 pub mod shell_host;
 #[cfg(all(feature = "network", feature = "wasm-host"))]
 pub mod spirit_session;

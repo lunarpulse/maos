@@ -1,0 +1,73 @@
+$ git rev-parse HEAD
+39cd7966a354917b2a9cf805faa2462cb05c9677
+$ git rev-parse HEAD^{tree}
+7bee47d2724f5292025463188deb39c8d4314175
+$ rustc --version
+rustc 1.98.1 (48a229cea 2026-09-01)
+CI run id: local; no CI run
+Image: local workstation
+
+PRE-PLANT / POST-RESTORATION DIFF SHA-256
+b5f3f48c5e7eecf56a219ba15ff498bbe8d9f73047a975d48239db8c747e1f45
+
+FINAL GREEN RESULTS (MAOS_17_2_CGROUP_MODE=undelegated; no SKIP)
+recall_17_3d: 16 passed; 0 failed; 0 ignored; 0 filtered out
+spawned_scope_17_3c: 22 passed; 0 failed; 0 ignored; 0 filtered out
+recall_mediation_17_3d: 14 passed; 0 failed; 0 ignored; 0 filtered out
+recall_runner_17_3d: 11 passed; 0 failed; 0 ignored; 0 filtered out
+
+INTEGRATION TEST NAMES
+seed_fetch_r1_r2_r3_precede_authorization_and_fr4_succeeds
+empty_page_has_one_token_bearing_call_and_no_receipt
+ungranted_manifest_denies_with_receipt_only
+operator_deny_overrides_manifest_and_has_receipt_only
+exhausted_quota_has_receipt_without_tokenless_fallback_call
+cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation
+oversized_fetch_reply_is_typed_and_next_call_same_turn_still_works
+sixty_fifth_recall_closes_channel_once_with_typed_protocol_end
+own_frame_second_turn_recalls_kernel_minted_id_kind_intent_and_fetches_stored_payload
+own_receipt_and_authorization_ids_are_never_recalled_and_fetch_is_scope_violation
+consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet
+configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted
+tagged_record_between_exports_closes_once_with_typed_protocol_end
+unknown_tag_closes_once_with_typed_protocol_end
+junk_after_tag_closes_once_with_typed_protocol_end
+checked_in_researcher_admits_both_scopes_and_native_port_rows_pass_fr4
+
+SERIALIZED PROVEN-RED CONTROLS
+a-disclosure.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.82s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.77s
+  exact inverse dirty-diff restoration: true
+b-boot-scope.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.65s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.70s
+  exact inverse dirty-diff restoration: true
+c-post-limit-kind-drop.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.20s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.29s
+  exact inverse dirty-diff restoration: true
+d-token-attribution.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.23s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.24s
+  exact inverse dirty-diff restoration: true
+e-refusal-receipt.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.68s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.66s
+  exact inverse dirty-diff restoration: true
+f-vec-byte-sequence.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.11s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.11s
+  exact inverse dirty-diff restoration: true
+g-tag-dispatch-order.log
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 8.59s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.48s
+  exact inverse dirty-diff restoration: true
+
+EVIDENCE
+t8-recall-17-3d.log: complete command outputs and provenance; preliminary fixture-development failures are retained, with FINAL SOURCE / PRE-PLANT BASELINE marking the final source run.
+t8-fr4-plain-seed.txt: exact to_fr4_plain output from the successful real-session seed test.
+t8-proven-red/*.log: source commit/tree/compiler, baseline and plant diff hashes, git diff and exact incremental plant, exact command, full RED/GREEN outputs, restored diff hash.
+
+PRODUCTION DEFECTS
+None. No permanent production source changes. Test fixture changes: probe `to SPIRIT` script command; declared 1 GiB memory cap for the larger real component under the undelegated RLIMIT_AS fallback; telemetry broadcast subscriber; process-isolated static-PID quota seam; RAII planned stop on consumer assertion failure. Hostile records use the existing SessionLaunch.plan seam with a WASM-free /bin/sh child under actual T2; no production seam was added.

@@ -537,3 +537,19 @@ fn four_mib_guest_intent_lineage_lifts_without_panicking_or_truncation() {
     let decoded: IacFrame = codec::decode_cbor(&encoded).expect("encoded frame must decode");
     assert_eq!(decoded, domain);
 }
+
+#[test]
+fn fetched_origin_case_names_match_the_wit_contract() {
+    use maos_domain::invariants::i3::FrameOrigin::*;
+    for (origin, expected) in [
+        (HumanAuthored, "human-authored"),
+        (SpiritAuto, "spirit-auto"),
+        (SpiritDraftedHumanApproved, "spirit-drafted-human-approved"),
+        (Kernel, "kernel"),
+    ] {
+        assert_eq!(
+            maos_wasm_host::frame_bridge::origin_case_name(origin),
+            expected
+        );
+    }
+}

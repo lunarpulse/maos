@@ -4462,6 +4462,7 @@ dependencies = [
  "maos-manifest",
  "maos-spirit-abi",
  "maos-spirit-sdk",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.10.9",

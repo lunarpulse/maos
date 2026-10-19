@@ -45,6 +45,8 @@ const MANIFEST_FIELDS: &[(&str, &str)] = &[
     ("capabilities", "loom_write"),
     ("capabilities", "loom_scan"),
     ("capabilities", "iac_send"),
+    ("capabilities", "log_recall"),
+    ("capabilities", "log_fetch"),
     ("posture", "default"),
     ("posture", "allowed_max"),
     ("output_shape", "required_fields"),
@@ -229,13 +231,18 @@ fn capabilities_fixtures_deserialize_to_their_declared_outcomes() {
                             .iter()
                             .any(|scope| matches!(scope, Scope::IacSend { .. })))
                     }
+                    Some("log_recall" | "log_fetch") => {
+                        let degraded = caps.clone().degrade_for_schema_version(4);
+                        assert_eq!(degraded.log, maos_manifest::LogCapabilities::default());
+                        assert!(caps.log.recall || caps.log.fetch);
+                    }
                     _ => {}
                 }
             }
         }
     }
     assert_eq!(
-        fixture_count, 15,
+        fixture_count, 21,
         "every capabilities fixture must be exercised"
     );
 }

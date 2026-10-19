@@ -226,3 +226,94 @@ not transit a new kernel protocol.
   `sendto`, `recvfrom`) are therefore ◆ FLAG-Winston for exactly those lines,
   each with its kernel figure measured by a prototype at its creation (E16-A7;
   epic-17 R17-46, routed by R17-51 when the old 17-3b was split).
+
+## Amendment — §D-C transport, in-band (ratified 2026-10-18)
+
+Ratified by the operator (Lunarpulse) on 2026-10-18 at Story 17-3d's preflight
+(epic-17 §R14, R17-157; `17-3d-flag-winston-decision.md` §Preflight rulings).
+It supersedes the 2026-09-26 amendment's transport bullet, its conditions (i)
+and (ii) as conditions of recall, and its kernel-core bullet as it applies to
+Story 17-3d. Story 17-3c's `memfd_create` entry is unaffected.
+
+- **Recall rides the runner's ADR-032 stdio channel.** SUPERSEDES *"The
+  transport is an inherited descriptor"* and §D-C's *"side-channel service over
+  a Unix socket"*. During an active `handle-frame` export the runner writes one
+  recall request as a stdout record whose body is a CBOR data item carrying a
+  private recall tag, flushes, and reads exactly one tagged reply record from
+  stdin. Frame records stay untagged and byte-identical. The kernel bridge
+  passes records through unchanged; `maos-bin`'s session loop, which owns the
+  runner's stdin writer and reads every stdout record since Story 17-3c,
+  decodes, mediates and replies. Recall still transits no new kernel protocol,
+  and the runner's stdio remains the ADR-032 bridge.
+- **Why the 2026-09-04 rejection no longer holds.** The in-bridge
+  request/response alternative was rejected because it cost +80–150 kernel
+  lines in `lifecycle/cli_wrapper/runtime.rs` while the bridge routed frames
+  itself. Since 17-3c the bridge is byte-transparent and `maos-bin` owns both
+  directions, so the in-band design costs no kernel line.
+- **No descriptor, no new syscall, no `unsafe`.** T2's allow-list gains nothing
+  for recall (`sendto` and `recvfrom` are not added). No descriptor is
+  inherited, so the same-uid descriptor-theft condition (i) and the path-socket
+  availability condition (ii) no longer apply to recall. The runner adopts
+  nothing by number: its recall client uses only std's stdin and stdout
+  handles, with no `unsafe`, no `libc` and no platform-specific code. The WASM
+  session itself still requires T2, which is Linux-only.
+- **Ordering and forgery.** `maos-bin` writes an inbound frame only between
+  exports, so during an export the only stdin record is the recall reply; any
+  other record is a protocol error, and EOF makes the outstanding call
+  `unavailable` before the session ends normally (wording clarified the same
+  day by the in-band prototype, `17-3d-evidence/inband/`). The guest cannot write the runner's
+  stdout: its WASI stdout is redirected to stderr. Recall is unavailable outside
+  `handle-frame` (before Ready, and during `on-shutdown`, when stdin is closed).
+- **Kernel-core.** Story 17-3d's kernel lines are no longer the descriptor
+  hand-off, `sendto` or `recvfrom`; its FLAG-Winston charter is re-ruled to the
+  manifest literal and a deletion-only removal of the dormant scheduler recall
+  seam, with no ceiling raise.
+
+## Implementation note — Story 17-3d
+
+The in-band implementation uses CBOR tag **60000** for recall requests
+(runner → daemon) and **60001** for replies (daemon → runner). These are
+private, unregistered tags in RFC 8949's first-come-first-served range, not
+an IANA registration. Each record contains exactly one tagged data item.
+Requests and replies alternate only during `handle-frame`; the daemon binds
+the admitted scheduler pid and Transparency Log boot nonce, never a wire identity.
+
+Schema v5 grants recall and fetch independently:
+
+```toml
+[capabilities.required.log]
+recall = true
+fetch = true
+```
+
+Both booleans default to `false`, unknown keys are refused, and below schema 5
+the table is dropped with a degradation warning like `iac`. The daemon mints
+and revokes a capability per admitted operation; the adapter writes its
+token-bearing invocation row before disclosure.
+
+The disclosure allow-list uses **raw stored kinds {0–6, 18}**: bus frames and
+MCP invocations emitted by this caller in this daemon run. Audit rows,
+including invocation rows and governance receipts, are never disclosable.
+Boot, emitter, kind, and exact-intent restrictions apply before the page limit.
+
+Replies must satisfy both `maos_frame_codec::MAX_FRAME_BYTES` and the codec's
+**16 MiB expansion budget**. Frame ids and payloads use CBOR byte strings,
+not integer arrays. A page returns the longest fitting prefix, searched
+downward from the full page; its continuation cursor names the last included
+entry when shortened. If even one entry cannot fit, or a complete fetched
+payload cannot fit both budgets, the result is `reply-too-large(bound)`,
+where `bound` is `MAX_FRAME_BYTES`. Fetched payloads are never truncated.
+
+Every operation refusal writes one kind-28 GovernanceEvent receipt with intent
+`log.recall.refused:<code>` or `log.fetch.refused:<code>` (`code` is the WIT
+error case name). Validation or mint refusal writes no invocation row;
+successful operations write no refusal receipt. Protocol violations write
+one kind-28 `recall.channel.closed:protocol-violation` receipt and end the
+session.
+
+An unexpected, untagged, oversized, or undecodable reply returns `unavailable`
+and latches the runner's recall client broken. Later calls perform no I/O.
+The current export still writes its frames and TurnComplete, then the runner
+exits with a typed `recall protocol desync` error without reading further
+stdin. EOF while waiting instead returns `unavailable`, closes recall I/O,
+and lets the export finish before a normal EOF exit.

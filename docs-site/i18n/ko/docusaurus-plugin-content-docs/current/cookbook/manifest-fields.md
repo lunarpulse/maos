@@ -59,6 +59,10 @@ time_cap_seconds = 300
 [capabilities.required.provider]
 complete = ["anthropic/claude-3"]
 
+[capabilities.required.log]
+recall = true
+fetch = true
+
 # ── Scheduling & Lifecycle ────────────────────────────────
 [scheduling]
 priority_weight = 100
@@ -87,5 +91,7 @@ on_confidence_below = 0.6
 `forms`는 `rust-inproc`, `subprocess`, `wasm-component`를 받습니다. `wasm-component` manifest는 그 형식만 단독으로 선언하고, 스키마 v5 이상을 사용하며, 상대 `.wasm` `artifact`를 선언하고, `[sandbox] tier = "T2"`를 설정해야 합니다. 다른 형식에서는 `artifact`가 금지됩니다. 완전한 서드파티 TypeScript 예시는 [WASM Component Spirit](./wasm-component-spirit)를 참조하세요.
 
 리소스 상한은 서로 독립적입니다. `cpu_max_pct`는 CPU 한 개 대비 양의 백분율이고, `memory_max_mb`는 MiB이며, `pids_max`는 선택적 양의 `u32` 프로세스/태스크 제한이고, `fd_max`는 선택적인 별도 파일 디스크립터 제한입니다. 필드를 생략하면 설정되지 않습니다. `pids_max`를 생략한 schema v4/v5 manifest는 계속 허용됩니다. `pids_max`는 Linux에서만 적용됩니다(native T2 cgroup `pids.max`, T3 `--pids-limit`). native macOS 및 Windows sandbox는 이를 적용하지도 거부하지도 않습니다. Worker/T3 동작과 native T2 위임 요구 사항은 [CLI Wrapper Spirit](./cli-wrapper-spirit)을 참조하세요.
+
+`[capabilities.required.log]`는 서로 독립적인 두 boolean 권한을 선언합니다. `recall`은 `Scope::LogRecall`, `fetch`는 `Scope::LogFetch`에 해당합니다. 두 값의 기본값은 모두 `false`이며 알 수 없는 key는 거부됩니다. 예제는 두 권한을 모두 요청합니다. 이 table은 스키마 v5가 필요합니다. 스키마 5 미만에서는 `[capabilities.required.iac]`와 마찬가지로 기능 저하 경고와 함께 제거되며 log scope를 부여하지 않습니다. 생략하면 어느 권한도 부여되지 않습니다. 호출마다 정책 중재를 거치므로 선언만으로 운영자 거부나 발급 할당량을 우회할 수 없습니다.
 
 전체 필드 수준 명세는 [Manifest 참조](/manifest/latest)를 참조하세요.

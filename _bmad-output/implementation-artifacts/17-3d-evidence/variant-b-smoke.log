@@ -1,0 +1,31 @@
+VARIANT B: manifest log capabilities on top of variant A
+source_head=39cd7966a354917b2a9cf805faa2462cb05c9677
+A_commit=b895d4e89980af165daa80e647b551f7668c4e8c
+B_commit=52af742f9c90aeebff2111f2e1180f1cda49e16a
+
+BUILD COMMANDS (isolated checkout; CARGO_TARGET_DIR=/mnt/build/cargo-17-3d-proto)
+cargo fmt --all -> exit 0
+cargo build --offline --locked -p maos-manifest --lib -> exit 0; 1 existing crate warning
+cargo build --offline --locked -p maos-kernel-core --lib -> exit 0; 43 existing crate warnings
+new warning diagnostics=[]
+
+Initial build correction: the first kernel build exited 101 with E0433 (LogCapabilities not re-exported at maos-manifest crate root). Added it to the existing lib.rs export list; final builds above succeeded. Full initial diagnostic excerpt:
+error[E0433]: cannot find `LogCapabilities` in `manifest`
+   --> crates/maos-kernel-core/src/scheduler/scheduler_loop.rs:335:49
+    |
+335 |                 log: crate::security::manifest::LogCapabilities::default(),
+    |                                                 ^^^^^^^^^^^^^^^ could not find `LogCapabilities` in `manifest`
+    |
+help: a struct with a similar name exists
+    |
+335 -                 log: crate::security::manifest::LogCapabilities::default(),
+335 +                 log: crate::security::manifest::LoomCapabilities::default(),
+    |
+
+GREEN B transport
++ cargo build --offline --locked -p maos-kernel-core --example recall_fd_probe -> exit 0
++ /mnt/build/cargo-17-3d-proto/debug/examples/recall_fd_probe
+PARENT runner_fd=4 CLOEXEC=true
+RESULT status=exit status: 0 code=Some(0) signal=None write=Ok(()) read=Ok(()) reply=[112, 111, 110, 103]
+CHILD roundtrip=ok
+probe_process_rc=0

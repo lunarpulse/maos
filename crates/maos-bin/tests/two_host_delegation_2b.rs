@@ -750,7 +750,6 @@ fn in_process_context(fixture: &Fixture, log: Arc<TransparencyLogAdapter>) -> Ho
         None,
         None,
         None,
-        None,
     ));
     let journal = Arc::new(
         maos_kernel_core::journal::JournalAdapter::open(&fixture.dir.join("host-b.journal.ndjson"))

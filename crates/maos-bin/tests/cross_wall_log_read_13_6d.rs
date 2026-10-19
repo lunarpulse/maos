@@ -237,8 +237,9 @@ fn single_connection_foreign_read_is_immune_to_an_artifact_swap_between_binding_
 
     // Query on the SAME held connection (what `read_remote` does after P2).
     let reader = TransparencyLogAdapter::from_read_only_connection(conn);
-    let page: LogRecallPage = LogRecallAdapter::query_page(&reader, 42, LogRecallFilter::default())
-        .expect("query on held connection");
+    let page: LogRecallPage =
+        LogRecallAdapter::query_page(&reader, 42, None, LogRecallFilter::default())
+            .expect("query on held connection");
 
     // Served rows are good.db's {good-1}, NOT swap.db's {swap-1}: the held
     // connection still points at good.db's inode. Two opens would return swap-1.

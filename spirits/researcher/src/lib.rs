@@ -44,7 +44,9 @@ use maos_domain::distillation::{
 };
 use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::invariants::i7::ScalarTapEvent;
-use maos_domain::log_recall::{FrameKindLabel, LogRecallEntry, LogRecallError, LogRecallFilter};
+use maos_domain::log_recall::{
+    FrameKindLabel, LogRecallCursor, LogRecallEntry, LogRecallError, LogRecallFilter,
+};
 use maos_domain::memory::{MemoryEntry, MemoryNamespace, MemoryValue};
 use maos_domain::ports::inference::{InferenceError, InferenceOptions, InferenceRequest};
 use maos_domain::ports::{DistillationPort, InferencePort, LogRecallPort};
@@ -351,6 +353,14 @@ impl std::fmt::Debug for LiveInference {
     }
 }
 
+/// Idle surveys retain fetched MCP frames and resume strictly after the last
+/// successfully fetched entry, including when the previous page was terminal.
+#[derive(Debug, Default)]
+struct McpRecallState {
+    cursor: Option<LogRecallCursor>,
+    frames: Vec<RecalledFrame>,
+}
+
 /// Researcher reference Spirit. Optionally holds the frames its `on_idle`
 /// survey reasons over (in production the walker seeds these from `log.recall`).
 #[derive(Clone)]
@@ -376,6 +386,8 @@ pub struct Researcher {
     /// Story 8.14c — the participant-scoped `LogRecallPort` used to recall
     /// McpInvocation frames after the fan-out. Required when `mcp_port` is `Some`.
     log_recall_port: Option<Arc<dyn LogRecallPort>>,
+    /// Incremental MCP log walk shared by cloned hook instances.
+    mcp_recall: Arc<Mutex<McpRecallState>>,
     /// Story 8.14c — the REAL spirit pid, backfilled after scheduler load.
     spirit_pid: Arc<AtomicU32>,
     /// Story 13.5d — mediated collective tier, wired by the composition root.
@@ -437,18 +449,28 @@ impl Researcher {
                 }
             };
             if let Some(log_port) = &self.log_recall_port {
-                let filter = LogRecallFilter::new(
-                    Some(FrameKindLabel::McpInvocation),
-                    None,
-                    None,
-                    1024,
-                    None,
-                    None,
-                );
+                let mut state = self.mcp_recall.lock().unwrap_or_else(|e| e.into_inner());
+                let filter = LogRecallFilter {
+                    kind: Some(FrameKindLabel::McpInvocation),
+                    cursor: state.cursor.clone(),
+                    order_by_insertion: true,
+                    ..Default::default()
+                };
                 let spirit_pid = self.spirit_pid.load(Ordering::Acquire);
-                match self.walk(log_port.as_ref(), spirit_pid, filter) {
-                    Ok(frames) => {
-                        let joined = self.join_claims_to_frames(&fetched, &frames);
+                let recalled =
+                    recall_all(log_port.as_ref(), spirit_pid, filter).and_then(|entries| {
+                        for entry in entries {
+                            let frame = fetch_payload(log_port.as_ref(), spirit_pid, &entry)?;
+                            state.frames.push(frame);
+                            state.cursor =
+                                Some(LogRecallCursor::new(entry.timestamp_ns, entry.frame_id));
+                        }
+                        Ok(())
+                    });
+                match recalled {
+                    Ok(()) => {
+                        let joined = self.join_claims_to_frames(&fetched, &state.frames);
+                        drop(state);
                         let output = self.survey(&joined);
                         let mut guard = self.last_output.lock().unwrap_or_else(|e| e.into_inner());
                         *guard = Some(output);
@@ -477,6 +499,7 @@ impl Default for Researcher {
             inference: None,
             mcp_port: None,
             log_recall_port: None,
+            mcp_recall: Arc::new(Mutex::new(McpRecallState::default())),
             spirit_pid: Arc::new(AtomicU32::new(0)),
             collective_port: None,
             collective_probe_completed: Arc::new(AtomicBool::new(false)),
@@ -627,6 +650,7 @@ impl Researcher {
     ) -> Self {
         self.log_recall_port = Some(port);
         self.spirit_pid = spirit_pid;
+        self.mcp_recall = Arc::new(Mutex::new(McpRecallState::default()));
         self
     }
 
@@ -1028,14 +1052,15 @@ pub fn recall_all(
     let mut out = Vec::new();
     let mut cursor = base.cursor.clone();
     for _ in 0..MAX_RECALL_PAGES {
-        let filter = LogRecallFilter::new(
-            base.kind.clone(),
-            base.since_ns,
-            base.until_ns,
-            base.limit,
-            cursor.clone(),
-            base.intent_filter.clone(),
-        );
+        let filter = LogRecallFilter {
+            kind: base.kind.clone(),
+            since_ns: base.since_ns,
+            until_ns: base.until_ns,
+            limit: base.limit.min(LogRecallFilter::MAX_LIMIT),
+            cursor: cursor.clone(),
+            intent_filter: base.intent_filter.clone(),
+            order_by_insertion: base.order_by_insertion,
+        };
         let page = port.recall(spirit_pid, filter)?;
         out.extend(page.entries);
         match page.next_cursor {
@@ -1058,18 +1083,26 @@ pub fn fetch_payloads(
 ) -> Result<Vec<RecalledFrame>, LogRecallError> {
     let mut out = Vec::with_capacity(entries.len());
     for entry in entries {
-        let payload = if entry.payload_available {
-            port.fetch(spirit_pid, entry.frame_id)?.payload_redacted
-        } else {
-            Vec::new()
-        };
-        out.push(RecalledFrame {
-            frame_id: entry.frame_id,
-            intent: entry.intent.clone(),
-            payload,
-        });
+        out.push(fetch_payload(port, spirit_pid, entry)?);
     }
     Ok(out)
+}
+
+fn fetch_payload(
+    port: &dyn LogRecallPort,
+    spirit_pid: u32,
+    entry: &LogRecallEntry,
+) -> Result<RecalledFrame, LogRecallError> {
+    let payload = if entry.payload_available {
+        port.fetch(spirit_pid, entry.frame_id)?.payload_redacted
+    } else {
+        Vec::new()
+    };
+    Ok(RecalledFrame {
+        frame_id: entry.frame_id,
+        intent: entry.intent.clone(),
+        payload,
+    })
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1118,10 +1151,16 @@ fn sanitize_unit(v: f32) -> f32 {
 /// hex run at 4 so the cite survives the filter cleanly — exactly the convention
 /// `DistillateWriter::format_frame_id_hex` uses for the same reason.
 pub fn encode_frame_id_hex(id: &[u8; 16]) -> String {
-    id.chunks(2)
-        .map(|c| format!("{:02x}{:02x}", c[0], c[1]))
-        .collect::<Vec<_>>()
-        .join(":")
+    use std::fmt::Write as _;
+    let mut label = String::with_capacity(39);
+    for (index, pair) in id.chunks_exact(2).enumerate() {
+        if index != 0 {
+            label.push(':');
+        }
+        write!(label, "{:02x}{:02x}", pair[0], pair[1])
+            .expect("writing a frame id to a String cannot fail");
+    }
+    label
 }
 
 /// Decode a frame id from either the colon-separated form produced by

@@ -67,7 +67,6 @@ async fn panic_hook_triggers_crash_detector() {
         None,
         None,
         None,
-        None,
     ));
 
     let mut scheduler_mut = scheduler;

@@ -1,0 +1,9 @@
+Story 17.3d AC2.4 reverse compatibility (dev evidence, not permanent test)
+$ rustc --version
+rustc 1.98.1 (48a229cea 2026-09-01)
+$ sha256sum /mnt/build/cargo-17-3d-guest-recall-probe/wasm32-wasip2/release/recall_probe.wasm
+10f1c9735f75b221ab4e67969bf2339aee76e37ecc4865df9b2fba358609576a  /mnt/build/cargo-17-3d-guest-recall-probe/wasm32-wasip2/release/recall_probe.wasm
+$ /mnt/build/cargo-17-3d-wasm-base/release/maos-wasm-runner --component /mnt/build/cargo-17-3d-guest-recall-probe/wasm32-wasip2/release/recall_probe.wasm --fuel 1000000000
+stdout hex: 
+stderr: maos-wasm-runner: InvalidComponent: component does not conform to maos:spirit@2.0.0 (instantiate failed): component imports instance `maos:spirit/recall@2.1.0`, but a matching implementation was not found in the linker
+exit 3 (typed InvalidComponent at instantiation; base host has no recall import)

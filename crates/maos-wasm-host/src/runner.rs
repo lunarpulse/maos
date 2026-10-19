@@ -15,7 +15,7 @@
 //! 1. Parse CLI arguments and create a fuel-metered wasmtime engine.
 //! 2. Compile the component under a watchdog, then reject an incompatible
 //!    `maos:spirit/frames` import before instantiation.
-//! 3. Instantiate it against the `maos:spirit@2.0.0` bindings, call
+//! 3. Instantiate it against the `maos:spirit@2.1.0` bindings, call
 //!    `on-start`, and exchange typed frames with `handle-frame`.
 //! 4. On EOF or a guest-returned `Halt`, call `on-shutdown` and use the
 //!    cause-distinguishing exit codes below.
@@ -35,12 +35,13 @@ compile_error!(
      appear in release builds (Story 17.3c ship-blocker)."
 );
 
-use std::io::{self, BufReader, BufWriter, Read};
+use std::io::Read;
 use std::process::ExitCode;
 
 use wasmtime::component::{Component, Linker};
 use wasmtime::{Config, Engine, Store};
 
+use maos_wasm_host::host_state::HostState;
 use maos_wasm_host::wit_guest::Spirit;
 
 /// Distinguishable exit codes so the parent (kernel) can attribute the kill
@@ -54,12 +55,14 @@ enum RunnerExit {
     GenericError = 1,
     /// Component imports an unsupported `maos:spirit/frames` major version.
     IncompatibleWorld = 2,
-    /// The supplied artifact is not a conformant `maos:spirit@2.0.0` component.
+    /// The supplied artifact is not a conformant `maos:spirit@2.x` component.
     InvalidComponent = 3,
     /// Wasmtime fuel was exhausted during a guest call (`Trap::OutOfFuel`).
     OutOfFuel = 4,
     /// An inbound domain frame has a future variant absent from the WIT world.
     UnrepresentableFrame = 5,
+    /// A recall reply broke the alternating in-band protocol.
+    RecallProtocolDesync = 6,
 }
 
 fn main() -> ExitCode {
@@ -76,7 +79,7 @@ fn main() -> ExitCode {
         Err(RunError::IncompatibleWorld(import)) => {
             eprintln!(
                 "maos-wasm-runner: IncompatibleWorld: component imports {import}; \
-                 this runner implements maos:spirit@2.0.0"
+                 this runner implements maos:spirit@2.1.0"
             );
             ExitCode::from(RunnerExit::IncompatibleWorld as u8)
         }
@@ -91,6 +94,10 @@ fn main() -> ExitCode {
         Err(RunError::UnrepresentableFrame(ty)) => {
             eprintln!("maos-wasm-runner: UnrepresentableFrame: {ty}");
             ExitCode::from(RunnerExit::UnrepresentableFrame as u8)
+        }
+        Err(RunError::RecallProtocolDesync) => {
+            eprintln!("maos-wasm-runner: recall protocol desync");
+            ExitCode::from(RunnerExit::RecallProtocolDesync as u8)
         }
         Err(RunError::Other(e)) => {
             eprintln!("maos-wasm-runner: {e}");
@@ -111,6 +118,7 @@ enum RunError {
     InvalidComponent(String),
     OutOfFuel,
     UnrepresentableFrame(&'static str),
+    RecallProtocolDesync,
     Other(String),
 }
 
@@ -218,7 +226,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     // this phase).
     let component = compile_with_timeout(&engine, wasm_bytes)?;
 
-    if let Some(import) = incompatible_spirit_frames_import(&component, &engine) {
+    if let Some(import) = incompatible_spirit_import(&component, &engine) {
         return Err(RunError::IncompatibleWorld(import));
     }
 
@@ -234,6 +242,11 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
     let mut linker = Linker::<maos_wasm_host::host_state::HostState>::new(&engine);
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)
         .map_err(|e| RunError::Other(format!("wasi linker setup: {e}")))?;
+    maos_wasm_host::wit_guest::maos::spirit::recall::add_to_linker::<
+        _,
+        wasmtime::component::HasSelf<HostState>,
+    >(&mut linker, |state| state)
+    .map_err(|e| RunError::Other(format!("recall linker setup: {e}")))?;
     let spirit = match Spirit::instantiate(&mut store, &component, &linker) {
         Ok(spirit) => spirit,
         Err(error) => {
@@ -242,7 +255,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
                 return Err(RunError::OutOfFuel);
             }
             return Err(RunError::InvalidComponent(format!(
-                "component does not conform to maos:spirit@2.0.0 (instantiate failed): {error_message}"
+                "component does not conform to maos:spirit@2.1.0 (instantiate failed): {error_message}"
             )));
         }
     };
@@ -259,14 +272,9 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
         Err(trap) => return Err(classify_trap(trap)),
     }
 
-    let stdin = io::stdin();
-    let stdout = io::stdout();
-    let mut reader = BufReader::new(stdin.lock());
-    let mut writer = BufWriter::new(stdout.lock());
-
     // Empty bodies are transport controls, never CBOR: initial Ready, then one
     // TurnComplete after each successful export, including exports emitting none.
-    maos_frame_codec::write_frame(&mut writer, &[])
+    maos_frame_codec::write_frame(&mut store.data_mut().writer, &[])
         .map_err(|e| RunError::Other(format!("Ready write: {e}")))?;
     #[cfg(all(feature = "runner-fault-inject", debug_assertions, target_os = "linux"))]
     if args.forbidden_syscall_after_ready {
@@ -289,7 +297,7 @@ fn run(args: RunnerArgs) -> Result<(), RunError> {
             "forbidden syscall unexpectedly returned".into(),
         ));
     }
-    let result = pump_frames(&mut store, &spirit, &mut reader, &mut writer, args.fuel);
+    let result = pump_frames(&mut store, &spirit, args.fuel);
 
     // Lifecycle: on-shutdown — best-effort, runs even if the pump errored,
     // mirroring the native form's halt-then-shutdown ordering. A shutdown
@@ -311,7 +319,7 @@ fn compile_with_timeout(engine: &Engine, bytes: Vec<u8>) -> Result<Component, Ru
     match rx.recv_timeout(COMPILE_TIMEOUT) {
         Ok(Ok(component)) => Ok(component),
         Ok(Err(e)) => Err(RunError::InvalidComponent(format!(
-            "component compile failed (and this runner requires a real maos:spirit@2.0.0 \
+            "component compile failed (and this runner requires a real maos:spirit@2.x \
              component — core-module fallback was removed once a real component fixture \
              landed): {e}"
         ))),
@@ -324,14 +332,16 @@ fn compile_with_timeout(engine: &Engine, bytes: Vec<u8>) -> Result<Component, Ru
     }
 }
 
-/// Return the first `frames` import whose semver major is not the host's
-/// `maos:spirit@2.0.0` major. Other imports are left to normal instantiation.
-fn incompatible_spirit_frames_import(component: &Component, engine: &Engine) -> Option<String> {
+/// Reject unsupported major versions of either Spirit host interface.
+/// Semver-compatible 2.0 imports resolve against this host's 2.1 definitions.
+fn incompatible_spirit_import(component: &Component, engine: &Engine) -> Option<String> {
     component
         .component_type()
         .imports(engine)
         .find_map(|(name, _)| {
-            let version = name.strip_prefix("maos:spirit/frames@")?;
+            let version = name
+                .strip_prefix("maos:spirit/frames@")
+                .or_else(|| name.strip_prefix("maos:spirit/recall@"))?;
             let major = version.split('.').next()?.parse::<u64>().ok()?;
             (major != 2).then(|| name.to_owned())
         })
@@ -346,15 +356,9 @@ fn classify_trap(err: wasmtime::Error) -> RunError {
     RunError::Other(format!("guest call failed: {err:#}"))
 }
 
-fn pump_frames<T>(
-    store: &mut Store<T>,
-    spirit: &Spirit,
-    reader: &mut impl io::BufRead,
-    writer: &mut impl io::Write,
-    fuel: u64,
-) -> Result<(), RunError> {
+fn pump_frames(store: &mut Store<HostState>, spirit: &Spirit, fuel: u64) -> Result<(), RunError> {
     loop {
-        let frame_bytes = match maos_frame_codec::read_frame(reader) {
+        let frame_bytes = match maos_frame_codec::read_frame(&mut store.data_mut().reader) {
             Ok(Some(b)) => b,
             Ok(None) => return Ok(()), // Clean EOF — Halt::Voluntary.
             Err(e) => return Err(RunError::Other(format!("stdin read error: {e}"))),
@@ -374,12 +378,15 @@ fn pump_frames<T>(
         store
             .set_fuel(fuel)
             .map_err(|e| RunError::Other(e.to_string()))?;
-        let emitted = match spirit.call_handle_frame(&mut *store, &wit_frame) {
+        store.data_mut().in_export = true;
+        let result = spirit.call_handle_frame(&mut *store, &wit_frame);
+        store.data_mut().in_export = false;
+        let emitted = match result {
             Ok(Ok(frames)) => frames,
             Ok(Err(maos_wasm_host::wit_guest::maos::spirit::frames::Halt::Voluntary)) => {
-                maos_frame_codec::write_frame(writer, &[])
+                maos_frame_codec::write_frame(&mut store.data_mut().writer, &[])
                     .map_err(|e| RunError::Other(format!("TurnComplete write: {e}")))?;
-                return Ok(());
+                return turn_result(store);
             }
             Ok(Err(halt)) => {
                 return Err(RunError::Other(format!(
@@ -406,10 +413,19 @@ fn pump_frames<T>(
             })
             .collect::<Result<Vec<_>, RunError>>()?;
         for cbor in &encoded {
-            maos_frame_codec::write_frame(writer, cbor)
+            maos_frame_codec::write_frame(&mut store.data_mut().writer, cbor)
                 .map_err(|e| RunError::Other(format!("stdout write error: {e}")))?;
         }
-        maos_frame_codec::write_frame(writer, &[])
+        maos_frame_codec::write_frame(&mut store.data_mut().writer, &[])
             .map_err(|e| RunError::Other(format!("TurnComplete write: {e}")))?;
+        turn_result(store)?;
+    }
+}
+
+fn turn_result(store: &Store<HostState>) -> Result<(), RunError> {
+    if store.data().recall_broken {
+        Err(RunError::RecallProtocolDesync)
+    } else {
+        Ok(())
     }
 }

@@ -18,17 +18,16 @@
 # The cognitive posture-set is realized Spirit-side (`ResearcherPosture`) and is
 # documented here as intent. (Flagged for Winston — Dev Agent Record.)
 #
-# LOG-RECALL CAPABILITY: `Scope::LogRecall`/`Scope::LogFetch`/`Scope::DistillateWrite`
-# are NOT manifest-declarable capability fields today (`capabilities_required_to_scopes`
-# derives only ProviderInfer + McpCall). They are granted at the kernel capability
-# layer; the enforced LogRecall path is exercised by the walker driving the real
-# `LogRecallAdapter` (which emits the CapabilityInvocation audit row) in tests.
+# LOG-RECALL CAPABILITY: schema v5 declares the emitter-scoped `Scope::LogRecall`
+# and `Scope::LogFetch` grants below. Admission preserves both through schema
+# degradation; the governed host mediates each recall/fetch. `Scope::DistillateWrite`
+# remains separate from these read grants.
 
 [class]
 name = "researcher"
 version = "0.5.0"
 abi = "1.0"
-manifest_schema_version = 4
+manifest_schema_version = 5
 min_substrate_version = "0.1.0-alpha"
 forms = ["rust-inproc"]
 trust_tier = "local"
@@ -50,6 +49,10 @@ provider.complete = ["anthropic.claude-sonnet-5-5"]
 read = true
 write = true
 scan = false
+
+[capabilities.required.log]
+recall = true
+fetch = true
 
 # Decision B — declare the McpCall { server, tool } capability scopes Researcher
 # WOULD exercise against real web/arXiv/GitHub/citation-graph drivers. At v0.5

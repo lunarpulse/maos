@@ -1,0 +1,730 @@
+{
+  "run_id": 39175953217,
+  "html_url": "https://github.com/lunarpulse/maos/actions/runs/39175953217",
+  "head_sha": "8ccfb10be893a84aea7d9be443544b5b077aba2c",
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "id": 117818534387,
+      "name": "ts-component",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017713",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run actions/setup-node@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Build, test, and componentize the TypeScript scaffold",
+          "success"
+        ],
+        [
+          "Drive the TypeScript component through the release runner (migrated ts_component_17_3b)",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/setup-node@v5",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "notice",
+          "17-3d TS driver",
+          "rc=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.13s"
+        ],
+        [
+          "notice",
+          "17-3d TS scaffold",
+          "rc=0 "
+        ],
+        [
+          "notice",
+          "",
+          "\"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748\""
+        ]
+      ]
+    },
+    {
+      "id": 117818534514,
+      "name": "recall-17-3d (ubuntu-24.04)",
+      "conclusion": "failure",
+      "runner": "GitHub Actions 1000017716",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "failure"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "skipped"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "skipped"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "failure",
+          "",
+          "Process completed with exit code 1."
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-24.04)",
+          "rc=101 fail=1 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.10s"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "thread 'empty_page_has_one_token_bearing_call_and_no_receipt' (18565) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "thread 'cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation' (18558) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "thread 'consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet' (18535) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (18505) panicked at crates/maos-bin/tests/recall_17_3d.rs:1026:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (18511) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "missing 'test result: ok. 16 passed;'"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04)",
+          "cargo test rc=101"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-24.04)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.19s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 250.02s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s"
+        ]
+      ]
+    },
+    {
+      "id": 117818534587,
+      "name": "exit-line-2-2b (ubuntu-26.04)",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017714",
+      "labels": [
+        "ubuntu-26.04"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run actions/setup-node@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Keep build and image temporaries off /tmp",
+          "success"
+        ],
+        [
+          "Provenance",
+          "success"
+        ],
+        [
+          "Componentize the TypeScript Spirit (line 2 prerequisite)",
+          "success"
+        ],
+        [
+          "Epic-17 exit line 2 \u2014 the TypeScript Spirit launch (Story 17-3c)",
+          "success"
+        ],
+        [
+          "Epic-17 exit line 2b \u2014 the TypeScript Spirit's recall rows (Story 17-3d)",
+          "success"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/setup-node@v5",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "notice",
+          "Epic-17 exit line 2b (ubuntu-26.04)",
+          "LINE-2B OK R1 log.recall -> R2 log.fetch -> R3 log.fetch.refused:scope-violation"
+        ],
+        [
+          "notice",
+          "Epic-17 exit line 2 (ubuntu-26.04)",
+          "rc=0"
+        ],
+        [
+          "notice",
+          "17-3d provenance (ubuntu-26.04)",
+          "sha=8ccfb10be893a84aea7d9be443544b5b077aba2c tree=065a95431d6711b6ea0e54a67b28eafd77f0136f rustc=rustc_1.99.1_(58cf8f9c3_2026-10-13)"
+        ]
+      ]
+    },
+    {
+      "id": 117818534618,
+      "name": "recall-17-3d (ubuntu-26.04)",
+      "conclusion": "failure",
+      "runner": "GitHub Actions 1000017717",
+      "labels": [
+        "ubuntu-26.04"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "failure"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "skipped"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "skipped"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "failure",
+          "",
+          "Process completed with exit code 1."
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-26.04)",
+          "rc=101 fail=1 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.22s"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "thread 'empty_page_has_one_token_bearing_call_and_no_receipt' (18441) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "thread 'cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation' (18434) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "thread 'consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet' (18411) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (18381) panicked at crates/maos-bin/tests/recall_17_3d.rs:1026:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (18387) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "missing 'test result: ok. 16 passed;'"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04)",
+          "cargo test rc=101"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-26.04)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.12s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 157.48s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+        ]
+      ]
+    },
+    {
+      "id": 117818534650,
+      "name": "recall-17-3d (ubuntu-26.04-arm)",
+      "conclusion": "failure",
+      "runner": "GitHub Actions 1000017720",
+      "labels": [
+        "ubuntu-26.04-arm"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "failure"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "skipped"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "skipped"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "failure",
+          "",
+          "Process completed with exit code 1."
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "rc=101 fail=1 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.09s"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "thread 'empty_page_has_one_token_bearing_call_and_no_receipt' (17570) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "thread 'cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation' (17563) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "thread 'consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet' (17540) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (17509) panicked at crates/maos-bin/tests/recall_17_3d.rs:1026:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (17515) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "missing 'test result: ok. 16 passed;'"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-26.04-arm)",
+          "cargo test rc=101"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-26.04-arm)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.22s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 174.16s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+        ]
+      ]
+    },
+    {
+      "id": 117818534654,
+      "name": "exit-line-2-2b (ubuntu-24.04)",
+      "conclusion": "success",
+      "runner": "GitHub Actions 1000017718",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run actions/setup-node@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Keep build and image temporaries off /tmp",
+          "success"
+        ],
+        [
+          "Provenance",
+          "success"
+        ],
+        [
+          "Componentize the TypeScript Spirit (line 2 prerequisite)",
+          "success"
+        ],
+        [
+          "Epic-17 exit line 2 \u2014 the TypeScript Spirit launch (Story 17-3c)",
+          "success"
+        ],
+        [
+          "Epic-17 exit line 2b \u2014 the TypeScript Spirit's recall rows (Story 17-3d)",
+          "success"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Post Run actions/setup-node@v5",
+          "success"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "notice",
+          "Epic-17 exit line 2b (ubuntu-24.04)",
+          "LINE-2B OK R1 log.recall -> R2 log.fetch -> R3 log.fetch.refused:scope-violation"
+        ],
+        [
+          "notice",
+          "Epic-17 exit line 2 (ubuntu-24.04)",
+          "rc=0"
+        ],
+        [
+          "notice",
+          "17-3d provenance (ubuntu-24.04)",
+          "sha=8ccfb10be893a84aea7d9be443544b5b077aba2c tree=065a95431d6711b6ea0e54a67b28eafd77f0136f rustc=rustc_1.99.1_(58cf8f9c3_2026-10-13)"
+        ]
+      ]
+    },
+    {
+      "id": 117818534671,
+      "name": "recall-17-3d (ubuntu-24.04-arm)",
+      "conclusion": "failure",
+      "runner": "GitHub Actions 1000017719",
+      "labels": [
+        "ubuntu-24.04-arm"
+      ],
+      "steps": [
+        [
+          "Set up job",
+          "success"
+        ],
+        [
+          "Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Run dtolnay/rust-toolchain@v1",
+          "success"
+        ],
+        [
+          "Run Swatinem/rust-cache@v2",
+          "success"
+        ],
+        [
+          "Fetch locked standalone fixture dependencies for offline process gates",
+          "success"
+        ],
+        [
+          "maos-wasm-host recall runner + wire suites (Story 17-3d)",
+          "success"
+        ],
+        [
+          "In-band recall through the admitted session (Story 17-3d)",
+          "failure"
+        ],
+        [
+          "Admitted 17-3c gates still green (frames unchanged)",
+          "skipped"
+        ],
+        [
+          "Run actions/upload-artifact@v4",
+          "success"
+        ],
+        [
+          "Post Run Swatinem/rust-cache@v2",
+          "skipped"
+        ],
+        [
+          "Post Run actions/checkout@v5",
+          "success"
+        ],
+        [
+          "Complete job",
+          "success"
+        ]
+      ],
+      "annotations": [
+        [
+          "warning",
+          "",
+          "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        ],
+        [
+          "failure",
+          "",
+          "Process completed with exit code 1."
+        ],
+        [
+          "notice",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "rc=101 fail=1 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.10s"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "thread 'empty_page_has_one_token_bearing_call_and_no_receipt' (17428) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "thread 'cross_boot_same_pid_is_not_recalled_and_fetch_is_scope_violation' (17421) panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/std/src/sync/lazy_lock.rs:415:5:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "thread 'consent_past_and_future_withheld_by_emitter_scope_no_consent_evaluation_exists_yet' (17397) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (17367) panicked at crates/maos-bin/tests/recall_17_3d.rs:1026:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "thread 'configured_sso_preserves_r1_r2_r3_order_and_never_recalls_identity_asserted' (17373) panicked at crates/maos-bin/tests/recall_17_3d.rs:59:9:"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "missing 'test result: ok. 16 passed;'"
+        ],
+        [
+          "failure",
+          "17-3d recall (ubuntu-24.04-arm)",
+          "cargo test rc=101"
+        ],
+        [
+          "notice",
+          "17-3d runner (ubuntu-24.04-arm)",
+          "rc=0 wire.log:test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.22s runner.log:test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 174.08s runner.log:test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s runner.log:test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+        ]
+      ]
+    }
+  ]
+}

@@ -58,6 +58,10 @@ time_cap_seconds = 300
 [capabilities.required.provider]
 complete = ["anthropic/claude-3"]
 
+[capabilities.required.log]
+recall = true
+fetch = true
+
 # ── Scheduling & Lifecycle ────────────────────────────────
 [scheduling]
 priority_weight = 100
@@ -87,5 +91,7 @@ This example's `my-spirit` name is not a built-in daemon class. Its manifest is 
 
 `trust_tier` is one of `local`, `org-internal`, `public-untrusted`, or `public-vetted`; use the hyphenated spellings inside `[class]`. The daemon requires `[sandbox]`, `[resources]`, `[posture]`, and `[output_shape]`; `[budget]` is optional, but if present requires both `context_window_size` and `time_cap_seconds`.
 Resource ceilings are independent: `cpu_max_pct` is a positive percentage of one CPU, `memory_max_mb` is MiB, `pids_max` is an optional positive `u32` process/task limit, and `fd_max` is an optional independent file-descriptor limit. Omit a field to leave it unset; schema v4/v5 manifests that omit `pids_max` remain accepted. `pids_max` is enforced only on Linux (native T2 cgroup `pids.max`, T3 `--pids-limit`); the native macOS and Windows sandboxes neither apply nor refuse it. For Worker/T3 behavior and native T2 delegation requirements, see [CLI Wrapper Spirit](./cli-wrapper-spirit).
+
+`[capabilities.required.log]` declares two independent boolean grants: `recall` for `Scope::LogRecall`, and `fetch` for `Scope::LogFetch`. Both default to `false`; unknown keys are rejected. The example opts into both. This table requires schema v5: below schema 5 it is dropped with a degradation warning, just like `[capabilities.required.iac]`, and grants no log scopes. Omission grants neither capability. Calls still undergo per-call policy mediation; a declaration alone does not bypass operator denial or issuance quota.
 
 See [Manifest Reference](/manifest/latest) for the complete field-level specification.

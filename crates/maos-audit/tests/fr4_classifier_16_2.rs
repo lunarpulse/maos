@@ -110,6 +110,20 @@ fn a_call_shaped_writer_stays_a_violation_at_a_spirit_pid() {
     assert!(maos_audit::project_to_fr4(&row).is_err());
 }
 
+#[test]
+fn attributed_and_tokenless_recall_fetch_rows_remain_calls() {
+    for intent in ["log.recall", "log.fetch"] {
+        for token in [
+            None,
+            Some("ab00000000000000000000000000000000000000000000000000000000000000"),
+        ] {
+            let row = entry("capability.invocation", intent, 7, token, "{}");
+            assert_eq!(classify_fr4_row(&row), Fr4RowDisposition::Call);
+            assert_eq!(maos_audit::project_to_fr4(&row).is_ok(), token.is_some());
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Non-calls — set (a) kinds, then every NonCall writer shape
 // ─────────────────────────────────────────────────────────────────────────────
@@ -733,7 +747,12 @@ fn scan_source(src: &str, file: &str) -> Vec<ScannedSite> {
             continue;
         }
         let tokenless = token_arg == "None";
-        if kind_is_capability_invocation && !tokenless {
+        // 17-3d's shared native/attributed writer can still emit a tokenless
+        // call. Inventory the optional-token expression as well as `None`;
+        // an always-token-bearing `Some(...)` remains outside this doorbell.
+        let compact_token: String = token_arg.chars().filter(|c| !c.is_whitespace()).collect();
+        let optional_token = compact_token.ends_with(".map(capability_token_column).as_ref()");
+        if kind_is_capability_invocation && !tokenless && !optional_token {
             continue; // token-bearing call row — not an exemption question
         }
         if kind_is_variable && !tokenless {
@@ -918,4 +937,51 @@ mod tests {
     let sites = scan_source(src, "x.rs");
     assert_eq!(sites.len(), 1, "only the prod site counts");
     assert_eq!(sites[0].f, "prod");
+}
+
+#[test]
+fn scanner_inventories_optional_capability_tokens_not_only_literal_none() {
+    let src = r#"
+fn shared_writer(pid: u32, token: Option<&TokenId>) {
+    tl.insert_frame_event(
+        FrameKind::CapabilityInvocation, pid,
+        token.map(capability_token_column).as_ref(),
+        "log.recall", b"{}", FrameOrigin::SpiritAuto,
+    );
+}
+fn always_attributed(pid: u32) {
+    tl.insert_frame_event(
+        FrameKind::CapabilityInvocation, pid,
+        Some(&capability_token_column(&token)),
+        "log.fetch", b"{}", FrameOrigin::SpiritAuto,
+    );
+}
+"#;
+    let sites = scan_source(src, "log_recall.rs");
+    assert_eq!(sites.len(), 1);
+    assert_eq!(sites[0].f, "shared_writer");
+    assert!(
+        !WRITER_SHAPES
+            .iter()
+            .any(|w| { w.site == ("log_recall.rs", "shared_writer", 0) }),
+        "a newly planted optional-token writer must ring the doorbell"
+    );
+}
+
+#[test]
+fn shared_recall_fetch_writers_have_call_dispositions() {
+    let source = workspace_src("crates/maos-iac/src/adapter/log_recall.rs");
+    let sites = scan_source(&source, "log_recall.rs");
+    for operation in ["recall_inner", "fetch_inner"] {
+        assert_eq!(sites.iter().filter(|site| site.f == operation).count(), 1);
+        let writer = WRITER_SHAPES
+            .iter()
+            .find(|writer| writer.site == ("log_recall.rs", operation, 0))
+            .expect("shared optional-token invocation writer is inventoried");
+        assert_eq!(writer.kind, 7);
+        assert!(
+            writer.shape.is_none(),
+            "recall/fetch can never be exempted as non-calls"
+        );
+    }
 }
