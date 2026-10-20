@@ -22,8 +22,8 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
 
-/// Telemetry Stream adapter — broadcasts `ScalarTapEvent`s via
-/// `tokio::sync::broadcast` per-topic channels with capacity 2048.
+/// Telemetry Stream adapter — broadcasts `ScalarTapEvent`s via `tokio::sync::
+/// broadcast` per-topic channels plus one broad channel, each capacity 2048.
 ///
 /// ### Topic convention
 /// `scalar.tap.<tag>` per ADR-035 — one broadcast channel per scalar tag.
@@ -38,6 +38,7 @@ use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
 #[derive(Debug)]
 pub struct TelemetryStreamAdapter {
     topics: Arc<DashMap<TelemetryTopic, tokio::sync::broadcast::Sender<ScalarTapEvent>>>,
+    all: tokio::sync::broadcast::Sender<ScalarTapEvent>,
     subscribers: Arc<DashMap<(String, TelemetryTopic), ()>>,
     capacity: usize,
     drop_count: std::sync::atomic::AtomicUsize,
@@ -47,6 +48,7 @@ impl Clone for TelemetryStreamAdapter {
     fn clone(&self) -> Self {
         Self {
             topics: Arc::clone(&self.topics),
+            all: self.all.clone(),
             subscribers: Arc::clone(&self.subscribers),
             capacity: self.capacity,
             drop_count: std::sync::atomic::AtomicUsize::new(0),
@@ -69,6 +71,7 @@ impl TelemetryStreamAdapter {
         Self {
             topics: Arc::new(DashMap::new()),
             subscribers: Arc::new(DashMap::new()),
+            all: tokio::sync::broadcast::channel(capacity).0,
             capacity,
             drop_count: std::sync::atomic::AtomicUsize::new(0),
         }
@@ -77,6 +80,9 @@ impl TelemetryStreamAdapter {
 
 impl TelemetryStreamPort for TelemetryStreamAdapter {
     fn publish_event(&self, topic: &TelemetryTopic, event: ScalarTapEvent) {
+        if self.all.receiver_count() > 0 {
+            let _ = self.all.send(event.clone());
+        }
         if let Some(sender) = self.topics.get(topic) {
             if sender.send(event).is_err() {
                 self.drop_count
@@ -116,6 +122,11 @@ impl TelemetryStreamPort for TelemetryStreamAdapter {
 }
 
 impl TelemetryStreamAdapter {
+    /// Receive every scalar event in publish-call order, across all tags.
+    pub fn subscribe_all(&self) -> tokio::sync::broadcast::Receiver<ScalarTapEvent> {
+        self.all.subscribe()
+    }
+
     /// Get a receiver for a topic. Returns `None` if the topic hasn't
     /// been subscribed to yet.
     pub fn subscribe(
@@ -173,6 +184,7 @@ mod tests {
         adapter.publish_event(
             &topic,
             ScalarTapEvent {
+                seq: 0,
                 spirit_id: "s1".into(),
                 tag: "uncertainty".into(),
                 value: 0.75,
@@ -197,6 +209,7 @@ mod tests {
         adapter.publish_event(
             &topic,
             ScalarTapEvent {
+                seq: 0,
                 spirit_id: "s1".into(),
                 tag: "uncertainty".into(),
                 value: 0.75,

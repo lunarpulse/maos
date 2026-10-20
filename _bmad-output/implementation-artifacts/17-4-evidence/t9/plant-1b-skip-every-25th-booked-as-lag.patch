@@ -1,0 +1,15 @@
+--- a/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:37:51.097739725 +0000
++++ b/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:38:24.331531539 +0000
+@@ -334,6 +334,12 @@
+     }
+ 
+     async fn deliver(&self, event: &ScalarTapEvent) {
++        // PLANT 1b (17-4 T9, throwaway): skip every 25th event, booked as lag.
++        static PLANT: AtomicU64 = AtomicU64::new(0);
++        if PLANT.fetch_add(1, Ordering::Relaxed) % 25 == 24 {
++            self.counters.lagged_skipped.fetch_add(1, Ordering::Relaxed);
++            return;
++        }
+         let pids: Vec<u32> = self.registry().keys().copied().collect();
+         if pids.is_empty() {
+             return;

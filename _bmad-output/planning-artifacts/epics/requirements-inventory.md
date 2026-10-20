@@ -562,7 +562,7 @@ Source: the 2026-09-04 review and preflight. Each requirement the review classif
 | FR45 re-distillation trigger (PARTIAL) | 21-4 |
 | FR48 operator-selectable crypto provider (PARTIAL) | later (post-v1.0) |
 | FR54 gateway connectors (CANNED) | parked v2.5 |
-| FR55 hook firers (PARTIAL) | 17-4 |
+| FR55 hook firers (CLOSED for compiled-in Spirits) | 17-4 — done 2026-10-20: live telemetry and idle-quiescent consolidation callers, Observer activity corpus and reviewed shutdown ordering. Spawned forms remain explicitly outside this story. |
 | FR59 yank policy (PARTIAL) | 20-1 |
 | FR61 GPG key (documented deviation, ADR-047) | unchanged |
 | FR62 (b) ABI-extension emitter (PARTIAL) | 17-3b (the `maos:spirit@2.0.0` break is the first **recorded** WIT ABI-extension proposal — a ratified `xtask/abi-ratifications.toml` entry gated by `wit_corpus.rs`; no Transparency-Log emitter exists or is claimed — epic-17 R17-59, R17-67) |

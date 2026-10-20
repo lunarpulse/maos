@@ -68,6 +68,7 @@ async fn researcher_subscribes_receives_and_incorporates_a_scalar() {
         pub_telemetry.publish_event(
             &pub_topic,
             ScalarTapEvent {
+                seq: 0,
                 spirit_id: "observer".into(),
                 tag: "confidence".into(),
                 value: 0.62,
@@ -146,6 +147,7 @@ async fn researcher_distillate_is_consumable_in_the_fr17_digest_pattern() {
     researcher.incorporate_scalar(
         &mut survey,
         &ScalarTapEvent {
+            seq: 0,
             spirit_id: "observer".into(),
             tag: "drift".into(),
             value: 0.3,

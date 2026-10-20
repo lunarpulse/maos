@@ -1304,6 +1304,7 @@ mod unit_tests {
         Researcher::new().incorporate_scalar(
             &mut out,
             &ScalarTapEvent {
+                seq: 0,
                 spirit_id: "observer".into(),
                 tag: "drift".into(),
                 value: 0.42,

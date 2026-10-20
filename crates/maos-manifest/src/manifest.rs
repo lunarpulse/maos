@@ -1547,6 +1547,9 @@ const VALID_HOOK_NAMES: &[&str] = &[
     "on_resume",
     "on_unload",
     "on_consolidate",
+    "on_swap_out",
+    "snapshot",
+    "migrate",
 ];
 
 /// The `[lifecycle]` manifest section — declared hook subset.

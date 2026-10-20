@@ -14,9 +14,12 @@ Make isolation real for non-first-party execution forms: Workers execute behind 
 - Story 17.3b: WASM form admission, contract, registry, and TypeScript toolchain.
 - Story 17.3c: WASM Spirit on the IAC bus under T2.
 - Story 17.3d: WASM log recall.
-- Story 17.4: Hooks, Observer, and activity corpus.
+- Story 17.4: Hooks, Observer, and activity corpus (◆ FLAG-Winston: broad telemetry channel + `seq`, R15/R16).
 - Story 17.5: Model-pin currency gate.
 - Story 17.6: T2 sandbox repair and proven-red containment.
+- Story 17.7: T3 Worker retained lifecycle and terminal facts.
+- Story 17.8: Participant recall and consent envelopes for both forms.
+- Story 17.9: Capability issuance quota window.
 
 ## Requirements & Constraints
 
@@ -34,7 +37,7 @@ Keep the ADR-031 runner process and ADR-032 length-delimited wire boundary. WASM
 
 The current `maos:spirit@2.0.0` contract preserves intent, consent, lineage, and typed scopes. Do not introduce a WIT version change casually: contract changes require ratification and reissue of all four provenance-pinned components. TypeScript componentization uses the pinned toolchain and a release runner; debug compilation is not equivalent evidence for the shipped TypeScript artifact.
 
-WASM recall is a separate capability surface and story. Its ratified transport is an inherited connected descriptor rather than a path socket; it is not part of the current runner launch/authority preparation. Worker vendor egress follows the ratified proxy decision, not general guest network access.
+WASM recall is a separate capability surface and story. Its ratified transport is in-band on the runner's ADR-032 stdio (R17-157, superseding the 2026-09-26 inherited-descriptor amendment). Worker vendor egress follows the ratified proxy decision, not general guest network access. Live telemetry reaches compiled-in Observer Spirits through one broad `scalar.tap` channel in the kernel's Telemetry Stream (17-4, R17-175); spawned forms receive no telemetry or consolidation hooks.
 
 ## Cross-Story Dependencies
 
@@ -42,4 +45,4 @@ The completed spike supplies measured premises and 17-6 supplies the real T2 rou
 
 17-3c must establish launch, trusted session identity, bus framing, safe conformance, authorization observation, and termination evidence before 17-3d adds recall. Registry publication depends on the admission/contract story, not recall. Reuse schema 5 for later egress/resource fields rather than making competing schema bumps.
 
-The user accepts completed Ubuntu25.10 x86_64 testing as sufficient for 17-3c; no further Ubuntu24/26/ARM execution is required or claimed verified. Broader repository/other-story CI stays separate. 17-3c is reviewed and integrated (kernel pin 25293); see its specification and `17-3c-evidence/`. 17-3d stays backlog. Exit commands stay hermetic and secret-free; provisioned external demonstrations remain operator-lane evidence.
+The user accepts completed Ubuntu25.10 x86_64 testing as sufficient for 17-3c; no further Ubuntu24/26/ARM execution is required or claimed verified. Broader repository/other-story CI stays separate. 17-3c and 17-3d are `done`; 17-8 and 17-9 follow 17-3d; 17-4 is independent of the WASM chain. `sprint-status.yaml` is authoritative for status. Exit commands stay hermetic and secret-free; provisioned external demonstrations remain operator-lane evidence.

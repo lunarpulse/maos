@@ -502,7 +502,17 @@
 #          lifecycle/cli_wrapper/runtime.rs, memory/mod.rs, revocation/applier.rs,
 #          scheduler/scheduler_loop.rs, supervision/crash_detector.rs. No kernel
 #          file was added or removed.
-src_lines = 26291
+src_lines = 26304
+# HISTORY: Story 17-4 FLAG-Winston landing (2026-10-20), D-17-4-PF-R1 ratified
+#          by Lunarpulse 2026-10-19 (kernel <= 26304 physical / <= 20538
+#          tokei, exact at landing): physical 26291 -> 26304 (+13), tokei
+#          20527 -> 20538 (+11), exactly the measured prototype. Driver:
+#          `TelemetryStreamAdapter` gains one broad `scalar.tap` broadcast
+#          channel (`all`, shared by clones, sent to first and cloned only
+#          when it has receivers) and `subscribe_all()`, plus the two
+#          D-17-4-FW-01 `seq` test literals. Only telemetry/mod.rs changed;
+#          all 95 files retained. Kernel surface pin regenerated for the
+#          struct hash; `subscribe_all` classified data-movement.
 # HISTORY: Story 17-3d FLAG-Winston landing (2026-10-18), exact LOWER re-pin,
 #          no raise (D-17-3d-FW-02 as re-ruled by PF-R1): physical 26311 ->
 #          26291 (-20), tokei 20545 -> 20527 (-18). Driver: the `log` field in
@@ -752,7 +762,7 @@ src_lines = 26291
 #          t3/argv.rs +5 (duplicate `--env` name rejection). Files 96, unchanged.
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "98199af2bf972357d7a78fb8112cff2acd1751d89bef6d2df022f5f7b5a7b209"
+set_hash = "0491a237ce04b685f1193026f5c141451941690c9f3c4ae3134f497f3fcccb88"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -849,7 +859,7 @@ set_hash = "98199af2bf972357d7a78fb8112cff2acd1751d89bef6d2df022f5f7b5a7b209"
 "supervision/silent_failure_detector.rs" = "fb9e4c0e881c08964c02f5372ddb664e294828b670d91f2ef078670f609ccec6"
 "supervision/test_double.rs" = "3162ed1ee1c2835f8a08496aff056d41acf247949c9076cb4fd9cb8a3cec8d5c"
 "supervision/watchdog_common.rs" = "a6f98ea2e799ea8d7b0fbcc9e02ac154625ab9b4e8e95d4508bd173dcde6e23c"
-"telemetry/mod.rs" = "48c1b6401e8806d83ef8899d5341b1d7be64ac91261c42f16578ec720963c70c"
+"telemetry/mod.rs" = "5b9a2b739a4c500c03b81b1eecc4c6a12bad28e0b2c003031d6e996ac30faeeb"
 
 # ── BOTH KERNEL PINS (E16-A1, Epic-16 retrospective 2026-09-20) ──────────────
 # The header's "update THIS number HERE" applies to the LINE COUNT only. There

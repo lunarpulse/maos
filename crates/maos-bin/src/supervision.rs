@@ -73,6 +73,9 @@
 //!   kills and reaps the child, and with two separate locals the bridge would
 //!   drop first and the guard's signal would prove nothing.
 
+#[cfg(feature = "network")]
+use std::future::Future;
+
 use maos_kernel_core::halt::HaltRegistry;
 use maos_kernel_core::scheduler::SpiritSchedulerAdapter;
 
@@ -169,6 +172,26 @@ pub async fn unload_all_loaded(
         }
     }
     report
+}
+
+/// Finish the serving root after the door and other watchdogs have drained.
+///
+/// Both hook callers must join before supervision stops and before any Spirit's
+/// `on_unload`: dispatch budgets can outlast the other watchdogs' drain timeout.
+/// Keep this order shared by the serving root and its real-signal regression.
+#[cfg(feature = "network")]
+pub async fn finish_serving_shutdown(
+    consolidation: &crate::hook_pump::ConsolidationWatchdog,
+    hooks: &crate::hook_pump::HookPump,
+    stop_supervision: impl Future<Output = ()>,
+    scheduler: &SpiritSchedulerAdapter,
+    halt_registry: &HaltRegistry,
+    post_unload: Option<&(dyn Fn(u32) + Send + Sync)>,
+) -> UnloadAllReport {
+    consolidation.shutdown().await;
+    hooks.shutdown().await;
+    stop_supervision.await;
+    unload_all_loaded(scheduler, halt_registry, post_unload).await
 }
 
 // ────────────────────────────────────────────────────────────────────────────

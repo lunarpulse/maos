@@ -1,0 +1,36 @@
+{
+  "baseline": {
+    "maos-kernel-core": {
+      "physical_src": 26291,
+      "tokei_code": 20527,
+      "rs_files": 94
+    },
+    "maos-domain": {
+      "physical_src": 14235,
+      "tokei_code": 9632,
+      "rs_files": 67
+    },
+    "maos-capability": {
+      "physical_src": 1513,
+      "tokei_code": 1127,
+      "rs_files": 9
+    }
+  },
+  "prototype": {
+    "maos-kernel-core": {
+      "physical_src": 26304,
+      "tokei_code": 20538,
+      "rs_files": 94
+    },
+    "maos-domain": {
+      "physical_src": 14239,
+      "tokei_code": 9635,
+      "rs_files": 67
+    },
+    "maos-capability": {
+      "physical_src": 1517,
+      "tokei_code": 1131,
+      "rs_files": 9
+    }
+  }
+}

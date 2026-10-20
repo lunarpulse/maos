@@ -2724,6 +2724,7 @@ dependencies = [
  "maos-wasm-host",
  "mira",
  "nash",
+ "observer",
  "orchestrator",
  "parking_lot",
  "rcgen",

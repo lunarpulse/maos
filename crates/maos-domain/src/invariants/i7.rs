@@ -43,6 +43,9 @@ impl TelemetryTopic {
 /// A scalar-tap event — the pre-halt observable trajectory.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ScalarTapEvent {
+    /// Store-write order: an identity label unique within one root, never a clock.
+    #[serde(default)]
+    pub seq: u64,
     /// Spirit that emitted the scalar.
     pub spirit_id: String,
     /// Tag identifying the scalar metric.
@@ -66,6 +69,7 @@ mod tests {
     #[test]
     fn scalar_tap_event_construction() {
         let e = ScalarTapEvent {
+            seq: 0,
             spirit_id: "s1".into(),
             tag: "entropy".into(),
             value: 0.75,

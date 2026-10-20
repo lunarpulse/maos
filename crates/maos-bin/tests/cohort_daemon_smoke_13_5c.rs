@@ -920,8 +920,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 16-6 — 23 → 24: `admission.rs` joins it.
     // Story 17-3c — 24 → 25: `spirit_session.rs` joins it (CI repair
     // 2026-10-06: 17-3c added the file without ringing this doorbell).
+    // Story 17-4 — 27 → 28: `hook_pump.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 27] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 28] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("egress.rs", include_str!("../src/egress.rs")),
         // Story 16-6 — the extracted `load → admit → start` path. Enrolled
@@ -1029,6 +1030,11 @@ fn composition_root_does_not_seed_manifest_scopes() {
             "recall_mediation.rs",
             include_str!("../src/recall_mediation.rs"),
         ),
+        // Story 17-4 — the telemetry hook pump and consolidation watchdog.
+        // Delivery eligibility is read from the live SCB and the admission
+        // that registered the pid, never from the manifest-derived policy
+        // table.
+        ("hook_pump.rs", include_str!("../src/hook_pump.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

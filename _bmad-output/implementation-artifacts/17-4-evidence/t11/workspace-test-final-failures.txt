@@ -1,0 +1,56 @@
+founder_loop_once_drains_capability_audit_writer :: declared-capable T3 founder-loop audit-drain Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+pairing_hold_blocks_until_host_b_is_pinned_then_releases :: declared-capable T3 F4 pairing V2 delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+crosshost_sender_publishes_before_the_delegation_frame :: declared-capable T3 F4 pairing V1 delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+wrong_nonce_is_refused_and_recovery_requires_a_b_restart :: declared-capable T3 F4 pairing V3 recovered delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac3_operator_door_unload_stops_a_live_worker_once :: declared-capable T3 root unload live Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac4_v1_serving_butler_receipts_the_raised_halt_on_sigterm :: declared-capable T3 root shutdown serving Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac4_v2_butler_once_receipts_the_raised_halt_and_drains :: declared-capable T3 root shutdown one-shot Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac4_v3_topology_once_unloads_every_loaded_spirit :: declared-capable T3 root shutdown topology Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac4_v3b_sigterm_mid_topology_unloads_what_loaded_and_nacks_the_worker :: declared-capable T3 root shutdown interrupted topology Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac4_v4_sigterm_during_standalone_worker_leaves_no_orphan :: declared-capable T3 root shutdown standalone Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+ac4_v4b_grandchild_is_stopped_with_its_worker_container :: declared-capable T3 root shutdown descendant Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+cohort::ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains :: declared-capable T3 cohort root shutdown Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+cohort::ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown :: declared-capable T3 cohort root startup shutdown Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+cohort::ac4_v5c_cohort_shutdown_stops_worker_container_descendants :: declared-capable T3 cohort root descendant Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+delegated_goal_reaches_the_frame_verbatim_with_non_ascii :: declared-capable T3 founder-loop delegated goal Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+founder_loop_journey_runs_with_real_worker_subprocess :: declared-capable T3 founder-loop delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+maos_run_cli_wrapper_worker_spawns_real_subprocess :: declared-capable T3 maos run cli-wrapper Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+two_daemon_delegation_is_joined_on_the_same_sixteen_bytes :: declared-capable T3 two-host delegation Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+replayed_inbound_frame_returns_duplicate_without_halting_host_b :: declared-capable T3 replayed inbound delegation Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+planted_refusal::a_hostless_topology_refusal_also_fails_the_run :: declared-capable T3 hostless completion Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+planted_refusal::claude_permission_denial_fails_the_run :: declared-capable T3 completion permission-denial Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+planted_refusal::codex_prose_only_refusal_fails_the_run :: declared-capable T3 completion prose-refusal Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+planted_refusal::codex_turn_completed_with_no_file_change_fails_the_run :: declared-capable T3 completion no-effect Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+planted_refusal::the_hermetic_fixture_path_is_untouched_by_the_credential_controls :: declared-capable T3 fixture credential-immunity Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+planted_refusal::the_standalone_path_no_longer_discards_the_verdict :: declared-capable T3 standalone completion Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+fd_request_above_inherited_hard_limit_refuses_before_worker_payload :: declared-capable T3 17-2 Worker FD hard-limit refusal: MAOS_T3_RUNTIME must select the provisioned runtime
+real_maos_worker_applies_independent_t3_limits_and_observes_exhaustion :: declared-capable T3 17-2 live Worker resource enforcement: MAOS_T3_RUNTIME must select the provisioned runtime
+the_fr4_call_feed_survives_every_worker_row_it_must_omit :: declared-capable T3 binary root stalled then crashed Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+a_hung_worker_under_the_real_root_is_reported_stalled_and_audits_clean :: declared-capable T3 binary root stalled Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+the_crash_scene_through_the_real_binary_lands_at_one_real_pid :: declared-capable T3 binary root crashed Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+s1_immediate_exit_terminal_facts :: declared-capable T3 S1 immediate exit: MAOS_T3_RUNTIME must select the provisioned runtime
+runtime_scenes::client_first_stop_snapshots_only_a_terminal_state :: declared-capable T3 client-first: MAOS_T3_RUNTIME must select the provisioned runtime
+s3_external_sigkill_requires_pidfd_fact :: declared-capable T3 S3 external SIGKILL: MAOS_T3_RUNTIME must select the provisioned runtime
+s2_intentional_exit_137_is_not_a_signal :: declared-capable T3 S2 exit-137: MAOS_T3_RUNTIME must select the provisioned runtime
+s4_oom_marker_is_not_payload_evidence_alone :: declared-capable T3 S4 memory.max OOM: MAOS_T3_RUNTIME must select the provisioned runtime
+runtime_scenes::ownership_is_by_cid_never_by_requested_name :: declared-capable T3 ownership: MAOS_T3_RUNTIME must select the provisioned runtime
+root_crash::root_crash_retains_stopped_container_and_purge_reports_it :: declared-capable T3 root-crash: MAOS_T3_RUNTIME must select the provisioned runtime
+runtime_scenes::fallback_oom_marker_persists_classified_fault_through_worker_binding :: declared-capable T3 fallback: MAOS_T3_RUNTIME must select the provisioned runtime
+unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership :: declared-capable T3 S5 on_unload panic: MAOS_T3_RUNTIME must select the provisioned runtime
+unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership :: declared-capable T3 S5 on_unload over-budget: MAOS_T3_RUNTIME must select the provisioned runtime
+the_python_twin_verifies_the_committed_non_ascii_tier2_bundle :: the stranger's path requires a Python Ed25519 backend — pip install cryptography (verify.py said: Error: no Ed25519 library found. Install one of:
+the_python_twin_verifies_a_host_stamped_bundle :: the stranger's path requires a Python Ed25519 backend — pip install cryptography (verify.py said: Error: no Ed25519 library found. Install one of:
+detection_quality_meets_floor_and_ceiling_on_real_seccomp :: detection_quality_emit_real_kill: spawn_sandboxed failed (not an environment-unavailable signal): SandboxSetup("exec set: /home/lunarpulse/dev_ws/crates/maos-escape-detector/test-fixtures/forbidden-sy
+real_seccomp_kill_produces_real_tl_row_and_detector_anomaly :: producer_wired_e2e: spawn_sandboxed failed (not an environment-unavailable signal): SandboxSetup("exec set: /home/lunarpulse/dev_ws/crates/maos-escape-detector/test-fixtures/forbidden-syscall-probe/ta
+all_executable_scenarios_are_blocked_inside_verified_t3 :: declared-capable T3 every executable escape-corpus-v1 scenario: MAOS_T3_RUNTIME must select the provisioned runtime
+the_egress_socket_mount_refuses_0600_and_connects_0666 :: declared-capable T3 t3 egress socket custody: MAOS_T3_RUNTIME must select the provisioned runtime
+j1_founder_loop_topology_run_once :: declared-capable T3 J1 founder-loop journey delegated Worker: MAOS_T3_RUNTIME must select the provisioned runtime
+j1_resume_continuity_ref_identity_oracle :: declared-capable T3 J1 resume-continuity topology Workers: MAOS_T3_RUNTIME must select the provisioned runtime
+creation_limit_write_and_exec_failures_release_owned_leaves :: valid ID must create a leaf under the same delegated resource set: SandboxRefused("/mnt/build/cargo/tmp/cgroup-ceiling-fixture: declared CPU or PID cap requires a writable delegated cgroup")
+native_child_is_placed_before_guest_and_resource_limits_bite :: delegated native T2 spawn must succeed: SandboxRefused("/mnt/build/cargo/tmp/cgroup-ceiling-fixture: declared CPU or PID cap requires a writable delegated cgroup")
+killed_leader_cleanup_kills_its_surviving_descendant :: spawn bounded process tree under T2: SandboxRefused("/mnt/build/cargo/tmp/cgroup-ceiling-fixture: declared CPU or PID cap requires a writable delegated cgroup")
+same_spirit_simultaneous_native_spawns_have_distinct_owned_leaves :: second delegated same-Spirit spawn: SandboxRefused("/mnt/build/cargo/tmp/cgroup-ceiling-fixture: declared CPU or PID cap requires a writable delegated cgroup")
+verified_t3_applies_nonroot_namespace_and_argv_environment_custody :: declared-capable T3 sandbox_t3_spawn_linux: MAOS_T3_RUNTIME must select the provisioned runtime
+gate_otel_airgap_default_off_no_connects :: gate_otel_airgap_default_off_no_connects: tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)
+gate_otel_airgap_enabled_proven_red_network_canary_detected :: gate_otel_airgap_enabled_proven_red_network_canary_detected: tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)
+gate_otel_airgap_enabled_no_endpoint_no_connects :: gate_otel_airgap_enabled_no_endpoint_no_connects: tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)

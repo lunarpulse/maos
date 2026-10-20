@@ -19,9 +19,9 @@
 #   a cognitive posture-set in `[posture]`).
 # - NO `[capabilities.required]`: Observer does NO inference at v0.5 (anomaly
 #   classification is deterministic, Spirit-side) and uses NO MCP drivers. The
-#   `scalar.tap` subscription scope is kernel-granted at the capability layer (it
-#   is not a manifest-declarable field — the same finding Researcher recorded for
-#   `Scope::LogRecall`).
+#   right to receive every `scalar.tap` write in the root is not a manifest
+#   field: it comes from the operator admitting this compiled-in `observer`
+#   class, and the host audits each grant and revoke (Story 17-4).
 # - NO `[epistemic_policy]`: Observer emits no claims and never fires a halt of
 #   its own. The drift *watch* thresholds it monitors are Observer-side config
 #   (Decision D), NOT manifest epistemic-policy halt rules.

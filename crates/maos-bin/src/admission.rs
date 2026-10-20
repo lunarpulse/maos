@@ -211,7 +211,7 @@ pub enum AdmissionRefusal {
     CliWrapperUnsupported,
     /// Gate 4 — `[class]` is absent or does not parse.
     ClassSection { detail: String },
-    /// Gate 5 — a non-WASM class name is not one of the eight compiled into
+    /// Gate 5 — a non-WASM class name is not one of the nine compiled into
     /// this binary. `rust-inproc` means first-party compiled-in (ADR-060).
     UnknownClass { name: String },
     /// Gate 6 — `rust-inproc` is compiled into this process and declares T0.
@@ -306,7 +306,10 @@ impl std::fmt::Display for AdmissionRefusal {
                 write!(f, "rust-inproc requires sandbox tier T0, got {tier}")
             }
             Self::WasmComponentRequiresT2 { tier } => {
-                write!(f, "wasm_component_requires_t2: wasm-component requires sandbox tier T2, got {tier}")
+                write!(
+                    f,
+                    "wasm_component_requires_t2: wasm-component requires sandbox tier T2, got {tier}"
+                )
             }
             Self::WasmEngineOff => f.write_str(
                 "wasm_engine_off: WASM engine disabled while Export Hold 2 is open; \
@@ -336,21 +339,46 @@ impl std::fmt::Display for AdmissionRefusal {
 
 impl std::error::Error for AdmissionRefusal {}
 
-/// The eight class names `maos-bin` can construct, in `classify_spirit` order.
-///
-/// Declared here rather than in `main.rs` so the library half of the load path
-/// can name the bound in its refusal message; `main.rs` owns the mapping to
-/// concrete Rust types and a parity test keeps the two from drifting.
-pub const KNOWN_CLASS_NAMES: [&str; 8] = [
-    "butler",
-    "researcher",
-    "orchestrator",
-    "architect",
-    "reviewer",
-    "mira",
-    "nash",
-    "digest",
-];
+// One declaration generates the enum, its exhaustive enumeration, and the names
+// quoted by admission refusals. Adding a class also extends every exhaustive
+// construction match in the binary.
+macro_rules! compiled_in_classes {
+    ($($kind:ident => $name:literal),+ $(,)?) => {
+        /// The first-party Spirit classes compiled into this binary.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub enum LoadedSpiritKind {
+            $($kind),+
+        }
+
+        /// The compiled-in class names, in enumeration order.
+        pub const KNOWN_CLASS_NAMES: [&str; [$(stringify!($kind)),+].len()] = [
+            $($name),+
+        ];
+
+        impl LoadedSpiritKind {
+            /// Every compiled-in class, generated alongside the enum variants.
+            pub const ALL: [Self; KNOWN_CLASS_NAMES.len()] = [$(Self::$kind),+];
+
+            pub fn class_name(self) -> &'static str {
+                match self {
+                    $(Self::$kind => $name),+
+                }
+            }
+        }
+    };
+}
+
+compiled_in_classes! {
+    Butler => "butler",
+    Researcher => "researcher",
+    Orchestrator => "orchestrator",
+    Architect => "architect",
+    Reviewer => "reviewer",
+    Mira => "mira",
+    Nash => "nash",
+    Digest => "digest",
+    Observer => "observer",
+}
 
 /// Every manifest section the admission triple needs, parsed and gate-checked.
 #[derive(Debug, Clone)]
@@ -608,6 +636,11 @@ pub struct AdmissionDeps<'a> {
     pub journal: &'a Arc<maos_kernel_core::journal::JournalAdapter>,
     pub memory: &'a Arc<maos_kernel_core::memory::MemoryManagerAdapter>,
     pub pid_by_spirit_id: &'a Arc<RwLock<BTreeMap<String, u32>>>,
+    /// Story 17-4 — `Some` only where the caller built a compiled-in class
+    /// (`classify_spirit` is `Some`); `None` on the WASM arm. A registered pid
+    /// receives `on_consolidate`, and `on_telemetry_event` while its live
+    /// class is Observer.
+    pub hooks: Option<&'a crate::hook_pump::HookPump>,
 }
 
 /// Whether the triple runs its third leg.
@@ -758,8 +791,21 @@ pub async fn load_admit_start(
         })
         .insert(spirit_id.clone(), pid);
 
+    // Story 17-4 — register only after the granted admission and before
+    // `start`; a spawned form (WASM) never registers, whatever the caller
+    // passed. A failed start withdraws the registration below.
+    let hooks = deps
+        .hooks
+        .filter(|_| gated.require_in_process("hooks").is_ok());
+    if let Some(hooks) = hooks {
+        hooks.register(pid, &spirit_id);
+    }
+
     if start == StartPolicy::StartNow {
         if let Err(error) = deps.scheduler.start(pid).await {
+            if let Some(hooks) = hooks {
+                hooks.unregister(pid, "start-failed");
+            }
             if matches!(
                 &error,
                 maos_domain::lifecycle::LifecycleError::HookPanicked { .. }

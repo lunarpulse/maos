@@ -235,6 +235,8 @@ impl World {
             journal: &self.journal,
             memory: &self.memory,
             pid_by_spirit_id: &self.lookup,
+            // Story 17-4 — the WASM form never registers with a hook pump.
+            hooks: None,
         }
     }
 

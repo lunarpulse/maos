@@ -4,7 +4,8 @@
 //! AUTHORITATIVE `maos-manifest` validators (no invented sections — AC6).
 //!
 //! Decision G: Observer declares NO `[capabilities.required]` (no inference at
-//! v0.5; the scalar.tap subscription scope is kernel-granted) and NO
+//! v0.5; the right to receive scalar.tap writes comes from operator admission
+//! of the compiled-in class, Story 17-4) and NO
 //! `[epistemic_policy]` (Observer emits no claims and never halts itself). The
 //! live drift / structural / scalar.tap paths are PROVEN against the real
 //! adapters in the other test files; this harness exercises the firing-side hook
@@ -29,6 +30,7 @@ fn on_idle_fires_once_and_surfaces_within_budget() {
         vec![WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15).unwrap()],
     )
     .with_pending_scalars(vec![ScalarTapEvent {
+        seq: 0,
         spirit_id: "mira".into(),
         tag: "belief_variance".into(),
         value: 0.66,

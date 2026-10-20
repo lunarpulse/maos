@@ -1915,6 +1915,49 @@ jobs:
           name: epic-17-terminal-${{ matrix.image }}
           path: worker-terminal-facts.log
           if-no-files-found: warn
+      # Story 17-4 (CR-6) — exit line 5: Observer live beside Butler in one
+      # root (AC1) and the 20-scenario activity corpus with its oracle (AC4).
+      # `maosctl` is a sibling package's binary resolved beside `maos`, so it
+      # is prebuilt above. The executed-count guard refuses SKIP, ignored and
+      # zero-test runs; a run that leaves no summary.json did not reach the
+      # oracle and fails. Corpus journals land in this run's own target dir.
+      - name: Epic-17 exit line 5 — Observer live scene + activity corpus (Story 17-4)
+        shell: bash
+        env:
+          EPIC17_LINE5_REQUIRED_TESTS: |
+            observer_activity_corpus_production_path
+            overflow_counts_exact_loss_and_preserves_first_plus_suffix
+            real_corpus_meets_all_scenario_floors
+            observer_serves_and_reports_a_door_loaded_butler_live
+            a_door_loaded_observer_reports_like_the_root_one
+            once_roots_with_an_observer_exit_cleanly_without_activity_lines
+        run: |
+          set +e
+          rm -rf target/tmp/observer-activity-17-4
+          cargo test --locked -p maos-bin --test observer_live_17_4 --test observer_activity_corpus_17_4 -- --nocapture --test-threads=1 2>&1 | tee observer-17-4.log
+          rc=${PIPESTATUS[0]}
+          required_tests=()
+          while IFS= read -r test_name; do
+            if [ -n "$test_name" ]; then required_tests+=(--required-test "$test_name"); fi
+          done <<< "${EPIC17_LINE5_REQUIRED_TESTS}"
+          # Suites run in target-name order: the corpus (16), then the scene (3).
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 16 --expected-count 3 "${required_tests[@]}" observer-17-4.log || rc=1
+          if [ ! -s target/tmp/observer-activity-17-4/summary.json ]; then
+            rc=1
+            echo "::error title=Epic-17 exit line 5 (${{ matrix.image }})::no summary.json — the corpus oracle never completed"
+          fi
+          grep -E '^aggregate \|' observer-17-4.log | while IFS= read -r line; do
+            echo "::notice title=Epic-17 exit line 5 (${{ matrix.image }})::${line}"
+          done
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: epic-17-observer-${{ matrix.image }}
+          path: |
+            observer-17-4.log
+            target/tmp/observer-activity-17-4/
+          if-no-files-found: warn
       # The runner refuses SKIP lines from its children; this step also refuses
       # one from the runner itself, and requires its positive kind-8 verdict, so
       # a runner that skips or returns early cannot pass (AC4 proof).

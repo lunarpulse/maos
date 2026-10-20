@@ -220,4 +220,4 @@ Spine (strict): **15 → 16 → 17 → 18 → 19 → 20 → 21**; each epic's he
 | 20-2 → 21-* | multi-host runbooks install from packages |
 | `ops-*` rows | run in parallel; never gate an engineering exit |
 
-Kernel-Δ: **16-5, 17-1, 17-2 FLAG-Winston (+), 21-5 optional (−)**; all else ZERO @24472.
+Kernel-Δ: **16-5, 17-1, 17-2 FLAG-Winston (+), 21-5 optional (−)**; all else ZERO @24472. ⚠ Superseded for Epic 17 by its later rounds: 17-3c, 17-3d, 17-6, 17-7, 17-9 and 17-4 (R15/R16: broad telemetry channel + `seq`, ≤ 26304) are FLAG-Winston too; the live pin is `xtask/kernel-core-baseline.toml:505`, not this line.

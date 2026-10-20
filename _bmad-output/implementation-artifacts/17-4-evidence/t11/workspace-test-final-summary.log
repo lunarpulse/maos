@@ -1,0 +1,1164 @@
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/architect-1c3a6bd0b9026cfa)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/code_review_loop.rs (/mnt/build/cargo/debug/deps/code_review_loop-866a91ee0fed87b2)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-8bedb685a27365a3)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-c3cfd47f9f03b04c)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/butler-0f4b0f01fa78f5d5)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/corpus_halt.rs (/mnt/build/cargo/debug/deps/corpus_halt-baf3b8e1b7cbe7b4)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+     Running tests/corpus_pin.rs (/mnt/build/cargo/debug/deps/corpus_pin-ab0e85810c3ad818)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/digest.rs (/mnt/build/cargo/debug/deps/digest-2caf242a3394fd4e)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+     Running tests/hallucination.rs (/mnt/build/cargo/debug/deps/hallucination-078b4206a6ab16e7)
+test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.39s
+     Running tests/on_idle_halt_8_10.rs (/mnt/build/cargo/debug/deps/on_idle_halt_8_10-16030fce0d304ab4)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-6d1b3dd749fe7e63)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/example_spirit-4fc4bf19138c9447)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-e86dfb5272592d9d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_a2a-6e11567b276b0b37)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/a1_security_regression_guards.rs (/mnt/build/cargo/debug/deps/a1_security_regression_guards-fafcf0258a1e5741)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cert_rotation_chaos_3_host.rs (/mnt/build/cargo/debug/deps/cert_rotation_chaos_3_host-0a56c34a87e90484)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cross_host_consent_v1.rs (/mnt/build/cargo/debug/deps/cross_host_consent_v1-78c501b46b2e4ef8)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/restart_invalidates_pin_nfr_rel_6.rs (/mnt/build/cargo/debug/deps/restart_invalidates_pin_nfr_rel_6-494ba9935aef712e)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_a2a_core-8020e8441124b4d8)
+test result: ok. 85 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/cohort_consent_chokepoint_12_2.rs (/mnt/build/cargo/debug/deps/cohort_consent_chokepoint_12_2-34775937b2a04431)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cohort_consent_router_12_2.rs (/mnt/build/cargo/debug/deps/cohort_consent_router_12_2-b48be69b33b7a335)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cohort_halt_receipt_chokepoint_12_3.rs (/mnt/build/cargo/debug/deps/cohort_halt_receipt_chokepoint_12_3-2a4d89fc3195a228)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cohort_manifest_chokepoint_12_1.rs (/mnt/build/cargo/debug/deps/cohort_manifest_chokepoint_12_1-50660ea424d11f14)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cross_host_consent_v1_5.rs (/mnt/build/cargo/debug/deps/cross_host_consent_v1_5-52fb88625f8c97ef)
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/crossing_wire_13_6b.rs (/mnt/build/cargo/debug/deps/crossing_wire_13_6b-fb2596bd01e5b134)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/digest_reply_durability_2c.rs (/mnt/build/cargo/debug/deps/digest_reply_durability_2c-e053f3883e46e70e)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fail_closed_8_8.rs (/mnt/build/cargo/debug/deps/fail_closed_8_8-8a3e8dcdf02955ca)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fault_typing_2c.rs (/mnt/build/cargo/debug/deps/fault_typing_2c-3818d5ed55dfc7d4)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_14_2a_rotation_reload.rs (/mnt/build/cargo/debug/deps/t_14_2a_rotation_reload-27939bc56106f032)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_a2a_tcp-a33ac520419d0ee4)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/h_guards.rs (/mnt/build/cargo/debug/deps/h_guards-47b1efc549e1cca5)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/t11_t12_chaos_absence.rs (/mnt/build/cargo/debug/deps/t11_t12_chaos_absence-8f7ed5875ed69104)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/t1_live_roundtrip.rs (/mnt/build/cargo/debug/deps/t1_live_roundtrip-d445cfcfb057e2f4)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t3_t6_security.rs (/mnt/build/cargo/debug/deps/t3_t6_security-2ff92c3126ade0a9)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/t7_t10_liveness.rs (/mnt/build/cargo/debug/deps/t7_t10_liveness-a70d245ea91295ce)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+     Running tests/t_10_4b_live_bilateral.rs (/mnt/build/cargo/debug/deps/t_10_4b_live_bilateral-e557d7b4e7454334)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+     Running tests/t_10_4b_rotation_real_timing.rs (/mnt/build/cargo/debug/deps/t_10_4b_rotation_real_timing-4c34718559905e0e)
+test result: ok. 0 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_11_3_scale_churn.rs (/mnt/build/cargo/debug/deps/t_11_3_scale_churn-b40f60b56c9a5386)
+test result: ok. 1 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/t_12_1_cohort_mesh.rs (/mnt/build/cargo/debug/deps/t_12_1_cohort_mesh-73bcf65ba9f5da9c)
+test result: ok. 1 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_12_2_cohort_consent.rs (/mnt/build/cargo/debug/deps/t_12_2_cohort_consent-54aa39998a2eec64)
+test result: ok. 0 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_12_3_cohort_halt_receipt.rs (/mnt/build/cargo/debug/deps/t_12_3_cohort_halt_receipt-c7b95e8b4a030aa4)
+test result: ok. 1 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/t_12_4a_digest_read.rs (/mnt/build/cargo/debug/deps/t_12_4a_digest_read-7ca510cb8d2de829)
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_12_5_cohort_hot_swap.rs (/mnt/build/cargo/debug/deps/t_12_5_cohort_hot_swap-89f7b1a7ac05a7db)
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_14_1_churn_scene.rs (/mnt/build/cargo/debug/deps/t_14_1_churn_scene-e9f401ee22521f06)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/t_14_2_rotation_scene.rs (/mnt/build/cargo/debug/deps/t_14_2_rotation_scene-48b80a2cc1e1bcf9)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/t_14_2a_connection_panic_supervision.rs (/mnt/build/cargo/debug/deps/t_14_2a_connection_panic_supervision-df9bd5429dfe1b9e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/t_14_2a_post_grace_journal.rs (/mnt/build/cargo/debug/deps/t_14_2a_post_grace_journal-da0f555e323c42d0)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_14_2a_post_grace_token.rs (/mnt/build/cargo/debug/deps/t_14_2a_post_grace_token-593d291f879e1744)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/t_2c_fault_windows.rs (/mnt/build/cargo/debug/deps/t_2c_fault_windows-52d8fa7b8b4e0e9b)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+     Running tests/t_2c_pin_journal.rs (/mnt/build/cargo/debug/deps/t_2c_pin_journal-db230f939dd7514c)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/trust_binding_8_9.rs (/mnt/build/cargo/debug/deps/trust_binding_8_9-9eb1e0a1b1b91b46)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_acp-43ed38f4db01ea2c)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/jetbrains_bridge_test.rs (/mnt/build/cargo/debug/deps/jetbrains_bridge_test-c0f37c1e50654ca1)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_attrs-852950b52a711832)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_audit-27762194f17c3d0a)
+test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+     Running unittests src/bin/gen_fixture.rs (/mnt/build/cargo/debug/deps/gen_fixture-69e518029c726a8f)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/gen_gdpr_cascade.rs (/mnt/build/cargo/debug/deps/gen_gdpr_cascade-3123c5801ce1af92)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/erasure_sla_test.rs (/mnt/build/cargo/debug/deps/erasure_sla_test-caac4214f3508702)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/erasure_smoke_test.rs (/mnt/build/cargo/debug/deps/erasure_smoke_test-36a65202f1e798e0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+     Running tests/fr4_classifier_16_2.rs (/mnt/build/cargo/debug/deps/fr4_classifier_16_2-ecf071e6aaf10057)
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/fr4_full_mediation_test.rs (/mnt/build/cargo/debug/deps/fr4_full_mediation_test-f2e361004f015c95)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+     Running tests/fr4_worker_rows_16_3.rs (/mnt/build/cargo/debug/deps/fr4_worker_rows_16_3-7e3df45f45d8ea7f)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/gdpr_cascade_corpus_test.rs (/mnt/build/cargo/debug/deps/gdpr_cascade_corpus_test-3eb1c7433c2557fd)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.30s
+     Running tests/gdpr_cascade_test.rs (/mnt/build/cargo/debug/deps/gdpr_cascade_test-a8996d373b4edd9f)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+     Running tests/i12_decision_audit_test.rs (/mnt/build/cargo/debug/deps/i12_decision_audit_test-5d4dbb4a0a584f60)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/identity_asserted_kind_test.rs (/mnt/build/cargo/debug/deps/identity_asserted_kind_test-d61de50c536a2b42)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/log_completeness_test.rs (/mnt/build/cargo/debug/deps/log_completeness_test-e608abb8d4ed7434)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.46s
+     Running tests/multi_backend_erasure_test.rs (/mnt/build/cargo/debug/deps/multi_backend_erasure_test-74502eeffde5db21)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+     Running tests/private_tier_count_16_5.rs (/mnt/build/cargo/debug/deps/private_tier_count_16_5-b79899200a393d11)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/query_schema_test.rs (/mnt/build/cargo/debug/deps/query_schema_test-6373241e0a35c52a)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+     Running tests/release_pubkey_parse.rs (/mnt/build/cargo/debug/deps/release_pubkey_parse-b272f31abb91b54e)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/replay_schema_test.rs (/mnt/build/cargo/debug/deps/replay_schema_test-0075fb1c4d10eab3)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+     Running tests/spirit_resolution.rs (/mnt/build/cargo/debug/deps/spirit_resolution-93cd00543e4c72cc)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+     Running tests/trajectory_redaction_test.rs (/mnt/build/cargo/debug/deps/trajectory_redaction_test-4b02c00f74102bfb)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+     Running tests/two_host_bundle_2c.rs (/mnt/build/cargo/debug/deps/two_host_bundle_2c-433c11d96fe33213)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_bench-d8f1fd4b576dc686)
+test result: ok. 34 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.50s
+     Running unittests src/bin/section_13_1_run.rs (/mnt/build/cargo/debug/deps/section_13_1_run-e85bc2f8facdc563)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_10_4c_j4_gate_integrity.rs (/mnt/build/cargo/debug/deps/t_10_4c_j4_gate_integrity-674e3ffa6b983b30)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_10_4c_j4_latency_gate.rs (/mnt/build/cargo/debug/deps/t_10_4c_j4_latency_gate-448240c3bca16d11)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_10_4c_j4_mutation.rs (/mnt/build/cargo/debug/deps/t_10_4c_j4_mutation-a58b22e5b32dae64)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_11_2b_cross_region_slo.rs (/mnt/build/cargo/debug/deps/t_11_2b_cross_region_slo-65c9aa56117d5e4a)
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_11_2b_halt_presence.rs (/mnt/build/cargo/debug/deps/t_11_2b_halt_presence-8d7b8d34df6c998f)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_bin-6fd07f37be988129)
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running unittests src/main.rs (/mnt/build/cargo/debug/deps/maos-8d09e2ba0c7e5e44)
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+     Running tests/audit_refusal_16_5.rs (/mnt/build/cargo/debug/deps/audit_refusal_16_5-013614b0a9ba522c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/bounded_postures_2b.rs (/mnt/build/cargo/debug/deps/bounded_postures_2b-74bd325fbc7e937c)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/butler_8_14b.rs (/mnt/build/cargo/debug/deps/butler_8_14b-195819d7fdb20b50)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+     Running tests/cert_rotation_trigger_14_2a.rs (/mnt/build/cargo/debug/deps/cert_rotation_trigger_14_2a-2edb3655214a0327)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.64s
+     Running tests/cohort_daemon_smoke_13_5c.rs (/mnt/build/cargo/debug/deps/cohort_daemon_smoke_13_5c-68a1c16502d84177)
+test result: ok. 9 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.36s
+     Running tests/cohort_halt_receipt_12_3.rs (/mnt/build/cargo/debug/deps/cohort_halt_receipt_12_3-27553873c6f00fed)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/consent_refusal_1b.rs (/mnt/build/cargo/debug/deps/consent_refusal_1b-9204c5f21ff2f4b3)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cookbook_manifests_17_3b.rs (/mnt/build/cargo/debug/deps/cookbook_manifests_17_3b-b181aff81f9bd0cb)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cross_team_consent_13_3.rs (/mnt/build/cargo/debug/deps/cross_team_consent_13_3-4f0fcbe00249fdbd)
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.28s
+     Running tests/cross_team_crossing_13_6b.rs (/mnt/build/cargo/debug/deps/cross_team_crossing_13_6b-a89c9b88fafd6e00)
+test result: ok. 21 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/cross_wall_log_read_13_6d.rs (/mnt/build/cargo/debug/deps/cross_wall_log_read_13_6d-b7e351ec23d619fe)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+     Running tests/delegation_leg_1a.rs (/mnt/build/cargo/debug/deps/delegation_leg_1a-1640b0d2556ca701)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/drain_once_audit_writer.rs (/mnt/build/cargo/debug/deps/drain_once_audit_writer-d18177b3420915a1)
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/egress_daemon_17_1.rs (/mnt/build/cargo/debug/deps/egress_daemon_17_1-ed6adb0b260d294d)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/enterprise_daemon_seam_13_5a.rs (/mnt/build/cargo/debug/deps/enterprise_daemon_seam_13_5a-725d9a3c20299f0d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/enterprise_identity_wiring.rs (/mnt/build/cargo/debug/deps/enterprise_identity_wiring-e919872a239cbc39)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/erasure_uninstall_13_5b.rs (/mnt/build/cargo/debug/deps/erasure_uninstall_13_5b-e856b8e8bbff529d)
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+     Running tests/f4_pairing.rs (/mnt/build/cargo/debug/deps/f4_pairing-e2f58a434583d987)
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s
+     Running tests/hook_pump_17_4.rs (/mnt/build/cargo/debug/deps/hook_pump_17_4-621cf976fab68df4)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.51s
+     Running tests/host_grants_2b.rs (/mnt/build/cargo/debug/deps/host_grants_2b-949f91fe496587b8)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/identity_asserted_write.rs (/mnt/build/cargo/debug/deps/identity_asserted_write-79918a99c8fd3f71)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/inference_mode_15_6.rs (/mnt/build/cargo/debug/deps/inference_mode_15_6-ddecd7c3f44acd61)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+     Running tests/inference_provider_polarity_8_11.rs (/mnt/build/cargo/debug/deps/inference_provider_polarity_8_11-61ed9df342a4419f)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+     Running tests/jetbrains_acp_server.rs (/mnt/build/cargo/debug/deps/jetbrains_acp_server-0ea38ccae238d69c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/maos_run_boot_loud_8_11.rs (/mnt/build/cargo/debug/deps/maos_run_boot_loud_8_11-cb436abe70df2847)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+     Running tests/maos_uninstall_16_4.rs (/mnt/build/cargo/debug/deps/maos_uninstall_16_4-80c3ccb26fcafbcf)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.63s
+     Running tests/maosctl_load_16_6.rs (/mnt/build/cargo/debug/deps/maosctl_load_16_6-f2644d7914ec801c)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
+     Running tests/observer_activity_corpus_17_4.rs (/mnt/build/cargo/debug/deps/observer_activity_corpus_17_4-dcb703aeb2b48bb5)
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.35s
+     Running tests/observer_live_17_4.rs (/mnt/build/cargo/debug/deps/observer_live_17_4-39534ee1c0a2d296)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
+     Running tests/one_daemon_one_door_16_1.rs (/mnt/build/cargo/debug/deps/one_daemon_one_door_16_1-0635cbaac77f7868)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.66s
+     Running tests/one_shot_hello.rs (/mnt/build/cargo/debug/deps/one_shot_hello-3e2caf05c6074a7a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.22s
+     Running tests/operator_door_16_1.rs (/mnt/build/cargo/debug/deps/operator_door_16_1-583e44208d62fff7)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/recall_17_3d.rs (/mnt/build/cargo/debug/deps/recall_17_3d-9e32f418e9c1d8a4)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/recall_mediation_17_3d.rs (/mnt/build/cargo/debug/deps/recall_mediation_17_3d-6b93b12a64c7a1e0)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/researcher_8_14c.rs (/mnt/build/cargo/debug/deps/researcher_8_14c-e06d4347407f181e)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+     Running tests/researcher_log_grant_17_3d.rs (/mnt/build/cargo/debug/deps/researcher_log_grant_17_3d-3c8db30bab337214)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/root_shutdown_unload_16_3.rs (/mnt/build/cargo/debug/deps/root_shutdown_unload_16_3-ec45af100aad56ef)
+test result: FAILED. 2 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+     Running tests/root_spawn_home_isolation_16_1.rs (/mnt/build/cargo/debug/deps/root_spawn_home_isolation_16_1-9786e7ac8981a4c6)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/shell_8_14a.rs (/mnt/build/cargo/debug/deps/shell_8_14a-9d73385929c43e51)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+     Running tests/shell_host_16_2.rs (/mnt/build/cargo/debug/deps/shell_host_16_2-b1240ff82a64636b)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.10s
+     Running tests/smoke_bench_5e_test.rs (/mnt/build/cargo/debug/deps/smoke_bench_5e_test-6f1ddab554cb058b)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/smoke_cli_wrapper_8_12.rs (/mnt/build/cargo/debug/deps/smoke_cli_wrapper_8_12-d4d005ea11d96803)
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/smoke_mira_nash_tcp_8_13.rs (/mnt/build/cargo/debug/deps/smoke_mira_nash_tcp_8_13-62e9640875114457)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+     Running tests/smoke_multi_provider_test.rs (/mnt/build/cargo/debug/deps/smoke_multi_provider_test-bf25e0c21965a388)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/smoke_registry_5d_test.rs (/mnt/build/cargo/debug/deps/smoke_registry_5d_test-01b29d27ed31f4f5)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/smoke_run_8_11.rs (/mnt/build/cargo/debug/deps/smoke_run_8_11-dc875a027b2b35e1)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+     Running tests/spawned_scope_17_3c.rs (/mnt/build/cargo/debug/deps/spawned_scope_17_3c-80143f41db4dad0e)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_14_2b_cohort_convergence.rs (/mnt/build/cargo/debug/deps/t_14_2b_cohort_convergence-f134e66c532daf1d)
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t_14_2c_local_leaf_declaration.rs (/mnt/build/cargo/debug/deps/t_14_2c_local_leaf_declaration-d48f8452b2623177)
+test result: ok. 7 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/team_identity_13_6a.rs (/mnt/build/cargo/debug/deps/team_identity_13_6a-ebced208eb26b065)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/tenant_audit_phase_a_13_5g.rs (/mnt/build/cargo/debug/deps/tenant_audit_phase_a_13_5g-2f40e4d80f905ea7)
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.27s
+     Running tests/tenant_map_13_1.rs (/mnt/build/cargo/debug/deps/tenant_map_13_1-8cb7e9ba41ad4d52)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/topology_delegation_1a.rs (/mnt/build/cargo/debug/deps/topology_delegation_1a-f47c2cb965fd841b)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/two_host_delegation_2b.rs (/mnt/build/cargo/debug/deps/two_host_delegation_2b-d4ac5f2e9d386401)
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.60s
+     Running tests/verb_table_15_3.rs (/mnt/build/cargo/debug/deps/verb_table_15_3-8674f6c09bb6bc5f)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/wasm_form_admission_17_3b.rs (/mnt/build/cargo/debug/deps/wasm_form_admission_17_3b-0f53839234a0a5c3)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+     Running tests/worker_completion_2a.rs (/mnt/build/cargo/debug/deps/worker_completion_2a-cebf57eb897a2f76)
+test result: FAILED. 39 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+     Running tests/worker_crash_corpus_16_3.rs (/mnt/build/cargo/debug/deps/worker_crash_corpus_16_3-4a65390925e129ad)
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/worker_hang_corpus_16_3.rs (/mnt/build/cargo/debug/deps/worker_hang_corpus_16_3-f0d668a752931d28)
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/worker_manifests_2a.rs (/mnt/build/cargo/debug/deps/worker_manifests_2a-542bdb435a8fd8a2)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/worker_resource_limits_17_2.rs (/mnt/build/cargo/debug/deps/worker_resource_limits_17_2-57673aef48590a63)
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/worker_supervision_16_3.rs (/mnt/build/cargo/debug/deps/worker_supervision_16_3-527d3e8b452f9fd5)
+test result: FAILED. 20 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.14s
+     Running tests/worker_terminal_facts_17_7.rs (/mnt/build/cargo/debug/deps/worker_terminal_facts_17_7-37feb312b191f238)
+test result: FAILED. 21 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.17s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_capability-07e63e173c289c5d)
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/operator_re_revoke_16_1.rs (/mnt/build/cargo/debug/deps/operator_re_revoke_16_1-98a9436bedac6161)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/scalar_seq_17_4.rs (/mnt/build/cargo/debug/deps/scalar_seq_17_4-a45600b80b080015)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_cli-fa26654f9875f241)
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+     Running unittests src/main.rs (/mnt/build/cargo/debug/deps/maosctl-7eb0f576fae5abcc)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/accessibility_test.rs (/mnt/build/cargo/debug/deps/accessibility_test-eefb9b2df979b9dd)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/audit_no_color_test.rs (/mnt/build/cargo/debug/deps/audit_no_color_test-6cc3c356ea8aa8ac)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+     Running tests/cohort_sign_2e.rs (/mnt/build/cargo/debug/deps/cohort_sign_2e-d78bc32e43dfa404)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/credential_posture_2c.rs (/mnt/build/cargo/debug/deps/credential_posture_2c-a682f01c9948a23f)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+     Running tests/dep_kernel_core_free_test.rs (/mnt/build/cargo/debug/deps/dep_kernel_core_free_test-fa220dfb9680a90a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/door_response_framing.rs (/mnt/build/cargo/debug/deps/door_response_framing-1eca53f8f835ecd1)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/forget_reason_test.rs (/mnt/build/cargo/debug/deps/forget_reason_test-5041b16b64b020db)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/halt_record_16_5.rs (/mnt/build/cargo/debug/deps/halt_record_16_5-d129bb600abfbb81)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/halt_resolve_test.rs (/mnt/build/cargo/debug/deps/halt_resolve_test-9b16532dabf997f0)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running tests/import_rust_inproc_refusal_17_3b.rs (/mnt/build/cargo/debug/deps/import_rust_inproc_refusal_17_3b-2b075a77cc7b7def)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/legal_hold_cli_13_5b.rs (/mnt/build/cargo/debug/deps/legal_hold_cli_13_5b-e482625ada515769)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/load_test.rs (/mnt/build/cargo/debug/deps/load_test-0aa6977a0ec64b61)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running tests/orchestrator_queue_test.rs (/mnt/build/cargo/debug/deps/orchestrator_queue_test-8be88ac152204190)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running tests/pause_resume_test.rs (/mnt/build/cargo/debug/deps/pause_resume_test-45f0438c5f340971)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+     Running tests/posture_shift_test.rs (/mnt/build/cargo/debug/deps/posture_shift_test-2e6cab5125f4fa36)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running tests/release_pubkey.rs (/mnt/build/cargo/debug/deps/release_pubkey-02d0b804b3fe17c5)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/revocations_import_test.rs (/mnt/build/cargo/debug/deps/revocations_import_test-c23a41f52c276ca4)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+     Running tests/revoke_token_test.rs (/mnt/build/cargo/debug/deps/revoke_token_test-91b97f56707797b6)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/signing_identity_2c.rs (/mnt/build/cargo/debug/deps/signing_identity_2c-5f550b633d43e7e8)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/skill_queue_integration_test.rs (/mnt/build/cargo/debug/deps/skill_queue_integration_test-1e0a0517f02f1f80)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+     Running tests/skill_queue_reconcile_test.rs (/mnt/build/cargo/debug/deps/skill_queue_reconcile_test-3c81a8edf12567d3)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+     Running tests/spirit_upgrade_test.rs (/mnt/build/cargo/debug/deps/spirit_upgrade_test-9041293f6c9cb4e5)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/two_host_reconcile_2c.rs (/mnt/build/cargo/debug/deps/two_host_reconcile_2c-0349224d73cfb114)
+test result: FAILED. 8 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+     Running tests/uninstall_exit_codes_13_5b.rs (/mnt/build/cargo/debug/deps/uninstall_exit_codes_13_5b-69c447d6e2907f49)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_cohort-b3e691d8b17a67e0)
+test result: ok. 80 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/cert_rotation_14_2a.rs (/mnt/build/cargo/debug/deps/cert_rotation_14_2a-86ef42c5bc361b12)
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+     Running tests/migration_chain.rs (/mnt/build/cargo/debug/deps/migration_chain-d6f7957f28d32b8a)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_compliance-2f1e4ad231df800d)
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ccac_ship_gate_test.rs (/mnt/build/cargo/debug/deps/ccac_ship_gate_test-a9a5b4e4da6ec081)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+     Running tests/evaluator_latency_test.rs (/mnt/build/cargo/debug/deps/evaluator_latency_test-41023390b8671668)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+     Running tests/evaluator_test.rs (/mnt/build/cargo/debug/deps/evaluator_test-ac7bdf516a605e45)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_control-4d86c87515423f88)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/post_surface_16_1.rs (/mnt/build/cargo/debug/deps/post_surface_16_1-dc2f51beb7104ef4)
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.06s
+     Running tests/submit_and_wait_16_2.rs (/mnt/build/cargo/debug/deps/submit_and_wait_16_2-e783b2e500c35637)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_corpus_gen-bb8f11eb4e3b019a)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/main.rs (/mnt/build/cargo/debug/deps/maos_corpus_gen-9d1460e4ce154ff8)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/determinism_integration.rs (/mnt/build/cargo/debug/deps/determinism_integration-3a09f753f9b1a65a)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+     Running tests/red_team_integration.rs (/mnt/build/cargo/debug/deps/red_team_integration-7863061d174b54f7)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+     Running tests/secret_redaction_integration.rs (/mnt/build/cargo/debug/deps/secret_redaction_integration-a1a7e1cc773ba71a)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_digest-d34519446a995e11)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_director_surface-07050a524c21c1ef)
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_domain-cc858065da7fc2d3)
+test result: ok. 279 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/container_terminal_facts_17_7.rs (/mnt/build/cargo/debug/deps/container_terminal_facts_17_7-c5e2bd43d45a3512)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/egress_destination_17_1.rs (/mnt/build/cargo/debug/deps/egress_destination_17_1-f192eb43c795ab8b)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/operator_door_control.rs (/mnt/build/cargo/debug/deps/operator_door_control-51833d895d27a926)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_egress-30b4116104ad9889)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/bearer_17_1.rs (/mnt/build/cargo/debug/deps/bearer_17_1-c972df1f3d93e2e0)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/bearer_edges_17_1.rs (/mnt/build/cargo/debug/deps/bearer_edges_17_1-8e2ae260d0d99316)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/proxy_17_1.rs (/mnt/build/cargo/debug/deps/proxy_17_1-4906b9023587b991)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/proxy_edges_17_1.rs (/mnt/build/cargo/debug/deps/proxy_edges_17_1-2856ebc8691e3a5d)
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_escape_detector-68486598e58165e3)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/concurrent_read.rs (/mnt/build/cargo/debug/deps/concurrent_read-a50babbd631fd0c5)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+     Running tests/detection_quality.rs (/mnt/build/cargo/debug/deps/detection_quality-2967f5737b1bf7f0)
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+     Running tests/no_verdict_invariant.rs (/mnt/build/cargo/debug/deps/no_verdict_invariant-a382ee1acd540b56)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/producer_wired_e2e.rs (/mnt/build/cargo/debug/deps/producer_wired_e2e-e937f1d77976a22d)
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+     Running tests/source_identity_blind.rs (/mnt/build/cargo/debug/deps/source_identity_blind-a83c7208f1cae91e)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_eval-96543570f85a80f3)
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/distillate_corpus_quarterly_pin.rs (/mnt/build/cargo/debug/deps/distillate_corpus_quarterly_pin-fd93accec69f16b7)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/distillate_five_metrics_floor.rs (/mnt/build/cargo/debug/deps/distillate_five_metrics_floor-9a83faaec5d50e86)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/halt_recall_floor.rs (/mnt/build/cargo/debug/deps/halt_recall_floor-7faabd10aa7e588c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/hsis_runner.rs (/mnt/build/cargo/debug/deps/hsis_runner-d5c6110f9483501e)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/intent_lineage_corpus_load.rs (/mnt/build/cargo/debug/deps/intent_lineage_corpus_load-0eccef2fa0a95969)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/onb_1_self_trial.rs (/mnt/build/cargo/debug/deps/onb_1_self_trial-5eb7b19fa657860c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/retract_corpus.rs (/mnt/build/cargo/debug/deps/retract_corpus-53a20aa3b7c2ba9b)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/revocation_corpus.rs (/mnt/build/cargo/debug/deps/revocation_corpus-4feb481334d75f1b)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/safety_critical_corpus_8_5.rs (/mnt/build/cargo/debug/deps/safety_critical_corpus_8_5-6a40d62eba7149e5)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t3_escape_corpus.rs (/mnt/build/cargo/debug/deps/t3_escape_corpus-ba7a8020bebd6a54)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t3_escape_workflow.rs (/mnt/build/cargo/debug/deps/t3_escape_workflow-0c7ab9c32a24dc3d)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/t3_network_escape_executor.rs (/mnt/build/cargo/debug/deps/t3_network_escape_executor-6def9ef42bdfab24)
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/trial_attestation.rs (/mnt/build/cargo/debug/deps/trial_attestation-e24d20fac9404867)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/upgrade_policy_corpus.rs (/mnt/build/cargo/debug/deps/upgrade_policy_corpus-417d179194e6b26d)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_exec_deps-c7f4eb5ede886041)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/resolver_17_6.rs (/mnt/build/cargo/debug/deps/resolver_17_6-0a19d83ffdfbb624)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_fkcs-787daf6e657f07d9)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fkcs_contract.rs (/mnt/build/cargo/debug/deps/fkcs_contract-483500506dea95a8)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_frame_codec-d8e0c74e88c184a0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/bounds.rs (/mnt/build/cargo/debug/deps/bounds-bca491a098078a9d)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_host-e09b9a84a0ef3ff5)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_iac-e477296921dd87a7)
+test result: ok. 99 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+     Running tests/audit_truth_16_5.rs (/mnt/build/cargo/debug/deps/audit_truth_16_5-a5bd83680c61334d)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iac_bus_intent_lineage.rs (/mnt/build/cargo/debug/deps/iac_bus_intent_lineage-442069df4dbb5b0d)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iac_log_before_deliver_invariant.rs (/mnt/build/cargo/debug/deps/iac_log_before_deliver_invariant-39f2d724bfa34203)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iac_send_token_17_3c.rs (/mnt/build/cargo/debug/deps/iac_send_token_17_3c-6663ba9c40052ac5)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+     Running tests/legal_hold_authority_13_5b.rs (/mnt/build/cargo/debug/deps/legal_hold_authority_13_5b-401ed59b5d43caa0)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+     Running tests/log_recall_17_3d.rs (/mnt/build/cargo/debug/deps/log_recall_17_3d-dea680d34555517d)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+     Running tests/mailbox_a2a_router_installer_1a.rs (/mnt/build/cargo/debug/deps/mailbox_a2a_router_installer_1a-37331fe7d11bccab)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/mailbox_reload_pid_17_3c.rs (/mnt/build/cargo/debug/deps/mailbox_reload_pid_17_3c-3e6f91fa062ef0ac)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/transparency_duplicate_discrimination_2b.rs (/mnt/build/cargo/debug/deps/transparency_duplicate_discrimination_2b-23fd6a6c15955788)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_journey_test-ea10be649954a8ed)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cassette_provenance_15_6.rs (/mnt/build/cargo/debug/deps/cassette_provenance_15_6-bd3c842d17e83583)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixture_roundtrip.rs (/mnt/build/cargo/debug/deps/fixture_roundtrip-3d01ed5afcca4826)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/guards_meta.rs (/mnt/build/cargo/debug/deps/guards_meta-4a4d43593ed1cbbd)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/jb3_self_tuning_halt.rs (/mnt/build/cargo/debug/deps/jb3_self_tuning_halt-2faa4546185f7f63)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+     Running tests/journey_butler.rs (/mnt/build/cargo/debug/deps/journey_butler-a28c3b6c25688d68)
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.50s
+     Running tests/journey_j0.rs (/mnt/build/cargo/debug/deps/journey_j0-98df5a1e5322a5e0)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+     Running tests/journey_j1.rs (/mnt/build/cargo/debug/deps/journey_j1-6ce5625ed64dafcd)
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+     Running tests/journey_j3.rs (/mnt/build/cargo/debug/deps/journey_j3-28af35a3babb9fe9)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+     Running tests/journey_j4.rs (/mnt/build/cargo/debug/deps/journey_j4-7b18f8d4b222fc63)
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.28s
+     Running tests/journey_researcher.rs (/mnt/build/cargo/debug/deps/journey_researcher-27a815c7c973cb9e)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+     Running tests/pty_drop_order.rs (/mnt/build/cargo/debug/deps/pty_drop_order-c04df305d9a3e319)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+     Running tests/recording_source_15_6.rs (/mnt/build/cargo/debug/deps/recording_source_15_6-1dd96535fbe2a64d)
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/run_bounded_full_pipe.rs (/mnt/build/cargo/debug/deps/run_bounded_full_pipe-09950787b1b5489b)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_kernel_core-916be6f561a45c50)
+test result: ok. 258 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+     Running unittests src/bin/assert-revocation-p99-floor.rs (/mnt/build/cargo/debug/deps/assert_revocation_p99_floor-1145edee6695674f)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/abi_stability_admit.rs (/mnt/build/cargo/debug/deps/abi_stability_admit-a8344d30f00e70f5)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/air_gap_ollama_test.rs (/mnt/build/cargo/debug/deps/air_gap_ollama_test-cd6271c14b099840)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/approval_prompt_e2e.rs (/mnt/build/cargo/debug/deps/approval_prompt_e2e-47914303cb7dda30)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/audit_sink_truth_16_5.rs (/mnt/build/cargo/debug/deps/audit_sink_truth_16_5-f50387745d282cf9)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/audit_spine_integration.rs (/mnt/build/cargo/debug/deps/audit_spine_integration-d1a73aafed43266d)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/bridge_t2_route_17_6.rs (/mnt/build/cargo/debug/deps/bridge_t2_route_17_6-faacc629568b2fc8)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+     Running tests/budget_seam_8_11.rs (/mnt/build/cargo/debug/deps/budget_seam_8_11-52a7a929f95fa2d5)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s
+     Running tests/cap_audit_backpressure.rs (/mnt/build/cargo/debug/deps/cap_audit_backpressure-5e27a49a4ff9138a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+     Running tests/cap_policy_decision.rs (/mnt/build/cargo/debug/deps/cap_policy_decision-1474fd6529d1a881)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cap_registry_integration.rs (/mnt/build/cargo/debug/deps/cap_registry_integration-ca106dee0929c4a0)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cap_token_verify_assertion.rs (/mnt/build/cargo/debug/deps/cap_token_verify_assertion-875dc3889567cd7b)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/capability_invocation_audit.rs (/mnt/build/cargo/debug/deps/capability_invocation_audit-fc82541dc89f0c42)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/cgroup_ceiling_smoke.rs (/mnt/build/cargo/debug/deps/cgroup_ceiling_smoke-d7ee2e379d0228d5)
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+     Running tests/cli_subprocess_invocation_fr52.rs (/mnt/build/cargo/debug/deps/cli_subprocess_invocation_fr52-3ba0687081e7c5ee)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cli_wrapper_admission.rs (/mnt/build/cargo/debug/deps/cli_wrapper_admission-5f03fdf9fd2fb307)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/cli_wrapper_bridge_8_12.rs (/mnt/build/cargo/debug/deps/cli_wrapper_bridge_8_12-f102de71e7a498fb)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/cli_wrapper_egress_admission_17_1.rs (/mnt/build/cargo/debug/deps/cli_wrapper_egress_admission_17_1-f4ee90c8e43dc51a)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cli_wrapper_shape_mismatch_journal_7_4.rs (/mnt/build/cargo/debug/deps/cli_wrapper_shape_mismatch_journal_7_4-6ba5be9dcb0f8d8b)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+     Running tests/cli_wrapper_t3_boundary_17_1.rs (/mnt/build/cargo/debug/deps/cli_wrapper_t3_boundary_17_1-dbfdb3e8109a40da)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/cold_restart_recover_in_flight.rs (/mnt/build/cargo/debug/deps/cold_restart_recover_in_flight-b387677abd6f534c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/consent_rupture_adr_034.rs (/mnt/build/cargo/debug/deps/consent_rupture_adr_034-ab2754ea3a642e37)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/crash_detector_in_process_panic.rs (/mnt/build/cargo/debug/deps/crash_detector_in_process_panic-3da9f07f1be0e539)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+     Running tests/distillation_i11_audit_chain.rs (/mnt/build/cargo/debug/deps/distillation_i11_audit_chain-2cc3451557130d18)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+     Running tests/drr_priority_weighted_dispatch.rs (/mnt/build/cargo/debug/deps/drr_priority_weighted_dispatch-1c55388736bf8782)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/drr_scheduler.rs (/mnt/build/cargo/debug/deps/drr_scheduler-c266ce9f4268c2eb)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+     Running tests/fr4_1000_call_fixture.rs (/mnt/build/cargo/debug/deps/fr4_1000_call_fixture-62c4314474ca6c00)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/frame_bridge_poll_17_3c.rs (/mnt/build/cargo/debug/deps/frame_bridge_poll_17_3c-aa5cef308cf8cd60)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s
+     Running tests/gateway_dispatcher_fr54.rs (/mnt/build/cargo/debug/deps/gateway_dispatcher_fr54-f5a1a9b911851767)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/gateway_uninstall_fr65_v05.rs (/mnt/build/cargo/debug/deps/gateway_uninstall_fr65_v05-2ef8fc74f7dd58a5)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/halt_continuity_test.rs (/mnt/build/cargo/debug/deps/halt_continuity_test-e7916e1e27bfbd45)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/halt_durability_16_5.rs (/mnt/build/cargo/debug/deps/halt_durability_16_5-6f1037cb48731b2e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/halt_invoke_test.rs (/mnt/build/cargo/debug/deps/halt_invoke_test-32179f6984043f90)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+     Running tests/halt_receipt_production_rate.rs (/mnt/build/cargo/debug/deps/halt_receipt_production_rate-686d27d12ff6ee77)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+     Running tests/halt_resolution_journaled.rs (/mnt/build/cargo/debug/deps/halt_resolution_journaled-eba56c437e6d68ae)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/halt_resolution_writes_memory.rs (/mnt/build/cargo/debug/deps/halt_resolution_writes_memory-cfac2335b11f236f)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/hook_dispatch_budget_envelope.rs (/mnt/build/cargo/debug/deps/hook_dispatch_budget_envelope-6eaab9c5e52aa315)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s
+     Running tests/hook_dispatch_swap_hooks.rs (/mnt/build/cargo/debug/deps/hook_dispatch_swap_hooks-61b3e914557cc177)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/hot_swap_cross_major_migration.rs (/mnt/build/cargo/debug/deps/hot_swap_cross_major_migration-c3a2aa75f0f95734)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/hot_swap_halt_continuity_corpus_integration.rs (/mnt/build/cargo/debug/deps/hot_swap_halt_continuity_corpus_integration-2555439948853119)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/hot_swap_halt_continuity_test.rs (/mnt/build/cargo/debug/deps/hot_swap_halt_continuity_test-ce3af4730e190533)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/hot_swap_saga_compensation.rs (/mnt/build/cargo/debug/deps/hot_swap_saga_compensation-6628ecaec1d218e1)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/hot_swap_same_major_lifecycle.rs (/mnt/build/cargo/debug/deps/hot_swap_same_major_lifecycle-66fffb3a2b66fc91)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/i12_real_digest_provider_8_10.rs (/mnt/build/cargo/debug/deps/i12_real_digest_provider_8_10-388350facfd77d05)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/intent_lineage_corpus_v0.rs (/mnt/build/cargo/debug/deps/intent_lineage_corpus_v0-3da0aca25acfd7b9)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/isolation_hookpoint_wiring.rs (/mnt/build/cargo/debug/deps/isolation_hookpoint_wiring-36ee3da818cf5fc0)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/journal_append_16_5.rs (/mnt/build/cargo/debug/deps/journal_append_16_5-83dfcda4e37bf81e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/journal_fsync_assertion.rs (/mnt/build/cargo/debug/deps/journal_fsync_assertion-ad2fafa48c5a0daf)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+     Running tests/journal_resource_downgrade_replay_17_2.rs (/mnt/build/cargo/debug/deps/journal_resource_downgrade_replay_17_2-756910c258468c6e)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/kernel_ctx_round_trip.rs (/mnt/build/cargo/debug/deps/kernel_ctx_round_trip-df671529692c0ce7)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/lifecycle_all_hooks_hot_swap_17_4.rs (/mnt/build/cargo/debug/deps/lifecycle_all_hooks_hot_swap_17_4-032832cea357891f)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/loaded_spirit_exit_16_6.rs (/mnt/build/cargo/debug/deps/loaded_spirit_exit_16_6-11d8fd9cfd00d7fc)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/log_recall_isolation_hookpoint.rs (/mnt/build/cargo/debug/deps/log_recall_isolation_hookpoint-2e74638829afff87)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/log_recall_scope.rs (/mnt/build/cargo/debug/deps/log_recall_scope-0d240be7ed7e5c8f)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/manifest_field_coverage.rs (/mnt/build/cargo/debug/deps/manifest_field_coverage-93464b371d552b6f)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/memory_i5_isolation.rs (/mnt/build/cargo/debug/deps/memory_i5_isolation-3d36f0ce0fd47ff5)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/memory_md_opaque_write.rs (/mnt/build/cargo/debug/deps/memory_md_opaque_write-e9456e25969bda72)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/memory_three_tier_smoke.rs (/mnt/build/cargo/debug/deps/memory_three_tier_smoke-b76dd68afeef606b)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/multi_provider_routing.rs (/mnt/build/cargo/debug/deps/multi_provider_routing-88d42550b0477b1c)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/nfr_perf_4_pause_resume_latency.rs (/mnt/build/cargo/debug/deps/nfr_perf_4_pause_resume_latency-7d706fef910153f8)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/nfr_perf_4_posture_shift_propagation.rs (/mnt/build/cargo/debug/deps/nfr_perf_4_posture_shift_propagation-f3d7cf42f11efa19)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/nfr_rel_9_revoke_latency.rs (/mnt/build/cargo/debug/deps/nfr_rel_9_revoke_latency-0670f7cf2adab88a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/nfr_sec_14_cross_spirit_isolation.rs (/mnt/build/cargo/debug/deps/nfr_sec_14_cross_spirit_isolation-bc4b7b65ed3575dd)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/on_idle_substrate.rs (/mnt/build/cargo/debug/deps/on_idle_substrate-4003207b5e0493dd)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+     Running tests/on_revocation_three_actions.rs (/mnt/build/cargo/debug/deps/on_revocation_three_actions-cc390a9781927015)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/operator_posture_ceiling_16_6.rs (/mnt/build/cargo/debug/deps/operator_posture_ceiling_16_6-933868a5faa0a1f0)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/orchestrator_distillate_dispatch.rs (/mnt/build/cargo/debug/deps/orchestrator_distillate_dispatch-9860ff13e7856945)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/policy_per_capability_deny.rs (/mnt/build/cargo/debug/deps/policy_per_capability_deny-3c363528910c6cf7)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/posture_shift_journaled.rs (/mnt/build/cargo/debug/deps/posture_shift_journaled-b585d6d51e987e1a)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/principal_namespace_lifecycle.rs (/mnt/build/cargo/debug/deps/principal_namespace_lifecycle-2f8510da3b3817ee)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/private_forget_restart_13_5i.rs (/mnt/build/cargo/debug/deps/private_forget_restart_13_5i-5f92cbb5dd43b613)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+     Running tests/private_spill_supersession_13_5j.rs (/mnt/build/cargo/debug/deps/private_spill_supersession_13_5j-6b2522056536d02a)
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+     Running tests/progress_watchdog_smoke.rs (/mnt/build/cargo/debug/deps/progress_watchdog_smoke-42ad183a22e041d9)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+     Running tests/provider_switched_journal.rs (/mnt/build/cargo/debug/deps/provider_switched_journal-32227ee5ccdf2c21)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/redaction_canary.rs (/mnt/build/cargo/debug/deps/redaction_canary-1d071a9a193c0783)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+     Running tests/resource_caps_linux.rs (/mnt/build/cargo/debug/deps/resource_caps_linux-24390738cc467179)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/retract_corpus_v0.rs (/mnt/build/cargo/debug/deps/retract_corpus_v0-472acd51da94b0c3)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/revocation_applier_pipeline.rs (/mnt/build/cargo/debug/deps/revocation_applier_pipeline-74bfe806036e4ad0)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/revocation_verify_denial.rs (/mnt/build/cargo/debug/deps/revocation_verify_denial-6276d23c16db61bf)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/sandbox_admission.rs (/mnt/build/cargo/debug/deps/sandbox_admission-a2790352718aac25)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/sandbox_enforcement_linux.rs (/mnt/build/cargo/debug/deps/sandbox_enforcement_linux-60e951b16ab920b2)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/sandbox_enforcement_windows.rs (/mnt/build/cargo/debug/deps/sandbox_enforcement_windows-b119e4d25eb8012c)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/sandbox_t3_image_verify.rs (/mnt/build/cargo/debug/deps/sandbox_t3_image_verify-e9c896f20412fd3d)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/sandbox_t3_spawn_linux.rs (/mnt/build/cargo/debug/deps/sandbox_t3_spawn_linux-89df8c4fa234405d)
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/scalar_policy_runtime_test.rs (/mnt/build/cargo/debug/deps/scalar_policy_runtime_test-8074e3e4fcd99602)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/scalar_predicate_to_halt_integration.rs (/mnt/build/cargo/debug/deps/scalar_predicate_to_halt_integration-b215258b2e2d68c6)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/scalar_predicate_truth_table.rs (/mnt/build/cargo/debug/deps/scalar_predicate_truth_table-f6b4888775e707d7)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/scalar_slot_set_and_tap.rs (/mnt/build/cargo/debug/deps/scalar_slot_set_and_tap-8a3db05ac071af49)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/scalar_tap_subscriber.rs (/mnt/build/cargo/debug/deps/scalar_tap_subscriber-75a6e503485a158a)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/schedule_watchdog_fr26.rs (/mnt/build/cargo/debug/deps/schedule_watchdog_fr26-45e529e902864131)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+     Running tests/scheduler_five_verb_lifecycle.rs (/mnt/build/cargo/debug/deps/scheduler_five_verb_lifecycle-2ca89ff5c77ec09e)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+     Running tests/self_telemetry_scope.rs (/mnt/build/cargo/debug/deps/self_telemetry_scope-28a422b8d0707113)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/silent_failure_detector_smoke.rs (/mnt/build/cargo/debug/deps/silent_failure_detector_smoke-5d6d06886e64bccf)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+     Running tests/spirit_boundary_invariants.rs (/mnt/build/cargo/debug/deps/spirit_boundary_invariants-c0fd2e8bd74d952e)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t3_argv_custody_17_1.rs (/mnt/build/cargo/debug/deps/t3_argv_custody_17_1-de8ab9866efbed7e)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/t3_terminal_helpers_17_7.rs (/mnt/build/cargo/debug/deps/t3_terminal_helpers_17_7-93d402b360040202)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.20s
+     Running tests/telemetry_firehose_17_4.rs (/mnt/build/cargo/debug/deps/telemetry_firehose_17_4-ce1d3418fda7c1fc)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/upgrade_cold_swap_with_inflight_tasks.rs (/mnt/build/cargo/debug/deps/upgrade_cold_swap_with_inflight_tasks-073ba87fbc5a261a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/upgrade_migrator_cross_major.rs (/mnt/build/cargo/debug/deps/upgrade_migrator_cross_major-f9f9b62c9d8fed5e)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/upgrade_orchestrator_three_policies.rs (/mnt/build/cargo/debug/deps/upgrade_orchestrator_three_policies-6022833c6dca2f62)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_loom_lite-5c5fc749bd41c7e8)
+test result: ok. 88 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cross_region_live.rs (/mnt/build/cargo/debug/deps/cross_region_live-f9628202c4b9a3cb)
+test result: ok. 3 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cross_team_apply_13_3.rs (/mnt/build/cargo/debug/deps/cross_team_apply_13_3-07a60e8b7977c341)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/migration_live.rs (/mnt/build/cargo/debug/deps/migration_live-7bc95a5a1bfc6b21)
+test result: ok. 0 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/read_path_chokepoint.rs (/mnt/build/cargo/debug/deps/read_path_chokepoint-b126cbe784231c28)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/tenant_wall_live.rs (/mnt/build/cargo/debug/deps/tenant_wall_live-45c4ecb64f16f0ba)
+test result: ok. 1 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/transport_failure.rs (/mnt/build/cargo/debug/deps/transport_failure-0f456e66ba5e71c3)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_manifest-ee293516542f653a)
+test result: ok. 178 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cli_wrapper_egress_17_1.rs (/mnt/build/cargo/debug/deps/cli_wrapper_egress_17_1-5d0b25229bc925ef)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iac_send_capability_17_3c.rs (/mnt/build/cargo/debug/deps/iac_send_capability_17_3c-2aa54bcb12e766e2)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/lifecycle_hook_parity_17_4.rs (/mnt/build/cargo/debug/deps/lifecycle_hook_parity_17_4-95c4e8376a4b47a9)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/log_capability_17_3d.rs (/mnt/build/cargo/debug/deps/log_capability_17_3d-3d57dbfd77567d81)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/manifest_n_minus_1_compat.rs (/mnt/build/cargo/debug/deps/manifest_n_minus_1_compat-3e7a7a38ffb08229)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/resources_pid_17_2.rs (/mnt/build/cargo/debug/deps/resources_pid_17_2-686b4038cc9f2b90)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_mcp-bb2f4a348948664b)
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/stdio_transport_test.rs (/mnt/build/cargo/debug/deps/stdio_transport_test-a89b47021c8a2dc0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_notify_push-d930918e2d47efa5)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+     Running tests/t_10_4b_mobile_push_halt.rs (/mnt/build/cargo/debug/deps/t_10_4b_mobile_push_halt-ca86aef2640abdcd)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_pdp-dd41a34b10fefaad)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/deny_fault_inject.rs (/mnt/build/cargo/debug/deps/deny_fault_inject-6522758dd886b827)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fail_closed.rs (/mnt/build/cargo/debug/deps/fail_closed-3b6ec1ddef2b0a13)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/issue_path_deny.rs (/mnt/build/cargo/debug/deps/issue_path_deny-160d75a0731b99e1)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/real_evaluation.rs (/mnt/build/cargo/debug/deps/real_evaluation-9f520c86a3842f99)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_persistence-d59d0b7a6acf29b2)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_providers-fd5e6145b2d26b6d)
+test result: ok. 31 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/multi_provider_matrix.rs (/mnt/build/cargo/debug/deps/multi_provider_matrix-64c2cd48c0ec42ef)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ollama_round_trip_test.rs (/mnt/build/cargo/debug/deps/ollama_round_trip_test-1737ce3ca6df6477)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/openai_round_trip_test.rs (/mnt/build/cargo/debug/deps/openai_round_trip_test-6d6daceaa33d1c1f)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/rate_limit_isolation_nfr_scale_4.rs (/mnt/build/cargo/debug/deps/rate_limit_isolation_nfr_scale_4-45e19b7600cdbf70)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_registry-d482bf91b87e03ec)
+test result: ok. 56 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/server.rs (/mnt/build/cargo/debug/deps/maos_registry_server-0136d38dbe946aa6)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/end_to_end_test.rs (/mnt/build/cargo/debug/deps/end_to_end_test-809818753d034e4c)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/form_admission_17_3b.rs (/mnt/build/cargo/debug/deps/form_admission_17_3b-510b263c3e7061c8)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fr59_yank_propagation_within_5min_test.rs (/mnt/build/cargo/debug/deps/fr59_yank_propagation_within_5min_test-74d2e540125db1f2)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/import_air_gap_test.rs (/mnt/build/cargo/debug/deps/import_air_gap_test-52113a9d55fc80bf)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/registry_roundtrip_test.rs (/mnt/build/cargo/debug/deps/registry_roundtrip_test-8ffbe1be7c749b24)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/runtime_drift_test.rs (/mnt/build/cargo/debug/deps/runtime_drift_test-01c5026255c804a3)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/search_lock_contention_test.rs (/mnt/build/cargo/debug/deps/search_lock_contention_test-724c84424a56d741)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/vetting_attestation_gate.rs (/mnt/build/cargo/debug/deps/vetting_attestation_gate-b41dd406a6de0ec7)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_secrets-34a72049fbb50d20)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/at_rest_seal.rs (/mnt/build/cargo/debug/deps/at_rest_seal-50e81111c8ae2c06)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/default_plaintext_preserved.rs (/mnt/build/cargo/debug/deps/default_plaintext_preserved-b2dcb7b960a4c331)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/kms_fault_inject.rs (/mnt/build/cargo/debug/deps/kms_fault_inject-088c5d1c7ff11eed)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_shell-e4739445b5d654e2)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/init_test.rs (/mnt/build/cargo/debug/deps/init_test-4c10e08003237136)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/shell_halt_repl_16_2.rs (/mnt/build/cargo/debug/deps/shell_halt_repl_16_2-88c90d90c0608020)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s
+     Running tests/shell_test.rs (/mnt/build/cargo/debug/deps/shell_test-91e9a6af30c61d9c)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_siem-3e9ec182019fd2a7)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fault_inject.rs (/mnt/build/cargo/debug/deps/fault_inject-e6a129fa006648f9)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/file_sink.rs (/mnt/build/cargo/debug/deps/file_sink-68be5410dfe5040b)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+     Running tests/forward_count_derive.rs (/mnt/build/cargo/debug/deps/forward_count_derive-1deab0ff01fd3c7e)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+     Running tests/redaction_before_forward.rs (/mnt/build/cargo/debug/deps/redaction_before_forward-135b809f0bc283a2)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_skill-f2e780124eb6575f)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/admission_queue_test.rs (/mnt/build/cargo/debug/deps/admission_queue_test-031c9b260a24d499)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/admission_store_test.rs (/mnt/build/cargo/debug/deps/admission_store_test-4d27a309da7c2451)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/discovery_test.rs (/mnt/build/cargo/debug/deps/discovery_test-ca81ddcb5122d32e)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/proposal_test.rs (/mnt/build/cargo/debug/deps/proposal_test-6370d1d4cc3efe9f)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/schema_test.rs (/mnt/build/cargo/debug/deps/schema_test-0f2253019ff0bdbb)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_spirit_abi-ad85f956c83d3e46)
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/manifest_n_minus_1_test.rs (/mnt/build/cargo/debug/deps/manifest_n_minus_1_test-9760c3492169f2e9)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_spirit_cli-ad6ed3b31246ff77)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/maos-spirit.rs (/mnt/build/cargo/debug/deps/maos_spirit-c38386e87d0e77a2)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/compliance_claim_autopopulate_test.rs (/mnt/build/cargo/debug/deps/compliance_claim_autopopulate_test-efec2d93a209a818)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/publish_happy_path_test.rs (/mnt/build/cargo/debug/deps/publish_happy_path_test-290d18c4a7c2d12a)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/publish_signing_test.rs (/mnt/build/cargo/debug/deps/publish_signing_test-2030bed468ca59a5)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/publish_tier_validation_test.rs (/mnt/build/cargo/debug/deps/publish_tier_validation_test-1d85011a857ea348)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_spirit_derive-b9bd2dc347bf23a5)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_spirit_hello-92c236df66f4a4d0)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/hello_spirit_bench.rs (/mnt/build/cargo/debug/deps/hello_spirit_bench-c84992eca7363695)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/frame_roundtrip.rs (/mnt/build/cargo/debug/deps/frame_roundtrip-3c4a29e440ce3224)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/hello_spirit_16_2.rs (/mnt/build/cargo/debug/deps/hello_spirit_16_2-8d6dafd831582852)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_spirit_sdk-aa3da08b81a1d21e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/deprecation_warnings_smoke.rs (/mnt/build/cargo/debug/deps/deprecation_warnings_smoke-7c129e5a81c2dd6e)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/isolation_smoke.rs (/mnt/build/cargo/debug/deps/isolation_smoke-dcc87c07fe75d6af)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/lcas_smoke.rs (/mnt/build/cargo/debug/deps/lcas_smoke-c61edce0c84b2de8)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/local_runner_smoke.rs (/mnt/build/cargo/debug/deps/local_runner_smoke-c80bd2e897475ae9)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/no_std_smoke.rs (/mnt/build/cargo/debug/deps/no_std_smoke-30fea054f204f06d)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_macro_errors.rs (/mnt/build/cargo/debug/deps/spirit_macro_errors-8ed30efbdc5ae79c)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+     Running tests/spirit_macro_smoke.rs (/mnt/build/cargo/debug/deps/spirit_macro_smoke-ae52a330a2fcedaa)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_test_smoke.rs (/mnt/build/cargo/debug/deps/spirit_test_smoke-c92699d3cb7f6ede)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_test_v05_macros.rs (/mnt/build/cargo/debug/deps/spirit_test_v05_macros-f3669b72b5896345)
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_sso-e5e9d4f7a2021534)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/alg_negatives.rs (/mnt/build/cargo/debug/deps/alg_negatives-34049d1890f6ae7f)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/claims_failclosed.rs (/mnt/build/cargo/debug/deps/claims_failclosed-b4bc9f9110ee0739)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fault_inject.rs (/mnt/build/cargo/debug/deps/fault_inject-c8287302a659483a)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixtures.rs (/mnt/build/cargo/debug/deps/fixtures-896c2feeb705bfa4)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/identity_provenance.rs (/mnt/build/cargo/debug/deps/identity_provenance-40e3434e1031f7ac)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/identity_source_blind.rs (/mnt/build/cargo/debug/deps/identity_source_blind-236bc4ff3bd8ad64)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/oidc_verify.rs (/mnt/build/cargo/debug/deps/oidc_verify-8dafdf7b7d4ab9bc)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/principal_governs.rs (/mnt/build/cargo/debug/deps/principal_governs-b360a4961c4dea4b)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_telemetry-329c2ef5291ec84d)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/otel-airgap-fixture.rs (/mnt/build/cargo/debug/deps/otel_airgap_fixture-308ec9197b2a898e)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/otel_gates.rs (/mnt/build/cargo/debug/deps/otel_gates-36c7e98cab7be4f0)
+test result: FAILED. 19 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/maos_wasm_host-0f623c807e807a1c)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running unittests src/runner.rs (/mnt/build/cargo/debug/deps/maos_wasm_runner-d3b7c4c6968784e8)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/codec_integration.rs (/mnt/build/cargo/debug/deps/codec_integration-493967148bdfbba1)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+     Running tests/e2e_roundtrip.rs (/mnt/build/cargo/debug/deps/e2e_roundtrip-2f5521bffa9e26ed)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
+     Running tests/equiv_harness.rs (/mnt/build/cargo/debug/deps/equiv_harness-d7a7792e001f1b81)
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.58s
+     Running tests/frame_bridge_roundtrip.rs (/mnt/build/cargo/debug/deps/frame_bridge_roundtrip-fef636fe4eda849c)
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/fuel_t2_matrix.rs (/mnt/build/cargo/debug/deps/fuel_t2_matrix-401ff99a10b3982a)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/recall_runner_17_3d.rs (/mnt/build/cargo/debug/deps/recall_runner_17_3d-15881c1c3760117a)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+     Running tests/t2_sandbox_kill.rs (/mnt/build/cargo/debug/deps/t2_sandbox_kill-ad6a5f501624d0e3)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/ts_component_17_3b.rs (/mnt/build/cargo/debug/deps/ts_component_17_3b-aa598a5b0229c5ec)
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/wit_copies_17_3b.rs (/mnt/build/cargo/debug/deps/wit_copies_17_3b-cce42133476b8623)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/wit_corpus.rs (/mnt/build/cargo/debug/deps/wit_corpus-0fadc9f0bb233ee7)
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/mira-1114efbc8e6beef0)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/a2a_pairing.rs (/mnt/build/cargo/debug/deps/a2a_pairing-bc7692889744e8fd)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-f5a0d3361f29872d)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/halt_bilateral.rs (/mnt/build/cargo/debug/deps/halt_bilateral-74b702c5ef1d691a)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-a7e52337220f9565)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/nash-3abd6d77de7c8715)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-3360f2dbe890a61a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-7e934ca4501d80de)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/observer-b80b4837c8952b22)
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/activity_hooks_17_4.rs (/mnt/build/cargo/debug/deps/activity_hooks_17_4-77f8a16a69850a2c)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/drift_watchdog.rs (/mnt/build/cargo/debug/deps/drift_watchdog-63126eaf076f93c4)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-2ffd0b16f0e3c4b4)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/scalar_tap_subscribe.rs (/mnt/build/cargo/debug/deps/scalar_tap_subscribe-4f2fce4e104cb879)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-b031ed46a680af87)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/structural_anomaly.rs (/mnt/build/cargo/debug/deps/structural_anomaly-7f544214632c742f)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/orchestrator-7c7ece3e74be3aad)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/distillate_dispatch.rs (/mnt/build/cargo/debug/deps/distillate_dispatch-45115104ff0d9838)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-5d72876a67e857cd)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/orchestrator_buffer.rs (/mnt/build/cargo/debug/deps/orchestrator_buffer-d3fb975fa7edad2c)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-af9d5628f50b20d8)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/researcher-3037b831406f37b2)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/distillation_i11.rs (/mnt/build/cargo/debug/deps/distillation_i11-e6ec2c60371ff502)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/five_metric_live_8_11.rs (/mnt/build/cargo/debug/deps/five_metric_live_8_11-89605b375d6d3fe0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/five_metric_self_verify.rs (/mnt/build/cargo/debug/deps/five_metric_self_verify-62176bfe83e992ab)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/incremental_recall.rs (/mnt/build/cargo/debug/deps/incremental_recall-9c0a3d68d38ab13e)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.66s
+     Running tests/inference_seam_8_11.rs (/mnt/build/cargo/debug/deps/inference_seam_8_11-d46382f489eb0e4a)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/recall_walker.rs (/mnt/build/cargo/debug/deps/recall_walker-577b608065fee1ae)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/scalar_tap.rs (/mnt/build/cargo/debug/deps/scalar_tap-49163a73faf2ffe5)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-a82249d8a58a2f48)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/reviewer-22235ccd29b3a5a7)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-188f422143f3da14)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-d298448e7f1b7ea1)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/worker-c2c590e3983cd042)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/worker-cli-fixture.rs (/mnt/build/cargo/debug/deps/worker_cli_fixture-6b7f73d88b300ae2)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/worker-probe-fixture.rs (/mnt/build/cargo/debug/deps/worker_probe_fixture-1572f5646104ac3b)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/cli_wrapper_admission.rs (/mnt/build/cargo/debug/deps/cli_wrapper_admission-4efa9d205de109bc)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+     Running tests/fixture_modes_16_3.rs (/mnt/build/cargo/debug/deps/fixture_modes_16_3-33c3f3b3adc4c753)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/fixtures_pin.rs (/mnt/build/cargo/debug/deps/fixtures_pin-af51e4b4e76bea8f)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/spirit_smoke.rs (/mnt/build/cargo/debug/deps/spirit_smoke-325e14168d3f2e2c)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (/mnt/build/cargo/debug/deps/xtask-881cdf58d86804db)
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running unittests src/main.rs (/mnt/build/cargo/debug/deps/xtask-3f5bd961ad592feb)
+test result: ok. 524 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.09s
+     Running tests/abi_diff_integration.rs (/mnt/build/cargo/debug/deps/abi_diff_integration-613f7a1dc63631f9)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+     Running tests/calibrate_integration.rs (/mnt/build/cargo/debug/deps/calibrate_integration-342ad17487b91436)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.15s
+     Running tests/cgroup_ceiling_workflow_17_2.rs (/mnt/build/cargo/debug/deps/cgroup_ceiling_workflow_17_2-538a634f13a86390)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/check_corpus_integration.rs (/mnt/build/cargo/debug/deps/check_corpus_integration-48f1def250b4a091)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+     Running tests/check_exit_commands_gate.rs (/mnt/build/cargo/debug/deps/check_exit_commands_gate-2ca929bd0cedba51)
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/check_judge_config_integration.rs (/mnt/build/cargo/debug/deps/check_judge_config_integration-cb6b62df5def1476)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.84s
+     Running tests/check_mock_not_in_release_smoke.rs (/mnt/build/cargo/debug/deps/check_mock_not_in_release_smoke-6a8f61f4724018c9)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/check_multi_provider_drift_integration.rs (/mnt/build/cargo/debug/deps/check_multi_provider_drift_integration-d93b54ec495b8098)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+     Running tests/check_release_precondition_gate.rs (/mnt/build/cargo/debug/deps/check_release_precondition_gate-c3e25d7afebf386d)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/check_unsafe_integration.rs (/mnt/build/cargo/debug/deps/check_unsafe_integration-7f1e93f9fcad2f7c)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+     Running tests/corpus_staleness_integration.rs (/mnt/build/cargo/debug/deps/corpus_staleness_integration-8ed977bd0179861e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+     Running tests/coverage_matrix_completeness_tests.rs (/mnt/build/cargo/debug/deps/coverage_matrix_completeness_tests-6912b8e624fe6e02)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/coverage_matrix_integration.rs (/mnt/build/cargo/debug/deps/coverage_matrix_integration-abe48763a0ba5602)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+     Running tests/d11_xtask_ceiling_ratchet.rs (/mnt/build/cargo/debug/deps/d11_xtask_ceiling_ratchet-1271acd8dccd9b53)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+     Running tests/d19_story_file_governance.rs (/mnt/build/cargo/debug/deps/d19_story_file_governance-d3c8b7ab7b896325)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/decision_adrs_and_provisioning.rs (/mnt/build/cargo/debug/deps/decision_adrs_and_provisioning-754eeecf14753b63)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+     Running tests/decision_register_gate.rs (/mnt/build/cargo/debug/deps/decision_register_gate-a74e7d75df7fda71)
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/diagnostics_20_3a.rs (/mnt/build/cargo/debug/deps/diagnostics_20_3a-481593dbaef1868a)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.12s
+     Running tests/empty_kernel_integration.rs (/mnt/build/cargo/debug/deps/empty_kernel_integration-b023f838b62256b9)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+     Running tests/epic17_exit_workflow_17_7.rs (/mnt/build/cargo/debug/deps/epic17_exit_workflow_17_7-a525036e6e26f0d8)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/error_catalog_20_3a.rs (/mnt/build/cargo/debug/deps/error_catalog_20_3a-07b9b339a412f662)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+     Running tests/example_spirit_regen_integration.rs (/mnt/build/cargo/debug/deps/example_spirit_regen_integration-af8a71a6865ca52d)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+     Running tests/fkcs_oracle.rs (/mnt/build/cargo/debug/deps/fkcs_oracle-38de5dcdab42cc7a)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+     Running tests/gate_honesty_20_3a.rs (/mnt/build/cargo/debug/deps/gate_honesty_20_3a-216d8235b2ebf0c1)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/j1_crosshost_1a_proven_red.rs (/mnt/build/cargo/debug/deps/j1_crosshost_1a_proven_red-2ece455b26938929)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/j1_crosshost_1b_proven_red.rs (/mnt/build/cargo/debug/deps/j1_crosshost_1b_proven_red-b6ce01fd29eec0ff)
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/j1_crosshost_2a_proven_red.rs (/mnt/build/cargo/debug/deps/j1_crosshost_2a_proven_red-6eaa07d2fb811fca)
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/j1_crosshost_2b_proven_red.rs (/mnt/build/cargo/debug/deps/j1_crosshost_2b_proven_red-134bf03946261667)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/j1_crosshost_2c_proven_red.rs (/mnt/build/cargo/debug/deps/j1_crosshost_2c_proven_red-e0a03e2141e42c7c)
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/kernel_pin_ci_wiring_20_3a.rs (/mnt/build/cargo/debug/deps/kernel_pin_ci_wiring_20_3a-ac6d6a294c828fbf)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/kernel_pin_content_hash_16_0.rs (/mnt/build/cargo/debug/deps/kernel_pin_content_hash_16_0-f20d23ab90176dea)
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.17s
+     Running tests/ledger_collectors_20_3a.rs (/mnt/build/cargo/debug/deps/ledger_collectors_20_3a-796a62d039cd0dae)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+     Running tests/loom_integration.rs (/mnt/build/cargo/debug/deps/loom_integration-d5f1c842eac29a0e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+     Running tests/macos_compile_guard_20_6.rs (/mnt/build/cargo/debug/deps/macos_compile_guard_20_6-6bbe91b4c6aaefae)
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+     Running tests/model_currency_gate.rs (/mnt/build/cargo/debug/deps/model_currency_gate-6110a9d449485738)
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.05s
+     Running tests/owner_assertion_epic_key_rejected.rs (/mnt/build/cargo/debug/deps/owner_assertion_epic_key_rejected-c94d06420bd5a3cc)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/pentest_gate_tests.rs (/mnt/build/cargo/debug/deps/pentest_gate_tests-4bd970620a45e974)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/recovery_lane_ceiling_rule.rs (/mnt/build/cargo/debug/deps/recovery_lane_ceiling_rule-cd5394d56f8d5544)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/release_dry_run_gate.rs (/mnt/build/cargo/debug/deps/release_dry_run_gate-6a896bad78b63e4f)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/release_workflow_15_4.rs (/mnt/build/cargo/debug/deps/release_workflow_15_4-30ebcf8cd787ddba)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/retro_action_items.rs (/mnt/build/cargo/debug/deps/retro_action_items-3b3930ac336796a7)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/service_boundary_integration.rs (/mnt/build/cargo/debug/deps/service_boundary_integration-0894908b5e27c5df)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.59s
+     Running tests/ship_gate_binding_20_3a.rs (/mnt/build/cargo/debug/deps/ship_gate_binding_20_3a-25bf4c1dd3263076)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/story_10_2_proven_red.rs (/mnt/build/cargo/debug/deps/story_10_2_proven_red-1890c152df422d72)
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/story_10_4a_ac1_proven_red.rs (/mnt/build/cargo/debug/deps/story_10_4a_ac1_proven_red-71d4a99ee6bceeea)
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+     Running tests/story_10_4a_proven_red.rs (/mnt/build/cargo/debug/deps/story_10_4a_proven_red-68b203aac09a0ede)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+     Running tests/story_10_5_proven_red.rs (/mnt/build/cargo/debug/deps/story_10_5_proven_red-a41ffe0c6f296262)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/story_13_6e_evidence_ledger.rs (/mnt/build/cargo/debug/deps/story_13_6e_evidence_ledger-0b01e795794aeaca)
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/trial_attestation_proven_red.rs (/mnt/build/cargo/debug/deps/trial_attestation_proven_red-b91ebbddd9e6736c)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+     Running tests/workflow_honesty_20_3a.rs (/mnt/build/cargo/debug/deps/workflow_honesty_20_3a-e4845ff69dee19d0)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 44 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

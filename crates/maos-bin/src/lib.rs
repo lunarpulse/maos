@@ -40,6 +40,12 @@ pub mod enterprise_identity;
 pub mod enterprise_pdp_runtime;
 /// Read-only sandbox-anomaly consumer, shared with actual process-boundary proofs.
 pub mod escape_detector_consumer;
+/// Story 17-4 — the telemetry hook pump, the consolidation watchdog and the
+/// Observer activity writer: the first production callers of
+/// `fire_on_telemetry_event` and `fire_on_consolidate`. In the library beside
+/// `admission`, so `crates/maos-bin/tests/` drives the real pump.
+#[cfg(feature = "network")]
+pub mod hook_pump;
 /// Story 15-6 — the one authoritative live/record/replay selector. Public so
 /// integration tests execute the production lattice; an in-`src` test module
 /// would be budget-charged and CI-invisible.

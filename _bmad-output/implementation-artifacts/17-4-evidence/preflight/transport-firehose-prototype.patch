@@ -1,0 +1,213 @@
+diff --git a/crates/maos-capability/src/working_memory/store.rs b/crates/maos-capability/src/working_memory/store.rs
+index 5ae449a8..860cb2f3 100644
+--- a/crates/maos-capability/src/working_memory/store.rs
++++ b/crates/maos-capability/src/working_memory/store.rs
+@@ -10,6 +10,7 @@
+ //! universal-arithmetic (§4.0.7) — no variance/entropy/EFE/KL computation.
+ 
+ use std::collections::HashMap;
++use std::sync::atomic::{AtomicU64, Ordering};
+ use std::sync::RwLock;
+ 
+ use maos_domain::invariants::i7::ScalarTapEvent;
+@@ -26,6 +27,7 @@ use super::{SetScalarError, WorkingMemorySlot};
+ #[derive(Debug, Default)]
+ pub struct WorkingMemoryStore {
+     slots: RwLock<HashMap<(u32, String), WorkingMemorySlot>>,
++    next_seq: AtomicU64,
+ }
+ 
+ impl WorkingMemoryStore {
+@@ -66,12 +68,14 @@ impl WorkingMemoryStore {
+         let slot =
+             WorkingMemorySlot::new(tag.to_string(), value, derived_from.to_string(), timestamp)?;
+ 
+-        {
++        let seq = {
+             let mut map = self.slots.write().unwrap_or_else(|e| e.into_inner());
+             map.insert((spirit_pid, tag.to_string()), slot);
+-        }
++            self.next_seq.fetch_add(1, Ordering::Relaxed)
++        };
+ 
+         Ok(ScalarTapEvent {
++            seq,
+             spirit_id: spirit_id.to_string(),
+             tag: tag.to_string(),
+             value,
+diff --git a/crates/maos-domain/src/invariants/i7.rs b/crates/maos-domain/src/invariants/i7.rs
+index 185e6520..bd8eb3e1 100644
+--- a/crates/maos-domain/src/invariants/i7.rs
++++ b/crates/maos-domain/src/invariants/i7.rs
+@@ -43,6 +43,9 @@ impl TelemetryTopic {
+ /// A scalar-tap event — the pre-halt observable trajectory.
+ #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+ pub struct ScalarTapEvent {
++    /// Per-store write order; unique within a root, not across roots.
++    #[serde(default)]
++    pub seq: u64,
+     /// Spirit that emitted the scalar.
+     pub spirit_id: String,
+     /// Tag identifying the scalar metric.
+@@ -66,6 +69,7 @@ mod tests {
+     #[test]
+     fn scalar_tap_event_construction() {
+         let e = ScalarTapEvent {
++            seq: 0,
+             spirit_id: "s1".into(),
+             tag: "entropy".into(),
+             value: 0.75,
+diff --git a/crates/maos-kernel-core/src/telemetry/mod.rs b/crates/maos-kernel-core/src/telemetry/mod.rs
+index ebd9e8bb..d220e321 100644
+--- a/crates/maos-kernel-core/src/telemetry/mod.rs
++++ b/crates/maos-kernel-core/src/telemetry/mod.rs
+@@ -38,6 +38,7 @@ use maos_domain::invariants::i7::{ScalarTapEvent, TelemetryTopic};
+ #[derive(Debug)]
+ pub struct TelemetryStreamAdapter {
+     topics: Arc<DashMap<TelemetryTopic, tokio::sync::broadcast::Sender<ScalarTapEvent>>>,
++    all: tokio::sync::broadcast::Sender<ScalarTapEvent>,
+     subscribers: Arc<DashMap<(String, TelemetryTopic), ()>>,
+     capacity: usize,
+     drop_count: std::sync::atomic::AtomicUsize,
+@@ -47,6 +48,7 @@ impl Clone for TelemetryStreamAdapter {
+     fn clone(&self) -> Self {
+         Self {
+             topics: Arc::clone(&self.topics),
++            all: self.all.clone(),
+             subscribers: Arc::clone(&self.subscribers),
+             capacity: self.capacity,
+             drop_count: std::sync::atomic::AtomicUsize::new(0),
+@@ -69,6 +71,7 @@ impl TelemetryStreamAdapter {
+         Self {
+             topics: Arc::new(DashMap::new()),
+             subscribers: Arc::new(DashMap::new()),
++            all: tokio::sync::broadcast::channel(capacity).0,
+             capacity,
+             drop_count: std::sync::atomic::AtomicUsize::new(0),
+         }
+@@ -77,6 +80,9 @@ impl TelemetryStreamAdapter {
+ 
+ impl TelemetryStreamPort for TelemetryStreamAdapter {
+     fn publish_event(&self, topic: &TelemetryTopic, event: ScalarTapEvent) {
++        if self.all.receiver_count() > 0 {
++            let _ = self.all.send(event.clone());
++        }
+         if let Some(sender) = self.topics.get(topic) {
+             if sender.send(event).is_err() {
+                 self.drop_count
+@@ -116,6 +122,11 @@ impl TelemetryStreamPort for TelemetryStreamAdapter {
+ }
+ 
+ impl TelemetryStreamAdapter {
++    /// Receive every scalar event in publish-call order, across all tags.
++    pub fn subscribe_all(&self) -> tokio::sync::broadcast::Receiver<ScalarTapEvent> {
++        self.all.subscribe()
++    }
++
+     /// Get a receiver for a topic. Returns `None` if the topic hasn't
+     /// been subscribed to yet.
+     pub fn subscribe(
+@@ -173,6 +184,7 @@ mod tests {
+         adapter.publish_event(
+             &topic,
+             ScalarTapEvent {
++                seq: 0,
+                 spirit_id: "s1".into(),
+                 tag: "uncertainty".into(),
+                 value: 0.75,
+@@ -197,6 +209,7 @@ mod tests {
+         adapter.publish_event(
+             &topic,
+             ScalarTapEvent {
++                seq: 0,
+                 spirit_id: "s1".into(),
+                 tag: "uncertainty".into(),
+                 value: 0.75,
+diff --git a/spirits/observer/src/lib.rs b/spirits/observer/src/lib.rs
+index 113d5540..21c31155 100644
+--- a/spirits/observer/src/lib.rs
++++ b/spirits/observer/src/lib.rs
+@@ -687,6 +687,7 @@ mod unit_tests {
+ 
+     fn scalar(spirit: &str, tag: &str, value: f64) -> ScalarTapEvent {
+         ScalarTapEvent {
++            seq: 0,
+             spirit_id: spirit.into(),
+             tag: tag.into(),
+             value,
+diff --git a/spirits/observer/tests/drift_watchdog.rs b/spirits/observer/tests/drift_watchdog.rs
+index f76ad8e6..cafafeb3 100644
+--- a/spirits/observer/tests/drift_watchdog.rs
++++ b/spirits/observer/tests/drift_watchdog.rs
+@@ -114,6 +114,7 @@ async fn drift_scenarios_warn_before_halt_via_the_real_dispatcher() {
+             telemetry.publish_event(
+                 &topic,
+                 ScalarTapEvent {
++                    seq: i as u64,
+                     spirit_id: ev.spirit_id.clone(),
+                     tag: ev.tag.clone(),
+                     value: ev.value,
+diff --git a/spirits/observer/tests/scalar_tap_subscribe.rs b/spirits/observer/tests/scalar_tap_subscribe.rs
+index d7f4acaa..2ebce709 100644
+--- a/spirits/observer/tests/scalar_tap_subscribe.rs
++++ b/spirits/observer/tests/scalar_tap_subscribe.rs
+@@ -49,6 +49,7 @@ async fn observer_subscribes_and_receives_peer_scalars() {
+         pub_telemetry.publish_event(
+             &pub_topic,
+             ScalarTapEvent {
++                seq: 0,
+                 spirit_id: "mira".into(),
+                 tag: "belief_variance".into(),
+                 value: 0.42,
+@@ -86,6 +87,7 @@ async fn fr31_client_side_filter_drops_out_of_namespace_emitters() {
+         telemetry.publish_event(
+             &topic,
+             ScalarTapEvent {
++                seq: 0,
+                 spirit_id: spirit.into(),
+                 tag: "belief_variance".into(),
+                 value: 0.66,
+diff --git a/spirits/observer/tests/spirit_smoke.rs b/spirits/observer/tests/spirit_smoke.rs
+index b476ad18..cfb23cca 100644
+--- a/spirits/observer/tests/spirit_smoke.rs
++++ b/spirits/observer/tests/spirit_smoke.rs
+@@ -29,6 +29,7 @@ fn on_idle_fires_once_and_surfaces_within_budget() {
+         vec![WatchThreshold::new("belief_variance", 0.7, DriftDirection::Above, 0.15).unwrap()],
+     )
+     .with_pending_scalars(vec![ScalarTapEvent {
++        seq: 0,
+         spirit_id: "mira".into(),
+         tag: "belief_variance".into(),
+         value: 0.66,
+diff --git a/spirits/researcher/src/lib.rs b/spirits/researcher/src/lib.rs
+index d121bddb..79fb65ba 100644
+--- a/spirits/researcher/src/lib.rs
++++ b/spirits/researcher/src/lib.rs
+@@ -1304,6 +1304,7 @@ mod unit_tests {
+         Researcher::new().incorporate_scalar(
+             &mut out,
+             &ScalarTapEvent {
++                seq: 0,
+                 spirit_id: "observer".into(),
+                 tag: "drift".into(),
+                 value: 0.42,
+diff --git a/spirits/researcher/tests/scalar_tap.rs b/spirits/researcher/tests/scalar_tap.rs
+index 90f9d377..4e24106b 100644
+--- a/spirits/researcher/tests/scalar_tap.rs
++++ b/spirits/researcher/tests/scalar_tap.rs
+@@ -68,6 +68,7 @@ async fn researcher_subscribes_receives_and_incorporates_a_scalar() {
+         pub_telemetry.publish_event(
+             &pub_topic,
+             ScalarTapEvent {
++                seq: 0,
+                 spirit_id: "observer".into(),
+                 tag: "confidence".into(),
+                 value: 0.62,
+@@ -146,6 +147,7 @@ async fn researcher_distillate_is_consumable_in_the_fr17_digest_pattern() {
+     researcher.incorporate_scalar(
+         &mut survey,
+         &ScalarTapEvent {
++            seq: 0,
+             spirit_id: "observer".into(),
+             tag: "drift".into(),
+             value: 0.3,

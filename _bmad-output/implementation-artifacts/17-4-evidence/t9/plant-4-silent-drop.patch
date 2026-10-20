@@ -1,0 +1,14 @@
+--- a/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:37:51.097739725 +0000
++++ b/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:39:41.134046274 +0000
+@@ -334,6 +334,11 @@
+     }
+ 
+     async fn deliver(&self, event: &ScalarTapEvent) {
++        // PLANT 4 (17-4 T9, throwaway): one event is dropped and not counted.
++        static PLANT: AtomicU64 = AtomicU64::new(0);
++        if PLANT.fetch_add(1, Ordering::Relaxed) == 9 {
++            return;
++        }
+         let pids: Vec<u32> = self.registry().keys().copied().collect();
+         if pids.is_empty() {
+             return;

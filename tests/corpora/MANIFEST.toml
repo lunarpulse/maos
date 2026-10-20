@@ -117,3 +117,11 @@ merkle_root = "dd42bbd1fdc9826a0377a8e80aa1834b78c474d56fe958e9d6744ff4802e7d69"
 payload_oracle = "6783fcaead6ff0f1d327571dd9090167d69ef661adadf2b3eb9438e4a65f0988"
 row_count = 1000000
 generated = true
+
+[corpus."observer-activity-v1"]
+sha256 = "035a669708870b0fb4f3825ce9e9f2762193cc9a15af3ffd6dcebc524963a9e2"
+schema_version = 1
+item_count = 20
+valid_until = "2027-10-20"
+prompt_version_hash = "0000000000000000000000000000000000000000000000000000000000000000"
+description = "Story 17-4 Observer activity-stream ship gate: 20 authored scenarios across six classes, 5720 scalar writes, production admission/store/registry/pump/dispatcher/Observer path. Structural file-backed seq identity, bit-exact value, loss-accounting and per-emitter causal oracle; missed-event rate <=2%, causal correctness >=99%. No model judge or prompt."

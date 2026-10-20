@@ -431,36 +431,14 @@ fn run_cross_wall_traceback(
     port.recall_cross_wall(spirit_pid, &remote_team, filter)
 }
 
-/// Which reference Spirit a manifest's `[class].name` selects. Construction is
-/// keyed by class (the daemon MUST build the right concrete Spirit type); the
-/// port-requirement decision is keyed by the declared epistemic halt transport,
-/// not posture or class.
 #[cfg(feature = "network")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LoadedSpiritKind {
-    Butler,
-    Researcher,
-    Orchestrator,
-    Architect,
-    Reviewer,
-    Mira,
-    Nash,
-    Digest,
-}
+use maos_bin::admission::LoadedSpiritKind;
 
 #[cfg(feature = "network")]
 fn classify_spirit(class_name: &str) -> Option<LoadedSpiritKind> {
-    match class_name {
-        "butler" => Some(LoadedSpiritKind::Butler),
-        "researcher" => Some(LoadedSpiritKind::Researcher),
-        "orchestrator" => Some(LoadedSpiritKind::Orchestrator),
-        "architect" => Some(LoadedSpiritKind::Architect),
-        "reviewer" => Some(LoadedSpiritKind::Reviewer),
-        "mira" => Some(LoadedSpiritKind::Mira),
-        "nash" => Some(LoadedSpiritKind::Nash),
-        "digest" => Some(LoadedSpiritKind::Digest),
-        _ => None,
-    }
+    LoadedSpiritKind::ALL
+        .into_iter()
+        .find(|kind| kind.class_name() == class_name)
 }
 
 #[cfg(feature = "network")]
@@ -591,6 +569,10 @@ struct ButlerOrchestratorAdapter {
     /// identity lazily so cold-swap allocation cannot leave the predecessor pid
     /// captured in the replacement port.
     spirit_pid_source: ButlerPidSource,
+    /// Story 17-4 (AC2.8, rule 10(a)) — the scheduler SCB id this port is
+    /// bound to (the id `load_obj` registered the pid under). Every write is
+    /// attributed to it; a Spirit claiming any other id is refused.
+    spirit_id: String,
 }
 
 #[cfg(feature = "network")]
@@ -606,6 +588,16 @@ impl maos_domain::ports::EpistemicScalarPort for ButlerOrchestratorAdapter {
         Option<maos_domain::halt::HaltReceipt>,
         maos_domain::ports::epistemic_scalar::ScalarPortError,
     > {
+        // Story 17-4 (AC2.8) — the identity is the host's, never the claim:
+        // every `scalar.tap` reader attributes the write to this id.
+        if spirit_id != self.spirit_id {
+            return Err(
+                maos_domain::ports::epistemic_scalar::ScalarPortError::SpiritIdMismatch {
+                    bound: self.spirit_id.clone(),
+                    claimed: spirit_id.to_owned(),
+                },
+            );
+        }
         // Story 16-3 (D-16-3-N) — the Spirit-supplied pid is IGNORED. An unset
         // binding is a refusal returned to the Spirit, never a pid-0 halt: a
         // halt nobody can list or resolve is worse than a write that failed
@@ -662,6 +654,7 @@ fn construct_butler_core(
     journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     boot_nonce: u64,
     pid_resolver: Option<Arc<dyn Fn() -> Option<u32> + Send + Sync>>,
+    spirit_id: &str,
 ) -> (
     butler::Butler,
     Option<Arc<std::sync::Mutex<Option<maos_domain::halt::HaltReceipt>>>>,
@@ -713,6 +706,7 @@ fn construct_butler_core(
             boot_nonce,
             last_receipt: Arc::clone(&receipt),
             spirit_pid_source: pid_source,
+            spirit_id: spirit_id.to_owned(),
         });
         butler =
             butler.with_scalar_port(adapter as Arc<dyn maos_domain::ports::EpistemicScalarPort>);
@@ -760,6 +754,20 @@ fn read_butler_epistemic_policy(
         )
 }
 
+/// Story 17-4 (CR-2, D-16-1-W) — ONE Observer construction for the standalone
+/// arm, the topology arm and `build_spirit_obj` (door load and hot-swap
+/// successor): the Spirit's own id, watching nothing by default, reporting
+/// every received write and closed window to the root's activity sink.
+#[cfg(feature = "network")]
+fn construct_observer(
+    spirit_id: &str,
+    sink: Arc<dyn ::observer::ActivitySink>,
+) -> ::observer::Observer {
+    ::observer::Observer::default()
+        .with_id(spirit_id)
+        .with_activity_sink(sink)
+}
+
 /// Composition-root handles the class constructors need.
 #[cfg(feature = "network")]
 struct SpiritBuildDeps {
@@ -769,6 +777,8 @@ struct SpiritBuildDeps {
     shared_journal: Arc<maos_kernel_core::journal::JournalAdapter>,
     scheduler: Arc<maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter>,
     boot_nonce: u64,
+    /// Story 17-4 — the root's Observer activity sink.
+    activity_sink: Arc<dyn ::observer::ActivitySink>,
 }
 
 /// Story 16-6 — the ONE class-dispatch switch for a Spirit that is being
@@ -822,6 +832,10 @@ fn build_spirit_obj(
         LoadedSpiritKind::Mira => make_spirit_obj(::mira::Mira::default().with_id(class_name)),
         LoadedSpiritKind::Nash => make_spirit_obj(::nash::Nash::default().with_id(class_name)),
         LoadedSpiritKind::Digest => make_spirit_obj(maos_digest::DigestSpirit::default()),
+        LoadedSpiritKind::Observer => make_spirit_obj(construct_observer(
+            class_name,
+            Arc::clone(&deps.activity_sink),
+        )),
         LoadedSpiritKind::Butler => {
             let staged = butler_manifest
                 .ok_or("butler requires the target manifest to re-parse [epistemic_policy]")?;
@@ -838,6 +852,7 @@ fn build_spirit_obj(
                 Arc::clone(&deps.shared_journal),
                 deps.boot_nonce,
                 Some(pid_resolver),
+                class_name,
             );
             make_spirit_obj(butler)
         }
@@ -1668,7 +1683,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             verbs::VerbName::Audit => {
                 // Expected: audit query [--spirit <name>] [--format ndjson|plain]
                 if !argv.get(1).is_some_and(|token| token == "query") {
-                    eprintln!("Usage: maos audit query [--spirit <name>] [--format ndjson|plain] [--plain]");
+                    eprintln!(
+                        "Usage: maos audit query [--spirit <name>] [--format ndjson|plain] [--plain]"
+                    );
                     return Err("expected subcommand: query".into());
                 }
                 let mut audit_spirit: Option<String> = None;
@@ -2056,7 +2073,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None
             }
             Err(e) => {
-                return Err(format!("maos: enterprise runtime construction failed: {e}").into())
+                return Err(format!("maos: enterprise runtime construction failed: {e}").into());
             }
         };
 
@@ -2304,8 +2321,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(_) => {
             eprintln!(
-                    "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
-                );
+                "maos: collective tier (Loom-lite) not configured — set MAOS_LOOM_POSTGRES to enable"
+            );
             (None, None, None)
         }
     };
@@ -2490,7 +2507,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ),
             ),
     );
-    eprintln!("maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)");
+    eprintln!(
+        "maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)"
+    );
 
     // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
     // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
@@ -2780,6 +2799,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     scheduler_mut.set_replica_resolver(Some(replica_resolver));
     eprintln!("maos: CrashDetector wired (Story 5.3)");
 
+    // Story 17-4 (AC2) — ONE hook pump per composition root, after the
+    // scheduler's exclusive wiring and before any admission. It takes its one
+    // broad receiver from THIS root's telemetry adapter (the one the capability
+    // registry publishes to) and holds the scheduler weakly; every root exit
+    // joins it before unload and before the audit drain.
+    let hook_pump = Arc::new(maos_bin::hook_pump::HookPump::new(
+        &scheduler,
+        &telemetry_stream,
+        Arc::clone(&transparency_log),
+    ));
+    eprintln!("maos: telemetry hook pump wired (Story 17-4)");
+
     // ⚠ Story 14-2a — THE OPERATOR HTTP SURFACE MOVED HERE, AND IT HAD TO.
     //
     // It used to bind ~90 lines above, immediately after the scheduler was
@@ -3064,6 +3095,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `scbs()` read guard is scoped to `upgrade.rs:113-129` and dropped before
     // `create`, so this lookup cannot deadlock.
     let factory_scheduler = Arc::clone(&scheduler);
+    let factory_activity_sink = hook_pump.activity_sink();
     let successor_factory: Arc<dyn maos_kernel_core::lifecycle::SuccessorSpiritFactory> = Arc::new(
         move |manifest: &maos_kernel_core::scheduler::SpiritManifestBundle| {
             let class = manifest.class.as_ref().ok_or_else(|| {
@@ -3097,6 +3129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     shared_journal: Arc::clone(&factory_shared_journal),
                     scheduler: Arc::clone(&factory_scheduler),
                     boot_nonce,
+                    activity_sink: Arc::clone(&factory_activity_sink),
                 },
                 &class.name,
                 factory_successor_slot.peek().as_deref(),
@@ -3258,7 +3291,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shared_journal: Arc::clone(&shared_journal),
                 scheduler: Arc::clone(&scheduler),
                 boot_nonce,
+                activity_sink: hook_pump.activity_sink(),
             }),
+            hooks: Arc::clone(&hook_pump),
         });
         let door = Arc::new(maos_bin::operator_door::OperatorDoor::new(
             Arc::clone(&scheduler),
@@ -3853,6 +3888,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(port) = operator_door_port.as_ref() {
             port.drain_started_tasks().await;
         }
+        // Story 17-4 (AC2.6) — the hook pump is joined before the unload.
+        hook_pump.shutdown().await;
         let shell_result = maos_bin::shell_host::finish_shell_session(
             shell_result,
             &scheduler,
@@ -3929,7 +3966,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let skill_stored = match skill_store.load() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("maos: warning: skill queue cache unreadable ({e}) — proceeding from discovery + TL");
+                eprintln!(
+                    "maos: warning: skill queue cache unreadable ({e}) — proceeding from discovery + TL"
+                );
                 Vec::new()
             }
         };
@@ -4545,6 +4584,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(
                                         &pid_binding,
                                     )),
+                                    spirit_id: spirit_id.clone(),
                                 });
                             pid_fixups.push(Box::new(move |pid| {
                                 pid_binding.store(pid, std::sync::atomic::Ordering::Release);
@@ -4560,6 +4600,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ),
                         LoadedSpiritKind::Digest => maos_kernel_core::scheduler::make_spirit_obj(
                             maos_digest::DigestSpirit::default(),
+                        ),
+                        LoadedSpiritKind::Observer => maos_kernel_core::scheduler::make_spirit_obj(
+                            construct_observer(&spirit_id, hook_pump.activity_sink()),
                         ),
                         LoadedSpiritKind::Butler | LoadedSpiritKind::Researcher => {
                             return Err(format!(
@@ -4578,6 +4621,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         journal: &shared_journal,
                         memory: &memory,
                         pid_by_spirit_id: &pid_by_spirit_id,
+                        hooks: Some(&hook_pump),
                     },
                     &gated,
                     spirit_obj,
@@ -4675,6 +4719,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(port) = operator_door_port.take() {
                     port.drain_started_tasks().await;
                 }
+                // Story 17-4 (AC2.6) — the hook pump is joined before unload.
+                hook_pump.shutdown().await;
                 // ── Story 16-3 (D-16-3-M) — the ruled teardown order ─────────
                 //
                 // door shutdown → drain_started_tasks → stop Workers and await
@@ -4856,6 +4902,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(port) = operator_door_port.take() {
                     port.drain_started_tasks().await;
                 }
+                // Story 17-4 (AC2.6) — the hook pump is joined before unload.
+                hook_pump.shutdown().await;
                 if let Some(supervision) = root_supervision.take() {
                     supervision.stop_and_join().await;
                 }
@@ -4943,8 +4991,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
             if strip_port {
                 eprintln!(
-                "maos run: WARNING — MAOS_TEST_ONLY_STRIP_SCALAR_PORT is set.                  This is a test-only seam and must NEVER be used in production."
-            );
+                    "maos run: WARNING — MAOS_TEST_ONLY_STRIP_SCALAR_PORT is set.                  This is a test-only seam and must NEVER be used in production."
+                );
             }
             let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
             let mut halt_receipt_handle: Option<
@@ -4997,6 +5045,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Arc::clone(&journal),
                                 boot_nonce,
                                 None,
+                                &spirit_id,
                             );
                         halt_receipt_handle = butler_receipt;
                         if needs_port && halt_receipt_handle.is_none() {
@@ -5446,8 +5495,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             );
                         } else {
                             eprintln!(
-                            "maos run: researcher deterministic survey (no --live; zero network)"
-                        );
+                                "maos run: researcher deterministic survey (no --live; zero network)"
+                            );
                         }
                         {
                             let binding = Arc::clone(&researcher_pid_binding);
@@ -5504,9 +5553,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // transport. Wire the production EpistemicScalarPort adapter.
                         if needs_port && strip_port {
                             return Err(format!(
-                        "maos run: FATAL boot — Spirit '{spirit_id}' declares synchronous \
+                                "maos run: FATAL boot — Spirit '{spirit_id}' declares synchronous \
                          diagnostic scalar halt transport but no EpistemicScalarPort could be wired"
-                    )
+                            )
                             .into());
                         }
                         let policy = epistemic_policy
@@ -5525,6 +5574,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 boot_nonce,
                                 last_receipt,
                                 spirit_pid_source: ButlerPidSource::Fixed(Arc::clone(&pid_binding)),
+                                spirit_id: spirit_id.clone(),
                             });
                         pid_fixups.push(Box::new(move |pid| {
                             pid_binding.store(pid, std::sync::atomic::Ordering::Release);
@@ -5541,6 +5591,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some(LoadedSpiritKind::Digest) => maos_kernel_core::scheduler::make_spirit_obj(
                         maos_digest::DigestSpirit::default(),
                     ),
+                    Some(LoadedSpiritKind::Observer) => {
+                        maos_kernel_core::scheduler::make_spirit_obj(construct_observer(
+                            &spirit_id,
+                            hook_pump.activity_sink(),
+                        ))
+                    }
                     None => {
                         #[cfg(not(feature = "wasm-host"))]
                         return Err(maos_bin::admission::AdmissionRefusal::WasmEngineOff.into());
@@ -5568,6 +5624,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     journal: &shared_journal,
                     memory: &memory,
                     pid_by_spirit_id: &pid_by_spirit_id,
+                    // Story 17-4 — the WASM arm (`kind == None`) never registers.
+                    hooks: kind.is_some().then_some(&*hook_pump),
                 },
                 &gated,
                 spirit_obj,
@@ -5799,6 +5857,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(port) = operator_door_port.take() {
                     port.drain_started_tasks().await;
                 }
+                // Story 17-4 (AC2.6) — the hook pump is joined before unload.
+                hook_pump.shutdown().await;
                 yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
                 if let Some(supervision) = root_supervision.take() {
                     supervision.stop_and_join().await;
@@ -5945,12 +6005,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "principal" => {
                     return Err(
                         "principal namespace is partitioned out of collective storage".into(),
-                    )
+                    );
                 }
                 other => {
                     return Err(
                         format!("unsupported MAOS_COLLECTIVE_ERASE_NAMESPACE '{other}'").into(),
-                    )
+                    );
                 }
             };
             let key = std::env::var("MAOS_COLLECTIVE_ERASE_KEY")
@@ -6871,7 +6931,10 @@ description = "smoke test spirit successor"
                     format!("failed: {e}")
                 }
             };
-            println!("{{\"step\":1,\"surface\":\"upgrade_orchestrator\",\"policy\":\"hot-swap\",\"outcome\":\"{}\"}}", hot_swap_outcome);
+            println!(
+                "{{\"step\":1,\"surface\":\"upgrade_orchestrator\",\"policy\":\"hot-swap\",\"outcome\":\"{}\"}}",
+                hot_swap_outcome
+            );
 
             // Step 3: Cold-swap upgrade (orchestrator handles unload + reload)
             let cold_reports = migration_plan::upgrade_with_plan_guard(
@@ -6885,8 +6948,11 @@ description = "smoke test spirit successor"
             let cold_report = cold_reports
                 .last()
                 .ok_or("smoke: cold-swap upgrade completed without a report")?;
-            println!("{{\"step\":2,\"surface\":\"upgrade_orchestrator\",\"policy\":\"cold-swap\",\"outcome\":\"{}\",\"halt_receipts_produced\":{}}}",
-                cold_report.outcome.as_str(), cold_report.halt_receipts_produced);
+            println!(
+                "{{\"step\":2,\"surface\":\"upgrade_orchestrator\",\"policy\":\"cold-swap\",\"outcome\":\"{}\",\"halt_receipts_produced\":{}}}",
+                cold_report.outcome.as_str(),
+                cold_report.halt_receipts_produced
+            );
 
             // Step 4: Admit the upgraded Spirit through the canonical security
             // path, then issue a real token before applying a real signed CRL.
@@ -7008,8 +7074,10 @@ description = "smoke test spirit successor"
                 .await
                 .map_err(|e| format!("smoke: CRL apply failed: {e}"))?;
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            println!("{{\"step\":3,\"surface\":\"revocation_applier\",\"outcome\":\"completed\",\"revoked_count\":{},\"halt_receipts_produced\":{}}}",
-                report.revoked_count, report.halt_receipts_produced);
+            println!(
+                "{{\"step\":3,\"surface\":\"revocation_applier\",\"outcome\":\"completed\",\"revoked_count\":{},\"halt_receipts_produced\":{}}}",
+                report.revoked_count, report.halt_receipts_produced
+            );
 
             // Step 5: The already-issued token must now be denied by the real
             // verification path; the output is derived from that observation.
@@ -7019,11 +7087,13 @@ description = "smoke test spirit successor"
                 maos_domain::invariants::i9::SandboxTier::T2,
             ) {
                 Err(maos_domain::ports::capability::CapError::Revoked) => {
-                    println!("{{\"step\":4,\"surface\":\"capability_registry\",\"outcome\":\"denied_after_revocation\"}}");
+                    println!(
+                        "{{\"step\":4,\"surface\":\"capability_registry\",\"outcome\":\"denied_after_revocation\"}}"
+                    );
                 }
                 Ok(()) => return Err("smoke: revoked token remained valid".into()),
                 Err(error) => {
-                    return Err(format!("smoke: expected CapError::Revoked, got {error}").into())
+                    return Err(format!("smoke: expected CapError::Revoked, got {error}").into());
                 }
             }
 
@@ -7887,10 +7957,7 @@ description = "smoke test spirit successor"
 
             println!(
                 "bench-section-13-1 complete: J1 P95={}us (budget 25000us, met={}); J4 P95={}us (budget 10000us, met={}); decision={}; report={}",
-                j1.p95_us, j1.budget_met,
-                j4.p95_us, j4.budget_met,
-                decision.outcome,
-                report_path,
+                j1.p95_us, j1.budget_met, j4.p95_us, j4.budget_met, decision.outcome, report_path,
             );
 
             return Ok(());
@@ -8001,6 +8068,8 @@ description = "smoke test spirit successor"
             if let Some(port) = operator_door_port.take() {
                 port.drain_started_tasks().await;
             }
+            // Story 17-4 (AC2.6) — the hook pump is joined before the unload.
+            hook_pump.shutdown().await;
             cohort_supervision.stop_and_join().await;
             let unload_report = maos_bin::supervision::unload_all_loaded(
                 scheduler.as_ref(),
@@ -8189,7 +8258,7 @@ description = "smoke test spirit successor"
                     None => {
                         return Err(
                             format!("missing manifest section [capabilities.required]").into()
-                        )
+                        );
                     }
                 };
                 maos_kernel_core::security::CapabilitiesRequired::from_toml_str(
@@ -8375,6 +8444,15 @@ description = "smoke test spirit successor"
     .spawn(cancel.child_token());
     eprintln!("maos: IdleWatchdog spawned (Story 5.1)");
 
+    // Story 17-4 (AC3) — the `on_consolidate` caller, beside IdleWatchdog:
+    // every registered compiled-in Spirit, once per its own idle window while
+    // Running and inbound-quiescent. It owns its token and is joined below.
+    let consolidation_watchdog = maos_bin::hook_pump::ConsolidationWatchdog::spawn(
+        &hook_pump,
+        maos_bin::hook_pump::ConsolidationCadence::from_env(),
+    );
+    eprintln!("maos: ConsolidationWatchdog spawned (Story 17-4)");
+
     // Story 6.4 / FR26 / ADR-025 — ScheduleWatchdog spawned alongside the
     // IdleWatchdog; wires the cadence loop for manifest `[[schedule]]` entries.
     let schedule_watchdog = Arc::new(
@@ -8442,7 +8520,6 @@ description = "smoke test spirit successor"
             }
         } => "root-supervision-shutdown",
     };
-    eprintln!("maos: shutdown reason = {shutdown_reason}; cancelling root token");
     // Signal yank poller to exit gracefully.
     yank_poller_shutdown.store(true, std::sync::atomic::Ordering::SeqCst);
     cancel.cancel();
@@ -8502,27 +8579,23 @@ description = "smoke test spirit successor"
             Err(_) => eprintln!("maos: EnterprisePdpRuntime drain timed out after 5s"),
         }
     }
-    // ── Story 16-3 (D-16-3-M) — the root's own supervision, in the ruled
-    // order: stop Workers and await their call paths, cancel and JOIN the
-    // ProgressWatchdog / progress stamper / signal listener, join any parked
-    // crash handler, and only THEN unload.
-    //
-    // `unload_all_loaded` comes after the joins on purpose: `IdleWatchdog`
-    // sees `cancel` only between ticks and awaits `fire_on_idle`, and a dropped
-    // `fire_on_idle` future leaves its `spawn_blocking` hook running — so an
-    // in-flight `on_idle` can raise a halt AFTER `terminate_spirit` drained,
-    // and the halt would exist with no receipt.
-    if let Some(supervision) = root_supervision.take() {
-        supervision.stop_and_join().await;
-    }
-    drop(root_shutdown_tail);
-    let unload_report = maos_bin::supervision::unload_all_loaded(
+    // Story 17-4 (AC2.6, AC3.1) — the shared serving teardown joins both
+    // hook callers without a detaching timeout, stops supervision, then unloads.
+    // A hook within its own budget must finish before unload and audit drain.
+    let unload_report = maos_bin::supervision::finish_serving_shutdown(
+        &consolidation_watchdog,
+        &hook_pump,
+        async {
+            if let Some(supervision) = root_supervision.take() {
+                supervision.stop_and_join().await;
+            }
+        },
         scheduler.as_ref(),
         halt_registry.as_ref(),
         post_unload_stop.as_deref(),
     )
     .await;
-    unload_report.render(&mut std::io::stderr());
+    drop(root_shutdown_tail);
 
     // Story 2.5 (A7 / D11) + Story 16-1 (T7, §11 row 3) — drain the cap-audit
     // channel deterministically on graceful shutdown.
@@ -8602,10 +8675,19 @@ description = "smoke test spirit successor"
             0
         }
     };
+    let output_detached = hook_pump.activity_stats().detached;
+    if !output_detached {
+        unload_report.render(&mut std::io::stderr());
+    }
     if unload_report.had_failures() {
         return Err("maos: serving-root planned unload failed".into());
     }
-    eprintln!("maos: drained {cap_audit_rows} cap-audit row(s); exiting cleanly");
+    // Output-only detach also abandons the optional terminal notice: `2>&1`
+    // may alias the same stalled pipe. Durable unload/audit work is complete.
+    if !output_detached {
+        eprintln!("maos: shutdown reason = {shutdown_reason}; root token cancelled");
+        eprintln!("maos: drained {cap_audit_rows} cap-audit row(s); exiting cleanly");
+    }
     Ok(())
 }
 
@@ -8691,6 +8773,9 @@ struct BinPrivateOpsImpl {
     /// needs. Held so the door builds Spirits through the SAME switch the
     /// hot-swap successor factory uses — not a fifth copy.
     spirit_build: Arc<SpiritBuildDeps>,
+    /// Story 17-4 — a door-loaded compiled-in Spirit registers with the
+    /// root's hook pump like any other admission.
+    hooks: Arc<maos_bin::hook_pump::HookPump>,
 }
 
 #[cfg(feature = "network")]
@@ -8843,6 +8928,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 journal: &self.shared_journal,
                 memory: &self.memory,
                 pid_by_spirit_id: &self.pid_by_spirit_id,
+                hooks: Some(&self.hooks),
             },
             &gated,
             spirit_obj,
@@ -8994,7 +9080,7 @@ fn run_uninstall_cascade_inner(
                 Vec::new()
             }
             Err(error) => {
-                return Err(format!("failed to resolve spirit '{spirit_id}': {error}").into())
+                return Err(format!("failed to resolve spirit '{spirit_id}': {error}").into());
             }
         }
     };
@@ -9570,8 +9656,7 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
     }
     let distillate_id = tl.last_frame_id();
     assert_ne!(
-        distillate_id,
-        [0u8; 16],
+        distillate_id, [0u8; 16],
         "smoke-orchestrator-fanout-6-2: TL last_frame_id is placeholder — insert_frame_event failed silently"
     );
 
@@ -9670,7 +9755,9 @@ async fn smoke_orchestrator_fanout_6_2() -> Result<(), Box<dyn std::error::Error
         br#"{"cli":"echo","exit_code":0,"bytes":12,"duration_ms":4}"#,
         FrameOrigin::Kernel,
     );
-    eprintln!("smoke-orchestrator-fanout-6-2: emitted 2× CliSubprocessOutput + 1× CapabilityInvocation rows");
+    eprintln!(
+        "smoke-orchestrator-fanout-6-2: emitted 2× CliSubprocessOutput + 1× CapabilityInvocation rows"
+    );
 
     // 8. Verify TL state.
     let cli_rows = tl.query_frames(FrameFilter {
@@ -11588,16 +11675,18 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
             direction: maos_a2a::error::IntentDirection::Send,
             ..
         }) => {
-            eprintln!("smoke-a2a-loopback-6-3: step 5 — DISALLOWED frame rejected at sender (IntentDenied/Send) ✓")
+            eprintln!(
+                "smoke-a2a-loopback-6-3: step 5 — DISALLOWED frame rejected at sender (IntentDenied/Send) ✓"
+            )
         }
         Ok(()) => {
-            return Err("smoke-a2a-loopback-6-3: disallowed frame admitted unexpectedly".into())
+            return Err("smoke-a2a-loopback-6-3: disallowed frame admitted unexpectedly".into());
         }
         Err(other) => {
             return Err(format!(
                 "smoke-a2a-loopback-6-3: disallowed frame failed with unexpected error: {other:?}"
             )
-            .into())
+            .into());
         }
     }
 
@@ -11608,13 +11697,15 @@ async fn smoke_a2a_loopback_6_3() -> Result<(), Box<dyn std::error::Error>> {
         .await;
     match pin_check {
         Err(EPinMismatch::Mismatch { .. }) => {
-            eprintln!("smoke-a2a-loopback-6-3: step 6 — TOFU pin mismatch fired (EPinMismatch::Mismatch) ✓")
+            eprintln!(
+                "smoke-a2a-loopback-6-3: step 6 — TOFU pin mismatch fired (EPinMismatch::Mismatch) ✓"
+            )
         }
         other => {
             return Err(format!(
                 "smoke-a2a-loopback-6-3: TOFU pin mismatch did not fire as expected: {other:?}"
             )
-            .into())
+            .into());
         }
     }
     // Suppress unused warning for the original router — still alive but
@@ -11764,12 +11855,10 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
         Some(s) if s == ADMIT_INTENT => eprintln!(
             "smoke-a2a-consent-vocab-8-7: ✓ fine-grained '{ADMIT_INTENT}' delivered to Nash (intent_class populated)"
         ),
-        other => {
-            return Err(format!(
-                "smoke-a2a-consent-vocab-8-7: AC2 violated — delivered frame intent_class = {other:?}"
-            )
-            .into())
-        }
+        other => return Err(format!(
+            "smoke-a2a-consent-vocab-8-7: AC2 violated — delivered frame intent_class = {other:?}"
+        )
+        .into()),
     }
 
     // ── (2) fine-grained DENIED frame (confused-deputy directive) ────────────
@@ -11803,13 +11892,13 @@ async fn smoke_a2a_consent_vocab_8_7() -> Result<(), Box<dyn std::error::Error>>
             return Err(
                 "smoke-a2a-consent-vocab-8-7: directive admitted unexpectedly (band collapse?)"
                     .into(),
-            )
+            );
         }
         Err(other) => {
             return Err(format!(
                 "smoke-a2a-consent-vocab-8-7: unexpected error on denial: {other:?}"
             )
-            .into())
+            .into());
         }
     }
 
@@ -11994,7 +12083,9 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
             direction: maos_a2a::error::IntentDirection::Send,
             ..
         }) => {
-            eprintln!("smoke-a2a-fail-closed-8-8: ✓ absent-intent frame REFUSED at sender (ConsentUnclassified{{Send}}) — never leaves the Host");
+            eprintln!(
+                "smoke-a2a-fail-closed-8-8: ✓ absent-intent frame REFUSED at sender (ConsentUnclassified{{Send}}) — never leaves the Host"
+            );
         }
         other => {
             return Err(format!(
@@ -12038,7 +12129,9 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
             direction: maos_a2a::error::IntentDirection::Send,
             ..
         }) => {
-            eprintln!("smoke-a2a-fail-closed-8-8: ✓ non-canonical-intent '!invalid' REFUSED at sender (ConsentUnclassified{{Send}})");
+            eprintln!(
+                "smoke-a2a-fail-closed-8-8: ✓ non-canonical-intent '!invalid' REFUSED at sender (ConsentUnclassified{{Send}})"
+            );
         }
         other => {
             return Err(format!(
@@ -12068,7 +12161,9 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
             direction: maos_a2a::error::IntentDirection::Send,
             reason,
         }) if reason == maos_a2a::error::UnclassifiedReason::Oversized => {
-            eprintln!("smoke-a2a-fail-closed-8-8: ✓ oversized intent (129 bytes) REFUSED at sender (ConsentUnclassified{{Send, Oversized}})");
+            eprintln!(
+                "smoke-a2a-fail-closed-8-8: ✓ oversized intent (129 bytes) REFUSED at sender (ConsentUnclassified{{Send, Oversized}})"
+            );
         }
         other => {
             return Err(format!(
@@ -12078,7 +12173,9 @@ async fn smoke_a2a_fail_closed_8_8() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    eprintln!("smoke-a2a-fail-closed-8-8: ✅ fail-closed cross-Host consent verified end-to-end (G7 closed)");
+    eprintln!(
+        "smoke-a2a-fail-closed-8-8: ✅ fail-closed cross-Host consent verified end-to-end (G7 closed)"
+    );
     Ok(())
 }
 
@@ -12176,7 +12273,9 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => return Err("expected ConsentRupture payload".into()),
     }
-    eprintln!("smoke-schedule-6-4: ✅ ConsentRupture surface — recipient B rejected, sender received typed rupture frame");
+    eprintln!(
+        "smoke-schedule-6-4: ✅ ConsentRupture surface — recipient B rejected, sender received typed rupture frame"
+    );
 
     // ─── Surface 2: Provider rate-limit isolation ───────────────────────
     let mut cfg = ProviderRateLimitConfig {
@@ -12402,7 +12501,9 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
         return Err("coverage measurement failed".into());
     }
 
-    println!("{{\"smoke\":\"7-1\",\"status\":\"ok\",\"steps\":[\"scaffold-rust\",\"test-rust\",\"scaffold-ts\",\"test-ts\",\"coverage-3-spirits\"]}}");
+    println!(
+        "{{\"smoke\":\"7-1\",\"status\":\"ok\",\"steps\":[\"scaffold-rust\",\"test-rust\",\"scaffold-ts\",\"test-ts\",\"coverage-3-spirits\"]}}"
+    );
     Ok(())
 }
 
@@ -13509,25 +13610,36 @@ mod tests {
     }
     /// Story 16-6 (§15 V4, §17 R20) — factory/classify parity.
     ///
-    /// Parity is a TYPE guarantee, not a test: `build_spirit_obj` matches on
-    /// `LoadedSpiritKind` exhaustively, so a ninth class cannot be added to
-    /// the enum without a loader. This test pins the one edge the compiler
-    /// cannot see — that `KNOWN_CLASS_NAMES`, which the door's refusal
-    /// message quotes as the admissible set, is exactly the set
-    /// `classify_spirit` maps.
+    /// Construction is a TYPE guarantee: `build_spirit_obj` matches on
+    /// `LoadedSpiritKind` exhaustively, so a class cannot be added without a
+    /// loader. The enum, enumeration and admission names are generated from
+    /// one declaration; this test exercises their classification round-trip.
     ///
     /// The defect it descends from: the successor factory had no
     /// `researcher` arm while `classify_spirit` mapped one, so a class
     /// `maos run` boots could never be hot-upgraded — and `maosctl load`
     /// built naively on that switch would have shipped the same hole as a
     /// brand-new capability regression.
+    ///
+    /// Story 17-4 (AC1.7) — every declared class is classified and names itself
+    /// back. Enumeration completeness is enforced by construction, not by
+    /// comparing independently maintained lists.
     #[test]
     fn story_16_6_known_class_names_match_classify_spirit() {
         for class in maos_bin::admission::KNOWN_CLASS_NAMES {
-            assert!(
-                classify_spirit(class).is_some(),
-                "KNOWN_CLASS_NAMES lists '{class}' but classify_spirit does not map it — \
-                 the door would quote a class its own gate rejects"
+            let kind = classify_spirit(class).unwrap_or_else(|| {
+                panic!(
+                    "KNOWN_CLASS_NAMES lists '{class}' but classify_spirit does not map it — \
+                     the door would quote a class its own gate rejects"
+                )
+            });
+            assert_eq!(kind.class_name(), class, "'{class}' must round-trip");
+        }
+        for (index, kind) in LoadedSpiritKind::ALL.into_iter().enumerate() {
+            assert_eq!(
+                maos_bin::admission::KNOWN_CLASS_NAMES[index],
+                kind.class_name(),
+                "classify_spirit maps {kind:?}, which the door's table must list at {index}"
             );
         }
         for unknown in ["", "wasm", "rust-inproc", "smoke-spirit", "hello-spirit"] {
@@ -13693,18 +13805,10 @@ mod tests {
 
     #[test]
     fn story_9_6_single_driver_guard_classify_round_trips() {
-        // Verify every LoadedSpiritKind variant is reachable from classify_spirit.
-        // (The topology-parser entry-count tail moved to
-        // `tests/topology_delegation_1a.rs` with the parser itself.)
-        let all_names = [
-            "butler",
-            "researcher",
-            "orchestrator",
-            "architect",
-            "reviewer",
-            "mira",
-            "nash",
-        ];
+        // Story 17-4 (AC1.7) — the round-trip list IS the door's table, so a
+        // class can no longer be added to one and forgotten in the other
+        // (Digest was missing from the hand-written list this replaced).
+        let all_names = maos_bin::admission::KNOWN_CLASS_NAMES;
         let mut kinds = std::collections::HashSet::new();
         for name in &all_names {
             let kind = classify_spirit(name).unwrap_or_else(|| {
@@ -13720,6 +13824,88 @@ mod tests {
         );
         // Unknown class returns None.
         assert!(classify_spirit("unknown").is_none());
+    }
+
+    /// Story 17-4 (AC2.8) — the production scalar port attributes every write
+    /// to the id it is bound to and refuses a Spirit claiming another one:
+    /// nothing is stored and nothing is published for the refused claim.
+    #[test]
+    fn story_17_4_scalar_port_refuses_a_claimed_spirit_id() {
+        use maos_domain::ports::EpistemicScalarPort;
+        let dir = tempfile::TempDir::new().unwrap();
+        // p1-allow: unit-test root — isolated from the supervised composition owner
+        let telemetry = Arc::new(maos_kernel_core::telemetry::TelemetryStreamAdapter::new(8));
+        let (audit_tx, _audit_rx) = maos_kernel_core::capability::cap_audit::channel();
+        let capability = Arc::new(
+            // p1-allow: unit-test root — isolated from the supervised composition owner
+            maos_kernel_core::capability::CapabilityRegistryAdapter::new(
+                Arc::new(maos_kernel_core::api::RingCryptoProvider),
+                maos_kernel_core::capability::cap_tokens::Ed25519SigningKey::new([0u8; 32]),
+                1,
+                Arc::new(maos_kernel_core::capability::cap_policy::PolicyTable::new()),
+                audit_tx,
+                maos_kernel_core::capability::cap_quota::CapQuotaTracker::new(),
+                Arc::new(maos_kernel_core::capability::WorkingMemoryStore::new()),
+                Arc::clone(&telemetry),
+            ),
+        );
+        let mut broad = telemetry.subscribe_all();
+        let port = ButlerOrchestratorAdapter {
+            orchestrator: Arc::new(
+                maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator::new(
+                    Arc::clone(&capability),
+                    Arc::new(maos_kernel_core::halt::HaltRegistry::new()),
+                ),
+            ),
+            tl: Arc::new(maos_kernel_core::iac::TransparencyLogAdapter::open_in_memory(1)),
+            journal: Arc::new(
+                maos_kernel_core::journal::JournalAdapter::open(&dir.path().join("j.sqlite"))
+                    .unwrap(),
+            ),
+            policy: maos_kernel_core::security::EpistemicPolicySection::from_toml_str(
+                "default_action = \"verbalize_only\"\n",
+            )
+            .unwrap(),
+            boot_nonce: 1,
+            last_receipt: Arc::new(std::sync::Mutex::new(None)),
+            spirit_pid_source: ButlerPidSource::Fixed(Arc::new(
+                std::sync::atomic::AtomicU32::new(7),
+            )),
+            spirit_id: "butler".into(),
+        };
+
+        let refused = port.write_scalar(7, "mallory", "belief_variance", 0.9, "claim");
+        assert!(
+            matches!(
+                &refused,
+                Err(maos_domain::ports::epistemic_scalar::ScalarPortError::SpiritIdMismatch {
+                    bound,
+                    claimed,
+                }) if bound == "butler" && claimed == "mallory"
+            ),
+            "a claimed id must be refused with the typed error, got {refused:?}"
+        );
+        assert_eq!(
+            capability.working_memory().get_scalar(7, "belief_variance"),
+            None
+        );
+        assert!(
+            broad.try_recv().is_err(),
+            "a refused claim must publish nothing"
+        );
+
+        port.write_scalar(0, "butler", "belief_variance", 0.5, "own")
+            .expect("the bound id writes");
+        let event = broad.try_recv().expect("the bound write is published");
+        assert_eq!((event.spirit_id.as_str(), event.value), ("butler", 0.5));
+        assert_eq!(
+            capability
+                .working_memory()
+                .get_scalar(7, "belief_variance")
+                .map(|(v, _)| v),
+            Some(0.5),
+            "stored at the host-bound pid, not the claimed one"
+        );
     }
 
     #[test]

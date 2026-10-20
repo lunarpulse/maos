@@ -86,6 +86,7 @@ nash = { path = "../../spirits/nash" }   # Story 8.5 — Mira+Nash bilateral pai
 butler = { path = "../../spirits/butler" }       # Story 8.11 — `maos run butler` daemon load + boot-loud EpistemicScalarPort
 researcher = { path = "../../spirits/researcher" }   # Story 8.11 — `maos run researcher` daemon load + live inference seam
 maos-digest = { path = "../../spirits/digest" }   # Story 12.4b — J3 day-30 narrative digest render + I11 persist tail
+observer = { path = "../../spirits/observer" }   # Story 17-4 — Observer admitted as a compiled-in class; activity sink + telemetry hooks
 # Story 8.14b — async-trait for LiveButlerMcpPort (ButlerMcpPort impl in composition root).
 async-trait = { workspace = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
@@ -126,6 +127,7 @@ rustix = { version = "1.1", features = ["fs", "process"] }
 maos-secrets = { path = "../maos-secrets", features = ["keyring"] }
 
 [dev-dependencies]
+tokio = { version = "1", features = ["process"] }
 tempfile = "3"
 wit-parser = "0.254"
 ed25519-dalek = { version = "2", features = ["std"] }   # Story 12.3 — sign a cohort manifest fixture for the Fact-2 provenance test

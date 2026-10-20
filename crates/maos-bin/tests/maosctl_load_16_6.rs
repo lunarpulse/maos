@@ -43,7 +43,7 @@ const BUTLER_MANIFEST: &str = "spirits/butler/manifest.toml";
 const BUTLER_CASSETTE: &str = "crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json";
 
 /// The Spirit the operator ADDS. `reviewer` is chosen for measured reasons:
-/// it is one of the eight compiled-in classes, `classify_spirit` maps it,
+/// it is one of the nine compiled-in classes, `classify_spirit` maps it,
 /// `build_spirit_obj` can construct it, it is `trust_tier = "local"` with
 /// `[posture] default/allowed_max = assistive`, and neither the butler
 /// boot-loud guard nor the mira scalar-port guard applies to it — so loading

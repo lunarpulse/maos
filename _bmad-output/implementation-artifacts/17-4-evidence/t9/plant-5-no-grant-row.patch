@@ -1,0 +1,12 @@
+--- a/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:37:51.097739725 +0000
++++ b/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:40:00.242373177 +0000
+@@ -480,8 +480,7 @@
+             entry.object = Some(Arc::downgrade(&snapshot.spirit_obj));
+             if class_of(snapshot) == OBSERVER_CLASS {
+                 entry.granted = true;
+-                self.shared
+-                    .subscription_row(pid, spirit_id, OBSERVER_CLASS, true, "admitted");
++                // PLANT 5 (17-4 T9, throwaway): the grant row is not written.
+             }
+         }
+         self.shared.registry().insert(pid, entry);

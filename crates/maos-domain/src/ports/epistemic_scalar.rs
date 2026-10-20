@@ -27,6 +27,10 @@ pub enum ScalarPortError {
     /// The kernel-backed scalar-write/policy-eval/halt pipeline failed.
     #[error("epistemic scalar-write backend error: {0}")]
     Backend(String),
+    /// Story 17-4 (AC2.8) — the Spirit claimed an id other than the one the
+    /// host bound this port to; the write is refused, never forwarded.
+    #[error("scalar port is bound to '{bound}'; refused a write claiming '{claimed}'")]
+    SpiritIdMismatch { bound: String, claimed: String },
 }
 
 /// The cognitive-Spirit epistemic-scalar **write** port.

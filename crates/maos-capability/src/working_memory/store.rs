@@ -10,6 +10,7 @@
 //! universal-arithmetic (§4.0.7) — no variance/entropy/EFE/KL computation.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 
 use maos_domain::invariants::i7::ScalarTapEvent;
@@ -26,6 +27,7 @@ use super::{SetScalarError, WorkingMemorySlot};
 #[derive(Debug, Default)]
 pub struct WorkingMemoryStore {
     slots: RwLock<HashMap<(u32, String), WorkingMemorySlot>>,
+    next_seq: AtomicU64,
 }
 
 impl WorkingMemoryStore {
@@ -66,12 +68,14 @@ impl WorkingMemoryStore {
         let slot =
             WorkingMemorySlot::new(tag.to_string(), value, derived_from.to_string(), timestamp)?;
 
-        {
+        let seq = {
             let mut map = self.slots.write().unwrap_or_else(|e| e.into_inner());
             map.insert((spirit_pid, tag.to_string()), slot);
-        }
+            self.next_seq.fetch_add(1, Ordering::Relaxed)
+        };
 
         Ok(ScalarTapEvent {
+            seq,
             spirit_id: spirit_id.to_string(),
             tag: tag.to_string(),
             value,

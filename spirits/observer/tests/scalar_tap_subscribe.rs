@@ -49,6 +49,7 @@ async fn observer_subscribes_and_receives_peer_scalars() {
         pub_telemetry.publish_event(
             &pub_topic,
             ScalarTapEvent {
+                seq: 0,
                 spirit_id: "mira".into(),
                 tag: "belief_variance".into(),
                 value: 0.42,
@@ -86,6 +87,7 @@ async fn fr31_client_side_filter_drops_out_of_namespace_emitters() {
         telemetry.publish_event(
             &topic,
             ScalarTapEvent {
+                seq: 0,
                 spirit_id: spirit.into(),
                 tag: "belief_variance".into(),
                 value: 0.66,

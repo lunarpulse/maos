@@ -1,0 +1,44 @@
+--- a/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:37:51.097739725 +0000
++++ b/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:38:57.809077188 +0000
+@@ -548,6 +548,8 @@
+     cancel: CancellationToken,
+ ) {
+     let mut closed = false;
++    // PLANT 2 (17-4 T9, throwaway): the delivery task swaps adjacent events.
++    let mut held: Option<ScalarTapEvent> = None;
+     loop {
+         tokio::select! {
+             biased;
+@@ -557,15 +559,30 @@
+                 // the ring: drain it, then acknowledge.
+                 loop {
+                     match rx.try_recv() {
+-                        Ok(event) => shared.deliver(&event).await,
++                        Ok(event) => match held.take() {
++                            Some(first) => {
++                                shared.deliver(&event).await;
++                                shared.deliver(&first).await;
++                            }
++                            None => held = Some(event),
++                        },
+                         Err(TryRecvError::Lagged(skipped)) => shared.lagged(skipped),
+                         Err(TryRecvError::Empty | TryRecvError::Closed) => break,
+                     }
+                 }
++                if let Some(first) = held.take() {
++                    shared.deliver(&first).await;
++                }
+                 let _ = ack.send(());
+             }
+             received = rx.recv(), if !closed => match received {
+-                Ok(event) => shared.deliver(&event).await,
++                Ok(event) => match held.take() {
++                    Some(first) => {
++                        shared.deliver(&event).await;
++                        shared.deliver(&first).await;
++                    }
++                    None => held = Some(event),
++                },
+                 Err(RecvError::Lagged(skipped)) => shared.lagged(skipped),
+                 Err(RecvError::Closed) => closed = true,
+             },

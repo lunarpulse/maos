@@ -144,6 +144,25 @@ pub struct ModelProvenancePayload {
     pub version: u32,
 }
 
+/// Story 17-4 (AC2.7) — the host started or stopped delivering every
+/// `scalar.tap` write in the root to one admitted subscriber. The right comes
+/// from operator admission of a compiled-in Observer-class Spirit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TelemetrySubscriptionPayload {
+    /// The subscriber's scheduler pid.
+    pub subscriber_pid: u32,
+    /// The subscriber's Spirit id.
+    pub spirit_id: String,
+    /// The `[class].name` the decision was taken on.
+    pub class: String,
+    /// What the subscription covers (`scalar.tap.*`).
+    pub scope: String,
+    /// `true` for a grant, `false` for a revoke.
+    pub granted: bool,
+    /// Why the subscription began or ended.
+    pub reason: String,
+}
+
 // ---------------------------------------------------------------------------
 // Governance event envelope (shared across all three streams)
 // ---------------------------------------------------------------------------
@@ -165,6 +184,8 @@ pub enum GovernanceEventKind {
     SchemaLifecycle(SchemaLifecyclePayload),
     /// Model-provenance admission event (Story 9.4b AC-6, D6/D7).
     ModelProvenance(ModelProvenancePayload),
+    /// Telemetry-subscription grant/revoke (Story 17-4 AC2.7).
+    TelemetrySubscription(TelemetrySubscriptionPayload),
 }
 
 /// Payload for governance TL frames (`FrameKind::GovernanceEvent` = 28).

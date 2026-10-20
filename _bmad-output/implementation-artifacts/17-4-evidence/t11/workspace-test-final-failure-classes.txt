@@ -1,0 +1,24 @@
+     30 declared-capable T3 <subject>: MAOS_T3_RUNTIME must select the provisioned runtime
+      3 tool unavailable on declared CI: strace unavailable: No such file or directory (os error 2)
+      2 Python Ed25519 backend absent
+      1 valid ID must create a leaf under the same delegated resource set: SandboxRefused(cgroup delegation absent)
+      1 the_standalone_path_no_longer_discards_the_verdict :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must sele
+      1 the_hermetic_fixture_path_is_untouched_by_the_credential_controls :: declared-capable T3 <subject>: MAOS_T3_RU
+      1 spawn bounded process tree under T2: SandboxRefused(cgroup delegation absent)
+      1 second delegated same-Spirit spawn: SandboxRefused(cgroup delegation absent)
+      1 s5_on_unload_panic_before_stop_keeps_planned_container_ownership :: declared-capable T3 <subject>: MAOS_T3_RUN
+      1 s5_on_unload_over_budget_keeps_planned_container_ownership :: declared-capable T3 <subject>: MAOS_T3_RUNTIME m
+      1 root_crash_retains_stopped_container_and_purge_reports_it :: declared-capable T3 <subject>: MAOS_T3_RUNTIME mu
+      1 producer_wired_e2e: spawn_sandboxed exec set: probe fixture unbuilt
+      1 ownership_is_by_cid_never_by_requested_name :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must select the 
+      1 fallback_oom_marker_persists_classified_fault_through_worker_binding :: declared-capable T3 <subject>: MAOS_T3
+      1 detection_quality_emit_real_kill: spawn_sandboxed exec set: probe fixture unbuilt
+      1 delegated native T2 spawn must succeed: SandboxRefused(cgroup delegation absent)
+      1 codex_turn_completed_with_no_file_change_fails_the_run :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must 
+      1 codex_prose_only_refusal_fails_the_run :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must select the provi
+      1 client_first_stop_snapshots_only_a_terminal_state :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must selec
+      1 claude_permission_denial_fails_the_run :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must select the provi
+      1 ac4_v5c_cohort_shutdown_stops_worker_container_descendants :: declared-capable T3 <subject>: MAOS_T3_RUNTIME m
+      1 ac4_v5b_sigterm_during_daemon_startup_exits_through_its_teardown :: declared-capable T3 <subject>: MAOS_T3_RUN
+      1 ac4_v5_cohort_sigterm_with_live_worker_unloads_and_drains :: declared-capable T3 <subject>: MAOS_T3_RUNTIME mu
+      1 a_hostless_topology_refusal_also_fails_the_run :: declared-capable T3 <subject>: MAOS_T3_RUNTIME must select t

@@ -5,12 +5,13 @@
 //!
 //! Observer is a **watchdog**. It:
 //!
-//! 1. **Subscribes broadly** to the `scalar.tap` Telemetry Stream (I7 —
-//!    runtime-operational at v0.5) and applies a **client-side principal-
-//!    namespace filter** on the emitting Spirit's id (FR31 — the
-//!    [`TelemetryStreamPort`](maos_domain::ports::TelemetryStreamPort) has only
-//!    exact-topic subscription, so the namespace scoping lives Spirit-side;
-//!    Decision C).
+//! 1. **Receives every `scalar.tap` write in its root** through
+//!    `on_telemetry_event` (Story 17-4: the host's hook pump delivers each
+//!    write, in its emitter's order, to every admitted Observer-class Spirit)
+//!    and applies a **client-side principal-namespace view filter** on the
+//!    emitting Spirit's id (FR31; Decision C). `on_consolidate` closes an
+//!    aggregate window ([`ObservedActivity`]) reported through an
+//!    [`ActivitySink`].
 //! 2. **Watches for pre-halt scalar drift** ([`Observer::observe_scalar`]): it
 //!    keeps a rolling per-`(spirit_id, tag)` trajectory and fires a **drift
 //!    early-warning when a value enters a watch-band approaching (but has not yet
@@ -49,7 +50,7 @@ use std::sync::{Arc, Mutex};
 
 use maos_domain::invariants::i7::ScalarTapEvent;
 use maos_domain::notification::{NotificationEvent, NotificationEventError};
-use maos_spirit_sdk::{spirit, Ctx, Spirit};
+use maos_spirit_sdk::{spirit, ConsolidatePayload, Ctx, Spirit, TelemetryEventPayload};
 use serde::{Deserialize, Serialize};
 
 /// The frame-kind discriminator the NFR-Sec-3 structural alarms are carried on.
@@ -411,6 +412,84 @@ impl ObserverSurface {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Live activity (Story 17-4) — what the two telemetry hooks report.
+// ───────────────────────────────────────────────────────────────────────────
+
+/// One `(spirit_id, tag)` stream aggregated over a consolidation window: how
+/// many writes Observer received and the last value. Never a list of events.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StreamSummary {
+    /// The emitting Spirit.
+    pub spirit_id: String,
+    /// The scalar tag.
+    pub tag: String,
+    /// Writes received for this stream in the window.
+    pub count: u64,
+    /// The most recent value received for this stream (exact, never rounded).
+    pub last_value: f64,
+}
+
+/// What Observer reports through its [`ActivitySink`]. Each value is one JSON
+/// line whose `event` field names it; the host renders it, Observer never
+/// prints.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "event")]
+pub enum ObservedActivity {
+    /// One `scalar.tap` write received through `on_telemetry_event`.
+    #[serde(rename = "observer.scalar")]
+    Scalar {
+        /// This Observer's own Spirit id.
+        observer: String,
+        /// The emitting Spirit.
+        spirit_id: String,
+        /// The scalar tag.
+        tag: String,
+        /// The value, bit-exact.
+        value: f64,
+        /// The store-write label (identity, not a clock).
+        seq: u64,
+        /// The store's write timestamp (Unix ms).
+        timestamp_ms: u64,
+    },
+    /// A drift early-warning raised by a configured watch on a received write.
+    #[serde(rename = "observer.anomaly")]
+    Anomaly {
+        /// This Observer's own Spirit id.
+        observer: String,
+        /// The surface [`Observer::observe_scalar`] produced.
+        surface: ObserverSurface,
+    },
+    /// The window `on_consolidate` closed: aggregates only, then reset.
+    #[serde(rename = "observer.consolidated")]
+    Consolidated {
+        /// This Observer's own Spirit id.
+        observer: String,
+        /// Decoded, in-namespace writes received in the window.
+        window_events: u64,
+        /// Per-stream aggregates, ordered by `(spirit_id, tag)`.
+        streams: Vec<StreamSummary>,
+        /// Payloads that did not decode as a `ScalarTapEvent`.
+        undecodable: u64,
+    },
+}
+
+/// Where Observer's live activity goes. Called from inside a hook, so an
+/// implementation must return promptly: enqueue, never block on I/O.
+pub trait ActivitySink: Send + Sync + std::fmt::Debug {
+    /// Accept one activity record.
+    fn emit(&self, activity: ObservedActivity);
+}
+
+/// The open consolidation window: per-stream `(count, last_value)` plus the
+/// two window counters. Bounded by the number of distinct streams.
+#[derive(Debug, Default)]
+struct ActivityWindow {
+    streams: BTreeMap<(String, String), (u64, f64)>,
+    window_events: u64,
+    undecodable: u64,
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // The Observer Spirit.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -434,6 +513,12 @@ pub struct Observer {
     pending_signals: Option<Vec<StructuralSignal>>,
     /// Surfaces produced by the most recent `on_idle` pass.
     last_surfaces: Arc<Mutex<Vec<ObserverSurface>>>,
+    /// The open consolidation window (Story 17-4). One lock covers accounting,
+    /// the sink call that reports a write, and the window's extraction, so a
+    /// `Consolidated` record counts exactly the `Scalar` records before it.
+    window: Arc<Mutex<ActivityWindow>>,
+    /// Where live activity goes; `None` keeps the hooks silent.
+    sink: Option<Arc<dyn ActivitySink>>,
 }
 
 #[derive(Debug, Default)]
@@ -446,10 +531,8 @@ struct DriftState {
 impl Observer {
     /// Idle watchdog pass. Cancellation-aware; bounded (a single linear pass over
     /// any seeded scalar events + structural signals). Stores the resulting
-    /// surfaces so the hook has a production-visible effect; the LIVE drift /
-    /// structural paths are proven against the real `TelemetryStreamAdapter` /
-    /// `NotificationDispatcher` in `tests/` (the ABI `Ctx` exposes no telemetry-
-    /// receive surface — Butler/Researcher navigated the same gap).
+    /// surfaces so the hook has a production-visible effect. Live writes arrive
+    /// through `on_telemetry_event` instead (Story 17-4).
     fn on_idle(&self, ctx: &mut Ctx) {
         if ctx.cancellation().is_cancelled() {
             return;
@@ -472,6 +555,76 @@ impl Observer {
         let mut guard = self.last_surfaces.lock().unwrap_or_else(|e| e.into_inner());
         *guard = surfaces;
     }
+
+    /// Story 17-4 — one live `scalar.tap` write, delivered by the host's hook
+    /// pump as `serde_json` bytes of a [`ScalarTapEvent`]. Undecodable bytes
+    /// are counted, never dropped silently; out-of-namespace emitters are
+    /// filtered from this Observer's view (FR31 view filter, not an access
+    /// control). A received write is counted in the window, reported as
+    /// [`ObservedActivity::Scalar`], and checked against the drift watches.
+    fn on_telemetry_event(&self, _ctx: &mut Ctx, payload: &TelemetryEventPayload) {
+        let bytes = &payload.event_data[..payload.event_len.min(payload.event_data.len())];
+        let mut window = self.window.lock().unwrap_or_else(|e| e.into_inner());
+        let Ok(event) = serde_json::from_slice::<ScalarTapEvent>(bytes) else {
+            window.undecodable += 1;
+            return;
+        };
+        if !self.in_namespace(&event.spirit_id) {
+            return;
+        }
+        window.window_events += 1;
+        let stream = window
+            .streams
+            .entry((event.spirit_id.clone(), event.tag.clone()))
+            .or_insert((0, event.value));
+        stream.0 += 1;
+        stream.1 = event.value;
+        let anomaly = self.observe_scalar(&event);
+        if let Some(sink) = &self.sink {
+            sink.emit(ObservedActivity::Scalar {
+                observer: self.observer_id.clone(),
+                spirit_id: event.spirit_id,
+                tag: event.tag,
+                value: event.value,
+                seq: event.seq,
+                timestamp_ms: event.timestamp,
+            });
+            if let Some(surface) = anomaly {
+                sink.emit(ObservedActivity::Anomaly {
+                    observer: self.observer_id.clone(),
+                    surface,
+                });
+            }
+        }
+    }
+
+    /// Story 17-4 — the host says *curate now* (the payload is empty, never a
+    /// list of what). A non-empty window is reported as one
+    /// [`ObservedActivity::Consolidated`] and reset; an empty one emits nothing.
+    fn on_consolidate(&self, _ctx: &mut Ctx, _payload: &ConsolidatePayload) {
+        let mut window = self.window.lock().unwrap_or_else(|e| e.into_inner());
+        if window.window_events == 0 && window.undecodable == 0 {
+            return;
+        }
+        let closed = std::mem::take(&mut *window);
+        if let Some(sink) = &self.sink {
+            sink.emit(ObservedActivity::Consolidated {
+                observer: self.observer_id.clone(),
+                window_events: closed.window_events,
+                streams: closed
+                    .streams
+                    .into_iter()
+                    .map(|((spirit_id, tag), (count, last_value))| StreamSummary {
+                        spirit_id,
+                        tag,
+                        count,
+                        last_value,
+                    })
+                    .collect(),
+                undecodable: closed.undecodable,
+            });
+        }
+    }
 }
 
 impl Default for Observer {
@@ -484,6 +637,8 @@ impl Default for Observer {
             pending_scalars: None,
             pending_signals: None,
             last_surfaces: Arc::new(Mutex::new(Vec::new())),
+            window: Arc::new(Mutex::new(ActivityWindow::default())),
+            sink: None,
         }
     }
 }
@@ -501,6 +656,13 @@ impl Observer {
     /// Override this Observer's own Spirit id.
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.observer_id = id.into();
+        self
+    }
+
+    /// Story 17-4 — route live activity (received writes, drift warnings,
+    /// closed windows) to `sink`.
+    pub fn with_activity_sink(mut self, sink: Arc<dyn ActivitySink>) -> Self {
+        self.sink = Some(sink);
         self
     }
 
@@ -687,6 +849,7 @@ mod unit_tests {
 
     fn scalar(spirit: &str, tag: &str, value: f64) -> ScalarTapEvent {
         ScalarTapEvent {
+            seq: 0,
             spirit_id: spirit.into(),
             tag: tag.into(),
             value,

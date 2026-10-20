@@ -1,0 +1,17 @@
+[
+  {
+    "name": "check",
+    "command": "cargo check --offline --locked -p maos-kernel-core --tests -p maos-capability -p maos-domain -p observer -p researcher",
+    "exit_code": 0
+  },
+  {
+    "name": "telemetry-tests",
+    "command": "cargo test --offline --locked -p maos-kernel-core --lib telemetry",
+    "exit_code": 0
+  },
+  {
+    "name": "firehose-tests",
+    "command": "cargo test --offline --locked -p maos-kernel-core --test proto_firehose_17_4 -- --nocapture",
+    "exit_code": 0
+  }
+]

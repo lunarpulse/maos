@@ -1,0 +1,101 @@
+44 -     async fn deliver(&self, frame: IacFrame) -> Result<LogBeforeDeliver<()>, IacBusError>;
+44 +     fn deliver(&self, frame: IacFrame) -> impl std::future::Future<Output = Result<LogBeforeDeliver<()>, IacBusError>> + Send;
+58 ~     fn retract(
+...
+63 ~     ) -> impl std::future::Future<Output = Result<RetractOutcome, IacBusError>> + Send;
+crates/maos-manifest/src/manifest.rs:1318:21: warning: unused variable: `on_confidence_below`: help: if this is intentional, prefix it with an underscore: `_on_confidence_below`
+...
+crates/maos-registry/src/fixture_replay.rs:6:5: warning: unused import: `std::sync::Mutex`
+crates/maos-registry/src/fixture_replay.rs:9:5: warning: unused imports: `PublishReceipt`, `RegistryError`, `SearchQuery`, `SearchResults`, `SignedArtifact`, `SignedManifest`, `SignedPackage`, `SpiritId`, `SpiritRegistryClient`, `YankList`, `YankReason`, and `YankReceipt`
+crates/maos-registry/src/handlers/manifest.rs:9:36: warning: unused import: `SignedManifest`
+crates/maos-registry/src/client.rs:149:27: warning: unused variable: `server_sig`: help: if this is intentional, prefix it with an underscore: `_server_sig`
+crates/maos-registry/src/yank.rs:164:16: warning: unused variable: `applied`: help: if this is intentional, prefix it with an underscore: `_applied`
+crates/maos-registry/src/yank.rs:171:28: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-registry/src/yank.rs:176:17: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-registry/src/yank.rs:189:16: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+...
+...
+crates/maos-spirit-cli/src/signing.rs:27:7: warning: constant `MAX_MANIFEST_FILE_SIZE` is never used
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:13:5: warning: unused import: `maos_domain::frame::EpistemicHaltPayload`
+crates/maos-kernel-core/src/capability/mod.rs:392:21: warning: unexpected `cfg` condition value: `test-introspection`
+crates/maos-kernel-core/src/halt/mod.rs:29:34: warning: unused import: `HaltJournal`
+crates/maos-kernel-core/src/iac.rs:19:5: warning: private item shadows public glob re-export
+crates/maos-kernel-core/src/inference/mod.rs:22:5: warning: unused import: `crate::capability::WorkingMemoryStore`
+crates/maos-kernel-core/src/isolation/runner.rs:10:5: warning: unused import: `std::sync::Arc`
+crates/maos-kernel-core/src/isolation/runner.rs:13:5: warning: unused imports: `IsolationAttackCategory` and `IsolationCorpus`
+crates/maos-kernel-core/src/journal/mod.rs:60:5: warning: unused import: `maos_domain::invariants::i1::TokenId`
+crates/maos-kernel-core/src/journal/mod.rs:61:65: warning: unused import: `LifecycleEntry`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:12:5: warning: unused import: `maos_domain::halt::TerminationKind`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:16:5: warning: unused import: `crate::halt::terminate_spirit`
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:22:33: warning: unused imports: `ClassSection` and `GatewaysSection`
+crates/maos-kernel-core/src/mcp/mod.rs:12:59: warning: unused import: `TokenId`
+crates/maos-kernel-core/src/mcp/mod.rs:13:73: warning: unused import: `McpRequest`
+crates/maos-kernel-core/src/memory/private.rs:12:17: warning: unused import: `Path`
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:9:25: warning: unused import: `AtomicU64`
+crates/maos-kernel-core/src/scheduler/idle_watchdog.rs:18:5: warning: unused import: `crate::scheduler::kernel_ctx::KernelCtx`
+crates/maos-kernel-core/src/supervision/crash_detector.rs:16:17: warning: unused import: `DispositionOutcome`
+crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:332:21: warning: unreachable pattern: no value can reach this
+crates/maos-kernel-core/src/inference/mod.rs:28:5: warning: unused import: `maos_providers::Provider`
+crates/maos-kernel-core/src/capability/working_memory/orchestrator.rs:66:13: warning: unused variable: `event`: help: if this is intentional, prefix it with an underscore: `_event`
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:69:5: warning: unused variable: `spirit_id`: help: if this is intentional, prefix it with an underscore: `_spirit_id`
+crates/maos-kernel-core/src/capability/working_memory/policy_runtime.rs:70:5: warning: unused variable: `spirit_pid`: help: if this is intentional, prefix it with an underscore: `_spirit_pid`
+crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs:619:9: warning: variable does not need to be mutable
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:157:25: warning: value assigned to `outcome` is never read
+crates/maos-kernel-core/src/lifecycle/upgrade.rs:229:25: warning: value assigned to `outcome` is never read
+crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:161:29: warning: unused variable: `e`: help: if this is intentional, prefix it with an underscore: `_e`
+crates/maos-kernel-core/src/orchestrator/gateway_dispatcher.rs:132:17: warning: unused variable: `ctx`: help: if this is intentional, prefix it with an underscore: `_ctx`
+crates/maos-kernel-core/src/supervision/crash_detector.rs:195:13: warning: unused variable: `now_ns`: help: if this is intentional, prefix it with an underscore: `_now_ns`
+crates/maos-kernel-core/src/security/sandbox/t3/spawn.rs:389:27: warning: value assigned to `owned_guard` is never read: this value is reassigned later and never used
+crates/maos-kernel-core/src/supervision/disposition.rs:22:9: warning: unused variable: `total`: help: if this is intentional, prefix it with an underscore: `_total`
+crates/maos-kernel-core/src/halt/resolver.rs:101:5: warning: field `boot_nonce` is never read
+crates/maos-kernel-core/src/memory/mod.rs:84:5: warning: field `next_frame_counter` is never read
+crates/maos-kernel-core/src/memory/mod.rs:710:8: warning: method `mint_frame_id` is never used
+crates/maos-kernel-core/src/memory/principal.rs:51:8: warning: associated function `now_ns` is never used
+crates/maos-kernel-core/src/memory/private.rs:44:5: warning: field `kind` is never read
+crates/maos-kernel-core/src/memory/self_telemetry.rs:33:5: warning: field `iac_rt_metrics` is never read
+crates/maos-kernel-core/src/memory/self_telemetry.rs:60:8: warning: associated function `resolution_label` is never used
+crates/maos-kernel-core/src/memory/shared.rs:52:8: warning: associated function `kind_to_str` is never used
+crates/maos-kernel-core/src/scheduler/hook_dispatch.rs:139:8: warning: method `build_kernel_ctx` is never used
+crates/maos-kernel-core/src/security/sandbox/t3/image_lock.rs:35:5: warning: field `attestation` is never read
+crates/maos-kernel-core/src/supervision/progress_watchdog.rs:27:5: warning: field `notification_dispatcher` is never read
+crates/maos-kernel-core/src/supervision/silent_failure_detector.rs:27:5: warning: field `notification_dispatcher` is never read
+crates/maos-control/src/lib.rs:17:11: warning: use of deprecated module `ring::deprecated_constant_time`: Will be removed. Internal module not intended for external use, with no promises regarding side channels.
+crates/maos-control/src/lib.rs:960:28: warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+crates/maos-control/src/lib.rs:772:8: warning: method `header` is never used
+   Compiling maos-bin v0.1.0-alpha.1 (/home/lunarpulse/dev_ws/crates/maos-bin)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.07s
+     Running tests/observer_live_17_4.rs (/mnt/build/cargo/debug/deps/observer_live_17_4-88eebffdd6bb6044)
+running 1 test
+test observer_serves_and_reports_a_door_loaded_butler_live ... 
+thread 'observer_serves_and_reports_a_door_loaded_butler_live' (3002973) panicked at crates/maos-bin/tests/observer_live_17_4.rs:320:5:
+no grant row at pid 1: [
+    "call_id                           boot_nonce        spirit_pid  call_type               timestamp_ns          intent",
+    "01a158aeaeff5bbc9f1fcbbd2401f3c8  493cb0955bbf82db  1           capability.invocation   1792489205503630767   lifecycle.admit",
+    "01a158aeaf065098afe8cb490dcf91b4  493cb0955bbf82db  1           capability.invocation   1792489205510385932   lifecycle.load",
+    "01a158aeaf10044ac4ff14ae7d678d0b  493cb0955bbf82db  1           capability.invocation   1792489205520709447   lifecycle.start",
+    "01a158aeb19ff2c8901c77d6fc71ae5d  493cb0955bbf82db  1           governance.event        1792489206175249453   governance:telemetry-subscription:revoked",
+    "01a158aeb1a93c1f4fec70d3a23b1da6  493cb0955bbf82db  1           capability.invocation   1792489206185604085   lifecycle.unload",
+    "01a158aeb1ae4933c763f67a075e93d7  493cb0955bbf82db  1           epistemic.halt          1792489206190657560   planned_unload",
+    "01a158aeb1b3c5bfa38a20abea02a729  493cb0955bbf82db  1           epistemic.halt          1792489206195913123   planned_unload",
+    "01a158aeb1b8ab5bb787d3265534129c  493cb0955bbf82db  1           capability.invocation   1792489206200994339   cap.revoke",
+    "",
+]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: observer_live_17_4::observer_serves_and_reports_a_door_loaded_butler_live
+             at ./tests/observer_live_17_4.rs:320:5
+   3: observer_live_17_4::observer_serves_and_reports_a_door_loaded_butler_live::{closure#0}
+             at ./tests/observer_live_17_4.rs:270:59
+   4: <observer_live_17_4::observer_serves_and_reports_a_door_loaded_butler_live::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /home/lunarpulse/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+   5: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+FAILED
+failures:
+failures:
+    observer_serves_and_reports_a_door_loaded_butler_live
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.93s
+error: test failed, to rerun pass `-p maos-bin --test observer_live_17_4`

@@ -1,0 +1,39 @@
+--- a/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:37:51.097739725 +0000
++++ b/crates/maos-bin/src/hook_pump.rs	2026-10-20 09:39:22.557278780 +0000
+@@ -548,6 +548,9 @@
+     cancel: CancellationToken,
+ ) {
+     let mut closed = false;
++    // PLANT 3 (17-4 T9, throwaway): the last delivered event is delivered
++    // again at the flush barrier, so the final event arrives twice.
++    let mut last: Option<ScalarTapEvent> = None;
+     loop {
+         tokio::select! {
+             biased;
+@@ -557,15 +560,24 @@
+                 // the ring: drain it, then acknowledge.
+                 loop {
+                     match rx.try_recv() {
+-                        Ok(event) => shared.deliver(&event).await,
++                        Ok(event) => {
++                            shared.deliver(&event).await;
++                            last = Some(event);
++                        }
+                         Err(TryRecvError::Lagged(skipped)) => shared.lagged(skipped),
+                         Err(TryRecvError::Empty | TryRecvError::Closed) => break,
+                     }
+                 }
++                if let Some(event) = last.take() {
++                    shared.deliver(&event).await;
++                }
+                 let _ = ack.send(());
+             }
+             received = rx.recv(), if !closed => match received {
+-                Ok(event) => shared.deliver(&event).await,
++                Ok(event) => {
++                    shared.deliver(&event).await;
++                    last = Some(event);
++                }
+                 Err(RecvError::Lagged(skipped)) => shared.lagged(skipped),
+                 Err(RecvError::Closed) => closed = true,
+             },

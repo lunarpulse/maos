@@ -780,13 +780,21 @@ coverage:
   FR55:
     gates:
     - check-service-boundary
-    corpora: []
+    corpora: [observer-activity-v1]
     phase: v0.3
     valid_until: '2027-05-12'
     notes: |
       2.1 ships 11-hook signatures + SpiritVtable<T> #[repr(C)] layout;
       2.2 enforces vtable + trait + HOOK_NAMES + count_hooks!() consistency
-      via check_spirit_abi_types AST scan
+      via check_spirit_abi_types AST scan.
+      Story 17-4: first production hook firers for compiled-in Spirits —
+      maos-bin HookPump (on_telemetry_event) and ConsolidationWatchdog
+      (on_consolidate), crates/maos-bin/tests/hook_pump_17_4.rs; the live
+      scene crates/maos-bin/tests/observer_live_17_4.rs and the corpus suite
+      crates/maos-bin/tests/observer_activity_corpus_17_4.rs run as Epic-17
+      exit line 5 (discipline.yml `epic-17-exit`, both x64 images);
+      [lifecycle].enabled_hooks accepts all 14 ABI hooks
+      (crates/maos-manifest/tests/lifecycle_hook_parity_17_4.rs).
   FR56:
     gates: []
     corpora: []
@@ -1164,9 +1172,16 @@ coverage:
     valid_until: '2027-05-12'
   NFR-Obs-3:
     gates: []
-    corpora: []
+    corpora: [observer-activity-v1]
     phase: v0.3
     valid_until: '2027-05-12'
+    notes: |
+      Story 17-4: the broad scalar.tap channel (TelemetryStreamAdapter::
+      subscribe_all) delivered to compiled-in Observer Spirits by the maos-bin
+      HookPump; delivery quality is gated by the observer-activity-v1 corpus
+      (missed <= 2 %, per-emitter causal correctness >= 99 %, missed ==
+      reported lag) in crates/maos-bin/tests/observer_activity_corpus_17_4.rs,
+      Epic-17 exit line 5 (discipline.yml `epic-17-exit`), summary.json uploaded.
   NFR-Obs-4:
     gates:
       - audit_spine_integration

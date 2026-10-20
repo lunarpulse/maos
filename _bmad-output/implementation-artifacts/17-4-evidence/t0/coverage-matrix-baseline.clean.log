@@ -1,0 +1,220 @@
+NFR-Meta-3 violation: ADR-024 references unknown gate 'check-kernel-baseline' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: ADR-050 references unknown gate 'check-kernel-baseline' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: ADR-051 references unknown gate 'check-kernel-baseline' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: ADR-055 references unknown gate 'check-kernel-baseline' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR39 references unknown gate 'smoke-skill-7-4' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR4 references unknown gate 'audit_spine_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR4 references unknown gate 'iac_transparency_log_tests' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR4 references unknown gate 'fr4_1000_call_fixture' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR4 references unknown gate 'cap_registry_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR40 references unknown gate 'smoke-skill-7-4' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR57 references unknown gate 'smoke-skill-7-4' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR9 references unknown gate 'journal_survives_cold_restart' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: FR9 references unknown gate 'audit_spine_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: I1 references unknown gate 'cap_registry_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: I10 references unknown gate 'journal_survives_cold_restart' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: I10 references unknown gate 'audit_spine_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: I2 references unknown gate 'audit_spine_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: I4 references unknown gate 'approval_log_is_distinct_table' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: I4 references unknown gate 'audit_spine_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Aud-8 references unknown corpus 'quarterly-audit-v0' (not in tests/corpora/MANIFEST.toml)
+NFR-Meta-3 violation: NFR-Maint-8 references unknown gate 'cap_registry_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Obs-4 references unknown gate 'audit_spine_integration' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Obs-5 references unknown gate 'approval_log_is_distinct_table' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Perf-3 references unknown gate 'cap_token_verify_assertion' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Rel-3 references unknown corpus 'hsis-corpus-v0' (not in tests/corpora/MANIFEST.toml)
+NFR-Meta-3 violation: NFR-Rel-3 references unknown gate 'nfr-rel-3-hsis-95pct' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Rel-7 has invalid phase 'v2.2' not in phase_order
+NFR-Meta-3 violation: NFR-Rel-8 references unknown gate 'journal_append_p99_measurement' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Scale-2 has invalid phase 'v2.2' not in phase_order
+NFR-Meta-3 violation: NFR-Test-13 references unknown corpus 'crates/maos-kernel-core/tests/fixtures/manifest' (not in tests/corpora/MANIFEST.toml)
+NFR-Meta-3 violation: NFR-Test-3 references unknown gate 'coverage-matrix-nfr-test-3' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Test-5 references unknown gate 'check-kernel-baseline' (not in xtask/gate-registry.toml)
+NFR-Meta-3 violation: NFR-Test-8 has invalid phase 'v2.0' not in phase_order
+coverage-matrix: deferred ADR-024 at phase v2.0+
+coverage-matrix: deferred ADR-050 at phase v2.0+
+coverage-matrix: deferred ADR-051 at phase v2.0+
+coverage-matrix: deferred ADR-055 at phase v2.0+
+coverage-matrix: deferred FR1 at phase v0.1
+coverage-matrix: deferred FR10 at phase v0.3
+coverage-matrix: deferred FR11 at phase v0.3
+coverage-matrix: deferred FR12 at phase v0.8
+coverage-matrix: deferred FR13 at phase v0.8
+coverage-matrix: deferred FR14 at phase v0.1
+coverage-matrix: deferred FR15 at phase v0.1
+coverage-matrix: deferred FR16 at phase v0.3
+coverage-matrix: deferred FR17 at phase v0.3
+coverage-matrix: deferred FR18 at phase v0.3
+coverage-matrix: deferred FR19 at phase v0.5
+coverage-matrix: deferred FR2 at phase v0.1
+coverage-matrix: deferred FR20 at phase v0.8
+coverage-matrix: deferred FR21 at phase v0.8
+coverage-matrix: deferred FR22 at phase v0.8
+coverage-matrix: deferred FR23 at phase v0.8
+coverage-matrix: deferred FR23a at phase v0.8
+coverage-matrix: deferred FR23b at phase v1.0
+coverage-matrix: deferred FR24 at phase v0.8
+coverage-matrix: deferred FR25 at phase v0.8
+coverage-matrix: deferred FR26 at phase v0.5
+coverage-matrix: deferred FR27 at phase v0.3
+coverage-matrix: deferred FR28 at phase v0.5
+coverage-matrix: deferred FR29 at phase v0.5
+coverage-matrix: deferred FR3 at phase v0.5
+coverage-matrix: deferred FR30 at phase v0.8
+coverage-matrix: deferred FR31 at phase v0.8
+coverage-matrix: deferred FR32 at phase v0.3
+coverage-matrix: deferred FR33 at phase v0.3
+coverage-matrix: deferred FR34 at phase v0.3
+coverage-matrix: deferred FR35 at phase v0.5
+coverage-matrix: deferred FR36 at phase v0.5
+coverage-matrix: deferred FR37 at phase v2.0+
+coverage-matrix: deferred FR38 at phase v0.5
+coverage-matrix: deferred FR39 at phase v0.5
+coverage-matrix: deferred FR4 at phase v0.1
+coverage-matrix: deferred FR40 at phase v0.5
+coverage-matrix: deferred FR41 at phase v0.5
+coverage-matrix: deferred FR42 at phase v1.0
+coverage-matrix: deferred FR43 at phase v1.0
+coverage-matrix: deferred FR44 at phase v1.0
+coverage-matrix: deferred FR45 at phase v1.0
+coverage-matrix: deferred FR46 at phase v1.0
+coverage-matrix: deferred FR47 at phase v0.1
+coverage-matrix: deferred FR49 at phase v1.0
+coverage-matrix: deferred FR5 at phase v0.5
+coverage-matrix: deferred FR50 at phase v0.8
+coverage-matrix: deferred FR51 at phase v1.0
+coverage-matrix: deferred FR52 at phase v0.8
+coverage-matrix: deferred FR53 at phase v0.8
+coverage-matrix: deferred FR54 at phase v1.0
+coverage-matrix: deferred FR55 at phase v0.3
+coverage-matrix: deferred FR56 at phase v0.8
+coverage-matrix: deferred FR57 at phase v0.5
+coverage-matrix: deferred FR58 at phase v0.1
+coverage-matrix: deferred FR59 at phase v1.0
+coverage-matrix: deferred FR6 at phase v0.5
+coverage-matrix: deferred FR60 at phase v1.5
+coverage-matrix: deferred FR61 at phase v0.1
+coverage-matrix: deferred FR62 at phase v1.0
+coverage-matrix: deferred FR63 at phase v1.0
+coverage-matrix: deferred FR64 at phase v1.0
+coverage-matrix: deferred FR65 at phase v1.0
+coverage-matrix: deferred FR7 at phase v0.5
+coverage-matrix: deferred FR8 at phase v0.1
+coverage-matrix: deferred FR9 at phase v0.1
+coverage-matrix: deferred I1 at phase v0.1
+coverage-matrix: deferred I10 at phase v0.1
+coverage-matrix: deferred I2 at phase v0.1
+coverage-matrix: deferred I4 at phase v0.1
+coverage-matrix: deferred NFR-Aud-1 at phase v1.0
+coverage-matrix: deferred NFR-Aud-10 at phase v1.0
+coverage-matrix: deferred NFR-Aud-11 at phase v2.0+
+coverage-matrix: deferred NFR-Aud-12 at phase v1.0
+coverage-matrix: deferred NFR-Aud-13 at phase v1.0
+coverage-matrix: deferred NFR-Aud-14 at phase v0.8
+coverage-matrix: deferred NFR-Aud-2 at phase v1.0
+coverage-matrix: deferred NFR-Aud-3 at phase v1.0
+coverage-matrix: deferred NFR-Aud-4 at phase v0.5
+coverage-matrix: deferred NFR-Aud-5 at phase v0.8
+coverage-matrix: deferred NFR-Aud-6 at phase v1.0
+coverage-matrix: deferred NFR-Aud-7 at phase v0.5
+coverage-matrix: deferred NFR-Aud-8 at phase v0.5
+coverage-matrix: deferred NFR-Aud-9 at phase v1.0
+coverage-matrix: deferred NFR-Comp-1 at phase v1.0
+coverage-matrix: deferred NFR-Comp-2 at phase v1.0
+coverage-matrix: deferred NFR-Comp-3 at phase v0.5
+coverage-matrix: deferred NFR-Comp-4 at phase v1.0
+coverage-matrix: deferred NFR-Comp-5 at phase v1.0
+coverage-matrix: deferred NFR-Cost-1 at phase v1.0
+coverage-matrix: deferred NFR-Doc-1 at phase v0.1
+coverage-matrix: deferred NFR-Doc-2 at phase v1.0
+coverage-matrix: deferred NFR-Doc-3 at phase v1.0
+coverage-matrix: deferred NFR-Doc-4 at phase v1.0
+coverage-matrix: deferred NFR-Doc-5 at phase v1.0
+coverage-matrix: deferred NFR-Doc-6 at phase v1.5
+coverage-matrix: deferred NFR-Doc-7 at phase v1.0
+coverage-matrix: deferred NFR-Maint-1 at phase v2.0+
+coverage-matrix: deferred NFR-Maint-2 at phase v0.1
+coverage-matrix: deferred NFR-Maint-3 at phase v0.1
+coverage-matrix: deferred NFR-Maint-4 at phase v1.0
+coverage-matrix: deferred NFR-Maint-5 at phase v1.0
+coverage-matrix: deferred NFR-Maint-6 at phase v1.0
+coverage-matrix: deferred NFR-Maint-7 at phase v1.0
+coverage-matrix: deferred NFR-Maint-8 at phase v0.1
+coverage-matrix: deferred NFR-Maint-9 at phase v1.0
+coverage-matrix: deferred NFR-Meta-1 at phase v1.0
+coverage-matrix: deferred NFR-Obs-1 at phase v1.0
+coverage-matrix: deferred NFR-Obs-2 at phase v0.5
+coverage-matrix: deferred NFR-Obs-3 at phase v0.3
+coverage-matrix: deferred NFR-Obs-4 at phase v0.5
+coverage-matrix: deferred NFR-Obs-5 at phase v0.3
+coverage-matrix: deferred NFR-Onb-1 at phase v0.3
+coverage-matrix: deferred NFR-Onb-2 at phase v0.1
+coverage-matrix: deferred NFR-Onb-3 at phase v0.5
+coverage-matrix: deferred NFR-Onb-4 at phase v0.3
+coverage-matrix: deferred NFR-Ops-1 at phase v0.1
+coverage-matrix: deferred NFR-Ops-10 at phase v1.5
+coverage-matrix: deferred NFR-Ops-11 at phase v2.0+
+coverage-matrix: deferred NFR-Ops-12 at phase v1.0
+coverage-matrix: deferred NFR-Ops-2 at phase v1.0
+coverage-matrix: deferred NFR-Ops-3 at phase v1.0
+coverage-matrix: deferred NFR-Ops-4 at phase v1.0
+coverage-matrix: deferred NFR-Ops-5 at phase v0.1
+coverage-matrix: deferred NFR-Ops-6 at phase v0.5
+coverage-matrix: deferred NFR-Ops-7 at phase v0.5
+coverage-matrix: deferred NFR-Ops-8 at phase v0.3
+coverage-matrix: deferred NFR-Ops-9 at phase v1.0
+coverage-matrix: deferred NFR-Perf-1 at phase v0.5
+coverage-matrix: deferred NFR-Perf-2 at phase v0.5
+coverage-matrix: deferred NFR-Perf-3 at phase v0.1
+coverage-matrix: deferred NFR-Perf-4 at phase v0.3
+coverage-matrix: deferred NFR-Perf-5 at phase v0.5
+coverage-matrix: deferred NFR-Perf-6 at phase v0.5
+coverage-matrix: deferred NFR-Perf-7 at phase v0.8
+coverage-matrix: deferred NFR-Perf-8 at phase v0.8
+coverage-matrix: deferred NFR-Rel-1 at phase v0.8
+coverage-matrix: deferred NFR-Rel-10 at phase v0.8
+coverage-matrix: deferred NFR-Rel-11 at phase v0.8
+coverage-matrix: deferred NFR-Rel-2 at phase v0.8
+coverage-matrix: deferred NFR-Rel-3 at phase v1.0
+coverage-matrix: deferred NFR-Rel-4 at phase v1.0
+coverage-matrix: deferred NFR-Rel-5 at phase v1.0
+coverage-matrix: deferred NFR-Rel-6 at phase v1.0
+coverage-matrix: deferred NFR-Rel-8 at phase v0.1
+coverage-matrix: deferred NFR-Rel-9 at phase v0.8
+coverage-matrix: deferred NFR-Saf-1 at phase v1.5
+coverage-matrix: deferred NFR-Scale-1 at phase v2.0+
+coverage-matrix: deferred NFR-Scale-3 at phase v0.5
+coverage-matrix: deferred NFR-Scale-4 at phase v0.5
+coverage-matrix: deferred NFR-Scale-5 at phase v2.0+
+coverage-matrix: deferred NFR-Sec-1 at phase v0.1
+coverage-matrix: deferred NFR-Sec-10 at phase v1.5
+coverage-matrix: deferred NFR-Sec-11 at phase v0.5
+coverage-matrix: deferred NFR-Sec-12 at phase v0.5
+coverage-matrix: deferred NFR-Sec-13 at phase v1.5
+coverage-matrix: deferred NFR-Sec-14 at phase v0.8
+coverage-matrix: deferred NFR-Sec-15 at phase v1.0
+coverage-matrix: deferred NFR-Sec-16 at phase v0.5
+coverage-matrix: deferred NFR-Sec-17 at phase v2.0+
+coverage-matrix: deferred NFR-Sec-18 at phase v2.0+
+coverage-matrix: deferred NFR-Sec-19 at phase v2.0+
+coverage-matrix: deferred NFR-Sec-2 at phase v1.5
+coverage-matrix: deferred NFR-Sec-3 at phase v2.0+
+coverage-matrix: deferred NFR-Sec-4 at phase v0.5
+coverage-matrix: deferred NFR-Sec-5 at phase v1.0
+coverage-matrix: deferred NFR-Sec-6 at phase v1.0
+coverage-matrix: deferred NFR-Sec-7 at phase v1.0
+coverage-matrix: deferred NFR-Sec-8 at phase v1.0
+coverage-matrix: deferred NFR-Sec-9 at phase v0.1
+coverage-matrix: deferred NFR-Tenancy-1 at phase v0.1
+coverage-matrix: deferred NFR-Test-10 at phase v1.5
+coverage-matrix: deferred NFR-Test-11 at phase v0.5
+coverage-matrix: deferred NFR-Test-12 at phase v0.3
+coverage-matrix: deferred NFR-Test-13 at phase v0.1
+coverage-matrix: deferred NFR-Test-14 at phase v1.0
+coverage-matrix: deferred NFR-Test-2 at phase v0.1
+coverage-matrix: deferred NFR-Test-3 at phase v1.0
+coverage-matrix: deferred NFR-Test-4 at phase v0.5
+coverage-matrix: deferred NFR-Test-5 at phase v2.0+
+coverage-matrix: deferred NFR-Test-6 at phase v0.5
+coverage-matrix: deferred NFR-Test-7 at phase v1.5
+coverage-matrix: deferred NFR-Test-7-binding at phase v2.0+

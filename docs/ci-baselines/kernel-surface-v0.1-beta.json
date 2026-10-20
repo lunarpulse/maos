@@ -1025,7 +1025,7 @@
     {
       "kind": "struct",
       "path": "maos_kernel_core::telemetry::TelemetryStreamAdapter",
-      "signature_hash": "9dda87eb44623f7736610674795a6f589e303f1805a500f2a27f4e53880ae50d"
+      "signature_hash": "ed31018ea8f509cdeddf362585e6dd36ee761ff9bf01f6dc5a85c6ef044e3e4b"
     },
     {
       "kind": "trait",

@@ -114,6 +114,7 @@ async fn drift_scenarios_warn_before_halt_via_the_real_dispatcher() {
             telemetry.publish_event(
                 &topic,
                 ScalarTapEvent {
+                    seq: i as u64,
                     spirit_id: ev.spirit_id.clone(),
                     tag: ev.tag.clone(),
                     value: ev.value,

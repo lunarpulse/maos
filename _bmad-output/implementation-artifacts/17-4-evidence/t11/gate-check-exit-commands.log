@@ -1,0 +1,4 @@
+check-exit-commands: PASS (5 epics, 5 blocks, 16 tokens resolved, 3 owed)
+  owed: `eval` (epic-18) → 18-2-eval-halt-verb-and-corpus-numbers [backlog], claimed in epic-18 AC text
+  owed: `maos-registry-server` (epic-20) → 20-1-registry-client-install-verb-vetter-and-yank [backlog], claimed in epic-20 AC text
+  owed: `install` (epic-20) → 20-1-registry-client-install-verb-vetter-and-yank [backlog], claimed in epic-20 AC text

@@ -403,6 +403,8 @@
 "maos_kernel_core::telemetry::TelemetryStreamAdapter::publish_event"    = "data-movement"
 "maos_kernel_core::telemetry::TelemetryStreamAdapter::subscribe_topic"  = "data-movement"
 "maos_kernel_core::telemetry::TelemetryStreamAdapter::subscribe"        = "data-movement"
+# Story 17-4 (D-17-4-PF-R1) — the one broad scalar.tap receiver.
+"maos_kernel_core::telemetry::TelemetryStreamAdapter::subscribe_all"    = "data-movement"
 
 # api/* re-exports (mirror convention at lines 22-28)
 "maos_kernel_core::api::capability::WorkingMemorySlot"           = "universal-arithmetic"
